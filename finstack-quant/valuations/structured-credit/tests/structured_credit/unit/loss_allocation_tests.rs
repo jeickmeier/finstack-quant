@@ -13,8 +13,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AssetPool, DealType, LossAllocationPolicy, LossRecognition, PoolAsset,
-    StepDownSpec, StepDownTrigger, StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
+    AssetPool, DealType, LossAllocationPolicy, LossRecognition, PoolAsset, StepDownSpec,
+    StepDownTrigger, StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
 };
 use time::Month;
 
@@ -153,7 +153,10 @@ fn policy_defaults_follow_the_deal_type() {
 fn clo_notes_keep_par_and_their_coupon_until_legal_final() {
     let (deal, as_of) = clo(None);
     let market = market(as_of);
-    let results = run_simulation(&deal, &market, as_of).expect("simulation");
+    let results = deal
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("simulation");
     let d_note = &results["D"];
 
     let final_date = results
@@ -209,7 +212,10 @@ fn clo_notes_keep_par_and_their_coupon_until_legal_final() {
 fn residual_is_paid_only_after_the_junior_note_coupon() {
     let (deal, as_of) = clo(None);
     let market = market(as_of);
-    let results = run_simulation(&deal, &market, as_of).expect("simulation");
+    let results = deal
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("simulation");
     let d_note = &results["D"];
     let equity = &results["E"];
     for (date, residual) in &equity.interest_flows {
@@ -233,7 +239,10 @@ fn residual_is_paid_only_after_the_junior_note_coupon() {
 fn write_down_policy_allocates_losses_at_default() {
     let (deal, as_of) = clo(Some(LossAllocationPolicy::WriteDown));
     let market = market(as_of);
-    let results = run_simulation(&deal, &market, as_of).expect("simulation");
+    let results = deal
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("simulation");
     let d_note = &results["D"];
     let first = d_note
         .writedown_flows
@@ -245,7 +254,10 @@ fn write_down_policy_allocates_losses_at_default() {
         "realized-loss allocation writes D down before legal final, first on {first}"
     );
     let (par_preserving, _) = clo(None);
-    let pp = run_simulation(&par_preserving, &market, as_of).expect("simulation");
+    let pp = par_preserving
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("simulation");
     assert!(
         pp["D"].total_interest.amount() > d_note.total_interest.amount() + 500_000.0,
         "the policy must change D's coupon stream: par-preserving {} vs write-down {}",
@@ -338,9 +350,15 @@ fn at_liquidation_books_the_loss_when_the_claim_settles() {
         "RMBS defaults to at-liquidation recognition"
     );
     let market = market(as_of);
-    let at_liquidation = run_simulation(&deal, &market, as_of).expect("simulation");
+    let at_liquidation = deal
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("simulation");
     let (at_default_deal, _) = rmbs(Some(LossRecognition::AtDefault));
-    let at_default = run_simulation(&at_default_deal, &market, as_of).expect("simulation");
+    let at_default = at_default_deal
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("simulation");
 
     let liquidation_first = at_liquidation["M"]
         .writedown_flows

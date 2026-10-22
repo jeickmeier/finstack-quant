@@ -215,10 +215,9 @@ fn production_structured_credit_model_matches_dated_distributions() {
     let value = deal.value(&market(as_of), as_of).expect("value");
     let market = market(as_of);
     let disc = market.get_discount("USD-OIS").expect("curve");
-    let run =
-        finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation(
-            &deal, &market, as_of,
-        )
+    let run = deal
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
         .expect("simulation");
     let mut expected = 0.0;
     for tranche in run.values() {

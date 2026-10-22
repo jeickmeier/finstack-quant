@@ -10,7 +10,7 @@ use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::SimulationDiagnostics;
 
 /// Deal-level accounting of one deterministic simulation
-/// (``StructuredCredit.run_simulation_with_diagnostics``'s return value):
+/// (the diagnostics member of ``StructuredCredit.run_simulation``'s result):
 /// the per-period pool, collections, cash-account and coverage-test record
 /// plus the reserve-account and draw-funding totals.
 ///
@@ -58,7 +58,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Sim
 /// >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
 /// >>> deal = StructuredCredit.from_json(json.dumps(envelope))
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
-/// >>> diagnostics = deal.run_simulation_with_diagnostics(market, as_of)
+/// >>> diagnostics = deal.run_simulation(market, as_of).diagnostics
 /// >>> diagnostics.unfunded_draws.amount
 /// 0.0
 /// >>> list(diagnostics.to_dataframe().columns)[:3]

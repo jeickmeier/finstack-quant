@@ -21987,16 +21987,13 @@ export interface StructuredCredit extends WasmOwned {
   /**
    * Run the deterministic simulation and return the deal-level accounting.
    *
-   * Mirrors Rust `run_simulation_with_diagnostics`.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
-   * @param asOf - ISO-8601 valuation date.
-   * @returns `SimulationDiagnostics` plain object with per-period pool, account and coverage-test records.
-   * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed, and kind `computation` if the simulation fails.
+   * Mirrors Rust `StructuredCredit::run_simulation`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying discount and forward curves.
+   * @param asOf - Requested ISO-8601 valuation date; lifecycle policy resolves the effective date.
+   * @returns `SimulationRun` with `tranches` keyed by tranche identifier and complete `diagnostics`.
+   * @throws Error - Throws with kind `not_found` if a curve is missing, `validation` if the deal or dates are invalid, and `computation` if simulation fails.
    */
-  runSimulationWithDiagnostics(
-    marketJson: JsonInput,
-    asOf: string
-  ): generated.valuations.SimulationDiagnostics;
+  runSimulation(marketJson: JsonInput, asOf: string): generated.valuations.SimulationRun;
 }
 
 /**

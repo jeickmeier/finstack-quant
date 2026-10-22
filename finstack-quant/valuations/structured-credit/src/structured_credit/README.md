@@ -44,8 +44,8 @@ There is **no `prelude` module** — import the names you need directly.
 | `BorrowingBaseRules`, `AdvanceRate`, `EligibilityRule`, `ConcentrationLimit`, `ConcentrationScope`, `BorrowingBaseReport`, `LiveCollateral` | Advance rates, eligibility (`exclude_defaulted`, `max_maturity`, `max_days_past_due` on the live delinquency buckets, `exclude_non_performing` for unresolved NPL timelines) and concentration limits behind the borrowing-base coverage test and the `asset_backed_facility` instrument; `evaluate_live` reads the live buckets and NPL flags. |
 | `HedgeSwap`, `SwapNotional`, `SwapPriority` | Interest-rate hedges paid through the waterfall as senior or junior fee recipients. |
 | `CallAssumption`, `CallScope` | Deal or tranche call for price-to-call analytics (`TrancheMetrics.wal_to_call`, `z_spread_to_call_bp`, `dm_to_call_bp`) — see [Calls and clean-up calls](#calls-and-clean-up-calls). |
-| `run_simulation_with_diagnostics`, `SimulationRun`, `SimulationDiagnostics`, `PeriodDiagnostics`, `CoverageTestDiagnostic`, `calculate_equity_metrics`, `EquityMetrics` | Period-by-period deal record and equity analytics — see [Deal diagnostics and equity analytics](#deal-diagnostics-and-equity-analytics). |
-| `run_simulation` | Deterministic projection entry point (per-tranche cashflows). |
+| `SimulationRun`, `SimulationDiagnostics`, `PeriodDiagnostics`, `CoverageTestDiagnostic`, `calculate_equity_metrics`, `EquityMetrics` | Period-by-period deal record and equity analytics — see [Deal diagnostics and equity analytics](#deal-diagnostics-and-equity-analytics). |
+| `StructuredCredit::run_simulation` | Deterministic projection returning tranche cashflows and accounting in one `SimulationRun`. |
 | `execute_waterfall`, `WaterfallContext`, `WaterfallDistribution` | Waterfall execution. |
 | `CoverageTest`, `TestContext`, `TestResult` | Coverage-test evaluation. |
 | `tranche_metrics`, `TrancheMetrics`, `tranche_scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | The one per-tranche API (clean/dirty price, accrued, WAL, yield, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters, plus requested registry metrics valued on the note) and scenario grids (one projection per cell, clean settlement price per current face). |
@@ -141,7 +141,7 @@ the reserve up to `reserve_target`. The reserve earns `reserve_account_rate`
 retained in the reserve. A deterministic run refuses a draw calendar the
 reserve cannot fund; stochastic runs cap the draw and report the affected
 paths (`StochasticPricingResult::unfunded_draw_path_fraction`).
-`run_simulation_with_diagnostics` returns the reserve path and draw funding
+`run_simulation` returns the reserve path and draw funding
 alongside the tranche cashflows.
 
 Stochastic pricing (`price_stochastic*`, OAS) drives the same instrument
@@ -190,10 +190,8 @@ let class_a = tranche_metrics(
 Deterministic cashflows without pricing:
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation;
-
-let per_tranche = run_simulation(&deal, &context, as_of)?;          // HashMap<String, TrancheCashflows>
-let class_a = run_simulation(&deal, &context, as_of)?.remove("CLASS_A");
+let per_tranche = deal.run_simulation(&context, as_of)?.tranches;          // HashMap<String, TrancheCashflows>
+let class_a = deal.run_simulation(&context, as_of)?.tranches.remove("CLASS_A");
 ```
 
 ## Waterfall
@@ -698,7 +696,7 @@ and the modified coupon.
 
 ### Deal diagnostics and equity analytics
 
-`run_simulation_with_diagnostics` returns `SimulationRun { tranches,
+`run_simulation` returns `SimulationRun { tranches,
 diagnostics }`. Besides the reserve fields, `SimulationDiagnostics::periods`
 holds one `PeriodDiagnostics` per payment date: end-of-period pool balance and
 factor, balance-weighted coupon / spread / WARF of the performing collateral,
@@ -803,7 +801,7 @@ Instrument collateral is typed in Python: `AssetPool.with_instruments(bonds=,
 term_loans=, revolvers=, call_exercise=, put_exercise=, overrides=)` accepts
 the typed `Bond`, `TermLoan` and `RevolvingCredit` classes,
 `AssetPool.with_reserve(...)` configures the reserve account and its interest
-destination, `StructuredCredit.run_simulation_with_diagnostics(market, as_of)`
+destination, `StructuredCredit.run_simulation(market, as_of).diagnostics`
 returns the reserve path and draw funding (`SimulationDiagnostics`) and
 `StructuredCredit.price_stochastic(market, as_of, num_paths=, antithetic=)`
 returns a `StochasticPricingResult` with the tranche shares of the draw
@@ -837,9 +835,9 @@ Both bindings expose structured credit under their `instruments` namespace:
   `HedgeSwap`, `Waterfall` (`StructuredCredit.create_waterfall()`
   introspection); deal methods `with_standard_fees`,
   `enable_stochastic`, `tranche_cashflows` (`TrancheCashflows`),
-  `equity_metrics` (`EquityMetrics`), `run_simulation_with_diagnostics`
-  (`SimulationDiagnostics` with the per-period record and coverage-test
-  frame), `price_stochastic`; tranche analytics
+  `equity_metrics` (`EquityMetrics`), `run_simulation`
+  (`SimulationRun`, whose `.tranches` contains cashflows and `.diagnostics`
+  contains the per-period record and coverage-test frame), `price_stochastic`; tranche analytics
   `tranche_metrics` (with the `*_to_call` twins),
   `tranche_oas`, `tranche_discount_margin`,
   `tranche_breakeven_cdr`,

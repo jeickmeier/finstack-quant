@@ -12,8 +12,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, AssetType, DealType, PoolAsset, RepLine,
-    SimulationRun, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, AssetType, DealType, PoolAsset, RepLine, SimulationRun, StructuredCredit, Tranche,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -90,7 +90,7 @@ fn cmbs(pool: AssetPool, maturity: Date) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit) -> SimulationRun {
-    run_simulation_with_diagnostics(deal, &market(), close()).expect("simulation")
+    deal.run_simulation(&market(), close()).expect("simulation")
 }
 
 /// Balance after `k` level payments of a schedule over `n` periods at
@@ -193,7 +193,7 @@ fn a_seasoned_rep_line_amortizes_over_the_remaining_term() {
     let mut short = cmbs(short, maturity);
     short.pool.assets[0].amortization_term_months = Some(60);
     assert!(
-        run_simulation_with_diagnostics(&short, &market(), close()).is_err(),
+        short.run_simulation(&market(), close()).is_err(),
         "an amortization term inside the loan's life is rejected"
     );
 }

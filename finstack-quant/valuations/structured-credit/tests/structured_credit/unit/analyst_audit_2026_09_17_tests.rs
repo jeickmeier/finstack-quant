@@ -22,12 +22,11 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    execute_waterfall, run_simulation, run_simulation_with_diagnostics, tranche_metrics,
-    AllocationMode, AssetPool, AssetType, CallAssumption, CardPortfolioSpec,
-    ControlledAccumulationSpec, CoverageRules, CoverageTestSpec, DealType, LiquidationSpec,
-    PaymentCalculation, PaymentType, PoolAsset, Recipient, RecipientType, ReinvestmentCriteria,
-    ReinvestmentPeriod, StepDownSpec, StepDownTrigger, StructuredCredit, Tranche, TrancheStructure,
-    Waterfall, WaterfallContext, WaterfallRules, WaterfallTier,
+    execute_waterfall, tranche_metrics, AllocationMode, AssetPool, AssetType, CallAssumption,
+    CardPortfolioSpec, ControlledAccumulationSpec, CoverageRules, CoverageTestSpec, DealType,
+    LiquidationSpec, PaymentCalculation, PaymentType, PoolAsset, Recipient, RecipientType,
+    ReinvestmentCriteria, ReinvestmentPeriod, StepDownSpec, StepDownTrigger, StructuredCredit,
+    Tranche, TrancheStructure, Waterfall, WaterfallContext, WaterfallRules, WaterfallTier,
 };
 use time::Month;
 
@@ -141,7 +140,10 @@ fn p1_deal_call_proceeds_include_final_stub_collateral_interest() {
     );
     deal.call_assumption = Some(CallAssumption::new(d(2026, 1, 1), 100.0));
 
-    let results = run_simulation(&deal, &market(close), close).expect("run");
+    let results = deal
+        .run_simulation(&market(close), close)
+        .map(|run| run.tranches)
+        .expect("run");
     let a = &results["A"];
     let eq = &results["EQ"];
     let call_date = *a
@@ -256,7 +258,10 @@ fn p2a_step_down_loss_trigger_uses_original_pool_balance() {
         }),
         ..Default::default()
     });
-    let results = run_simulation(&deal, &market(close), close).expect("run");
+    let results = deal
+        .run_simulation(&market(close), close)
+        .map(|run| run.tranches)
+        .expect("run");
     let sub = &results["SUB"];
     let first_date = sub
         .cashflows
@@ -277,7 +282,10 @@ fn p2a_step_down_loss_trigger_uses_original_pool_balance() {
 fn p2b_cleanup_call_factor_uses_original_pool_balance() {
     let (mut deal, close) = seasoned_abs(8_000_000.0, 92_000_000.0, 0.0, 0.0, 0.0);
     deal.cleanup_call_decimal = Some(0.10);
-    let results = run_simulation(&deal, &market(close), close).expect("run");
+    let results = deal
+        .run_simulation(&market(close), close)
+        .map(|run| run.tranches)
+        .expect("run");
     let sr = &results["SR"];
     let first_date = sr.cashflows.first().map(|(dt, _)| *dt).expect("first date");
     let sr_principal = flows_on(&sr.principal_flows, first_date);
@@ -338,7 +346,7 @@ fn p3_commercial_mortgage_amortization_term_produces_the_balloon() {
         .expect("valid structured-credit dates"),
         0.0,
     );
-    let run = run_simulation_with_diagnostics(&deal, &market(close), close).expect("run");
+    let run = deal.run_simulation(&market(close), close).expect("run");
     let last = run.diagnostics.periods.last().expect("periods");
     assert!(
         (last.principal_collections.amount() - 8_386_595.0).abs() < 1_000.0,
@@ -496,7 +504,7 @@ fn p6_clo_standard_rules_carry_performing_collateral_at_par() {
             )
         };
         deal.coverage_rules = Some(CoverageRules::clo_standard());
-        let run = run_simulation_with_diagnostics(&deal, &market(close), close).expect("run");
+        let run = deal.run_simulation(&market(close), close).expect("run");
         run.diagnostics.periods[0].coverage_tests[0].ratio
     };
     let b = ratio_for(CreditRating::B);
@@ -797,7 +805,10 @@ fn card_accumulation_uses_a_fixed_investor_allocation() {
         }),
         ..Default::default()
     });
-    let results = run_simulation(&deal, &market(close), close).expect("run");
+    let results = deal
+        .run_simulation(&market(close), close)
+        .map(|run| run.tranches)
+        .expect("run");
     let bullet = results["A"]
         .principal_flows
         .iter()
@@ -870,7 +881,7 @@ fn cumulative_loss_curve_is_based_on_the_original_pool_balance() {
     );
     let curve: Vec<f64> = (1..=36).map(|m| 3.0 * f64::from(m) / 36.0).collect();
     deal.credit_model.default_spec = DefaultModelSpec::cumulative_loss(curve, 0.5);
-    let run = run_simulation_with_diagnostics(&deal, &market(close), close).expect("run");
+    let run = deal.run_simulation(&market(close), close).expect("run");
     let defaults: f64 = run
         .diagnostics
         .periods
@@ -943,7 +954,10 @@ fn deal_call_values_unresolved_npl_rows_at_net_proceeds() {
         0.0,
     );
     deal.call_assumption = Some(CallAssumption::new(d(2026, 1, 1), 100.0));
-    let results = run_simulation(&deal, &market(close), close).expect("run");
+    let results = deal
+        .run_simulation(&market(close), close)
+        .map(|run| run.tranches)
+        .expect("run");
     let a_total: f64 = results["A"].cashflows.iter().map(|(_, m)| m.amount()).sum();
     let e_total: f64 = results["E"].cashflows.iter().map(|(_, m)| m.amount()).sum();
     // Net proceeds 50% of 100M = 50M: they cover A's deferred coupons first
@@ -1012,7 +1026,10 @@ fn cleanup_call_feasibility_counts_the_stub_collections() {
         0.0,
     );
     deal.cleanup_call_decimal = Some(0.10);
-    let results = run_simulation(&deal, &market(close), close).expect("run");
+    let results = deal
+        .run_simulation(&market(close), close)
+        .map(|run| run.tranches)
+        .expect("run");
     let a = &results["A"];
     let first_date = a.cashflows.first().map(|(dt, _)| *dt).expect("first date");
     let a_principal = flows_on(&a.principal_flows, first_date);
@@ -1077,7 +1094,7 @@ fn rating_haircuts_key_by_rating_bucket() {
             rating_haircuts: map.into_iter().collect(),
             ..CoverageRules::default()
         });
-        let run = run_simulation_with_diagnostics(&deal, &market(close), close).expect("run");
+        let run = deal.run_simulation(&market(close), close).expect("run");
         run.diagnostics.periods[0].coverage_tests[0].ratio
     };
     let b_minus = ratio_for(CreditRating::BMinus, vec![(CreditRating::B, 0.10)]);

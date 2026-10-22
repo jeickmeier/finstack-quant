@@ -13,9 +13,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, DealType, PoolAsset, ShiftMode,
-    ShiftingInterestSpec, ShiftingInterestStep, SimulationRun, StepDownTrigger, StructuredCredit,
-    Tranche, TrancheStructure, WaterfallRules,
+    AssetPool, DealType, PoolAsset, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
+    SimulationRun, StepDownTrigger, StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
 };
 use time::Month;
 
@@ -120,7 +119,7 @@ fn rmbs(step: f64, mode: ShiftMode, triggers: Vec<StepDownTrigger>) -> Structure
 }
 
 fn simulate(deal: &StructuredCredit) -> SimulationRun {
-    run_simulation_with_diagnostics(deal, &market(), close()).expect("simulation")
+    deal.run_simulation(&market(), close()).expect("simulation")
 }
 
 /// Month-37 principal to A and the pool prepayment that period, plus A's

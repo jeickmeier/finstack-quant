@@ -28,11 +28,12 @@ impl CashflowScheduleSource for StructuredCredit {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let detailed_flows =
-            crate::structured_credit::pricing::run_simulation(self, context, as_of)?
-                .into_values()
-                .flat_map(|result| result.detailed_flows.into_iter())
-                .collect();
+        let detailed_flows = self
+            .run_simulation(context, as_of)?
+            .tranches
+            .into_values()
+            .flat_map(|result| result.detailed_flows.into_iter())
+            .collect();
         self.projected_schedule(detailed_flows)
     }
 }
@@ -71,7 +72,7 @@ impl StructuredCredit {
         as_of: Date,
     ) -> finstack_quant_core::Result<(Money, SimulationMetricSeed)> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let run = crate::structured_credit::pricing::run_simulation(self, market, as_of)?;
+        let run = self.run_simulation(market, as_of)?.tranches;
         let flows = RunFlows {
             deal: self,
             run: &run,
@@ -278,8 +279,7 @@ impl Instrument for StructuredCredit {
         if context.tagged_cashflows.is_some() {
             return;
         }
-        if let Ok(results) = crate::structured_credit::pricing::run_simulation(self, market, as_of)
-        {
+        if let Ok(results) = self.run_simulation(market, as_of).map(|run| run.tranches) {
             SimulationMetricSeed::from_run(results).install(context);
         }
     }

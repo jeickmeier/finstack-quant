@@ -16,8 +16,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
-    TrancheStructure,
+    AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -160,7 +159,10 @@ fn writedown_recorded_under_severe_stress() {
     let market = flat_market();
     let clo = build_clo(0.05, 0.25, 0.10, 6);
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     // Equity tranche should be written down (first loss)
     let eq = results.get("EQ").unwrap();
@@ -193,7 +195,10 @@ fn writedown_respects_subordination_order() {
     let market = flat_market();
     let clo = build_clo(0.05, 0.25, 0.10, 6);
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     let sr = results.get("SR").unwrap();
     let mz = results.get("MZ").unwrap();
@@ -224,7 +229,10 @@ fn no_writedown_without_defaults() {
     let market = flat_market();
     let clo = build_clo(0.10, 0.0, 0.40, 6);
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     for (tranche_id, tc) in &results {
         assert!(
@@ -249,7 +257,10 @@ fn writedown_non_negative_and_bounded() {
 
     for (cdr, recovery) in scenarios {
         let clo = build_clo(0.05, cdr, recovery, 6);
-        let results = run_simulation(&clo, &market, as_of()).unwrap();
+        let results = clo
+            .run_simulation(&market, as_of())
+            .map(|run| run.tranches)
+            .unwrap();
 
         for (tranche_id, tc) in &results {
             assert!(
@@ -286,7 +297,10 @@ fn cleanup_call_triggers_when_pool_factor_below_threshold() {
     let mut clo = build_clo(0.40, 0.0, 0.40, 6); // Very high CPR
     clo.cleanup_call_decimal = Some(0.30); // Trigger at 30% pool factor
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     // After cleanup call, all tranche balances should be zero
     let sr = results.get("SR").unwrap();
@@ -315,8 +329,14 @@ fn cleanup_call_produces_fewer_periods_than_no_call() {
     let mut clo_with_call = build_clo(0.30, 0.0, 0.40, 6);
     clo_with_call.cleanup_call_decimal = Some(0.20); // 20% threshold
 
-    let res_no = run_simulation(&clo_no_call, &market, as_of()).unwrap();
-    let res_yes = run_simulation(&clo_with_call, &market, as_of()).unwrap();
+    let res_no = clo_no_call
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
+    let res_yes = clo_with_call
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     let periods_no = res_no.get("SR").unwrap().cashflows.len();
     let periods_yes = res_yes.get("SR").unwrap().cashflows.len();
@@ -346,7 +366,10 @@ fn cleanup_call_does_not_trigger_for_low_cpr() {
     let mut clo = build_clo(0.02, 0.0, 0.40, 6);
     clo.cleanup_call_decimal = Some(0.10); // 10% threshold
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     // With very low CPR and 5-year maturity, pool factor stays well above 10%
     // until near maturity. The deal should run to completion normally.
@@ -368,7 +391,10 @@ fn waterfall_with_coverage_triggers_still_works() {
     let clo = build_clo(0.10, 0.02, 0.40, 6);
 
     // Run simulation - should succeed without panic
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     // Basic sanity
     assert!(!results.is_empty(), "Should produce tranche results");
@@ -623,8 +649,8 @@ mod excess_spread_tests {
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        run_simulation, AssetPool, DealType, ExcessSpreadSpec, PoolAsset, StructuredCredit,
-        Tranche, TrancheStructure, WaterfallRules,
+        AssetPool, DealType, ExcessSpreadSpec, PoolAsset, StructuredCredit, Tranche,
+        TrancheStructure, WaterfallRules,
     };
     use time::Month;
 
@@ -712,22 +738,26 @@ mod excess_spread_tests {
     }
 
     fn equity_cash(sc: &StructuredCredit) -> f64 {
-        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let results = sc
+            .run_simulation(&market(), closing())
+            .map(|run| run.tranches)
+            .unwrap();
         let eq = results.get("EQ").expect("equity results");
         eq.total_interest.amount() + eq.total_principal.amount()
     }
 
     #[test]
     fn spread_capture_delays_equity_cash_without_destroying_it() {
-        let base = run_simulation(&deal(None), &market(), closing()).unwrap();
-        let trapped = run_simulation(
-            &deal(Some(ExcessSpreadSpec {
-                target_balance: Money::new(20_000.0, Currency::USD).unwrap(),
-                trap_loss_decimal: Some(0.01),
-            })),
-            &market(),
-            closing(),
-        )
+        let base = (deal(None))
+            .run_simulation(&market(), closing())
+            .map(|run| run.tranches)
+            .unwrap();
+        let trapped = (deal(Some(ExcessSpreadSpec {
+            target_balance: Money::new(20_000.0, Currency::USD).unwrap(),
+            trap_loss_decimal: Some(0.01),
+        })))
+        .run_simulation(&market(), closing())
+        .map(|run| run.tranches)
         .unwrap();
         let first = base["EQ"].interest_flows[0].0;
         let paid_at = |result: &finstack_quant_valuations_structured_credit::structured_credit::TrancheCashflows| result.interest_flows.iter()
@@ -885,8 +915,14 @@ mod excess_spread_tests {
     #[test]
     fn draw_covers_senior_interest_shortfall() {
         let mkt = draw_market();
-        let base = run_simulation(&draw_deal(false), &mkt, closing()).unwrap();
-        let with_acct = run_simulation(&draw_deal(true), &mkt, closing()).unwrap();
+        let base = (draw_deal(false))
+            .run_simulation(&mkt, closing())
+            .map(|run| run.tranches)
+            .unwrap();
+        let with_acct = (draw_deal(true))
+            .run_simulation(&mkt, closing())
+            .map(|run| run.tranches)
+            .unwrap();
         let sr_base = base.get("SR").expect("SR results");
         let sr_with = with_acct.get("SR").expect("SR results");
 
@@ -930,8 +966,8 @@ mod step_down_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        run_simulation, AssetPool, DealType, PoolAsset, StepDownSpec, StepDownTrigger,
-        StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
+        AssetPool, DealType, PoolAsset, StepDownSpec, StepDownTrigger, StructuredCredit, Tranche,
+        TrancheStructure, WaterfallRules,
     };
     use time::Month;
 
@@ -1038,7 +1074,10 @@ mod step_down_tests {
 
     /// Principal paid to the subordinate tranche before `cutoff`.
     fn sub_principal_before(sc: &StructuredCredit, cutoff: Date) -> f64 {
-        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let results = sc
+            .run_simulation(&market(), closing())
+            .map(|run| run.tranches)
+            .unwrap();
         let sub = results.get("SUB").expect("SUB results");
         sub.principal_flows
             .iter()
@@ -1194,8 +1233,8 @@ mod shifting_interest_tests {
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        run_simulation, AssetPool, AssetType, DealType, PoolAsset, ShiftingInterestSpec,
-        ShiftingInterestStep, StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
+        AssetPool, AssetType, DealType, PoolAsset, ShiftingInterestSpec, ShiftingInterestStep,
+        StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
     };
     use time::Month;
 
@@ -1295,7 +1334,10 @@ mod shifting_interest_tests {
     }
 
     fn sub_principal(sc: &StructuredCredit, before: bool, cutoff: Date) -> f64 {
-        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let results = sc
+            .run_simulation(&market(), closing())
+            .map(|run| run.tranches)
+            .unwrap();
         let sub = results.get("SUB").expect("SUB results");
         sub.principal_flows
             .iter()
@@ -1430,7 +1472,10 @@ mod shifting_interest_tests {
     }
 
     fn sub_principal_amortizing(sc: &StructuredCredit, before: Date) -> f64 {
-        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let results = sc
+            .run_simulation(&market(), closing())
+            .map(|run| run.tranches)
+            .unwrap();
         let sub = results.get("SUB").expect("SUB results");
         sub.principal_flows
             .iter()
@@ -1549,7 +1594,10 @@ mod shifting_interest_tests {
         // by current balance: the 200k SUBA should receive meaningfully more than
         // the 100k SUBB (≈2:1), not an equal split.
         let sc = two_sub_deal();
-        let results = run_simulation(&sc, &market(), closing()).unwrap();
+        let results = sc
+            .run_simulation(&market(), closing())
+            .map(|run| run.tranches)
+            .unwrap();
         let suba: f64 = results
             .get("SUBA")
             .expect("SUBA")
@@ -1586,9 +1634,8 @@ mod early_amortization_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        run_simulation, AssetPool, DealType, EarlyAmortizationSpec, PoolAsset,
-        ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheStructure,
-        WaterfallRules,
+        AssetPool, DealType, EarlyAmortizationSpec, PoolAsset, ReinvestmentCriteria,
+        ReinvestmentPeriod, StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
     };
     use time::Month;
 
@@ -1694,7 +1741,10 @@ mod early_amortization_tests {
     }
 
     fn senior_principal_before(sc: &StructuredCredit, cutoff: Date) -> f64 {
-        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let results = sc
+            .run_simulation(&market(), closing())
+            .map(|run| run.tranches)
+            .unwrap();
         let sr = results.get("SR").expect("SR results");
         sr.principal_flows
             .iter()
@@ -1734,8 +1784,8 @@ mod controlled_accumulation_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        run_simulation, AssetPool, ControlledAccumulationSpec, DealType, PoolAsset,
-        StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
+        AssetPool, ControlledAccumulationSpec, DealType, PoolAsset, StructuredCredit, Tranche,
+        TrancheStructure, WaterfallRules,
     };
     use time::Month;
 
@@ -1823,7 +1873,10 @@ mod controlled_accumulation_tests {
 
     /// Senior principal paid in the half-open window `[lo, hi)`.
     fn senior_principal_between(sc: &StructuredCredit, lo: Date, hi: Date) -> f64 {
-        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let results = sc
+            .run_simulation(&market(), closing())
+            .map(|run| run.tranches)
+            .unwrap();
         let sr = results.get("SR").expect("SR results");
         sr.principal_flows
             .iter()
@@ -1947,7 +2000,10 @@ mod controlled_accumulation_tests {
         // accumulated balance until the terminal sweep pushes this OUT; early
         // amortization is supposed to pull it IN.
         let senior_principal_wal = |sc: &StructuredCredit| -> f64 {
-            let results = run_simulation(sc, &market(), closing()).unwrap();
+            let results = sc
+                .run_simulation(&market(), closing())
+                .map(|run| run.tranches)
+                .unwrap();
             let flows = &results.get("SR").expect("SR results").principal_flows;
             let (mut weighted, mut total) = (0.0_f64, 0.0_f64);
             for (date, amount) in flows {

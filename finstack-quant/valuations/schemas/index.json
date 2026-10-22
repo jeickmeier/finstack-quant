@@ -1081,6 +1081,15 @@
       "type_name": "SimulationDiagnostics"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
+      "bytes": 33933,
+      "kind": "output",
+      "path": "schemas/results/1/simulation_run.schema.json",
+      "summary": "Tranche cashflows and deal accounting from one deterministic simulation.",
+      "title": "SimulationRun",
+      "type_name": "SimulationRun"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/tranche_cashflows.schema.json",
       "bytes": 24688,
       "kind": "output",

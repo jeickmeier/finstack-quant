@@ -15,7 +15,7 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, tranche_breakeven_cdr, tranche_discount_margin, tranche_metrics, tranche_oas,
+    tranche_breakeven_cdr, tranche_discount_margin, tranche_metrics, tranche_oas,
     tranche_scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, ScenarioGrid,
     StructuredCredit, Tranche, TrancheStructure,
 };
@@ -405,7 +405,8 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         recovery_lag: None,
     };
     let errors = [
-        run_simulation(&sc, &market, closing_date())
+        sc.run_simulation(&market, closing_date())
+            .map(|run| run.tranches)
             .expect_err("invalid simulation")
             .to_string(),
         (sc).tranche_cashflows("missing", &market, closing_date())

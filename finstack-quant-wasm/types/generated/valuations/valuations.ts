@@ -20042,6 +20042,22 @@ export interface ScenarioTable {
   tranche_id: string;
 }
 /**
+ * Tranche cashflows and deal accounting from one deterministic simulation.
+ */
+export interface SimulationRun {
+  /**
+   * Reserve, draw-funding and reserve-interest accounting.
+   */
+  diagnostics: SimulationDiagnostics;
+  /**
+   * Detailed cashflow results per tranche id.
+   */
+  tranches: {
+    [k: string]: TrancheCashflows;
+  };
+  [k: string]: unknown;
+}
+/**
  * Inputs for the standard structured-credit registry constructor.
  */
 export interface StandardDealParams {

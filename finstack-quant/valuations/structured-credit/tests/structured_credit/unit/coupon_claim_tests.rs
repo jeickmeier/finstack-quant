@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -115,12 +115,16 @@ fn starved_abs(tranches: TrancheStructure) -> StructuredCredit {
 /// marked non-deferrable is covered too, in full, from the same proceeds.
 #[test]
 fn a_non_deferrable_class_b_coupon_is_covered_from_principal() {
-    let deferring =
-        run_simulation(&starved_abs(capital_structure()), &market(), close()).expect("simulation");
+    let deferring = (starved_abs(capital_structure()))
+        .run_simulation(&market(), close())
+        .map(|run| run.tranches)
+        .expect("simulation");
     let mut covered_structure = capital_structure();
     covered_structure.tranches[1].non_deferrable = Some(true);
-    let covered =
-        run_simulation(&starved_abs(covered_structure), &market(), close()).expect("simulation");
+    let covered = (starved_abs(covered_structure))
+        .run_simulation(&market(), close())
+        .map(|run| run.tranches)
+        .expect("simulation");
 
     let first = |flows: &[(Date, Money)]| flows.first().map_or(0.0, |(_, amount)| amount.amount());
     // The ABS pays monthly: coupons accrue Act/360 over the first period.

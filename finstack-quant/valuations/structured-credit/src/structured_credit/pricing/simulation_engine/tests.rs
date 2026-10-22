@@ -1883,12 +1883,10 @@ mod cases {
     /// Total cash distributed to every tranche over the life of a deal.
     fn total_distributed(instrument: &StructuredCredit) -> f64 {
         let market = MarketContext::new().insert(cleanup_discount_curve());
-        let results = crate::structured_credit::pricing::run_simulation(
-            instrument,
-            &market,
-            cleanup_test_date(),
-        )
-        .expect("simulation");
+        let results = instrument
+            .run_simulation(&market, cleanup_test_date())
+            .map(|run| run.tranches)
+            .expect("simulation");
         results
             .values()
             .flat_map(|tc| tc.cashflows.iter())
@@ -2006,12 +2004,10 @@ mod cases {
     #[test]
     fn fee_aware_capture_does_not_starve_note_interest() {
         let market = MarketContext::new().insert(cleanup_discount_curve());
-        let results = crate::structured_credit::pricing::run_simulation(
-            &excess_spread_deal(true),
-            &market,
-            cleanup_test_date(),
-        )
-        .expect("simulation");
+        let results = (excess_spread_deal(true))
+            .run_simulation(&market, cleanup_test_date())
+            .map(|run| run.tranches)
+            .expect("simulation");
 
         // The tranche is NOT pik_enabled, so its shortfalls land in
         // `total_deferred`. Reading `total_pik` here would pass vacuously.
@@ -2065,12 +2061,10 @@ mod cases {
             let mut deal = reserve_account_deal(reserve);
             deal.tranches.tranches[0].coupon = RateSpec::Fixed { rate: 0.09 };
             let market = MarketContext::new().insert(cleanup_discount_curve());
-            let results = crate::structured_credit::pricing::run_simulation(
-                &deal,
-                &market,
-                cleanup_test_date(),
-            )
-            .expect("simulation");
+            let results = deal
+                .run_simulation(&market, cleanup_test_date())
+                .map(|run| run.tranches)
+                .expect("simulation");
             let mut flows: Vec<(Date, f64)> = results
                 .values()
                 .flat_map(|tc| tc.interest_flows.iter())
@@ -2234,12 +2228,10 @@ mod cases {
         // can converge while the trap still delays subordinated interest.
         let interest_wal = |deal: &StructuredCredit, tranche: &str| -> f64 {
             let market = MarketContext::new().insert(cleanup_discount_curve());
-            let results = crate::structured_credit::pricing::run_simulation(
-                deal,
-                &market,
-                cleanup_test_date(),
-            )
-            .expect("simulation");
+            let results = deal
+                .run_simulation(&market, cleanup_test_date())
+                .map(|run| run.tranches)
+                .expect("simulation");
             let flows = &results
                 .get(tranche)
                 .expect("tranche results")
@@ -2272,12 +2264,10 @@ mod cases {
         // benefit through earlier principal rather than nominal cash.
         let senior_principal_wal = |deal: &StructuredCredit| -> f64 {
             let market = MarketContext::new().insert(cleanup_discount_curve());
-            let results = crate::structured_credit::pricing::run_simulation(
-                deal,
-                &market,
-                cleanup_test_date(),
-            )
-            .expect("simulation");
+            let results = deal
+                .run_simulation(&market, cleanup_test_date())
+                .map(|run| run.tranches)
+                .expect("simulation");
             let flows = &results
                 .get("CLASS_A")
                 .expect("senior results")

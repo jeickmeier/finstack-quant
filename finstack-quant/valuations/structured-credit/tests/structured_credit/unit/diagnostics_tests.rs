@@ -12,9 +12,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_equity_metrics, run_simulation_with_diagnostics, AssetPool, CoverageTestSpec,
-    DealType, PoolAsset, ReserveInterestDestination, SimulationDiagnostics, StructuredCredit,
-    Tranche, TrancheStructure,
+    calculate_equity_metrics, AssetPool, CoverageTestSpec, DealType, PoolAsset,
+    ReserveInterestDestination, SimulationDiagnostics, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -121,7 +120,7 @@ fn clo(cdr: f64) -> StructuredCredit {
 /// bullet pool) and follows the pool as it defaults.
 #[test]
 fn period_diagnostics_carry_the_executor_coverage_ratios_and_pool_path() {
-    let clean = run_simulation_with_diagnostics(&clo(0.0), &market(), close()).expect("run");
+    let clean = (clo(0.0)).run_simulation(&market(), close()).expect("run");
     let periods = &clean.diagnostics.periods;
     assert_eq!(periods.len(), clean.tranches["A"].interest_flows.len());
 
@@ -142,7 +141,7 @@ fn period_diagnostics_carry_the_executor_coverage_ratios_and_pool_path() {
     assert_eq!(first.defaults.amount(), 0.0);
     assert!(first.interest_collections.amount() > 0.0);
 
-    let stressed = run_simulation_with_diagnostics(&clo(0.10), &market(), close()).expect("run");
+    let stressed = (clo(0.10)).run_simulation(&market(), close()).expect("run");
     let periods = &stressed.diagnostics.periods;
     assert!(periods[0].defaults.amount() > 0.0);
     assert!(periods
@@ -183,7 +182,7 @@ fn equity_irr_reproduces_xirr_of_the_equity_flows() {
         tranche_id: "E".into(),
     };
 
-    let run = run_simulation_with_diagnostics(&deal, &market(), close()).expect("run");
+    let run = deal.run_simulation(&market(), close()).expect("run");
     let equity = &run.tranches["E"];
     assert!(
         run.diagnostics
@@ -234,11 +233,24 @@ fn equity_irr_reproduces_xirr_of_the_equity_flows() {
 /// Diagnostics with populated periods survive a JSON round-trip.
 #[test]
 fn diagnostics_round_trip_through_json() {
-    let run = run_simulation_with_diagnostics(&clo(0.05), &market(), close()).expect("run");
+    let run = (clo(0.05)).run_simulation(&market(), close()).expect("run");
     assert!(!run.diagnostics.periods.is_empty());
 
     let json = serde_json::to_string(&run.diagnostics).expect("serialize");
     let parsed: SimulationDiagnostics = serde_json::from_str(&json).expect("deserialize");
 
     assert_eq!(parsed, run.diagnostics);
+}
+
+#[test]
+fn full_simulation_run_serialization_preserves_flows_and_accounting() {
+    let run = clo(0.05).run_simulation(&market(), close()).expect("run");
+    let json = serde_json::to_string(&run).expect("serialize complete run");
+    let restored: finstack_quant_valuations_structured_credit::structured_credit::SimulationRun =
+        serde_json::from_str(&json).expect("deserialize complete run");
+    assert_eq!(restored.tranches.len(), run.tranches.len());
+    assert_eq!(restored.diagnostics, run.diagnostics);
+    for (id, flows) in &run.tranches {
+        assert_eq!(restored.tranches[id].cashflows, flows.cashflows);
+    }
 }

@@ -12,9 +12,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, run_simulation_with_diagnostics, AdvancingPolicy, AssetPool, DealType,
-    DelinquencyModel, PeriodDiagnostics, PoolAsset, StepDownSpec, StepDownTrigger,
-    StructuredCredit, Tranche, TrancheCashflows, TrancheStructure, WaterfallRules,
+    AdvancingPolicy, AssetPool, DealType, DelinquencyModel, PeriodDiagnostics, PoolAsset,
+    StepDownSpec, StepDownTrigger, StructuredCredit, Tranche, TrancheCashflows, TrancheStructure,
+    WaterfallRules,
 };
 use time::Month;
 
@@ -105,7 +105,9 @@ fn abs(model: DelinquencyModel) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
-    run_simulation(deal, &market(), close()).expect("simulation")
+    deal.run_simulation(&market(), close())
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 /// Pool interest collections per payment date: everything the interest
@@ -400,7 +402,7 @@ fn abs_one_off(model: DelinquencyModel) -> StructuredCredit {
 }
 
 fn periods(deal: &StructuredCredit) -> Vec<PeriodDiagnostics> {
-    run_simulation_with_diagnostics(deal, &market(), close())
+    deal.run_simulation(&market(), close())
         .expect("simulation")
         .diagnostics
         .periods

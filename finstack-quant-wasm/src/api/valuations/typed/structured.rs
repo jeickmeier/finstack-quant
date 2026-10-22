@@ -878,28 +878,20 @@ impl JsStructuredCredit {
         )
     }
 
-    /// Run the deterministic simulation and return the deal-level accounting.
-    ///
-    /// Mirrors Rust `run_simulation_with_diagnostics`.
-    /// @param market_json - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
-    /// @param as_of - ISO-8601 valuation date.
-    /// @returns `SimulationDiagnostics` plain object with per-period pool, account and coverage-test records.
-    /// @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed, and kind `computation` if the simulation fails.
-    #[wasm_bindgen(js_name = runSimulationWithDiagnostics)]
-    pub fn run_simulation_with_diagnostics(
-        &self,
-        market_json: JsValue,
-        as_of: JsValue,
-    ) -> Result<JsValue, JsValue> {
+    /// Run deterministic simulation and return all tranche flows and deal accounting.
+    /// @param market_json - Canonical market-context JSON (string or plain object) supplying discount and forward curves.
+    /// @param as_of - Requested ISO-8601 valuation date; lifecycle policy resolves the effective date.
+    /// @returns `SimulationRun` with `tranches` keyed by tranche identifier and complete `diagnostics`.
+    /// @throws Error - Throws with kind `not_found` if a curve is missing, `validation` if the deal or dates are invalid, and `computation` if simulation fails.
+    #[wasm_bindgen(js_name = runSimulation)]
+    pub fn run_simulation(&self, market_json: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
         let market = parse_market(&market_json)?;
         let as_of = js_date(&as_of, "asOf")?;
-        let run = finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation_with_diagnostics(
-            &self.inner,
-            &market,
-            as_of,
-        )
-        .map_err(to_js_err)?;
-        to_js_value(&run.diagnostics)
+        let run = self
+            .inner
+            .run_simulation(&market, as_of)
+            .map_err(to_js_err)?;
+        to_js_value(&run)
     }
 }
 

@@ -231,3 +231,17 @@ class TestStructuredCreditTypedAnalytics:
         cells = table.cells
         cells[0]["price"] = 1.0
         assert table.cells[0]["price"] == pytest.approx(98.2)
+
+
+def test_simulation_returns_complete_result() -> None:
+    from finstack_quant.valuations.instruments import SimulationRun
+
+    deal = StructuredCredit.example()
+    as_of = datetime.date(2024, 1, 1)
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
+    run = deal.run_simulation(market, as_of)
+    assert isinstance(run, SimulationRun)
+    assert "CLONOTES-A" in run.tranches
+    assert run.diagnostics.periods
+    restored = SimulationRun.from_json(run.to_json())
+    assert restored.to_dict() == run.to_dict()

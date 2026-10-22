@@ -5139,7 +5139,7 @@
       "metric",
       "price",
       "priceStochastic",
-      "runSimulationWithDiagnostics",
+      "runSimulation",
       "toDict",
       "toJson",
       "trancheCashflows",

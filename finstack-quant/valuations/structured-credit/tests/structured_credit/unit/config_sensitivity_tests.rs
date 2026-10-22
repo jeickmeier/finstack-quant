@@ -19,9 +19,9 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StochasticPricingResult, StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, tranche_metrics, AssetPool, CoverageTestSpec, DealType,
-    LossAllocationPolicy, PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod, SimulationRun,
-    StructuredCredit, Tranche, TrancheStructure,
+    tranche_metrics, AssetPool, CoverageTestSpec, DealType, LossAllocationPolicy, PoolAsset,
+    ReinvestmentCriteria, ReinvestmentPeriod, SimulationRun, StructuredCredit, Tranche,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -196,7 +196,8 @@ fn intensity_mean_reversion_changes_the_loss_distribution() {
 // deal-level reinvestment.
 
 fn deterministic(deal: &StructuredCredit, market: &MarketContext) -> SimulationRun {
-    run_simulation_with_diagnostics(deal, market, as_of()).expect("deterministic run")
+    deal.run_simulation(market, as_of())
+        .expect("deterministic run")
 }
 
 fn total(flows: &[(Date, Money)]) -> f64 {
