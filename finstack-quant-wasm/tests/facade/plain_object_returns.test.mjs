@@ -78,7 +78,7 @@ test('FxOption price and greeks return plain objects', () => {
   const calibrated = wasm.calibrate(JSON.stringify(fixture.market.envelope));
   assertPlainObject(calibrated, 'calibrate result');
   const marketJson = JSON.stringify(calibrated.result.final_market);
-  const option = new wasm.FxOption(fixture.instrument.instrument.spec);
+  const option = wasm.FxOption.fromJson(JSON.stringify(fixture.instrument));
 
   const valuation = option.price(marketJson, asOf);
   assertPlainObject(valuation, 'FxOption.price result');

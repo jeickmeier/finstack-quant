@@ -46,8 +46,8 @@ impl MetricCalculator for YtwCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         // Bonds with exercise rights and a quoted price share the workout path
         // cached for the other workout metrics.
-        if let Some((ytw, _, _)) = super::super::context_workout_path(context)? {
-            return Ok(ytw);
+        if let Some(path) = super::super::context_workout_path(context)? {
+            return Ok(path.yield_rate);
         }
         let bond: &Bond = context.instrument_as()?;
 
@@ -71,11 +71,7 @@ impl MetricCalculator for YtwCalculator {
             context.cashflows = Some(built);
             context.discount_curve_id = Some(discount_curve_id);
             context.day_count = Some(day_count);
-            context.cashflows.as_ref().ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "cashflows".to_string(),
-                })
-            })?
+            context.require_cashflows()?
         };
 
         // Construct current dirty market price from quoted clean price + accrued at quote_date.
@@ -116,5 +112,3 @@ impl MetricCalculator for YtwCalculator {
         Ok(best_ytm)
     }
 }
-
-impl YtwCalculator {}

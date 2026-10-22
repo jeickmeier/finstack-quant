@@ -7,9 +7,7 @@
 //! `clawback`. Each retired key is rejected by `deny_unknown_fields`.
 
 use finstack_quant_valuations::instruments::equity::pe_fund::PrivateMarketsFund;
-use finstack_quant_valuations::instruments::equity::pe_fund::{
-    ClawbackSettle, ClawbackSpec, PeFundWaterfallSpec,
-};
+use finstack_quant_valuations::instruments::equity::pe_fund::{ClawbackSpec, PeFundWaterfallSpec};
 use finstack_quant_valuations::instruments::equity::real_estate::{
     LeveredRealEstateEquity, RealEstateAsset,
 };
@@ -92,7 +90,6 @@ fn retired_waterfall_spec_keys_are_rejected() {
 fn retired_clawback_enable_is_rejected() {
     let clawback = ClawbackSpec {
         holdback_decimal: Some(0.2),
-        settle_on: ClawbackSettle::FundEnd,
     };
     assert_rejected(&clawback, |w| {
         object(w).insert("enable".into(), json!(true));

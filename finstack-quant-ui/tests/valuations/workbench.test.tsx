@@ -77,7 +77,7 @@ beforeEach(() => {
       case "calibrate":
         return native.calibrate(request);
       case "scenarioTable":
-        return native.structuredCreditTrancheScenarioTable(
+        return native.trancheScenarioTable(
           request.instrumentJson,
           request.trancheId,
           request.marketJson,

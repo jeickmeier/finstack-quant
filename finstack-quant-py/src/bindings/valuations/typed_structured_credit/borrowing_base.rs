@@ -31,7 +31,12 @@ pub struct PyEligibilityRule {
     pub(crate) inner: EligibilityRule,
 }
 
-sc_wire_methods!(PyEligibilityRule, EligibilityRule, "EligibilityRule");
+crate::bindings::macros::wire_methods!(
+    PyEligibilityRule,
+    EligibilityRule,
+    "EligibilityRule",
+    to_dict
+);
 
 #[pymethods]
 impl PyEligibilityRule {
@@ -74,12 +79,6 @@ impl PyEligibilityRule {
         })
     }
 
-    /// Whether defaulted rows are excluded.
-    #[getter]
-    fn exclude_defaulted(&self) -> bool {
-        self.inner.exclude_defaulted
-    }
-
     /// Latest eligible maturity as ``datetime.date``, or ``None``.
     #[getter]
     fn max_maturity<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -87,18 +86,6 @@ impl PyEligibilityRule {
             .max_maturity
             .map(|date| date_to_py(py, date))
             .transpose()
-    }
-
-    /// Maximum days past due of an eligible balance, or ``None``.
-    #[getter]
-    fn max_days_past_due(&self) -> Option<u32> {
-        self.inner.max_days_past_due
-    }
-
-    /// Whether unresolved non-performing loans are excluded.
-    #[getter]
-    fn exclude_non_performing(&self) -> bool {
-        self.inner.exclude_non_performing
     }
 
     /// Return ``repr(self)``.
@@ -109,6 +96,17 @@ impl PyEligibilityRule {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyEligibilityRule |s| {
+    /// Whether defaulted rows are excluded.
+    exclude_defaulted -> bool = s.inner.exclude_defaulted;
+
+    /// Maximum days past due of an eligible balance, or ``None``.
+    max_days_past_due -> Option<u32> = s.inner.max_days_past_due;
+
+    /// Whether unresolved non-performing loans are excluded.
+    exclude_non_performing -> bool = s.inner.exclude_non_performing;
+});
 
 /// Advance rate on one asset class of the collateral.
 ///
@@ -130,7 +128,7 @@ pub struct PyAdvanceRate {
     pub(crate) inner: AdvanceRate,
 }
 
-sc_wire_methods!(PyAdvanceRate, AdvanceRate, "AdvanceRate");
+crate::bindings::macros::wire_methods!(PyAdvanceRate, AdvanceRate, "AdvanceRate", to_dict);
 
 #[pymethods]
 impl PyAdvanceRate {
@@ -171,26 +169,6 @@ impl PyAdvanceRate {
         Ok(Self { inner })
     }
 
-    /// ``AssetType`` wire name the rate applies to.
-    #[getter]
-    fn asset_class(&self) -> String {
-        self.inner.asset_class.clone()
-    }
-
-    /// Advance rate as a decimal.
-    #[getter]
-    fn rate(&self) -> f64 {
-        self.inner.rate
-    }
-
-    /// Eligibility rule of the class.
-    #[getter]
-    fn eligibility(&self) -> PyEligibilityRule {
-        PyEligibilityRule {
-            inner: self.inner.eligibility.clone(),
-        }
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -199,6 +177,17 @@ impl PyAdvanceRate {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyAdvanceRate |s| {
+    /// ``AssetType`` wire name the rate applies to.
+    asset_class -> String = s.inner.asset_class.clone();
+
+    /// Advance rate as a decimal.
+    rate -> f64 = s.inner.rate;
+
+    /// Eligibility rule of the class.
+    eligibility -> PyEligibilityRule = PyEligibilityRule { inner: s.inner.eligibility.clone() };
+});
 
 /// Cap on the eligible collateral one obligor, industry or asset class may
 /// contribute; balance above the cap is excluded from the borrowing base.
@@ -220,10 +209,11 @@ pub struct PyConcentrationLimit {
     pub(crate) inner: ConcentrationLimit,
 }
 
-sc_wire_methods!(
+crate::bindings::macros::wire_methods!(
     PyConcentrationLimit,
     ConcentrationLimit,
-    "ConcentrationLimit"
+    "ConcentrationLimit",
+    to_dict
 );
 
 #[pymethods]
@@ -257,18 +247,6 @@ impl PyConcentrationLimit {
         Ok(Self { inner })
     }
 
-    /// ``"obligor"``, ``"industry"`` or ``"asset_class"``.
-    #[getter]
-    fn scope(&self) -> PyResult<String> {
-        crate::bindings::valuations::convert::enum_to_py_string(&self.inner.scope)
-    }
-
-    /// Maximum share of the eligible collateral in percent.
-    #[getter]
-    fn max_pct(&self) -> f64 {
-        self.inner.max_pct
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -278,6 +256,15 @@ impl PyConcentrationLimit {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyConcentrationLimit |s| {
+    /// ``"obligor"``, ``"industry"`` or ``"asset_class"``.
+    scope -> PyResult<String> =
+        crate::bindings::valuations::convert::enum_to_py_string(&s.inner.scope);
+
+    /// Maximum share of the eligible collateral in percent.
+    max_pct -> f64 = s.inner.max_pct;
+});
 
 /// Advance rates and concentration limits that size a borrowing base.
 ///
@@ -302,10 +289,11 @@ pub struct PyBorrowingBaseRules {
     pub(crate) inner: BorrowingBaseRules,
 }
 
-sc_wire_methods!(
+crate::bindings::macros::wire_methods!(
     PyBorrowingBaseRules,
     BorrowingBaseRules,
-    "BorrowingBaseRules"
+    "BorrowingBaseRules",
+    to_dict
 );
 
 #[pymethods]

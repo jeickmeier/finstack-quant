@@ -106,6 +106,87 @@ pub(crate) fn resolve_lifecycle_value(
     Ok(Some(Money::new(unit_value * inst.quantity, currency)?))
 }
 
+/// Market state an equity-option model pricer works from.
+pub(crate) enum ModelInputs {
+    /// The value is already fixed: an observed exercise/expiry, or zero model
+    /// time to expiry (intrinsic value). Total trade value in `inst.currency`.
+    Settled(Money),
+    /// Live option inputs for the model.
+    Live(EquityOptionInputs),
+}
+
+/// Model failure tagged with the instrument and `model`.
+pub(crate) fn model_error(
+    inst: &EquityOption,
+    model: ModelKey,
+    error: impl std::fmt::Display,
+) -> PricingError {
+    PricingError::model_failure_with_context(
+        error.to_string(),
+        PricingErrorContext::from_instrument(inst).model(model),
+    )
+}
+
+/// Shared pre-amble of the equity-option model pricers.
+///
+/// Resolves a fixed lifecycle value first, then runs the model's exercise and
+/// dividend checks (`validate`), collects the live inputs and short-circuits to
+/// intrinsic value when the model time to expiry is zero (possible on a live
+/// option with a 30/360-style model day count).
+///
+/// # Errors
+///
+/// Lifecycle and input-collection failures are model failures tagged with
+/// `model`; `validate` errors are returned unchanged.
+pub(crate) fn model_inputs(
+    inst: &EquityOption,
+    market: &MarketContext,
+    as_of: Date,
+    model: ModelKey,
+    validate: impl FnOnce() -> std::result::Result<(), PricingError>,
+) -> std::result::Result<ModelInputs, PricingError> {
+    if let Some(pv) =
+        resolve_lifecycle_value(inst, market, as_of).map_err(|e| model_error(inst, model, e))?
+    {
+        return Ok(ModelInputs::Settled(pv));
+    }
+    validate()?;
+    let inputs = collect_inputs(inst, market, as_of).map_err(|e| model_error(inst, model, e))?;
+    if inputs.t_vol <= 0.0 {
+        let intrinsic = match inst.option_type {
+            OptionType::Call => (inputs.spot - inst.strike).max(0.0),
+            OptionType::Put => (inst.strike - inputs.spot).max(0.0),
+        };
+        return Money::new(intrinsic * inst.quantity, inst.currency)
+            .map(ModelInputs::Settled)
+            .map_err(|e| {
+                PricingError::from_core(e, PricingErrorContext::from_instrument(inst).model(model))
+            });
+    }
+    Ok(ModelInputs::Live(inputs))
+}
+
+/// [`model_inputs`] for the European stochastic-volatility models (Heston,
+/// rough Heston, rough Bergomi): rejects non-European exercise and future
+/// discrete dividends, whose escrowed-dividend treatment is Black-Scholes-only.
+///
+/// # Errors
+///
+/// As [`model_inputs`], plus a model failure for American/Bermudan exercise or
+/// a dividend in `(as_of, expiry]`.
+pub(crate) fn stochastic_vol_inputs(
+    inst: &EquityOption,
+    market: &MarketContext,
+    as_of: Date,
+    model: ModelKey,
+    model_name: &str,
+) -> std::result::Result<ModelInputs, PricingError> {
+    model_inputs(inst, market, as_of, model, || {
+        require_european(inst, model_name).map_err(|e| model_error(inst, model, e))?;
+        reject_future_discrete_dividends_for_stochastic_vol(inst, as_of, model, model_name)
+    })
+}
+
 /// Collected market inputs for equity option pricing.
 ///
 /// The effective rate `r` reproduces the curve-native date-to-date discount
@@ -124,29 +205,20 @@ pub(crate) struct EquityOptionInputs {
     pub(crate) t_vol: f64,
 }
 
-/// Collect inputs with curve-native discounting and the configured model time.
-///
-/// The curve's day count is consumed by its date-to-date discount-factor
-/// lookup; `t_vol` uses the configured model day count for volatility lookup and option pricing.
-///
-/// # Discrete Dividend Handling
-///
-/// When `discrete_dividends` is non-empty and contains future dividends (ex-date > as_of
-/// and ex-date <= expiry), the escrowed dividend model is applied:
-/// - Spot is adjusted: `S* = S - Σ D_i × e^{-r × t_i}`
-/// - Dividend yield `q` is set to 0.0 (dividends are already priced into S*)
-///
-/// This is the QuantLib-standard approach for discrete dividends in Black-Scholes.
-/// Extract future discrete dividends as `(time_to_ex_date, amount)` pairs.
-///
-/// Only dividends with an ex-date strictly after `as_of` and on or before
-/// `inst.expiry` are returned (past and post-expiry dividends do not affect the
-/// option). Times use the configured model day count (ACT/365F by default). The returned
-/// slice drives the escrowed-dividend spot adjustment and its rho correction.
-pub(crate) fn has_future_discrete_dividends(inst: &EquityOption, as_of: Date) -> bool {
+/// Discrete dividends that affect a live option: ex-date strictly after
+/// `as_of` and on or before `inst.expiry`, as `(ex_date, cash_amount)` pairs.
+pub(crate) fn future_discrete_dividends(
+    inst: &EquityOption,
+    as_of: Date,
+) -> impl Iterator<Item = &(Date, f64)> {
     inst.discrete_dividends
         .iter()
-        .any(|(ex_date, _)| *ex_date > as_of && *ex_date <= inst.expiry)
+        .filter(move |(ex_date, _)| *ex_date > as_of && *ex_date <= inst.expiry)
+}
+
+/// Whether any discrete dividend falls in `(as_of, expiry]`.
+pub(crate) fn has_future_discrete_dividends(inst: &EquityOption, as_of: Date) -> bool {
+    future_discrete_dividends(inst, as_of).next().is_some()
 }
 
 pub(crate) fn reject_future_discrete_dividends_for_stochastic_vol(
@@ -170,18 +242,18 @@ pub(crate) fn reject_future_discrete_dividends_for_stochastic_vol(
     Ok(())
 }
 
+/// Future discrete dividends as `(time_to_ex_date, present_value)` pairs.
+///
+/// Only dividends in `(as_of, expiry]` with a positive model time are kept.
+/// Times use the configured model day count (ACT/365F by default); each
+/// amount is discounted with its own ex-date discount factor. The result
+/// drives the escrowed-dividend spot adjustment and its rho correction.
 pub(crate) fn future_dividends(
     inst: &EquityOption,
     disc_curve: &finstack_quant_core::market_data::term_structures::DiscountCurve,
     as_of: Date,
 ) -> Result<Vec<(f64, f64)>> {
-    if inst.discrete_dividends.is_empty() {
-        return Ok(Vec::new());
-    }
-    let divs = inst
-        .discrete_dividends
-        .iter()
-        .filter(|(ex_date, _)| *ex_date > as_of && *ex_date <= inst.expiry)
+    let divs = future_discrete_dividends(inst, as_of)
         .map(|(ex_date, amount)| {
             let t_div = year_fraction(inst.day_count, as_of, *ex_date)?;
             let df = disc_curve.df_between_dates(as_of, *ex_date)?;
@@ -194,6 +266,19 @@ pub(crate) fn future_dividends(
     Ok(divs)
 }
 
+/// Collect inputs with curve-native discounting and the configured model time.
+///
+/// The curve's day count is consumed by its date-to-date discount-factor
+/// lookup; `t_vol` uses the configured model day count for volatility lookup and option pricing.
+///
+/// # Discrete Dividend Handling
+///
+/// When `discrete_dividends` is non-empty and contains future dividends (ex-date > as_of
+/// and ex-date <= expiry), the escrowed dividend model is applied:
+/// - Spot is adjusted: `S* = S - Σ D_i × e^{-r × t_i}`
+/// - Dividend yield `q` is set to 0.0 (dividends are already priced into S*)
+///
+/// This is the QuantLib-standard approach for discrete dividends in Black-Scholes.
 pub(crate) fn collect_inputs(
     inst: &EquityOption,
     curves: &MarketContext,
@@ -236,26 +321,10 @@ pub(crate) fn collect_inputs(
         // When a dividend yield ID is explicitly provided, we require the lookup to succeed
         // and return a unitless scalar. Silent fallback to 0.0 would mask market data
         // configuration errors.
-        let q = if let Some(div_id) = &inst.div_yield_id {
-            let ms = curves.get_price(div_id.as_str()).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Failed to fetch dividend yield '{}': {}",
-                    div_id, e
-                ))
-            })?;
-            match ms {
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Dividend yield '{}' should be a unitless scalar, got Price({})",
-                        div_id,
-                        m.currency()
-                    )));
-                }
-            }
-        } else {
-            0.0
-        };
+        let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+            curves,
+            inst.div_yield_id.as_ref(),
+        )?;
         (raw_spot, q)
     };
 
@@ -278,9 +347,7 @@ pub(crate) fn collect_inputs(
 }
 
 fn future_dividend_amounts(inst: &EquityOption, as_of: Date) -> Result<Vec<(f64, f64)>> {
-    inst.discrete_dividends
-        .iter()
-        .filter(|(date, _)| *date > as_of && *date <= inst.expiry)
+    future_discrete_dividends(inst, as_of)
         .map(|(date, amount)| Ok((year_fraction(inst.day_count, as_of, *date)?, *amount)))
         .collect()
 }

@@ -77,7 +77,7 @@ struct StructuredCreditYtmConfigV1 {
 /// For structured credit, **Z-spread is generally more important than YTM**
 /// because it properly accounts for the term structure of rates.
 ///
-pub struct YtmCalculator;
+pub(crate) struct YtmCalculator;
 
 impl YtmCalculator {
     fn compounding_from_config(
@@ -124,10 +124,7 @@ impl YtmCalculator {
         });
         let periods_per_year = match Self::compounding_from_config(context)? {
             Some(compounding) => compounding.periods_per_year(),
-            None => tranche
-                .and_then(|t| t.frequency.months())
-                .filter(|months| *months > 0)
-                .map_or(1.0, |months| 12.0 / f64::from(months)),
+            None => tranche.map_or(1.0, note_periods_per_year),
         };
         Ok((periods_per_year, day_count))
     }
@@ -135,22 +132,10 @@ impl YtmCalculator {
 
 impl MetricCalculator for YtmCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let dirty_price = context
-            .computed
-            .get(&MetricId::DirtyPrice)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:DirtyPrice".to_string(),
-                })
-            })?;
+        let dirty_price = context.computed_metric(&MetricId::DirtyPrice)?;
 
         let quote = super::super::quote::SettlementQuote::from_context(context)?;
-        let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
-        })?;
+        let flows = context.require_cashflows()?;
 
         // Convert price points back to currency using original notional.
         let notional = crate::structured_credit::metrics::pricing::prices::quote_notional(context)?;
@@ -164,77 +149,88 @@ impl MetricCalculator for YtmCalculator {
             context.instrument_as::<crate::structured_credit::StructuredCredit>()?,
             context.as_of,
         )?;
-        if !flows
-            .iter()
-            .any(|(date, amount)| *date > settlement && amount.amount() > 0.0)
-            || target_value <= 0.0
-        {
-            return Err(finstack_quant_core::Error::Validation(
-                "structured-credit yield requires a positive settlement target and future cashflow"
-                    .into(),
-            ));
-        }
-
-        // Day count for year fractions
         let (periods_per_year, day_count) = Self::compounding_basis(
             context,
             context.instrument_as::<crate::structured_credit::StructuredCredit>()?,
         )?;
-
-        // Objective function: PV(y) - target = 0
-        let objective = |y: f64| -> f64 {
-            let base = 1.0 + y / periods_per_year;
-            if base <= 0.0 {
-                return f64::INFINITY;
-            }
-            let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-            for (date, amount) in flows {
-                if *date <= settlement {
-                    continue;
-                }
-
-                // A failed date conversion previously became `0.0`,
-                // and the `t > 0.0` guard below then DROPPED that cashflow from
-                // the PV entirely — silently solving a yield against a
-                // different bond. Skipping is only correct when the flow is
-                // genuinely non-future; a conversion failure is a broken input
-                // and must not masquerade as one.
-                // A failed date conversion previously became `0.0`,
-                // and the `t > 0.0` guard below then DROPPED that cashflow from
-                // the PV entirely — silently solving a yield against a
-                // different bond. Skipping is only correct for a genuinely
-                // non-future flow; a conversion failure is a broken input.
-                //
-                // The objective must stay `f64`, so signal with NaN:
-                // `BrentSolver::find_bracket` rejects a non-finite objective
-                // and surfaces `SolverConvergenceFailed`, which is a loud
-                // failure rather than a confident wrong number.
-                let Ok(t) = day_count.year_fraction(settlement, *date, DayCountContext::default())
-                else {
-                    return f64::NAN;
-                };
-
-                if t > 0.0 {
-                    let df = base.powf(-periods_per_year * t);
-                    pv.add(amount.amount() * df);
-                }
-            }
-            pv.total() - target_value
-        };
-
-        // Solve for YTM using Brent solver
-        // Tolerance: 1e-6 = 0.01 bp precision (market standard)
-        let solver = BrentSolver::new().with_tolerance(YTM_SOLVER_TOLERANCE);
-
-        // Initial guess: 5% is reasonable for structured credit
-        let ytm = solver.solve(objective, 0.05)?;
-
-        Ok(ytm)
+        solve_yield(flows, settlement, target_value, periods_per_year, day_count)
     }
 
     fn dependencies(&self) -> &[MetricId] {
         &[MetricId::DirtyPrice]
     }
+}
+
+/// Coupon periods per year of a note: its payment frequency (annual when the
+/// frequency has no month count).
+pub(crate) fn note_periods_per_year(tranche: &crate::structured_credit::Tranche) -> f64 {
+    tranche
+        .frequency
+        .months()
+        .filter(|months| *months > 0)
+        .map_or(1.0, |months| 12.0 / f64::from(months))
+}
+
+/// Yield compounded `periods_per_year` times a year, with time in
+/// `day_count` from `settlement`, that discounts the flows after
+/// `settlement` to `target_value` (currency units).
+///
+/// # Errors
+///
+/// Returns a validation error when `target_value` is not positive or no
+/// positive flow falls after `settlement`, and a solver error when no yield
+/// reproduces the target.
+pub(crate) fn solve_yield(
+    flows: &[(
+        finstack_quant_core::dates::Date,
+        finstack_quant_core::money::Money,
+    )],
+    settlement: finstack_quant_core::dates::Date,
+    target_value: f64,
+    periods_per_year: f64,
+    day_count: finstack_quant_core::dates::DayCount,
+) -> Result<f64> {
+    if !flows
+        .iter()
+        .any(|(date, amount)| *date > settlement && amount.amount() > 0.0)
+        || target_value <= 0.0
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "structured-credit yield requires a positive settlement target and future cashflow"
+                .into(),
+        ));
+    }
+
+    // Objective function: PV(y) - target = 0
+    let objective = |y: f64| -> f64 {
+        let base = 1.0 + y / periods_per_year;
+        if base <= 0.0 {
+            return f64::INFINITY;
+        }
+        let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+        for (date, amount) in flows {
+            if *date <= settlement {
+                continue;
+            }
+            // A failed date conversion is a broken input, not a non-future
+            // flow: signal it with NaN, which `BrentSolver::find_bracket`
+            // rejects as `SolverConvergenceFailed` instead of solving a yield
+            // against a different bond.
+            let Ok(t) = day_count.year_fraction(settlement, *date, DayCountContext::default())
+            else {
+                return f64::NAN;
+            };
+            if t > 0.0 {
+                pv.add(amount.amount() * base.powf(-periods_per_year * t));
+            }
+        }
+        pv.total() - target_value
+    };
+
+    // Tolerance 1e-6 = 0.01 bp; a 5% initial guess suits structured credit.
+    BrentSolver::new()
+        .with_tolerance(YTM_SOLVER_TOLERANCE)
+        .solve(objective, 0.05)
 }
 
 #[cfg(test)]

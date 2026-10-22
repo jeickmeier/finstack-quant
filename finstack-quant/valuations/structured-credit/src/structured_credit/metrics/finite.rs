@@ -1,8 +1,8 @@
 //! Finite-output guards for the tranche analytics calculators.
 //!
-//! [`calculate_tranche_metrics`](super::calculate_tranche_metrics),
-//! [`calculate_tranche_oas`](super::calculate_tranche_oas) and
-//! [`scenario_table`](super::scenario_table) reject a non-finite field
+//! [`tranche_metrics`](super::tranche_metrics),
+//! [`tranche_oas`](super::tranche_oas) and
+//! [`tranche_scenario_table`](super::tranche_scenario_table) reject a non-finite field
 //! rather than return it: `serde_json` serializes NaN and infinity as JSON
 //! `null`, which downstream consumers coerce to 0, so a failed computation
 //! would otherwise read as a valid result.
@@ -26,18 +26,31 @@ pub(crate) fn ensure_tranche_metrics_finite(metrics: &TrancheMetrics) -> Result<
     ensure_finite(
         &[
             ("pv", metrics.pv),
-            ("price_pct", metrics.price_pct),
+            ("clean_price_pct", metrics.clean_price_pct),
+            ("dirty_price_pct", metrics.dirty_price_pct),
+            ("accrued", metrics.accrued),
             ("factor", metrics.factor),
             ("wal", metrics.wal),
+            ("ytm", metrics.ytm.unwrap_or(0.0)),
             ("z_spread_bp", metrics.z_spread_bp),
             ("cs01", metrics.cs01),
             ("spread_duration", metrics.spread_duration),
-            ("modified_duration", metrics.modified_duration),
-            ("convexity", metrics.convexity),
+            ("spread_convexity", metrics.spread_convexity),
+            ("effective_duration", metrics.effective_duration),
+            ("effective_convexity", metrics.effective_convexity),
             ("target_price_pct", metrics.target_price_pct),
         ],
         "structured-credit tranche metrics",
-    )
+    )?;
+    for (id, value) in &metrics.metrics {
+        if !value.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "structured-credit tranche metrics produced a non-finite registry \
+                 metric `{id}` ({value})"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Reject non-finite metrics before `serde_json` converts them to JSON `null`.
@@ -113,20 +126,24 @@ mod tests {
                 tranche_id: "A".to_string(),
                 currency: finstack_quant_core::currency::Currency::USD,
                 pv: 100.0,
-                price_pct: 100.0,
+                clean_price_pct: 100.0,
+                dirty_price_pct: 100.0,
+                accrued: 0.0,
                 factor: 1.0,
                 wal: 3.0,
+                ytm: None,
                 z_spread_bp: 150.0,
                 cs01: bad,
                 spread_duration: 4.0,
                 spread_convexity: 12.0,
-                modified_duration: 3.5,
-                convexity: 12.0,
+                effective_duration: 3.5,
+                effective_convexity: 12.0,
                 target_price_pct: 98.0,
                 wal_to_call: None,
                 z_spread_to_call_bp: None,
                 dm_to_call_bp: None,
                 dm_bp: None,
+                metrics: Default::default(),
             };
             let err = ensure_tranche_metrics_finite(&metrics)
                 .expect_err("a non-finite cs01 must be rejected");

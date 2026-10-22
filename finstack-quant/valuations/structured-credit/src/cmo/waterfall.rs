@@ -556,8 +556,8 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DateExt;
     const PAYMENT: Date = time::macros::date!(2024 - 02 - 25);
-    fn pac_plan(amount: f64) -> super::super::tranches::pac_support::PacSchedule {
-        use super::super::tranches::pac_support::{PacPayment, PacSchedule};
+    fn pac_plan(amount: f64) -> crate::cmo::PacSchedule {
+        use crate::cmo::{PacPayment, PacSchedule};
         PacSchedule {
             payments: (0..12)
                 .map(|month| PacPayment {
@@ -1571,9 +1571,9 @@ mod tests {
 
 #[cfg(test)]
 mod dated_pac_regressions {
-    use super::super::tranches::pac_support::{PacPayment, PacSchedule};
     use super::super::PacCollar;
     use super::*;
+    use crate::cmo::{PacPayment, PacSchedule};
     use finstack_quant_core::currency::Currency;
     use time::macros::date;
 

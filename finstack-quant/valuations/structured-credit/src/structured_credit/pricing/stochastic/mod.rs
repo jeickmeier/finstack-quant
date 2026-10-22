@@ -8,9 +8,7 @@
 //! # Module Organization
 //!
 //! - [`calibrations`]: Standard calibration constants for RMBS, CLO, CMBS
-//! - [`tree`]: Scenario configuration shared by setup and the pricer
-//! - [`pricer`]: Monte Carlo pricing engine
+//! - [`pricer`]: Monte Carlo pricing engine and its scenario configuration
 
 pub(crate) mod calibrations;
 pub(crate) mod pricer;
-pub(crate) mod tree;

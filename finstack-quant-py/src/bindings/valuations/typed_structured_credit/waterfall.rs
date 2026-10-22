@@ -54,31 +54,16 @@ pub struct PyWaterfall {
     pub(crate) inner: Waterfall,
 }
 
-sc_wire_methods!(PyWaterfall, Waterfall, "Waterfall");
+crate::bindings::macros::wire_methods!(PyWaterfall, Waterfall, "Waterfall", to_dict);
 
 #[pymethods]
 impl PyWaterfall {
-    /// ISO-4217 currency code every waterfall amount is denominated in.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
     /// Ordered tiers as ``WaterfallTier`` serde dicts (``id``, ``priority``,
     /// ``payment_type``, ``allocation_mode``, ``recipients``, ``tests``,
     /// ``funding``).
     #[getter]
     fn tiers<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.tiers)
-    }
-
-    /// Collateral valuation rules attached to the coverage tests, or ``None``.
-    #[getter]
-    fn coverage_rules(&self) -> Option<PyCoverageRules> {
-        self.inner
-            .coverage_rules
-            .clone()
-            .map(|inner| PyCoverageRules { inner })
     }
 
     /// Every coverage test placed in the waterfall as ``CoverageTestSpec``
@@ -109,3 +94,12 @@ impl PyWaterfall {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyWaterfall |s| {
+    /// ISO-4217 currency code every waterfall amount is denominated in.
+    currency -> String = s.inner.currency.to_string();
+
+    /// Collateral valuation rules attached to the coverage tests, or ``None``.
+    coverage_rules -> Option<PyCoverageRules> =
+        s.inner.coverage_rules.clone().map(|inner| PyCoverageRules { inner });
+});

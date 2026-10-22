@@ -523,20 +523,11 @@ fn test_recovery_rate_golden_industry_standards() {
     )
     .unwrap();
     let tranches = TrancheStructure::new(vec![tranche]).unwrap();
-    let registry_recovery = |deal_type: DealType| {
-        StructuredCredit::apply_deal_defaults(
-            format!("TEST-{deal_type:?}"),
-            deal_type,
-            pool.clone(),
-            tranches.clone(),
-            closing,
-            maturity,
-            "USD-OIS",
-        )
-        .expect("valid structured-credit dates")
-        .credit_model
-        .recovery_spec
-        .rate
+    let registry_recovery = |deal: finstack_quant_core::Result<StructuredCredit>| {
+        deal.expect("valid structured-credit dates")
+            .credit_model
+            .recovery_spec
+            .rate
     };
 
     // CLO (Senior Secured Loans): 60% recovery — the rating-agency and
@@ -544,7 +535,14 @@ fn test_recovery_rate_golden_industry_standards() {
     // recovery data for senior secured loans averages 60-70%; the CLO
     // registry used 40% until 2026-09-17, the senior unsecured bond figure).
     assert_eq!(
-        registry_recovery(DealType::Clo),
+        registry_recovery(StructuredCredit::new_clo(
+            "TEST-CLO",
+            pool.clone(),
+            tranches.clone(),
+            closing,
+            maturity,
+            "USD-OIS",
+        )),
         0.60,
         "CLO standard recovery should be 60%"
     );
@@ -552,7 +550,14 @@ fn test_recovery_rate_golden_industry_standards() {
     // RMBS (Residential Mortgages): ~60% recovery
     // Source: S&P RMBS methodology
     assert_eq!(
-        registry_recovery(DealType::Rmbs),
+        registry_recovery(StructuredCredit::new_rmbs(
+            "TEST-RMBS",
+            pool.clone(),
+            tranches.clone(),
+            closing,
+            maturity,
+            "USD-OIS",
+        )),
         0.60,
         "RMBS standard recovery should be 60%"
     );
@@ -560,7 +565,14 @@ fn test_recovery_rate_golden_industry_standards() {
     // Auto ABS: ~45% recovery
     // Source: S&P Auto ABS methodology
     assert_eq!(
-        registry_recovery(DealType::Abs),
+        registry_recovery(StructuredCredit::new_abs(
+            "TEST-ABS",
+            pool.clone(),
+            tranches.clone(),
+            closing,
+            maturity,
+            "USD-OIS",
+        )),
         0.45,
         "Auto ABS standard recovery should be 45%"
     );
@@ -568,7 +580,14 @@ fn test_recovery_rate_golden_industry_standards() {
     // CMBS (Commercial Mortgages): ~65% recovery
     // Source: Moody's CMBS methodology
     assert_eq!(
-        registry_recovery(DealType::Cmbs),
+        registry_recovery(StructuredCredit::new_cmbs(
+            "TEST-CMBS",
+            pool.clone(),
+            tranches,
+            closing,
+            maturity,
+            "USD-OIS",
+        )),
         0.65,
         "CMBS standard recovery should be 65%"
     );

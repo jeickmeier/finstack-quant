@@ -11,11 +11,16 @@ use finstack_quant_valuations::{instruments::Instrument, pricer::InstrumentType}
 
 #[test]
 fn test_same_currency_pair() {
-    let fx = FxSpot::new(InstrumentId::new("USDUSD"), Currency::USD, Currency::USD)
-        .with_notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .expect("notional should be accepted before pair validation")
-        .with_quoted_spot(1.0)
-        .expect("rate should be accepted before pair validation");
+    // A struct literal skips construction-time validation, so pricing itself
+    // must reject the degenerate pair.
+    let fx = FxSpot {
+        id: InstrumentId::new("USDUSD"),
+        base_currency: Currency::USD,
+        quote_currency: Currency::USD,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        quoted_spot: Some(1.0),
+        ..sample_eurusd()
+    };
     let err = fx
         .value(&MarketContext::new(), test_date())
         .expect_err("same-currency FX spot should be rejected");
@@ -66,11 +71,14 @@ fn test_extremely_small_rate() {
 #[test]
 fn test_negative_notional() {
     // Negative notional (short position)
-    let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-        .with_notional(Money::new(-1_000_000.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.20)
-        .expect("test rate");
+    let fx = FxSpot::builder()
+        .id(InstrumentId::new("EURUSD"))
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::USD)
+        .notional(Money::new(-1_000_000.0, Currency::EUR).expect("valid money fixture"))
+        .quoted_spot(1.20)
+        .build()
+        .expect("valid FX spot");
 
     let market = MarketContext::new();
     let pv = fx.value(&market, test_date()).unwrap();
@@ -85,7 +93,10 @@ fn test_negative_notional() {
 
 #[test]
 fn test_settlement_far_future() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2050, 1, 15)); // 25 years out
+    let fx = FxSpot {
+        settlement_date: Some(d(2050, 1, 15)),
+        ..eurusd_with_notional(1_000_000.0, 1.20)
+    }; // 25 years out
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -96,7 +107,10 @@ fn test_settlement_far_future() {
 
 #[test]
 fn test_settlement_far_past() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2000, 1, 15)); // 25 years ago
+    let fx = FxSpot {
+        settlement_date: Some(d(2000, 1, 15)),
+        ..eurusd_with_notional(1_000_000.0, 1.20)
+    }; // 25 years ago
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -116,7 +130,10 @@ fn test_valuation_on_leap_day() {
 
 #[test]
 fn test_settlement_on_leap_day() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2024, 2, 29));
+    let fx = FxSpot {
+        settlement_date: Some(d(2024, 2, 29)),
+        ..eurusd_with_notional(1_000_000.0, 1.20)
+    };
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, d(2024, 2, 28)).unwrap();
@@ -127,7 +144,10 @@ fn test_settlement_on_leap_day() {
 
 #[test]
 fn test_year_boundary_settlement() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2025, 12, 31));
+    let fx = FxSpot {
+        settlement_date: Some(d(2025, 12, 31)),
+        ..eurusd_with_notional(1_000_000.0, 1.20)
+    };
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, d(2025, 12, 30)).unwrap();
@@ -181,9 +201,10 @@ fn test_concurrent_pricing() {
 
 #[test]
 fn test_missing_fx_matrix_error_message() {
-    let fx = sample_eurusd()
-        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap();
+    let fx = FxSpot {
+        notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    };
     let market = MarketContext::new(); // No FX matrix
 
     let result = fx.value(&market, test_date());
@@ -224,11 +245,13 @@ fn test_rate_precision_limits() {
 #[test]
 fn test_weekend_settlement_adjustment() {
     // Settlement on Saturday should adjust to Monday (with Following convention)
-    let fx = eurusd_with_notional(1_000_000.0, 1.20)
-        .with_settlement_date(d(2025, 1, 18)) // Saturday
-        .with_business_day_convention(BusinessDayConvention::Following)
-        .with_base_calendar_id("target2")
-        .with_quote_calendar_id("usny");
+    let fx = FxSpot {
+        settlement_date: Some(d(2025, 1, 18)), // Saturday
+        business_day_convention: BusinessDayConvention::Following,
+        base_calendar_id: Some("target2".into()),
+        quote_calendar_id: Some("usny".into()),
+        ..eurusd_with_notional(1_000_000.0, 1.20)
+    };
 
     let market = MarketContext::new();
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -246,12 +269,15 @@ fn test_weekend_settlement_adjustment() {
 fn test_extreme_settlement_lag() {
     // Test with very far future settlement instead of lag
     let far_future = d(2050, 1, 15);
-    let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.20)
-        .expect("test rate")
-        .with_settlement_date(far_future);
+    let fx = FxSpot::builder()
+        .id(InstrumentId::new("EURUSD"))
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::USD)
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
+        .quoted_spot(1.20)
+        .settlement_date(far_future)
+        .build()
+        .expect("valid FX spot");
 
     let market = MarketContext::new();
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -275,7 +301,10 @@ fn test_default_notional_with_various_rates() {
     let market = MarketContext::new();
 
     for rate in [0.1, 1.0, 10.0, 100.0, 1000.0] {
-        let fx = sample_eurusd().with_quoted_spot(rate).expect("test rate");
+        let fx = FxSpot {
+            quoted_spot: Some(rate),
+            ..sample_eurusd()
+        };
         let pv = fx.value(&market, test_date()).unwrap();
 
         approx_eq(pv.amount(), rate, EPSILON, &format!("Rate {}", rate));

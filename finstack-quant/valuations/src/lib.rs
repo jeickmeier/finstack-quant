@@ -91,21 +91,19 @@
 //! # }
 //! ```
 
-extern crate self as finstack_quant_valuations;
-
 // The framework crate's exported macros keep their `finstack_quant_valuations::` paths.
 pub use finstack_quant_valuations_core::{
     impl_empty_cashflow_provider, impl_focused_pricing_overrides, impl_future_option_instrument,
-    impl_instrument_base, register_generic, register_metrics,
+    impl_instrument_base, register_generic, register_metrics, validate_on_deserialize,
 };
 
 #[doc(hidden)]
 pub use finstack_quant_valuations_core::serde_defaults;
-pub use finstack_quant_valuations_core::{constants, contract_specs, market, recalibration};
+pub use finstack_quant_valuations_core::{
+    constants, contract_specs, market, recalibration, results,
+};
 /// Pricing dispatch and registry infrastructure.
 pub mod pricer;
-/// Valuation result envelopes and metadata.
-pub mod results;
 /// JSON Schema generation for API contracts.
 pub mod schema;
 

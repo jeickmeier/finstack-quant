@@ -24,7 +24,6 @@ use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, Pr
 use finstack_quant_valuations_core::market::conventions::CdsConvention;
 
 use super::parameters::CdsIndexParams;
-use super::pricer::CdsIndexPricer;
 use finstack_quant_valuations_core::impl_instrument_base;
 
 /// Pricing mode for CDS indices.
@@ -68,57 +67,6 @@ impl CdsIndexConstituent {
             defaulted: false,
         }
     }
-}
-
-/// Per-constituent result entry for index-level analytics.
-#[derive(Debug, Clone)]
-pub struct ConstituentResult<T> {
-    /// Hazard curve identifier for the constituent.
-    pub credit_curve_id: CurveId,
-    /// Recovery rate used for the constituent.
-    pub recovery_rate: f64,
-    /// Raw weight supplied on the index definition.
-    pub weight_raw: f64,
-    /// Effective weight used after optional normalization.
-    pub weight_effective: f64,
-    /// Computed value for the constituent.
-    pub value: T,
-}
-
-/// Aggregate result for index-level analytics.
-///
-/// In `SingleCurve` mode, `constituents` is empty.
-#[derive(Debug, Clone)]
-pub struct IndexResult<T> {
-    /// Total aggregated value.
-    pub total: T,
-    /// Optional per-constituent breakdown.
-    pub constituents: Vec<ConstituentResult<T>>,
-}
-
-impl<T> IndexResult<T> {
-    /// Construct a single-curve result with no breakdown.
-    pub fn single_curve(total: T) -> Self {
-        Self {
-            total,
-            constituents: Vec::new(),
-        }
-    }
-}
-
-/// Detailed par spread result for CDS indices.
-///
-/// Note: constituent par spreads are informational and are not additive.
-#[derive(Debug, Clone)]
-pub struct IndexParSpreadResult {
-    /// Total par spread in basis points.
-    pub total_spread_bp: f64,
-    /// Per-constituent par spreads in basis points (informational).
-    pub constituents_spread_bp: Vec<ConstituentResult<f64>>,
-    /// Aggregated protection PV used in the total calculation.
-    pub numerator_protection_pv: Money,
-    /// Aggregated denominator used in the total calculation.
-    pub denominator: f64,
 }
 
 /// CDS Index instrument definition
@@ -454,31 +402,6 @@ impl CdsIndex {
         })
     }
 
-    /// Configure equal-weight constituents by credit parameter set per name.
-    /// Each name receives weight = 1/(n names). Mode switches to `Constituents`.
-    pub fn with_constituents_equal_weight(
-        mut self,
-        names: impl IntoIterator<Item = CreditParams>,
-    ) -> Self {
-        let list: Vec<CreditParams> = names.into_iter().collect();
-        if list.is_empty() {
-            self.constituents.clear();
-            self.pricing = IndexPricing::SingleCurve;
-            return self;
-        }
-        let w = 1.0 / (list.len() as f64);
-        self.constituents = list
-            .into_iter()
-            .map(|credit| CdsIndexConstituent {
-                credit,
-                weight: w,
-                defaulted: false,
-            })
-            .collect();
-        self.pricing = IndexPricing::Constituents;
-        self
-    }
-
     /// Configure explicit constituents with custom weights.
     pub fn with_constituents(mut self, constituents: Vec<CdsIndexConstituent>) -> Self {
         if constituents.is_empty() {
@@ -489,60 +412,6 @@ impl CdsIndex {
             self.pricing = IndexPricing::Constituents;
         }
         self
-    }
-
-    /// Calculate protection leg PV
-    pub fn pv_protection_leg(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pricer = CdsIndexPricer::new();
-        pricer.pv_protection_leg(self, market, as_of)
-    }
-
-    /// Calculate premium leg PV
-    pub fn pv_premium_leg(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pricer = CdsIndexPricer::new();
-        pricer.pv_premium_leg(self, market, as_of)
-    }
-
-    /// Calculate par spread
-    pub fn par_spread(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = CdsIndexPricer::new();
-        pricer.par_spread(self, market, as_of)
-    }
-
-    /// Calculate risky PV01
-    pub fn risky_pv01(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = CdsIndexPricer::new();
-        pricer.risky_pv01(self, market, as_of)
-    }
-
-    /// Calculate CS01 under the default parallel credit-spread bump; the
-    /// `Cs01` metric uses the configured `credit_spread_bump_bp` instead.
-    pub fn cs01(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        provider: &dyn finstack_quant_valuations_core::recalibration::RecalibrationProvider,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = CdsIndexPricer::new();
-        let bump_bp = finstack_quant_valuations_core::metrics::sensitivities::config::SensitivitiesConfig::default()
-            .credit_spread_bump_bp;
-        pricer.cs01(self, market, as_of, provider, bump_bp)
     }
 }
 
@@ -582,8 +451,18 @@ impl finstack_quant_valuations_core::instruments::Instrument for CdsIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pricer = CdsIndexPricer::new();
-        pricer.npv(self, curves, as_of)
+        self.npv(curves, as_of)
+    }
+
+    fn valuation_details(
+        &self,
+        _market: &finstack_quant_core::market_data::context::MarketContext,
+        _as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        crate::family::credit_derivative_details(
+            finstack_quant_valuations_core::pricer::ModelKey::HazardRate,
+            Some("isda_standard_model"),
+        )
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
@@ -603,15 +482,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CdsIndex {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let pricer = CdsIndexPricer::new();
-        let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
+        let schedule = self.build_projected_schedule(curves, as_of)?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 // In Constituents mode, include per-constituent credit curves so that DV01/BucketedDV01
 // correctly bump all credit curves, not just the index-level one.
 

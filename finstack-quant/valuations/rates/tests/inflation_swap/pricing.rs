@@ -12,7 +12,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 use time::Month;
@@ -26,7 +26,7 @@ fn test_par_rate_gives_zero_pv() {
     let ctx = standard_market(as_of, 0.02, 0.04);
 
     // First, compute par rate
-    let temp_swap = InflationSwapBuilder::new()
+    let temp_swap = InflationSwap::builder()
         .id("ZCINF-PAR".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -47,7 +47,7 @@ fn test_par_rate_gives_zero_pv() {
     );
 
     // Now price swap with par rate
-    let par_swap = InflationSwapBuilder::new()
+    let par_swap = InflationSwap::builder()
         .id("ZCINF-PAR2".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -76,7 +76,7 @@ fn test_fixed_leg_pv_scales_with_notional() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap1 = InflationSwapBuilder::new()
+    let swap1 = InflationSwap::builder()
         .id("ZCINF-FL1".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
@@ -90,7 +90,7 @@ fn test_fixed_leg_pv_scales_with_notional() {
         .build()
         .unwrap();
 
-    let swap2 = InflationSwapBuilder::new()
+    let swap2 = InflationSwap::builder()
         .id("ZCINF-FL2".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
@@ -122,7 +122,7 @@ fn test_inflation_leg_pv_scales_with_notional() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap1 = InflationSwapBuilder::new()
+    let swap1 = InflationSwap::builder()
         .id("ZCINF-IL1".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
@@ -136,7 +136,7 @@ fn test_inflation_leg_pv_scales_with_notional() {
         .build()
         .unwrap();
 
-    let swap2 = InflationSwapBuilder::new()
+    let swap2 = InflationSwap::builder()
         .id("ZCINF-IL2".into())
         .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
@@ -170,7 +170,7 @@ fn test_pv_sign_convention_pay_fixed() {
 
     let ctx = standard_market(as_of, 0.03, 0.04); // 3% inflation
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-SIGN".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -197,7 +197,7 @@ fn test_pv_sign_convention_receive_fixed() {
 
     let ctx = standard_market(as_of, 0.01, 0.04); // 1% inflation
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-SIGN2".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -226,7 +226,7 @@ fn test_par_rate_increases_with_inflation_expectations() {
     let ctx_low_infl = standard_market(as_of, 0.01, 0.04);
     let ctx_high_infl = standard_market(as_of, 0.03, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-PAR3".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -259,7 +259,7 @@ fn test_fixed_leg_increases_with_maturity() {
     let mut pvs = Vec::new();
     for years in &[1, 2, 5, 10] {
         let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-MAT".into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -294,7 +294,7 @@ fn test_inflation_leg_increases_with_maturity() {
     let mut pvs = Vec::new();
     for years in &[1, 2, 5, 10] {
         let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-MAT2".into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -329,7 +329,7 @@ fn test_par_rate_formula_consistency() {
 
     let ctx = standard_market(as_of, 0.025, 0.04); // 2.5% inflation
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-FORM".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -361,7 +361,7 @@ fn test_npv_equals_leg_difference() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-NPV".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -396,7 +396,7 @@ fn test_realistic_market_pricing() {
 
     let ctx = realistic_market(as_of);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-REAL".into())
         .notional(large_notional())
         .start_date(as_of)
@@ -426,7 +426,7 @@ fn test_day_count_impact_on_fixed_leg() {
 
     let mut pvs = Vec::new();
     for day_count in &[DayCount::Act360, DayCount::Act365F, DayCount::Thirty360] {
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-DC".into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -465,7 +465,7 @@ fn test_zero_fixed_rate() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-ZERO".into())
         .notional(standard_notional())
         .start_date(as_of)

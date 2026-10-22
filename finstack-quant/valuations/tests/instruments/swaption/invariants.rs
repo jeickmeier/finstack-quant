@@ -21,7 +21,7 @@ use super::common::*;
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations_test_support::test_helpers::tolerances;
+use finstack_quant_valuations_test_support::tolerances;
 use proptest::prelude::*;
 use time::macros::date;
 

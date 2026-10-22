@@ -168,7 +168,6 @@ fn vol_index_future_uses_settlement_price_on_settlement_date() {
             )
             .expect("terms"),
         )
-        .discount_curve_id("USD-OIS".into())
         .vol_index_curve_id("VIX".into())
         .build()
         .expect("future");

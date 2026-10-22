@@ -242,6 +242,12 @@ def test_python_module_is_partitioned(module_path: str) -> None:
 
 
 def claimed_js_paths() -> set[str]:
+    """Full WASM paths that have a Python twin.
+
+    That is every rule match and module rename, plus every member rename whose
+    target is a namespace function (the free-function twin of a data-class
+    method); a member rename to a class member names no namespace key.
+    """
     claimed = set()
     for path, entry in MODULES.items():
         js = entry.get("js", "")
@@ -250,6 +256,8 @@ def claimed_js_paths() -> set[str]:
             if js_name(name) in keys and name not in entry.get("renames", {}):
                 claimed.add(f"{js}.{js_name(name)}")
         claimed |= {rename["js"] for rename in entry.get("renames", {}).values()}
+    for entry in MEMBERS.values():
+        claimed |= {rename["js"] for rename in entry.get("renames", {}).values() if rename["js"] in SURFACE}
     return claimed
 
 

@@ -65,7 +65,7 @@ fn callable_loan_tree_pv_is_below_straight() {
     let loan = build_callable_loan(as_of);
     let market = base_market(as_of);
 
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
     let pv_callable = pricer
         .price_callable(&loan, &market, as_of)
@@ -91,7 +91,7 @@ fn callable_loan_tree_pv_is_below_straight() {
 fn friction_cost_increases_callable_value_monotonically() {
     let as_of = date!(2025 - 01 - 01);
     let market = base_market(as_of);
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
     let mut loan0 = build_callable_loan(as_of);
     loan0
@@ -141,7 +141,7 @@ fn friction_cost_increases_callable_value_monotonically() {
 fn huge_friction_matches_straight_loan() {
     let as_of = date!(2025 - 01 - 01);
     let market = base_market(as_of);
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
     let mut callable = build_callable_loan(as_of);
     callable
@@ -173,7 +173,7 @@ fn oas_round_trip_near_zero_at_model_price() {
     let as_of = date!(2025 - 01 - 01);
     let loan = build_callable_loan(as_of);
     let market = base_market(as_of);
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
     let settlement = loan.settlement_date(as_of).expect("settlement");
     // The PV is anchored at `as_of`; the quote is a settlement-date price, so
@@ -243,7 +243,7 @@ fn credit_tree_higher_hazard_lowers_price() {
     let mut loan = build_callable_loan(as_of);
     loan.credit_curve_id = Some(CurveId::from("USD-HAZ"));
 
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
     let market_low = MarketContext::new().insert(disc.clone()).insert(low_hazard);
     let market_high = MarketContext::new().insert(disc).insert(high_hazard);
@@ -272,7 +272,7 @@ fn credit_tree_higher_hazard_lowers_price() {
 fn call_at_settlement_date_produces_nonzero_pv() {
     let as_of = date!(2025 - 01 - 01);
     let market = base_market(as_of);
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
     // Build a loan whose first call date equals as_of (immediate call option).
     let maturity = date!(2030 - 01 - 01);
@@ -323,7 +323,7 @@ fn call_at_settlement_date_produces_nonzero_pv() {
 fn hard_call_remains_exercisable_until_replaced() {
     let as_of = date!(2025 - 01 - 01);
     let market = base_market(as_of);
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
     let single_effective_date = build_callable_loan(as_of);
     let mut repeated_schedule = single_effective_date.clone();
@@ -365,7 +365,7 @@ fn hard_call_remains_exercisable_until_replaced() {
 fn tree_uses_short_rate_sigma_not_option_implied_volatility() {
     let as_of = date!(2025 - 01 - 01);
     let market = base_market(as_of);
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
     let baseline = build_callable_loan(as_of);
     let base_pv = pricer
@@ -456,7 +456,7 @@ fn floating_callable_rejects_stochastic_short_rate_tree() {
     let mut loan = build_floating_callable(as_of);
     loan.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
     let market = base_market(as_of);
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
     let err = pricer
         .price_callable(&loan, &market, as_of)
         .expect_err("stochastic rates-only floating must be rejected");
@@ -475,7 +475,7 @@ fn floating_callable_deterministic_short_rate_still_prices() {
     let market = MarketContext::new()
         .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
         .insert(flat_forward_curve(0.04, as_of, "USD-SOFR-3M"));
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
     let pv = pricer
         .price_callable(&loan, &market, as_of)
         .expect("zero-vol floating tree")
@@ -490,7 +490,7 @@ fn floating_callable_defaults_to_frozen_projection() {
     let market = MarketContext::new()
         .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
         .insert(flat_forward_curve(0.04, as_of, "USD-SOFR-3M"));
-    let pv = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new()
+    let pv = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer
         .price_callable(&loan, &market, as_of)
         .expect("unset rates-only floating volatility should freeze projection")
         .amount();
@@ -529,7 +529,7 @@ fn quoted_oas_discounts_off_grid_cashflows_at_event_time() {
         * discount
             .df_between_dates(as_of, settlement)
             .expect("settlement df");
-    let actual = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new()
+    let actual = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer
         .price_callable(&loan, &market, as_of)
         .expect("tree OAS PV")
         .amount();
@@ -583,7 +583,7 @@ fn off_cycle_immediate_par_call_includes_accrued() {
         &loan.accrual_config(),
     )
     .expect("accrued");
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
     let pv = pricer
         .price_callable(&loan, &market, as_of)
         .expect("off-cycle call")
@@ -608,7 +608,7 @@ fn term_loan_tree_prices_are_bit_pinned() {
     use finstack_quant_core::market_data::term_structures::ParInterp;
 
     let as_of = date!(2025 - 01 - 01);
-    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer::new();
+    let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
 
     let mut loan = build_callable_loan(as_of);
     loan.instrument_pricing_overrides.market_quotes.quoted_oas = Some(0.0075);

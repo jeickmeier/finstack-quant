@@ -225,9 +225,7 @@ pub fn apply_pricing_overrides(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metrics::{
-        format_bucket_label, format_bucket_label_cow, format_key_rate_label, parse_key_rate_label,
-    };
+    use crate::metrics::{format_bucket_label, format_key_rate_label, parse_key_rate_label};
     use serde_json::json;
 
     #[test]
@@ -291,11 +289,8 @@ mod tests {
         assert_eq!(format_bucket_label(10.0), "10y");
         assert_eq!(format_bucket_label(0.75), "9m");
         assert_eq!(format_bucket_label(1.4), "1y");
-        assert_eq!(
-            format_bucket_label_cow(5.0),
-            std::borrow::Cow::Borrowed("5y")
-        );
-        assert_eq!(format_bucket_label_cow(1.25).into_owned(), "1y");
+        assert_eq!(format_bucket_label(5.0), std::borrow::Cow::Borrowed("5y"));
+        assert_eq!(format_bucket_label(1.25).into_owned(), "1y");
     }
 
     #[test]

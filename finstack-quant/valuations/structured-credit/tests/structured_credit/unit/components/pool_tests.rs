@@ -71,17 +71,19 @@ fn test_pool_asset_fixed_rate_bond_creation() {
 #[test]
 fn test_pool_asset_builder_methods() {
     // Arrange & Act
-    let asset = PoolAsset::floating_rate_loan(
-        "LOAN002",
-        Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
-        "SOFR-3M",
-        500.0,
-        maturity_date(),
-        finstack_quant_core::dates::DayCount::Act360,
-    )
-    .with_rating(CreditRating::BB)
-    .with_industry("Technology")
-    .with_obligor_id("OBLIGOR001");
+    let asset = PoolAsset {
+        industry: Some("Technology".into()),
+        obligor_id: Some("OBLIGOR001".into()),
+        ..PoolAsset::floating_rate_loan(
+            "LOAN002",
+            Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
+            "SOFR-3M",
+            500.0,
+            maturity_date(),
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .with_rating(CreditRating::BB)
+    };
 
     // Assert
     assert_eq!(asset.rating, Some(CreditRating::BB));
@@ -119,10 +121,10 @@ fn test_pool_asset_default_with_recovery() {
     );
 
     // Act
-    asset.default_with_recovery(
-        Money::new(400_000.0, Currency::USD).expect("valid money fixture"),
-        test_date(),
-    );
+    asset.defaulted = true;
+    asset.recovery_amount =
+        Some(Money::new(400_000.0, Currency::USD).expect("valid money fixture"));
+    asset.default_date = Some(test_date());
 
     // Assert
     assert!(asset.defaulted);
@@ -255,10 +257,10 @@ fn test_asset_pool_performing_balance_excludes_defaults() {
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
     );
-    defaulted.default_with_recovery(
-        Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
-        test_date(),
-    );
+    defaulted.defaulted = true;
+    defaulted.recovery_amount =
+        Some(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"));
+    defaulted.default_date = Some(test_date());
     pool.assets.push(defaulted);
 
     // Act
@@ -501,8 +503,9 @@ fn test_pool_weighted_avg_maturity_propagates_balance_errors() {
 fn test_pool_diversity_score_single_obligor() {
     // Arrange
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    pool.assets.push(PoolAsset {
+        obligor_id: Some("OB1".into()),
+        ..PoolAsset::floating_rate_loan(
             "L1",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -510,10 +513,10 @@ fn test_pool_diversity_score_single_obligor() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor_id("OB1"),
-    );
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    });
+    pool.assets.push(PoolAsset {
+        obligor_id: Some("OB1".into()),
+        ..PoolAsset::floating_rate_loan(
             "L2",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -521,8 +524,7 @@ fn test_pool_diversity_score_single_obligor() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor_id("OB1"),
-    );
+    });
 
     // Act
     let diversity = pool.diversity_score();
@@ -535,8 +537,9 @@ fn test_pool_diversity_score_single_obligor() {
 fn test_pool_diversity_score_multiple_obligors() {
     // Arrange
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    pool.assets.push(PoolAsset {
+        obligor_id: Some("OB1".into()),
+        ..PoolAsset::floating_rate_loan(
             "L1",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -544,10 +547,10 @@ fn test_pool_diversity_score_multiple_obligors() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor_id("OB1"),
-    );
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    });
+    pool.assets.push(PoolAsset {
+        obligor_id: Some("OB2".into()),
+        ..PoolAsset::floating_rate_loan(
             "L2",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -555,8 +558,7 @@ fn test_pool_diversity_score_multiple_obligors() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor_id("OB2"),
-    );
+    });
 
     // Act
     let diversity = pool.diversity_score();
@@ -570,8 +572,9 @@ fn test_pool_diversity_score_is_independent_of_asset_order() {
     // The score sums per-obligor balances in obligor-id order, so the same
     // pool in any asset order gives the same bits (and the same bits on
     // native and wasm32, whose hash iteration orders differ).
-    let asset = |i: usize| {
-        PoolAsset::floating_rate_loan(
+    let asset = |i: usize| PoolAsset {
+        obligor_id: Some(format!("OB{i:02}").as_str().into()),
+        ..PoolAsset::floating_rate_loan(
             format!("L{i}").as_str(),
             Money::new(1_000_000.0 + 12_345.67 * (i * i) as f64, Currency::USD)
                 .expect("valid money fixture"),
@@ -580,7 +583,6 @@ fn test_pool_diversity_score_is_independent_of_asset_order() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor_id(format!("OB{i:02}").as_str())
     };
     let mut forward = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     let mut reverse = AssetPool::new("POOL", DealType::Clo, Currency::USD);
@@ -611,8 +613,9 @@ fn test_pool_diversity_score_empty_pool() {
 fn test_pool_assets_by_industry() {
     // Arrange
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    pool.assets.push(PoolAsset {
+        industry: Some("Technology".into()),
+        ..PoolAsset::floating_rate_loan(
             "L1",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -620,10 +623,10 @@ fn test_pool_assets_by_industry() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_industry("Technology"),
-    );
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    });
+    pool.assets.push(PoolAsset {
+        industry: Some("Healthcare".into()),
+        ..PoolAsset::floating_rate_loan(
             "L2",
             Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -631,10 +634,10 @@ fn test_pool_assets_by_industry() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_industry("Healthcare"),
-    );
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    });
+    pool.assets.push(PoolAsset {
+        industry: Some("Technology".into()),
+        ..PoolAsset::floating_rate_loan(
             "L3",
             Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -642,8 +645,7 @@ fn test_pool_assets_by_industry() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_industry("Technology"),
-    );
+    });
 
     // Act
     let tech_assets = pool.assets_by_industry("Technology");
@@ -660,8 +662,9 @@ fn test_pool_assets_by_industry() {
 fn test_pool_assets_by_obligor() {
     // Arrange
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    pool.assets.push(PoolAsset {
+        obligor_id: Some("OB1".into()),
+        ..PoolAsset::floating_rate_loan(
             "L1",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -669,10 +672,10 @@ fn test_pool_assets_by_obligor() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor_id("OB1"),
-    );
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    });
+    pool.assets.push(PoolAsset {
+        obligor_id: Some("OB1".into()),
+        ..PoolAsset::floating_rate_loan(
             "L2",
             Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -680,8 +683,7 @@ fn test_pool_assets_by_obligor() {
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
         )
-        .with_obligor_id("OB1"),
-    );
+    });
 
     // Act
     let ob1_assets = pool.assets_by_obligor("OB1");
@@ -698,8 +700,10 @@ fn test_calculate_pool_stats_comprehensive() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
 
     // Add diverse assets
-    pool.assets.push(
-        PoolAsset::floating_rate_loan(
+    pool.assets.push(PoolAsset {
+        industry: Some("Technology".into()),
+        obligor_id: Some("OB1".into()),
+        ..PoolAsset::floating_rate_loan(
             "L1",
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
@@ -708,12 +712,12 @@ fn test_calculate_pool_stats_comprehensive() {
             finstack_quant_core::dates::DayCount::Act360,
         )
         .with_rating(CreditRating::BB)
-        .with_industry("Technology")
-        .with_obligor_id("OB1"),
-    );
+    });
 
-    pool.assets.push(
-        PoolAsset::fixed_rate_bond(
+    pool.assets.push(PoolAsset {
+        industry: Some("Healthcare".into()),
+        obligor_id: Some("OB2".into()),
+        ..PoolAsset::fixed_rate_bond(
             "B1",
             Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             0.07,
@@ -721,9 +725,7 @@ fn test_calculate_pool_stats_comprehensive() {
             finstack_quant_core::dates::DayCount::Thirty360,
         )
         .with_rating(CreditRating::B)
-        .with_industry("Healthcare")
-        .with_obligor_id("OB2"),
-    );
+    });
 
     // Act
     let stats = calculate_pool_stats(&pool, test_date()).expect("stats");
@@ -763,10 +765,10 @@ fn test_calculate_pool_stats_with_defaults() {
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
     );
-    defaulted.default_with_recovery(
-        Money::new(400_000.0, Currency::USD).expect("valid money fixture"),
-        test_date(),
-    );
+    defaulted.defaulted = true;
+    defaulted.recovery_amount =
+        Some(Money::new(400_000.0, Currency::USD).expect("valid money fixture"));
+    defaulted.default_date = Some(test_date());
     pool.assets.push(defaulted);
 
     // Act

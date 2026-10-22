@@ -1,7 +1,7 @@
 //! Per-flow cashflow export with discount-factor / survival-probability / PV enrichment.
 //!
-//! Provides the Rust cashflow envelope behind the umbrella crate's
-//! `instrument_cashflows` entry points and the Python and WASM bindings. Produces a structured envelope for any instrument
+//! Provides [`instrument_cashflows`](crate::instruments::cashflow_export::instrument_cashflows), the Rust cashflow envelope behind the
+//! Python and WASM `instrument_cashflows` bindings. Produces a structured envelope for any instrument
 //! that is priceable under either the `Discounting` or `HazardRate` model. For
 //! those two models, `sum(flows.pv) ≈ base_value` within rounding.
 //!
@@ -55,7 +55,7 @@ use std::collections::HashMap;
 
 // Envelope schema
 
-/// Top-level cashflow envelope returned by [`export_cashflows`].
+/// Top-level cashflow envelope returned by [`instrument_cashflows`].
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct InstrumentCashflowEnvelope {
@@ -194,8 +194,7 @@ pub struct CashflowRow {
 
 /// Build the enriched cashflow envelope for a validated instrument.
 ///
-/// This is the engine behind the umbrella crate's `instrument_cashflows` and
-/// `instrument_cashflows_json` entry points. The instrument is priced once
+/// Host bindings call it with an already parsed instrument. The instrument is priced once
 /// through its family registry under `model` and its flows are reconciled to
 /// that value.
 ///
@@ -215,7 +214,7 @@ pub struct CashflowRow {
 /// Returns `Error::Validation` if the model is unsupported, the instrument and
 /// model are not registered together, required market data is missing, or the
 /// resulting cashflows cannot be reconciled.
-pub fn export_cashflows(
+pub fn instrument_cashflows(
     instrument: &dyn Instrument,
     market: &MarketContext,
     as_of: &str,
@@ -270,7 +269,7 @@ fn ensure_decomposable(instrument: &dyn Instrument, model_key: ModelKey) -> Resu
 
 /// Build the per-flow trace attached to a valuation result's `explanation`.
 ///
-/// Uses the same rows as [`export_cashflows`], so the trace reconciles to
+/// Uses the same rows as [`instrument_cashflows`], so the trace reconciles to
 /// `priced.value`. When the model has no static per-flow decomposition the
 /// trace holds one `computation_step` entry carrying the reason.
 #[doc(hidden)]

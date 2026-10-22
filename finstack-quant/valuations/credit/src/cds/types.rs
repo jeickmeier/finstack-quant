@@ -260,8 +260,7 @@ impl CreditDefaultSwap {
         finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         let discount = market.get_discount(self.premium_leg.discount_curve_id.as_str())?;
         let hazard = market.get_hazard(self.protection_leg.credit_curve_id.as_str())?;
-        super::pricing::CdsPricer::with_config(super::pricing::CdsPricerConfig::from_cds(self))
-            .par_spread(self, discount.as_ref(), hazard.as_ref(), as_of)
+        CdsPricer::new().par_spread(self, discount.as_ref(), hazard.as_ref(), as_of)
     }
 
     /// Create a canonical example CDS for testing and documentation.
@@ -606,7 +605,8 @@ impl CreditDefaultSwap {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        self.validate()?;
+        // Unchecked kernel: every caller enters through the validated pricing
+        // lifecycle (`Instrument::value*` or the pricer registry).
         let disc = market.get_discount(&self.premium_leg.discount_curve_id)?;
         let surv = market.get_hazard(&self.protection_leg.credit_curve_id)?;
         CdsPricer::new().npv_full(self, disc.as_ref(), surv.as_ref(), as_of)
@@ -669,6 +669,17 @@ impl finstack_quant_valuations_core::instruments::Instrument for CreditDefaultSw
         ))
     }
 
+    fn valuation_details(
+        &self,
+        _market: &finstack_quant_core::market_data::context::MarketContext,
+        _as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        crate::family::credit_derivative_details(
+            finstack_quant_valuations_core::pricer::ModelKey::HazardRate,
+            Some("isda_standard_model"),
+        )
+    }
+
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.premium_leg.end)
     }
@@ -701,10 +712,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CreditDefaultSwap {
 
         // Apply holder-view sign: protection buyer (Pay) pays premium,
         // protection seller (Receive) receives premium.
-        let sign = match self.side {
-            PayReceive::Pay => -1.0,
-            PayReceive::Receive => 1.0,
-        };
+        let sign = self.side.sign();
         schedule.update_flows(|cf| {
             cf.amount = if sign < 0.0 {
                 cf.amount.checked_neg()

@@ -4,7 +4,7 @@
 
 mod levered;
 mod levered_pricer;
-/// Pricer for real estate assets.
+/// Real estate metric calculators.
 pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;

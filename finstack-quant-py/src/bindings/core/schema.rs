@@ -11,7 +11,10 @@ use pyo3::types::{PyList, PyModule};
 /// Docstring for the `finstack_quant.core.schema` Python namespace.
 const MODULE_DOC: &str = "Compiled-in JSON Schemas for the core wire formats.\n\nThe registry covers the persisted market context, the columnar table\nenvelope, period plans, date schedules and their specifications, and\nscorecard rating scales.\n\nUse `index()` to see what this crate publishes, `get(selector)` to fetch one\nschema, and `validate(selector, payload)` to check a payload and get back the\nJSON Pointer of anything that failed.\n\nExamples\n--------\n>>> import json\n>>> from finstack_quant.core import schema\n>>> json.loads(schema.get(\"market_context_state.schema.json\"))[\"$schema\"]\n'https://json-schema.org/draft/2020-12/schema'\n";
 
-schema_registry_functions!(finstack_quant_core::schema::ARTIFACTS);
+schema_registry_functions!(
+    finstack_quant_core::schema::ARTIFACTS,
+    "finstack_quant.core.schema"
+);
 
 /// Register the `finstack_quant.core.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -78,9 +78,6 @@ impl StructuredCreditAssumptionRegistry {
             base_cpr: record.base_cpr,
             prepay_factor_loading: record.prepay_factor_loading,
             cpr_volatility: record.cpr_volatility,
-            default_factor_loading: record.default_factor_loading,
-            default_mean_reversion: record.default_mean_reversion,
-            default_volatility: record.default_volatility,
             refi_sensitivity: record.refi_sensitivity,
             burnout_rate: record.burnout_rate,
         })
@@ -99,9 +96,6 @@ impl StructuredCreditAssumptionRegistry {
             base_cpr: record.base_cpr,
             prepay_factor_loading: record.prepay_factor_loading,
             cpr_volatility: record.cpr_volatility,
-            default_factor_loading: record.default_factor_loading,
-            default_mean_reversion: record.default_mean_reversion,
-            default_volatility: record.default_volatility,
         })
     }
 

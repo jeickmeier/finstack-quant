@@ -45,21 +45,12 @@ impl MetricCalculator for GammaCalculator {
 }
 
 /// CDS option Γ, branched by strike kind (see the module docs).
-pub(crate) fn gamma(
-    option: &CdsOption,
-    curves: &MarketContext,
-    as_of: finstack_quant_core::dates::Date,
-) -> Result<f64> {
-    gamma_with_provider(option, curves, as_of, None)
-}
-
-fn gamma_with_provider(
+pub(crate) fn gamma_with_provider(
     option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
     provider: Option<&dyn RecalibrationProvider>,
 ) -> Result<f64> {
-    option.validate_supported_configuration()?;
     let t = option.time_to_expiry(as_of)?;
     if t <= 0.0 {
         return Ok(0.0);

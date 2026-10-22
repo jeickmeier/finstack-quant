@@ -1,17 +1,18 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::valuations::convert::{enum_to_py_string, money_from_py, money_to_py};
+use crate::bindings::valuations::convert::{
+    enum_to_py_string, money_from_py, money_to_py, typed_list_from_py,
+};
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::errors::serde_json_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CallExercisePolicy, DealType, InstrumentCollateral, InstrumentExerciseOverride,
-    PutExercisePolicy, ReinvestmentPeriod, ReserveInterestDestination,
+    PutExercisePolicy, ReinvestmentPeriod,
 };
 
 use super::super::instruments::enum_from_str;
-use super::pool_asset::pool_assets_from_py;
 use super::{PyPoolAsset, PyRepLine};
 
 /// Parse an internally tagged policy/destination enum from a bare variant
@@ -147,7 +148,9 @@ impl PyAssetPool {
     ///     If ``value`` does not match the ``PoolAsset`` list shape.
     #[pyo3(text_signature = "($self, value)")]
     fn with_assets(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let assets = pool_assets_from_py(py, value)?;
+        let assets = typed_list_from_py(py, value, "assets", |asset: &PyPoolAsset| {
+            asset.inner.clone()
+        })?;
         let mut inner = self.inner.clone();
         inner.assets = assets;
         Ok(Self { inner })
@@ -317,16 +320,16 @@ impl PyAssetPool {
         reserve_interest_destination: Option<&Bound<'_, PyAny>>,
         currency: Option<&str>,
     ) -> PyResult<Self> {
-        let mut inner = self.inner.clone();
-        inner.reserve_account = money_from_py(reserve_account, currency, "reserve_account")?;
-        inner.reserve_account_rate = reserve_account_rate;
-        inner.reserve_target = reserve_target
-            .map(|value| money_from_py(value, currency, "reserve_target"))
-            .transpose()?;
-        inner.reserve_interest_destination = match reserve_interest_destination {
-            Some(value) => tagged_enum_from_py(py, value, "kind", "reserve_interest_destination")?,
-            None => ReserveInterestDestination::default(),
-        };
+        let inner = self.inner.clone().with_reserve(
+            money_from_py(reserve_account, currency, "reserve_account")?,
+            reserve_account_rate,
+            reserve_target
+                .map(|value| money_from_py(value, currency, "reserve_target"))
+                .transpose()?,
+            reserve_interest_destination
+                .map(|value| tagged_enum_from_py(py, value, "kind", "reserve_interest_destination"))
+                .transpose()?,
+        );
         Ok(Self { inner })
     }
 
@@ -492,24 +495,6 @@ impl PyAssetPool {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Pool identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
-    }
-
-    /// Deal classification (serde name).
-    #[getter]
-    fn deal_type(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.deal_type)
-    }
-
-    /// ISO-4217 currency code every pool amount is denominated in.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
     /// Loan-level assets as a list of dicts (``PoolAsset`` serde shape).
     #[getter]
     fn asset_records<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -542,62 +527,6 @@ impl PyAssetPool {
         })
     }
 
-    /// Cumulative defaults to date.
-    #[getter]
-    fn cumulative_defaults(&self) -> PyMoney {
-        money_to_py(self.inner.cumulative_defaults)
-    }
-
-    /// Cumulative recoveries to date.
-    #[getter]
-    fn cumulative_recoveries(&self) -> PyMoney {
-        money_to_py(self.inner.cumulative_recoveries)
-    }
-
-    /// Cumulative prepayments to date.
-    #[getter]
-    fn cumulative_prepayments(&self) -> PyMoney {
-        money_to_py(self.inner.cumulative_prepayments)
-    }
-
-    /// Cumulative scheduled amortization to date.
-    #[getter]
-    fn cumulative_scheduled_amortization(&self) -> PyMoney {
-        money_to_py(self.inner.cumulative_scheduled_amortization)
-    }
-
-    /// Original (cut-off) pool balance when supplied, else ``None`` (the
-    /// engine then reconstructs it from the current balance and the
-    /// cumulative tallies).
-    #[getter]
-    fn original_balance(&self) -> Option<PyMoney> {
-        self.inner.original_balance.map(money_to_py)
-    }
-
-    /// Collection account balance.
-    #[getter]
-    fn collection_account(&self) -> PyMoney {
-        money_to_py(self.inner.collection_account)
-    }
-
-    /// Reserve account balance.
-    #[getter]
-    fn reserve_account(&self) -> PyMoney {
-        money_to_py(self.inner.reserve_account)
-    }
-
-    /// Annual interest rate earned by the reserve account, as a decimal.
-    #[getter]
-    fn reserve_account_rate(&self) -> f64 {
-        self.inner.reserve_account_rate
-    }
-
-    /// Reserve balance revolver repayments replenish toward, or ``None``.
-    #[getter]
-    fn reserve_target(&self) -> Option<PyMoney> {
-        self.inner.reserve_target.map(money_to_py)
-    }
-
     /// Destination of the reserve interest as its serde ``dict``
     /// (``{"kind": "waterfall"}``, ``{"kind": "retain"}`` or
     /// ``{"kind": "tranche", "tranche_id": ...}``).
@@ -627,12 +556,6 @@ impl PyAssetPool {
             .as_ref()
             .map(|period| crate::bindings::pandas_utils::serde_to_py(py, period))
             .transpose()
-    }
-
-    /// Excess-spread account balance.
-    #[getter]
-    fn excess_spread_account(&self) -> PyMoney {
-        money_to_py(self.inner.excess_spread_account)
     }
 
     /// Current balance of the whole pool (mirrors Rust ``AssetPool::total_balance``).
@@ -862,3 +785,47 @@ impl PyAssetPool {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyAssetPool |s| {
+    /// Pool identifier.
+    id -> String = s.inner.id.to_string();
+
+    /// Deal classification (serde name).
+    deal_type -> PyResult<String> = enum_to_py_string(&s.inner.deal_type);
+
+    /// ISO-4217 currency code every pool amount is denominated in.
+    currency -> String = s.inner.currency.to_string();
+
+    /// Cumulative defaults to date.
+    cumulative_defaults -> PyMoney = money_to_py(s.inner.cumulative_defaults);
+
+    /// Cumulative recoveries to date.
+    cumulative_recoveries -> PyMoney = money_to_py(s.inner.cumulative_recoveries);
+
+    /// Cumulative prepayments to date.
+    cumulative_prepayments -> PyMoney = money_to_py(s.inner.cumulative_prepayments);
+
+    /// Cumulative scheduled amortization to date.
+    cumulative_scheduled_amortization -> PyMoney =
+        money_to_py(s.inner.cumulative_scheduled_amortization);
+
+    /// Original (cut-off) pool balance when supplied, else ``None`` (the
+    /// engine then reconstructs it from the current balance and the
+    /// cumulative tallies).
+    original_balance -> Option<PyMoney> = s.inner.original_balance.map(money_to_py);
+
+    /// Collection account balance.
+    collection_account -> PyMoney = money_to_py(s.inner.collection_account);
+
+    /// Reserve account balance.
+    reserve_account -> PyMoney = money_to_py(s.inner.reserve_account);
+
+    /// Annual interest rate earned by the reserve account, as a decimal.
+    reserve_account_rate -> f64 = s.inner.reserve_account_rate;
+
+    /// Reserve balance revolver repayments replenish toward, or ``None``.
+    reserve_target -> Option<PyMoney> = s.inner.reserve_target.map(money_to_py);
+
+    /// Excess-spread account balance.
+    excess_spread_account -> PyMoney = money_to_py(s.inner.excess_spread_account);
+});

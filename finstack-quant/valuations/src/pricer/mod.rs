@@ -8,8 +8,9 @@
 //! are defined in `finstack_quant_valuations_core::pricer` and re-exported here.
 //! This module adds what needs every instrument family: the
 //! [`FAMILIES`](crate::pricer::FAMILIES) list, the [`STANDARD`](crate::pricer::STANDARD)
-//! umbrella family and its registries, and the JSON pricing entry points in
-//! this module ([`price_instrument`](crate::pricer::price_instrument) and its siblings).
+//! umbrella family and its registries, and the JSON pricing entry points
+//! ([`parse_boxed_instrument_from_json`](crate::pricer::parse_boxed_instrument_from_json),
+//! [`price_instrument`](crate::pricer::price_instrument) and friends).
 
 use crate::register_generic;
 pub use finstack_quant_valuations_core::pricer::*;
@@ -25,16 +26,14 @@ pub use json::{
     validate_typed_instrument_json, MetricMetadata, ParsedInstrument, STANDARD_OPTION_GREEKS,
 };
 
-use std::sync::Arc;
-
 use crate::instruments::credit_derivatives::CREDIT;
 use crate::instruments::equity::EQUITY;
-use crate::instruments::exotics::EXOTICS;
-use crate::instruments::fixed_income::structured_credit::STRUCTURED_CREDIT;
 use crate::instruments::fixed_income::FIXED_INCOME;
 use crate::instruments::fx::FX;
 use crate::instruments::rates::RATES;
 use crate::metrics::{MetricRegistry, MetricRegistryError};
+use finstack_quant_valuations_exotics::EXOTICS;
+use finstack_quant_valuations_structured_credit::STRUCTURED_CREDIT;
 
 /// The built-in instrument families, each owning a disjoint set of
 /// instrument types.
@@ -112,12 +111,6 @@ pub fn standard_pricer_registry() -> &'static PricerRegistry {
     STANDARD.pricers()
 }
 
-/// Return the shared standard pricer registry as an `Arc` for pricing options
-/// and dispatch handles.
-pub(crate) fn shared_standard_registry() -> Arc<PricerRegistry> {
-    STANDARD.shared_pricers()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,7 +182,7 @@ mod tests {
         ));
         assert!(ptr::eq(
             standard_pricer_registry(),
-            shared_standard_registry().as_ref(),
+            STANDARD.shared_pricers().as_ref(),
         ));
         assert!(ptr::eq(
             crate::metrics::standard_registry(),

@@ -109,18 +109,19 @@ fn clo(tests: Vec<CoverageTestSpec>) -> (StructuredCredit, Date) {
         ),
     ])
     .expect("structure");
-    let mut deal = StructuredCredit::new_clo(
-        "CLO-COVERAGE-POSITION",
-        pool,
-        tranches,
-        close,
-        maturity,
-        "USD-OIS",
-    )
-    .expect("valid structured-credit dates")
-    .with_calendar_id("nyse")
-    .with_coverage_triggers(tests)
-    .expect("coverage tests");
+    let mut deal = StructuredCredit {
+        coverage_triggers: tests,
+        ..StructuredCredit::new_clo(
+            "CLO-COVERAGE-POSITION",
+            pool,
+            tranches,
+            close,
+            maturity,
+            "USD-OIS",
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse")
+    };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 18);
@@ -338,9 +339,10 @@ fn senior_oc_breach_traps_junior_coupons_only_up_to_the_cure() {
 #[test]
 fn reinvest_action_retains_the_diverted_interest_as_principal_proceeds() {
     let pay_down = simulate(vec![CoverageTestSpec::oc("D", 1.10)]);
-    let reinvest = simulate(vec![
-        CoverageTestSpec::oc("D", 1.10).with_action(CoverageTestAction::Reinvest)
-    ]);
+    let reinvest = simulate(vec![CoverageTestSpec {
+        action: CoverageTestAction::Reinvest,
+        ..CoverageTestSpec::oc("D", 1.10)
+    }]);
 
     let breach = first_principal(&pay_down, "A").expect("PayDownSenior redeems A on the breach");
     assert!(

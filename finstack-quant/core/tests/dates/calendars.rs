@@ -1190,3 +1190,23 @@ fn swiss_and_frankfurt_calendars_do_not_substitute_weekend_holidays() {
     assert!(by_id("defr").is_holiday(make_date(2026, 12, 26)));
     assert!(by_id("defr").is_business_day(make_date(2026, 12, 28)));
 }
+
+#[test]
+fn nerc_observes_sunday_holidays_on_monday_and_leaves_saturday_holidays() {
+    let nerc = calendar_by_id_strict("nerc").unwrap();
+    // 2026-07-04 is a Saturday: not moved, so Friday 2026-07-03 trades.
+    assert!(nerc.is_business_day(make_date(2026, 7, 3)));
+    // 2027-07-04 is a Sunday: observed on Monday 2027-07-05.
+    assert!(!nerc.is_business_day(make_date(2027, 7, 5)));
+    // Federal-only holidays (MLK Day) are NERC business days.
+    assert!(nerc.is_business_day(make_date(2026, 1, 19)));
+    for holiday in [
+        make_date(2026, 1, 1),
+        make_date(2026, 5, 25),
+        make_date(2026, 9, 7),
+        make_date(2026, 11, 26),
+        make_date(2026, 12, 25),
+    ] {
+        assert!(!nerc.is_business_day(holiday), "{holiday}");
+    }
+}

@@ -28,11 +28,13 @@ use serde::{Deserialize, Serialize};
 ///     AdvancingPolicy, DelinquencyModel,
 /// };
 ///
-/// let model = DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])
-///     .with_advancing(AdvancingPolicy::PrincipalAndInterest {
+/// let model = DelinquencyModel {
+///     advancing: AdvancingPolicy::PrincipalAndInterest {
 ///         recoverability_cap_pct: 100.0,
 ///         reimburse_from_collections: false,
-///     });
+///     },
+///     ..DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])
+/// };
 /// assert_eq!(model.buckets(), 3);
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -126,37 +128,6 @@ impl DelinquencyModel {
             advancing: AdvancingPolicy::None,
             modification: None,
         }
-    }
-
-    /// Set the servicer advancing policy.
-    ///
-    /// # Arguments
-    ///
-    /// * `advancing` - Policy applied to missed principal and interest.
-    ///
-    /// # Returns
-    ///
-    /// The model with the policy attached.
-    #[must_use]
-    pub fn with_advancing(mut self, advancing: AdvancingPolicy) -> Self {
-        self.advancing = advancing;
-        self
-    }
-
-    /// Set the loan modification program.
-    ///
-    /// # Arguments
-    ///
-    /// * `modification` - Monthly modification terms applied to delinquent
-    ///   balances.
-    ///
-    /// # Returns
-    ///
-    /// The model with the program attached.
-    #[must_use]
-    pub fn with_modification(mut self, modification: ModificationSpec) -> Self {
-        self.modification = Some(modification);
-        self
     }
 
     /// Number of delinquency buckets before charge-off.

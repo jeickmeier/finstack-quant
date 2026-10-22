@@ -4,7 +4,7 @@ use crate::fx_option::FxOption;
 use crate::shared::{
     collect_fx_option_inputs as collect_shared_fx_option_inputs,
     collect_fx_option_inputs_no_vol as collect_shared_fx_option_inputs_no_vol,
-    FxOptionInputRequest, FxSpotSource,
+    FxOptionInputRequest,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -21,13 +21,6 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
         return Ok(Money::from((0_i64, inst.quote_currency)));
     }
     let (spot, r_d, r_f, sigma, t) = collect_inputs(inst, curves, as_of)?;
-    if spot <= 0.0 || inst.strike < 0.0 || inst.notional.amount() <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-                "FxOption requires spot > 0, strike >= 0, and notional > 0; got spot={spot}, strike={}, notional={}",
-                inst.strike,
-                inst.notional.amount()
-            )));
-    }
 
     if t <= 0.0 {
         let intrinsic = match inst.option_type {
@@ -35,12 +28,6 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
             OptionType::Put => (inst.strike - spot).max(0.0),
         };
         return Money::new(intrinsic * inst.notional.amount(), inst.quote_currency);
-    }
-
-    if !inst.strike.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(
-            "FX option strike must be finite".to_string(),
-        ));
     }
 
     if inst.strike.abs() < STRIKE_ZERO_TOL {
@@ -72,7 +59,7 @@ fn input_request<'a>(
         vol_surface_id: inst.vol_surface_id.as_str(),
         strike: inst.strike,
         instrument_pricing_overrides: &inst.instrument_pricing_overrides,
-        spot_source: FxSpotSource::Matrix,
+        spot_id: None,
         rate_context: "FxOption",
     }
 }
@@ -148,19 +135,6 @@ pub(crate) fn compute_greeks(
     }
     inst.validate()?;
     let (spot, r_d, r_f, sigma, t) = collect_inputs(inst, curves, as_of)?;
-    if spot <= 0.0 || inst.strike < 0.0 || inst.notional.amount() <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-                "FxOption greeks require spot > 0, strike >= 0, and notional > 0; got spot={spot}, strike={}, notional={}",
-                inst.strike,
-                inst.notional.amount()
-            )));
-    }
-
-    if !inst.strike.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(
-            "FX option strike must be finite".into(),
-        ));
-    }
     if t <= 0.0 || inst.strike.abs() < STRIKE_ZERO_TOL {
         // At the expiry kink use half of each one-sided delta, consistently
         // across all four quoting conventions. Zero-strike puts are worthless.

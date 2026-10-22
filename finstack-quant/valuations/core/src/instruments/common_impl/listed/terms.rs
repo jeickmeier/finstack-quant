@@ -21,27 +21,6 @@ pub enum ListedFutureSettlement {
     },
 }
 
-/// Delivery instruction produced after a physically settled future stops trading.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct ListedDeliveryObligation {
-    /// Deliverable asset, grade, location, or basket identifier.
-    pub asset: String,
-    /// Settlement date on which delivery and invoice exchange occur.
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub delivery_date: Date,
-    /// Signed physical quantity: positive is received, negative is delivered.
-    pub asset_quantity: f64,
-    /// Signed settlement-currency invoice: positive is received, negative is paid.
-    pub invoice_amount: f64,
-    /// Settlement currency of the invoice amount.
-    pub currency: Currency,
-}
-
 /// Standardized position, multiplier, and lifecycle terms for a listed future.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -116,47 +95,6 @@ impl ListedFutureTerms {
         };
         terms.validate()?;
         Ok(terms)
-    }
-
-    /// Set the current exchange mark.
-    ///
-    /// # Arguments
-    ///
-    /// * `quoted_price` - Finite current futures price in contract price points.
-    #[must_use]
-    pub fn with_quoted_price(mut self, quoted_price: f64) -> Self {
-        self.quoted_price = Some(quoted_price);
-        self
-    }
-
-    /// Set the official final settlement price.
-    ///
-    /// # Arguments
-    ///
-    /// * `settlement_price` - Finite official exchange settlement in price points.
-    #[must_use]
-    pub fn with_settlement_price(mut self, settlement_price: f64) -> Self {
-        self.settlement_price = Some(settlement_price);
-        self
-    }
-
-    /// Configure physical delivery for the exchange contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `asset` - Non-empty deliverable asset, grade, location, or basket identifier.
-    /// * `quantity_per_contract` - Positive finite physical units per contract.
-    pub fn with_physical_delivery(
-        mut self,
-        asset: impl Into<String>,
-        quantity_per_contract: f64,
-    ) -> finstack_quant_core::Result<Self> {
-        self.settlement = ListedFutureSettlement::Physical {
-            asset: asset.into(),
-            quantity_per_contract,
-        };
-        self.validate()?;
-        Ok(self)
     }
 
     /// Validate position, price, and lifecycle invariants.
@@ -288,45 +226,6 @@ impl ListedFutureTerms {
         self.validate()?;
         Ok(self.position.sign() * self.contracts * self.multiplier)
     }
-
-    /// Produce the post-trading physical delivery obligation, if any.
-    ///
-    /// The generic invoice is `settlement_price × multiplier × contracts`.
-    /// Bond-future conversion factors and accrued interest remain the domain of
-    /// the dedicated bond-future instrument.
-    ///
-    /// # Arguments
-    ///
-    /// * `as_of` - Valuation date; obligations exist after last trading through settlement.
-    pub fn delivery_obligation(
-        &self,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Option<ListedDeliveryObligation>> {
-        self.validate()?;
-        let ListedFutureSettlement::Physical {
-            asset,
-            quantity_per_contract,
-        } = &self.settlement
-        else {
-            return Ok(None);
-        };
-        if as_of <= self.last_trading_date || as_of > self.settlement_date {
-            return Ok(None);
-        }
-        let settlement_price = self.settlement_price.ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "physical delivery requires settlement_price after last trading".to_string(),
-            )
-        })?;
-        let delivery_sign = self.position.sign();
-        Ok(Some(ListedDeliveryObligation {
-            asset: asset.clone(),
-            delivery_date: self.settlement_date,
-            asset_quantity: delivery_sign * self.contracts * quantity_per_contract,
-            invoice_amount: -delivery_sign * self.contracts * self.multiplier * settlement_price,
-            currency: self.currency,
-        }))
-    }
 }
 
 #[cfg(test)]
@@ -335,32 +234,8 @@ mod tests {
     use time::macros::date;
 
     #[test]
-    fn physical_long_receives_asset_and_pays_invoice() {
-        let terms = ListedFutureTerms::new(
-            2.0,
-            100.0,
-            Currency::USD,
-            90.0,
-            date!(2026 - 06 - 28),
-            date!(2026 - 06 - 30),
-            Position::Long,
-        )
-        .expect("terms")
-        .with_physical_delivery("WTI-CUSHING", 1_000.0)
-        .expect("delivery")
-        .with_settlement_price(92.0);
-
-        let obligation = terms
-            .delivery_obligation(date!(2026 - 06 - 29))
-            .expect("obligation")
-            .expect("physical");
-        assert_eq!(obligation.asset_quantity, 2_000.0);
-        assert_eq!(obligation.invoice_amount, -18_400.0);
-    }
-
-    #[test]
     fn mark_resolution_switches_from_live_quote_to_official_settlement() {
-        let terms = ListedFutureTerms::new(
+        let mut terms = ListedFutureTerms::new(
             1.0,
             10.0,
             Currency::USD,
@@ -369,9 +244,9 @@ mod tests {
             date!(2026 - 06 - 30),
             Position::Long,
         )
-        .expect("terms")
-        .with_quoted_price(91.0)
-        .with_settlement_price(92.0);
+        .expect("terms");
+        terms.quoted_price = Some(91.0);
+        terms.settlement_price = Some(92.0);
 
         assert_eq!(
             terms

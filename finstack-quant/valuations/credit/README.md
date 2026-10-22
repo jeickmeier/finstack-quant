@@ -15,7 +15,7 @@ valuations-core only; no other instrument family.
 | Directory | Prices | Market convention / model |
 |-----------|--------|---------------------------|
 | `cds/` | Single-name credit default swaps | ISDA Standard Model conventions (IMM rolls, ACT/360 premium leg, accrual on default, step-in `T+1`), `CdsValuationConvention` for the Bloomberg CDSW clean/dirty presentation, upfront and quoted-spread quoting |
-| `cds_index/` | CDX / iTraxx indices | Constituent-level or index-curve pricing, factor and IMM-roll handling, `IndexResult` constituent breakdown |
+| `cds_index/` | CDX / iTraxx indices | Constituent-level or index-curve pricing, factor and IMM-roll handling |
 | `cds_tranche/` | Synthetic CDO tranches | Gaussian copula with base-correlation interpolation, expected-loss and tranche-spread metrics |
 | `cds_option/` | Payer / receiver options on CDS and indices | Lognormal spread (Black) and price-strike forms, knock-out convention, Bloomberg CDSO quadrature reconciliation |
 | `cs01.rs` | Not an instrument | The shared CS01 fast path: hazard-curve bump and reprice without rebuilding the schedule |
@@ -31,11 +31,11 @@ assert!(!cds.id().is_empty());
 
 ## Public surface
 
-Import path: `finstack_quant_valuations_credit::<leaf>` (or
-`finstack_quant_valuations::instruments::credit_derivatives::<leaf>` through
-the umbrella). `CreditDefaultSwap`, `CdsIndex`, `CdsTranche`, `CdsOption`,
-`CdsOptionStrike` and `CdsOptionStrikeKind` are also re-exported at the crate
-root and flat at `finstack_quant_valuations::instruments`. The quadrature
+Import path: `finstack_quant_valuations_credit::<leaf>::<Type>` (or
+`finstack_quant_valuations::instruments::credit_derivatives::<leaf>::<Type>`
+through the umbrella); the crate root exports only the `CREDIT` family static.
+`CreditDefaultSwap`, `CdsIndex`, `CdsTranche` and `CdsOption` are also flat at
+`finstack_quant_valuations::instruments`. The quadrature
 helpers in `cds_option::{bloomberg_quadrature, pricer}` and the CDS pricing
 engine in `cds::pricing` are `#[doc(hidden)] pub`: the umbrella's Bloomberg
 CDSO golden test reaches them because its market bootstrap needs

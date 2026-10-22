@@ -344,13 +344,6 @@ impl Recipient {
         }
     }
 
-    /// Set weight for pro-rata allocation
-    #[must_use]
-    pub fn with_weight(mut self, weight: f64) -> Self {
-        self.weight = Some(weight);
-        self
-    }
-
     /// Create a fixed fee recipient
     #[must_use]
     pub fn fixed_fee(id: impl Into<String>, provider: impl Into<String>, amount: Money) -> Self {

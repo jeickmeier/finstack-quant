@@ -2,7 +2,6 @@
 //! `CdsIndexParams` preset descriptor and the `CdsIndexConstituent` row.
 
 use pyo3::prelude::*;
-use pyo3::types::PyList;
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
@@ -12,21 +11,20 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndexConstituent, CdsIndexParams, IndexPricing,
 };
-use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::{CreditParams, Instrument};
+use finstack_quant_valuations::market::conventions::CdsConvention;
 use rust_decimal::prelude::ToPrimitive;
 
 use super::super::convert::{
-    attributes_from_py, bool_repr, bps_from_py, builder_repr, date_repr, dated_money_from_py,
-    enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py, opt_repr,
+    attributes_from_py, bool_repr, date_repr, dated_money_from_py, enum_to_py_string, float_repr,
+    money_from_py, money_repr, money_to_py, opt_repr, typed_list_from_py,
 };
-use super::super::instruments::{enum_from_str, serialize_typed_instrument_json};
+use super::super::instruments::enum_from_str;
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
-use super::cds::cds_convention_from_str;
-use crate::bindings::valuations::convert::take_builder;
+use crate::bindings::extract::extract_basis_points;
 
 type CdsIndexBuilderInner =
     finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexBuilder;
@@ -110,8 +108,8 @@ impl PyCdsIndexParams {
             index_name,
             series,
             version,
-            bps_from_py(coupon_bp, "coupon_bp")?,
-            cds_convention_from_str(convention)?,
+            extract_basis_points(coupon_bp, "coupon_bp")?,
+            enum_from_str::<CdsConvention>(convention, "convention")?,
         );
         if let Some(n) = num_constituents {
             inner = inner.with_num_constituents(n);
@@ -149,7 +147,11 @@ impl PyCdsIndexParams {
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn cdx_na_ig(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: CdsIndexParams::cdx_na_ig(series, version, bps_from_py(coupon_bp, "coupon_bp")?),
+            inner: CdsIndexParams::cdx_na_ig(
+                series,
+                version,
+                extract_basis_points(coupon_bp, "coupon_bp")?,
+            ),
         })
     }
 
@@ -183,7 +185,11 @@ impl PyCdsIndexParams {
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn cdx_na_hy(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: CdsIndexParams::cdx_na_hy(series, version, bps_from_py(coupon_bp, "coupon_bp")?),
+            inner: CdsIndexParams::cdx_na_hy(
+                series,
+                version,
+                extract_basis_points(coupon_bp, "coupon_bp")?,
+            ),
         })
     }
 
@@ -220,45 +226,9 @@ impl PyCdsIndexParams {
             inner: CdsIndexParams::itraxx_europe(
                 series,
                 version,
-                bps_from_py(coupon_bp, "coupon_bp")?,
+                extract_basis_points(coupon_bp, "coupon_bp")?,
             ),
         })
-    }
-
-    /// Index name.
-    #[getter]
-    fn index_name(&self) -> String {
-        self.inner.index_name.clone()
-    }
-
-    /// Series number.
-    #[getter]
-    fn series(&self) -> u16 {
-        self.inner.series
-    }
-
-    /// Version within the series.
-    #[getter]
-    fn version(&self) -> u16 {
-        self.inner.version
-    }
-
-    /// Fixed running coupon in basis points.
-    #[getter]
-    fn coupon_bp(&self) -> f64 {
-        self.inner.coupon_bp
-    }
-
-    /// Regional ISDA convention (serde name).
-    #[getter]
-    fn convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.convention)
-    }
-
-    /// Number of names in the pool, if known.
-    #[getter]
-    fn num_constituents(&self) -> Option<u32> {
-        self.inner.num_constituents
     }
 
     /// Return ``repr(self)``.
@@ -274,6 +244,26 @@ impl PyCdsIndexParams {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyCdsIndexParams |s| {
+    /// Index name.
+    index_name -> String = s.inner.index_name.clone();
+
+    /// Series number.
+    series -> u16 = s.inner.series;
+
+    /// Version within the series.
+    version -> u16 = s.inner.version;
+
+    /// Fixed running coupon in basis points.
+    coupon_bp -> f64 = s.inner.coupon_bp;
+
+    /// Regional ISDA convention (serde name).
+    convention -> PyResult<String> = enum_to_py_string(&s.inner.convention);
+
+    /// Number of names in the pool, if known.
+    num_constituents -> Option<u32> = s.inner.num_constituents;
+});
 
 /// One reference entity in a CDS index (typed wrapper for Rust ``CdsIndexConstituent``).
 ///
@@ -403,36 +393,6 @@ impl PyCdsIndexConstituent {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Issuer / reference-entity name.
-    #[getter]
-    fn reference_entity(&self) -> String {
-        self.inner.credit.reference_entity.clone()
-    }
-
-    /// Assumed recovery as a fraction.
-    #[getter]
-    fn recovery_rate(&self) -> f64 {
-        self.inner.credit.recovery_rate
-    }
-
-    /// Hazard curve identifier for the issuer.
-    #[getter]
-    fn credit_curve_id(&self) -> String {
-        self.inner.credit.credit_curve_id.to_string()
-    }
-
-    /// Weight of the issuer in the index notional.
-    #[getter]
-    fn weight(&self) -> f64 {
-        self.inner.weight
-    }
-
-    /// Whether the name has defaulted.
-    #[getter]
-    fn defaulted(&self) -> bool {
-        self.inner.defaulted
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -446,32 +406,22 @@ impl PyCdsIndexConstituent {
     }
 }
 
-/// Coerce `list[CdsIndexConstituent | dict] | str` to Rust constituents.
-fn constituents_from_py(
-    py: Python<'_>,
-    value: &Bound<'_, PyAny>,
-) -> PyResult<Vec<CdsIndexConstituent>> {
-    if let Ok(json) = value.extract::<std::borrow::Cow<'_, str>>() {
-        return serde_json::from_str(&json)
-            .map_err(|e| serde_json_to_py(e, "invalid constituents JSON"));
-    }
-    let Ok(items) = value.cast::<PyList>() else {
-        return Err(pyo3::exceptions::PyTypeError::new_err(format!(
-            "constituents: expected a list of CdsIndexConstituent / dict or a JSON string, got {}",
-            value.get_type().name()?
-        )));
-    };
-    items
-        .iter()
-        .map(|item| {
-            if let Ok(row) = item.cast::<PyCdsIndexConstituent>() {
-                Ok(row.borrow().inner.clone())
-            } else {
-                crate::bindings::module_utils::py_to_serde(py, &item, "constituents entry")
-            }
-        })
-        .collect()
-}
+crate::bindings::macros::py_getters!(PyCdsIndexConstituent |s| {
+    /// Issuer / reference-entity name.
+    reference_entity -> String = s.inner.credit.reference_entity.clone();
+
+    /// Assumed recovery as a fraction.
+    recovery_rate -> f64 = s.inner.credit.recovery_rate;
+
+    /// Hazard curve identifier for the issuer.
+    credit_curve_id -> String = s.inner.credit.credit_curve_id.to_string();
+
+    /// Weight of the issuer in the index notional.
+    weight -> f64 = s.inner.weight;
+
+    /// Whether the name has defaulted.
+    defaulted -> bool = s.inner.defaulted;
+});
 
 /// Credit index (CDX / iTraxx) trade (typed wrapper for Rust ``CdsIndex``).
 ///
@@ -504,22 +454,15 @@ pub struct PyCdsIndex {
         finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex,
 }
 
-impl PyCdsIndex {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(InstrumentJson::CdsIndex(self.inner.clone()), "CdsIndex")
-    }
-}
-
 instrument_envelope_methods!(
-    PyCdsIndex,
+    PyCdsIndex("CdsIndex"),
     CdsIndex,
-    "cds_index",
-    PyCdsIndexBuilder,
-    finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::builder()
-        .constituents(Vec::new())
+    builder = PyCdsIndexBuilder("CdsIndexBuilder", fields),
+    seed =
+        finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::builder()
+            .constituents(Vec::new()),
 );
-instrument_pricing_methods!(PyCdsIndex);
+instrument_pricing_methods!(PyCdsIndex, "CdsIndex");
 
 #[pymethods]
 impl PyCdsIndex {
@@ -729,70 +672,6 @@ impl PyCdsIndex {
             .map_err(core_to_py)
     }
 
-    /// Index name.
-    #[getter]
-    fn index_name(&self) -> String {
-        self.inner.index_name.clone()
-    }
-
-    /// Series number.
-    #[getter]
-    fn series(&self) -> u16 {
-        self.inner.series
-    }
-
-    /// Version within the series.
-    #[getter]
-    fn version(&self) -> u16 {
-        self.inner.version
-    }
-
-    /// Index notional.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
-    /// Fraction of surviving notional (``1.0`` = no defaults since inception).
-    #[getter]
-    fn index_factor(&self) -> f64 {
-        self.inner.index_factor
-    }
-
-    /// ``"pay"`` (buy protection) or ``"receive"`` (sell protection).
-    #[getter]
-    fn side(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.side)
-    }
-
-    /// Regional ISDA convention (serde name).
-    #[getter]
-    fn convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.convention)
-    }
-
-    /// Premium leg specification.
-    #[getter]
-    fn premium_leg(&self) -> PyPremiumLegSpec {
-        PyPremiumLegSpec {
-            inner: self.inner.premium_leg.clone(),
-        }
-    }
-
-    /// Protection leg specification.
-    #[getter]
-    fn protection_leg(&self) -> PyProtectionLegSpec {
-        PyProtectionLegSpec {
-            inner: self.inner.protection_leg.clone(),
-        }
-    }
-
-    /// Pricing mode: ``"single_curve"`` or ``"constituents"``.
-    #[getter]
-    fn pricing(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.pricing)
-    }
-
     /// Constituent rows (empty in ``single_curve`` mode).
     #[getter]
     fn constituents(&self) -> Vec<PyCdsIndexConstituent> {
@@ -801,12 +680,6 @@ impl PyCdsIndex {
             .iter()
             .map(|row| PyCdsIndexConstituent { inner: row.clone() })
             .collect()
-    }
-
-    /// Number of names in the pool, if set.
-    #[getter]
-    fn num_constituents(&self) -> Option<u32> {
-        self.inner.num_constituents
     }
 
     /// Contractual upfront payment as ``(payment_date, amount)``, or ``None``.
@@ -854,6 +727,42 @@ impl PyCdsIndex {
     }
 }
 
+crate::bindings::macros::py_getters!(PyCdsIndex |s| {
+    /// Index name.
+    index_name -> String = s.inner.index_name.clone();
+
+    /// Series number.
+    series -> u16 = s.inner.series;
+
+    /// Version within the series.
+    version -> u16 = s.inner.version;
+
+    /// Index notional.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// Fraction of surviving notional (``1.0`` = no defaults since inception).
+    index_factor -> f64 = s.inner.index_factor;
+
+    /// ``"pay"`` (buy protection) or ``"receive"`` (sell protection).
+    side -> PyResult<String> = enum_to_py_string(&s.inner.side);
+
+    /// Regional ISDA convention (serde name).
+    convention -> PyResult<String> = enum_to_py_string(&s.inner.convention);
+
+    /// Premium leg specification.
+    premium_leg -> PyPremiumLegSpec = PyPremiumLegSpec { inner: s.inner.premium_leg.clone() };
+
+    /// Protection leg specification.
+    protection_leg -> PyProtectionLegSpec =
+        PyProtectionLegSpec { inner: s.inner.protection_leg.clone() };
+
+    /// Pricing mode: ``"single_curve"`` or ``"constituents"``.
+    pricing -> PyResult<String> = enum_to_py_string(&s.inner.pricing);
+
+    /// Number of names in the pool, if set.
+    num_constituents -> Option<u32> = s.inner.num_constituents;
+});
+
 /// Fluent builder for ``CdsIndex``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).
 ///
@@ -869,13 +778,6 @@ pub struct PyCdsIndexBuilder {
     inner: Option<CdsIndexBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyCdsIndex,
-    PyCdsIndexBuilder,
-    "CdsIndexBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyCdsIndexBuilder {
@@ -1053,7 +955,7 @@ impl PyCdsIndexBuilder {
     ///     If ``value`` is not one of the accepted strings; the message lists them.
     #[pyo3(text_signature = "($self, value)")]
     fn convention<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let convention = cds_convention_from_str(value)?;
+        let convention = enum_from_str::<CdsConvention>(value, "convention")?;
         builder_set!(
             slf,
             convention,
@@ -1163,16 +1065,18 @@ impl PyCdsIndexBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a dict/JSON entry does not match the constituent shape.
-    /// TypeError
-    ///     If ``value`` is neither a list nor a string.
+    ///     If ``value`` is neither a sequence nor a string, or a dict/JSON
+    ///     entry does not match the constituent shape.
     #[pyo3(text_signature = "($self, value)")]
     fn constituents<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let constituents = constituents_from_py(py, value)?;
+        let constituents =
+            typed_list_from_py(py, value, "constituents", |row: &PyCdsIndexConstituent| {
+                row.inner.clone()
+            })?;
         let shown = format!("<{} constituents>", constituents.len());
         builder_set!(slf, constituents, shown, |b: CdsIndexBuilderInner| b
             .constituents(constituents))
@@ -1292,33 +1196,6 @@ impl PyCdsIndexBuilder {
         let shown = value.repr()?.to_string();
         builder_set!(slf, attributes, shown, |b: CdsIndexBuilderInner| b
             .attributes(attrs))
-    }
-
-    /// Build the validated CDS index.
-    ///
-    /// Validation is the Rust ``CdsIndex::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndex
-    ///     The validated CDS index.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed CDS index fails validation.
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCdsIndex> {
-        let b = take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyCdsIndex { inner })
-    }
-
-    /// Return ``repr(self)`` listing the fields set so far.
-    fn __repr__(&self) -> String {
-        builder_repr("CdsIndexBuilder", &self.fields)
     }
 }
 

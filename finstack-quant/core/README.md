@@ -53,7 +53,7 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 | `dates::{create_date, parse_iso_date}` | Fallible constructors (no `unwrap` on `from_calendar_date`). |
 | `dates::DayCount` | Day-count conventions, plus `DayCountContext` for conventions (Act/Act ICMA, Bus/252) that need a coupon period or calendar. |
 | `dates::{adjust, BusinessDayConvention, HolidayCalendar, CalendarMetadata}` | Business-day rolling. |
-| `dates::{calendar_by_id_strict, available_calendars, resolve_calendar, resolve_joint_calendar, WEEKENDS_ONLY}` | Calendar registry by id; the 27 built-in calendars are generated from `data/calendars/*.json` at build time, and a `+`-joined id (`"nyse+gblo"`) resolves to their union. |
+| `dates::{calendar_by_id_strict, available_calendars, resolve_calendar, resolve_joint_calendar, WEEKENDS_ONLY}` | Calendar registry by id; the 28 built-in calendars are generated from `data/calendars/*.json` at build time, and a `+`-joined id (`"nyse+gblo"`) resolves to their union. |
 | `dates::{Schedule, ScheduleBuilder, ScheduleSpec, StubKind, ScheduleWarning, ScheduleErrorPolicy}` | Schedule generation with stub handling and EOM rules. |
 | `dates::{Tenor, TenorUnit}` | Tenor arithmetic. |
 | IMM / roll helpers on `dates` | `next_imm`, `third_wednesday`, `third_friday`, `is_cds_date`, `next_cds_date`, `sifma_settlement_date`, `SifmaSettlementClass`, equity and IMM option expiries. |
@@ -249,7 +249,7 @@ editing the input changes the next build:
 
 | Input | Generated into `OUT_DIR` | Included by |
 |-------|--------------------------|-------------|
-| `data/calendars/*.json` (27 calendars) | `calendars.rs` — per-calendar `Rule` tables and the registry, evaluated at runtime (there are no precomputed holiday bitsets) | `src/dates/calendar/mod.rs` |
+| `data/calendars/*.json` (28 calendars) | `calendars.rs` — per-calendar `Rule` tables and the registry, evaluated at runtime (there are no precomputed holiday bitsets) | `src/dates/calendar/mod.rs` |
 | `data/sifma_settlements.csv` | `sifma_settlements_generated.rs` | `src/dates/imm.rs` |
 
 **Committed under `src/generated/`.** `build.rs` does not derive these from the

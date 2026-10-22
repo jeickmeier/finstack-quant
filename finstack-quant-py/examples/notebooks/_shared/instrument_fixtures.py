@@ -307,7 +307,6 @@ def cds_option(idx: int) -> tuple[str, dict]:
             "id": iid,
             "strike": {"spread": str(strike)},
             "option_type": opt_type,
-            "exercise_style": "european",
             "expiry": "2025-06-20",
             "underlying_maturity": "2030-06-20",
             "notional": {"amount": "10000000", "currency": "USD"},

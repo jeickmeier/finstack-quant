@@ -67,18 +67,11 @@ pub(crate) fn resolve_spot(
     inst: &BarrierOption,
     curves: &MarketContext,
 ) -> finstack_quant_core::Result<f64> {
-    let spot = match curves.get_price(&inst.spot_id)? {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(value) => {
-            if value.currency() != inst.currency {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: inst.currency,
-                    actual: value.currency(),
-                });
-            }
-            value.amount()
-        }
-    };
+    let spot =
+        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            curves.get_price(&inst.spot_id)?,
+            inst.currency,
+        )?;
     finstack_quant_core::validation::validate_f64_positive(spot, "BarrierOption asset spot")?;
     Ok(spot)
 }
@@ -119,6 +112,78 @@ pub(crate) fn wants_at_hit_rebate(inst: &BarrierOption) -> bool {
     inst.rebate.is_some() && inst.rebate_timing == PayoutTiming::AtHit
 }
 
+/// Value fixed by the contract state alone, shared by every barrier engine.
+///
+/// Validates the observed monitoring state, then returns the realized payoff
+/// of an expired option or the known rebate of an option already knocked out;
+/// `None` means the option is live and the engine must price it.
+pub(crate) fn settled_barrier_value(
+    inst: &BarrierOption,
+    curves: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<Option<Money>> {
+    inst.validate_monitoring_state(as_of)?;
+    if as_of >= inst.expiry {
+        return price_expired_barrier(inst, curves, as_of).map(Some);
+    }
+    known_knock_out_value(inst, curves, as_of)
+}
+
+/// Black-Scholes vanilla value of a live option whose barrier was already
+/// breached (a knocked-in option, since knocked-out ones are settled by
+/// [`settled_barrier_value`]); `None` when no breach was observed.
+pub(crate) fn knocked_in_vanilla_value(
+    inst: &BarrierOption,
+    inputs: &finstack_quant_valuations_core::instruments::common_impl::helpers::BlackScholesInputsDf,
+) -> finstack_quant_core::Result<Option<Money>> {
+    if inst.observed_barrier_breached != Some(true) {
+        return Ok(None);
+    }
+    let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+        inputs.spot,
+        inst.strike,
+        inputs.r_eff(),
+        inputs.q,
+        inputs.sigma,
+        inputs.t,
+        inst.option_type,
+    );
+    let unit = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
+        unit,
+        "barrier knocked-in vanilla price",
+    )?;
+    Money::new(unit * inst.quantity, inst.currency).map(Some)
+}
+
+/// Monte Carlo barrier payoff on `time_grid`: per-unit rebate, bridge
+/// volatility `sigma`, and at-hit rebate compounding at the flat rate `r`
+/// when the contract pays its rebate at the hit time.
+pub(crate) fn barrier_payoff(
+    inst: &BarrierOption,
+    sigma: f64,
+    time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
+    monitoring: finstack_quant_models::monte_carlo::payoff::barrier::BarrierMonitoring,
+    r: f64,
+) -> BarrierOptionPayoff {
+    let payoff = BarrierOptionPayoff::new(
+        inst.strike,
+        inst.barrier,
+        inst.barrier_type,
+        inst.option_type,
+        inst.rebate.map(|m| m.amount() / inst.quantity),
+        inst.quantity,
+        time_grid.num_steps(),
+        sigma,
+        time_grid,
+        monitoring,
+    );
+    if wants_at_hit_rebate(inst) {
+        payoff.with_rebate_at_hit(r)
+    } else {
+        payoff
+    }
+}
+
 /// Barrier option Monte Carlo pricer.
 pub struct BarrierOptionMcPricer {
     config: PathDependentPricerConfig,
@@ -140,40 +205,22 @@ impl BarrierOptionMcPricer {
     /// - **Discounting**: Uses the discount curve's own day count for DF and zero rate calculations
     /// - **Volatility lookup**: Uses the instrument's day count (assumed to match vol surface calibration)
     /// - **Monte Carlo time grid**: Uses the vol surface time basis for proper barrier monitoring
-    fn price_internal(
+    pub(crate) fn price_internal(
         &self,
         inst: &BarrierOption,
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        inst.validate_monitoring_state(as_of)?;
-        if as_of >= inst.expiry {
-            return price_expired_barrier(inst, curves, as_of);
-        }
-        if let Some(value) = known_knock_out_value(inst, curves, as_of)? {
+        if let Some(value) = settled_barrier_value(inst, curves, as_of)? {
             return Ok(value);
         }
         let inputs = collect_barrier_inputs(inst, curves, as_of)?;
+        if let Some(value) = knocked_in_vanilla_value(inst, &inputs)? {
+            return Ok(value);
+        }
         let (spot, q, sigma, t_vol, discount_factor) =
             (inputs.spot, inputs.q, inputs.sigma, inputs.t, inputs.df);
         let r = inputs.r_eff();
-
-        if inst.observed_barrier_breached == Some(true) {
-            let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
-                spot,
-                inst.strike,
-                r,
-                q,
-                sigma,
-                t_vol,
-                inst.option_type,
-            );
-            let unit = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
-                unit,
-                "barrier knocked-in vanilla price",
-            )?;
-            return Money::new(unit * inst.quantity, inst.currency);
-        }
 
         let gbm_params = GbmParams::new(r, q, sigma)?;
         let process = GbmProcess::new(gbm_params)
@@ -187,24 +234,8 @@ impl BarrierOptionMcPricer {
         let (time_grid, monitoring) =
             inst.monitoring
                 .time_grid(as_of, inst.day_count, None, t_vol, &config)?;
-        let maturity_step = time_grid.num_steps();
-
-        // Create payoff (using vol surface time for barrier adjustment calculations)
-        let mut payoff = BarrierOptionPayoff::new(
-            inst.strike,
-            inst.barrier,
-            inst.barrier_type,
-            inst.option_type,
-            inst.rebate.map(|m| m.amount() / inst.quantity),
-            inst.quantity,
-            maturity_step,
-            sigma,
-            &time_grid,
-            monitoring,
-        );
-        if wants_at_hit_rebate(inst) {
-            payoff = payoff.with_rebate_at_hit(r);
-        }
+        // Payoff on the vol surface time basis used for the barrier adjustment.
+        let payoff = barrier_payoff(inst, sigma, &time_grid, monitoring, r);
 
         // Derive deterministic seed from instrument ID and scenario
 
@@ -255,16 +286,6 @@ impl Pricer for BarrierOptionMcPricer {
     }
 }
 
-/// Present value using Monte Carlo.
-pub(crate) fn compute_pv(
-    inst: &BarrierOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> finstack_quant_core::Result<Money> {
-    let pricer = BarrierOptionMcPricer::new();
-    pricer.price_internal(inst, curves, as_of)
-}
-
 /// Price an expired barrier option using explicit observed barrier state.
 ///
 /// Terminal spot alone is insufficient to determine whether a barrier was
@@ -277,7 +298,6 @@ pub(crate) fn price_expired_barrier(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
-    inst.validate_monitoring_state(as_of)?;
     if let Some(value) = known_knock_out_value(inst, curves, as_of)? {
         return Ok(value);
     }
@@ -292,9 +312,7 @@ pub(crate) fn price_expired_barrier(
         )));
     };
 
-    let ccy = inst.currency;
     let quantity = inst.quantity;
-    let is_knock_out = inst.barrier_type.is_knock_out();
 
     let barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
         finstack_quant_core::Error::Validation(
@@ -309,44 +327,21 @@ pub(crate) fn price_expired_barrier(
     };
     let rebate = inst.rebate.map(|m| m.amount()).unwrap_or(0.0);
 
-    let pv = if is_knock_out {
-        if barrier_breached {
-            match inst.rebate_timing {
-                finstack_quant_core::types::PayoutTiming::AtHit => 0.0,
-                finstack_quant_core::types::PayoutTiming::AtExpiry => rebate,
-            }
-        } else {
-            intrinsic
-        }
-    } else {
-        // Knock-in
-        if barrier_breached {
-            intrinsic
-        } else {
-            rebate
-        }
-    };
+    let pv = finstack_quant_models::closed_form::barrier::expired_barrier_payoff(
+        inst.barrier_type,
+        barrier_breached,
+        inst.rebate_timing,
+        intrinsic,
+        rebate,
+    );
 
-    Money::new(pv, ccy)
+    Money::new(pv, inst.currency)
 }
 
 use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate, BarrierParams};
 /// Reiner-Rubinstein pricer for continuous contractual monitoring.
 /// Discrete observation dates require the Monte Carlo or PDE engine.
 pub(crate) struct BarrierOptionAnalyticalPricer;
-
-impl BarrierOptionAnalyticalPricer {
-    /// Create a new analytical barrier option pricer
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for BarrierOptionAnalyticalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Pricer for BarrierOptionAnalyticalPricer {
     fn key(&self) -> PricerKey {
@@ -360,12 +355,11 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         as_of: Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
         let barrier_opt = expect_inst::<BarrierOption>(instrument, InstrumentType::BarrierOption)?;
+        let wrap = |error| {
+            PricingError::from_core(error, PricingErrorContext::from_instrument(barrier_opt))
+        };
 
-        barrier_opt
-            .validate_monitoring_state(as_of)
-            .map_err(|error| {
-                PricingError::from_core(error, PricingErrorContext::from_instrument(barrier_opt))
-            })?;
+        barrier_opt.validate_monitoring_state(as_of).map_err(wrap)?;
         if matches!(
             barrier_opt.monitoring,
             finstack_quant_valuations_core::instruments::Monitoring::Discrete { .. }
@@ -376,20 +370,13 @@ impl Pricer for BarrierOptionAnalyticalPricer {
             ));
         }
 
-        if as_of >= barrier_opt.expiry {
-            let pv = price_expired_barrier(barrier_opt, market, as_of).map_err(|error| {
-                PricingError::from_core(error, PricingErrorContext::from_instrument(barrier_opt))
-            })?;
-            return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv));
-        }
-        if let Some(value) = known_knock_out_value(barrier_opt, market, as_of).map_err(|error| {
-            PricingError::from_core(error, PricingErrorContext::from_instrument(barrier_opt))
-        })? {
+        if let Some(value) = settled_barrier_value(barrier_opt, market, as_of).map_err(wrap)? {
             return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, value));
         }
-        let bs_inputs = collect_barrier_inputs(barrier_opt, market, as_of).map_err(|error| {
-            PricingError::from_core(error, PricingErrorContext::from_instrument(barrier_opt))
-        })?;
+        let bs_inputs = collect_barrier_inputs(barrier_opt, market, as_of).map_err(wrap)?;
+        if let Some(value) = knocked_in_vanilla_value(barrier_opt, &bs_inputs).map_err(wrap)? {
+            return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, value));
+        }
         let (spot, q, sigma, t, df) = (
             bs_inputs.spot,
             bs_inputs.q,
@@ -397,30 +384,6 @@ impl Pricer for BarrierOptionAnalyticalPricer {
             bs_inputs.t,
             bs_inputs.df,
         );
-
-        if barrier_opt.observed_barrier_breached == Some(true) {
-            let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
-                spot,
-                barrier_opt.strike,
-                bs_inputs.r_eff(),
-                q,
-                sigma,
-                t,
-                barrier_opt.option_type,
-            );
-            let unit = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
-                unit,
-                "barrier observed-breach vanilla price",
-            )?;
-            let pv =
-                Money::new(unit * barrier_opt.quantity, barrier_opt.currency).map_err(|error| {
-                    finstack_quant_valuations_core::pricer::PricingError::from_core(
-                        error,
-                        finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(barrier_opt),
-                    )
-                })?;
-            return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv));
-        }
 
         let analytical_barrier_type = barrier_opt.barrier_type;
 
@@ -501,7 +464,6 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::Attributes;
-    use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_core::types::{BarrierType, PayoutTiming};
     use finstack_quant_models::closed_form::barrier::{
@@ -688,18 +650,14 @@ mod tests {
         let expected_at_hit = finstack_quant_models::closed_form::barrier::barrier_rebate(
             &p,
             rebate,
-            AnalyticalBarrierType::UpAndOut,
+            BarrierType::UpAndOut,
             finstack_quant_core::types::PayoutTiming::AtHit,
         );
         assert!(((rebate_pv - base_pv) - expected_at_hit).abs() < 1e-12);
 
         // Explicit AtExpiry reproduces the legacy pay-at-expiry value.
-        let expected_at_expiry = barrier_rebate(
-            &p,
-            rebate,
-            AnalyticalBarrierType::UpAndOut,
-            PayoutTiming::AtExpiry,
-        );
+        let expected_at_expiry =
+            barrier_rebate(&p, rebate, BarrierType::UpAndOut, PayoutTiming::AtExpiry);
         assert!(((rebate_pv_at_expiry - base_pv) - expected_at_expiry).abs() < 1e-12);
 
         // At-hit must dominate at-expiry under positive rates.
@@ -768,7 +726,7 @@ mod tests {
             observation_dates: vec![expiry],
         };
         let market = market(as_of, 100.0, 0.2, 0.05, 0.0);
-        let error = BarrierOptionAnalyticalPricer::new()
+        let error = BarrierOptionAnalyticalPricer
             .price_dyn(&option, &market, as_of)
             .expect_err("discrete contract cannot use continuous formula");
         assert!(error.to_string().contains("continuous monitoring"));
@@ -921,7 +879,7 @@ mod tests {
         let df = (-rate * t).exp();
         let p = BarrierParams::with_df(spot, strike, barrier, t, df, div_yield, vol)
             .expect("positive df constructs");
-        let expected = barrier_price(&p, AnalyticalBarrierType::UpAndOut, OptionType::Put);
+        let expected = barrier_price(&p, BarrierType::UpAndOut, OptionType::Put);
 
         assert!((pv - expected).abs() < 1e-12);
     }

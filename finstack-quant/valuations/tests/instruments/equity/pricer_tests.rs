@@ -6,8 +6,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::common_impl::pricing::GenericInstrumentPricer;
 use finstack_quant_valuations::instruments::equity::spot::Equity;
+use finstack_quant_valuations::instruments::pricing::GenericInstrumentPricer;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, Pricer};
 
@@ -149,22 +149,6 @@ fn test_equity_forward_price() {
         .unwrap();
     let expected = 100.0 * (0.03_f64).exp(); // ~103.05
     assert!((forward_price.amount() - expected).abs() < 0.01);
-}
-
-#[test]
-fn test_equity_forward_value() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_quoted_spot(100.0)
-        .with_quantity(10.0);
-
-    let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
-    let curve = build_flat_curve(0.04, base_date, "USD");
-    let market = MarketContext::new().insert(curve);
-
-    // Forward value should be forward_price_per_share * shares
-    let forward_value = equity.forward_value(&market, base_date, 1.0).unwrap();
-    let expected = 100.0 * (0.04_f64).exp() * 10.0; // ~104.08 * 10 = 1040.8
-    assert!((forward_value.amount() - expected).abs() < 0.1);
 }
 
 #[test]

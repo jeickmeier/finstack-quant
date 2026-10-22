@@ -194,7 +194,7 @@ export function ScenarioHeatmapPanel({
       priceDomain={priceDomain}
       link={link}
       caption="Original native scenario prices"
-      sources={[{ label: "structuredCreditTrancheScenarioTable" }]}
+      sources={[{ label: "trancheScenarioTable" }]}
     />
   );
 }

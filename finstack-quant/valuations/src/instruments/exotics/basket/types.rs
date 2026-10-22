@@ -155,7 +155,6 @@ pub struct Basket {
 }
 
 impl Basket {
-    // Builder provided by derive
     /// Create a canonical example basket with two market data constituents.
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
@@ -209,78 +208,6 @@ impl Basket {
             ConstituentReference::Instrument(json) => Ok(Some(json.as_ref().clone().into_boxed()?)),
             ConstituentReference::MarketData { .. } => Ok(None),
         }
-    }
-
-    /// Create an example basket with instrument-backed constituents.
-    pub fn example_with_instruments() -> finstack_quant_core::Result<Self> {
-        use finstack_quant_core::currency::Currency;
-        use finstack_quant_core::money::Money;
-        use time::macros::date;
-
-        // Create a bond instrument
-        let bond = crate::instruments::fixed_income::bond::Bond::fixed(
-            "CORP-BOND-001",
-            Money::from((1000_i64, Currency::USD)),
-            finstack_quant_core::types::Rate::from_decimal(0.05)?,
-            date!(2024 - 01 - 01),
-            date!(2034 - 01 - 01),
-            finstack_quant_core::dates::StubKind::ShortFront,
-            "USD-OIS",
-        )?;
-
-        let constituents = vec![
-            BasketConstituent {
-                id: "BOND-CORP".to_string(),
-                reference: ConstituentReference::Instrument(Box::new(
-                    crate::instruments::json_loader::InstrumentJson::Bond(bond),
-                )),
-                weight: 0.0,
-                units: Some(100.0),
-                ticker: Some("CORP".to_string()),
-            },
-            BasketConstituent {
-                id: "EQ-AAPL".to_string(),
-                reference: ConstituentReference::MarketData {
-                    price_id: PriceId::new("AAPL-SPOT"),
-                    asset_type: BasketAssetType::Equity,
-                },
-                weight: 1.0,
-                units: None,
-                ticker: Some("AAPL".to_string()),
-            },
-        ];
-
-        Basket::builder()
-            .id(InstrumentId::new("BASKET-MIXED"))
-            .constituents(constituents)
-            .expense_ratio(0.001)
-            .reporting_currency(Currency::USD)
-            .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
-            .attributes(Attributes::new())
-            .pricing_config(BasketPricingConfig::default())
-            .build()
-    }
-
-    /// Create a new basket with custom pricing configuration.
-    pub fn with_pricing_config(mut self, config: BasketPricingConfig) -> Self {
-        self.pricing_config = config;
-        self
-    }
-
-    /// Get a configured calculator for this basket.
-    ///
-    /// This centralizes calculator creation and avoids duplication across
-    /// metrics, pricers, and other components.
-    pub fn calculator(&self) -> crate::instruments::exotics::basket::pricer::BasketCalculator {
-        crate::instruments::exotics::basket::pricer::BasketCalculator::with_config(
-            self.pricing_config.clone(),
-        )
-    }
-
-    /// Get constituent by ID
-    pub fn get_constituent(&self, id: &str) -> Option<&BasketConstituent> {
-        self.constituents.iter().find(|c| c.id == id)
     }
 
     /// Get total number of constituents
@@ -349,7 +276,7 @@ impl Instrument for Basket {
     fn base_value(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
         // Scale NAV-per-unit by explicit basket notional for portfolio PV.
-        let nav_per_unit = self.calculator().nav(self, curves, as_of, 1.0)?;
+        let nav_per_unit = super::pricer::nav(self, curves, as_of, 1.0)?;
         let scaled = nav_per_unit.amount() * self.notional.amount();
         Money::new(scaled, self.notional.currency())
     }
@@ -357,7 +284,6 @@ impl Instrument for Basket {
     crate::impl_focused_pricing_overrides!();
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 crate::impl_empty_cashflow_provider!(
     Basket,
     finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder

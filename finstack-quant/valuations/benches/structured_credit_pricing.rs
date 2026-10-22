@@ -119,15 +119,15 @@ fn create_deal(deal_type: DealType, num_assets: usize) -> StructuredCredit {
     let pool = create_pool(deal_type, num_assets);
     let tranches = create_tranches(10_000_000.0);
 
-    StructuredCredit::apply_deal_defaults(
-        format!("{:?}-BENCHMARK", deal_type),
-        deal_type,
-        pool,
-        tranches,
-        closing_date(),
-        maturity_date(),
-        "USD-OIS",
-    )
+    let id = format!("{deal_type:?}-BENCHMARK");
+    let (close, legal) = (closing_date(), maturity_date());
+    match deal_type {
+        DealType::Clo => StructuredCredit::new_clo(id, pool, tranches, close, legal, "USD-OIS"),
+        DealType::Cmbs => StructuredCredit::new_cmbs(id, pool, tranches, close, legal, "USD-OIS"),
+        DealType::Rmbs => StructuredCredit::new_rmbs(id, pool, tranches, close, legal, "USD-OIS"),
+        DealType::Abs => StructuredCredit::new_abs(id, pool, tranches, close, legal, "USD-OIS"),
+        other => panic!("benchmark has no deal profile for {other:?}"),
+    }
     .expect("valid structured-credit dates")
 }
 

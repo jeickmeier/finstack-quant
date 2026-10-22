@@ -12,13 +12,15 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     execute_waterfall, run_simulation_with_diagnostics, AssetPool, CoverageTestDiagnostic,
     CoverageTestSpec, DealType, HedgeSwap, PaymentCalculation, PaymentType, PeriodDiagnostics,
     PoolAsset, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, Tranche, TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
+    StructuredCredit, SwapNotional, Tranche, TrancheStructure, Waterfall, WaterfallContext,
+    WaterfallTier,
 };
 use time::macros::date;
 
@@ -90,12 +92,12 @@ fn clo(tests: Vec<CoverageTestSpec>) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_clo("CLO-TRIGGERS", pool, tranches, CLOSE, MATURITY, "USD-OIS")
+    let mut deal = StructuredCredit {
+        coverage_triggers: tests,
+        ..StructuredCredit::new_clo("CLO-TRIGGERS", pool, tranches, CLOSE, MATURITY, "USD-OIS")
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
-            .with_coverage_triggers(tests)
-            .expect("tests");
+    };
     deal.fees = None;
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -105,7 +107,7 @@ fn clo(tests: Vec<CoverageTestSpec>) -> StructuredCredit {
 
 /// Pay 6% fixed against SOFR on the senior par: with SOFR at 2% the net
 /// payment is about 600k a quarter, ranked as a senior fee.
-fn hedged(deal: StructuredCredit) -> StructuredCredit {
+fn hedged(mut deal: StructuredCredit) -> StructuredCredit {
     let mut swap = usd_irs_swap(
         InstrumentId::new("HEDGE-A"),
         usd(60_000_000.0),
@@ -117,7 +119,11 @@ fn hedged(deal: StructuredCredit) -> StructuredCredit {
     .expect("swap");
     swap.fixed_leg.frequency = Tenor::quarterly();
     swap.float_leg.frequency = Tenor::quarterly();
-    deal.with_hedge_swap(HedgeSwap::new(swap).on_tranche_par("A"))
+    deal.hedge_swaps.push(HedgeSwap {
+        notional: SwapNotional::TranchePar("A".into()),
+        ..HedgeSwap::new(swap)
+    });
+    deal
 }
 
 fn periods(deal: &StructuredCredit) -> Vec<PeriodDiagnostics> {
@@ -238,11 +244,10 @@ fn diverted_and_equity(deal: &StructuredCredit, waterfall: &Waterfall) -> (f64, 
 fn a_fifty_percent_diversion_after_the_sub_fee_diverts_half_the_residual() {
     let deal = clo(Vec::new());
     let mut waterfall = junior_fee_waterfall();
-    waterfall.insert_coverage_test(
-        CoverageTestSpec::ic("A", 5.0)
-            .after_junior_fees()
-            .with_divert_pct(50.0),
-    );
+    waterfall.insert_coverage_test(CoverageTestSpec {
+        divert_pct: Some(50.0),
+        ..CoverageTestSpec::ic("A", 5.0).after_junior_fees()
+    });
     let ids: Vec<&str> = waterfall.tiers.iter().map(|t| t.id.as_str()).collect();
     assert_eq!(
         ids,
@@ -275,18 +280,16 @@ fn a_fifty_percent_diversion_after_the_sub_fee_diverts_half_the_residual() {
 fn tests_with_different_caps_at_one_position_each_bind() {
     let deal = clo(Vec::new());
     let mut waterfall = junior_fee_waterfall();
-    waterfall.insert_coverage_test(
-        CoverageTestSpec::ic("A", 5.0)
-            .after_junior_fees()
-            .with_divert_pct(50.0),
-    );
+    waterfall.insert_coverage_test(CoverageTestSpec {
+        divert_pct: Some(50.0),
+        ..CoverageTestSpec::ic("A", 5.0).after_junior_fees()
+    });
     // OC = 100M / 60M = 1.67x against a 3x trigger: the cure (pay A down
     // to 33.3M) far exceeds the residual, so only the cap binds.
-    waterfall.insert_coverage_test(
-        CoverageTestSpec::oc("A", 3.0)
-            .after_junior_fees()
-            .with_divert_pct(25.0),
-    );
+    waterfall.insert_coverage_test(CoverageTestSpec {
+        divert_pct: Some(25.0),
+        ..CoverageTestSpec::oc("A", 3.0).after_junior_fees()
+    });
     let test_tiers: Vec<Vec<&str>> = waterfall
         .tiers
         .iter()
@@ -323,16 +326,26 @@ fn a_tier_mixing_diversion_caps_is_rejected() {
             "mixed_caps",
             0,
             vec![
-                CoverageTestSpec::ic("A", 5.0).with_divert_pct(50.0),
-                CoverageTestSpec::oc("A", 3.0).with_divert_pct(25.0),
+                CoverageTestSpec {
+                    divert_pct: Some(50.0),
+                    ..CoverageTestSpec::ic("A", 5.0)
+                },
+                CoverageTestSpec {
+                    divert_pct: Some(25.0),
+                    ..CoverageTestSpec::oc("A", 3.0)
+                },
             ],
         ),
     );
     for (index, tier) in waterfall.tiers.iter_mut().enumerate() {
         tier.priority = index + 1;
     }
-    let err = clo(Vec::new())
-        .with_waterfall(waterfall)
+    let deal = StructuredCredit {
+        waterfall: Some(waterfall),
+        ..clo(Vec::new())
+    };
+    let err = deal
+        .validate_invariants()
         .expect_err("mixed caps in one tier must be rejected");
     assert!(err.to_string().contains("divert_pct"), "{err}");
 }

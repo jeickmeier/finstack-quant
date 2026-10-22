@@ -1,13 +1,13 @@
 //! Stochastic Monte Carlo revolving-credit pricing.
 
 use super::path_generator::generate_three_factor_paths;
-use super::path_pricing::resolve_fixings;
 use super::results::EnhancedMonteCarloResult;
 use super::unified::{
     RevolvingCreditPricer, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR,
 };
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::revolving_credit::types::{DrawRepaySpec, RevolvingCredit, RevolvingCreditMcRun};
+use crate::revolving_credit::utils::resolve_fixings;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
@@ -207,7 +207,7 @@ impl RevolvingCreditPricer {
             ));
         }
 
-        use super::super::types::{CreditSpreadProcessSpec, McConfig};
+        use crate::revolving_credit::types::{CreditSpreadProcessSpec, McConfig};
         let mc_config_to_use;
         let mc_config = if let Some(ref mc_config) = stoch_spec.mc_config {
             mc_config.validate()?;
@@ -267,7 +267,7 @@ impl RevolvingCreditPricer {
         let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
         // Factor state is observed on accrual boundaries plus term-index
         // reset dates so intra-period resets re-fix the coupon.
-        let observation_dates = super::super::utils::build_observation_dates(facility)?;
+        let observation_dates = crate::revolving_credit::utils::build_observation_dates(facility)?;
 
         // Generate 3-factor paths (simulation starts at as_of for seasoned facilities)
         let paths = generate_three_factor_paths(

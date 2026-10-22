@@ -1,5 +1,6 @@
 //! Commodity option instrument definition and pricing logic.
 
+use crate::commodity::bump_price_curve_pct;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -13,7 +14,6 @@ use finstack_quant_models::trees::BinomialTree;
 use finstack_quant_models::types::OptionMarketParams;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityConvention;
 use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::SettlementType;
@@ -205,18 +205,6 @@ pub struct CommoditySpotOption {
     )]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Optional market convention for this commodity.
-    ///
-    /// When set, provides default premium settlement days and calendar.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub convention: Option<CommodityConvention>,
-    /// Premium settlement lag in business days after trade date.
-    ///
-    /// Standard: T+1 for most exchange-traded options, T+2 for OTC.
-    /// If not set and `convention` is provided, uses convention default.
-    /// Otherwise defaults to 1 (T+1).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub premium_settlement_days: Option<u32>,
     /// Attributes for tagging and selection.
     #[builder(default)]
     #[serde(default)]
@@ -482,18 +470,6 @@ impl CommoditySpotOption {
         })
     }
 
-    /// Get the effective premium settlement lag in business days.
-    ///
-    /// Resolution order:
-    /// 1. `premium_settlement_days` if explicitly set
-    /// 2. `convention.settlement_days()` if convention is set
-    /// 3. Default: 1 (T+1, standard for exchange-traded options)
-    pub fn effective_premium_settlement_days(&self) -> u32 {
-        self.premium_settlement_days
-            .or_else(|| self.convention.map(|c| c.settlement_days()))
-            .unwrap_or(1)
-    }
-
     /// Price commodity option using Monte Carlo with Schwartz-Smith dynamics.
     ///
     /// Simulates paths under the Schwartz-Smith two-factor model and
@@ -688,27 +664,10 @@ fn implied_carry(spot: f64, forward: f64, r: f64, t: f64) -> f64 {
     }
 }
 
-fn black76_unit_price(
-    forward: f64,
-    strike: f64,
-    sigma: f64,
-    t: f64,
-    df: f64,
-    option_type: OptionType,
-) -> f64 {
-    let undiscounted = match option_type {
-        OptionType::Call => {
-            finstack_quant_models::closed_form::black_call(forward, strike, sigma, t)
-        }
-        OptionType::Put => finstack_quant_models::closed_form::black_put(forward, strike, sigma, t),
-    };
-    undiscounted * df
-}
-
 impl Instrument for CommoditySpotOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySpotOption,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
@@ -759,14 +718,14 @@ impl Instrument for CommoditySpotOption {
                         self.id, inputs.forward
                     )));
                 }
-                black76_unit_price(
+                finstack_quant_models::closed_form::black76_price(
                     inputs.forward,
                     self.strike,
+                    inputs.df,
                     inputs.sigma,
                     inputs.t,
-                    inputs.df,
                     self.option_type,
-                )
+                )?
             }
             ExerciseStyle::American => {
                 let steps = self
@@ -1020,29 +979,8 @@ impl CommoditySpotOption {
             ));
         }
 
-        #[derive(Debug)]
-        enum ForwardDriver {
-            QuotedForward(f64),
-            PriceCurve,
-            SpotScalar(PriceId),
-        }
-
-        let driver = if let Some(fwd) = self.quoted_forward {
-            ForwardDriver::QuotedForward(fwd)
-        } else if market
-            .get_price_curve(self.forward_curve_id.as_str())
-            .is_ok()
-        {
-            ForwardDriver::PriceCurve
-        } else if let Some(ref spot_id) = self.spot_id {
-            ForwardDriver::SpotScalar(spot_id.clone())
-        } else {
-            return Err(finstack_quant_core::Error::Validation(
-                "Cannot compute gamma: no quoted_forward, PriceCurve, or spot_id available"
-                    .to_string(),
-            ));
-        };
-
+        // `forward_price` errors unless `quoted_forward` or the price curve
+        // supplies the forward, so those are the two drivers to bump.
         let bump_pct = bumps.spot_bump_decimal;
         let forward_price = self.forward_price(market, as_of)?;
         let bump_size = forward_price * bump_pct;
@@ -1052,8 +990,8 @@ impl CommoditySpotOption {
 
         let pv_base = self.value(market, as_of)?.amount();
 
-        let (pv_up, pv_down) = match driver {
-            ForwardDriver::QuotedForward(fwd) => {
+        let (pv_up, pv_down) = match self.quoted_forward {
+            Some(fwd) => {
                 let mut up = self.clone();
                 up.quoted_forward = Some(fwd * (1.0 + bump_pct));
                 let pv_up = up.value(market, as_of)?.amount();
@@ -1063,42 +1001,10 @@ impl CommoditySpotOption {
                 let pv_down = down.value(market, as_of)?.amount();
                 (pv_up, pv_down)
             }
-            ForwardDriver::PriceCurve => {
-                use finstack_quant_core::market_data::bumps::{
-                    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
-                };
-                let curve_id = CurveId::new(self.forward_curve_id.as_str());
-                let up = market.bump([MarketBump::Curve {
-                    id: curve_id.clone(),
-                    spec: BumpSpec {
-                        bump_type: BumpType::Parallel,
-                        mode: BumpMode::Additive,
-                        units: BumpUnits::Percent,
-                        value: bump_pct * 100.0,
-                    },
-                }])?;
+            None => {
+                let up = bump_price_curve_pct(market, self.forward_curve_id.as_str(), bump_pct)?;
                 let pv_up = self.value(&up, as_of)?.amount();
-
-                let down = market.bump([MarketBump::Curve {
-                    id: curve_id,
-                    spec: BumpSpec {
-                        bump_type: BumpType::Parallel,
-                        mode: BumpMode::Additive,
-                        units: BumpUnits::Percent,
-                        value: -bump_pct * 100.0,
-                    },
-                }])?;
-                let pv_down = self.value(&down, as_of)?.amount();
-                (pv_up, pv_down)
-            }
-            ForwardDriver::SpotScalar(ref spot_id) => {
-                let up = finstack_quant_valuations_core::metrics::bump_scalar_price(
-                    market, spot_id, bump_pct,
-                )?;
-                let down = finstack_quant_valuations_core::metrics::bump_scalar_price(
-                    market, spot_id, -bump_pct,
-                )?;
-                let pv_up = self.value(&up, as_of)?.amount();
+                let down = bump_price_curve_pct(market, self.forward_curve_id.as_str(), -bump_pct)?;
                 let pv_down = self.value(&down, as_of)?.amount();
                 (pv_up, pv_down)
             }
@@ -1165,29 +1071,8 @@ impl CommoditySpotOption {
                 "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
             ));
         }
-        #[derive(Debug)]
-        enum ForwardDriver {
-            QuotedForward(f64),
-            PriceCurve,
-            SpotScalar(PriceId),
-        }
-
-        let driver = if let Some(fwd) = self.quoted_forward {
-            ForwardDriver::QuotedForward(fwd)
-        } else if market
-            .get_price_curve(self.forward_curve_id.as_str())
-            .is_ok()
-        {
-            ForwardDriver::PriceCurve
-        } else if let Some(ref spot_id) = self.spot_id {
-            ForwardDriver::SpotScalar(spot_id.clone())
-        } else {
-            return Err(finstack_quant_core::Error::Validation(
-                "Cannot compute vanna: no quoted_forward, PriceCurve, or spot_id available"
-                    .to_string(),
-            ));
-        };
-
+        // `forward_price` errors unless `quoted_forward` or the price curve
+        // supplies the forward, so those are the two drivers to bump.
         let fwd_bump_pct = bumps.spot_bump_decimal;
         let vol_bump = bumps.vol_bump_decimal;
 
@@ -1200,8 +1085,8 @@ impl CommoditySpotOption {
         let pv_with_bumps = |fwd_bump_pct: f64,
                              vol_bump: f64|
          -> finstack_quant_core::Result<f64> {
-            match driver {
-                ForwardDriver::QuotedForward(fwd) => {
+            match self.quoted_forward {
+                Some(fwd) => {
                     let mut inst = self.clone();
                     inst.quoted_forward = Some(fwd * (1.0 + fwd_bump_pct));
                     let bumped =
@@ -1212,37 +1097,12 @@ impl CommoditySpotOption {
                         )?;
                     Ok(inst.value(&bumped, as_of)?.amount())
                 }
-                ForwardDriver::PriceCurve => {
-                    use finstack_quant_core::market_data::bumps::{
-                        BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
-                    };
-                    let curve_id = CurveId::new(self.forward_curve_id.as_str());
-                    let bumped_price = market.bump([MarketBump::Curve {
-                        id: curve_id,
-                        spec: BumpSpec {
-                            bump_type: BumpType::Parallel,
-                            mode: BumpMode::Additive,
-                            units: BumpUnits::Percent,
-                            value: fwd_bump_pct * 100.0,
-                        },
-                    }])?;
+                None => {
+                    let bumped_price =
+                        bump_price_curve_pct(market, self.forward_curve_id.as_str(), fwd_bump_pct)?;
                     let bumped =
                         finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
                             &bumped_price,
-                            self.vol_surface_id.as_str(),
-                            vol_bump,
-                        )?;
-                    Ok(self.value(&bumped, as_of)?.amount())
-                }
-                ForwardDriver::SpotScalar(ref spot_id) => {
-                    let bumped_spot = finstack_quant_valuations_core::metrics::bump_scalar_price(
-                        market,
-                        spot_id,
-                        fwd_bump_pct,
-                    )?;
-                    let bumped =
-                        finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-                            &bumped_spot,
                             self.vol_surface_id.as_str(),
                             vol_bump,
                         )?;
@@ -1399,7 +1259,7 @@ mod tests {
                     .build()
                     .expect("vol surface"),
             );
-        let registry = crate::exotics::EXOTICS.pricers();
+        let registry = crate::EXOTICS.pricers();
 
         let default = option
             .price_with_metrics(

@@ -1,5 +1,6 @@
 use super::*;
 use crate::structured_credit::utils::amortization::level_payment_per_unit;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
 /// AssetPool flow results for a single period.
 pub(crate) struct PoolFlows {
@@ -802,7 +803,8 @@ pub(super) fn calculate_pool_flows_with_rates(
                     };
                     surviving_payment += outcome.cured * per_unit;
                     if let Some(spec) = model.modification {
-                        let reduced_rate = (rate - spec.rate_reduction_bp / 10_000.0).max(0.0)
+                        let reduced_rate = (rate - spec.rate_reduction_bp / BASIS_POINTS_PER_UNIT)
+                            .max(0.0)
                             * request.months_per_period
                             / 12.0;
                         let extended_periods = remaining_periods_f64
@@ -874,7 +876,7 @@ pub(super) fn calculate_pool_flows_with_rates(
                         }
                     } else {
                         state.pool_state.rates[i] = (state.pool_state.rates[i]
-                            - spec.rate_reduction_bp / 10_000.0 * weight)
+                            - spec.rate_reduction_bp / BASIS_POINTS_PER_UNIT * weight)
                             .max(0.0);
                     }
                 }

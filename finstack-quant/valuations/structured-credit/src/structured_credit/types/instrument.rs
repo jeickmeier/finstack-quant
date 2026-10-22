@@ -1,18 +1,24 @@
-use super::{DealAccruals, DealType, StructuredCredit, TrancheSeniority};
+use super::{
+    DealAccruals, StructuredCredit, TrancheAccrualPeriod, TrancheCashflows, TrancheSeniority,
+};
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
 };
+use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Error;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::{MetricContext, MetricSeed};
 
-impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
+impl CashflowScheduleSource for StructuredCredit {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
         Ok(self.pool.total_balance().ok())
     }
@@ -27,19 +33,22 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
                 .into_values()
                 .flat_map(|result| result.detailed_flows.into_iter())
                 .collect();
-        // Use deal-type-appropriate day count convention:
-        // CLO/CBO: ACT/360 (standard for leveraged loan market)
-        // RMBS/CMBS: 30/360 (standard for mortgage market)
-        // ABS/Auto/Card: ACT/360
-        let day_count = match self.deal_type {
-            DealType::Rmbs | DealType::Cmbs => finstack_quant_core::dates::DayCount::Thirty360,
-            _ => finstack_quant_core::dates::DayCount::Act360,
-        };
+        self.projected_schedule(detailed_flows)
+    }
+}
+
+impl StructuredCredit {
+    /// Projected deal schedule from the detailed flows of one deterministic
+    /// simulation run, in tranche iteration order.
+    fn projected_schedule(
+        &self,
+        detailed_flows: Vec<CashFlow>,
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         schedule_from_classified_flows(
             detailed_flows,
-            day_count,
+            self.deal_type.schedule_day_count(),
             ScheduleBuildOpts {
-                notional_hint: self.notional()?,
+                notional_hint: CashflowScheduleSource::notional(self)?,
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     representation:
                         finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
@@ -48,12 +57,109 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
             },
         )
     }
+
+    /// Deal NPV from one deterministic simulation run, plus that run's flows
+    /// for metric evaluation.
+    ///
+    /// The value is the one [`Instrument::base_value`] computes (the same
+    /// discounting of the same public schedule), so a registry valuation that
+    /// prices through here and seeds its metric context with the returned
+    /// [`SimulationMetricSeed`] runs the waterfall once.
+    pub(crate) fn price_with_seed(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<(Money, SimulationMetricSeed)> {
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let run = crate::structured_credit::pricing::run_simulation(self, market, as_of)?;
+        let flows = RunFlows {
+            deal: self,
+            run: &run,
+        }
+        .dated_cashflows(market, as_of)?;
+        let value = finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows)?;
+        Ok((value, SimulationMetricSeed::from_run(run)))
+    }
+}
+
+/// One simulation run as a schedule source, so its flows go through the same
+/// public normalization as [`StructuredCredit`]'s own schedule.
+struct RunFlows<'a> {
+    deal: &'a StructuredCredit,
+    run: &'a FxHashMap<String, TrancheCashflows>,
+}
+
+impl CashflowScheduleSource for RunFlows<'_> {
+    fn raw_cashflow_schedule(
+        &self,
+        _curves: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        let detailed_flows = self
+            .run
+            .values()
+            .flat_map(|result| result.detailed_flows.iter().cloned())
+            .collect();
+        self.deal.projected_schedule(detailed_flows)
+    }
+}
+
+/// Deal flows and accrual records of one deterministic simulation run, as the
+/// metric context reads them.
+#[derive(Clone)]
+pub(crate) struct SimulationMetricSeed {
+    cashflows: Vec<(Date, Money)>,
+    tagged_cashflows: Vec<CashFlow>,
+    accruals: Vec<TrancheAccrualPeriod>,
+}
+
+impl SimulationMetricSeed {
+    fn from_run(run: FxHashMap<String, TrancheCashflows>) -> Self {
+        let mut flows = Vec::new();
+        let mut accruals = Vec::new();
+        for result in run.into_values() {
+            flows.extend(result.detailed_flows);
+            accruals.extend(result.accrual_periods);
+        }
+        flows.sort_by_key(|flow| flow.date);
+        Self {
+            cashflows: flows
+                .iter()
+                .filter(|flow| flow.kind.is_cash_settlement())
+                .map(|flow| (flow.date, flow.amount))
+                .collect(),
+            tagged_cashflows: flows,
+            accruals,
+        }
+    }
+
+    fn install(self, context: &mut MetricContext) {
+        context.cashflows = Some(self.cashflows);
+        context.tagged_cashflows = Some(self.tagged_cashflows);
+        context.set_ext(DealAccruals(self.accruals));
+    }
+}
+
+impl std::fmt::Debug for SimulationMetricSeed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SimulationMetricSeed")
+            .field("cashflows", &self.cashflows.len())
+            .field("tagged_cashflows", &self.tagged_cashflows.len())
+            .field("accruals", &self.accruals.len())
+            .finish()
+    }
+}
+
+impl MetricSeed for SimulationMetricSeed {
+    fn seed(&self, context: &mut MetricContext) {
+        self.clone().install(context);
+    }
 }
 
 impl Instrument for StructuredCredit {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::StructuredCredit,
-        crate::structured_credit::STRUCTURED_CREDIT
+        crate::STRUCTURED_CREDIT
     );
 
     fn market_dependencies(
@@ -91,6 +197,11 @@ impl Instrument for StructuredCredit {
             }
         }
         self.validate_custom_waterfall()?;
+        // A custom waterfall validates the deal-level triggers together with
+        // its own test tiers; the template path validates them here.
+        if self.waterfall.is_none() {
+            self.validate_coverage_tests(self.coverage_triggers.iter())?;
+        }
         self.pool.validate_original_balance()?;
         let currency = self.pool.get_currency();
         for hedge in &self.hedge_swaps {
@@ -162,24 +273,14 @@ impl Instrument for StructuredCredit {
             |acc, tranche| acc.checked_add(tranche.current_balance),
         );
         context.notional = current_face.ok().or(self.tranches.total_size().ok());
+        // The discounting pricer seeds the flows of the run it priced; any
+        // other path runs the waterfall here.
+        if context.tagged_cashflows.is_some() {
+            return;
+        }
         if let Ok(results) = crate::structured_credit::pricing::run_simulation(self, market, as_of)
         {
-            let mut flows = Vec::new();
-            let mut accruals = Vec::new();
-            for result in results.into_values() {
-                flows.extend(result.detailed_flows);
-                accruals.extend(result.accrual_periods);
-            }
-            flows.sort_by_key(|flow| flow.date);
-            context.cashflows = Some(
-                flows
-                    .iter()
-                    .filter(|flow| flow.kind.is_cash_settlement())
-                    .map(|flow| (flow.date, flow.amount))
-                    .collect(),
-            );
-            context.tagged_cashflows = Some(flows);
-            context.set_ext(DealAccruals(accruals));
+            SimulationMetricSeed::from_run(results).install(context);
         }
     }
 
@@ -451,5 +552,69 @@ impl StructuredCredit {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::structured_credit::pricing::SIMULATION_RUNS;
+    use finstack_quant_valuations_core::instruments::common_impl::helpers::compute_metrics_dyn;
+    use finstack_quant_valuations_core::instruments::PricingOptions;
+    use finstack_quant_valuations_core::metrics::MetricId;
+    use finstack_quant_valuations_test_support::discount_forward_curves::{
+        flat_discount_with_tenor, flat_forward_with_tenor,
+    };
+    use std::sync::Arc;
+
+    fn simulation_runs() -> usize {
+        SIMULATION_RUNS.with(std::cell::Cell::get)
+    }
+
+    #[test]
+    fn price_with_metrics_runs_the_waterfall_once() {
+        let deal = StructuredCredit::example().expect("example deal");
+        let as_of = deal.closing_date;
+        let dependencies = deal.market_dependencies().expect("dependencies");
+        let mut market = MarketContext::new();
+        for id in &dependencies.curves.discount_curves {
+            market = market.insert(flat_discount_with_tenor(id.as_str(), as_of, 0.04, 30.0));
+        }
+        for id in &dependencies.curves.forward_curves {
+            market = market.insert(flat_forward_with_tenor(id.as_str(), as_of, 0.04, 0.25));
+        }
+        let metrics = [MetricId::WAL];
+
+        let before = simulation_runs();
+        let priced = deal
+            .price_with_metrics(&market, as_of, &metrics, PricingOptions::default())
+            .expect("price with metrics");
+        assert_eq!(
+            simulation_runs() - before,
+            1,
+            "one deterministic waterfall run per price_with_metrics"
+        );
+
+        // The seeded value and metrics match the unseeded paths bit for bit.
+        assert_eq!(
+            priced.value.amount().to_bits(),
+            deal.value(&market, as_of)
+                .expect("value")
+                .amount()
+                .to_bits()
+        );
+        let unseeded = compute_metrics_dyn(
+            Arc::new(deal),
+            Arc::new(market),
+            as_of,
+            priced.value,
+            &metrics,
+            Default::default(),
+        )
+        .expect("unseeded metrics");
+        assert_eq!(
+            priced.metric(MetricId::WAL).map(f64::to_bits),
+            unseeded.get(&MetricId::WAL).copied().map(f64::to_bits)
+        );
     }
 }

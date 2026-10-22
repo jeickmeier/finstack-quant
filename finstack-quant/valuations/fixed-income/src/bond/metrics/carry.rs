@@ -5,7 +5,7 @@ use crate::bond::pricing::time_basis::{act365l_year_fraction, bond_coupon_period
 use crate::bond::Bond;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::coupon_period::icma_reference_period;
+use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
 use finstack_quant_valuations_core::metrics::sensitivities::carry_decomposition::YieldClock;
 use finstack_quant_valuations_core::metrics::MetricContext;
 

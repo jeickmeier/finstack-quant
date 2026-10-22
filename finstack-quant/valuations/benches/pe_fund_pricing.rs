@@ -25,8 +25,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::equity::pe_fund::{
-    ClawbackSettle, ClawbackSpec, FundEvent, PeFundWaterfallSpec, PrivateMarketsFund,
-    WaterfallStyle,
+    ClawbackSpec, FundEvent, PeFundWaterfallSpec, PrivateMarketsFund, WaterfallStyle,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use std::hint::black_box;
@@ -75,7 +74,6 @@ fn full_waterfall_with_clawback() -> PeFundWaterfallSpec {
         .promote_tier(0.0, 0.80, 0.20)
         .clawback(ClawbackSpec {
             holdback_decimal: Some(0.20),
-            settle_on: ClawbackSettle::FundEnd,
         })
         .build()
         .unwrap()
@@ -150,7 +148,8 @@ fn make_fund(
     spec: PeFundWaterfallSpec,
     with_discount: bool,
 ) -> PrivateMarketsFund {
-    let fund = PrivateMarketsFund::new("PMF-BENCH", Currency::USD, spec, events);
+    let fund =
+        PrivateMarketsFund::new("PMF-BENCH", Currency::USD, spec, events).expect("valid fund");
     if with_discount {
         fund.with_discount_curve_id("USD-OIS")
     } else {

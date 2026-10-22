@@ -3,7 +3,9 @@
 
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
-use crate::utils::input::js_string;
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::input::{from_js_json, js_f64, js_string};
+use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
@@ -11,26 +13,16 @@ use wasm_bindgen::prelude::*;
 /// The `upfront(paymentDate, amount)` setter shared by the CDS-family builders.
 macro_rules! upfront_setter {
     ($bty:ident, $bjs:literal) => {
-        #[wasm_bindgen(js_class = $bjs)]
-        impl $bty {
+        dated_money_setter!(
+            $bty,
+            $bjs,
             /// Set the upfront payment exchanged at inception.
             /// @param payment_date - Upfront payment date as an ISO-8601 string.
             /// @param amount - Upfront amount; positive when the protection buyer pays.
             /// @returns The builder, for chaining.
             /// @throws Error - Throws with kind `validation` if `paymentDate` is malformed or the builder was already consumed by `build()`, and kind `invalid_type` if `paymentDate` is not a string.
-            pub fn upfront(
-                &self,
-                payment_date: JsValue,
-                amount: &JsMoney,
-            ) -> Result<$bty, JsValue> {
-                let upfront = (
-                    super::arg::date(&payment_date, "paymentDate")?,
-                    amount.inner,
-                );
-                let inner = self.inner.apply(|b| b.upfront(upfront))?;
-                Ok(Self { inner })
-            }
-        }
+            upfront
+        );
     };
 }
 
@@ -41,34 +33,16 @@ instrument_class!(
     finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap
 );
 
-instrument_builder_entry!(
+instrument_surface!(
     JsCreditDefaultSwap,
     "CreditDefaultSwap",
     JsCreditDefaultSwapBuilder
 );
 
-instrument_to_dict!(JsCreditDefaultSwap, "CreditDefaultSwap");
-
-instrument_market_dependencies!(JsCreditDefaultSwap, "CreditDefaultSwap");
-
-instrument_pricing!(JsCreditDefaultSwap, "CreditDefaultSwap");
-
 getters!(JsCreditDefaultSwap, "CreditDefaultSwap", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Notional amount of protection.
         /// @returns Currency-tagged notional.
         notional as notional => money(i.notional),
@@ -109,6 +83,8 @@ getters!(JsCreditDefaultSwap, "CreditDefaultSwap", |i| {
         /// @returns The scheduled maturity, or `null`.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsCreditDefaultSwap, "CreditDefaultSwap");
 
 factories!(JsCreditDefaultSwap, "CreditDefaultSwap", finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap, {
         /// Canonical 5-year USD 10,000,000 investment-grade payer CDS (mirrors Rust `CreditDefaultSwap::example`): `isda_na` convention, 100bp running spread, 40% recovery, curves `USD-OIS` / `CORP-HAZARD`, premium 2024-03-20 to 2029-03-20.
@@ -184,27 +160,9 @@ setters!(JsCreditDefaultSwapBuilder, "CreditDefaultSwapBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         margin_spec as marginSpec => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsCreditDefaultSwapBuilder, "CreditDefaultSwapBuilder");
 
 handle_setters!(JsCreditDefaultSwapBuilder, "CreditDefaultSwapBuilder", {
         /// Set the notional amount.
@@ -221,30 +179,12 @@ instrument_class!(
     finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex
 );
 
-instrument_builder_entry!(JsCdsIndex, "CdsIndex", JsCdsIndexBuilder);
-
-instrument_to_dict!(JsCdsIndex, "CdsIndex");
-
-instrument_market_dependencies!(JsCdsIndex, "CdsIndex");
-
-instrument_pricing!(JsCdsIndex, "CdsIndex");
+instrument_surface!(JsCdsIndex, "CdsIndex", JsCdsIndexBuilder);
 
 getters!(JsCdsIndex, "CdsIndex", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Ticker of the credit index family this contract references.
         /// @returns Index family ticker as supplied at construction, for example `"CDX.NA.IG"` or `"iTraxx Europe"`. The value is stored verbatim and is not normalised or validated against a registry.
         index_name as indexName => json(i.index_name),
@@ -291,6 +231,8 @@ getters!(JsCdsIndex, "CdsIndex", |i| {
         /// @returns The scheduled maturity, or `null`.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsCdsIndex, "CdsIndex");
 
 factories!(JsCdsIndex, "CdsIndex", finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex, {
         /// Canonical CDX.NA.IG series 42 USD 10,000,000 payer (mirrors Rust `CdsIndex::example`): 60bp running coupon, `single_curve` pricing off `CDX.NA.IG.HAZARD` discounted on `USD-OIS`, premium 2024-03-20 to 2029-12-20, 125 names.
@@ -392,27 +334,9 @@ setters!(JsCdsIndexBuilder, "CdsIndexBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         margin_spec as marginSpec => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsCdsIndexBuilder, "CdsIndexBuilder");
 
 handle_setters!(JsCdsIndexBuilder, "CdsIndexBuilder", {
         /// Set the notional amount of the index.
@@ -429,30 +353,12 @@ instrument_class!(
     finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche
 );
 
-instrument_builder_entry!(JsCdsTranche, "CdsTranche", JsCdsTrancheBuilder);
-
-instrument_to_dict!(JsCdsTranche, "CdsTranche");
-
-instrument_market_dependencies!(JsCdsTranche, "CdsTranche");
-
-instrument_pricing!(JsCdsTranche, "CdsTranche");
+instrument_surface!(JsCdsTranche, "CdsTranche", JsCdsTrancheBuilder);
 
 getters!(JsCdsTranche, "CdsTranche", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Underlying index name.
         /// @returns The index name.
         index_name as indexName => json(i.index_name),
@@ -514,6 +420,8 @@ getters!(JsCdsTranche, "CdsTranche", |i| {
         /// @returns The maturity, or `null`.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsCdsTranche, "CdsTranche");
 
 factories!(JsCdsTranche, "CdsTranche", finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche, {
         /// Canonical CDX.NA.IG 42 equity (0–3%) tranche, USD 10,000,000 (mirrors Rust `CdsTranche::example`): buy protection, 100bp running, maturity 2029-12-20, curves `USD-OIS` / `CDX.NA.IG.HAZARD`.
@@ -624,27 +532,9 @@ setters!(JsCdsTrancheBuilder, "CdsTrancheBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         stub as stub => en,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsCdsTrancheBuilder, "CdsTrancheBuilder");
 
 handle_setters!(JsCdsTrancheBuilder, "CdsTrancheBuilder", {
         /// Set the notional amount of the tranche.
@@ -671,34 +561,16 @@ instrument_class!(
     finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond
 );
 
-instrument_builder_entry!(
+instrument_surface!(
     JsConvertibleBond,
     "ConvertibleBond",
     JsConvertibleBondBuilder
 );
 
-instrument_to_dict!(JsConvertibleBond, "ConvertibleBond");
-
-instrument_market_dependencies!(JsConvertibleBond, "ConvertibleBond");
-
-instrument_pricing!(JsConvertibleBond, "ConvertibleBond");
-
 getters!(JsConvertibleBond, "ConvertibleBond", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Principal amount.
         /// @returns Currency-tagged principal.
         notional as notional => money(i.notional),
@@ -754,6 +626,8 @@ getters!(JsConvertibleBond, "ConvertibleBond", |i| {
         /// @returns The maturity, or `null`.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsConvertibleBond, "ConvertibleBond");
 
 factories!(JsConvertibleBond, "ConvertibleBond", finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond, {
         /// Canonical 5-year USD 1,000,000 2% semi-annual convertible (mirrors Rust `ConvertibleBond::example`): ratio 25 shares per bond, voluntary conversion, underlying `"TECH"`, curves `USD-IG` / `USD-CREDIT-BBB`, issue 2024-01-15, maturity 2029-01-15.
@@ -854,27 +728,9 @@ setters!(JsConvertibleBondBuilder, "ConvertibleBondBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         cashflow_spec as cashflowSpec => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsConvertibleBondBuilder, "ConvertibleBondBuilder");
 
 handle_setters!(JsConvertibleBondBuilder, "ConvertibleBondBuilder", {
         /// Set the principal amount.
@@ -920,15 +776,15 @@ impl JsCdsIndex {
         credit_curve_id: JsValue,
     ) -> Result<JsCdsIndex, JsValue> {
         let preset: finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexParams =
-            super::arg::json(&preset, "preset")?;
+            from_js_json(&preset, "preset")?;
         finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::from_preset(
             &preset,
             js_string(&id, "id")?,
             notional.inner,
-            super::arg::en(&side, "side")?,
-            super::arg::date(&start, "start")?,
-            super::arg::date(&end, "end")?,
-            super::arg::num(&recovery_rate, "recoveryRate")?,
+            js_wire(&side, "side")?,
+            js_date(&start, "start")?,
+            js_date(&end, "end")?,
+            js_f64(&recovery_rate, "recoveryRate")?,
             js_string(&discount_curve_id, "discountCurveId")?,
             js_string(&credit_curve_id, "creditCurveId")?,
         )
@@ -945,8 +801,8 @@ impl JsCdsIndex {
     /// @returns Change in present value for a one basis point spread widening, in the notional currency.
     /// @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if recalibration or pricing fails.
     pub fn cs01(&self, market_json: JsValue, as_of: JsValue) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         let provider =
             finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
         self.inner
@@ -975,13 +831,13 @@ impl JsCdsTranche {
         side: JsValue,
     ) -> Result<JsCdsTranche, JsValue> {
         let params: finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams =
-            super::arg::json(&params, "params")?;
+            from_js_json(&params, "params")?;
         finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::standard(
             js_string(&id, "id")?,
             &params,
             js_string(&discount_curve_id, "discountCurveId")?,
             js_string(&credit_index_id, "creditIndexId")?,
-            super::arg::en(&side, "side")?,
+            js_wire(&side, "side")?,
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
@@ -993,7 +849,7 @@ impl JsCdsTranche {
     /// @throws Error - Throws with kind `not_found` if the credit index data is missing, kind `validation` if the market JSON is malformed, and kind `computation` if the loss model fails.
     #[wasm_bindgen(js_name = expectedLoss)]
     pub fn expected_loss(&self, market_json: JsValue) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
+        let market = parse_market(&market_json)?;
         self.inner.expected_loss(&market).map_err(to_js_err)
     }
 }
@@ -1005,7 +861,7 @@ impl JsConvertibleBond {
     /// @returns Value of the shares received on conversion, in the bond's currency.
     /// @throws Error - Throws with kind `not_found` if the spot is missing, and kind `validation` if the market JSON is malformed or the bond fails validation.
     pub fn parity(&self, market_json: JsValue) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
+        let market = parse_market(&market_json)?;
         self.inner.parity(&market).map_err(to_js_err)
     }
 
@@ -1020,8 +876,8 @@ impl JsConvertibleBond {
         market_json: JsValue,
         bond_price: JsValue,
     ) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
-        let bond_price = super::arg::num(&bond_price, "bondPrice")?;
+        let market = parse_market(&market_json)?;
+        let bond_price = js_f64(&bond_price, "bondPrice")?;
         self.inner
             .conversion_premium(&market, bond_price)
             .map_err(to_js_err)
@@ -1036,8 +892,8 @@ impl JsConvertibleBond {
     /// @returns `ConvertibleGreeks` plain object with the price and its delta, gamma, vega, rho and theta.
     /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the tree fails.
     pub fn greeks(&self, market_json: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         to_js_value(&self.inner.greeks(&market, as_of).map_err(to_js_err)?)
     }
 }

@@ -43,26 +43,25 @@ shards. See Registration below.
 
 ## Public surface
 
-Import path: `finstack_quant_valuations_fx::<leaf>` (or `finstack_quant_valuations::instruments::fx::<leaf>` through the umbrella). All twelve
-leaf directories are `pub mod`; `shared` is `pub(crate) mod`. Headline types
-are also re-exported at the crate root and flat at `finstack_quant_valuations::instruments`:
+Import path: `finstack_quant_valuations_fx::<leaf>::<Type>` (or
+`finstack_quant_valuations::instruments::fx::<leaf>::<Type>` through the umbrella).
+All twelve leaf directories are `pub mod`; `shared` is `pub(crate) mod`; the crate
+root exports only the `FX` family static. Headline types are also flat at
+`finstack_quant_valuations::instruments`:
 
 `FxSpot`, `FxForward`, `FxFuture`, `FxFutureOption`, `FxSwap`, `Ndf`,
 `FxOption`, `FxBarrierOption`, `FxDigitalOption`, `DigitalPayoutType`,
-`FxTouchOption`, `TouchType`, `BarrierDirection`, `PayoutTiming`,
-`FxVarianceSwap`, `QuantoOption`.
+`FxTouchOption`, `TouchType`, `FxVarianceSwap`, `QuantoOption`. The touch
+option's `BarrierDirection` and `PayoutTiming` are `finstack_quant_core::types`.
 
 Family-path-only types include `fx_option::{FxDeltaConvention,
 FxDeltaConventionKind, FxOptionBuilder}`,
-`fx_forward::FxForwardBuilder`, `fx_barrier_option::Monitoring`,
-`fx_variance_swap::FxVarianceSwapBuilder`, and
-`ndf::{NdfQuoteConvention, NdfFixingSource}`. Monte Carlo payoff kernels and
+`fx_forward::FxForwardBuilder`, `fx_variance_swap::FxVarianceSwapBuilder` and
+`ndf::NdfFixingSource`; `NdfQuoteConvention` and the barrier `Monitoring` are
+valuations-core types at `finstack_quant_valuations::instruments`. Monte Carlo payoff kernels and
 pricers are crate-private.
 
-Three leaves re-export a shared parameter type under their own path:
-`fx_option::FxUnderlyingParams` and `fx_swap::FxUnderlyingParams`, and
-`fx_variance_swap::PayReceive`. All three name the same types that already exist
-at `instruments::*` — aliases, not FX-specific variants.
+`PayReceive` and `FxUnderlyingParams` live only at `instruments::`.
 
 Inside a leaf, `metrics/`, `pricer.rs`, `types.rs` and Monte Carlo payoff
 adapters are `pub(crate)` or private; supported items surface through each

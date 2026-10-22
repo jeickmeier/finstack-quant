@@ -181,7 +181,8 @@ fn tranche_option_costs_sum_to_the_deal_cost_and_equity_bears_the_most() {
         },
         0.25,
     );
-    deal.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.01, 0.3));
+    deal.credit_model.stochastic_default_spec =
+        Some(StochasticDefaultSpec::gaussian_copula(0.01, 0.3));
     let market = market().insert(widening_hazard_curve());
     let result = deal
         .price_stochastic_with_mode(&market, CLOSING, monte_carlo(100))
@@ -259,18 +260,19 @@ fn credit_risky_single_revolver_pool_matches_the_standalone_option_cost_in_expec
 #[test]
 fn senior_coverage_position_diverts_to_the_senior_note_only() {
     let build = |tests: Vec<CoverageTestSpec>| {
-        let mut deal = pool_of(
-            vec![Bond::example().expect("fixed bond")],
-            CreditSpreadProcessSpec::MarketAnchored {
-                credit_curve_id: HAZARD_ID.into(),
-                kappa: 0.5,
-                implied_vol: 0.4,
-                tenor_years: None,
-            },
-            0.25,
-        )
-        .with_coverage_triggers(tests)
-        .expect("coverage tests");
+        let mut deal = StructuredCredit {
+            coverage_triggers: tests,
+            ..pool_of(
+                vec![Bond::example().expect("fixed bond")],
+                CreditSpreadProcessSpec::MarketAnchored {
+                    credit_curve_id: HAZARD_ID.into(),
+                    kappa: 0.5,
+                    implied_vol: 0.4,
+                    tenor_years: None,
+                },
+                0.25,
+            )
+        };
         // A 1% senior coupon leaves excess spread every period, so there is
         // a residual for the failing position to trap.
         for tranche in deal.tranches.tranches.iter_mut() {
@@ -278,7 +280,8 @@ fn senior_coverage_position_diverts_to_the_senior_note_only() {
                 tranche.coupon = RateSpec::Fixed { rate: 0.01 };
             }
         }
-        deal.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.01, 0.3));
+        deal.credit_model.stochastic_default_spec =
+            Some(StochasticDefaultSpec::gaussian_copula(0.01, 0.3));
         deal
     };
     // A 5.0x OC level the collateral can never reach: the position fails on

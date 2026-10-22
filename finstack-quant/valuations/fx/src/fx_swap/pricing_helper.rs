@@ -143,21 +143,9 @@ impl FxSwapPricingContext {
         Ok(forward)
     }
 
-    /// Calculate PV of the foreign leg in base currency.
+    /// Calculate PV of the foreign leg in base currency with the given DFs.
     ///
     /// Foreign leg: receive base currency at near, pay base currency at far.
-    pub(crate) fn pv_foreign_leg_base(&self) -> f64 {
-        let mut pv = 0.0;
-        if self.include_near {
-            pv += self.notional * self.df_for_near;
-        }
-        if self.include_far {
-            pv -= self.notional * self.df_for_far;
-        }
-        pv
-    }
-
-    /// Calculate PV of the foreign leg in base currency with custom DFs.
     pub(crate) fn pv_foreign_leg_base_with_dfs(&self, df_for_near: f64, df_for_far: f64) -> f64 {
         let mut pv = 0.0;
         if self.include_near {
@@ -169,21 +157,9 @@ impl FxSwapPricingContext {
         pv
     }
 
-    /// Calculate PV of the domestic leg in quote currency using contract rates.
+    /// Calculate PV of the domestic leg in quote currency with the given rates and DFs.
     ///
     /// Domestic leg: pay quote currency at near, receive quote currency at far.
-    pub(crate) fn pv_domestic_leg(&self) -> f64 {
-        let mut pv = 0.0;
-        if self.include_near {
-            pv -= self.notional * self.contract_near_rate * self.df_dom_near;
-        }
-        if self.include_far {
-            pv += self.notional * self.contract_far_rate * self.df_dom_far;
-        }
-        pv
-    }
-
-    /// Calculate PV of the domestic leg with custom DFs and rates.
     pub(crate) fn pv_domestic_leg_with_params(
         &self,
         near_rate: f64,
@@ -205,8 +181,14 @@ impl FxSwapPricingContext {
     ///
     /// Converts foreign leg to quote currency at model spot and adds domestic leg.
     pub(crate) fn total_pv(&self) -> f64 {
-        let pv_foreign_dom = self.pv_foreign_leg_base() * self.model_spot;
-        let pv_dom_leg = self.pv_domestic_leg();
+        let pv_foreign_dom =
+            self.pv_foreign_leg_base_with_dfs(self.df_for_near, self.df_for_far) * self.model_spot;
+        let pv_dom_leg = self.pv_domestic_leg_with_params(
+            self.contract_near_rate,
+            self.contract_far_rate,
+            self.df_dom_near,
+            self.df_dom_far,
+        );
         pv_foreign_dom + pv_dom_leg
     }
 

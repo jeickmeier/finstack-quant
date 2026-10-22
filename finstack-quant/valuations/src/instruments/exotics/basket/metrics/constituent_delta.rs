@@ -22,6 +22,7 @@ use crate::instruments::exotics::basket::types::{BasketAssetType, ConstituentRef
 use crate::instruments::exotics::basket::{Basket, BasketConstituent};
 use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PriceId;
 use finstack_quant_core::Result;
@@ -61,33 +62,6 @@ impl MetricCalculator for ConstituentDeltaCalculator {
     }
 }
 
-/// Helper to get the price (as Money) of a constituent.
-fn get_constituent_price_money(
-    basket: &Basket,
-    constituent_index: usize,
-    constituent: &BasketConstituent,
-    context: &MetricContext,
-    as_of: finstack_quant_core::dates::Date,
-) -> Result<Money> {
-    match &constituent.reference {
-        ConstituentReference::Instrument(_) => {
-            let price =
-                instrument_price_and_type(basket, constituent_index, constituent, context, as_of)?
-                    .0;
-            Ok(price)
-        }
-        ConstituentReference::MarketData { price_id, .. } => {
-            let scalar = context.curves.get_price(price_id.as_ref())?;
-            match scalar {
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => Ok(*money),
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => {
-                    Ok(Money::new(*v, basket.reporting_currency)?)
-                }
-            }
-        }
-    }
-}
-
 /// Bump a constituent's price and measure the impact on basket NAV.
 fn bump_and_measure_delta(
     basket: &Basket,
@@ -101,8 +75,7 @@ fn bump_and_measure_delta(
 
     let (current_price, pv_bumped) = match &constituent.reference {
         ConstituentReference::Instrument(_) => {
-            let (price, asset_type) =
-                instrument_price_and_type(basket, constituent_index, constituent, context, as_of)?;
+            let price = instrument_price(basket, constituent_index, constituent, context, as_of)?;
             let bumped_price = price.amount() * (1.0 + PRICE_BUMP_PCT);
             let synthetic_id = synthetic_price_id(basket, constituent);
 
@@ -115,34 +88,27 @@ fn bump_and_measure_delta(
             );
 
             let bumped_basket =
-                basket_with_price_reference(basket, constituent_index, synthetic_id, asset_type);
+                basket_with_price_reference(basket, constituent_index, synthetic_id);
             let pv_bumped = bumped_basket.value(&bumped_ctx, as_of)?.amount();
             (price.amount(), pv_bumped)
         }
         ConstituentReference::MarketData { price_id, .. } => {
-            let current_price = get_constituent_price_money(
-                basket,
-                constituent_index,
-                constituent,
-                context,
-                as_of,
-            )?;
-            let bumped_price = current_price.amount() * (1.0 + PRICE_BUMP_PCT);
-            let current_scalar = bumped_ctx.get_price(price_id.as_ref())?;
-            let new_scalar = match current_scalar {
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => {
-                    finstack_quant_core::market_data::scalars::MarketScalar::Price(
-                        finstack_quant_core::money::Money::new(bumped_price, m.currency())?,
-                    )
+            let (current_price, new_scalar) = match bumped_ctx.get_price(price_id.as_ref())? {
+                MarketScalar::Price(money) => {
+                    let price = money.amount();
+                    let bumped = Money::new(price * (1.0 + PRICE_BUMP_PCT), money.currency())?;
+                    (price, MarketScalar::Price(bumped))
                 }
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
-                    finstack_quant_core::market_data::scalars::MarketScalar::Unitless(bumped_price)
+                MarketScalar::Unitless(v) => {
+                    let price = Money::new(*v, basket.reporting_currency)?.amount();
+                    let bumped = price * (1.0 + PRICE_BUMP_PCT);
+                    (price, MarketScalar::Unitless(bumped))
                 }
             };
             bumped_ctx = bumped_ctx.insert_price(price_id.as_ref(), new_scalar);
 
             let pv_bumped = basket.value(&bumped_ctx, as_of)?.amount();
-            (current_price.amount(), pv_bumped)
+            (current_price, pv_bumped)
         }
     };
 
@@ -159,46 +125,19 @@ fn bump_and_measure_delta(
     Ok(delta)
 }
 
-fn instrument_price_and_type(
+fn instrument_price(
     basket: &Basket,
     constituent_index: usize,
     constituent: &BasketConstituent,
     context: &MetricContext,
     as_of: finstack_quant_core::dates::Date,
-) -> Result<(Money, BasketAssetType)> {
+) -> Result<Money> {
     let boxed = basket.boxed_constituent_at(constituent_index)?.ok_or(
         finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
             id: constituent.id.clone(),
         }),
     )?;
-    let price = boxed.value(context.curves.as_ref(), as_of)?;
-    let asset_type = asset_type_for_instrument_key(boxed.key());
-    Ok((price, asset_type))
-}
-
-fn asset_type_for_instrument_key(key: crate::pricer::InstrumentType) -> BasketAssetType {
-    use crate::pricer::InstrumentType;
-
-    match key {
-        InstrumentType::Equity
-        | InstrumentType::EquityOption
-        | InstrumentType::EquityFuture
-        | InstrumentType::EquityTotalReturnSwap => BasketAssetType::Equity,
-        InstrumentType::Bond
-        | InstrumentType::BondFuture
-        | InstrumentType::InflationLinkedBond
-        | InstrumentType::AgencyMbsPassthrough
-        | InstrumentType::AgencyTba
-        | InstrumentType::AgencyCmo
-        | InstrumentType::TermLoan
-        | InstrumentType::RevolvingCredit
-        | InstrumentType::Deposit
-        | InstrumentType::Repo => BasketAssetType::Bond,
-        InstrumentType::CommodityForward | InstrumentType::CommoditySwap => {
-            BasketAssetType::Commodity
-        }
-        _ => BasketAssetType::Derivative,
-    }
+    boxed.value(context.curves.as_ref(), as_of)
 }
 
 fn synthetic_price_id(basket: &Basket, constituent: &BasketConstituent) -> PriceId {
@@ -209,17 +148,19 @@ fn synthetic_price_id(basket: &Basket, constituent: &BasketConstituent) -> Price
     ))
 }
 
+/// Copy of `basket` whose constituent at `constituent_index` reads `price_id`.
+///
+/// The asset type of the synthetic reference is not read by pricing.
 fn basket_with_price_reference(
     basket: &Basket,
     constituent_index: usize,
     price_id: PriceId,
-    asset_type: BasketAssetType,
 ) -> Basket {
     let mut bumped_basket = basket.clone();
     let constituent = &mut bumped_basket.constituents[constituent_index];
     constituent.reference = ConstituentReference::MarketData {
         price_id,
-        asset_type,
+        asset_type: BasketAssetType::Derivative,
     };
     bumped_basket
 }
@@ -238,6 +179,57 @@ mod tests {
     use finstack_quant_core::money::Money;
     use std::sync::Arc;
 
+    /// A basket mixing an instrument-backed bond and a market-data equity.
+    fn basket_with_instrument_constituent() -> Basket {
+        use crate::instruments::exotics::basket::BasketPricingConfig;
+        use finstack_quant_core::types::Attributes;
+        use finstack_quant_core::types::InstrumentId;
+        use time::macros::date;
+
+        let bond = crate::instruments::fixed_income::bond::Bond::fixed(
+            "CORP-BOND-001",
+            Money::from((1000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("rate"),
+            date!(2024 - 01 - 01),
+            date!(2034 - 01 - 01),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        let constituents = vec![
+            BasketConstituent {
+                id: "BOND-CORP".to_string(),
+                reference: ConstituentReference::Instrument(Box::new(
+                    crate::instruments::json_loader::InstrumentJson::Bond(bond),
+                )),
+                weight: 0.0,
+                units: Some(100.0),
+                ticker: Some("CORP".to_string()),
+            },
+            BasketConstituent {
+                id: "EQ-AAPL".to_string(),
+                reference: ConstituentReference::MarketData {
+                    price_id: PriceId::new("AAPL-SPOT"),
+                    asset_type: BasketAssetType::Equity,
+                },
+                weight: 1.0,
+                units: None,
+                ticker: Some("AAPL".to_string()),
+            },
+        ];
+        Basket::builder()
+            .id(InstrumentId::new("BASKET-MIXED"))
+            .constituents(constituents)
+            .expense_ratio(0.001)
+            .reporting_currency(Currency::USD)
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
+            .attributes(Attributes::new())
+            .pricing_config(BasketPricingConfig::default())
+            .build()
+            .expect("basket")
+    }
+
     #[test]
     fn test_constituent_delta_mixed_references() {
         let as_of = date_support::date(2024, 1, 2);
@@ -248,7 +240,7 @@ mod tests {
                 MarketScalar::Price(Money::from((150_i64, Currency::USD))),
             );
 
-        let basket = Basket::example_with_instruments().expect("Basket example is valid");
+        let basket = basket_with_instrument_constituent();
         let base_value = basket
             .value(&market, as_of)
             .expect("base basket value should succeed");

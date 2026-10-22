@@ -1,50 +1,5 @@
 {
   "$defs": {
-    "CommodityConvention": {
-      "description": "Standard commodity market conventions by product type.\n\nEach variant provides market-standard defaults for settlement days,\nbusiness day convention, and calendar. Use when constructing commodity\nforwards, options, or swaps without explicitly specifying these parameters.\n\n# Market Standards Reference\n\n| Convention | Settlement | BDC | Calendar | Exchange |\n|------------|------------|-----|----------|----------|\n| WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |\n| Brent Crude | T+2 | Following | ICE | ICE |\n| Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |\n| Gold | T+2 | Modified Following | COMEX | CME |\n| Silver | T+2 | Modified Following | COMEX | CME |\n| Copper | T+2 | Following | LME | LME |\n| Corn/Wheat | T+2 | Following | CBOT | CME |\n| Power | T+1 | Modified Following | NERC | Various |\n\n# Sources\n\n- CME Group rulebooks\n- ICE Futures exchange rules\n- LME trading procedures",
-      "oneOf": [
-        {
-          "const": "wti_crude",
-          "description": "WTI Crude Oil: T+2, Following, NYMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "brent_crude",
-          "description": "Brent Crude Oil: T+2, Following, ICE calendar",
-          "type": "string"
-        },
-        {
-          "const": "natural_gas",
-          "description": "Henry Hub Natural Gas: T+2, Following, NYMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "gold",
-          "description": "COMEX Gold: T+2, Modified Following, COMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "silver",
-          "description": "COMEX Silver: T+2, Modified Following, COMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "copper",
-          "description": "LME Copper: T+2, Following, LME calendar",
-          "type": "string"
-        },
-        {
-          "const": "agricultural",
-          "description": "CBOT Agricultural (Corn, Wheat, Soybeans): T+2, Following, CBOT calendar",
-          "type": "string"
-        },
-        {
-          "const": "power",
-          "description": "Power/Electricity: T+1, Modified Following, NERC calendar",
-          "type": "string"
-        }
-      ]
-    },
     "CommoditySpotOption": {
       "additionalProperties": false,
       "description": "Option on spot commodity. Options on a specified futures contract use\n[`crate::commodity::commodity_future_option::CommodityFutureOption`], including futures delivery.\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\n`spot_id` must identify an observed spot for early exercise and Monte Carlo.\nThe commodity forward is never substituted for the spot underlying.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
@@ -57,17 +12,6 @@
         "commodity_type": {
           "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")",
           "type": "string"
-        },
-        "convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CommodityConvention"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
         },
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -135,15 +79,6 @@
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)."
-        },
-        "premium_settlement_days": {
-          "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
         },
         "quantity": {
           "$ref": "#/$defs/PositiveF64Wire",

@@ -79,10 +79,7 @@ def instrument_types() -> list[str]:
         ``"interest_rate_swap"``. Every entry resolves through
         :func:`instrument_schema`.
 
-    Raises
-    ------
-    ValueError
-        If the compiled-in instrument registry cannot be read.
+        This function does not raise; the registry is compiled in.
 
     Examples
     --------
@@ -211,10 +208,10 @@ def validate_instrument_type_json(instrument_type: str, instrument_json: dict[st
 
     Returns
     -------
-    bool
-        ``True`` when the payload validates. A failure raises rather than
-        returning ``False``, so the individual schema violations are never
-        discarded.
+    str
+        Canonical compact JSON of the validated payload. A failure raises
+        rather than returning a falsy value, so the individual schema
+        violations are never discarded.
 
     Raises
     ------

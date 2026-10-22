@@ -262,11 +262,11 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
                 // missing, but the position did silently switch pricing paths, so
                 // the canonical failure is recorded to keep the switch auditable.
                 (
-                    ValuationResult::stamped_with_config(
+                    ValuationResult::stamped_with_meta(
                         position.instrument.id(),
                         input.as_of,
                         value,
-                        input.config,
+                        finstack_quant_core::config::results_meta(input.config),
                     ),
                     !metrics_requested,
                     Some(pricing_error.to_string()),

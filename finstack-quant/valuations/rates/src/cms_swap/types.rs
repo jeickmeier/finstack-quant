@@ -702,7 +702,8 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSwap {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        crate::cms_swap::pricer::compute_pv(self, market, as_of)
+        crate::cms_swap::pricer::CmsSwapPricer
+            .price_internal_with_convexity(self, market, as_of, 1.0)
     }
 
     fn market_dependencies(

@@ -4,7 +4,7 @@ use crate::bindings::models::credit::{
     PyDynamicRecoverySpec, PyEndogenousHazardSpec, PyMertonModel, PyToggleExerciseModel,
 };
 use crate::errors::{core_to_py, display_to_py};
-use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{
+use finstack_quant_valuations::instruments::fixed_income::bond::pricing::merton_mc::{
     MertonMcResult, PathStatistics,
 };
 use finstack_quant_valuations::instruments::{
@@ -315,36 +315,6 @@ impl PyPathStatistics {
 
 #[pymethods]
 impl PyPathStatistics {
-    /// Fraction of simulated paths that defaulted.
-    #[getter]
-    fn default_rate(&self) -> f64 {
-        self.inner.default_rate
-    }
-
-    /// Average default time in years among defaulted paths.
-    #[getter]
-    fn avg_default_time(&self) -> f64 {
-        self.inner.avg_default_time
-    }
-
-    /// Average terminal notional, reflecting PIK accretion.
-    #[getter]
-    fn avg_terminal_notional(&self) -> f64 {
-        self.inner.avg_terminal_notional
-    }
-
-    /// Average recovery rate (decimal fraction) among defaulted paths.
-    #[getter]
-    fn avg_recovery_rate(&self) -> f64 {
-        self.inner.avg_recovery_rate
-    }
-
-    /// Fraction of coupon dates where PIK was elected.
-    #[getter]
-    fn pik_exercise_rate(&self) -> f64 {
-        self.inner.pik_exercise_rate
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// The inner type is not `Serialize`, so the headline statistics are
@@ -356,6 +326,23 @@ impl PyPathStatistics {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyPathStatistics |s| {
+    /// Fraction of simulated paths that defaulted.
+    default_rate -> f64 = s.inner.default_rate;
+
+    /// Average default time in years among defaulted paths.
+    avg_default_time -> f64 = s.inner.avg_default_time;
+
+    /// Average terminal notional, reflecting PIK accretion.
+    avg_terminal_notional -> f64 = s.inner.avg_terminal_notional;
+
+    /// Average recovery rate (decimal fraction) among defaulted paths.
+    avg_recovery_rate -> f64 = s.inner.avg_recovery_rate;
+
+    /// Fraction of coupon dates where PIK was elected.
+    pik_exercise_rate -> f64 = s.inner.pik_exercise_rate;
+});
 
 /// Result from Merton Monte Carlo PIK bond pricing.
 #[pyclass(
@@ -377,66 +364,6 @@ impl PyMertonMcResult {
 
 #[pymethods]
 impl PyMertonMcResult {
-    /// Clean price as a percentage of par: the dirty price less accrued interest.
-    #[getter]
-    fn clean_price_pct(&self) -> f64 {
-        self.inner.clean_price_pct
-    }
-
-    /// Dirty price as a percentage of par: the mean simulated present value.
-    #[getter]
-    fn dirty_price_pct(&self) -> f64 {
-        self.inner.dirty_price_pct
-    }
-
-    /// Expected loss as a fraction of PIK-aware risk-free present value.
-    #[getter]
-    fn expected_loss(&self) -> f64 {
-        self.inner.expected_loss
-    }
-
-    /// Unexpected loss (standard deviation of path PVs divided by notional).
-    #[getter]
-    fn unexpected_loss(&self) -> f64 {
-        self.inner.unexpected_loss
-    }
-
-    /// Expected shortfall at the 95% confidence level.
-    #[getter]
-    fn expected_shortfall_95(&self) -> f64 {
-        self.inner.expected_shortfall_95
-    }
-
-    /// Average PIK fraction across all coupon dates and paths.
-    #[getter]
-    fn average_pik_fraction(&self) -> f64 {
-        self.inner.average_pik_fraction
-    }
-
-    /// Effective spread in basis points implied by the MC price versus risk-free PV.
-    #[getter]
-    fn effective_spread_bp(&self) -> f64 {
-        self.inner.effective_spread_bp
-    }
-
-    /// Path-level simulation statistics.
-    #[getter]
-    fn path_statistics(&self) -> PyPathStatistics {
-        PyPathStatistics::from_inner(self.inner.path_statistics.clone())
-    }
-
-    /// Number of independent Monte Carlo estimators (antithetic pairs count once).
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.num_paths
-    }
-
-    /// Standard error of the clean price estimate (percentage of par).
-    #[getter]
-    fn standard_error(&self) -> f64 {
-        self.inner.standard_error
-    }
-
     /// Export the headline results as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``clean_price_pct``, ``dirty_price_pct``, ``expected_loss``,
@@ -468,6 +395,39 @@ impl PyMertonMcResult {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyMertonMcResult |s| {
+    /// Clean price as a percentage of par: the dirty price less accrued interest.
+    clean_price_pct -> f64 = s.inner.clean_price_pct;
+
+    /// Dirty price as a percentage of par: the mean simulated present value.
+    dirty_price_pct -> f64 = s.inner.dirty_price_pct;
+
+    /// Expected loss as a fraction of PIK-aware risk-free present value.
+    expected_loss -> f64 = s.inner.expected_loss;
+
+    /// Unexpected loss (standard deviation of path PVs divided by notional).
+    unexpected_loss -> f64 = s.inner.unexpected_loss;
+
+    /// Expected shortfall at the 95% confidence level.
+    expected_shortfall_95 -> f64 = s.inner.expected_shortfall_95;
+
+    /// Average PIK fraction across all coupon dates and paths.
+    average_pik_fraction -> f64 = s.inner.average_pik_fraction;
+
+    /// Effective spread in basis points implied by the MC price versus risk-free PV.
+    effective_spread_bp -> f64 = s.inner.effective_spread_bp;
+
+    /// Path-level simulation statistics.
+    path_statistics -> PyPathStatistics =
+        PyPathStatistics::from_inner(s.inner.path_statistics.clone());
+
+    /// Number of independent Monte Carlo estimators (antithetic pairs count once).
+    num_paths -> usize = s.inner.num_paths;
+
+    /// Standard error of the clean price estimate (percentage of par).
+    standard_error -> f64 = s.inner.standard_error;
+});
 
 /// Market calibration of a Merton Monte Carlo configuration.
 ///
@@ -586,42 +546,6 @@ impl PyMertonMcCalibrationSpec {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.target)
     }
 
-    /// Structural parameter solved for: ``"debt_barrier"`` or ``"asset_vol"``.
-    #[getter]
-    fn parameter(&self) -> PyResult<String> {
-        super::convert::enum_to_py_string(&self.inner.parameter)
-    }
-
-    /// Independent MC estimators per calibration iteration.
-    #[getter]
-    fn low_paths(&self) -> usize {
-        self.inner.low_paths
-    }
-
-    /// Maximum bisection iterations.
-    #[getter]
-    fn max_iterations(&self) -> usize {
-        self.inner.max_iterations
-    }
-
-    /// Absolute tolerance on the PV residual, in currency units.
-    #[getter]
-    fn tolerance_pv(&self) -> f64 {
-        self.inner.tolerance_pv
-    }
-
-    /// ``(low, high)`` search bracket, or ``None`` to auto-bracket.
-    #[getter]
-    fn bracket(&self) -> Option<(f64, f64)> {
-        self.inner.bracket
-    }
-
-    /// Seed override for the calibration run, or ``None``.
-    #[getter]
-    fn seed(&self) -> Option<u64> {
-        self.inner.seed
-    }
-
     /// Deserialize from the JSON produced by ``to_json``.
     ///
     /// Parameters
@@ -680,6 +604,26 @@ impl PyMertonMcCalibrationSpec {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyMertonMcCalibrationSpec |s| {
+    /// Structural parameter solved for: ``"debt_barrier"`` or ``"asset_vol"``.
+    parameter -> PyResult<String> = super::convert::enum_to_py_string(&s.inner.parameter);
+
+    /// Independent MC estimators per calibration iteration.
+    low_paths -> usize = s.inner.low_paths;
+
+    /// Maximum bisection iterations.
+    max_iterations -> usize = s.inner.max_iterations;
+
+    /// Absolute tolerance on the PV residual, in currency units.
+    tolerance_pv -> f64 = s.inner.tolerance_pv;
+
+    /// ``(low, high)`` search bracket, or ``None`` to auto-bracket.
+    bracket -> Option<(f64, f64)> = s.inner.bracket;
+
+    /// Seed override for the calibration run, or ``None``.
+    seed -> Option<u64> = s.inner.seed;
+});
 
 /// Configuration for Merton Monte Carlo PIK bond pricing.
 ///

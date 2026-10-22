@@ -4,9 +4,9 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::extract::extract_rate_decimal;
 use crate::bindings::valuations::convert::{
     attributes_from_py, attributes_to_py, bool_repr, enum_to_py_string, money_to_py, opt_repr,
-    rate_decimal_from_py,
 };
 use crate::errors::core_to_py;
 use finstack_quant_cashflows::builder::RateSpec;
@@ -97,33 +97,6 @@ impl PyTranche {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Tranche identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
-    }
-
-    /// Attachment point in percent of the capital structure (0-100 scale),
-    /// or ``None`` for a note built without points that has not yet joined
-    /// a ``TrancheStructure`` (which derives it from the balance shares).
-    #[getter]
-    fn attach_pct(&self) -> Option<f64> {
-        self.inner.attach_pct
-    }
-
-    /// Detachment point in percent of the capital structure (0-100 scale),
-    /// or ``None`` until derived (see ``attach_pct``).
-    #[getter]
-    fn detach_pct(&self) -> Option<f64> {
-        self.inner.detach_pct
-    }
-
-    /// Seniority (serde name, e.g. ``"Senior"``, ``"Mezzanine"``, ``"Equity"``).
-    #[getter]
-    fn seniority(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.seniority)
-    }
-
     /// Credit rating (serde name) or ``None``.
     #[getter]
     fn rating(&self) -> PyResult<Option<String>> {
@@ -134,60 +107,10 @@ impl PyTranche {
             .transpose()
     }
 
-    /// Original (issuance) balance.
-    #[getter]
-    fn original_balance(&self) -> PyMoney {
-        money_to_py(self.inner.original_balance)
-    }
-
-    /// Current outstanding balance.
-    #[getter]
-    fn current_balance(&self) -> PyMoney {
-        money_to_py(self.inner.current_balance)
-    }
-
     /// Coupon definition as a plain ``dict`` (``RateSpec`` serde shape).
     #[getter]
     fn coupon<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.coupon)
-    }
-
-    /// Payment frequency.
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
-    }
-
-    /// Accrual day-count convention.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// Accumulated deferred (PIK) interest.
-    #[getter]
-    fn deferred_interest(&self) -> PyMoney {
-        money_to_py(self.inner.deferred_interest)
-    }
-
-    /// Whether interest may be deferred (PIK).
-    #[getter]
-    fn pik_enabled(&self) -> bool {
-        self.inner.pik_enabled
-    }
-
-    /// Explicit non-deferrable flag, or ``None`` for the seniority
-    /// convention (senior notes non-deferrable, every other class defers).
-    #[getter]
-    fn non_deferrable(&self) -> Option<bool> {
-        self.inner.non_deferrable
-    }
-
-    /// Whether the coupon is a non-deferrable claim the template pays from
-    /// principal proceeds when interest falls short.
-    #[getter]
-    fn is_non_deferrable(&self) -> bool {
-        self.inner.is_non_deferrable()
     }
 
     /// Legal final maturity as ``datetime.date``.
@@ -218,19 +141,6 @@ impl PyTranche {
             .transpose()
     }
 
-    /// Payment priority rank (1 = most senior), assigned by
-    /// ``TrancheStructure``; ``0`` on a standalone tranche.
-    #[getter]
-    fn payment_priority(&self) -> u32 {
-        self.inner.payment_priority
-    }
-
-    /// User attributes (tags and metadata).
-    #[getter]
-    fn attributes(&self) -> crate::bindings::core::types::PyAttributes {
-        attributes_to_py(&self.inner.attributes)
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -245,6 +155,57 @@ impl PyTranche {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyTranche |s| {
+    /// Tranche identifier.
+    id -> String = s.inner.id.to_string();
+
+    /// Attachment point in percent of the capital structure (0-100 scale),
+    /// or ``None`` for a note built without points that has not yet joined
+    /// a ``TrancheStructure`` (which derives it from the balance shares).
+    attach_pct -> Option<f64> = s.inner.attach_pct;
+
+    /// Detachment point in percent of the capital structure (0-100 scale),
+    /// or ``None`` until derived (see ``attach_pct``).
+    detach_pct -> Option<f64> = s.inner.detach_pct;
+
+    /// Seniority (serde name, e.g. ``"Senior"``, ``"Mezzanine"``, ``"Equity"``).
+    seniority -> PyResult<String> = enum_to_py_string(&s.inner.seniority);
+
+    /// Original (issuance) balance.
+    original_balance -> PyMoney = money_to_py(s.inner.original_balance);
+
+    /// Current outstanding balance.
+    current_balance -> PyMoney = money_to_py(s.inner.current_balance);
+
+    /// Payment frequency.
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+
+    /// Accrual day-count convention.
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    /// Accumulated deferred (PIK) interest.
+    deferred_interest -> PyMoney = money_to_py(s.inner.deferred_interest);
+
+    /// Whether interest may be deferred (PIK).
+    pik_enabled -> bool = s.inner.pik_enabled;
+
+    /// Explicit non-deferrable flag, or ``None`` for the seniority
+    /// convention (senior notes non-deferrable, every other class defers).
+    non_deferrable -> Option<bool> = s.inner.non_deferrable;
+
+    /// Whether the coupon is a non-deferrable claim the template pays from
+    /// principal proceeds when interest falls short.
+    is_non_deferrable -> bool = s.inner.is_non_deferrable();
+
+    /// Payment priority rank (1 = most senior), assigned by
+    /// ``TrancheStructure``; ``0`` on a standalone tranche.
+    payment_priority -> u32 = s.inner.payment_priority;
+
+    /// User attributes (tags and metadata).
+    attributes -> crate::bindings::core::types::PyAttributes =
+        attributes_to_py(&s.inner.attributes);
+});
 
 /// Fluent builder for [`PyTranche`]; wraps the hand-written Rust
 /// `TrancheBuilder` (consuming setters).
@@ -412,7 +373,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         rate: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let rate = rate_decimal_from_py(rate, "rate")?;
+        let rate = extract_rate_decimal(rate, "rate")?;
         builder_set!(slf, |b: TrancheBuilderInner| b
             .coupon(RateSpec::Fixed { rate }))
     }
@@ -652,7 +613,7 @@ impl PyTrancheBuilder {
     ///     If ``value`` is not a known rating or the builder was consumed.
     #[pyo3(text_signature = "($self, value)")]
     fn rating<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let rating: CreditRating = enum_from_str(value, "rating")?;
+        let rating: CreditRating = value.parse().map_err(core_to_py)?;
         builder_set!(slf, |b: TrancheBuilderInner| b.rating(rating))
     }
 

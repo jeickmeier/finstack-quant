@@ -8,16 +8,20 @@ Calculators run through `Instrument::price_with_metrics` or directly against a
 
 ```
 metrics/
-├── core/           # MetricId + ids/, MetricCalculator, MetricContext,
-│                   # MetricRegistry, standard_registry, finite differences
-├── sensitivities/  # DV01, CS01 (curve and Z-spread), vega, theta, FD Greeks,
-│                   # FX01, carry decomposition, breakeven, cross-factor
-├── risk/           # Historical VaR / expected shortfall, market history,
-│                   # risk-factor extraction
-└── shared/         # Cross-instrument calculators driven by trait metadata
+├── ids/                  # MetricId, MetricGroup, MetricUnit, the standard catalogue
+├── traits.rs             # MetricCalculator, MetricContext
+├── registry.rs           # MetricRegistry: dependency resolution, strict errors
+├── registration_macro.rs # register_metrics!
+├── universal.rs          # calculators every family registry shares
+├── finite_difference.rs  # curve and scalar bump helpers
+├── aggregation.rs        # additive-metric classification
+├── sensitivities/        # DV01, CS01 (curve and Z-spread), vega, theta, FD Greeks,
+│                         # FX01, carry decomposition, breakeven, cross-factor
+└── risk/                 # Historical VaR / expected shortfall, market history,
+                          # risk-factor extraction
 ```
 
-`core` is a private module; `sensitivities` is public but hidden from the rendered docs (the instrument families in the umbrella crate register its calculators).
+`ids`, `traits`, `registry`, `universal` and `finite_difference` are private modules; `sensitivities` is public but hidden from the rendered docs (the instrument families in the umbrella crate register its calculators).
 Everything supported is re-exported from `crate::metrics`. `risk` is public.
 
 ## Public surface
@@ -33,22 +37,22 @@ Everything supported is re-exported from `crate::metrics`. `risk` is public.
 | `bump_surface_vol_absolute` | Absolute vol-point surface bump helper |
 | `STANDARD_BUCKETS_YEARS`, `STANDARD_BUCKET_LABELS`, `format_bucket_label` | Canonical key-rate bucket grid and labels |
 | `CrossFactorCalculator`, `CrossFactorPair` | Cross-gamma style two-factor sensitivities |
-| `collect_cashflows_in_period` | Theta helper for period cashflow collection |
-| `risk::{calculate_var, VarConfig, VarMethod, VarResult}` | Historical VaR entry point and configuration |
+| `collect_period_cash`, `PeriodCash` | Period economic cash (total and income) for theta carry and attribution |
+| `risk::var_calculator::{calculate_var, VarConfig, VarMethod, VarResult}` | Historical VaR entry point and configuration |
 | `risk::{GenericHVar, GenericExpectedShortfall, MarketHistory, MarketScenario, RiskFactorShift}` | Scenario inputs and estimators |
-| `risk::{extract_risk_factors, RiskFactorType}` | Risk-factor extraction from a market context |
+| `risk::RiskFactorType` | Risk-factor categories historical scenarios shift |
 
 ## MetricId
 
-Standard IDs live in [`core/ids/`](core/ids/) and are enumerated by
+Standard IDs live in [`ids/`](ids/) and are enumerated by
 `MetricId::get_standard()` — **218 metrics** partitioned across the ten
 `MetricGroup` values (`Pricing`, `Carry`, `Sensitivity`, `Greeks`, `Credit`,
 `Rates`, `Fx`, `Equity`, `StructuredCredit`, `Alternatives`). Every standard
 metric belongs to exactly one group, and the union of the group slices equals
-`get_standard()` (enforced by a test in `core/ids/tests.rs`).
+`get_standard()` (enforced by a test in `ids/tests.rs`).
 
 Units, sign conventions, and bump definitions are documented per-ID in
-`core/ids/` and in the instrument-specific metric modules. Measures are raw
+`ids/` and in the instrument-specific metric modules. Measures are raw
 `f64` but are not unitless: some are currency amounts, some currency-per-bump,
 some decimal rates, some ratios or counts. Always read a value through its
 `MetricId` contract.
@@ -100,7 +104,7 @@ the implementation defines that invariant.
 
 ## Finite differences
 
-`core/finite_difference.rs` is reachable only through the hidden `metrics::*` re-exports and holds the curve and scalar
+`finite_difference.rs` is reachable only through the hidden `metrics::*` re-exports and holds the curve and scalar
 bump helpers plus `CORRELATION_BUMP`. Spot, volatility, rate, credit-spread and
 yield bump sizes are never hard-coded: calculators resolve them with
 `sensitivities::config::resolve(context)`, which layers
@@ -110,8 +114,8 @@ public item from `finite_difference.rs` is `bump_surface_vol_absolute`.
 
 ## Adding a metric
 
-1. Add the `MetricId` constant in `core/ids/`, assign it to a `MetricGroup`, in
-   `core/ids/group.rs`. `get_standard()` derives the discovery catalogue from
+1. Add the `MetricId` constant in `ids/`, assign it to a `MetricGroup`, in
+   `ids/group.rs`. `get_standard()` derives the discovery catalogue from
    those named group slices.
 2. Implement `MetricCalculator`, usually under
    `../instruments/<asset_class>/<instrument>/metrics/`.

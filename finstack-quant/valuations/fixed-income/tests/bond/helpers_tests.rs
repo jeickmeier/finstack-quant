@@ -7,40 +7,44 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
-    df_from_yield, fixed_leg_annuity, par_rate_and_annuity_from_discount, periods_per_year,
+    df_from_yield, fixed_leg_annuity, par_rate_and_annuity_from_discount,
     price_from_ytm_compounded_params, YieldCompounding,
 };
 
 #[test]
 fn test_periods_per_year_monthly() {
     // 1 month = 12 periods per year
-    assert_eq!(periods_per_year(Tenor::monthly()).unwrap(), 12.0);
+    assert_eq!(Tenor::monthly().payments_per_year(), 12.0);
 
     // 3 months = 4 periods per year (quarterly)
-    assert_eq!(periods_per_year(Tenor::quarterly()).unwrap(), 4.0);
+    assert_eq!(Tenor::quarterly().payments_per_year(), 4.0);
 
     // 6 months = 2 periods per year (semi-annual)
-    assert_eq!(periods_per_year(Tenor::semi_annual()).unwrap(), 2.0);
+    assert_eq!(Tenor::semi_annual().payments_per_year(), 2.0);
 
     // 12 months = 1 period per year (annual)
-    assert_eq!(periods_per_year(Tenor::annual()).unwrap(), 1.0);
+    assert_eq!(Tenor::annual().payments_per_year(), 1.0);
 }
 
 #[test]
 fn test_periods_per_year_days() {
     // 30 days = 365/30 ≈ 12.17 periods per year
-    let result =
-        periods_per_year(Tenor::new(30, TenorUnit::Days).expect("valid tenor fixture")).unwrap();
+    let result = Tenor::new(30, TenorUnit::Days)
+        .expect("valid tenor fixture")
+        .payments_per_year();
     assert!((result - 12.166666).abs() < 0.01);
 
     // 90 days ≈ 4.06 periods per year
-    let result =
-        periods_per_year(Tenor::new(90, TenorUnit::Days).expect("valid tenor fixture")).unwrap();
+    let result = Tenor::new(90, TenorUnit::Days)
+        .expect("valid tenor fixture")
+        .payments_per_year();
     assert!((result - 4.0555).abs() < 0.01);
 
     // 365 days = 1 period per year
     assert_eq!(
-        periods_per_year(Tenor::new(365, TenorUnit::Days).expect("valid tenor fixture")).unwrap(),
+        Tenor::new(365, TenorUnit::Days)
+            .expect("valid tenor fixture")
+            .payments_per_year(),
         1.0
     );
 }
@@ -48,15 +52,21 @@ fn test_periods_per_year_days() {
 #[test]
 fn test_periods_per_year_years_and_weeks() {
     assert_eq!(
-        periods_per_year(Tenor::new(2, TenorUnit::Years).expect("valid tenor fixture")).unwrap(),
+        Tenor::new(2, TenorUnit::Years)
+            .expect("valid tenor fixture")
+            .payments_per_year(),
         0.5
     );
     assert_eq!(
-        periods_per_year(Tenor::new(1, TenorUnit::Weeks).expect("valid tenor fixture")).unwrap(),
+        Tenor::new(1, TenorUnit::Weeks)
+            .expect("valid tenor fixture")
+            .payments_per_year(),
         52.0
     );
     assert_eq!(
-        periods_per_year(Tenor::new(2, TenorUnit::Weeks).expect("valid tenor fixture")).unwrap(),
+        Tenor::new(2, TenorUnit::Weeks)
+            .expect("valid tenor fixture")
+            .payments_per_year(),
         26.0
     );
 }
@@ -160,27 +170,6 @@ fn test_df_from_yield_street() {
 }
 
 #[test]
-fn test_df_from_yield_treasury_actual_short_and_long_paths() {
-    let frequency = Tenor::semi_annual();
-
-    let short_df = df_from_yield(0.06, 0.25, YieldCompounding::TreasuryActual, frequency).unwrap();
-    let short_expected = 1.0 / (1.0 + 0.06 * 0.25);
-    assert!((short_df - short_expected).abs() < 1e-12);
-
-    let stub_df = df_from_yield(0.06, 1.3, YieldCompounding::TreasuryActual, frequency).unwrap();
-    let m = 2.0_f64;
-    let n_full_periods = (1.3_f64 * m).floor();
-    let stub_time = 1.3 - n_full_periods / m;
-    let stub_expected = (1.0_f64 / (1.0_f64 + 0.06_f64 * stub_time))
-        * (1.0_f64 + 0.06_f64 / m).powf(-n_full_periods);
-    assert!((stub_df - stub_expected).abs() < 1e-12);
-
-    let no_stub_df = df_from_yield(0.06, 1.5, YieldCompounding::TreasuryActual, frequency).unwrap();
-    let no_stub_expected = (1.0_f64 + 0.06_f64 / m).powf(-m * 1.5_f64);
-    assert!((no_stub_df - no_stub_expected).abs() < 1e-12);
-}
-
-#[test]
 fn test_df_from_yield_validation_errors_cover_multiple_compounding_modes() {
     assert!(df_from_yield(
         -2.0,
@@ -197,13 +186,6 @@ fn test_df_from_yield_validation_errors_cover_multiple_compounding_modes() {
     )
     .is_err());
     assert!(df_from_yield(-5.0, 1.0, YieldCompounding::Street, Tenor::semi_annual()).is_err());
-    assert!(df_from_yield(
-        -5.0,
-        0.75,
-        YieldCompounding::TreasuryActual,
-        Tenor::semi_annual()
-    )
-    .is_err());
 }
 
 #[test]

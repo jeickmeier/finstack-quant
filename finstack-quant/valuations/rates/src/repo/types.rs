@@ -493,22 +493,6 @@ impl Repo {
         self.cash_amount.checked_div_f64(factor)
     }
 
-    /// Check if the repo is adequately collateralized.
-    pub fn is_adequately_collateralized(&self, market: &MarketContext) -> Result<bool> {
-        let collateral_value = self.collateral.market_value(market)?;
-        let required_value = self.required_collateral_value()?;
-
-        // Ensure same currency for comparison
-        if collateral_value.currency() != required_value.currency() {
-            return Err(Error::CurrencyMismatch {
-                expected: required_value.currency(),
-                actual: collateral_value.currency(),
-            });
-        }
-
-        Ok(collateral_value.amount() >= required_value.amount())
-    }
-
     /// Compute present value of the repo using curves in the market context.
     ///
     /// Returns the PV of future cashflows.
@@ -558,7 +542,11 @@ impl Repo {
     pub fn interest_amount(&self) -> Result<Money> {
         // Apply business day adjustments to get correct accrual period
         let (adj_start, adj_maturity) = self.adjusted_dates()?;
+        self.interest_between(adj_start, adj_maturity)
+    }
 
+    /// Interest accrued over the already business-day-adjusted period.
+    fn interest_between(&self, adj_start: Date, adj_maturity: Date) -> Result<Money> {
         let year_fraction = self.day_count.year_fraction(
             adj_start,
             adj_maturity,
@@ -663,7 +651,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
         let (adj_start, adj_maturity) = self.adjusted_dates()?;
 
         let cash_outflow = Money::new(-self.cash_amount.amount(), self.cash_amount.currency())?;
-        let total_repayment = self.total_repayment()?;
+        let total_repayment = self
+            .cash_amount
+            .checked_add(self.interest_between(adj_start, adj_maturity)?)?;
         let interest = total_repayment.checked_sub(self.cash_amount)?;
         let flows = vec![
             finstack_quant_core::cashflow::CashFlow::new(
@@ -706,7 +696,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 #[cfg(test)]
 mod tests {
     use super::*;

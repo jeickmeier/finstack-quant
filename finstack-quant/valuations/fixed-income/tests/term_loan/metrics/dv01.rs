@@ -196,7 +196,7 @@ fn quoted_callable_dv01_freezes_solved_oas() {
         .unwrap();
 
     let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
-    let pricer = TermLoanTreePricer::new();
+    let pricer = TermLoanTreePricer;
     let oas_bp = pricer
         .calculate_oas(&loan, &market, as_of, 90.0)
         .expect("OAS from discounted quote");

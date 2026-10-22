@@ -1,5 +1,5 @@
-//! Mod implementation used by the sensitivities subsystem.
-//!
+//! Family-facing sensitivity calculators — DV01, CS01, finite-difference Greeks,
+//! vega, theta, carry and breakeven — and their bump configuration.
 pub mod breakeven;
 pub mod carry_decomposition;
 pub mod config;

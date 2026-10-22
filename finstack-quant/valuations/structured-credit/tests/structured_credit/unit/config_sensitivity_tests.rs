@@ -19,9 +19,9 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StochasticPricingResult, StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_metrics, run_simulation_with_diagnostics, AssetPool, CoverageTestSpec,
-    DealType, LossAllocationPolicy, PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod,
-    SimulationRun, StructuredCredit, Tranche, TrancheStructure,
+    run_simulation_with_diagnostics, tranche_metrics, AssetPool, CoverageTestSpec, DealType,
+    LossAllocationPolicy, PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod, SimulationRun,
+    StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -219,10 +219,10 @@ fn seasoned_note_prices_per_current_face() {
     tranche_mut(&mut seasoned, "SR").current_balance =
         Money::new(400_000.0, Currency::USD).expect("money");
 
-    let fresh = calculate_tranche_metrics(&new_issue, "SR", &market, as_of(), None)
-        .expect("new-issue metrics");
-    let aged = calculate_tranche_metrics(&seasoned, "SR", &market, as_of(), None)
-        .expect("seasoned metrics");
+    let fresh =
+        tranche_metrics(&new_issue, "SR", &market, as_of(), None, &[]).expect("new-issue metrics");
+    let aged =
+        tranche_metrics(&seasoned, "SR", &market, as_of(), None, &[]).expect("seasoned metrics");
     assert!(
         (aged.pv / fresh.pv - 0.5).abs() < 1e-9,
         "PV scales with the current balance: {} vs {}",
@@ -230,12 +230,12 @@ fn seasoned_note_prices_per_current_face() {
         fresh.pv
     );
     assert!(
-        (aged.price_pct - fresh.price_pct).abs() < 1e-6,
+        (aged.clean_price_pct - fresh.clean_price_pct).abs() < 1e-6,
         "price per current face is unchanged by seasoning: {} vs {}",
-        aged.price_pct,
-        fresh.price_pct
+        aged.clean_price_pct,
+        fresh.clean_price_pct
     );
-    assert!(aged.price_pct > 95.0 && aged.price_pct < 110.0);
+    assert!(aged.clean_price_pct > 95.0 && aged.clean_price_pct < 110.0);
 }
 
 /// Audit probe 2 — the loss-allocation policy reaches the notes: under
@@ -302,9 +302,10 @@ fn loss_allocation_policy_changes_the_senior_note_flows() {
 fn failing_coverage_test_does_not_trap_the_coupon_it_protects() {
     let market = fixed_market();
     let untested = structured_credit();
-    let tested = structured_credit()
-        .with_coverage_triggers(vec![CoverageTestSpec::oc("SR", 2.0)])
-        .expect("coverage test");
+    let tested = StructuredCredit {
+        coverage_triggers: vec![CoverageTestSpec::oc("SR", 2.0)],
+        ..structured_credit()
+    };
 
     let without = deterministic(&untested, &market);
     let with = deterministic(&tested, &market);

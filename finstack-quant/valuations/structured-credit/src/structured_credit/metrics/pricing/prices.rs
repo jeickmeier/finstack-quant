@@ -15,7 +15,7 @@ use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, M
 ///
 /// Where NPV is the net present value of all future cashflows.
 ///
-pub struct DirtyPriceCalculator;
+pub(crate) struct DirtyPriceCalculator;
 
 impl MetricCalculator for DirtyPriceCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
@@ -45,29 +45,13 @@ impl MetricCalculator for DirtyPriceCalculator {
 ///
 /// Clean Price = Dirty Price - (Accrued / Notional) × 100
 ///
-pub struct CleanPriceCalculator;
+pub(crate) struct CleanPriceCalculator;
 
 impl MetricCalculator for CleanPriceCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let dirty = context
-            .computed
-            .get(&MetricId::DirtyPrice)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:DirtyPrice".to_string(),
-                })
-            })?;
+        let dirty = context.computed_metric(&MetricId::DirtyPrice)?;
 
-        let accrued = context
-            .computed
-            .get(&MetricId::Accrued)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Accrued".to_string(),
-                })
-            })?;
+        let accrued = context.computed_metric(&MetricId::Accrued)?;
 
         // Convert accrued to price points
         let notional = quote_notional(context)?;

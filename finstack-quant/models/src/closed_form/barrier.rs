@@ -585,6 +585,61 @@ pub fn barrier_rebate(
     }
 }
 
+/// Realized payoff of a barrier option whose monitoring window has closed.
+///
+/// | Barrier | Breached | Payoff |
+/// |---|---|---|
+/// | knock-out | no | `intrinsic` |
+/// | knock-out | yes | `rebate` at [`PayoutTiming::AtExpiry`]; `0.0` at [`PayoutTiming::AtHit`] (already settled on the hit) |
+/// | knock-in | yes | `intrinsic` |
+/// | knock-in | no | `rebate` |
+///
+/// # Arguments
+///
+/// * `barrier_type` - Knock-in or knock-out direction of the contract.
+/// * `breached` - Whether the barrier was observed hit during monitoring.
+/// * `timing` - Knock-out rebate payment timing; knock-in rebates always
+///   settle at expiry.
+/// * `intrinsic` - Exercise value at expiry (`max(S - K, 0)` or
+///   `max(K - S, 0)`), on the caller's scale (per unit or total).
+/// * `rebate` - Rebate amount on the same scale as `intrinsic`; `0.0` when
+///   the contract has none.
+///
+/// # Returns
+///
+/// The undiscounted amount the holder receives at expiry, on the scale of
+/// the inputs.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::types::{BarrierType, PayoutTiming};
+/// use finstack_quant_models::closed_form::barrier::expired_barrier_payoff;
+///
+/// let knocked_out =
+///     expired_barrier_payoff(BarrierType::UpAndOut, true, PayoutTiming::AtExpiry, 5.0, 1.0);
+/// assert_eq!(knocked_out, 1.0);
+/// let knocked_in =
+///     expired_barrier_payoff(BarrierType::DownAndIn, true, PayoutTiming::AtHit, 5.0, 1.0);
+/// assert_eq!(knocked_in, 5.0);
+/// ```
+pub fn expired_barrier_payoff(
+    barrier_type: BarrierType,
+    breached: bool,
+    timing: PayoutTiming,
+    intrinsic: f64,
+    rebate: f64,
+) -> f64 {
+    match (barrier_type.is_knock_out(), breached) {
+        (true, false) | (false, true) => intrinsic,
+        (true, true) => match timing {
+            PayoutTiming::AtHit => 0.0,
+            PayoutTiming::AtExpiry => rebate,
+        },
+        (false, false) => rebate,
+    }
+}
+
 /// Discounted first-passage value `E[e^{-r·τ} 1{τ≤T}]` for a continuously
 /// monitored barrier (Rubinstein–Reiner one-touch, pay-at-hit).
 ///

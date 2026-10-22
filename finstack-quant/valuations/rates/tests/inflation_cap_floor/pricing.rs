@@ -13,9 +13,8 @@ use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPr
 use finstack_quant_valuations_core::pricer::ModelKey;
 use finstack_quant_valuations_rates::cap_floor::RateOptionType;
 use finstack_quant_valuations_rates::inflation_cap_floor::InflationCapFloor;
-use finstack_quant_valuations_test_support::inflation::{
-    flat_discount, flat_inflation_curve, simple_index,
-};
+use finstack_quant_valuations_test_support::inflation::{flat_inflation_curve, simple_index};
+use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve_with_day_count;
 use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 use rust_decimal::Decimal;
 use time::{Duration, Month};
@@ -50,7 +49,12 @@ fn cap_floor_parity_matches_same_forward_swap_across_quote_volatilities() {
             (ModelKey::Normal, VolQuoteType::Normal, 0.02),
         ] {
             let market = MarketContext::new()
-                .insert(flat_discount("USD-OIS", as_of, 0.03).unwrap())
+                .insert(flat_discount_curve_with_day_count(
+                    0.03,
+                    as_of,
+                    "USD-OIS",
+                    DayCount::Act365F,
+                ))
                 .insert(flat_inflation_curve("US-CPI", as_of, 300.0, 0.02).unwrap())
                 .insert_inflation_index(
                     InflationIndex::new("US-CPI", vec![(as_of, 300.0)], Currency::USD).unwrap(),
@@ -90,7 +94,12 @@ fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
     let as_of = date!(2026 - 01 - 20);
     let last_release = date!(2026 - 03 - 13);
     let market = MarketContext::new()
-        .insert(flat_discount("USD-OIS", as_of, 0.0).unwrap())
+        .insert(flat_discount_curve_with_day_count(
+            0.0,
+            as_of,
+            "USD-OIS",
+            DayCount::Act365F,
+        ))
         .insert(
             InflationCurve::builder("US-CPI")
                 .base_date(date!(2025 - 12 - 01))
@@ -182,7 +191,12 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
     .with_publication_dates(vec![(january, release)])
     .unwrap();
     let market = MarketContext::new()
-        .insert(flat_discount("USD-OIS", as_of, 0.0).unwrap())
+        .insert(flat_discount_curve_with_day_count(
+            0.0,
+            as_of,
+            "USD-OIS",
+            DayCount::Act365F,
+        ))
         .insert(
             InflationCurve::builder("US-CPI")
                 .base_date(date!(2025 - 12 - 01))
@@ -265,7 +279,7 @@ fn test_caplet_intrinsic_after_fixing() {
     let end = as_of + Duration::days(30);
 
     let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
-    let disc = flat_discount("USD-OIS", as_of, 0.02).unwrap();
+    let disc = flat_discount_curve_with_day_count(0.02, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02).unwrap();
     let index = simple_index(
         "US-CPI-U",
@@ -333,7 +347,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
     let end = Date::from_calendar_date(2026, Month::January, 2).unwrap();
 
     let notional = Money::new(5_000_000.0, Currency::USD).expect("valid money fixture");
-    let disc = flat_discount("USD-OIS", as_of, 0.01).unwrap();
+    let disc = flat_discount_curve_with_day_count(0.01, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, -0.01).unwrap();
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD, InflationLag::None);
     let vol_surface = flat_vol_surface("US-CPI-VOL", &[1.0], &[0.0], 0.01)

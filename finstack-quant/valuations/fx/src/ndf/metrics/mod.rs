@@ -17,25 +17,17 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_ndf_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
+    use finstack_quant_valuations_core::metrics::sensitivities::fx01::GenericFx01Calculator;
     use finstack_quant_valuations_core::pricer::InstrumentType;
 
-    // Fx01 uses the shared `GenericFx01Calculator` (1% relative spot move).
-    // The previous per-NDF calculator had bespoke quote-convention logic
-    // (BasePerSettlement vs SettlementPerBase). Routing through MarketBump
-    // + the canonical NDF pricer preserves that quote-convention awareness
-    // automatically — the bump goes through the FX matrix, and `Ndf::value`
-    // already reads spot in its own convention. The previous calculator's
-    // regression tests are subsumed by the generic + canonical pricer path.
-    registry.register_metric(
-        MetricId::Fx01,
-        finstack_quant_valuations_core::metrics::sensitivities::fx01::arc_generic_fx01(),
-        &[InstrumentType::Ndf],
-    )?;
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
         instrument: InstrumentType::Ndf,
         metrics: [
+            // The bump goes through the FX matrix and `Ndf::value` reads spot
+            // in its own quote convention, so the generic calculator honours
+            // BasePerSettlement vs SettlementPerBase quoting.
+            (Fx01, GenericFx01Calculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]

@@ -36,7 +36,7 @@ from finstack_quant.valuations.instruments import (
     TrancheStructure,
     Waterfall,
     price_instrument,
-    structured_credit_tranche_metrics,
+    tranche_metrics,
 )
 from tests.golden.runners.pricing_common import _resolve_market
 from tests.golden.schema import GoldenFixture
@@ -442,7 +442,7 @@ def test_waterfall_introspection_and_custom_waterfall_round_trip() -> None:
 
 def test_tranche_metrics_report_the_to_call_twins() -> None:
     deal = _clo()
-    metrics = structured_credit_tranche_metrics(deal.to_json(), "A", _market(), "2024-01-01")
+    metrics = tranche_metrics(deal.to_json(), "A", _market(), "2024-01-01")
     assert metrics.wal_to_call is not None
     assert metrics.wal_to_call < metrics.wal
     assert metrics.z_spread_to_call_bp is not None

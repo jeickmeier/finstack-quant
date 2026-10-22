@@ -53,7 +53,7 @@ pub(crate) use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPa
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "AutocallableUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct Autocallable {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -182,149 +182,7 @@ pub struct Autocallable {
     pub attributes: Attributes,
 }
 
-/// Mirror of `Autocallable` used by serde to apply `validate()` after
-/// deserialization. Not part of the public API.
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct AutocallableUnchecked {
-    /// Unique instrument identifier
-    id: InstrumentId,
-    /// Underlying asset ticker symbol
-    underlying_ticker: String,
-    /// Observation dates for autocall and coupon checks.
-    ///
-    /// Barriers are monitored **discretely** at these exact dates only.
-    /// The Monte Carlo time grid is constructed to include these dates precisely.
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
-    )]
-    observation_dates: Vec<Date>,
-    /// Contractual payment dates corresponding to observation dates.
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
-    )]
-    payment_dates: Vec<Date>,
-    /// Explicit terminal expiry date for the structure.
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    expiry: Date,
-    /// Autocall barrier levels (as ratios of initial spot, e.g., 1.0 = 100%).
-    ///
-    /// Each barrier corresponds to the observation date at the same index.
-    /// If spot ≥ barrier × initial_spot on the observation date, the product autocalls.
-    autocall_barriers: Vec<f64>,
-    /// Coupon barriers corresponding to observation dates.
-    coupon_barriers: Vec<f64>,
-    /// Coupon return amounts for each observation date.
-    coupons: Vec<f64>,
-    /// Memory ("Phoenix") coupon feature.
-    ///
-    /// Missed coupons accrue until a later coupon barrier is met.
-    #[serde(default)]
-    memory_coupons: bool,
-    /// Final barrier level for final payoff determination
-    final_barrier: f64,
-    /// Type of final payoff (capital protection, participation, knock-in put)
-    final_payoff_type: FinalPayoffType,
-    /// Cap level for final payoff (maximum return)
-    cap_level: f64,
-    /// Notional amount
-    notional: Money,
-    /// Day count convention for interest calculations
-    day_count: finstack_quant_core::dates::DayCount,
-    /// Discount curve ID for present value calculations
-    discount_curve_id: CurveId,
-    /// Spot price identifier for underlying asset
-    spot_id: PriceId,
-    /// Volatility surface ID for option pricing
-    vol_surface_id: CurveId,
-    /// Explicit path model selection; required to acknowledge model risk.
-    path_model: EquityPathModel,
-    /// Optional dividend-yield scalar ID.
-    ///
-    /// `Some(id)`: lookup MUST succeed (a missing or non-unitless scalar
-    /// returns an error). `None`: no implicit default; treated as zero
-    /// continuous dividend yield. Set explicitly for index underlyings.
-    #[serde(default)]
-    div_yield_id: Option<PriceId>,
-    /// Initial (strike-set) underlying level S_0 used as the reference for
-    /// barrier and payoff ratios.
-    ///
-    /// `None` (the default) uses the spot at the valuation date, which is only
-    /// correct for a new trade priced on its strike-set date. **Required for
-    /// seasoned trades** (any observation date on or before `as_of`): pricing
-    /// errors if past observation dates exist without it.
-    #[serde(default)]
-    initial_level: Option<f64>,
-    /// Observed underlying fixings for seasoned trades (date, level pairs).
-    ///
-    /// For a mid-life autocallable, every observation date on or before the
-    /// valuation date must have a matching fixing here; pricing errors
-    /// otherwise. Past fixings are evaluated deterministically (autocall,
-    /// missed memory coupons, discrete knock-in monitoring) and only the
-    /// remaining future observation dates are simulated.
-    #[serde(default)]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
-    )]
-    past_fixings: Vec<(Date, f64)>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and grouping
-    attributes: Attributes,
-}
-
-impl TryFrom<AutocallableUnchecked> for Autocallable {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: AutocallableUnchecked) -> std::result::Result<Self, Self::Error> {
-        let inst = Self {
-            id: value.id,
-            underlying_ticker: value.underlying_ticker,
-            observation_dates: value.observation_dates,
-            payment_dates: value.payment_dates,
-            expiry: value.expiry,
-            autocall_barriers: value.autocall_barriers,
-            coupon_barriers: value.coupon_barriers,
-            coupons: value.coupons,
-            memory_coupons: value.memory_coupons,
-            final_barrier: value.final_barrier,
-            final_payoff_type: value.final_payoff_type,
-            cap_level: value.cap_level,
-            notional: value.notional,
-            day_count: value.day_count,
-            discount_curve_id: value.discount_curve_id,
-            spot_id: value.spot_id,
-            vol_surface_id: value.vol_surface_id,
-            path_model: value.path_model,
-            div_yield_id: value.div_yield_id,
-            initial_level: value.initial_level,
-            past_fixings: value.past_fixings,
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        inst.validate()?;
-        Ok(inst)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(Autocallable);
 
 impl Autocallable {
     /// Validate structural invariants required by the pricing engine.
@@ -494,23 +352,7 @@ impl Autocallable {
                 )));
             }
         }
-        for (d, v) in &self.past_fixings {
-            if !v.is_finite() || *v <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Autocallable past_fixings[{}] = {} must be finite and positive",
-                    d, v
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    /// Look up the observed fixing for an observation date, if provided.
-    pub fn fixing_on(&self, date: Date) -> Option<f64> {
-        self.past_fixings
-            .iter()
-            .find(|(d, _)| *d == date)
-            .map(|(_, v)| *v)
+        crate::past_fixings::validate_positive_fixings(&"Autocallable", &self.past_fixings)
     }
 
     /// Create a canonical example autocallable (quarterly observations, simple barriers/coupons).
@@ -571,20 +413,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for Autocallable {
         &self,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
     {
-        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
-        deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_market_scalar_id(self.spot_id.as_str());
-        deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
-                self.vol_surface_id.clone(),
-                Some(self.spot_id.clone()),
-                None,
-            ),
-        );
-        if let Some(dividend_yield) = &self.div_yield_id {
-            deps.add_market_scalar_id(dividend_yield.as_str());
-        }
-        Ok(deps)
+        Ok(crate::equity_vol_dependencies(
+            &self.discount_curve_id,
+            &self.spot_id,
+            &self.vol_surface_id,
+            None,
+            self.div_yield_id.as_ref(),
+        ))
     }
 
     fn base_value(
@@ -624,7 +459,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for Autocallable {
             .observation_dates
             .iter()
             .copied()
-            .filter(|date| *date > as_of && *date <= rolled_date && self.fixing_on(*date).is_none())
+            .filter(|date| {
+                *date > as_of
+                    && *date <= rolled_date
+                    && crate::past_fixings::fixing_on(&self.past_fixings, *date).is_none()
+            })
             .collect();
         let needs_initial_level = self.initial_level.is_none()
             && self

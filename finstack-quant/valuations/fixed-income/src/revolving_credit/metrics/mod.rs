@@ -21,18 +21,26 @@ use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 
-/// Drawn balance on the valuation date: `drawn` is the balance at the
-/// simulation anchor in both modes and deterministic events are future-only,
-/// so the helper only replays events dated on `as_of` itself (none can be).
-fn drawn_balance_as_of(
+/// Drawn balance on `date`: the deterministic replay of the events after the
+/// anchor `as_of` up to `date`, or the anchor balance `drawn` of a stochastic
+/// facility. On `date == as_of` no event is replayed (events are future-only).
+fn drawn_at(
     facility: &RevolvingCredit,
     as_of: Date,
+    date: Date,
 ) -> finstack_quant_core::Result<Money> {
     if facility.is_deterministic() {
-        super::cashflow_engine::calculate_drawn_balance_at_date(facility, as_of, as_of)
+        super::cashflow_engine::calculate_drawn_balance_at_date(facility, as_of, date)
     } else {
         Ok(facility.drawn)
     }
+}
+
+/// Undrawn availability on `as_of` given the `drawn` balance: the commitment
+/// in force less drawn and letters of credit outstanding, floored at zero.
+fn undrawn_at(facility: &RevolvingCredit, as_of: Date, drawn: f64) -> f64 {
+    (facility.commitment_at(as_of).amount() - drawn - facility.lc_outstanding_at(as_of).amount())
+        .max(0.0)
 }
 
 /// Register all revolving credit metrics with the registry.
@@ -59,7 +67,6 @@ pub(crate) fn register_revolving_credit_metrics(
             (BucketedCs01, finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01::<
                 crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
-            // Theta is now registered universally in crate::FIXED_INCOME.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             // Quote metrics on the settlement schedule (LSTA convention: a
             // quote applies to the drawn balance plus accrued).
@@ -94,7 +101,7 @@ pub(crate) struct AvailableCapacityCalculator;
 impl MetricCalculator for AvailableCapacityCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let facility: &RevolvingCredit = context.instrument_as()?;
-        let drawn = drawn_balance_as_of(facility, context.as_of)?;
+        let drawn = drawn_at(facility, context.as_of, context.as_of)?;
         let available = facility
             .commitment_at(context.as_of)
             .checked_sub(drawn)?
@@ -136,7 +143,7 @@ pub(crate) struct UtilizationRateCalculator;
 impl MetricCalculator for UtilizationRateCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let facility: &RevolvingCredit = context.instrument_as()?;
-        let drawn = drawn_balance_as_of(facility, context.as_of)?.amount();
+        let drawn = drawn_at(facility, context.as_of, context.as_of)?.amount();
         let commitment = facility.commitment_at(context.as_of).amount();
         let utilization_rate = if commitment > 0.0 {
             drawn / commitment

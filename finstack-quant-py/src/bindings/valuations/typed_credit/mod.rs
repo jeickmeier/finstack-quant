@@ -1,14 +1,12 @@
-//! Typed credit instruments: `CreditDefaultSwap`, `CdsIndex`, `CdsTranche`,
-//! `CdsOption` and `ConvertibleBond`, plus their small typed helper classes
-//! (`CdsIndexParams`, `CdsIndexConstituent`, `CdsTrancheParams`,
-//! `CallPutSchedule`, `ConversionSpec`).
+//! Typed credit instruments: `CreditDefaultSwap`, `CdsIndex`, `CdsTranche`
+//! and `CdsOption`, plus their small typed helper classes (`CdsIndexParams`,
+//! `CdsIndexConstituent`, `CdsTrancheParams`).
 //! Mirrors the `PyBond` pattern in `instruments.rs`.
 
 mod cds;
 mod cds_index;
 mod cds_option;
 mod cds_tranche;
-mod convertible;
 
 use pyo3::prelude::*;
 
@@ -20,8 +18,6 @@ pub(crate) use cds_option::PyCdsOption;
 use cds_option::PyCdsOptionBuilder;
 pub(crate) use cds_tranche::PyCdsTranche;
 use cds_tranche::PyCdsTrancheBuilder;
-pub(crate) use convertible::PyConvertibleBond;
-use convertible::PyConvertibleBondBuilder;
 
 /// Register the typed credit-derivative instruments on the instruments
 /// submodule.
@@ -34,11 +30,8 @@ pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCdsOptionBuilder>()?;
     m.add_class::<PyCdsTranche>()?;
     m.add_class::<PyCdsTrancheBuilder>()?;
-    m.add_class::<PyConvertibleBond>()?;
-    m.add_class::<PyConvertibleBondBuilder>()?;
     cds_index::register(py, m)?;
     cds_tranche::register(py, m)?;
-    convertible::register(py, m)?;
     Ok(())
 }
 
@@ -46,10 +39,7 @@ pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
 /// merges every submodule list so registration stays in one place per file.
-/// The four older instrument classes and their builders are listed by the
-/// parent; `CdsOption` and the helper classes are listed here.
 pub(crate) const EXPORTS: &[&str] = &[
-    "CallPutSchedule",
     "CdsIndex",
     "CdsIndexBuilder",
     "CdsIndexConstituent",
@@ -59,9 +49,6 @@ pub(crate) const EXPORTS: &[&str] = &[
     "CdsTranche",
     "CdsTrancheBuilder",
     "CdsTrancheParams",
-    "ConversionSpec",
-    "ConvertibleBond",
-    "ConvertibleBondBuilder",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
 ];

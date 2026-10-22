@@ -1,6 +1,6 @@
 //! Shared clean redemption for dated loan call provisions.
 
-use crate::bond::pricing::engine::tree::BondValuator;
+use crate::bond::pricing::tree::BondValuator;
 use crate::term_loan::{LoanCall, LoanCallType, TermLoan};
 use finstack_quant_cashflows::accrual::AccrualIndex;
 use finstack_quant_cashflows::builder::CashFlowSchedule;

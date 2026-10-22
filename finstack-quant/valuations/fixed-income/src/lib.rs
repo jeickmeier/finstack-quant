@@ -89,18 +89,16 @@ pub mod inflation_linked_bond;
 pub mod loan_quotes;
 /// Dated loan terms shared by term loans and revolving credit facilities.
 pub mod loan_terms;
-/// MBS passthrough module - Agency MBS pass-throughs (renamed from agency_mbs_passthrough).
+/// MBS passthrough module - Agency MBS pass-throughs.
 pub mod mbs_passthrough;
 pub mod revolving_credit;
-/// TBA module - To Be Announced trades (renamed from agency_tba).
+/// TBA module - To Be Announced trades.
 pub mod tba;
 /// Term loan module.
 pub mod term_loan;
 
 mod family;
 pub use family::FIXED_INCOME;
-
-extern crate self as finstack_quant_valuations_fixed_income;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

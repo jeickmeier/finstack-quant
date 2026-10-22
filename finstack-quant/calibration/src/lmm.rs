@@ -611,7 +611,11 @@ mod tests {
     #[test]
     fn calibration_rejects_contract_without_remaining_exercises() {
         let swaption = test_swaption();
-        let as_of = swaption.last_exercise().expect("last exercise");
+        let as_of = *swaption
+            .exercise_schedule
+            .exercise_dates
+            .last()
+            .expect("last exercise");
         let market = MarketContext::new().insert(test_discount_curve(as_of, "D"));
         let error = calibrate_bermudan_lmm_base_vol(&swaption, &market, as_of)
             .expect_err("no remaining option to calibrate")
@@ -632,10 +636,6 @@ mod tests {
         swaption.underlying_float_leg.forward_curve_id = "USD-OIS".into();
         swaption.underlying_float_leg.compounding =
             FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
-        swaption
-            .build_swap_schedule()
-            .expect("overnight contract has a valid underlying IRS schedule");
-
         let error = calibrate_bermudan_lmm_base_vol(&swaption, &market, as_of)
             .expect_err("overnight compounding lies outside the LMM domain")
             .to_string();

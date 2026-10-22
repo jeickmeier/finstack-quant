@@ -30,12 +30,7 @@ pub(crate) fn calculate_tranche_zspread(
     market: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    let tranche = cmo.reference_tranche().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "Tranche {} not found",
-            cmo.reference_tranche_id
-        ))
-    })?;
+    let tranche = cmo.reference_tranche()?;
 
     // The clean quote plus accrued buys the settlement-month accrual onward;
     // the collateral's prior-month in-flight P&I belongs to the seller.
@@ -54,24 +49,29 @@ pub(crate) fn calculate_tranche_zspread(
         )?;
     let market_price = market_price_pct / 100.0 * tranche.current_face.amount() + accrued;
 
-    // Cache cashflows outside the solver loop — they don't depend on spread.
-    let tranche_cfs = tranche_cashflows_on(cmo, &collateral, as_of, None)?;
+    // Cache `(years, base_df, total)` outside the solver loop — none of them
+    // depends on the spread.
     let discount_curve = market.get_discount(&cmo.discount_curve_id)?;
     let day_count = DayCount::Thirty360;
-
-    // Price function with spread (uses cached cashflows).
-    let price_at_spread = |spread: f64| -> Result<f64> {
-        let mut pv = 0.0;
-        for cf in &tranche_cfs {
+    let cached_flows = tranche_cashflows_on(cmo, &collateral, as_of, None)?
+        .iter()
+        .map(|cf| -> Result<(f64, f64, f64)> {
             let years =
                 day_count.year_fraction(as_of, cf.payment_date, DayCountContext::default())?;
             let base_df = discount_curve.df_between_dates(as_of, cf.payment_date)?;
+            Ok((years, base_df, cf.total))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    // Objective: model PV at `spread` minus the dirty market price.
+    let objective = |spread: f64| -> f64 {
+        let mut pv = 0.0;
+        for &(years, base_df, total) in &cached_flows {
             let spread_adj = (-spread * years).exp();
             let df = base_df * spread_adj;
-            pv += cf.total * df;
+            pv += total * df;
         }
-
-        Ok(pv)
+        pv - market_price
     };
 
     // `BrentSolver` returns `Err(SolverConvergenceFailed)` when no bracketing
@@ -84,30 +84,7 @@ pub(crate) fn calculate_tranche_zspread(
         .with_bracket_bounds(-0.10, 0.20)
         .with_initial_bracket_size(Some(0.05));
 
-    // Capture any pricing error from the objective so it can be propagated
-    // after the solver finishes (`BrentSolver::solve` expects `Fn(f64) -> f64`).
-    let pricing_error: std::cell::RefCell<Option<finstack_quant_core::Error>> =
-        std::cell::RefCell::new(None);
-    let objective = |spread: f64| -> f64 {
-        match price_at_spread(spread) {
-            Ok(model_price) => model_price - market_price,
-            Err(e) => {
-                if pricing_error.borrow().is_none() {
-                    *pricing_error.borrow_mut() = Some(e);
-                }
-                f64::NAN
-            }
-        }
-    };
-
-    let result = solver.solve(objective, 0.0);
-
-    // A pricing error during objective evaluation takes precedence.
-    if let Some(err) = pricing_error.into_inner() {
-        return Err(err);
-    }
-
-    result.map_err(|e| {
+    solver.solve(objective, 0.0).map_err(|e| {
         finstack_quant_core::Error::Validation(format!(
             "CMO tranche Z-spread solver failed to converge within bounds [-10%, 20%]: {e}. \
              Check that market price {market_price_pct} pct is within the model's reachable PV range."

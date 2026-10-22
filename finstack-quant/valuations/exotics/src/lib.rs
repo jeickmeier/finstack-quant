@@ -21,7 +21,7 @@
 //! Exotic options, structured rate notes and commodity derivatives.
 //!
 //! Two instrument families share this crate and one registration unit,
-//! [`exotics::EXOTICS`]:
+//! [`EXOTICS`]:
 //!
 //! - [`exotics`]: path-dependent options (Asian, barrier, lookback), range
 //!   accruals and the Hull-White structured notes (TARN, snowball, callable
@@ -46,12 +46,13 @@
 //! assert_ne!(asian.id(), forward.id());
 //! ```
 
-extern crate self as finstack_quant_valuations_exotics;
-
 /// Commodity derivatives.
 pub mod commodity;
 /// Exotic and path-dependent options.
 pub mod exotics;
+
+mod family;
+pub use family::EXOTICS;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

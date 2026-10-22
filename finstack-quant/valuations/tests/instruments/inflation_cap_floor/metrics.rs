@@ -13,7 +13,8 @@ use finstack_quant_valuations::instruments::rates::cap_floor::RateOptionType;
 use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations_test_support::inflation::{flat_discount, flat_inflation_curve};
+use finstack_quant_valuations_test_support::inflation::flat_inflation_curve;
+use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve_with_day_count;
 use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 use rust_decimal::Decimal;
 use time::Month;
@@ -45,7 +46,12 @@ fn build_caplet() -> InflationCapFloor {
 
 fn build_market(as_of: Date, vol: f64) -> MarketContext {
     MarketContext::new()
-        .insert(flat_discount("USD-OIS", as_of, 0.02).unwrap())
+        .insert(flat_discount_curve_with_day_count(
+            0.02,
+            as_of,
+            "USD-OIS",
+            DayCount::Act365F,
+        ))
         .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.025).unwrap())
         .insert_surface(flat_vol_surface("US-CPI-VOL", &[1.0, 5.0], &[0.025], vol))
 }
@@ -70,7 +76,12 @@ fn risk_uses_selected_model_and_declared_bump_units() {
     ] {
         let market_at_vol = |vol| {
             MarketContext::new()
-                .insert(flat_discount("USD-OIS", as_of, 0.02).unwrap())
+                .insert(flat_discount_curve_with_day_count(
+                    0.02,
+                    as_of,
+                    "USD-OIS",
+                    DayCount::Act365F,
+                ))
                 .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, inflation).unwrap())
                 .insert_surface(
                     flat_vol_surface("US-CPI-VOL", &[1.0, 5.0], &[strike], vol)

@@ -5,6 +5,9 @@ const ALLOWED: &[(&str, usize)] = &[
     // `PrimitiveExposure::instrument` and `::metric_defaults` are runtime-only
     // decomposition state (the leg instrument and inherited metric defaults).
     ("core/src/results/composite.rs", 2),
+    // `ValuationResult::metric_seed` is pricer state handed to the metric
+    // evaluation of the same request; the registry drops it before returning.
+    ("core/src/results/valuation_result.rs", 1),
     // `Tranche::payment_priority` and `TrancheStructure::currency` are
     // derived when the structure is assembled, never read from the wire.
     (

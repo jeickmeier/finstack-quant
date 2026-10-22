@@ -30,17 +30,13 @@
 //! Bloomberg CDSO terminal expects the same.
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, DateExt, HolidayCalendar,
-};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::CreditParams;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use rust_decimal::Decimal;
-use time::Month;
 
 use super::parameters::CdsOptionParams;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -97,8 +93,6 @@ pub struct CdsOption {
     pub strike: super::strike::CdsOptionStrike,
     /// Option type (Call = right to buy protection, Put = right to sell protection)
     pub option_type: OptionType,
-    /// Exercise style
-    pub exercise_style: ExerciseStyle,
     /// Option expiry date
     #[cfg_attr(
         feature = "json-schema",
@@ -115,16 +109,6 @@ pub struct CdsOption {
     pub notional: Money,
     /// Settlement type
     pub settlement: SettlementType,
-    /// Payment date of the option premium, returned by the settlement-date
-    /// accessor. This does not change variance time or front-end protection;
-    /// the option value excludes the separately agreed trade premium.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
-    )]
-    #[builder(default)]
-    pub premium_settlement_date: Option<Date>,
     /// Payment date of the exercise proceeds, defaulting to legal expiry.
     /// Must be on or after expiry and before CDS maturity. Discounting uses
     /// this date; spread variance ends at legal expiry.
@@ -260,21 +244,6 @@ pub struct CdsOption {
 }
 
 impl CdsOption {
-    pub(crate) fn validate_supported_configuration(&self) -> finstack_quant_core::Result<()> {
-        if self.exercise_style != ExerciseStyle::European {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CDS options currently support only European exercise; got {:?}",
-                self.exercise_style
-            )));
-        }
-
-        // Cash and physical settlement carry the same pre-expiry
-        // cash-equivalent model value; both route through the same
-        // quadrature. Post-expiry physical exercise lifecycle is rejected in
-        // the pricer's valuation-date guard.
-        Ok(())
-    }
-
     /// Validate the CdsOption parameters.
     fn validate(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::validation;
@@ -289,16 +258,6 @@ impl CdsOption {
         validation::validate_money_finite(self.notional, "CDS option notional")?;
         validation::validate_money_gt(self.notional, 0.0, "CDS option notional")?;
 
-        if let (Some(cash_settlement), Some(exercise_settlement)) =
-            (self.premium_settlement_date, self.exercise_settlement_date)
-        {
-            if exercise_settlement <= cash_settlement {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "exercise_settlement_date ({}) must be after premium_settlement_date ({})",
-                    exercise_settlement, cash_settlement
-                )));
-            }
-        }
         if let Some(exercise_settlement) = self.exercise_settlement_date {
             if exercise_settlement < self.expiry {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -489,12 +448,10 @@ impl CdsOption {
             id: id.into(),
             strike: option_params.strike,
             option_type: option_params.option_type,
-            exercise_style: ExerciseStyle::European,
             expiry: option_params.expiry,
             underlying_maturity: option_params.underlying_maturity,
             notional: option_params.notional,
             settlement: option_params.settlement,
-            premium_settlement_date: None,
             exercise_settlement_date: None,
             underlying_start_date: None,
             protection_start_convention: option_params.protection_start_convention,
@@ -524,29 +481,6 @@ impl CdsOption {
     /// interval over which spread variance accumulates.
     pub(crate) fn time_to_expiry(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
         Ok(((self.expiry - as_of).whole_days() as f64 / 365.0).max(0.0))
-    }
-
-    /// Effective settlement (payment) date of the option premium. Defaults to
-    /// the underlying CDS convention's settlement lag from the next
-    /// business day after `as_of`.
-    #[doc(hidden)]
-    pub fn effective_premium_settlement_date(
-        &self,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Date> {
-        if let Some(date) = self.premium_settlement_date {
-            return Ok(date);
-        }
-
-        let calendar = self.standard_calendar()?;
-        let trade_date = adjust(as_of, BusinessDayConvention::Following, calendar)?;
-        trade_date.add_business_days(
-            self.underlying_convention
-                .get_spec()?
-                .settlement_days
-                .into(),
-            calendar,
-        )
     }
 
     /// Effective contractual running coupon `c` of the synthetic underlying
@@ -588,16 +522,17 @@ impl CdsOption {
             return date;
         }
         match self.protection_start_convention {
-            ProtectionStartConvention::Spot => prior_cds_roll_on_or_before(as_of)
-                .saturating_add(time::Duration::days(1))
-                .min(as_of),
+            ProtectionStartConvention::Spot => {
+                // Quarterly CDS roll (20 Mar/Jun/Sep/Dec) on or before `as_of`.
+                let roll = if finstack_quant_core::dates::is_cds_date(as_of) {
+                    as_of
+                } else {
+                    finstack_quant_core::dates::prev_cds_date(as_of).unwrap_or(as_of)
+                };
+                roll.saturating_add(time::Duration::days(1)).min(as_of)
+            }
             ProtectionStartConvention::Forward => self.expiry,
         }
-    }
-
-    fn standard_calendar(&self) -> finstack_quant_core::Result<&'static dyn HolidayCalendar> {
-        let calendar_id = self.underlying_convention.get_spec()?.calendar_id.as_str();
-        calendar_by_id_strict(calendar_id)
     }
 
     /// CDS option Δ for spread strikes: closed-form Black-76 N(d₁) on the
@@ -635,7 +570,7 @@ impl CdsOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
-        super::metrics::delta::delta(self, market, as_of)
+        super::metrics::delta::delta_with_provider(self, market, as_of, None)
     }
 
     /// CDS option Γ for spread strikes: central difference of the Black-76
@@ -672,7 +607,7 @@ impl CdsOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
-        super::metrics::gamma::gamma(self, market, as_of)
+        super::metrics::gamma::gamma_with_provider(self, market, as_of, None)
     }
 
     /// Bloomberg CDSO Vega(1%) — one-sided forward difference of the
@@ -716,21 +651,6 @@ impl CdsOption {
     }
 }
 
-pub(crate) fn prior_cds_roll_on_or_before(date: Date) -> Date {
-    const CDS_ROLL_MONTHS: [Month; 4] =
-        [Month::March, Month::June, Month::September, Month::December];
-
-    for month in CDS_ROLL_MONTHS.iter().rev().copied() {
-        if let Ok(candidate) = Date::from_calendar_date(date.year(), month, 20) {
-            if candidate <= date {
-                return candidate;
-            }
-        }
-    }
-
-    Date::from_calendar_date(date.year().saturating_sub(1), Month::December, 20).unwrap_or(date)
-}
-
 impl finstack_quant_valuations_core::instruments::Instrument for CdsOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CdsOption,
@@ -738,8 +658,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CdsOption {
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
-        self.validate()?;
-        self.validate_supported_configuration()
+        self.validate()
     }
 
     fn market_dependencies(
@@ -771,6 +690,17 @@ impl finstack_quant_valuations_core::instruments::Instrument for CdsOption {
         super::pricer::npv(self, curves, as_of)
     }
 
+    fn valuation_details(
+        &self,
+        _market: &finstack_quant_core::market_data::context::MarketContext,
+        _as_of: finstack_quant_core::dates::Date,
+    ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
+        crate::family::credit_derivative_details(
+            finstack_quant_valuations_core::pricer::ModelKey::BloombergCdso,
+            None,
+        )
+    }
+
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.expiry)
     }
@@ -778,7 +708,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for CdsOption {
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(
     CdsOption,
     finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
@@ -811,16 +740,7 @@ mod tests {
         )
         .expect("valid option");
 
-        // T+3 BD from 2026-05-02 (Sat) is 2026-05-07 (Thu) under the
-        // ISDA-NA weekend calendar.
         let as_of = date!(2026 - 05 - 02);
-        assert_eq!(
-            option
-                .effective_premium_settlement_date(as_of)
-                .expect("cash settlement date"),
-            date!(2026 - 05 - 07)
-        );
-
         // No explicit underlying_start_date → default Spot convention uses
         // the standard prior CDS roll relative to valuation date.
         assert_eq!(
@@ -858,7 +778,7 @@ mod tests {
     }
 
     #[test]
-    fn pricing_boundary_rejects_non_finite_and_unsupported_terms() {
+    fn pricing_boundary_rejects_non_finite_terms() {
         let mut option = CdsOption::example().expect("example");
         option.recovery_rate = f64::NAN;
         assert!(option
@@ -866,14 +786,6 @@ mod tests {
             .expect_err("NaN recovery must fail")
             .to_string()
             .contains("finite"));
-
-        option.recovery_rate = 0.4;
-        option.exercise_style = ExerciseStyle::American;
-        assert!(option
-            .validate_for_pricing()
-            .expect_err("American CDS option must fail")
-            .to_string()
-            .contains("European"));
     }
 
     #[test]

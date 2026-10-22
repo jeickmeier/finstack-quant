@@ -199,9 +199,9 @@ const displays = [
   {
     id: "scenario-heatmap",
     api: [
-      "valuations.instruments.structuredCreditTrancheScenarioTable",
+      "valuations.instruments.trancheScenarioTable",
       "ValuationInstrumentsNamespace",
-      "structuredCreditTrancheScenarioTable",
+      "trancheScenarioTable",
     ],
     route: "returned-prices",
     convention:

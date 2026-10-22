@@ -5,9 +5,7 @@
 //! grid using the Modified Craig-Sneyd (MCS) ADI splitting scheme. Heston model
 //! parameters are sourced from required market scalars.
 
-use crate::equity_option::pricing::{
-    collect_inputs, reject_future_discrete_dividends_for_stochastic_vol, resolve_lifecycle_value,
-};
+use crate::equity_option::pricing::{stochastic_vol_inputs, ModelInputs};
 use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -71,57 +69,12 @@ impl EquityOptionHestonPdePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<Money, PricingError> {
-        if let Some(value) = resolve_lifecycle_value(inst, market, as_of).map_err(|error| {
-            PricingError::model_failure_with_context(
-                error.to_string(),
-                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
-            )
-        })? {
-            return Ok(value);
-        }
-        if !matches!(
-            inst.exercise_style,
-            finstack_quant_models::types::ExerciseStyle::European
-        ) {
-            return Err(PricingError::model_failure_with_context(
-                "Heston PDE supports European exercise only",
-                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
-            ));
-        }
-        reject_future_discrete_dividends_for_stochastic_vol(
-            inst,
-            as_of,
-            ModelKey::PdeAdi2D,
-            "Heston PDE",
-        )?;
-
-        let inputs = collect_inputs(inst, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
-                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
-            )
-        })?;
-        let spot = inputs.spot;
-        let r = inputs.r;
-        let q = inputs.q;
-        let t = inputs.t_vol;
-        let ccy = inst.currency;
-
-        if t <= 0.0 {
-            let intrinsic = match inst.option_type {
-                OptionType::Call => (spot - inst.strike).max(0.0),
-                OptionType::Put => (inst.strike - spot).max(0.0),
+        let (spot, r, q, t) =
+            match stochastic_vol_inputs(inst, market, as_of, ModelKey::PdeAdi2D, "Heston PDE")? {
+                ModelInputs::Settled(pv) => return Ok(pv),
+                ModelInputs::Live(inputs) => (inputs.spot, inputs.r, inputs.q, inputs.t_vol),
             };
-            return Money::new(intrinsic * inst.quantity, ccy).map_err(|error| {
-                finstack_quant_valuations_core::pricer::PricingError::from_core(
-                    error,
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        inst,
-                    )
-                    .model(ModelKey::PdeAdi2D),
-                )
-            });
-        }
+        let ccy = inst.currency;
 
         // Source production Heston parameters from explicit market scalars.
         // Validation is still enforced inside `HestonParams::new`.

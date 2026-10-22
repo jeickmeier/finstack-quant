@@ -114,38 +114,21 @@ fn test_dv01_finite_difference() {
 }
 
 #[test]
-fn test_tick_value_exchange_standard() {
-    let (_, start, end) = standard_dates();
-
-    // SOFR future: 3-month, $1MM face, 0.25bp tick
-    let future = create_standard_future(start, end);
-    let tick_value = future.derived_tick_value().unwrap();
-
-    // Tick value varies with exact dates (Act/360 basis)
-    // For a ~3-month future, should be in reasonable range
-    assert!(tick_value > 0.0, "Tick value should be positive");
-    assert!(
-        tick_value < 2000.0,
-        "Tick value should be reasonable, got {}",
-        tick_value
-    );
-}
-
-#[test]
 fn test_eurodollar_convention() {
     let (as_of, start, end) = standard_dates();
     let market = build_standard_market(as_of, 0.05);
 
     // Eurodollar specs
     let ed_specs = create_eurodollar_specs();
-    let future = create_standard_future(start, end).with_contract_specs(ed_specs);
+    let mut future = create_standard_future(start, end);
+    future.contract_specs = ed_specs;
 
     // Should price reasonably
     let pv = future.value(&market, as_of).unwrap();
     assert!(pv.amount().is_finite());
 
-    // Tick value should be reasonable (actual value depends on exact dates)
-    let tick_value = future.derived_tick_value().unwrap();
+    // Tick value (quote-point multiplier × tick size) should be reasonable
+    let tick_value = future.terms.multiplier * future.contract_specs.tick_size;
     assert!(tick_value > 0.0 && tick_value < 2000.0);
 }
 

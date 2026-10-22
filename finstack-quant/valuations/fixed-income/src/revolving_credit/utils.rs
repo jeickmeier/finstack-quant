@@ -8,16 +8,33 @@ use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+use finstack_quant_valuations_core::instruments::pricing::overnight::{
     adjust_overnight_accrual_boundaries, project_overnight_coupon, OvernightCouponProjectionInput,
     OvernightProjectionCurve,
 };
 use finstack_quant_valuations_core::instruments::pricing::overnight_conventions;
+
+/// Historical fixing series of a floating-rate facility's index, when the
+/// market carries one; `None` for fixed-rate facilities or a missing series.
+pub(super) fn resolve_fixings<'a>(
+    facility: &RevolvingCredit,
+    market: &'a MarketContext,
+) -> Option<&'a ScalarTimeSeries> {
+    match &facility.rate {
+        RateSpec::Floating(spec) => finstack_quant_core::market_data::fixings::get_fixing_series(
+            market,
+            spec.forward_curve_id.as_ref(),
+        )
+        .ok(),
+        RateSpec::Fixed { .. } => None,
+    }
+}
 
 /// Build the canonical accrual/payment periods for a revolving credit facility.
 ///
@@ -374,7 +391,7 @@ pub(super) fn project_revolver_floating_rate(
         .as_deref()
         .or(input.calendar_id);
     let calendar =
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+        finstack_quant_valuations_core::instruments::pricing::overnight::resolve_overnight_fixing_calendar(
             calendar_id,
             input.currency,
             "RevolvingCredit",
@@ -529,8 +546,8 @@ mod tests {
             lc: None,
             scheduled_fees: Vec::new(),
             oid_eir: None,
-            fees: super::super::types::RevolvingCreditFees::default(),
-            draw_repay_spec: super::super::types::DrawRepaySpec::Deterministic(vec![]),
+            fees: crate::revolving_credit::types::RevolvingCreditFees::default(),
+            draw_repay_spec: crate::revolving_credit::types::DrawRepaySpec::Deterministic(vec![]),
             discount_curve_id: "USD-OIS".into(),
             credit_curve_id: None,
             recovery_rate: 0.0,
@@ -691,7 +708,7 @@ mod tests {
     fn overnight_index_uses_shared_compounding_engine() {
         use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
         use rust_decimal::Decimal;
@@ -979,7 +996,7 @@ mod tests {
 
     #[test]
     fn test_apply_draw_repay_event_draw() {
-        use super::super::types::DrawRepayEvent;
+        use crate::revolving_credit::types::DrawRepayEvent;
 
         let balance = Money::from((5_000_000_i64, Currency::USD));
         let commitment = Money::from((10_000_000_i64, Currency::USD));
@@ -998,7 +1015,7 @@ mod tests {
 
     #[test]
     fn test_apply_draw_repay_event_repay() {
-        use super::super::types::DrawRepayEvent;
+        use crate::revolving_credit::types::DrawRepayEvent;
 
         let balance = Money::from((5_000_000_i64, Currency::USD));
         let commitment = Money::from((10_000_000_i64, Currency::USD));
@@ -1017,7 +1034,7 @@ mod tests {
 
     #[test]
     fn test_apply_draw_repay_event_exceeds_commitment() {
-        use super::super::types::DrawRepayEvent;
+        use crate::revolving_credit::types::DrawRepayEvent;
 
         let balance = Money::from((8_000_000_i64, Currency::USD));
         let commitment = Money::from((10_000_000_i64, Currency::USD));

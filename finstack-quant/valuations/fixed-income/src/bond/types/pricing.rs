@@ -82,7 +82,7 @@ impl Bond {
         model: finstack_quant_valuations_core::pricer::ModelKey,
         curves: &finstack_quant_core::market_data::context::MarketContext,
     ) -> Result<()> {
-        use crate::bond::pricing::engine::hazard::HazardBondEngine;
+        use crate::bond::pricing::hazard::HazardBondEngine;
         use finstack_quant_valuations_core::pricer::ModelKey;
 
         if model == ModelKey::RatesCredit && self.credit_curve_id.is_none() {
@@ -125,8 +125,8 @@ impl Bond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         oas_quote_decimal: f64,
-    ) -> Result<crate::bond::pricing::engine::tree::TreePriceOutcome> {
-        use crate::bond::pricing::engine::{
+    ) -> Result<crate::bond::pricing::tree::TreePriceOutcome> {
+        use crate::bond::pricing::{
             discount::BondEngine,
             hazard::HazardBondEngine,
             tree::{bond_tree_config, bond_tree_settings, TreePriceOutcome, TreePricer},
@@ -149,9 +149,11 @@ impl Bond {
                 lsmc: None,
             }),
             ModelKey::Tree => TreePricer::with_config(bond_tree_config(self, curves)?)
-                .price_at_oas_outcome(self, curves, as_of, oas_quote_decimal * 10_000.0),
+                .prepare(self, curves, as_of)?
+                .price(oas_quote_decimal * 10_000.0),
             ModelKey::RatesCredit => TreePricer::rates_credit(bond_tree_settings(self))
-                .price_at_oas_outcome(self, curves, as_of, oas_quote_decimal * 10_000.0),
+                .prepare(self, curves, as_of)?
+                .price(oas_quote_decimal * 10_000.0),
             _ => Err(finstack_quant_core::Error::Validation(format!(
                 "Bond '{}' does not support pricing model '{}'",
                 self.id,
@@ -167,8 +169,8 @@ impl Bond {
         model: finstack_quant_valuations_core::pricer::ModelKey,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-    ) -> Result<crate::bond::pricing::engine::tree::TreePriceOutcome> {
-        use crate::bond::pricing::engine::tree::TreePriceOutcome;
+    ) -> Result<crate::bond::pricing::tree::TreePriceOutcome> {
+        use crate::bond::pricing::tree::TreePriceOutcome;
         use crate::bond::pricing::{quote_conversions, settlement};
         use finstack_quant_valuations_core::pricer::ModelKey;
 
@@ -238,20 +240,6 @@ impl Bond {
         as_of: finstack_quant_core::dates::Date,
     ) -> Result<f64> {
         Ok(self.price_for_model_outcome(model, curves, as_of)?.amount)
-    }
-
-    /// Compute the bond's unshocked pricing-policy value without entering the
-    /// public instrument lifecycle.
-    ///
-    /// This is the instrument-native default path used by `base_value` and
-    /// `base_value_raw`. Explicit registry pricing bypasses inference and calls
-    /// [`Self::price_for_model_raw`] with the caller-selected model.
-    pub(crate) fn base_value_raw_impl(
-        &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> Result<f64> {
-        self.price_for_model_raw(self.default_pricing_model(), curves, as_of)
     }
 
     /// Pricing-oriented dated cashflows: coupons, amortization, and positive
@@ -363,6 +351,13 @@ impl Bond {
         )
     }
 
+    /// Whether a schedule row is cash the holder receives: excludes non-cash
+    /// PIK capitalization and the negative initial `Notional` funding draw.
+    pub(crate) fn is_holder_cashflow(cf: &finstack_quant_core::cashflow::CashFlow) -> bool {
+        use finstack_quant_core::cashflow::CFKind;
+        cf.kind != CFKind::Pik && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0)
+    }
+
     fn pricing_dated_cashflows_from_schedule_with_boundary(
         &self,
         schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
@@ -375,16 +370,11 @@ impl Bond {
             finstack_quant_core::money::Money,
         )>,
     > {
-        use finstack_quant_core::cashflow::CFKind;
-
         let ex_coupon = self.accrual_config().ex_coupon;
         let mut flows = Vec::with_capacity(schedule.get_flows().len());
         for cf in schedule.get_flows() {
             let after_boundary = cf.date > as_of || (include_as_of && cf.date == as_of);
-            let keep = after_boundary
-                && cf.kind != CFKind::Pik
-                && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0);
-            if !keep {
+            if !(after_boundary && Self::is_holder_cashflow(cf)) {
                 continue;
             }
             if cf.kind.is_interest_like() {
@@ -461,13 +451,7 @@ impl Bond {
     /// True for [`CashflowSpec::Floating`] and for [`CashflowSpec::Amortizing`] when the
     /// base specification is floating.
     pub fn has_floating_coupons(&self) -> bool {
-        match &self.cashflow_spec {
-            CashflowSpec::Floating(_) => true,
-            CashflowSpec::Amortizing { base, .. } => {
-                matches!(base.as_ref(), CashflowSpec::Floating(_))
-            }
-            _ => false,
-        }
+        self.cashflow_spec.floating_rate_spec().is_some()
     }
 
     /// Recursively validate that fixed coupon rates are non-negative.
@@ -504,6 +488,11 @@ impl Bond {
                 }
             }
             CashflowSpec::Amortizing { base, .. } => {
+                if matches!(**base, CashflowSpec::Amortizing { .. }) {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "amortizing cashflow spec cannot nest another amortizing spec".to_string(),
+                    ));
+                }
                 Self::validate_coupon_rate(base)?;
             }
             CashflowSpec::Floating(_) => {
@@ -829,10 +818,9 @@ mod tests {
             "native inference must select the joint model when joint controls are attached"
         );
 
-        let expected = crate::bond::pricing::engine::hazard::HazardBondEngine::price_raw(
-            &bond, &market, as_of,
-        )
-        .expect("scalar FRP price");
+        let expected =
+            crate::bond::pricing::hazard::HazardBondEngine::price_raw(&bond, &market, as_of)
+                .expect("scalar FRP price");
         let actual = bond
             .price_for_model_raw(ModelKey::HazardRate, &market, as_of)
             .expect("explicit hazard-rate price");

@@ -178,30 +178,6 @@ impl PySimulationDiagnostics {
             .collect()
     }
 
-    /// Collateral draws funded from the reserve account over the simulation.
-    #[getter]
-    fn draws_from_reserve(&self) -> PyMoney {
-        money_to_py(self.inner.draws_from_reserve)
-    }
-
-    /// Collateral draws funded from principal collections over the simulation.
-    #[getter]
-    fn draws_from_principal(&self) -> PyMoney {
-        money_to_py(self.inner.draws_from_principal)
-    }
-
-    /// Collateral draws that could not be funded over the simulation.
-    #[getter]
-    fn unfunded_draws(&self) -> PyMoney {
-        money_to_py(self.inner.unfunded_draws)
-    }
-
-    /// Revolver repayments diverted to replenish the reserve over the simulation.
-    #[getter]
-    fn reserve_replenished(&self) -> PyMoney {
-        money_to_py(self.inner.reserve_replenished)
-    }
-
     /// Payment date of the early-amortization event (or coverage-test
     /// acceleration) that ended the revolving period, or ``None``.
     #[getter]
@@ -381,3 +357,17 @@ impl PySimulationDiagnostics {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PySimulationDiagnostics |s| {
+    /// Collateral draws funded from the reserve account over the simulation.
+    draws_from_reserve -> PyMoney = money_to_py(s.inner.draws_from_reserve);
+
+    /// Collateral draws funded from principal collections over the simulation.
+    draws_from_principal -> PyMoney = money_to_py(s.inner.draws_from_principal);
+
+    /// Collateral draws that could not be funded over the simulation.
+    unfunded_draws -> PyMoney = money_to_py(s.inner.unfunded_draws);
+
+    /// Revolver repayments diverted to replenish the reserve over the simulation.
+    reserve_replenished -> PyMoney = money_to_py(s.inner.reserve_replenished);
+});

@@ -62,30 +62,6 @@ pub enum LookbackType {
     FloatingStrike,
 }
 
-impl std::fmt::Display for LookbackType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FixedStrike => write!(f, "fixed_strike"),
-            Self::FloatingStrike => write!(f, "floating_strike"),
-        }
-    }
-}
-
-impl std::str::FromStr for LookbackType {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "fixed_strike" => Ok(Self::FixedStrike),
-            "floating_strike" => Ok(Self::FloatingStrike),
-            _ => Err(format!(
-                "Unknown lookback type: '{}'. Valid: fixed_strike, floating_strike",
-                s
-            )),
-        }
-    }
-}
-
 /// Lookback option instrument.
 ///
 /// # Monitoring Convention
@@ -194,7 +170,6 @@ pub struct LookbackOption {
     pub attributes: Attributes,
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 impl LookbackOption {
     /// Create a canonical example lookback option (fixed strike call).
     pub fn example() -> finstack_quant_core::Result<Self> {
@@ -221,21 +196,12 @@ impl LookbackOption {
             .attributes(Attributes::new())
             .build()
     }
-    /// Calculate the net present value using Monte Carlo.
-    pub fn npv_mc(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        use crate::exotics::lookback_option::pricer;
-        pricer::compute_pv(self, market, as_of)
-    }
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for LookbackOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::LookbackOption,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
@@ -313,13 +279,14 @@ impl finstack_quant_valuations_core::instruments::Instrument for LookbackOption 
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         if matches!(self.monitoring, Monitoring::Discrete { .. }) {
-            return self.npv_mc(market, as_of);
+            use crate::exotics::lookback_option::pricer::LookbackOptionMcPricer;
+            return LookbackOptionMcPricer::new().price_internal(self, market, as_of);
         }
 
         use crate::exotics::lookback_option::pricer::LookbackOptionAnalyticalPricer;
         use finstack_quant_valuations_core::pricer::Pricer;
 
-        let pricer = LookbackOptionAnalyticalPricer::new();
+        let pricer = LookbackOptionAnalyticalPricer;
         let result = pricer.price_dyn(self, market, as_of)?;
         Ok(result.value)
     }
@@ -331,23 +298,3 @@ finstack_quant_valuations_core::impl_empty_cashflow_provider!(
     LookbackOption,
     finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
 );
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::str::FromStr;
-
-    #[test]
-    fn lookback_type_fromstr_display_roundtrip() {
-        let variants = [LookbackType::FixedStrike, LookbackType::FloatingStrike];
-        for v in variants {
-            let s = v.to_string();
-            let parsed = LookbackType::from_str(&s).expect("roundtrip parse should succeed");
-            assert_eq!(v, parsed, "roundtrip failed for {s}");
-        }
-        for retired in ["fixedstrike", "floatingstrike", "fixed"] {
-            assert!(LookbackType::from_str(retired).is_err());
-        }
-        assert!(LookbackType::from_str("invalid").is_err());
-    }
-}

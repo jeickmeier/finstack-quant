@@ -30,7 +30,7 @@ use finstack_quant_valuations_structured_credit::structured_credit::{
     CoverageTestSpec, CoverageTrigger, DealFees, DealType, DelinquencyModel, EligibilityRule,
     HedgeSwap, IncentiveFeeSpec, LossAllocationPolicy, LossRecognition, ModificationSpec,
     PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit,
-    Tranche, TrancheStructure, TriggerConsequence,
+    SwapNotional, Tranche, TrancheStructure, TriggerConsequence,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
     AfcSpec, AssetType, BalloonSpec, CallAssumption, CardPortfolioSpec, EarlyAmortizationSpec,
@@ -112,13 +112,13 @@ fn baseline() -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_clo("CLO-KNOBS", pool, tranches, close(), maturity(), "USD-OIS")
+    let mut deal = StructuredCredit {
+        fees: Some(DealFees::clo_standard(Currency::USD)),
+        coverage_triggers: vec![CoverageTestSpec::oc("A", 1.20)],
+        ..StructuredCredit::new_clo("CLO-KNOBS", pool, tranches, close(), maturity(), "USD-OIS")
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
-            .with_fees(DealFees::clo_standard(Currency::USD))
-            .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.20)])
-            .expect("coverage test");
+    };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 12);
@@ -385,11 +385,11 @@ fn card_portfolio(deal: &mut StructuredCredit) {
 /// Card model with a seller interest and a fixed allocation, so either knob
 /// moves the investor flow base.
 fn card_with_seller(deal: &mut StructuredCredit) {
-    deal.credit_model.card = Some(
-        CardPortfolioSpec::new(0.15, 0.18, 0.05)
-            .with_seller_interest(usd(20_000_000.0))
-            .with_fixed_allocation_decimal(0.9),
-    );
+    deal.credit_model.card = Some(CardPortfolioSpec {
+        seller_interest: Some(usd(20_000_000.0)),
+        fixed_allocation_decimal: Some(0.9),
+        ..CardPortfolioSpec::new(0.15, 0.18, 0.05)
+    });
 }
 
 fn divert_from_b(deal: &mut StructuredCredit) {
@@ -641,7 +641,10 @@ fn knobs() -> Vec<Knob> {
                 .expect("swap");
                 swap.fixed_leg.frequency = Tenor::quarterly();
                 swap.float_leg.frequency = Tenor::quarterly();
-                d.hedge_swaps.push(HedgeSwap::new(swap).on_tranche_par("A"));
+                d.hedge_swaps.push(HedgeSwap {
+                    notional: SwapNotional::TranchePar("A".into()),
+                    ..HedgeSwap::new(swap)
+                });
             },
         },
         Knob {

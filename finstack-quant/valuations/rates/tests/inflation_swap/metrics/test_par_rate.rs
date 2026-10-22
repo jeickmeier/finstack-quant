@@ -4,7 +4,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 use time::Month;
@@ -16,7 +16,7 @@ fn test_par_rate_gives_zero_pv() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-PR-1".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -42,7 +42,7 @@ fn test_par_rate_gives_zero_pv() {
     let par_rate = *result.measures.get("par_rate").unwrap();
 
     // Use par rate to create new swap
-    let par_swap = InflationSwapBuilder::new()
+    let par_swap = InflationSwap::builder()
         .id("ZCINF-PR-2".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -74,7 +74,7 @@ fn test_par_rate_increases_with_inflation() {
     let ctx_low = standard_market(as_of, 0.015, 0.04);
     let ctx_high = standard_market(as_of, 0.025, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-PR-INFL".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -123,7 +123,7 @@ fn test_par_rate_reasonable_range() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-PR-RANGE".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -163,7 +163,7 @@ fn test_par_rate_independent_of_side() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap_pay = InflationSwapBuilder::new()
+    let swap_pay = InflationSwap::builder()
         .id("ZCINF-PR-PAY".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -177,7 +177,7 @@ fn test_par_rate_independent_of_side() {
         .build()
         .unwrap();
 
-    let swap_receive = InflationSwapBuilder::new()
+    let swap_receive = InflationSwap::builder()
         .id("ZCINF-PR-RCV".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -212,7 +212,8 @@ fn test_par_rate_independent_of_side() {
     let par_receive = *result_receive.measures.get("par_rate").unwrap();
 
     assert!(
-        (par_pay - par_receive).abs() < rate_tolerance(),
+        (par_pay - par_receive).abs()
+            < finstack_quant_valuations_test_support::tolerances::ANALYTICAL,
         "Par rate should be independent of side: {} vs {}",
         par_pay,
         par_receive

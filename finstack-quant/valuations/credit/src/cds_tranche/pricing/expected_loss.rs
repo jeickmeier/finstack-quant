@@ -1,6 +1,7 @@
-//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
-//!
-use super::config::{CdsTranchePricer, ElWdPoint, PoolExposure, INTEGRATION_TOLERANCE};
+//! Expected tranche loss and the expected loss/write-down curve, with the
+//! equity-tranche capped expectations they are built from.
+
+use super::pricer::{CdsTranchePricer, ElWdPoint, PoolExposure, INTEGRATION_TOLERANCE};
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
@@ -63,20 +64,22 @@ impl CdsTranchePricer {
         let corr_detach = self.smooth_correlation_boundary(corr_detach);
 
         // Calculate expected losses for equity tranches [0, A_eff] and [0, D_eff]
-        // Note: These inputs to calculate_equity_tranche_loss are now in "Effective %" terms
+        // Note: These inputs to calculate_equity_tranche_capped are now in "Effective %" terms
         // but correlations are from "Original %" terms.
-        let el_to_attach = self.calculate_equity_tranche_loss(
+        let el_to_attach = self.calculate_equity_tranche_capped(
             eff_attach * 100.0,
             corr_attach,
             index_data,
             maturity,
+            PoolExposure::Loss,
         )?;
 
-        let el_to_detach = self.calculate_equity_tranche_loss(
+        let el_to_detach = self.calculate_equity_tranche_capped(
             eff_detach * 100.0,
             corr_detach,
             index_data,
             maturity,
+            PoolExposure::Loss,
         )?;
 
         // The [A_eff, D_eff] tranche loss as a fraction of CURRENT portfolio.
@@ -347,61 +350,27 @@ impl CdsTranchePricer {
         Ok(curve)
     }
 
-    /// Calculate expected loss for an equity tranche [0, K] using Gaussian Copula.
-    ///
-    /// Enhanced with adaptive integration for superior numerical stability,
-    /// particularly critical near correlation boundaries (0 and 1) where
-    /// the conditional default probability function exhibits sharp transitions.
-    ///
-    /// # Arguments
-    /// * `detachment_pct` - Detachment point K in percent
-    /// * `correlation` - Asset correlation parameter ρ
-    /// * `index_data` - Credit index market data
-    /// * `maturity` - Maturity date for loss calculation
-    pub(super) fn calculate_equity_tranche_loss(
-        &self,
-        detachment_pct: f64,
-        correlation: f64,
-        index_data: &CreditIndexData,
-        maturity: Date,
-    ) -> Result<f64> {
-        self.calculate_equity_tranche_capped(
-            detachment_pct,
-            correlation,
-            index_data,
-            maturity,
-            PoolExposure::Loss,
-        )
-    }
-
-    /// Calculate the expected CAPPED RECOVERED notional `E[min(G, cap)]`
-    /// where `G = Σᵢ wᵢ·Rᵢ·Bᵢ` is the recovered pool notional.
-    ///
-    /// This is the recovery-side analogue of
-    /// [`Self::calculate_equity_tranche_loss`] — same conditional default
-    /// distribution and copula machinery, with per-name exposure `Rᵢ`
-    /// instead of LGD `1 − Rᵢ`. Used to amortize the detachment point from
-    /// the top: the senior writedown of tranche `[A, D]` is
-    /// `E[min(G, 1−A)] − E[min(G, 1−D)]`.
-    pub(super) fn calculate_equity_tranche_recovery(
-        &self,
-        cap_pct: f64,
-        correlation: f64,
-        index_data: &CreditIndexData,
-        maturity: Date,
-    ) -> Result<f64> {
-        self.calculate_equity_tranche_capped(
-            cap_pct,
-            correlation,
-            index_data,
-            maturity,
-            PoolExposure::Recovery,
-        )
-    }
-
     /// Shared engine for capped pool expectations `E[min(Σᵢ wᵢ·eᵢ·Bᵢ, cap)]`
     /// with `eᵢ` selected by `exposure` (loss given default or recovery).
-    fn calculate_equity_tranche_capped(
+    ///
+    /// With [`PoolExposure::Loss`] this is the expected loss of an equity
+    /// tranche `[0, K]` under the Gaussian copula, using adaptive integration
+    /// for numerical stability near the correlation boundaries (0 and 1),
+    /// where the conditional default probability has sharp transitions.
+    ///
+    /// With [`PoolExposure::Recovery`] it is the expected CAPPED RECOVERED
+    /// notional `E[min(G, cap)]`, where `G = Σᵢ wᵢ·Rᵢ·Bᵢ` — same conditional
+    /// default distribution, with per-name exposure `Rᵢ` instead of LGD
+    /// `1 − Rᵢ`. Used to amortize the detachment point from the top: the
+    /// senior writedown of tranche `[A, D]` is `E[min(G, 1−A)] − E[min(G, 1−D)]`.
+    ///
+    /// # Arguments
+    /// * `cap_pct` - Cap (detachment point K for losses) in percent
+    /// * `correlation` - Asset correlation parameter ρ
+    /// * `index_data` - Credit index market data
+    /// * `maturity` - Maturity date for the loss calculation
+    /// * `exposure` - Per-name exposure: loss given default or recovery
+    pub(super) fn calculate_equity_tranche_capped(
         &self,
         cap_pct: f64,
         correlation: f64,
@@ -419,15 +388,39 @@ impl CdsTranchePricer {
                 exposure,
             )
         } else {
-            let t = self.years_from_base(index_data, maturity)?;
+            let (count, default_prob, recovery) = self.homogeneous_pool(index_data, maturity)?;
             self.homogeneous_capped_expectation(
                 cap_pct / 100.0,
-                usize::from(index_data.num_constituents()),
-                self.get_default_probability(index_data, t)?,
-                index_data.recovery_rate(),
+                count,
+                default_prob,
+                recovery,
                 self.smooth_correlation_boundary(correlation),
                 exposure,
             )
+        }
+    }
+
+    /// Constituent count, default probability to `date` and recovery of a
+    /// homogeneous (index-curve) pool.
+    fn homogeneous_pool(
+        &self,
+        index_data: &CreditIndexData,
+        date: Date,
+    ) -> Result<(usize, f64, f64)> {
+        let t = self.years_from_base(index_data, date)?;
+        Ok((
+            usize::from(index_data.num_constituents()),
+            self.get_default_probability(index_data, t)?,
+            index_data.recovery_rate(),
+        ))
+    }
+
+    /// Conditional default probability `P(default | factors)` of a name with
+    /// unconditional `default_prob` under the pricer's copula at `correlation`.
+    fn conditional_pd(&self, default_prob: f64, correlation: f64) -> impl Fn(&[f64]) -> f64 + '_ {
+        let threshold = self.default_threshold_for_copula(default_prob);
+        move |factors| {
+            self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
         }
     }
 
@@ -445,14 +438,7 @@ impl CdsTranchePricer {
             PoolExposure::Loss => 1.0 - base_recovery,
             PoolExposure::Recovery => base_recovery,
         };
-        let threshold = self.default_threshold_for_copula(default_prob);
-        let conditional_p = |factors: &[f64]| {
-            if self.copula_spec.is_gaussian() {
-                self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
-            } else {
-                self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
-            }
-        };
+        let conditional_p = self.conditional_pd(default_prob, correlation);
         self.integrate_factors(&|factors| {
             self.conditional_equity_tranche_capped(count, cap, conditional_p(factors), exposure)
         })
@@ -472,22 +458,29 @@ impl CdsTranchePricer {
     ) -> Result<(f64, f64)> {
         if index_data.has_issuer_curves() {
             return Ok((
-                self.calculate_equity_tranche_loss(loss_cap_pct, correlation, index_data, date)?,
-                self.calculate_equity_tranche_recovery(
+                self.calculate_equity_tranche_capped(
+                    loss_cap_pct,
+                    correlation,
+                    index_data,
+                    date,
+                    PoolExposure::Loss,
+                )?,
+                self.calculate_equity_tranche_capped(
                     recovery_cap_pct,
                     correlation,
                     index_data,
                     date,
+                    PoolExposure::Recovery,
                 )?,
             ));
         }
-        let t = self.years_from_base(index_data, date)?;
+        let (count, default_prob, recovery) = self.homogeneous_pool(index_data, date)?;
         self.homogeneous_capped_pair(
             loss_cap_pct / 100.0,
             recovery_cap_pct / 100.0,
-            usize::from(index_data.num_constituents()),
-            self.get_default_probability(index_data, t)?,
-            index_data.recovery_rate(),
+            count,
+            default_prob,
+            recovery,
             self.smooth_correlation_boundary(correlation),
         )
     }
@@ -502,14 +495,7 @@ impl CdsTranchePricer {
         base_recovery: f64,
         correlation: f64,
     ) -> Result<(f64, f64)> {
-        let threshold = self.default_threshold_for_copula(default_prob);
-        let conditional_p = |factors: &[f64]| {
-            if self.copula_spec.is_gaussian() {
-                self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
-            } else {
-                self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
-            }
-        };
+        let conditional_p = self.conditional_pd(default_prob, correlation);
         self.integrate_factors_pair(&|factors| {
             self.conditional_equity_tranche_pair(
                 count,

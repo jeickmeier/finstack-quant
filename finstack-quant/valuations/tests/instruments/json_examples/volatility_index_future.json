@@ -2,7 +2,6 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "discount_curve_id": "USD-OIS",
       "id": "VIX-FUT-2025M03",
       "terms": {
         "contracts": 4.651162790697675,

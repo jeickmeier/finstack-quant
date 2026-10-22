@@ -1,6 +1,6 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::pricing::settlement::settlement_date;
+use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
@@ -28,35 +28,20 @@ impl MetricCalculator for AccruedInterestCalculator {
         // Borrow bond once to compute accrued and optionally cache flows/hints
         let (accrued_amt, discount_curve_id, day_count, maybe_flows) = {
             let bond: &Bond = context.instrument_as()?;
-
-            // Build full schedule with market context (supports FRNs, amortization, custom schedules)
-            let schedule = bond.full_cashflow_schedule(&context.curves)?;
-
-            let accrual_date = settlement_date(bond, context.as_of)?;
-
-            // Use generic cashflow accrual engine with bond's config.
-            let accrued_amt = finstack_quant_cashflows::accrual::accrued_interest_amount(
-                &schedule,
-                accrual_date,
-                &bond.accrual_config(),
-            )?;
+            let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
 
             // Prepare potential flows for caching (build now, assign later).
             // Coupon entitlement is tested at the same date the accrued is
             // anchored to (quote/settlement date for market quotes), so the
             // cached flows and the accrued stay on one convention basis.
             let maybe_flows = if context.cashflows.is_none() {
-                Some(bond.pricing_dated_cashflows_at(
-                    &context.curves,
-                    context.as_of,
-                    accrual_date,
-                )?)
+                Some(quote_ctx.entitled_flows(bond, &context.curves, context.as_of)?)
             } else {
                 None
             };
 
             (
-                accrued_amt,
+                quote_ctx.accrued_at_quote_date,
                 bond.discount_curve_id.to_owned(),
                 bond.cashflow_spec.day_count(),
                 maybe_flows,

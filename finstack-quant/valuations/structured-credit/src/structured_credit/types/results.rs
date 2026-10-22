@@ -7,7 +7,6 @@ use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::metrics::MetricId;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -130,40 +129,6 @@ pub struct TrancheCashflows {
     pub total_deferred: Money,
     /// Total write-down (loss allocation).
     pub total_writedown: Money,
-}
-
-/// Tranche-specific valuation result.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct TrancheValuation {
-    /// Tranche identifier.
-    pub tranche_id: String,
-    /// Present value of all cashflows.
-    pub pv: Money,
-    /// Clean settlement price as a percentage of the CURRENT note balance
-    /// (the factor-adjusted secondary-market quote basis).
-    pub clean_price: f64,
-    /// Dirty settlement price as a percentage of the CURRENT note balance.
-    pub dirty_price: f64,
-    /// Pool factor of the note: `current_balance / original_balance`.
-    pub factor: f64,
-    /// Current-period accrued interest at buyer settlement in note currency.
-    pub accrued: Money,
-    /// Weighted average life.
-    pub wal: f64,
-    /// Modified duration.
-    pub modified_duration: f64,
-    /// Z-spread (basis points).
-    pub z_spread_bp: f64,
-    /// CS01 (credit DV01).
-    pub cs01: f64,
-    /// Decimal yield reproducing the dirty settlement target, compounded at
-    /// the note's coupon frequency; `None` for an impaired note (no positive
-    /// settlement value).
-    pub ytm: Option<f64>,
-    /// Additional metrics.
-    pub metrics: BTreeMap<MetricId, f64>,
 }
 
 impl TrancheCashflows {

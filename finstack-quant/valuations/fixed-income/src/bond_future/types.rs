@@ -1214,7 +1214,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for BondFuture {
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
-// Declare canonical market dependencies for DV01 calculators.
 impl finstack_quant_cashflows::CashflowScheduleSource for BondFuture {
     /// Face exposure `terms.contracts × terms.multiplier × 100` in `terms.currency`.
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {

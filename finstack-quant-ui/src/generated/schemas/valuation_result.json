@@ -565,7 +565,7 @@
       "description": "Stochastic pricing result for a structured credit deal.",
       "properties": {
         "clean_price": {
-          "description": "Clean price (percent of the sum of current tranche balances),\nUNADJUSTED for accrued interest.\n\nThis equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `calculate_tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
+          "description": "Clean price (percent of the sum of current tranche balances),\nUNADJUSTED for accrued interest.\n\nThis equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
           "format": "double",
           "type": "number"
         },

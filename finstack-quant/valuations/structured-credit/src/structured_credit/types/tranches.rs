@@ -51,15 +51,6 @@ impl CoverageTrigger {
         }
     }
 
-    /// Set a separate cure threshold and return the updated trigger.
-    ///
-    /// # Arguments
-    /// * `cure_level` - Coverage ratio required to exit breach, at least the breach threshold.
-    pub fn with_cure_level(mut self, cure_level: f64) -> Self {
-        self.cure_level = Some(cure_level);
-        self
-    }
-
     /// Determine breach status, retaining an existing breach until its cure level.
     ///
     /// # Arguments
@@ -301,24 +292,6 @@ impl Tranche {
         self.effective_detach_pct() - self.effective_attach_pct()
     }
 
-    /// Check if tranche is first loss (attachment at 0%)
-    pub fn is_first_loss(&self) -> bool {
-        self.effective_attach_pct() == 0.0
-    }
-
-    /// Check if tranche is currently impaired by losses.
-    ///
-    /// A tranche is impaired when cumulative pool losses, expressed in
-    /// percentage points of performing pool balance, exceed the tranche's
-    /// attachment point.
-    ///
-    /// # Arguments
-    /// * `cumulative_loss_pct` - Cumulative net loss in percentage points of
-    ///   performing pool balance, in `[0, 100]` (for example, `5.0` means 5%).
-    pub fn is_impaired(&self, cumulative_loss_pct: f64) -> bool {
-        cumulative_loss_pct > self.effective_attach_pct()
-    }
-
     /// Calculate the dollar loss allocated to this tranche given cumulative pool losses.
     ///
     /// Uses attachment/detachment point convention (INTEX/Moody's Analytics):
@@ -348,43 +321,10 @@ impl Tranche {
         }
     }
 
-    /// Current tranche balance after applying cumulative losses.
-    ///
-    /// Returns `max(0, current_balance - loss_allocation)`.
-    ///
-    /// # Arguments
-    ///
-    /// * `cumulative_loss_pct` - Cumulative net loss in percentage points of
-    ///   performing pool balance, in `[0, 100]` (for example, `12.0` means 12%).
-    pub fn current_balance_after_losses(
-        &self,
-        cumulative_loss_pct: f64,
-    ) -> finstack_quant_core::Result<Money> {
-        let loss_amount = self.loss_allocation(cumulative_loss_pct)?;
-        Money::new(
-            (self.current_balance.amount() - loss_amount.amount()).max(0.0),
-            self.current_balance.currency(),
-        )
-    }
-
     /// Builder methods for fluent construction
     #[must_use]
     pub fn with_rating(mut self, rating: CreditRating) -> Self {
         self.rating = Some(rating);
-        self
-    }
-
-    /// Add overcollateralization coverage trigger
-    #[must_use]
-    pub fn with_oc_trigger(mut self, trigger: CoverageTrigger) -> Self {
-        self.oc_trigger = Some(trigger);
-        self
-    }
-
-    /// Add interest coverage trigger
-    #[must_use]
-    pub fn with_ic_trigger(mut self, trigger: CoverageTrigger) -> Self {
-        self.ic_trigger = Some(trigger);
         self
     }
 }
@@ -411,8 +351,9 @@ pub struct TrancheBuilder {
 }
 
 impl TrancheBuilder {
-    /// Create new tranche builder
-    pub fn new() -> Self {
+    /// Empty builder with the tranche defaults (quarterly, Act/360); reached
+    /// through [`Tranche::builder`].
+    fn new() -> Self {
         Self {
             id: None,
             attach_pct: None,
@@ -677,12 +618,6 @@ impl TrancheBuilder {
     }
 }
 
-impl Default for TrancheBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Collection of tranches forming the capital structure
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -748,6 +683,29 @@ impl TrancheStructure {
     #[inline]
     pub fn currency(&self) -> Currency {
         self.currency
+    }
+
+    /// Look up a tranche by its identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche_id` - Tranche identifier (`Tranche::id`) to find; matched
+    ///   exactly and case-sensitively.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::InputError::NotFound`] with id
+    /// `tranche:<tranche_id>` when no tranche in the structure has that id.
+    pub fn require(&self, tranche_id: &str) -> finstack_quant_core::Result<&Tranche> {
+        self.tranches
+            .iter()
+            .find(|t| t.id.as_str() == tranche_id)
+            .ok_or_else(|| {
+                finstack_quant_core::InputError::NotFound {
+                    id: format!("tranche:{tranche_id}"),
+                }
+                .into()
+            })
     }
 
     /// Total original balance of all tranches combined.
@@ -840,7 +798,7 @@ impl TrancheStructure {
     /// A real CLO/ABS carries multiple notes at one `TrancheSeniority` (Class
     /// A-1, A-2, A-3 all `Senior`); deriving `payment_priority` from the
     /// 4-valued seniority enum directly collapses them onto one value, which
-    /// breaks `senior_to` / `subordination_amount` (strict `<`/`>` filters) and
+    /// breaks `senior_to` (a strict `<` filter) and
     /// the OC/IC coverage denominators built on them.
     ///
     /// Ranking rule: `(TrancheSeniority discriminant ASCENDING, then original
@@ -973,14 +931,6 @@ impl TrancheStructure {
         Ok(())
     }
 
-    /// Get tranches by seniority
-    pub fn by_seniority(&self, seniority: TrancheSeniority) -> Vec<&Tranche> {
-        self.tranches
-            .iter()
-            .filter(|t| t.seniority == seniority)
-            .collect()
-    }
-
     /// Get tranches senior to a given tranche
     pub fn senior_to(&self, tranche_id: &str) -> Vec<&Tranche> {
         let target_tranche = self.tranches.iter().find(|t| t.id.as_str() == tranche_id);
@@ -1003,23 +953,6 @@ impl TrancheStructure {
                 acc.checked_add(t.current_balance)
             })
             .unwrap_or_else(|_| Money::from((0_i64, self.currency)))
-    }
-
-    /// Calculate tranche subordination amount
-    pub fn subordination_amount(&self, tranche_id: &str) -> Money {
-        let target_tranche = self.tranches.iter().find(|t| t.id.as_str() == tranche_id);
-
-        if let Some(target) = target_tranche {
-            self.tranches
-                .iter()
-                .filter(|t| t.payment_priority > target.payment_priority)
-                .try_fold(Money::from((0_i64, self.currency)), |acc, t| {
-                    acc.checked_add(t.current_balance)
-                })
-                .unwrap_or_else(|_| Money::from((0_i64, self.currency)))
-        } else {
-            Money::from((0_i64, self.currency))
-        }
     }
 }
 
@@ -1082,7 +1015,6 @@ mod tests {
         assert_eq!(tranche.attach_pct, Some(0.0));
         assert_eq!(tranche.detach_pct, Some(10.0));
         assert_eq!(tranche.thickness(), 10.0);
-        assert!(tranche.is_first_loss());
     }
 
     #[test]
@@ -1163,8 +1095,10 @@ mod tests {
 
     #[test]
     fn test_coverage_trigger() {
-        let trigger =
-            CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow).with_cure_level(1.25);
+        let trigger = CoverageTrigger {
+            cure_level: Some(1.25),
+            ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+        };
 
         // Breach scenario
         assert!(trigger.is_breached(1.15));
@@ -1177,8 +1111,10 @@ mod tests {
 
     #[test]
     fn production_waterfall_breached_trigger_requires_cure_threshold() {
-        let mut trigger =
-            CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow).with_cure_level(1.25);
+        let mut trigger = CoverageTrigger {
+            cure_level: Some(1.25),
+            ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+        };
         trigger.breach_date = Some(test_date());
         assert!(
             trigger.is_breached(1.22),

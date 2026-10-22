@@ -15,7 +15,7 @@
           "type": "number"
         },
         "price": {
-          "description": "Clean settlement price as a percentage of the tranche's CURRENT\nbalance (the factor-adjusted quote basis): the model dirty value at\nbuyer settlement less accrued, the same figure as\n`TrancheMetrics::price_pct`.",
+          "description": "Clean settlement price as a percentage of the tranche's CURRENT\nbalance (the factor-adjusted quote basis): the model dirty value at\nbuyer settlement less accrued, the same figure as\n`TrancheMetrics::clean_price_pct`.",
           "format": "double",
           "type": "number"
         },

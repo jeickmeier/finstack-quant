@@ -102,11 +102,8 @@ pub fn implied_financing_rate(roll: &DollarRoll) -> Result<CarryResult> {
     let net_benefit = coupon_income + principal_paydown * (100.0 - roll.back_price) / 100.0 - drop;
 
     let dirty_front = roll.front_price + settlement_accrued_interest(&pool, front_settle)? * scale;
-    let implied_rate = if days > 0 {
-        (net_benefit / dirty_front) * (360.0 / days as f64)
-    } else {
-        0.0
-    };
+    // `roll_days` rejects non-positive spans, so `days > 0` here.
+    let implied_rate = (net_benefit / dirty_front) * (360.0 / days as f64);
 
     Ok(CarryResult {
         implied_rate,
@@ -140,47 +137,23 @@ pub fn roll_specialness(roll: &DollarRoll, repo_rate: f64) -> Result<f64> {
     Ok(specialness * 10_000.0)
 }
 
-/// Calculate break-even drop given a target financing rate.
-///
-/// Inverts the implied-rate formula for the drop:
-///
-/// ```text
-/// drop = coupon_income + paydown × (100 − back_price)/100
-///        − target_rate × dirty_front_price × days/360
-/// ```
-///
-/// # Arguments
-///
-/// * `target_rate` - Desired annualized financing rate as a decimal on the
-///   ACT/360 convention used by dollar-roll carry.
-/// * `dirty_front_price` - Front-month TBA price plus accrued interest at
-///   front settlement, in points per 100 of face.
-/// * `back_price` - Back-month TBA price in points per 100 of face.
-/// * `coupon_income` - Expected accrued coupon income over the roll period in
-///   points per 100 of face.
-/// * `principal_paydown` - Expected scheduled and prepaid principal received
-///   during the roll period in points per 100 of face.
-/// * `days` - Actual number of calendar days between front and back settlement
-///   dates, annualized on a 360-day basis.
-///
-/// # Returns
-///
-/// Break-even drop (in price points)
-pub fn break_even_drop(
-    target_rate: f64,
-    dirty_front_price: f64,
-    back_price: f64,
-    coupon_income: f64,
-    principal_paydown: f64,
-    days: i64,
-) -> f64 {
-    let required_net = target_rate * dirty_front_price * (days as f64 / 360.0);
-    coupon_income + principal_paydown * (100.0 - back_price) / 100.0 - required_net
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Break-even drop at `target_rate`: the implied-rate formula solved for
+    /// the drop, `coupon + paydown·(100 − back)/100 − rate·dirty_front·days/360`.
+    fn break_even_drop(
+        target_rate: f64,
+        dirty_front_price: f64,
+        back_price: f64,
+        coupon_income: f64,
+        principal_paydown: f64,
+        days: i64,
+    ) -> f64 {
+        let required_net = target_rate * dirty_front_price * (days as f64 / 360.0);
+        coupon_income + principal_paydown * (100.0 - back_price) / 100.0 - required_net
+    }
 
     #[test]
     fn test_implied_financing_rate() {

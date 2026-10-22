@@ -38,9 +38,6 @@ use finstack_quant_valuations_core::pricer::{
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
-/// Number of tree steps used for the HW tree pricing.
-const DEFAULT_TREE_STEPS: usize = 100;
-
 /// Hull-White 1-factor tree pricer for European swaptions.
 ///
 /// Prices European swaptions via backward induction on a calibrated
@@ -53,7 +50,7 @@ pub(crate) struct SwaptionHullWhitePricer {
 impl Default for SwaptionHullWhitePricer {
     fn default() -> Self {
         Self {
-            tree_steps: DEFAULT_TREE_STEPS,
+            tree_steps: super::BermudanSwaptionPricerConfig::DEFAULT_TREE_STEPS,
         }
     }
 }
@@ -95,24 +92,15 @@ impl SwaptionHullWhitePricer {
             return Ok(ValuationResult::stamped(swaption.id(), as_of, pv));
         }
 
-        // Single-curve requirement (same as Bermudan pricer)
-        if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
-            return Err(PricingError::model_failure_with_context(
-                "Hull-White tree pricing is currently single-curve only. \
-                 Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
-                    .to_string(),
-                PricingErrorContext::default(),
-            ));
-        }
-
-        let disc = market
-            .get_discount(swaption.get_discount_curve_id().as_str())
-            .map_err(|e| {
-                PricingError::missing_market_data_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        super::bermudan::require_single_curve(
+            "Hull-White tree",
+            swaption.get_forward_curve_id(),
+            swaption.get_discount_curve_id(),
+        )?;
+        let disc = super::bermudan::require_discount_curve(
+            market,
+            swaption.get_discount_curve_id().as_str(),
+        )?;
 
         let time_to_expiry =
             finstack_quant_models::rates::clock::model_time(as_of, swaption.expiry);
@@ -207,13 +195,6 @@ impl SwaptionHullWhitePricer {
     }
 }
 
-/// Build the HW1F override JSON blob from a swaption's typed pricing overrides.
-///
-/// Reads `model_config.hw1f_mean_reversion` → κ and
-/// `model_config.hw1f_sigma` → σ (the Hull-White short-rate absolute
-/// volatility). Partial overrides are preserved so [`resolve_hw1f_params`] can
-/// reject them explicitly instead of combining sources.
-///
 #[cfg(test)]
 mod tests {
     use finstack_quant_valuations_test_support::date as date_support;

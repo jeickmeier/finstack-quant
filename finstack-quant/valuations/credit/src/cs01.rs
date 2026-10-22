@@ -163,11 +163,7 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         with_prepared_cds_risk_context::<I>(context, None, "CS01", |context, prepared| {
-            let bump_bp = sens_config::from_context_or_default(
-                context.get_config(),
-                context.get_metric_pricing_overrides(),
-            )?
-            .credit_spread_bump_bp;
+            let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
             let reval = cs01_reval(context);
             let request = prepared.cs01_request(bump_bp);
             let cs01 = compute_parallel_cs01_with_context_raw(
@@ -207,10 +203,7 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         with_prepared_cds_risk_context::<I>(context, None, "bucketed CS01", |context, prepared| {
-            let defaults = sens_config::from_context_or_default(
-                context.get_config(),
-                context.get_metric_pricing_overrides(),
-            )?;
+            let defaults = sens_config::resolve(context)?;
             let bump_bp = defaults.credit_spread_bump_bp;
             let series_id =
                 MetricId::composite(&MetricId::BucketedCs01, &[prepared.hazard_id.as_str()]);

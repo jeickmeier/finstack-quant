@@ -237,30 +237,34 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
 
     let mut pool = AssetPool::new("POOL-FULL", DealType::Clo, Currency::USD);
 
-    let mut loan = PoolAsset::floating_rate_loan(
-        "LOAN1",
-        Money::new(12_000_000.0, Currency::USD).expect("valid money fixture"),
-        "SOFR-3M",
-        350.0,
-        Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-        DayCount::Act360,
-    )
-    .with_rating(CreditRating::BB)
-    .with_industry("Technology")
-    .with_obligor_id("OBLIGOR-1");
+    let mut loan = PoolAsset {
+        industry: Some("Technology".into()),
+        obligor_id: Some("OBLIGOR-1".into()),
+        ..PoolAsset::floating_rate_loan(
+            "LOAN1",
+            Money::new(12_000_000.0, Currency::USD).expect("valid money fixture"),
+            "SOFR-3M",
+            350.0,
+            Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+            DayCount::Act360,
+        )
+        .with_rating(CreditRating::BB)
+    };
     loan.smm_override = Some(0.0123);
     loan.mdr_override = Some(0.0042);
 
-    let mut bond = PoolAsset::fixed_rate_bond(
-        "BOND1",
-        Money::new(8_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.055,
-        Date::from_calendar_date(2029, Month::July, 1).unwrap(),
-        DayCount::Act365F,
-    )
-    .with_rating(CreditRating::A)
-    .with_industry("Healthcare")
-    .with_obligor_id("OBLIGOR-2");
+    let mut bond = PoolAsset {
+        industry: Some("Healthcare".into()),
+        obligor_id: Some("OBLIGOR-2".into()),
+        ..PoolAsset::fixed_rate_bond(
+            "BOND1",
+            Money::new(8_000_000.0, Currency::USD).expect("valid money fixture"),
+            0.055,
+            Date::from_calendar_date(2029, Month::July, 1).unwrap(),
+            DayCount::Act365F,
+        )
+        .with_rating(CreditRating::A)
+    };
     bond.defaulted = true;
     bond.recovery_amount =
         Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
@@ -295,24 +299,26 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     .with_cdr(0.03)
     .with_recovery_rate(0.50)]);
 
-    let mut equity = Tranche::new(
-        "EQUITY",
-        0.0,
-        10.0,
-        TrancheSeniority::Equity,
-        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-        RateSpec::Fixed { rate: 0.12 },
-        legal,
-    )
-    .unwrap()
-    .with_oc_trigger(CoverageTrigger::new(
-        1.15,
-        TriggerConsequence::DivertCashFlow,
-    ))
-    .with_ic_trigger(CoverageTrigger::new(
-        1.05,
-        TriggerConsequence::DivertCashFlow,
-    ));
+    let mut equity = Tranche {
+        oc_trigger: Some(CoverageTrigger::new(
+            1.15,
+            TriggerConsequence::DivertCashFlow,
+        )),
+        ic_trigger: Some(CoverageTrigger::new(
+            1.05,
+            TriggerConsequence::DivertCashFlow,
+        )),
+        ..Tranche::new(
+            "EQUITY",
+            0.0,
+            10.0,
+            TrancheSeniority::Equity,
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+            RateSpec::Fixed { rate: 0.12 },
+            legal,
+        )
+        .unwrap()
+    };
     equity.rating = Some(CreditRating::BB);
     equity.attributes = Attributes::new()
         .with_tag("equity")
@@ -399,8 +405,10 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         PayReceive::Pay,
     )
     .expect("valid swap");
-    deal.hedge_swaps
-        .push(HedgeSwap::new(swap).on_tranche_par("SENIOR"));
+    deal.hedge_swaps.push(HedgeSwap {
+        notional: SwapNotional::TranchePar("SENIOR".into()),
+        ..HedgeSwap::new(swap)
+    });
 
     deal
 }
@@ -518,7 +526,7 @@ fn test_structured_credit_full_feature_json_roundtrip() {
 fn test_structured_credit_instrument_envelope_roundtrip() {
     let instrument = build_full_feature_structured_credit();
     let envelope = InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::StructuredCredit(Box::new(instrument.clone())),
     };
 
@@ -649,7 +657,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
 /// Serialize the canonical Rust provider as mutable JSON.
 fn full_example_value() -> serde_json::Value {
     serde_json::to_value(InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::StructuredCredit(Box::new(
             build_full_feature_structured_credit(),
         )),
@@ -748,7 +756,7 @@ fn retired_behavior_and_credit_factor_channels_are_rejected() {
 fn retired_trustee_fee_annual_key_is_rejected() {
     let deal = build_full_feature_structured_credit().with_standard_fees();
     let mut v = serde_json::to_value(InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::StructuredCredit(Box::new(deal)),
     })
     .expect("provider must serialize");

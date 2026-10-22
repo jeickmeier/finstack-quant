@@ -1,11 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
-use finstack_quant_core::dates::Date;
-use finstack_quant_core::math::Compounding;
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::pricing_overrides::BondRiskBasis;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
@@ -43,8 +39,7 @@ impl MetricCalculator for ConvexityCalculator {
         let Ok(bond) = context.instrument_as::<Bond>() else {
             return Cow::Borrowed(self.dependencies());
         };
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             Cow::Borrowed(&[])
         } else {
@@ -57,166 +52,46 @@ impl MetricCalculator for ConvexityCalculator {
 
         // Callable/OAS model risk is opt-in. The default matches Bloomberg YAS
         // Workout risk: quoted-yield convexity on maturity/workout cashflows.
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
-            return Ok(super::effective::effective_convexity(bond, context, None)? / 100.0);
+            return Ok(
+                super::effective::effective_duration_convexity(bond, context, None)?.convexity
+                    / 100.0,
+            );
         }
-        let workout = super::context_workout_path(context)?;
-        let bond: &Bond = context.instrument_as()?;
-
-        let ytm = context
-            .computed
-            .get(&MetricId::Ytm)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Ytm".to_string(),
-                })
-            })?;
-
+        let ytm = context.computed_metric(&MetricId::Ytm)?;
         // YTM dependency ensures cashflows are already built and cached
-        let flows: &Vec<(Date, Money)> = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
-        })?;
-
+        let super::YieldRiskBasis {
+            yield_rate,
+            timed,
+            price,
+        } = super::yield_risk_basis(context, ytm)?;
+        let bond: &Bond = context.instrument_as()?;
         let comp = crate::bond::pricing::quote_conversions::YieldCompounding::Street;
         let frequency = bond.cashflow_spec.frequency();
-
-        // Compute quote-date context (settlement date) for yield-based convexity
-        let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-        let (yield_rate, risk_flows, quote_date) =
-            if let Some((workout_yield, workout_flows, workout_quote_date)) = workout {
-                (workout_yield, Cow::Owned(workout_flows), workout_quote_date)
-            } else {
-                (ytm, Cow::Borrowed(flows.as_slice()), quote_ctx.quote_date)
-            };
-
-        // Calculate price from flows using quote_date to ensure consistency with YTM
-        let timed = crate::bond::pricing::quote_conversions::bond_flow_times(
-            bond,
-            risk_flows.as_ref(),
-            quote_date,
-        )?;
-        let price = crate::bond::pricing::quote_conversions::price_from_ytm_timed(
-            &timed, frequency, yield_rate, comp,
-        )?;
         if price.abs() < ZERO_TOLERANCE {
             return Ok(0.0);
         }
 
-        // Calculate convexity using quote_date as time origin
+        // Calculate convexity using quote_date as time origin. Street
+        // compounding: DF = (1 + y/m)^(-c) with c = m·t, so
+        // d²DF/dy² = c·(c + 1) / (m + y)² · DF.
+        let m = frequency.payments_per_year().max(1.0);
         let mut d2_price = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for &(_, t, amount) in &timed {
             if t <= 0.0 {
                 continue;
             }
-            let df_second = df_second_derivative(yield_rate, t, comp, frequency)?;
-            d2_price.add(amount.amount() * df_second);
+            let df = crate::bond::pricing::quote_conversions::df_from_yield(
+                yield_rate, t, comp, frequency,
+            )?;
+            let c = m * t;
+            let denom = m + yield_rate;
+            d2_price.add(amount.amount() * c * (c + 1.0) / (denom * denom) * df);
         }
 
         Ok(d2_price.total() / price / 100.0)
     }
-}
-
-fn df_second_derivative(
-    ytm: f64,
-    t: f64,
-    comp: crate::bond::pricing::quote_conversions::YieldCompounding,
-    frequency: finstack_quant_core::dates::Tenor,
-) -> finstack_quant_core::Result<f64> {
-    use crate::bond::pricing::quote_conversions::{
-        df_from_yield, periods_per_year, YieldCompounding,
-    };
-
-    if t <= 0.0 {
-        return Ok(0.0);
-    }
-
-    let df = df_from_yield(ytm, t, comp, frequency)?;
-    Ok(match comp {
-        YieldCompounding::Rate(Compounding::Simple) => {
-            let denom = 1.0 + ytm * t;
-            2.0 * t * t / (denom * denom * denom)
-        }
-        YieldCompounding::Rate(Compounding::Annual) => {
-            let denom = 1.0 + ytm;
-            t * (t + 1.0) / (denom * denom) * df
-        }
-        YieldCompounding::Rate(Compounding::Periodic(m)) => {
-            let m = f64::from(m.get());
-            let c = m * t;
-            let denom = m + ytm;
-            c * (c + 1.0) / (denom * denom) * df
-        }
-        YieldCompounding::Rate(Compounding::Continuous) => t * t * df,
-        YieldCompounding::Street => {
-            let m = periods_per_year(frequency)?.max(1.0);
-            let c = m * t;
-            let denom = m + ytm;
-            c * (c + 1.0) / (denom * denom) * df
-        }
-        YieldCompounding::Moosmuller => {
-            let m = periods_per_year(frequency)?.max(1.0);
-            let n_full = (t * m).floor();
-            let mut w = t - n_full / m;
-            if w <= 1e-12 {
-                w = 1.0 / m;
-            }
-            if t <= w + 1e-12 {
-                let denom = 1.0 + ytm * w;
-                2.0 * w * w / (denom * denom * denom)
-            } else {
-                let k_minus_1 = ((t - w) * m).round().max(0.0);
-                let df_stub = 1.0 / (1.0 + ytm * w);
-                let df_periodic = (1.0 + ytm / m).powf(-k_minus_1);
-                let df_stub_prime = -w / (1.0 + ytm * w).powi(2);
-                let df_stub_second = 2.0 * w * w / (1.0 + ytm * w).powi(3);
-                let denom = m + ytm;
-                let df_periodic_prime = -(k_minus_1 / denom) * df_periodic;
-                let df_periodic_second =
-                    k_minus_1 * (k_minus_1 + 1.0) / (denom * denom) * df_periodic;
-                df_stub_second * df_periodic
-                    + 2.0 * df_stub_prime * df_periodic_prime
-                    + df_stub * df_periodic_second
-            }
-        }
-        YieldCompounding::TreasuryActual => {
-            let m = periods_per_year(frequency)?.max(1.0);
-            let period_length = 1.0 / m;
-
-            if t <= period_length {
-                let denom = 1.0 + ytm * t;
-                2.0 * t * t / (denom * denom * denom)
-            } else {
-                let n_full = (t * m).floor();
-                let stub_time = t - n_full / m;
-                if stub_time <= 1e-10 {
-                    let c = m * t;
-                    let denom = m + ytm;
-                    c * (c + 1.0) / (denom * denom) * df
-                } else {
-                    let df_stub = 1.0 / (1.0 + ytm * stub_time);
-                    let df_periodic = (1.0 + ytm / m).powf(-n_full);
-
-                    let df_stub_prime = -stub_time / (1.0 + ytm * stub_time).powi(2);
-                    let df_stub_second =
-                        2.0 * stub_time * stub_time / (1.0 + ytm * stub_time).powi(3);
-
-                    let denom = m + ytm;
-                    let df_periodic_prime = -(n_full / denom) * df_periodic;
-                    let df_periodic_second =
-                        n_full * (n_full + 1.0) / (denom * denom) * df_periodic;
-
-                    df_stub_second * df_periodic
-                        + 2.0 * df_stub_prime * df_periodic_prime
-                        + df_stub * df_periodic_second
-                }
-            }
-        }
-    })
 }
 
 #[cfg(test)]

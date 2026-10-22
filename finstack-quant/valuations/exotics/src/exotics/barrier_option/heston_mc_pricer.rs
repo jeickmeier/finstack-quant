@@ -17,7 +17,6 @@ use finstack_quant_valuations_core::results::ValuationResult;
 
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_quant_models::monte_carlo::payoff::barrier::BarrierOptionPayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
@@ -49,12 +48,7 @@ impl BarrierOptionHestonMcPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<(Money, f64)> {
-        inst.validate_monitoring_state(as_of)?;
-        if as_of >= inst.expiry {
-            return super::pricer::price_expired_barrier(inst, market, as_of)
-                .map(|value| (value, 0.0));
-        }
-        if let Some(value) = super::pricer::known_knock_out_value(inst, market, as_of)? {
+        if let Some(value) = super::pricer::settled_barrier_value(inst, market, as_of)? {
             return Ok((value, 0.0));
         }
         // Time to maturity
@@ -95,25 +89,9 @@ impl BarrierOptionHestonMcPricer {
         let (time_grid, monitoring) =
             inst.monitoring
                 .time_grid(as_of, inst.day_count, None, t, &grid_config)?;
-        let maturity_step = time_grid.num_steps();
-
         // The Heston path variance supplies the local bridge volatility.
-        let mut payoff = BarrierOptionPayoff::new(
-            inst.strike,
-            inst.barrier,
-            inst.barrier_type,
-            inst.option_type,
-            inst.rebate.map(|m| m.amount() / inst.quantity),
-            inst.quantity,
-            maturity_step,
-            sigma,
-            &time_grid,
-            monitoring,
-        )
-        .with_observed_barrier_breached(inst.observed_barrier_breached.unwrap_or(false));
-        if super::pricer::wants_at_hit_rebate(inst) {
-            payoff = payoff.with_rebate_at_hit(r);
-        }
+        let payoff = super::pricer::barrier_payoff(inst, sigma, &time_grid, monitoring, r)
+            .with_observed_barrier_breached(inst.observed_barrier_breached.unwrap_or(false));
 
         let num_paths =
             finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(

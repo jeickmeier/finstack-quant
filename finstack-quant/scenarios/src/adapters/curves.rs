@@ -61,16 +61,12 @@ where
 /// Build the core triangular key-rate bump centered on one native knot.
 fn key_rate_spec(knots: &[f64], index: usize, bump_bp: f64) -> Option<BumpSpec> {
     let &target = knots.get(index)?;
-    Some(match (index.checked_sub(1), knots.get(index + 1)) {
-        (None, Some(&next)) => BumpSpec::triangular_key_rate_first_bp(target, next, bump_bp),
-        (Some(previous), None) => {
-            BumpSpec::triangular_key_rate_last_bp(knots[previous], target, bump_bp)
-        }
-        (Some(previous), Some(&next)) => {
-            BumpSpec::triangular_key_rate_bp(knots[previous], target, next, bump_bp)
-        }
-        (None, None) => BumpSpec::parallel_bp(bump_bp),
-    })
+    Some(BumpSpec::triangular_key_rate_bucket_bp(
+        knots[..index].last().copied(),
+        target,
+        knots.get(index + 1).copied(),
+        bump_bp,
+    ))
 }
 
 /// Convert resolved curve-node shocks into core triangular key-rate bumps.

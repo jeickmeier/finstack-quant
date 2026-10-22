@@ -41,7 +41,6 @@ pub(crate) fn register_cds_index_metrics(
             (ExpectedLoss, expected_loss::ExpectedLossCalculator),
             (JumpToDefault, jump_to_default::JumpToDefaultCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-            // Theta is now registered universally in crate::CREDIT.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (RiskyPv01, simple::RiskyPv01Calculator),
             // Recovery01 (custom metric - recovery rate sensitivity)

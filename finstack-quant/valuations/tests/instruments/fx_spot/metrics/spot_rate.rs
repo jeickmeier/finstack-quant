@@ -47,7 +47,10 @@ fn test_spot_rate_derived_from_pv() {
 
 #[test]
 fn test_spot_rate_default_notional() {
-    let fx = sample_eurusd().with_quoted_spot(1.18).expect("test rate");
+    let fx = FxSpot {
+        quoted_spot: Some(1.18),
+        ..sample_eurusd()
+    };
     let mut ctx = create_context(fx, test_date());
 
     let rate = calculate_metric(&mut ctx, MetricId::SpotRate).unwrap();
@@ -56,11 +59,11 @@ fn test_spot_rate_default_notional() {
 
 #[test]
 fn test_spot_rate_zero_notional_errors() {
-    let fx = sample_eurusd()
-        .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.20)
-        .expect("test rate");
+    let fx = FxSpot {
+        notional: Money::new(0.0, Currency::EUR).expect("valid money fixture"),
+        quoted_spot: Some(1.20),
+        ..sample_eurusd()
+    };
     let mut ctx = create_context(fx, test_date());
 
     let err = calculate_metric(&mut ctx, MetricId::SpotRate)
@@ -93,11 +96,11 @@ fn test_spot_rate_various_rates() {
 #[test]
 fn test_spot_rate_various_currencies() {
     // GBPUSD = 1.40
-    let gbp_fx = sample_gbpusd()
-        .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.40)
-        .expect("test rate");
+    let gbp_fx = FxSpot {
+        notional: Money::new(500_000.0, Currency::GBP).expect("valid money fixture"),
+        quoted_spot: Some(1.40),
+        ..sample_gbpusd()
+    };
     let mut gbp_ctx = create_context(gbp_fx, test_date());
     approx_eq(
         calculate_metric(&mut gbp_ctx, MetricId::SpotRate).unwrap(),
@@ -107,11 +110,11 @@ fn test_spot_rate_various_currencies() {
     );
 
     // USDJPY = 110.0
-    let jpy_fx = sample_usdjpy()
-        .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(110.0)
-        .expect("test rate");
+    let jpy_fx = FxSpot {
+        notional: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        quoted_spot: Some(110.0),
+        ..sample_usdjpy()
+    };
     let mut jpy_ctx = create_context(jpy_fx, test_date());
     approx_eq(
         calculate_metric(&mut jpy_ctx, MetricId::SpotRate).unwrap(),

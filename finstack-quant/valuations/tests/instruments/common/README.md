@@ -34,7 +34,6 @@ use finstack_quant_valuations_test_support::test_helpers::{
     usd_swap_market,       // (base_date, rate) -> MarketContext
     credit_market,         // (base_date, disc_rate, hazard_rate, recovery) -> MarketContext
     usd, eur, gbp,         // f64 -> Money
-    black_scholes_call,    // (spot, strike, rate, vol, time, div_yield) reference formula
     tolerances,            // tolerance tier constants (see below)
     scaled_tolerance,      // (base_tol, value, min_abs) -> f64
 };
@@ -46,23 +45,21 @@ Fixed test dates live in `test_helpers::dates` (`TODAY`, `TODAY_WEEKDAY`,
 ## Tolerance tiers
 
 Pick the tier that matches the calculation, not the tier that makes the test
-pass. Values are defined in `test_helpers::tolerances`.
+pass. Values are defined in
+`finstack_quant_valuations_test_support::tolerances`.
 
 | Constant | Value | Use case |
 |----------|-------|----------|
+| `TIGHT` | 1e-10 | Identities and roundtrips that should be exact up to rounding |
 | `ANALYTICAL` | 1e-6 | Closed-form solutions, put-call parity, zero-coupon YTM |
 | `NUMERICAL` | 1e-4 | Newton-Raphson, tree pricing, other iterative methods |
 | `CURVE_PRICING` | 5e-3 | Curve-based valuations with compounding-convention differences |
 | `RELATIVE` | 1e-2 | Proportional comparisons, textbook benchmarks |
 | `BUMP_VS_ANALYTICAL` | 1.5e-2 | Bump-and-reprice against an analytical approximation (DV01 vs duration) |
-| `STATISTICAL` | 2e-2 | Monte Carlo |
+| `STATISTICAL` | 2e-2 | Monte Carlo, finite-difference greeks |
 
 `scaled_tolerance(base_tol, value, min_abs)` gives a relative tolerance with an
 absolute floor, for property tests where the magnitude varies.
-
-Note that the `metrics` target uses a different, unrelated set of constants
-from `finstack_quant_valuations_test_support::tolerances` (`TIGHT`, `STANDARD`,
-`LOOSE`, `PERCENT_*`). The two modules are not interchangeable.
 
 ## Parity comparisons
 

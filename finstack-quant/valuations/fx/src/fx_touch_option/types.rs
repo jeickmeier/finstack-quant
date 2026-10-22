@@ -20,7 +20,7 @@ pub enum TouchType {
     NoTouch,
 }
 
-pub(crate) use finstack_quant_core::types::{BarrierDirection, PayoutTiming};
+use finstack_quant_core::types::{BarrierDirection, PayoutTiming};
 
 /// FX touch option (American binary option).
 ///
@@ -335,58 +335,60 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxTou
     }
 }
 impl FxTouchOption {
+    /// Quote-per-base spot read from the FX matrix, as touch pricing reads it.
+    fn matrix_spot(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        Ok(market
+            .fx_required()?
+            .rate(finstack_quant_core::money::fx::FxQuery::new(
+                self.base_currency,
+                self.quote_currency,
+                as_of,
+            ))?
+            .rate)
+    }
+
+    /// Market with the FX matrix spot bumped relatively by `bump_pct`; the
+    /// base market is left untouched.
+    fn spot_bumped_market(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        bump_pct: f64,
+    ) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
+        crate::shared::fx_matrix_bumped_market(
+            market,
+            self.base_currency,
+            self.quote_currency,
+            as_of,
+            bump_pct,
+        )
+    }
+
     fn option_delta(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+            return Ok(Some(0.0));
+        }
 
-        let t = self.day_count.year_fraction(
+        let current_spot = self.matrix_spot(market, as_of)?;
+        if current_spot * bumps.spot_bump_decimal <= 0.0 {
+            return Ok(Some(0.0));
+        }
+        Ok(Some(crate::shared::spot_delta(
+            self,
             as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        // Use FX spot bump via FX matrix
-        let fx_matrix = market.fx_required()?;
-        let current_spot = fx_matrix
-            .rate(finstack_quant_core::money::fx::FxQuery::new(
-                self.base_currency,
-                self.quote_currency,
-                as_of,
-            ))?
-            .rate;
-        let bump_size = current_spot * bumps.spot_bump_decimal;
-        if bump_size <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        // Central-difference spot bump through the matrix's own relative bump,
-        // which keeps its `FxConfig` (pivot, triangulation) and pinned quotes
-        // and never mutates the shared provider, so the base market is
-        // unaffected.
-        let up_fx = market.clone().insert_fx(fx_matrix.with_bumped_rate(
-            self.base_currency,
-            self.quote_currency,
+            current_spot,
             bumps.spot_bump_decimal,
-            as_of,
-        )?);
-        let dn_fx = market.clone().insert_fx(fx_matrix.with_bumped_rate(
-            self.base_currency,
-            self.quote_currency,
-            -bumps.spot_bump_decimal,
-            as_of,
-        )?);
-
-        let pv_up = self.value(&up_fx, as_of)?.amount();
-        let pv_dn = self.value(&dn_fx, as_of)?.amount();
-
-        Ok(Some((pv_up - pv_dn) / (2.0 * bump_size)))
+            |pct| self.spot_bumped_market(market, as_of, pct),
+        )?))
     }
     fn option_gamma(
         &self,
@@ -396,50 +398,20 @@ impl FxTouchOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-
-        let fx_matrix = market.fx_required()?;
-        let current_spot = fx_matrix
-            .rate(finstack_quant_core::money::fx::FxQuery::new(
-                self.base_currency,
-                self.quote_currency,
-                as_of,
-            ))?
-            .rate;
-        let bump_size = current_spot * bumps.spot_bump_decimal;
-        if bump_size <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        // See `option_delta`: the relative bump leaves the base market untouched.
-        let up_fx = market.clone().insert_fx(fx_matrix.with_bumped_rate(
-            self.base_currency,
-            self.quote_currency,
+        let current_spot = self.matrix_spot(market, as_of)?;
+        Ok(Some(crate::shared::spot_gamma(
+            self,
+            as_of,
+            base_pv,
+            current_spot,
             bumps.spot_bump_decimal,
-            as_of,
-        )?);
-        let dn_fx = market.clone().insert_fx(fx_matrix.with_bumped_rate(
-            self.base_currency,
-            self.quote_currency,
-            -bumps.spot_bump_decimal,
-            as_of,
-        )?);
-
-        let pv_up = self.value(&up_fx, as_of)?.amount();
-        let pv_dn = self.value(&dn_fx, as_of)?.amount();
-
-        Ok(Some(
-            (pv_up - 2.0 * base_pv + pv_dn) / (bump_size * bump_size),
-        ))
+            |pct| self.spot_bumped_market(market, as_of, pct),
+        )?))
     }
     fn option_vega(
         &self,
@@ -449,12 +421,7 @@ impl FxTouchOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -477,24 +444,12 @@ impl FxTouchOption {
             ));
         }
 
-        let vol_bump = self
-            .instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility
-            .map_or(bumps.vol_bump_decimal, |volatility| {
-                bumps.vol_bump_decimal.min(volatility * 0.5)
-            });
-        let (up, market_up) = finstack_quant_valuations_core::metrics::bump_active_volatility(
+        let (vol_bump, (up, market_up), (down, market_down)) = crate::shared::active_vol_scenarios(
             self,
+            &self.instrument_pricing_overrides,
             market,
             self.vol_surface_id.as_str(),
-            vol_bump,
-        )?;
-        let (down, market_down) = finstack_quant_valuations_core::metrics::bump_active_volatility(
-            self,
-            market,
-            self.vol_surface_id.as_str(),
-            -vol_bump,
+            bumps.vol_bump_decimal,
         )?;
         let pv_up = up.value(&market_up, as_of)?.amount();
         let pv_down = down.value(&market_down, as_of)?.amount();
@@ -508,26 +463,17 @@ impl FxTouchOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
-        let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = bumps.rate_bump_bp;
-        let bumped = finstack_quant_valuations_core::metrics::bump_discount_curve_parallel(
+        Ok(Some(crate::shared::discount_rho_bp(
+            self,
             market,
+            as_of,
             &self.domestic_discount_curve_id,
-            bump_bp,
-        )?;
-        let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok(Some((pv_bumped - base_pv) / bump_bp))
+            bumps.rate_bump_bp,
+        )?))
     }
 }
 

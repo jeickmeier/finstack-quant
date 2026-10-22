@@ -98,11 +98,12 @@ fn trust(spec: CardPortfolioSpec, revolving_end: Date) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_abs("CARD-MT", pool, tranches, close(), maturity(), "USD-OIS")
+    let mut deal = StructuredCredit {
+        fees: Some(fees(0.0)),
+        ..StructuredCredit::new_abs("CARD-MT", pool, tranches, close(), maturity(), "USD-OIS")
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
-            .with_fees(fees(0.0));
+    };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
@@ -169,7 +170,10 @@ fn metric_context(deal: StructuredCredit) -> MetricContext {
 /// metric reports the monthly rate in percent.
 #[test]
 fn static_excess_spread_and_payment_rate_metrics_match_the_hand_computation() {
-    let deal = trust(card(0.05), d(2027, 1, 1)).with_fees(fees(100.0));
+    let deal = StructuredCredit {
+        fees: Some(fees(100.0)),
+        ..trust(card(0.05), d(2027, 1, 1))
+    };
 
     let excess = AbsExcessSpreadCalculator
         .calculate(&mut metric_context(deal.clone()))
@@ -413,9 +417,11 @@ fn early_amortization_pays_down_at_the_fixed_allocation_of_the_payment_rate() {
 fn fixed_allocation_pct_applies_to_the_level_trust_receivables() {
     let revolving_end = d(2026, 1, 1);
     let bullet_date = d(2026, 7, 1);
-    let spec = card(0.0)
-        .with_seller_interest(usd(50_000_000.0))
-        .with_fixed_allocation_decimal(0.80);
+    let spec = CardPortfolioSpec {
+        seller_interest: Some(usd(50_000_000.0)),
+        fixed_allocation_decimal: Some(0.80),
+        ..card(0.0)
+    };
     let deal = with_rules(
         trust(spec, revolving_end),
         WaterfallRules {
@@ -447,7 +453,10 @@ fn fixed_allocation_pct_applies_to_the_level_trust_receivables() {
     // Without a supplied allocation the floating share (100 / 150) applies and
     // the seller interest changes nothing: the base is the investor interest.
     let floating = trust(
-        card(0.0).with_seller_interest(usd(50_000_000.0)),
+        CardPortfolioSpec {
+            seller_interest: Some(usd(50_000_000.0)),
+            ..card(0.0)
+        },
         revolving_end,
     );
     let floating = with_rules(

@@ -62,7 +62,7 @@ impl EquityOptionParams {
             expiry,
             option_type,
             exercise_style: ExerciseStyle::European,
-            settlement: SettlementType::Physical,
+            settlement: SettlementType::Cash,
             quantity,
             currency,
         }

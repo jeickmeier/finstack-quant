@@ -524,6 +524,12 @@ export interface DF056A252F953016E9606 {
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
    * Net operating income schedule (date, amount).
+   *
+   * Entries must be **annual** NOI amounts: cap-rate formulas (direct cap,
+   * exit-cap terminal value, going-in cap rate) apply a quoted annual cap
+   * rate to a single schedule entry, so a monthly or quarterly schedule
+   * would understate those values by 12x/4x. Flows dated exactly on the
+   * valuation `as_of` are included in PV undiscounted (t = 0).
    */
   noi_schedule: [Date, number][];
   /**
@@ -560,7 +566,10 @@ export interface DF056A252F953016E9606 {
    * Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.
    *
    * Market convention for exit-cap terminal value is \(TV = NOI_{N+1} / cap\_rate\_exit\).
-   * When not provided, defaults to 0 (uses last NOI as-is).
+   * When not provided, defaults to 0 (uses last NOI as-is, i.e. a trailing-NOI
+   * terminal value). Exactly **one** period of growth is applied to the last
+   * NOI on/before the exit date — it is not compounded over any gap between
+   * the last scheduled NOI and a later `sale_date`.
    * Validation range is \([-100\%, 20\%]\) to guard against configuration errors.
    */
   terminal_growth_rate?: number | null;

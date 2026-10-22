@@ -57,10 +57,8 @@ Constructors and builders:
 | Method | Use |
 |--------|-----|
 | `stamped(instrument_id, as_of, value)` | Default config metadata |
-| `stamped_with_config(...)` | Stamp from an explicit `FinstackConfig` |
-| `stamped_with_meta(...)` | Reuse a prebuilt `ResultsMeta` — build it once per batch with `finstack_quant_core::config::results_meta(&config)` to avoid re-deriving config per instrument |
+| `stamped_with_meta(...)` | Stamp from an explicit config: build `ResultsMeta` once per batch with `finstack_quant_core::config::results_meta(&config)` to avoid re-deriving config per instrument |
 | `with_measures`, `with_details`, `with_explanation` | Attach payloads |
-| `with_covenants`, `with_covenant(key, report)` | Attach covenant reports |
 
 Accessors: `metric(MetricId)`, `metric_str(&str)`, `metric_series(&MetricId)`
 (bucketed series read back as `(labels, value)` pairs), `all_covenants_passed()`,
@@ -98,8 +96,8 @@ pricer restating it.
 ## Covenants
 
 ```rust
-let result = ValuationResult::stamped("LOAN-001", as_of, pv)
-    .with_covenant("dscr_test", dscr_report);
+let mut result = ValuationResult::stamped("LOAN-001", as_of, pv);
+result.covenants = Some([("dscr_test".to_string(), dscr_report)].into_iter().collect());
 
 assert!(result.all_covenants_passed());
 assert!(result.failed_covenants().is_empty());

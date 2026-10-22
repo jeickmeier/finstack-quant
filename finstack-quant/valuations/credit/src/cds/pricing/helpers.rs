@@ -1,10 +1,11 @@
-//! Configuration, integration, and metric helpers for CDS pricing.
-//!
+//! Hazard-time conversion, settlement dates, ISDA integration boundaries and
+//! recovery-consistency checks shared by the CDS pricer.
+
 use finstack_quant_core::dates::{Date, DateExt, DayCount, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::constants::credit;
+use finstack_quant_valuations_core::constants::{credit, time as time_constants};
 use time::Duration;
 
 /// Tolerance for recovery-rate consistency between the CDS instrument and the
@@ -109,9 +110,9 @@ pub(crate) fn date_from_hazard_time(surv: &HazardCurve, t: f64) -> Date {
 ///
 /// With a holiday calendar the `settlement_delay` business days are applied
 /// exactly via [`DateExt::add_business_days`]. Without a calendar the delay
-/// is approximated as calendar days (`settlement_delay · 365 /
-/// business_days_per_year`); the raw calendar-day jump can land on a
-/// weekend, so the result is then rolled forward to the next weekday
+/// is approximated as calendar days (`settlement_delay · 365 / 252`, the US
+/// business-day year); the raw calendar-day jump can land on a weekend, so
+/// the result is then rolled forward to the next weekday
 /// (`BusinessDayConvention::Following`, weekends only). A settlement date is
 /// by definition a business day — the previous implementation could return
 /// a Saturday or Sunday.
@@ -120,7 +121,6 @@ pub(super) fn settlement_date(
     default_date: Date,
     settlement_delay: u16,
     calendar: Option<&dyn HolidayCalendar>,
-    business_days_per_year: f64,
 ) -> Result<Date> {
     if settlement_delay == 0 {
         return Ok(default_date);
@@ -134,7 +134,7 @@ pub(super) fn settlement_date(
     // result forward off any weekend so settlement always lands on a weekday.
     let delay_days = ((settlement_delay as f64)
         * finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR
-        / business_days_per_year)
+        / time_constants::BUSINESS_DAYS_PER_YEAR_US)
         .round() as i64;
     let mut settle = default_date + Duration::days(delay_days);
     while settle.is_weekend() {
@@ -149,23 +149,23 @@ pub(super) fn settlement_date(
 /// constant hazard rate on each segment (and in no case longer than any
 /// accrual period of the premium leg)."
 ///
-/// Default: `25` sub-steps per year (matching FinancePy's
-/// `GLOB_NUM_STEPS_PER_YEAR`), giving ~14-day resolution. This is finer
-/// than any coupon period (~91 days) and finer than typical
-/// discount-curve knot spacings, so within each segment both `r` and `λ`
-/// are effectively constant under any reasonable interpolation. Curve
-/// knots remain as boundaries so piecewise-constant hazard is honoured.
-///
-/// Configurable via `CdsPricerConfig::protection_leg_substeps_per_year`
-/// — see that field's docs for performance/precision tradeoffs.
-pub(crate) const PROTECTION_LEG_SUB_STEPS_PER_YEAR_DEFAULT: f64 = 25.0;
+/// `25` sub-steps per year (matching FinancePy's `GLOB_NUM_STEPS_PER_YEAR`,
+/// Bloomberg parity), giving ~14-day resolution: ~750 sub-windows for a 30Y
+/// CDS. This is finer than any coupon period (~91 days) and finer than
+/// typical discount-curve knot spacings, so within each segment both `r` and
+/// `λ` are effectively constant under any reasonable interpolation. Hazard-
+/// and discount-curve knots are always inserted as boundaries on top of these
+/// sub-steps, so piecewise-constant hazard is honoured.
+const PROTECTION_LEG_SUB_STEPS_PER_YEAR: f64 = 25.0;
 
+/// Sorted, de-duplicated integration grid on `[t_start, t_end]` (hazard-curve
+/// years): the interval ends, every hazard and discount knot inside it, and
+/// the [`PROTECTION_LEG_SUB_STEPS_PER_YEAR`] sub-steps.
 pub(super) fn isda_standard_model_boundaries(
     t_start: f64,
     t_end: f64,
     surv: &HazardCurve,
     disc: &DiscountCurve,
-    sub_steps_per_year: f64,
 ) -> Result<Vec<f64>> {
     let mut boundaries = Vec::with_capacity(surv.len() + disc.knots().len() + 2);
     boundaries.push(t_start);
@@ -208,13 +208,8 @@ pub(super) fn isda_standard_model_boundaries(
         }
     }
     // Sub-step subdivision per DOCS 2057273 §3.
-    let density = if sub_steps_per_year.is_finite() && sub_steps_per_year > 0.0 {
-        sub_steps_per_year
-    } else {
-        PROTECTION_LEG_SUB_STEPS_PER_YEAR_DEFAULT
-    };
-    let dt = 1.0 / density;
-    let n_steps = ((t_end - t_start) * density).ceil() as usize;
+    let dt = 1.0 / PROTECTION_LEG_SUB_STEPS_PER_YEAR;
+    let n_steps = ((t_end - t_start) * PROTECTION_LEG_SUB_STEPS_PER_YEAR).ceil() as usize;
     if n_steps > 0 {
         for i in 1..n_steps {
             let t = t_start + (i as f64) * dt;

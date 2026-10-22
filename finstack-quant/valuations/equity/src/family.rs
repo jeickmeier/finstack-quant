@@ -87,8 +87,8 @@ fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryE
     crate::equity_total_return_future::metrics::register_equity_total_return_future_metrics(
         registry,
     )?;
-    crate::equity_future_option::metrics::register_equity_future_option_metrics(registry)?;
-    crate::vol_index_future_option::metrics::register_vol_index_future_option_metrics(registry)?;
+    crate::equity_future_option::register_equity_future_option_metrics(registry)?;
+    crate::vol_index_future_option::register_vol_index_future_option_metrics(registry)?;
     crate::equity_trs::metrics::register_equity_trs_metrics(registry)?;
     crate::variance_swap::metrics::register_variance_swap_metrics(registry)?;
     crate::pe_fund::metrics::register_private_markets_fund_metrics(registry)?;

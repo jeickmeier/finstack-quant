@@ -341,11 +341,7 @@ where
         let disc = curves.get_discount(inputs.discount_curve_id.as_str())?;
         let cached = cache_flows(&inputs, disc.as_ref())?;
 
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .credit_spread_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
 
         let inst_id = instrument.id();
         let cs01 = if cached.is_empty() {
@@ -429,10 +425,7 @@ where
         let disc = curves.get_discount(inputs.discount_curve_id.as_str())?;
         let cached = cache_flows(&inputs, disc.as_ref())?;
 
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
         let buckets = defaults.cs01_buckets_years;
         let bump_bp = defaults.credit_spread_bump_bp;
         validate_buckets_strictly_increasing(&buckets)?;
@@ -462,7 +455,7 @@ where
             Vec::with_capacity(buckets.len());
         let mut total = NeumaierAccumulator::new();
         for (b, group) in groups.iter().enumerate() {
-            let label = crate::metrics::format_bucket_label_cow(buckets[b]);
+            let label = crate::metrics::format_bucket_label(buckets[b]);
             let cs01 = if group.is_empty() {
                 0.0
             } else {

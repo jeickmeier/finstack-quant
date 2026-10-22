@@ -330,7 +330,8 @@ pub fn boxed_bonds(bonds: &[Bond]) -> Vec<Box<dyn Instrument>> {
 
 pub fn structured_credit_with_corr() -> StructuredCredit {
     let mut deal = StructuredCredit::example().expect("example");
-    deal.with_correlation(CorrelationStructure::flat(0.20, -0.15).expect("valid correlation"));
+    deal.credit_model.correlation_structure =
+        Some(CorrelationStructure::flat(0.20, -0.15).expect("valid correlation"));
     deal
 }
 

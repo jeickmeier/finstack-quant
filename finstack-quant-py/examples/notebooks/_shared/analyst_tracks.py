@@ -243,7 +243,6 @@ def credit_index_inputs() -> dict[str, dict[str, Any]]:
             "underlying_maturity": "2029-12-20",
             "credit_curve_id": "CDX-HAZ",
             "discount_curve_id": "USD-OIS",
-            "exercise_style": "european",
             "expiry": "2025-06-20",
             "index_factor": 1.0,
             "knockout": False,

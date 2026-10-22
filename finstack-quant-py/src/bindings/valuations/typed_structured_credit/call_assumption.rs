@@ -36,7 +36,7 @@ pub struct PyCallAssumption {
     pub(crate) inner: CallAssumption,
 }
 
-sc_wire_methods!(PyCallAssumption, CallAssumption, "CallAssumption");
+crate::bindings::macros::wire_methods!(PyCallAssumption, CallAssumption, "CallAssumption", to_dict);
 
 #[pymethods]
 impl PyCallAssumption {
@@ -76,30 +76,6 @@ impl PyCallAssumption {
         date_to_py(py, self.inner.date)
     }
 
-    /// Redemption price as a percent of balance.
-    #[getter]
-    fn price_pct(&self) -> f64 {
-        self.inner.price_pct
-    }
-
-    /// ``"deal"`` or ``"tranche"``.
-    #[getter]
-    fn scope(&self) -> &'static str {
-        match self.inner.scope {
-            CallScope::Deal => "deal",
-            CallScope::Tranche(_) => "tranche",
-        }
-    }
-
-    /// The called class for a tranche-scope call, else ``None``.
-    #[getter]
-    fn tranche_id(&self) -> Option<String> {
-        match &self.inner.scope {
-            CallScope::Deal => None,
-            CallScope::Tranche(id) => Some(id.clone()),
-        }
-    }
-
     /// ``CallScope`` serde value (``"deal"`` or ``{"tranche": id}``).
     #[getter]
     fn scope_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -117,3 +93,18 @@ impl PyCallAssumption {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyCallAssumption |s| {
+    /// Redemption price as a percent of balance.
+    price_pct -> f64 = s.inner.price_pct;
+
+    /// ``"deal"`` or ``"tranche"``.
+    scope -> &'static str =
+        match s.inner.scope { CallScope::Deal => "deal", CallScope::Tranche(_) => "tranche" };
+
+    /// The called class for a tranche-scope call, else ``None``.
+    tranche_id -> Option<String> = match &s.inner.scope {
+        CallScope::Deal => None,
+        CallScope::Tranche(id) => Some(id.clone()),
+    };
+});

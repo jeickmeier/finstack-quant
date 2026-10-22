@@ -49,9 +49,8 @@ Build with `TermLoan::builder()`; `build()` validates the complete contract.
 envelope carries it directly).
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, RateSpec, TermLoan,
-};
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_cashflows::builder::CouponType;

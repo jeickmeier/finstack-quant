@@ -1,13 +1,9 @@
 //! FX barrier option pricers (Monte Carlo and analytical).
 
 use crate::fx_barrier_option::types::FxBarrierOption;
-use crate::shared::{
-    collect_fx_option_inputs, resolve_fx_spot as resolve_shared_fx_spot, FxOptionInputRequest,
-    FxSpotSource,
-};
+use crate::shared::{collect_fx_option_inputs_at_spot, FxOptionInputRequest, FxOptionInputs};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -72,7 +68,6 @@ impl FxBarrierOptionMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<FxBarrierPricingOutcome> {
-        inst.validate()?;
         if as_of > inst.expiry {
             return Ok(FxBarrierPricingOutcome::deterministic(Money::from((
                 0_i64,
@@ -80,33 +75,21 @@ impl FxBarrierOptionMcPricer {
             ))));
         }
 
-        let (fx_spot, t) = collect_fx_barrier_expiry_state(inst, curves, as_of)?;
-        if t <= 0.0 {
-            let per_unit = expired_barrier_value_per_unit(inst, fx_spot)?;
-            return Ok(FxBarrierPricingOutcome::deterministic(Money::new(
-                per_unit * inst.notional.amount(),
-                inst.quote_currency,
-            )?));
-        }
-
-        let (_, r_dom, r_for, sigma, discount_factor) =
-            collect_fx_barrier_inputs(inst, curves, as_of)?;
-
-        if inst.observed_barrier_breached == Some(true) {
-            let per_unit = seasoned_breached_value_per_unit(
-                inst,
-                fx_spot,
-                r_dom,
-                r_for,
-                sigma,
-                t,
-                discount_factor,
-            );
-            return Ok(FxBarrierPricingOutcome::deterministic(Money::new(
-                per_unit * inst.notional.amount(),
-                inst.quote_currency,
-            )?));
-        }
+        let FxOptionInputs {
+            spot: fx_spot,
+            r_domestic: r_dom,
+            r_foreign: r_for,
+            sigma,
+            t,
+            df_domestic: discount_factor,
+        } = match barrier_state(inst, curves, as_of)? {
+            BarrierState::Fixed(per_unit) => {
+                return Ok(FxBarrierPricingOutcome::deterministic(notional_value(
+                    inst, per_unit,
+                )?));
+            }
+            BarrierState::Live(inputs) => inputs,
+        };
 
         // For FX, drift is r_dom - r_for.
         // In GBM process param 'q' is subtracted from r to get drift (r-q).
@@ -124,17 +107,10 @@ impl FxBarrierOptionMcPricer {
         // Standard FX barrier: the GBM drift `r_dom - r_for` (set above via
         // `GbmParams`) fully describes the dynamics. Quanto barriers are not
         // supported by this 1D MC payoff — see `BarrierOptionPayoff` docs.
-        use finstack_quant_models::monte_carlo::seed;
-
-        let seed = if let Some(scenario) = &inst
+        let seed = inst
             .instrument_pricing_overrides
             .model_config
-            .mc_seed_scenario
-        {
-            seed::derive_seed(&inst.id, scenario)
-        } else {
-            seed::derive_seed(&inst.id, "base")
-        };
+            .mc_seed(&inst.id);
         config.seed = seed;
 
         let (time_grid, monitoring) = inst.monitoring.time_grid(
@@ -242,9 +218,6 @@ pub(crate) fn compute_pv(
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
     validate_monitoring_state(inst, as_of)?;
-    if as_of > inst.expiry {
-        return Ok(Money::from((0_i64, inst.quote_currency)));
-    }
     let pricer = FxBarrierOptionMcPricer::new();
     pricer
         .price_internal(inst, curves, as_of)
@@ -277,7 +250,7 @@ fn validate_monitoring_state(
     Ok(())
 }
 
-use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
+use finstack_quant_core::types::BarrierType;
 use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate, BarrierParams};
 
 fn expired_barrier_value_per_unit(
@@ -285,78 +258,70 @@ fn expired_barrier_value_per_unit(
     spot: f64,
 ) -> finstack_quant_core::Result<f64> {
     let strike = inst.strike;
-    let is_knock_in = inst.barrier_type.is_knock_in();
     let barrier_hit = inst.observed_barrier_breached.ok_or_else(|| {
         finstack_quant_core::Error::Validation(
             "Expired FX barrier option requires `observed_barrier_breached` to determine realized payoff"
                 .to_string(),
         )
     })?;
-    let activated = if is_knock_in {
-        barrier_hit
-    } else {
-        !barrier_hit
+    let intrinsic = match inst.option_type {
+        finstack_quant_models::types::OptionType::Call => (spot - strike).max(0.0),
+        finstack_quant_models::types::OptionType::Put => (strike - spot).max(0.0),
     };
-
-    let intrinsic = if activated {
-        match inst.option_type {
-            finstack_quant_models::types::OptionType::Call => (spot - strike).max(0.0),
-            finstack_quant_models::types::OptionType::Put => (strike - spot).max(0.0),
-        }
-    } else {
-        0.0
-    };
-
-    let rebate_due = if is_knock_in {
-        !barrier_hit
-    } else {
-        // A recorded hit includes settlement of an at-hit rebate. The same
-        // claim is extinguished before, on, and after expiry.
-        barrier_hit && inst.rebate_timing == PayoutTiming::AtExpiry
-    };
-    let rebate = if rebate_due {
-        inst.rebate_per_unit().unwrap_or(0.0)
-    } else {
-        0.0
-    };
-
-    Ok(intrinsic + rebate)
+    // A recorded knock-out hit includes settlement of an at-hit rebate; the
+    // same claim is extinguished before, on, and after expiry.
+    Ok(
+        finstack_quant_models::closed_form::barrier::expired_barrier_payoff(
+            inst.barrier_type,
+            barrier_hit,
+            inst.rebate_timing,
+            intrinsic,
+            inst.rebate_per_unit().unwrap_or(0.0),
+        ),
+    )
 }
 
-#[allow(clippy::too_many_arguments)]
-fn seasoned_breached_value_per_unit(
-    inst: &FxBarrierOption,
-    spot: f64,
-    r_dom: f64,
-    r_for: f64,
-    sigma: f64,
-    t: f64,
-    discount_factor: f64,
-) -> f64 {
+fn seasoned_breached_value_per_unit(inst: &FxBarrierOption, inputs: &FxOptionInputs) -> f64 {
     if inst.barrier_type.is_knock_in() {
         finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
-            spot,
+            inputs.spot,
             inst.strike,
-            r_dom,
-            r_for,
-            sigma,
-            t,
+            inputs.r_domestic,
+            inputs.r_foreign,
+            inputs.sigma,
+            inputs.t,
             inst.option_type,
         )
     } else {
         match inst.rebate_timing {
             PayoutTiming::AtHit => 0.0,
-            PayoutTiming::AtExpiry => inst.rebate_per_unit().unwrap_or(0.0) * discount_factor,
+            PayoutTiming::AtExpiry => inst.rebate_per_unit().unwrap_or(0.0) * inputs.df_domestic,
         }
     }
 }
 
+/// FX spot from the `fx_spot_id` scalar when set, else the FX matrix.
 pub(crate) fn resolve_fx_spot(
     inst: &FxBarrierOption,
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    resolve_shared_fx_spot(FxOptionInputRequest {
+    crate::shared::resolve_fx_spot(
+        curves,
+        as_of,
+        inst.base_currency,
+        inst.quote_currency,
+        inst.fx_spot_id.as_ref(),
+        "FxBarrierOption",
+    )
+}
+
+fn input_request<'a>(
+    inst: &'a FxBarrierOption,
+    curves: &'a MarketContext,
+    as_of: Date,
+) -> FxOptionInputRequest<'a> {
+    FxOptionInputRequest {
         market: curves,
         as_of,
         base_currency: inst.base_currency,
@@ -368,80 +333,68 @@ pub(crate) fn resolve_fx_spot(
         vol_surface_id: inst.vol_surface_id.as_str(),
         strike: inst.strike,
         instrument_pricing_overrides: &inst.instrument_pricing_overrides,
-        spot_source: FxSpotSource::ScalarId(inst.fx_spot_id.as_ref()),
+        spot_id: inst.fx_spot_id.as_ref(),
         rate_context: "FxBarrierOption",
-    })
+    }
 }
 
-fn collect_fx_barrier_expiry_state(
-    inst: &FxBarrierOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> finstack_quant_core::Result<(f64, f64)> {
-    let t = inst
-        .day_count
-        .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
-    let fx_spot = resolve_fx_spot(inst, curves, as_of)?;
-    Ok((fx_spot, t))
-}
-
-/// Helper to collect inputs for FX barrier option pricing.
+/// Live FX barrier inputs at an already resolved `spot`.
 fn collect_fx_barrier_inputs(
     inst: &FxBarrierOption,
     curves: &MarketContext,
     as_of: Date,
-) -> finstack_quant_core::Result<(f64, f64, f64, f64, f64)> {
-    let inputs = collect_fx_option_inputs(FxOptionInputRequest {
-        market: curves,
-        as_of,
-        base_currency: inst.base_currency,
-        quote_currency: inst.quote_currency,
-        expiry: inst.expiry,
-        day_count: inst.day_count,
-        domestic_discount_curve_id: &inst.domestic_discount_curve_id,
-        foreign_discount_curve_id: &inst.foreign_discount_curve_id,
-        vol_surface_id: inst.vol_surface_id.as_str(),
-        strike: inst.strike,
-        instrument_pricing_overrides: &inst.instrument_pricing_overrides,
-        spot_source: FxSpotSource::ScalarId(inst.fx_spot_id.as_ref()),
-        rate_context: "FxBarrierOption",
-    })?;
-    let sigma = inputs.sigma;
-    if !sigma.is_finite() || sigma < 0.0 {
+    spot: f64,
+) -> finstack_quant_core::Result<FxOptionInputs> {
+    let inputs = collect_fx_option_inputs_at_spot(input_request(inst, curves, as_of), spot)?;
+    if !inputs.sigma.is_finite() || inputs.sigma < 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "FxBarrierOption volatility must be finite and non-negative, got {}",
-            sigma
+            inputs.sigma
         )));
     }
+    Ok(inputs)
+}
 
-    let domestic_df = curves
-        .get_discount(inst.domestic_discount_curve_id.as_str())?
-        .df_between_dates(as_of, inst.expiry)?;
+/// FX barrier state at a valuation date on or before expiry.
+enum BarrierState {
+    /// Value per unit of base notional fixed by the observed barrier state.
+    Fixed(f64),
+    /// Live market inputs for a model price.
+    Live(FxOptionInputs),
+}
 
-    Ok((
-        inputs.spot,
-        inputs.r_domestic,
-        inputs.r_foreign,
-        sigma,
-        domestic_df,
-    ))
+/// Resolve spot once, then settle expired and breached contracts or return
+/// the live inputs both pricers price from.
+fn barrier_state(
+    inst: &FxBarrierOption,
+    curves: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<BarrierState> {
+    let t = inst
+        .day_count
+        .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
+    let spot = resolve_fx_spot(inst, curves, as_of)?;
+    if t <= 0.0 {
+        return Ok(BarrierState::Fixed(expired_barrier_value_per_unit(
+            inst, spot,
+        )?));
+    }
+    let inputs = collect_fx_barrier_inputs(inst, curves, as_of, spot)?;
+    if inst.observed_barrier_breached == Some(true) {
+        return Ok(BarrierState::Fixed(seasoned_breached_value_per_unit(
+            inst, &inputs,
+        )));
+    }
+    Ok(BarrierState::Live(inputs))
+}
+
+/// Scale a per-unit value by the base notional into quote currency.
+fn notional_value(inst: &FxBarrierOption, per_unit: f64) -> finstack_quant_core::Result<Money> {
+    Money::new(per_unit * inst.notional.amount(), inst.quote_currency)
 }
 
 /// FX Barrier option analytical pricer (continuous monitoring).
 pub(crate) struct FxBarrierOptionAnalyticalPricer;
-
-impl FxBarrierOptionAnalyticalPricer {
-    /// Create a new analytical FX barrier option pricer
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for FxBarrierOptionAnalyticalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 /// Compute the BS barrier price + optional rebate (without notional scaling).
 fn bs_barrier_price_per_unit(
@@ -451,7 +404,7 @@ fn bs_barrier_price_per_unit(
     r_for: f64,
     sigma: f64,
     t: f64,
-    analytical_barrier_type: AnalyticalBarrierType,
+    analytical_barrier_type: BarrierType,
 ) -> f64 {
     let params = BarrierParams::new(
         fx_spot,
@@ -496,9 +449,6 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
             expect_inst::<FxBarrierOption>(instrument, InstrumentType::FxBarrierOption)?;
 
         let context = barrier_pricing_context(fx_barrier, ModelKey::FxBarrierBSContinuous);
-        fx_barrier
-            .validate()
-            .map_err(|error| PricingError::from_core(error, context.clone()))?;
         validate_monitoring_state(fx_barrier, as_of)
             .map_err(|error| PricingError::from_core(error, context.clone()))?;
 
@@ -529,82 +479,23 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
             ));
         }
 
-        let (fx_spot, t) = collect_fx_barrier_expiry_state(fx_barrier, market, as_of)
-            .map_err(|error| PricingError::from_core(error, context.clone()))?;
-
-        if t <= 0.0 {
-            let per_unit = expired_barrier_value_per_unit(fx_barrier, fx_spot)
-                .map_err(|error| PricingError::from_core(error, context.clone()))?;
-            return Ok(ValuationResult::stamped(
-                fx_barrier.id(),
-                as_of,
-                Money::new(
-                    per_unit * fx_barrier.notional.amount(),
-                    fx_barrier.quote_currency,
-                )
-                .map_err(|error| {
-                    finstack_quant_valuations_core::pricer::PricingError::from_core(
-                        error,
-                        finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(fx_barrier),
-                    )
-                })?,
-            ));
-        }
-
-        let (_, r_dom, r_for, sigma, discount_factor) =
-            collect_fx_barrier_inputs(fx_barrier, market, as_of)
-                .map_err(|error| PricingError::from_core(error, context))?;
-
-        if fx_barrier.observed_barrier_breached == Some(true) {
-            let per_unit = seasoned_breached_value_per_unit(
-                fx_barrier,
-                fx_spot,
-                r_dom,
-                r_for,
-                sigma,
-                t,
-                discount_factor,
-            );
-            return Ok(ValuationResult::stamped(
-                fx_barrier.id(),
-                as_of,
-                Money::new(
-                    per_unit * fx_barrier.notional.amount(),
-                    fx_barrier.quote_currency,
-                )
-                .map_err(|error| {
-                    finstack_quant_valuations_core::pricer::PricingError::from_core(
-                        error,
-                        finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(fx_barrier),
-                    )
-                })?,
-            ));
-        }
-
-        let analytical_barrier_type = fx_barrier.barrier_type;
-
-        let price_per_unit = bs_barrier_price_per_unit(
-            fx_barrier,
-            fx_spot,
-            r_dom,
-            r_for,
-            sigma,
-            t,
-            analytical_barrier_type,
-        );
-
-        let pv = Money::new(
-            price_per_unit * fx_barrier.notional.amount(),
-            fx_barrier.quote_currency,
-        )
-        .map_err(|error| {
-            finstack_quant_valuations_core::pricer::PricingError::from_core(
-                error,
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    fx_barrier,
-                ),
-            )
-        })?;
+        let pv = barrier_state(fx_barrier, market, as_of)
+            .and_then(|state| {
+                let per_unit = match state {
+                    BarrierState::Fixed(per_unit) => per_unit,
+                    BarrierState::Live(inputs) => bs_barrier_price_per_unit(
+                        fx_barrier,
+                        inputs.spot,
+                        inputs.r_domestic,
+                        inputs.r_foreign,
+                        inputs.sigma,
+                        inputs.t,
+                        fx_barrier.barrier_type,
+                    ),
+                };
+                notional_value(fx_barrier, per_unit)
+            })
+            .map_err(|error| PricingError::from_core(error, context))?;
         Ok(ValuationResult::stamped(fx_barrier.id(), as_of, pv))
     }
 }
@@ -618,6 +509,7 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
@@ -637,7 +529,7 @@ mod tests {
             observation_dates: vec![start, inst.expiry],
         };
 
-        let error = FxBarrierOptionAnalyticalPricer::new()
+        let error = FxBarrierOptionAnalyticalPricer
             .price_dyn(&inst, &MarketContext::new(), start)
             .expect_err("discrete contract must reject analytical model");
         let PricingError::InvalidInput { context, .. } = error else {
@@ -660,7 +552,7 @@ mod tests {
         let mut inst = FxBarrierOption::example().expect("example");
         let as_of = inst.monitoring_start_date.expect("example start");
         inst.monitoring_start_date = Some(inst.expiry);
-        let error = FxBarrierOptionAnalyticalPricer::new()
+        let error = FxBarrierOptionAnalyticalPricer
             .price_dyn(&inst, &MarketContext::new(), as_of)
             .expect_err("future monitoring");
         assert!(error.to_string().contains("Future FX barrier monitoring"));
@@ -790,7 +682,7 @@ mod tests {
                 };
                 let booked = 50_000.0 - remaining;
                 for result in [
-                    FxBarrierOptionAnalyticalPricer::new().price_dyn(&inst, &market, as_of),
+                    FxBarrierOptionAnalyticalPricer.price_dyn(&inst, &market, as_of),
                     FxBarrierOptionMcPricer::new().price_dyn(&inst, &market, as_of),
                 ] {
                     let pv = result.expect("processed hit value").value.amount();
@@ -1036,9 +928,14 @@ mod tests {
             .value(&market, as_of)
             .expect("finite-vol FX barrier price with rebate");
 
-        let (spot, r_dom, r_for, sigma, _) =
-            collect_fx_barrier_inputs(&rebate_option, &market, as_of)
-                .expect("finite-vol FX barrier inputs");
+        let spot = resolve_fx_spot(&rebate_option, &market, as_of).expect("spot");
+        let FxOptionInputs {
+            r_domestic: r_dom,
+            r_foreign: r_for,
+            sigma,
+            ..
+        } = collect_fx_barrier_inputs(&rebate_option, &market, as_of, spot)
+            .expect("finite-vol FX barrier inputs");
         let t = rebate_option
             .day_count
             .year_fraction(as_of, expiry, DayCountContext::default())
@@ -1368,8 +1265,10 @@ mod tests {
             .expect("dom curve")
             .df_between_dates(as_of, expiry)
             .expect("domestic df");
-        let (_, _, _, _, discount_factor) =
-            collect_fx_barrier_inputs(&option, &market, as_of).expect("inputs");
+        let spot = resolve_fx_spot(&option, &market, as_of).expect("spot");
+        let discount_factor = collect_fx_barrier_inputs(&option, &market, as_of, spot)
+            .expect("inputs")
+            .df_domestic;
 
         assert!(
             (discount_factor - expected_domestic_df).abs() < 1e-12,

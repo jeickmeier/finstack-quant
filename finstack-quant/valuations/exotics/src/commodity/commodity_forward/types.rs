@@ -19,8 +19,7 @@ use finstack_quant_valuations_core::instruments::common_impl::parameters::Commod
 use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::Position;
 
-/// Settlement type for commodity contracts.
-pub(crate) use finstack_quant_valuations_core::instruments::SettlementType;
+use finstack_quant_valuations_core::instruments::SettlementType;
 
 /// Commodity forward or futures contract.
 ///
@@ -40,7 +39,15 @@ pub(crate) use finstack_quant_valuations_core::instruments::SettlementType;
 /// - K = Contract price (entry price). If None, treated as at-market (K = F)
 /// - Q = Quantity
 /// - M = Contract multiplier
-/// - DF(T) = Discount factor to settlement date
+/// - DF(T_pay) = Discount factor to the payment date (see below)
+///
+/// # Settlement
+///
+/// The forward fixes on `maturity` (the last pricing date) and pays
+/// [`CommodityForward::payment_date`]: `maturity` plus the effective settlement
+/// lag in business days on the effective settlement calendar, adjusted by the
+/// effective business-day convention (for example T+2 on the CME calendar for
+/// WTI). The value is zero once the payment date is before `as_of`.
 ///
 /// # At-Market vs Off-Market
 ///
@@ -272,6 +279,7 @@ impl CommodityForward {
                     .to_string(),
             ));
         }
+        self.payment_date()?;
         Ok(())
     }
 
@@ -305,71 +313,61 @@ impl CommodityForward {
             .build()
     }
 
-    /// Calculate the net present value of this commodity forward.
+    /// Get the market forward price for this contract at `maturity`.
     ///
-    /// # Formula
+    /// # Resolution Order
     ///
-    /// ```text
-    /// NPV = sign(position) × (F - K) × Q × M × DF(T)
-    /// ```
-    ///
-    /// where:
-    /// - sign = +1.0 for Long, -1.0 for Short
-    /// - F = Market forward price from `quoted_forward` or `PriceCurve`
-    /// - K = Contract price (`contract_price`). If `None`, K = F (at-market)
-    /// - Q = Quantity
-    /// - M = Contract multiplier
-    /// - DF(T) = Discount factor to settlement date
+    /// 1. `quoted_forward`, when set.
+    /// 2. The `PriceCurve` `forward_curve_id`: its spot once `maturity <= as_of`,
+    ///    otherwise `price_on_date(maturity)` (on the curve's own day count).
+    /// 3. Cost of carry from `spot_id`: the spot once delivered, otherwise
+    ///    `spot / DF(as_of, maturity)` on `discount_curve_id`.
     ///
     /// # Arguments
     ///
-    /// * `market` - Market context with curves and prices
-    /// * `as_of` - Valuation date
-    ///
-    /// # Returns
-    ///
-    /// Present value in the instrument's currency.
-    ///
-    /// Get the market forward price for this contract.
-    ///
-    /// Uses `quoted_forward` if provided, otherwise interpolates from the
-    /// `PriceCurve` referenced by `forward_curve_id`.
-    ///
-    /// # Curve Lookup Order
-    ///
-    /// 1. If `quoted_forward` is set, return it directly
-    /// 2. Look up `PriceCurve` by `forward_curve_id`
-    /// 3. If `spot_id` is set and PriceCurve not found, use cost-of-carry model
+    /// * `market` - Market context supplying the price curve, or the spot
+    ///   scalar and discount curve for the cost-of-carry fallback.
+    /// * `as_of` - Valuation date; decides whether the contract has delivered
+    ///   and anchors the carry discount factor.
     ///
     /// # Errors
     ///
-    /// Returns an error if neither `quoted_forward` nor `PriceCurve` is available.
-    ///
+    /// Returns a validation error for an invalid instrument,
+    /// `InputError::NotFound` when neither `quoted_forward`, the price curve
+    /// nor a `spot_id` is available, and propagates spot or discount-curve
+    /// lookup failures of the carry fallback.
     pub fn forward_price(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         self.validate()?;
-        super::super::forward_price::resolve_forward_price(
-            super::super::forward_price::ForwardPriceRequest {
-                market,
-                as_of,
-                delivery: self.maturity,
-                quoted: self.quoted_forward,
-                forward_curve_id: &self.forward_curve_id,
-                spot_id: self.spot_id.as_deref(),
-                discount_curve_id: &self.discount_curve_id,
+        if let Some(price) = self.quoted_forward {
+            return Ok(price);
+        }
+        let delivered = self.maturity <= as_of;
+        if let Ok(price_curve) = market.get_price_curve(self.forward_curve_id.as_str()) {
+            if delivered {
+                return Ok(price_curve.spot_price());
+            }
+            return price_curve.price_on_date(self.maturity);
+        }
+        if let Some(spot_id) = self.spot_id.as_deref() {
+            let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
+                market.get_price(spot_id)?,
+            );
+            if delivered {
+                return Ok(spot);
+            }
+            let disc = market.get_discount(self.discount_curve_id.as_str())?;
+            let df = disc.df_between_dates(as_of, self.maturity)?;
+            return Ok(spot / df);
+        }
+        Err(finstack_quant_core::Error::Input(
+            finstack_quant_core::InputError::NotFound {
+                id: format!(
+                    "PriceCurve '{}' not found. \
+                     Use MarketContext::insert_price_curve() to add a commodity forward price curve.",
+                    self.forward_curve_id
+                ),
             },
-        )
-    }
-
-    /// Get the effective notional value at settlement.
-    pub fn notional_value(&self, forward_price: f64) -> f64 {
-        forward_price * self.quantity * self.multiplier
-    }
-
-    /// Check if this forward is at-market (no contract price set).
-    ///
-    /// At-market forwards have NPV ≈ 0 at inception.
-    pub fn is_at_market(&self) -> bool {
-        self.contract_price.is_none()
+        ))
     }
 
     /// Get the effective settlement lag in business days.
@@ -408,6 +406,36 @@ impl CommodityForward {
             .unwrap_or(BusinessDayConvention::Following)
     }
 
+    /// Date on which the forward's settlement amount is paid.
+    ///
+    /// `maturity` plus [`Self::effective_settlement_days`] business days on
+    /// [`Self::effective_settlement_calendar`] (weekends only when no calendar
+    /// is set), adjusted by [`Self::effective_settlement_business_day_convention`].
+    /// The forward price is still observed at `maturity`; only discounting and
+    /// the cashflow date use the payment date.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::CalendarNotFound` when the effective calendar id
+    /// is not registered, and a validation error when the lag exceeds the
+    /// supported range or no business day is found while adjusting.
+    pub fn payment_date(&self) -> Result<Date> {
+        use finstack_quant_core::dates::DateExt;
+        let calendar =
+            finstack_quant_core::dates::resolve_calendar(self.effective_settlement_calendar())?;
+        let lag = i32::try_from(self.effective_settlement_days()).map_err(|_| {
+            finstack_quant_core::Error::Validation(
+                "CommodityForward settlement_days exceeds the supported range".to_string(),
+            )
+        })?;
+        let lagged = self.maturity.add_business_days(lag, calendar)?;
+        finstack_quant_core::dates::adjust(
+            lagged,
+            self.effective_settlement_business_day_convention(),
+            calendar,
+        )
+    }
+
     fn contractual_invoice_amount(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         let contract_price = match self.contract_price {
             Some(price) => price,
@@ -421,7 +449,7 @@ impl CommodityForward {
 impl finstack_quant_valuations_core::instruments::Instrument for CommodityForward {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommodityForward,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> Result<()> {
@@ -446,8 +474,10 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommodityForwar
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        // If settlement has passed, value is zero
-        if self.maturity < as_of {
+        // Zero once the payment date is before `as_of`; a payment on `as_of`
+        // is still owed, matching the `date >= as_of` flow-inclusion rule.
+        let payment_date = self.payment_date()?;
+        if payment_date < as_of {
             return Ok(finstack_quant_core::money::Money::from((
                 0_i64,
                 self.underlying.currency,
@@ -461,9 +491,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommodityForwar
         let contract_price = self.contract_price.unwrap_or(forward_price);
 
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let df = disc.df_between_dates(as_of, self.maturity)?;
+        let df = disc.df_between_dates(as_of, payment_date)?;
 
-        // NPV = sign(position) × (F - K) × Q × M × DF
+        // NPV = sign(position) × (F - K) × Q × M × DF(T_pay)
         let price_diff = forward_price - contract_price;
         let notional_qty = self.quantity * self.multiplier;
         let pv = self.position.sign() * price_diff * notional_qty * df;
@@ -507,7 +537,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
             ),
         };
         let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
-            vec![(self.maturity, settlement)],
+            vec![(self.payment_date()?, settlement)],
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -532,6 +562,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
     use finstack_quant_valuations_core::instruments::Instrument;
+    use time::macros::date;
     use time::Month;
 
     fn test_market(as_of: Date) -> MarketContext {
@@ -578,7 +609,7 @@ mod tests {
         assert_eq!(forward.quantity, 1000.0);
         assert_eq!(forward.underlying.currency, Currency::USD);
         assert_eq!(forward.position, Position::Long);
-        assert!(forward.is_at_market());
+        assert!(forward.contract_price.is_none());
     }
 
     #[test]
@@ -829,15 +860,15 @@ mod tests {
             .build()
             .expect("should build");
 
-        // WTI convention: T+2, Following, NYMEX calendar
+        // WTI convention: T+2, Following, CME calendar (NYMEX)
         assert_eq!(forward.effective_settlement_days(), 2);
-        assert_eq!(forward.effective_settlement_calendar(), Some("nymex"));
+        assert_eq!(forward.effective_settlement_calendar(), Some("cme"));
         assert_eq!(
             forward.effective_settlement_business_day_convention(),
             BusinessDayConvention::Following
         );
 
-        // Gold convention: T+2, Modified Following, COMEX calendar
+        // Gold convention: T+2, Modified Following, CME calendar (COMEX)
         let gold_forward = CommodityForward::builder()
             .id(InstrumentId::new("GOLD-CONV-TEST"))
             .underlying(CommodityUnderlyingParams::new(
@@ -857,7 +888,7 @@ mod tests {
             .expect("should build");
 
         assert_eq!(gold_forward.effective_settlement_days(), 2);
-        assert_eq!(gold_forward.effective_settlement_calendar(), Some("comex"));
+        assert_eq!(gold_forward.effective_settlement_calendar(), Some("cme"));
         assert_eq!(
             gold_forward.effective_settlement_business_day_convention(),
             BusinessDayConvention::ModifiedFollowing
@@ -896,7 +927,7 @@ mod tests {
             BusinessDayConvention::ModifiedFollowing
         );
         // Calendar still comes from convention
-        assert_eq!(forward.effective_settlement_calendar(), Some("nymex"));
+        assert_eq!(forward.effective_settlement_calendar(), Some("cme"));
     }
 
     #[test]
@@ -978,7 +1009,8 @@ mod tests {
             1,
             "commodity forward should emit one invoice flow"
         );
-        assert_eq!(flows[0].0, forward.maturity);
+        // Pays T+2 weekends-only after the 2025-04-15 maturity (V25 settlement wiring).
+        assert_eq!(flows[0].0, date!(2025 - 04 - 17));
         assert_eq!(flows[0].1.currency(), Currency::USD);
         assert!(
             (flows[0].1.amount() + 72_000.0).abs() < 1e-10,
@@ -999,6 +1031,9 @@ mod tests {
         forward.discount_curve_id = CurveId::new("USD-OIS");
         forward.quantity = 1000.0;
         forward.multiplier = 2.0;
+        // WTI on the CME calendar: Tue 2025-04-15 + 2 business days.
+        let payment_date = forward.payment_date().expect("payment date");
+        assert_eq!(payment_date, date!(2025 - 04 - 17));
         for quoted in [None, Some(80.0)] {
             forward.quoted_forward = quoted;
             let f = forward.forward_price(&market, as_of).expect("forward");
@@ -1019,11 +1054,11 @@ mod tests {
                             .dated_cashflows(&market, valuation_date)
                             .expect("flows");
                         assert_eq!(flows.len(), 1);
-                        assert_eq!(flows[0].0, forward.maturity);
+                        assert_eq!(flows[0].0, payment_date);
                         let df = market
                             .get_discount("USD-OIS")
                             .expect("discount")
-                            .df_between_dates(valuation_date, forward.maturity)
+                            .df_between_dates(valuation_date, payment_date)
                             .expect("df");
                         assert!(
                             (flows[0].1.amount() * df
@@ -1033,9 +1068,16 @@ mod tests {
                         );
                     }
                     assert!(forward
-                        .dated_cashflows(&market, forward.maturity + time::Duration::days(1))
+                        .dated_cashflows(&market, payment_date + time::Duration::days(1))
                         .expect("expired")
                         .is_empty());
+                    assert_eq!(
+                        forward
+                            .value(&market, payment_date + time::Duration::days(1))
+                            .expect("expired PV")
+                            .amount(),
+                        0.0
+                    );
                     forward.settlement = SettlementType::Physical;
                     let flows = forward
                         .dated_cashflows(&market, as_of)
@@ -1058,5 +1100,65 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn payment_date_rolls_the_settlement_lag_over_exchange_holidays() {
+        let mut forward = CommodityForward::example().expect("example");
+        // WTI: T+2 Following on CME. Thu 2025-07-03 + 2 business days skips
+        // Independence Day and the weekend.
+        forward.maturity = date!(2025 - 07 - 03);
+        assert_eq!(forward.payment_date().expect("WTI"), date!(2025 - 07 - 08));
+        // An explicit lag and calendar override the convention.
+        forward.settlement_days = Some(1);
+        forward.settlement_calendar_id = Some("gblo".into());
+        assert_eq!(
+            forward.payment_date().expect("override"),
+            date!(2025 - 07 - 04)
+        );
+        // No convention: T+2 on weekends only.
+        forward.convention = None;
+        forward.settlement_days = None;
+        forward.settlement_calendar_id = None;
+        assert_eq!(
+            forward.payment_date().expect("default"),
+            date!(2025 - 07 - 07)
+        );
+    }
+
+    #[test]
+    fn unknown_settlement_calendar_fails_at_build() {
+        let mut forward = CommodityForward::example().expect("example");
+        forward.settlement_calendar_id = Some("not_a_calendar".into());
+        assert!(forward.validate_invariants().is_err());
+    }
+
+    #[test]
+    fn pv_discounts_to_the_payment_date_until_it_passes() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("date");
+        let market = test_market(as_of);
+        let mut forward = CommodityForward::example().expect("example");
+        forward.maturity = date!(2025 - 04 - 15);
+        forward.forward_curve_id = CurveId::new("WTI-FORWARD");
+        forward.discount_curve_id = CurveId::new("USD-OIS");
+        forward.contract_price = Some(70.0);
+        let payment_date = forward.payment_date().expect("payment date");
+        let f = forward.forward_price(&market, as_of).expect("forward");
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("discount")
+            .df_between_dates(as_of, payment_date)
+            .expect("df");
+        let expected = (f - 70.0) * forward.quantity * forward.multiplier * df;
+        let pv = forward.value(&market, as_of).expect("pv").amount();
+        assert!((pv - expected).abs() < 1e-8, "{pv} vs {expected}");
+        // Fixed but unpaid between maturity and payment: still valued.
+        assert!(
+            forward
+                .value(&market, payment_date)
+                .expect("on payment")
+                .amount()
+                != 0.0
+        );
     }
 }

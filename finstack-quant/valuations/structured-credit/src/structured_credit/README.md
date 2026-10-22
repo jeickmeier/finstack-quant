@@ -45,11 +45,12 @@ There is **no `prelude` module** — import the names you need directly.
 | `HedgeSwap`, `SwapNotional`, `SwapPriority` | Interest-rate hedges paid through the waterfall as senior or junior fee recipients. |
 | `CallAssumption`, `CallScope` | Deal or tranche call for price-to-call analytics (`TrancheMetrics.wal_to_call`, `z_spread_to_call_bp`, `dm_to_call_bp`) — see [Calls and clean-up calls](#calls-and-clean-up-calls). |
 | `run_simulation_with_diagnostics`, `SimulationRun`, `SimulationDiagnostics`, `PeriodDiagnostics`, `CoverageTestDiagnostic`, `calculate_equity_metrics`, `EquityMetrics` | Period-by-period deal record and equity analytics — see [Deal diagnostics and equity analytics](#deal-diagnostics-and-equity-analytics). |
-| `run_simulation`, `generate_cashflows` | Deterministic projection entry points. |
+| `run_simulation` | Deterministic projection entry point (per-tranche cashflows). |
 | `execute_waterfall`, `WaterfallContext`, `WaterfallDistribution` | Waterfall execution. |
 | `CoverageTest`, `TestContext`, `TestResult` | Coverage-test evaluation. |
-| `calculate_tranche_metrics`, `TrancheMetrics`, `scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | Tranche summary (price, WAL, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters) and scenario grids (one projection per cell, clean settlement price per current face). |
-| `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_discount_margin`, `_oas` (+ `OasConfig`, `OasResult`), `_cs01`, `_breakeven_cdr` | Individual tranche analytics, the same functions the Python/WASM `structured_credit_tranche_*` entry points wrap. |
+| `tranche_metrics`, `TrancheMetrics`, `tranche_scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | The one per-tranche API (clean/dirty price, accrued, WAL, yield, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters, plus requested registry metrics valued on the note) and scenario grids (one projection per cell, clean settlement price per current face). |
+| `tranche_discount_margin`, `tranche_oas` (+ `OasConfig`, `OasResult`), `tranche_breakeven_cdr` | Individual tranche analytics, bound under the same names in Python and (camelCase) in WASM. |
+| `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_cs01` | Individual tranche analytics used by `tranche_metrics` (Rust-only). |
 | `clamped_cpr_to_smm`, `clamped_smm_to_cpr`, `clamped_cdr_to_mdr`, `clamped_mdr_to_cdr`, `psa_to_cpr` | Rate conversions. |
 | `validate_tiers`, `ValidationError` | Waterfall validation. |
 | Constants | Solver tolerances stay crate-internal (basis-point conversion is `finstack_quant_core::math::units`). The pool-balance cleanup threshold is read from the embedded assumptions registry. |
@@ -79,8 +80,8 @@ structured_credit/
 │   ├── risk/          # duration, convexity, YTM, z-spread, OAS, CS01, breakeven CDR, *01 sensitivities
 │   ├── pool/          # WAM, CPR, CDR, WARF, WAS
 │   ├── deal_specific/ # ABS charge-off & credit enhancement, CMBS DSCR
-│   ├── scenario.rs    # scenario_table
-│   └── summary.rs     # calculate_tranche_metrics
+│   ├── scenario.rs    # tranche_scenario_table
+│   └── summary.rs     # tranche_metrics
 └── utils/             # rate conversions, floating-rate helpers, recovery queue, validation
 ```
 
@@ -163,6 +164,7 @@ against the path's fair spread; see
 ## Valuation
 
 ```rust
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::tranche_metrics;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::MetricId;
@@ -180,23 +182,24 @@ let result = deal.price_with_metrics(
 
 // Per-tranche.
 let tranche_pv = deal.value_tranche("CLASS_A", &context, as_of)?;
-let tranche_valuation = deal.value_tranche_with_metrics(
+// Prices, yield, spreads and durations of one note, plus registry metrics
+// (DV01, Default01, ...) valued on that note.
+let class_a = tranche_metrics(
+    &deal,
     "CLASS_A",
     &context,
     as_of,
-    &[MetricId::WAL, MetricId::ZSpread],
+    None,
+    &[MetricId::Dv01, MetricId::Default01],
 )?;
 ```
 
 Deterministic cashflows without pricing:
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    generate_cashflows, run_simulation,
-};
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation;
 
 let per_tranche = run_simulation(&deal, &context, as_of)?;          // HashMap<String, TrancheCashflows>
-let aggregate = generate_cashflows(&deal, &context, as_of)?;        // DatedFlows
 let class_a = run_simulation(&deal, &context, as_of)?.remove("CLASS_A");
 ```
 
@@ -383,7 +386,7 @@ to the earliest principal tier's recipients in order
 therefore traps only the residual; a Class A test placed after A's coupon traps
 the mezzanine coupons and the residual. `after_junior_fees()` places a test
 after the subordinated management fee, ahead of the residual, and
-`with_divert_pct(50.0)` caps what a failure diverts at that share of the
+`divert_pct: Some(50.0)` caps what a failure diverts at that share of the
 interest remaining at the test (`CoverageTestSpec::placement` /
 `divert_pct` on the wire). Every failing `PayDownSenior` test also suspends
 reinvestment for the period; the pre-waterfall evaluation that makes that
@@ -395,10 +398,12 @@ the interest proceeds — so the two never disagree.
 // Deal-level: placed after the tested class's interest tier by `create_waterfall`.
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
 
-let deal = deal.with_coverage_triggers(vec![
+deal.coverage_triggers = vec![
     CoverageTestSpec::oc("CLASS_B", 1.20),
     CoverageTestSpec::ic("CLASS_B", 1.15).after_tranche("CLASS_A"),
-])?;
+];
+// Validated with the rest of the deal by `validate_invariants` / at pricing.
+deal.validate_invariants()?;
 ```
 
 ```rust
@@ -425,8 +430,10 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CoverageTrigger, TriggerConsequence,
 };
 
-let trigger = CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
-    .with_cure_level(1.25);
+let trigger = CoverageTrigger {
+    cure_level: Some(1.25),
+    ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+};
 ```
 
 #### Borrowing-base tests
@@ -757,10 +764,10 @@ Registered for `InstrumentType::StructuredCredit`:
 `Theta` is registered universally by `metrics::standard_registry()`.
 
 **Price basis**: note prices, quotes and spread solves are per CURRENT face
-(`Tranche::current_balance`); `TrancheMetrics::factor` and
-`TrancheValuation::factor` report `current / original`, and the deal-level
-notional is the sum of current balances. A note paid down to factor 0.5 that is
-worth par prints `price_pct ≈ 100`, not 50, and a desk quote of 99.0 solves a
+(`Tranche::current_balance`); `TrancheMetrics::factor` reports
+`current / original`, and the deal-level notional is the sum of current
+balances. A note paid down to factor 0.5 that is worth par prints
+`clean_price_pct ≈ 100`, not 50, and a desk quote of 99.0 solves a
 sensible spread on a seasoned trade.
 
 **Metric time basis**: every structured-credit risk metric measures time on
@@ -769,14 +776,14 @@ so duration and convexity are quoted
 against the same yield unit the bump metrics define their shocks in. Do not
 introduce a metric on the discount curve's own day count.
 
-**Yield convention**: a note's `ytm` (`TrancheValuation::ytm`, the `Ytm`
+**Yield convention**: a note's `ytm` (`TrancheMetrics::ytm`, the `Ytm`
 metric) compounds at the note's coupon frequency and measures time in the
 note's own day count, so a par 5% quarterly 30/360 note yields 5.00%; the
 `valuations.structured_credit.ytm.v1` extension's `compounding` overrides the
 frequency. An impaired note (no current face, or fully written down in the
 projection) prices at zero with `ytm: None` and zero spreads instead of
-failing the solves. `TrancheMetrics::modified_duration` / `convexity` are
-EFFECTIVE: the note is re-projected with every discount and forward curve
+failing the solves. `TrancheMetrics::effective_duration` /
+`effective_convexity` are EFFECTIVE: the note is re-projected with every discount and forward curve
 bumped ±1 bp, so a floater's resets shorten its duration while
 `spread_duration` / `spread_convexity` keep the spread-DV01 life; `dm_bp` is
 the floater's discount margin to maturity at `target_price_pct`.
@@ -841,21 +848,21 @@ Both bindings expose structured credit under their `instruments` namespace:
   `equity_metrics` (`EquityMetrics`), `run_simulation_with_diagnostics`
   (`SimulationDiagnostics` with the per-period record and coverage-test
   frame), `price_stochastic`; tranche analytics
-  `structured_credit_tranche_metrics` (with the `*_to_call` twins),
-  `structured_credit_tranche_oas`, `structured_credit_tranche_discount_margin`,
-  `structured_credit_tranche_breakeven_cdr`,
-  `structured_credit_tranche_scenario_table` and the result types
+  `tranche_metrics` (with the `*_to_call` twins),
+  `tranche_oas`, `tranche_discount_margin`,
+  `tranche_breakeven_cdr`,
+  `tranche_scenario_table` and the result types
   `TrancheMetrics`, `OasResult`, `ScenarioTable`. Generic pricing via
   `price_instrument(...)`. `tests/parity/test_structured_credit_fields.py`
   checks every schema field of the five core types against the getters and
   setters; `tests/test_typed_structured_credit_surface.py` rebuilds the CLO
   regression golden from typed calls alone.
-- **WASM** (`valuations.instruments`): `structuredCreditTrancheMetrics`
+- **WASM** (`valuations.instruments`): `trancheMetrics`
   (its `TrancheMetrics` shape carries the optional `wal_to_call`,
-  `z_spread_to_call_bp`, `dm_to_call_bp`), `structuredCreditTrancheOas`,
-  `structuredCreditTrancheDiscountMargin`,
-  `structuredCreditTrancheBreakevenCdr`,
-  `structuredCreditTrancheScenarioTable`, plus `priceInstrument` and
+  `z_spread_to_call_bp`, `dm_to_call_bp`), `trancheOas`,
+  `trancheDiscountMargin`,
+  `trancheBreakevenCdr`,
+  `trancheScenarioTable`, plus `priceInstrument` and
   `instrumentCashflows` on the `InstrumentJson::StructuredCredit` envelope.
 
 Deep sub-configs (`WaterfallRules`, the stochastic specs, `DealFees`,

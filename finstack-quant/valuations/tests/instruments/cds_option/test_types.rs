@@ -3,7 +3,6 @@
 use super::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionParams;
@@ -162,19 +161,6 @@ fn test_attributes_access() {
         option.attributes().meta.get("test_key"),
         Some(&"test_value".to_string())
     );
-}
-
-#[test]
-fn test_american_exercise_is_rejected_at_pricing_time() {
-    let as_of = date!(2025 - 01 - 01);
-    let market = standard_market(as_of);
-    let mut option = CdsOptionBuilder::new().build(as_of);
-    option.exercise_style = ExerciseStyle::American;
-
-    let err = option
-        .value(&market, as_of)
-        .expect_err("American CDS options should be rejected");
-    assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
 }
 
 #[test]

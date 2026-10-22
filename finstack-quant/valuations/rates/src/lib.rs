@@ -125,7 +125,6 @@ pub mod cap_floor;
 /// Reference-swap resolution shared by the CMS instruments.
 pub(crate) mod cms_common;
 /// Historical CMS (par swap rate) fixing lookups for seasoned CMS trades.
-pub(crate) mod cms_fixings;
 /// CMS option module - Constant maturity swap options.
 pub mod cms_option;
 /// CMS spread option module - Option on spread between two CMS rates.
@@ -140,6 +139,8 @@ pub(crate) mod forward_swap_rate;
 pub mod fra;
 /// Inflation cap/floor module.
 pub mod inflation_cap_floor;
+/// Finite-difference inflation-curve sensitivities shared by the inflation instruments.
+pub(crate) mod inflation_fd;
 /// Inflation swap module.
 pub mod inflation_swap;
 /// IR future module - Interest rate futures.
@@ -160,6 +161,8 @@ pub mod xccy_swap;
 mod family;
 pub use family::RATES;
 
+// `irs::marginable`'s unit tests `include!` the integration-test helper
+// `tests/support/rates.rs`, which names this crate from outside.
 extern crate self as finstack_quant_valuations_rates;
 
 /// Compiles the crate `README.md` Rust samples as doctests.

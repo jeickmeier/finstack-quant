@@ -247,11 +247,11 @@
       "finstack_quant.models.correlation.PortfolioLossConfig",
       "finstack_quant.models.correlation.simulate_portfolio_loss",
       "finstack_quant.valuations.instruments.price_instrument",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_breakeven_cdr",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_discount_margin",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_oas",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_scenario_table"
+      "finstack_quant.valuations.instruments.tranche_breakeven_cdr",
+      "finstack_quant.valuations.instruments.tranche_discount_margin",
+      "finstack_quant.valuations.instruments.tranche_metrics",
+      "finstack_quant.valuations.instruments.tranche_oas",
+      "finstack_quant.valuations.instruments.tranche_scenario_table"
     ],
     "models": [
       "monte_carlo_gbm",
@@ -274,7 +274,7 @@
     ],
     "expected_exceptions": [
       {
-        "operation": "finstack_quant.valuations.instruments.structured_credit_tranche_discount_margin",
+        "operation": "finstack_quant.valuations.instruments.tranche_discount_margin",
         "type": "ValueError",
         "condition": "The BBB fixture has a fixed coupon; the floating discount-margin solver rejects it."
       }

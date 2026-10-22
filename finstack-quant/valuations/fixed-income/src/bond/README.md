@@ -24,7 +24,7 @@ Import path: `finstack_quant_valuations::instruments::fixed_income::bond`
 | `BondSettlementConvention` | Settlement days and ex-coupon days. |
 | `AccrualMethod` | `Linear` (default) or `Compounded` (ICMA Rule 251). |
 | `bond_from_cashflows_json` | Build a `Bond` from an explicit cashflow list. |
-| `pricing::engine::{discount, hazard, tree, merton_mc}` | Pricing engines and their registry adapters. |
+| `pricing::{discount, hazard, tree, merton_mc}` | Pricing engines and their registry adapters. |
 | `pricing::quote_conversions`, `pricing::ytm_solver` | Price ↔ yield ↔ spread conversions and the YTM root finder. |
 
 Details are in the rustdoc; this file covers layout, conventions and the parts
@@ -40,16 +40,15 @@ bond/
 │   ├── construction.rs      # builder + factories (fixed/floating/zero_coupon/with_convention/example)
 │   ├── return_floor.rs      # ReturnFloorSpec, ReturnFloorKind, IssuePrice, ProtectionWindow
 │   ├── pricing.rs           # Instrument::base_value and quote-override precedence
-│   └── traits.rs            # Instrument / CashflowProvider impls
+│   └── traits.rs            # Instrument / CashflowProvider / CashflowScheduleSource impls
 ├── cashflow_spec.rs         # CashflowSpec
-├── cashflows.rs             # holder-view (Date, Money) projection
 ├── json.rs                  # bond_from_cashflows_json
 ├── pricing/
-│   ├── engine/              # pricing math + the model-preserving BondPricer adapter
-│   │   ├── discount.rs      # BondEngine: PV = Σ CF_i × DF_i
-│   │   ├── hazard.rs        # HazardBondEngine: non-callable survival-weighted PV + FRP
-│   │   ├── tree/            # TreePricer: rates-only and joint rates-credit optionality + OAS
-│   │   └── merton_mc/       # MertonMcEngine: structural credit and PIK
+│   ├── mod.rs               # the model-preserving BondPricer adapter
+│   ├── discount.rs          # BondEngine: PV = Σ CF_i × DF_i
+│   ├── hazard.rs            # HazardBondEngine: non-callable survival-weighted PV + FRP
+│   ├── tree/                # TreePricer: rates-only and joint rates-credit optionality + OAS
+│   ├── merton_mc/           # MertonMcEngine: structural credit and PIK
 │   ├── quote_conversions/   # yield↔price, spread↔price, annuity helpers
 │   ├── ytm_solver.rs        # Newton/Brent yield-to-maturity solver
 │   ├── return_floor.rs      # lowers ReturnFloorSpec into a CallPutSchedule at pricing time
@@ -127,9 +126,9 @@ Notes that bite:
   `maturity`, `cashflow_spec`, `discount_curve_id`.
 - Every `Option<T>` field gets two setters: `.call_put(schedule)` takes the
   inner value, `.call_put_opt(Some(schedule))` takes the `Option`.
-- `CashflowSpec::fixed` / `fixed_rate` return `Result` (the coupon must be a
-  finite `Decimal`). `CashflowSpec::floating_bp` takes a typed `Bps` and does
-  not.
+- `CashflowSpec::fixed` and `CashflowSpec::floating` return `Result` (the
+  coupon or margin must be a finite `Decimal`); `floating`'s `reset_lag_days`
+  is `None` for the rate-index registry default.
 - `Bond::fixed` / `with_convention` / `zero_coupon` / `floating` all return
   `Result<Bond>` and run `validate()` before returning.
 
@@ -243,7 +242,7 @@ PIK coupons accrete to notional instead of paying cash. Set
 the stochastic rates-credit path evaluates floating PIK coupons pathwise.
 `ModelKey::MertonMc` remains available for structural-credit pricing.
 
-The Merton MC engine (`pricing::engine::merton_mc`) prices PIK bonds in a
+The Merton MC engine (`pricing::merton_mc`) prices PIK bonds in a
 structural credit framework:
 
 - **Merton model** — asset value follows GBM (or jump diffusion); default is a

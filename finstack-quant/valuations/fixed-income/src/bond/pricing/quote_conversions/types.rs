@@ -45,7 +45,6 @@ pub struct BondQuoteSet {
 /// | Convention | Use Case | Formula |
 /// |------------|----------|---------|
 /// | `Street` | Most secondary market trading | `(1 + y/f)^(-f*t)` |
-/// | `TreasuryActual` | US Treasury new issues with stubs | Simple interest for first period |
 /// | `Rate(Simple)` | Money market instruments | `1/(1 + y*t)` |
 /// | `Rate(Annual)` | Annual bond yields | `(1 + y)^(-t)` |
 /// | `Rate(Periodic(m))` | Explicit periods per year | `(1 + y/m)^(-m*t)` |
@@ -60,24 +59,6 @@ pub enum YieldCompounding {
     /// This is the standard convention for secondary market bond trading.
     /// Formula: `DF = (1 + y/f)^(-f*t)` where `f` is coupon frequency.
     Street,
-
-    /// U.S. Treasury actual convention for regular and irregular first periods.
-    ///
-    /// The schedule-aware pricing path decomposes the first horizon into an
-    /// initial simple-interest fractional quasi-coupon and zero or more full
-    /// periodically compounded coupon periods, following 31 CFR Part 356,
-    /// Appendix B, section II.
-    ///
-    /// # When to Use
-    ///
-    /// - U.S. Treasury auction/new-issue price conversion
-    /// - Regular, short-first, and long-first payment periods
-    /// - Source-backed Treasury price/yield reconciliation
-    ///
-    /// The standalone [`super::df_from_yield`] helper has no schedule and can
-    /// only infer the initial fraction from `t`. Use
-    /// [`super::price_from_ytm_compounded_params`] for irregular schedules.
-    TreasuryActual,
 
     /// Moosmüller: simple interest to the next coupon, then periodic compounding.
     ///

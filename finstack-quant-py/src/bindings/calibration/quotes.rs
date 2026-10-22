@@ -100,7 +100,7 @@ impl PyRateQuote {
             id,
             index,
             extract_pillar(py, pillar)?,
-            extract_rate_decimal(rate)?,
+            extract_rate_decimal(rate, "rate")?,
         )
         .map(Self::from_inner)
         .map_err(core_to_py)
@@ -140,7 +140,7 @@ impl PyRateQuote {
             index,
             extract_pillar(py, start)?,
             extract_pillar(py, end)?,
-            extract_rate_decimal(rate)?,
+            extract_rate_decimal(rate, "rate")?,
         )
         .map(Self::from_inner)
         .map_err(core_to_py)
@@ -224,7 +224,7 @@ impl PyRateQuote {
             id,
             index,
             extract_pillar(py, pillar)?,
-            extract_rate_decimal(rate)?,
+            extract_rate_decimal(rate, "rate")?,
             spread_decimal,
         )
         .map(Self::from_inner)
@@ -338,7 +338,7 @@ impl PyCdsQuote {
             &currency_code(currency)?,
             doc_clause,
             extract_pillar(py, pillar)?,
-            extract_basis_points(spread_bp)?,
+            extract_basis_points(spread_bp, "spread_bp")?,
             recovery_rate,
         )
         .map(Self::from_inner)
@@ -392,7 +392,7 @@ impl PyCdsQuote {
             &currency_code(currency)?,
             doc_clause,
             extract_pillar(py, pillar)?,
-            extract_basis_points(coupon_bp)?,
+            extract_basis_points(coupon_bp, "coupon_bp")?,
             upfront_pct,
             recovery_rate,
         )
@@ -867,7 +867,7 @@ impl PyXccyQuote {
             id,
             convention,
             extract_pillar(py, far_pillar)?,
-            extract_basis_points(basis_spread_bp)?,
+            extract_basis_points(basis_spread_bp, "basis_spread_bp")?,
             spot_fx,
         )
         .map(|inner| Self { inner })
@@ -989,7 +989,7 @@ impl PyCdsTrancheQuote {
             detachment,
             py_to_date(maturity)?,
             upfront_pct,
-            extract_basis_points(coupon_bp)?,
+            extract_basis_points(coupon_bp, "coupon_bp")?,
             &currency_code(currency)?,
             doc_clause,
         )

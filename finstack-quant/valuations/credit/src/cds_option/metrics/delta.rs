@@ -48,21 +48,12 @@ impl MetricCalculator for DeltaCalculator {
 ///
 /// Returned as a unit-less ratio (multiply by 100 for the displayed
 /// percentage). Payers Δ ≥ 0, receivers Δ ≤ 0 under both conventions.
-pub(crate) fn delta(
-    option: &CdsOption,
-    curves: &MarketContext,
-    as_of: finstack_quant_core::dates::Date,
-) -> Result<f64> {
-    delta_with_provider(option, curves, as_of, None)
-}
-
-fn delta_with_provider(
+pub(crate) fn delta_with_provider(
     option: &CdsOption,
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
     provider: Option<&dyn RecalibrationProvider>,
 ) -> Result<f64> {
-    option.validate_supported_configuration()?;
     let t = option.time_to_expiry(as_of)?;
     if t <= 0.0 {
         return Ok(0.0);
@@ -167,14 +158,15 @@ pub(super) fn black_delta_ratio(
     if forward <= 0.0 || strike <= 0.0 || sigma <= 0.0 || t <= 0.0 {
         return 0.0;
     }
-    let sigma_sqrt_t = sigma * t.sqrt();
-    if sigma_sqrt_t <= 1e-12 {
+    if sigma * t.sqrt() <= 1e-12 {
         return 0.0;
     }
-    let d1 = ((forward / strike).ln() + 0.5 * sigma_sqrt_t * sigma_sqrt_t) / sigma_sqrt_t;
-
     match option_type {
-        OptionType::Call => finstack_quant_core::math::special_functions::norm_cdf(d1),
-        OptionType::Put => -finstack_quant_core::math::special_functions::norm_cdf(-d1),
+        OptionType::Call => {
+            finstack_quant_models::closed_form::black_delta_call(forward, strike, sigma, t)
+        }
+        OptionType::Put => {
+            finstack_quant_models::closed_form::black_delta_put(forward, strike, sigma, t)
+        }
     }
 }

@@ -16,7 +16,6 @@ mod yield_price;
 
 pub use annuity::{
     asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
-    periods_per_year,
 };
 pub use compute::compute_quotes;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
@@ -25,9 +24,13 @@ pub use yield_price::{
     df_from_yield, price_from_ytm, price_from_ytm_compounded_params, price_from_ytw,
 };
 
-pub(crate) use annuity::floating_leg_pv_and_annuity;
+pub(crate) use annuity::{
+    asw_leg_schedule, floating_leg_pv_and_annuity, i_spread_par_rate, settlement_asw_components,
+};
 pub(crate) use compute::{clear_price_driving_overrides, settlement_dirty_from_quote_overrides};
-pub(crate) use finstack_quant_valuations_core::instruments::common_impl::pricing::coupon_period::icma_reference_period;
+pub(crate) use spread_price::{
+    quoted_workout_path, solve_kernel_spread, BondZSpreadPricingKernel, WorkoutPath,
+};
 pub(crate) use yield_price::{
     act365l_flow_times, bond_flow_times, clean_price_from_japanese_simple_yield,
     enumerate_exit_paths, exercise_redemption_amount, flow_times, japanese_simple_yield,

@@ -11,6 +11,8 @@
 /// - Append `validate` when the Rust type's invariants are checked by an
 ///   inherent `validate()` returning a `finstack_quant_core` error rather than
 ///   by its `Deserialize` impl.
+/// - Append `to_dict` to also generate `to_dict`, returning the canonical
+///   serde shape as a plain `dict`.
 /// - Append `arc` when the wrapper holds `inner: Arc<T>`. Such types (curves,
 ///   surfaces) do not derive `PartialEq` in Rust, so this arm also emits
 ///   `__eq__` comparing the canonical JSON wire form.
@@ -21,6 +23,26 @@ macro_rules! wire_methods {
     ($py_type:ident, $rust_type:ty, $name:literal) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [], |inner| inner);
         $crate::bindings::macros::wire_methods!(@reduce $py_type);
+    };
+    ($py_type:ident, $rust_type:ty, $name:literal, to_dict) => {
+        $crate::bindings::macros::wire_methods!($py_type, $rust_type, $name);
+
+        #[::pyo3::pymethods]
+        impl $py_type {
+            /// Return every field as a plain ``dict`` (canonical serde shape).
+            ///
+            /// Raises
+            /// ------
+            /// ValueError
+            ///     If the value cannot be serialized.
+            #[pyo3(text_signature = "($self)")]
+            fn to_dict<'py>(
+                &self,
+                py: ::pyo3::Python<'py>,
+            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
+                $crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+            }
+        }
     };
     ($py_type:ident, $rust_type:ty, $name:literal, validate) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [], |inner| {
@@ -260,3 +282,28 @@ macro_rules! impl_repr_html_via_dataframe {
     };
 }
 pub(crate) use impl_repr_html_via_dataframe;
+
+/// Generate read-only `#[getter]`s whose body is one expression.
+///
+/// `py_getters!(PyType |s| { /// docs \n name -> Ret = expr; ... })` expands
+/// to a `#[pymethods]` block with one `#[getter] fn name(&self) -> Ret` per
+/// entry. Inside `expr`, the binder (`s`) is the wrapper (`&self`), so a body
+/// reads `s.inner.field`. Each entry's docstring is forwarded verbatim.
+/// Getters that need `py`, a lifetime or more than one statement stay
+/// hand-written.
+macro_rules! py_getters {
+    ($py_type:ident |$s:ident| { $( $(#[$doc:meta])* $name:ident -> $ret:ty = $body:expr; )+ }) => {
+        #[::pyo3::pymethods]
+        impl $py_type {
+            $(
+                $(#[$doc])*
+                #[getter]
+                fn $name(&self) -> $ret {
+                    let $s = self;
+                    $body
+                }
+            )+
+        }
+    };
+}
+pub(crate) use py_getters;

@@ -117,15 +117,6 @@ impl NdfFixingSource {
             NdfFixingSource::Other => None,
         }
     }
-
-    /// Get the typical fixing offset (business days before settlement).
-    /// Most NDFs fix T-2, but some (KRW, PHP) fix T-1.
-    pub fn typical_fixing_offset(&self) -> i64 {
-        match self {
-            NdfFixingSource::Kftc | NdfFixingSource::PhpBval => 1, // KRW/PHP fix T-1
-            _ => 2,                                                // Most currencies fix T-2
-        }
-    }
 }
 
 impl std::fmt::Display for NdfFixingSource {
@@ -235,7 +226,7 @@ impl std::str::FromStr for NdfFixingSource {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "NdfUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct Ndf {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -331,105 +322,7 @@ pub struct Ndf {
     pub attributes: Attributes,
 }
 
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct NdfUnchecked {
-    /// Unique instrument identifier.
-    id: InstrumentId,
-    /// Base currency (restricted/non-deliverable currency, numerator).
-    base_currency: Currency,
-    /// Settlement currency (freely convertible, typically USD, denominator and PV currency).
-    settlement_currency: Currency,
-    /// Fixing date (rate observation date, typically T-2 before maturity).
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    fixing_date: Date,
-    /// Maturity/settlement date.
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    maturity: Date,
-    /// Notional amount in base currency.
-    notional: Money,
-    /// Contract forward rate. Interpretation depends on `quote_convention`.
-    /// `None` values the NDF at-market.
-    #[serde(default)]
-    contract_rate: Option<f64>,
-    /// Settlement currency discount curve ID.
-    domestic_discount_curve_id: CurveId,
-    /// Quote convention for contract_rate and observed_fixing.
-    quote_convention: NdfQuoteConvention,
-    /// Optional foreign (base) currency discount curve ID.
-    #[serde(default)]
-    foreign_discount_curve_id: Option<CurveId>,
-    /// Observed fixing rate. Interpretation depends on `quote_convention`.
-    #[serde(default)]
-    observed_fixing: Option<f64>,
-    /// Official fixing source/benchmark enum for type-safe specification.
-    #[serde(default)]
-    fixing_source: Option<NdfFixingSource>,
-    /// Optional spot rate override for forward rate calculation.
-    #[serde(default)]
-    quoted_spot: Option<f64>,
-    /// Explicit pre-fixing forward rate in `quote_convention` units.
-    #[serde(default)]
-    quoted_forward: Option<f64>,
-    /// Optional base currency calendar.
-    #[serde(default)]
-    base_calendar_id: Option<String>,
-    /// Optional settlement currency calendar.
-    #[serde(default)]
-    settlement_calendar_id: Option<String>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging.
-    attributes: Attributes,
-}
-
-impl TryFrom<NdfUnchecked> for Ndf {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: NdfUnchecked) -> std::result::Result<Self, Self::Error> {
-        let ndf = Self {
-            id: value.id,
-            base_currency: value.base_currency,
-            settlement_currency: value.settlement_currency,
-            fixing_date: value.fixing_date,
-            maturity: value.maturity,
-            notional: value.notional,
-            contract_rate: value.contract_rate,
-            domestic_discount_curve_id: value.domestic_discount_curve_id,
-            quote_convention: value.quote_convention,
-            foreign_discount_curve_id: value.foreign_discount_curve_id,
-            observed_fixing: value.observed_fixing,
-            fixing_source: value.fixing_source,
-            quoted_spot: value.quoted_spot,
-            quoted_forward: value.quoted_forward,
-            base_calendar_id: value.base_calendar_id.map(Into::into),
-            settlement_calendar_id: value.settlement_calendar_id.map(Into::into),
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        ndf.validate()?;
-        Ok(ndf)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(Ndf);
 
 impl Ndf {
     const MIN_POSITIVE_RATE: f64 = 1.0e-12;
@@ -649,43 +542,6 @@ impl Ndf {
             .build()
     }
 
-    /// Construct an NDF from explicit broken fixing and maturity dates.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Instrument identifier.
-    /// * `base_currency` - Restricted currency underlying the fixing.
-    /// * `settlement_currency` - Convertible payout currency.
-    /// * `fixing_date` - Explicit contractual fixing date.
-    /// * `maturity` - Explicit cash-settlement date.
-    /// * `notional` - Positive base-currency notional.
-    /// * `contract_rate` - Positive contractual NDF rate.
-    /// * `domestic_discount_curve_id` - Settlement-currency discount curve.
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_broken_dates(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        settlement_currency: Currency,
-        fixing_date: Date,
-        maturity: Date,
-        notional: Money,
-        contract_rate: f64,
-        domestic_discount_curve_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
-        Self::builder()
-            .id(id.into())
-            .base_currency(base_currency)
-            .settlement_currency(settlement_currency)
-            .fixing_date(fixing_date)
-            .maturity(maturity)
-            .notional(notional)
-            .contract_rate(contract_rate)
-            .domestic_discount_curve_id(domestic_discount_curve_id.into())
-            .quote_convention(NdfQuoteConvention::BasePerSettlement)
-            .attributes(Attributes::new())
-            .build()
-    }
-
     /// Set the observed fixing rate (transitions NDF to post-fixing mode).
     ///
     /// # Errors
@@ -697,11 +553,6 @@ impl Ndf {
         Self::validate_rate("observed_fixing", observed_fixing)?;
         self.observed_fixing = Some(observed_fixing);
         Ok(self)
-    }
-
-    /// Check if NDF is in post-fixing mode.
-    pub fn is_fixed(&self) -> bool {
-        self.observed_fixing.is_some()
     }
 
     /// Estimate the forward rate when in pre-fixing mode.
@@ -869,7 +720,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for Ndf {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        self.validate()?;
         // End-of-day policy: settlement remains live on maturity.
         if crate::shared::event_has_occurred(self.maturity, as_of) {
             return Ok(Money::from((0_i64, self.settlement_currency)));
@@ -895,18 +745,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
         if crate::shared::event_has_occurred(self.maturity, as_of) {
-            return finstack_quant_cashflows::schedule_from_classified_flows(
-                Vec::new(),
-                finstack_quant_core::dates::DayCount::Act365F,
-                finstack_quant_cashflows::ScheduleBuildOpts {
-                    notional_hint: Some(Money::from((0_i64, self.settlement_currency))),
-                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
-                        representation:
-                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
-                        ..Default::default()
-                    },
-                },
-            );
+            return crate::shared::settled_schedule(Some(Money::from((
+                0_i64,
+                self.settlement_currency,
+            ))));
         }
         let settlement_amount = self.settlement_amount(market, as_of)?;
         let ccy = self.settlement_currency;
@@ -1141,18 +983,6 @@ mod tests {
             Some(Currency::BRL)
         );
         assert_eq!(NdfFixingSource::Other.typical_currency(), None);
-    }
-
-    #[test]
-    fn test_ndf_fixing_source_typical_fixing_offset() {
-        // Most currencies fix T-2
-        assert_eq!(NdfFixingSource::Pboc.typical_fixing_offset(), 2);
-        assert_eq!(NdfFixingSource::Rbi.typical_fixing_offset(), 2);
-        assert_eq!(NdfFixingSource::Ptax.typical_fixing_offset(), 2);
-
-        // KRW and PHP fix T-1
-        assert_eq!(NdfFixingSource::Kftc.typical_fixing_offset(), 1);
-        assert_eq!(NdfFixingSource::PhpBval.typical_fixing_offset(), 1);
     }
 
     #[test]

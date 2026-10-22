@@ -19,7 +19,10 @@ fn test_npv_with_explicit_rate() {
 
 #[test]
 fn test_npv_with_default_notional() {
-    let fx = sample_eurusd().with_quoted_spot(1.18).expect("test rate");
+    let fx = FxSpot {
+        quoted_spot: Some(1.18),
+        ..sample_eurusd()
+    };
     let market = MarketContext::new();
     let pv = fx.value(&market, test_date()).unwrap();
 
@@ -29,9 +32,10 @@ fn test_npv_with_default_notional() {
 
 #[test]
 fn test_npv_from_fx_matrix() {
-    let fx = sample_eurusd()
-        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap();
+    let fx = FxSpot {
+        notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    };
     let market = market_with_fx_matrix();
     let pv = fx.value(&market, test_date()).unwrap();
 
@@ -62,9 +66,10 @@ fn test_npv_explicit_rate_overrides_matrix() {
 
 #[test]
 fn test_npv_without_rate_or_matrix_fails() {
-    let fx = sample_eurusd()
-        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap();
+    let fx = FxSpot {
+        notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    };
     let market = MarketContext::new(); // No FX matrix
 
     let result = fx.value(&market, test_date());
@@ -83,9 +88,10 @@ fn test_value_method() {
 
 #[test]
 fn test_gbpusd_pricing() {
-    let fx = sample_gbpusd()
-        .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
-        .unwrap();
+    let fx = FxSpot {
+        notional: Money::new(500_000.0, Currency::GBP).expect("valid money fixture"),
+        ..sample_gbpusd()
+    };
     let market = market_with_fx_matrix(); // Has GBP/USD = 1.40
     let pv = fx.value(&market, test_date()).unwrap();
 
@@ -95,9 +101,10 @@ fn test_gbpusd_pricing() {
 
 #[test]
 fn test_usdjpy_pricing() {
-    let fx = sample_usdjpy()
-        .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
-        .unwrap();
+    let fx = FxSpot {
+        notional: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        ..sample_usdjpy()
+    };
     let market = market_with_fx_matrix(); // Has USD/JPY = 110.0
     let pv = fx.value(&market, test_date()).unwrap();
 
@@ -107,11 +114,11 @@ fn test_usdjpy_pricing() {
 
 #[test]
 fn test_zero_notional() {
-    let fx = sample_eurusd()
-        .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.20)
-        .expect("test rate");
+    let fx = FxSpot {
+        notional: Money::new(0.0, Currency::EUR).expect("valid money fixture"),
+        quoted_spot: Some(1.20),
+        ..sample_eurusd()
+    };
     let market = MarketContext::new();
     let pv = fx.value(&market, test_date()).unwrap();
 
@@ -191,9 +198,13 @@ fn test_price_with_metrics_base_value() {
 #[test]
 fn test_triangulated_rate() {
     // EUR/GBP should be EUR/USD / GBP/USD = 1.20 / 1.40
-    let fx = FxSpot::new(InstrumentId::new("EURGBP"), Currency::EUR, Currency::GBP)
-        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap();
+    let fx = FxSpot::builder()
+        .id(InstrumentId::new("EURGBP"))
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::GBP)
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
+        .build()
+        .expect("valid FX spot");
 
     let market = market_with_fx_matrix();
     let pv = fx.value(&market, test_date()).unwrap();
@@ -206,9 +217,13 @@ fn test_triangulated_rate() {
 #[test]
 fn test_inverse_pair() {
     // Test USD/EUR (inverse of EUR/USD)
-    let fx = FxSpot::new(InstrumentId::new("USDEUR"), Currency::USD, Currency::EUR)
-        .with_notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .unwrap();
+    let fx = FxSpot::builder()
+        .id(InstrumentId::new("USDEUR"))
+        .base_currency(Currency::USD)
+        .quote_currency(Currency::EUR)
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
+        .build()
+        .expect("valid FX spot");
 
     let market = market_with_fx_matrix(); // Has EUR/USD = 1.20
     let pv = fx.value(&market, test_date()).unwrap();
@@ -221,11 +236,11 @@ fn test_inverse_pair() {
 #[test]
 fn test_multiple_currencies_independence() {
     let eurusd = eurusd_with_notional(1_000_000.0, 1.20);
-    let gbpusd = sample_gbpusd()
-        .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.40)
-        .expect("test rate");
+    let gbpusd = FxSpot {
+        notional: Money::new(500_000.0, Currency::GBP).expect("valid money fixture"),
+        quoted_spot: Some(1.40),
+        ..sample_gbpusd()
+    };
 
     let market = MarketContext::new();
 

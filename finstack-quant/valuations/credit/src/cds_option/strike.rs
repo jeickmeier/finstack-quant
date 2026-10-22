@@ -116,30 +116,6 @@ impl CdsOptionStrike {
         }
     }
 
-    /// The strike clean price in percentage points, when this is a
-    /// clean-price strike.
-    pub fn clean_price_pct_decimal(&self) -> Option<Decimal> {
-        match self {
-            Self::Spread(_) => None,
-            Self::CleanPricePct(p) => Some(*p),
-        }
-    }
-
-    /// The strike spread as `f64`, failing for clean-price strikes.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error when the strike is a clean-price strike.
-    pub fn spread_f64(&self) -> finstack_quant_core::Result<f64> {
-        match self {
-            Self::Spread(s) => Ok(s.as_f64()),
-            Self::CleanPricePct(p) => Err(finstack_quant_core::Error::Validation(format!(
-                "expected a spread strike but got clean-price strike {p}; \
-                 clean-price strikes have no spread representation"
-            ))),
-        }
-    }
-
     /// The strike clean price converted to a fraction (`107.0` → `1.07`),
     /// failing for spread strikes.
     ///
@@ -224,7 +200,6 @@ mod tests {
 
         let spread = CdsOptionStrike::Spread(Decimal::new(325, 4));
         assert!(spread.clean_price_fraction().is_err());
-        assert!(price.spread_f64().is_err());
     }
 
     #[test]
@@ -232,11 +207,9 @@ mod tests {
         let spread = CdsOptionStrike::Spread(Decimal::new(1, 2));
         assert_eq!(spread.kind(), CdsOptionStrikeKind::Spread);
         assert_eq!(spread.spread_decimal(), Some(Decimal::new(1, 2)));
-        assert_eq!(spread.clean_price_pct_decimal(), None);
 
         let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1));
         assert_eq!(price.kind(), CdsOptionStrikeKind::CleanPricePct);
         assert_eq!(price.spread_decimal(), None);
-        assert_eq!(price.clean_price_pct_decimal(), Some(Decimal::new(1070, 1)));
     }
 }

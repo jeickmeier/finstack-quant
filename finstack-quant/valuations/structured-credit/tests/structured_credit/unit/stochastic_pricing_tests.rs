@@ -15,9 +15,9 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
-    calculate_tranche_oas, generate_cashflows, run_simulation, scenario_table, AssetPool, DealType,
-    HedgeSwap, OasConfig, PoolAsset, ScenarioGrid, StructuredCredit, Tranche, TrancheStructure,
+    run_simulation, tranche_breakeven_cdr, tranche_discount_margin, tranche_metrics, tranche_oas,
+    tranche_scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, ScenarioGrid,
+    StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -166,13 +166,17 @@ fn monte_carlo_rejects_fewer_than_two_independent_estimators() {
 }
 
 #[test]
-fn cleanup_call_builder_rejects_invalid_thresholds() {
+fn cleanup_call_validation_rejects_invalid_thresholds() {
     let sc = build_sc("ABS-CLEANUP", 1_000_000.0);
+    let with_cleanup = |threshold: f64| StructuredCredit {
+        cleanup_call_decimal: Some(threshold),
+        ..sc.clone()
+    };
 
-    assert!(sc.clone().with_cleanup_call_decimal(0.10).is_ok());
-    assert!(sc.clone().with_cleanup_call_decimal(0.0).is_err());
-    assert!(sc.clone().with_cleanup_call_decimal(1.0).is_err());
-    assert!(sc.with_cleanup_call_decimal(f64::NAN).is_err());
+    assert!(with_cleanup(0.10).validate_invariants().is_ok());
+    assert!(with_cleanup(0.0).validate_invariants().is_err());
+    assert!(with_cleanup(1.0).validate_invariants().is_err());
+    assert!(with_cleanup(f64::NAN).validate_invariants().is_err());
 }
 
 #[test]
@@ -209,24 +213,6 @@ fn correlation_constructor_rejects_invalid_matrix() {
 }
 
 #[test]
-fn current_loss_percentage_respects_defaults_and_recoveries() {
-    let mut sc = build_sc("ABS-LOSS", 1_000_000.0);
-    sc.pool.cumulative_defaults =
-        Money::new(100_000.0, Currency::USD).expect("valid money fixture");
-    sc.pool.cumulative_recoveries =
-        Money::new(25_000.0, Currency::USD).expect("valid money fixture");
-
-    let loss_pct = sc.current_loss_percentage().expect("loss percentage");
-    // Original balance ≈ current(1M) + defaults(100k) + prepays(0) = 1.1M
-    // Net loss = 100k - 25k = 75k => 75k / 1.1M * 100 ≈ 6.818%
-    let expected = (100_000.0 - 25_000.0) / 1_100_000.0 * 100.0;
-    assert!(
-        (loss_pct - expected).abs() < 1e-9,
-        "expected {expected}%, got {loss_pct}"
-    );
-}
-
-#[test]
 fn stochastic_helper_methods_toggle_flags() {
     let mut sc = build_sc("ABS-STOCHASTIC", 1_000_000.0);
     assert!(!sc.is_stochastic());
@@ -250,27 +236,44 @@ fn enable_stochastic_populates_specs_for_each_deal_family() {
     abs.enable_stochastic().expect("valid built-in defaults");
     assert!(abs.is_stochastic());
 
-    let make = |deal_type| {
-        let pool = AssetPool::new("POOL", deal_type, Currency::USD);
-        let tranches = single_tranche_structure(1_000_000.0);
-        StructuredCredit::apply_deal_defaults(
-            format!("TEST-{deal_type:?}"),
-            deal_type,
-            pool,
-            tranches,
-            closing_date(),
-            legal_maturity(),
+    let pool = |deal_type| AssetPool::new("POOL", deal_type, Currency::USD);
+    let tranches = || single_tranche_structure(1_000_000.0);
+    let (close, legal) = (closing_date(), legal_maturity());
+    for sc in [
+        StructuredCredit::new_rmbs(
+            "RMBS",
+            pool(DealType::Rmbs),
+            tranches(),
+            close,
+            legal,
             "USD-OIS",
-        )
-        .expect("valid structured-credit dates")
-    };
-
-    for mut sc in [
-        make(DealType::Rmbs),
-        make(DealType::Clo),
-        make(DealType::Cmbs),
-        make(DealType::Card),
+        ),
+        StructuredCredit::new_clo(
+            "CLO",
+            pool(DealType::Clo),
+            tranches(),
+            close,
+            legal,
+            "USD-OIS",
+        ),
+        StructuredCredit::new_cmbs(
+            "CMBS",
+            pool(DealType::Cmbs),
+            tranches(),
+            close,
+            legal,
+            "USD-OIS",
+        ),
+        StructuredCredit::new_abs(
+            "CARD",
+            pool(DealType::Card),
+            tranches(),
+            close,
+            legal,
+            "USD-OIS",
+        ),
     ] {
+        let mut sc = sc.expect("valid structured-credit dates");
         sc.enable_stochastic().expect("valid built-in defaults");
         assert!(sc.credit_model.stochastic_prepay_spec.is_some());
         assert!(sc.credit_model.stochastic_default_spec.is_some());
@@ -385,31 +388,22 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         run_simulation(&sc, &market, closing_date())
             .expect_err("invalid simulation")
             .to_string(),
-        generate_cashflows(&sc, &market, closing_date())
-            .expect_err("invalid aggregate cashflows")
-            .to_string(),
         (sc).tranche_cashflows("missing", &market, closing_date())
             .expect_err("invalid tranche cashflows")
-            .to_string(),
-        (sc).tranche_cashflows("missing", &market, closing_date())
-            .expect_err("invalid tranche helper")
             .to_string(),
         sc.value_tranche("missing", &market, closing_date())
             .expect_err("invalid tranche value")
             .to_string(),
-        sc.value_tranche_with_metrics("missing", &market, closing_date(), &[])
-            .expect_err("invalid tranche metrics value")
-            .to_string(),
-        calculate_tranche_metrics(&sc, "missing", &market, closing_date(), None)
+        tranche_metrics(&sc, "missing", &market, closing_date(), None, &[])
             .expect_err("invalid tranche metrics")
             .to_string(),
-        calculate_tranche_breakeven_cdr(&sc, "missing", &market, closing_date())
+        tranche_breakeven_cdr(&sc, "missing", &market, closing_date())
             .expect_err("invalid breakeven cdr")
             .to_string(),
-        calculate_tranche_discount_margin(&sc, "missing", &market, closing_date(), 99.0)
+        tranche_discount_margin(&sc, "missing", &market, closing_date(), 99.0)
             .expect_err("invalid discount margin")
             .to_string(),
-        calculate_tranche_oas(
+        tranche_oas(
             &sc,
             "missing",
             &market,
@@ -419,7 +413,7 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         )
         .expect_err("invalid oas")
         .to_string(),
-        scenario_table(&sc, "missing", &market, closing_date(), &grid)
+        tranche_scenario_table(&sc, "missing", &market, closing_date(), &grid)
             .expect_err("invalid scenario table")
             .to_string(),
         sc.price_with_metrics(&market, closing_date(), &[], Default::default())
@@ -454,7 +448,8 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
         .expect("example hedge swap");
     swap.fixed_leg.end = swap.fixed_leg.start;
     swap.float_leg.end = swap.float_leg.start;
-    let sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0).with_hedge_swap(HedgeSwap::new(swap));
+    let mut sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0);
+    sc.hedge_swaps.push(HedgeSwap::new(swap));
 
     let err = sc
         .price_with_metrics(
@@ -470,17 +465,6 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
         "unexpected nested hedge validation error: {message}"
     );
     assert!(!message.contains("Curve not found"));
-}
-
-#[test]
-fn with_hedge_swap_attaches_a_waterfall_settled_swap() {
-    let swap = finstack_quant_valuations_rates::irs::InterestRateSwap::example()
-        .expect("example hedge swap");
-    let sc = build_sc("ABS-HEDGED", 1_000_000.0);
-    assert!(sc.hedge_swaps.is_empty());
-    let hedged = sc.with_hedge_swap(HedgeSwap::new(swap.clone()).on_pool_par().junior());
-    assert_eq!(hedged.hedge_swaps.len(), 1);
-    assert_eq!(hedged.hedge_swaps[0].swap.id, swap.id);
 }
 
 /// Regression: the `pv_std_error` of a large-PV deal stays accurate when using
@@ -881,15 +865,15 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
         sc.first_payment_date = Date::from_calendar_date(2025, Month::February, 1).expect("date");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.18);
         if case.stochastic {
-            sc.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
+            sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::factor_correlated(
                 PrepaymentModelSpec::constant_cpr(0.15),
                 0.25,
                 0.15,
             ));
-            sc.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
-            sc.with_correlation(
-                CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid correlation"),
-            );
+            sc.credit_model.stochastic_default_spec =
+                Some(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
+            sc.credit_model.correlation_structure =
+                Some(CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid correlation"));
         } else if case.label == "factor_correlated_mc" {
             use finstack_quant_cashflows::builder::DefaultModelSpec;
             sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
@@ -1053,13 +1037,15 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
 /// the estimator count changes the computed estimate.
 fn stochastic_estimator_count_deal() -> StructuredCredit {
     let mut sc = build_sc("ABS-MC-ESTIMATOR-PIN", 1_000_000.0);
-    sc.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::factor_correlated(
         PrepaymentModelSpec::constant_cpr(0.15),
         0.25,
         0.15,
     ));
-    sc.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
-    sc.with_correlation(CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("correlation"));
+    sc.credit_model.stochastic_default_spec =
+        Some(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
+    sc.credit_model.correlation_structure =
+        Some(CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("correlation"));
     sc
 }
 

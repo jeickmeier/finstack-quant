@@ -5,25 +5,37 @@
   "description": "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",
   "examples": [
     {
-      "convexity": 0.001,
+      "accrued": 1000000.0,
+      "clean_price_pct": 99.5,
       "cs01": 108500.0,
       "currency": "USD",
+      "dirty_price_pct": 99.9,
       "dm_bp": 139.0,
+      "effective_convexity": 0.001,
+      "effective_duration": 0.24,
       "factor": 1.0,
-      "modified_duration": 0.24,
-      "price_pct": 99.5,
+      "metrics": {
+        "default01": -41200.0,
+        "dv01": 5970.0
+      },
       "pv": 248750000.0,
       "spread_convexity": 0.24,
       "spread_duration": 4.36,
       "target_price_pct": 99.5,
       "tranche_id": "A",
       "wal": 4.6,
+      "ytm": 0.0612,
       "z_spread_bp": 142.0
     }
   ],
   "properties": {
-    "convexity": {
-      "description": "Effective convexity (years²) from the same ±1 bp re-projection.",
+    "accrued": {
+      "description": "Accrued coupon at buyer settlement (currency units).",
+      "format": "double",
+      "type": "number"
+    },
+    "clean_price_pct": {
+      "description": "Model clean settlement price as a percentage of the tranche's CURRENT\nbalance.",
       "format": "double",
       "type": "number"
     },
@@ -34,7 +46,12 @@
     },
     "currency": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-      "description": "ISO-4217 code of the currency `pv` and `cs01` are denominated in."
+      "description": "ISO-4217 code of the currency `pv`, `accrued` and `cs01` are denominated in."
+    },
+    "dirty_price_pct": {
+      "description": "Model dirty settlement price (clean plus accrued) as a percentage of\nthe tranche's CURRENT balance.",
+      "format": "double",
+      "type": "number"
     },
     "dm_bp": {
       "description": "Discount margin to maturity at `target_price_pct` (basis points): the\nconstant spread over the deal discount curve that reprices the\nfloater's projected cashflows; `None` for fixed-rate tranches.",
@@ -52,23 +69,31 @@
         "null"
       ]
     },
-    "factor": {
-      "description": "Pool factor of the note: `current_balance / original_balance`, so a\nprice on original face is `price_pct * factor`.",
+    "effective_convexity": {
+      "description": "Effective convexity (years²) from the same ±1 bp re-projection.",
       "format": "double",
       "type": "number"
     },
-    "modified_duration": {
+    "effective_duration": {
       "description": "Effective (rate) duration (years): the tranche is re-projected with\nevery rate curve in the market (discount and forward) bumped ±1 bp in\nparallel and the dirty settlement values differenced, so a floater's\ncoupon resets move with the curve and its duration is short, while a\nfixed-coupon note's equals its modified duration.",
       "format": "double",
       "type": "number"
     },
-    "price_pct": {
-      "description": "Model clean settlement price as a percentage of the tranche's CURRENT\nbalance (the factor-adjusted secondary-market quote basis).",
+    "factor": {
+      "description": "Pool factor of the note: `current_balance / original_balance`, so a\nprice on original face is `clean_price_pct * factor`.",
       "format": "double",
       "type": "number"
     },
+    "metrics": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "Registry metrics requested by the caller, valued on this note: every\nreprice (DV01, theta, Default01, Prepayment01, Recovery01,\nSeverity01, …) values the tranche, not the deal, so the senior and\nthe equity carry their own sensitivities that sum to the deal's.\nUnits follow each metric's registry definition.",
+      "type": "object"
+    },
     "pv": {
-      "description": "Present value of the tranche (currency units).",
+      "description": "Present value of the tranche at valuation (currency units).",
       "format": "double",
       "type": "number"
     },
@@ -83,7 +108,7 @@
       "type": "number"
     },
     "target_price_pct": {
-      "description": "Price the z-spread/CS01 were solved against (% of current balance) —\nthe supplied market price, or the model price when none was given.",
+      "description": "Price the yield, z-spread and CS01 were solved against (% of current\nbalance) — the supplied market price, else the deal's quote override,\nelse the model price.",
       "format": "double",
       "type": "number"
     },
@@ -98,6 +123,14 @@
     },
     "wal_to_call": {
       "description": "Weighted-average life to the deal's assumed call (years); `None`\nwithout a `call_assumption` covering this tranche.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "ytm": {
+      "description": "Decimal yield reproducing the `target_price_pct` dirty settlement\nvalue, compounded at the note's coupon frequency with time in the\nnote's day count (a par note yields its coupon); `None` for an\nimpaired note.",
       "format": "double",
       "type": [
         "number",
@@ -122,15 +155,17 @@
     "tranche_id",
     "currency",
     "pv",
-    "price_pct",
+    "clean_price_pct",
+    "dirty_price_pct",
+    "accrued",
     "factor",
     "wal",
     "z_spread_bp",
     "cs01",
     "spread_duration",
     "spread_convexity",
-    "modified_duration",
-    "convexity",
+    "effective_duration",
+    "effective_convexity",
     "target_price_pct"
   ],
   "title": "TrancheMetrics",

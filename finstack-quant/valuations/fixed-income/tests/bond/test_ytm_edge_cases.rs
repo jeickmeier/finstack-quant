@@ -19,7 +19,7 @@ use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::bond::{Bond, CashflowSpec};
 use time::Month;
 
-use finstack_quant_valuations_test_support::test_helpers::tolerances;
+use finstack_quant_valuations_test_support::tolerances;
 
 fn create_test_market(base_date: Date) -> MarketContext {
     let curve = DiscountCurve::builder("USD-OIS")

@@ -191,7 +191,7 @@
           "type": "number"
         },
         "coupon_barriers": {
-          "description": "Coupon barriers corresponding to observation dates.",
+          "description": "Coupon barriers as ratios of initial spot.\n\nCoupon eligibility is independent of the autocall barrier. Each entry\ncorresponds to the observation date at the same index.",
           "items": {
             "format": "double",
             "type": "number"
@@ -223,7 +223,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
         },
         "expiry": {
@@ -254,19 +253,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "memory_coupons": {
           "default": false,
-          "description": "Memory (\"Phoenix\") coupon feature.\n\nMissed coupons accrue until a later coupon barrier is met.",
+          "description": "Memory (\"Phoenix\") coupon feature.\n\nWhen enabled, a coupon whose coupon barrier is missed accrues until a\nlater observation meets its coupon barrier. The current and all accrued\ncoupons are then paid on that observation's payment date. Coupon\neligibility remains independent of autocall eligibility.",
           "type": "boolean"
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -301,10 +296,10 @@
         },
         "path_model": {
           "$ref": "#/$defs/d_d0f5a4349d07a8bf07eb",
-          "description": "Explicit path model selection; required to acknowledge model risk."
+          "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation."
         },
         "payment_dates": {
-          "description": "Contractual payment dates corresponding to observation dates.",
+          "description": "Contractual payment dates for coupons and early redemption.\n\nEach entry corresponds to `observation_dates` at the same index.",
           "items": {
             "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
           },
@@ -312,7 +307,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {

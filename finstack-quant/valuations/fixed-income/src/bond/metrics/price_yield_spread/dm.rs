@@ -1,12 +1,11 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use super::z_spread::{maturity_scaled_bracket, BondZSpreadPricingKernel};
+use super::quote_date_dirty_target;
 use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
+use crate::bond::pricing::quote_conversions::{solve_kernel_spread, BondZSpreadPricingKernel};
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
-use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
-use std::cell::RefCell;
 
 /// Discount-margin solver tolerance on the DM axis (decimal).
 ///
@@ -74,29 +73,8 @@ pub struct DiscountMarginCalculator;
 impl MetricCalculator for DiscountMarginCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
-
-        // Compute quote-date context (settlement date and accrued at settlement)
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-
-        // Determine dirty market price in currency at quote_date
-        let dirty_currency = if let Some(clean_px) = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price_pct
-        {
-            quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())
-        } else {
-            // Fallback: forward-value the model PV (at `as_of`) to the
-            // quote/settlement date, matching the YTM and Z-spread fallbacks,
-            // since the DM objective discounts from `quote_date`.
-            crate::bond::pricing::settlement::model_dirty_at_quote_date(
-                bond,
-                &context.curves,
-                context.as_of,
-                quote_ctx.quote_date,
-                context.base_value.amount(),
-            )?
-        };
+        let target = quote_date_dirty_target(bond, context, &quote_ctx)?;
 
         // DM is only defined for bonds with floating coupons (plain FRNs and
         // amortizing floaters). For fixed-rate bonds, return an error; callers
@@ -114,50 +92,15 @@ impl MetricCalculator for DiscountMarginCalculator {
         let mut model_bond = bond.clone();
         clear_price_driving_overrides(&mut model_bond);
         let kernel = BondZSpreadPricingKernel::new(&model_bond, &context.curves, context.as_of)?;
-        let pricing_error: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
-        let quote_date = quote_ctx.quote_date;
-
-        let objective = |dm: f64| -> f64 {
-            match kernel.price(dm) {
-                Ok(pv) => pv - dirty_currency,
-                Err(e) => {
-                    // Capture the first pricing error and map to a large non-zero residual
-                    let mut slot = pricing_error.borrow_mut();
-                    if slot.is_none() {
-                        *slot = Some(e);
-                    }
-                    drop(slot);
-                    // Return a large *positive* residual that does NOT depend on the
-                    // sign of `dm`. The DM objective is monotonically decreasing in
-                    // `dm` (higher spread → lower PV), so a pricing failure in the
-                    // deep-negative-DM regime means the true price diverges to
-                    // +∞ and `price - target` is unambiguously large and positive.
-                    //
-                    // The previous `sign(dm)`-based residual flipped sign at dm = 0
-                    // even when every pricing call failed, handing Brent a fake
-                    // sign-changing bracket that "converged" to a meaningless DM ≈ 0.
-                    // This is the same fix applied to the YTM solver (see ytm_solver.rs).
-                    1e12
-                }
-            }
-        };
-
-        // Use a maturity-aware initial bracket with production-grade tolerance.
-        let bracket =
-            maturity_scaled_bracket(bond, quote_date, DM_BASE_BRACKET_BP, DM_MAX_BRACKET_BP)?;
-        let solver = BrentSolver::new()
-            .with_tolerance(DM_TOLERANCE)
-            .with_initial_bracket_size(Some(bracket));
-        // Initial guess 0.0 (0 bp). DM returned in decimal (e.g., 0.01 = 100bp)
-        let dm = solver.solve(objective, 0.0)?;
-
-        // If any pricing error occurred during objective evaluation, surface it instead of
-        // returning a potentially meaningless DM.
-        if let Some(err) = pricing_error.into_inner() {
-            return Err(err);
-        }
-
-        Ok(dm)
+        solve_kernel_spread(
+            bond,
+            &kernel,
+            target,
+            quote_ctx.quote_date,
+            DM_BASE_BRACKET_BP,
+            DM_MAX_BRACKET_BP,
+            DM_TOLERANCE,
+        )
     }
 }
 
@@ -176,9 +119,9 @@ mod tests {
     /// solver must surface an error rather than silently returning a near-zero DM.
     ///
     /// With the pre-fix residual `1e12 * sign(dm)`, Brent found a fake sign-changing
-    /// bracket straddling `dm = 0` and "converged" to a meaningless DM ≈ 0. The
-    /// objective now returns a flat `+1e12` residual on a pricing error, and a
-    /// missing curve fails the one-time kernel build before the solver runs.
+    /// bracket straddling `dm = 0` and "converged" to a meaningless DM ≈ 0. A
+    /// pricing error now aborts the solve, and a missing curve fails the
+    /// one-time kernel build before the solver runs.
     ///
     /// This test drives the real `DiscountMarginCalculator::calculate` path: a valid FRN
     /// is constructed with only the discount curve present; the forward/projection curve

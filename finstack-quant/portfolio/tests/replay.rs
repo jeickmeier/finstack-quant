@@ -647,11 +647,11 @@ mod replay_tests {
                 .cloned()
                 .map(|metric| (metric, 0.0))
                 .collect();
-            Ok(ValuationResult::stamped_with_config(
+            Ok(ValuationResult::stamped_with_meta(
                 self.id(),
                 as_of,
                 Self::value_for_date(as_of),
-                config,
+                finstack_quant_core::config::results_meta(config),
             )
             .with_measures(measures))
         }

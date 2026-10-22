@@ -203,10 +203,7 @@ impl UnifiedDv01Calculator {
 impl MetricCalculator for UnifiedDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         // Resolve bump size from config, then layer instrument overrides.
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
         let bump_bp = defaults.rate_bump_bp;
 
         let curves = self.collect_curves(context.instrument.as_ref(), context.curves.as_ref())?;
@@ -440,7 +437,6 @@ impl UnifiedDv01Calculator {
         let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> =
             Vec::with_capacity(buckets.len());
 
-        let last_idx = buckets.len() - 1;
         context.with_market_scratch(|context, scratch| {
             for (i, &target_time) in buckets.iter().enumerate() {
                 let label =
@@ -452,21 +448,12 @@ impl UnifiedDv01Calculator {
                 // understate short-end DV01 — see
                 // `BumpSpec::triangular_key_rate_first_bp` for the rationale.
                 let build = |bp: f64| -> BumpSpec {
-                    match (i == 0, i == last_idx) {
-                        (true, true) => BumpSpec::parallel_bp(bp),
-                        (true, false) => {
-                            BumpSpec::triangular_key_rate_first_bp(target_time, buckets[i + 1], bp)
-                        }
-                        (false, true) => {
-                            BumpSpec::triangular_key_rate_last_bp(buckets[i - 1], target_time, bp)
-                        }
-                        (false, false) => BumpSpec::triangular_key_rate_bp(
-                            buckets[i - 1],
-                            target_time,
-                            buckets[i + 1],
-                            bp,
-                        ),
-                    }
+                    BumpSpec::triangular_key_rate_bucket_bp(
+                        buckets[..i].last().copied(),
+                        target_time,
+                        buckets.get(i + 1).copied(),
+                        bp,
+                    )
                 };
 
                 let spec_up = build(bump_bp);

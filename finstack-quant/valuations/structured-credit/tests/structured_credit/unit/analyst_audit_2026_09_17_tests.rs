@@ -22,12 +22,12 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    execute_waterfall, run_simulation, run_simulation_with_diagnostics, AllocationMode, AssetPool,
-    AssetType, CallAssumption, CardPortfolioSpec, ControlledAccumulationSpec, CoverageRules,
-    CoverageTestSpec, DealType, LiquidationSpec, PaymentCalculation, PaymentType, PoolAsset,
-    Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod, StepDownSpec,
-    StepDownTrigger, StructuredCredit, Tranche, TrancheStructure, Waterfall, WaterfallContext,
-    WaterfallRules, WaterfallTier,
+    execute_waterfall, run_simulation, run_simulation_with_diagnostics, tranche_metrics,
+    AllocationMode, AssetPool, AssetType, CallAssumption, CardPortfolioSpec,
+    ControlledAccumulationSpec, CoverageRules, CoverageTestSpec, DealType, LiquidationSpec,
+    PaymentCalculation, PaymentType, PoolAsset, Recipient, RecipientType, ReinvestmentCriteria,
+    ReinvestmentPeriod, StepDownSpec, StepDownTrigger, StructuredCredit, Tranche, TrancheStructure,
+    Waterfall, WaterfallContext, WaterfallRules, WaterfallTier,
 };
 use time::Month;
 
@@ -454,13 +454,14 @@ fn p6_clo_standard_rules_carry_performing_collateral_at_par() {
             ),
         ])
         .expect("structure");
-        let mut deal = quiet(
-            StructuredCredit::new_clo("P6", pool, tranches, close, legal, "USD-OIS")
-                .expect("valid structured-credit dates"),
-            0.0,
-        )
-        .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.10)])
-        .expect("triggers");
+        let mut deal = StructuredCredit {
+            coverage_triggers: vec![CoverageTestSpec::oc("A", 1.10)],
+            ..quiet(
+                StructuredCredit::new_clo("P6", pool, tranches, close, legal, "USD-OIS")
+                    .expect("valid structured-credit dates"),
+                0.0,
+            )
+        };
         deal.coverage_rules = Some(CoverageRules::clo_standard());
         let run = run_simulation_with_diagnostics(&deal, &market(close), close).expect("run");
         run.diagnostics.periods[0].coverage_tests[0].ratio
@@ -515,11 +516,9 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
     );
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
     let mkt = market(close);
-    let a = deal
-        .value_tranche_with_metrics("A", &mkt, close, &[MetricId::Default01])
-        .expect("A metrics");
-    let eq = deal
-        .value_tranche_with_metrics("EQ", &mkt, close, &[MetricId::Default01])
+    let a =
+        tranche_metrics(&deal, "A", &mkt, close, None, &[MetricId::Default01]).expect("A metrics");
+    let eq = tranche_metrics(&deal, "EQ", &mkt, close, None, &[MetricId::Default01])
         .expect("EQ metrics");
     let whole = deal
         .price_with_metrics(
@@ -544,12 +543,10 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
     // senior's sensitivity is a small fraction of equity's.
     let mut mild = deal.clone();
     mild.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.01);
-    let a_mild = mild
-        .value_tranche_with_metrics("A", &mkt, close, &[MetricId::Default01])
+    let a_mild = tranche_metrics(&mild, "A", &mkt, close, None, &[MetricId::Default01])
         .expect("A metrics")
         .metrics[&MetricId::Default01];
-    let eq_mild = mild
-        .value_tranche_with_metrics("EQ", &mkt, close, &[MetricId::Default01])
+    let eq_mild = tranche_metrics(&mild, "EQ", &mkt, close, None, &[MetricId::Default01])
         .expect("EQ metrics")
         .metrics[&MetricId::Default01];
     assert!(
@@ -578,12 +575,24 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
     assert_eq!(severity01, -recovery01);
 
     // Requested alone, at tranche scope, Severity01 still resolves.
-    let eq_sev = low_recovery
-        .value_tranche_with_metrics("EQ", &mkt, close, &[MetricId::Severity01])
-        .expect("EQ severity");
-    let eq_rec = low_recovery
-        .value_tranche_with_metrics("EQ", &mkt, close, &[MetricId::Recovery01])
-        .expect("EQ recovery");
+    let eq_sev = tranche_metrics(
+        &low_recovery,
+        "EQ",
+        &mkt,
+        close,
+        None,
+        &[MetricId::Severity01],
+    )
+    .expect("EQ severity");
+    let eq_rec = tranche_metrics(
+        &low_recovery,
+        "EQ",
+        &mkt,
+        close,
+        None,
+        &[MetricId::Recovery01],
+    )
+    .expect("EQ recovery");
     assert_eq!(
         eq_sev.metrics[&MetricId::Severity01],
         -eq_rec.metrics[&MetricId::Recovery01]
@@ -957,13 +966,14 @@ fn rating_haircuts_key_by_rating_bucket() {
             ),
         ])
         .expect("structure");
-        let mut deal = quiet(
-            StructuredCredit::new_clo("HC", pool, tranches, close, legal, "USD-OIS")
-                .expect("valid structured-credit dates"),
-            0.0,
-        )
-        .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.10)])
-        .expect("triggers");
+        let mut deal = StructuredCredit {
+            coverage_triggers: vec![CoverageTestSpec::oc("A", 1.10)],
+            ..quiet(
+                StructuredCredit::new_clo("HC", pool, tranches, close, legal, "USD-OIS")
+                    .expect("valid structured-credit dates"),
+                0.0,
+            )
+        };
         deal.coverage_rules = Some(CoverageRules {
             rating_haircuts: map.into_iter().collect(),
             ..CoverageRules::default()
@@ -1024,12 +1034,10 @@ fn tranche_dv01_is_per_tranche_and_sums_to_the_deal() {
         0.0,
     );
     let mkt = market(close);
-    let a = deal
-        .value_tranche_with_metrics("A", &mkt, close, &[MetricId::Dv01])
+    let a = tranche_metrics(&deal, "A", &mkt, close, None, &[MetricId::Dv01])
         .expect("A metrics")
         .metrics[&MetricId::Dv01];
-    let eq = deal
-        .value_tranche_with_metrics("EQ", &mkt, close, &[MetricId::Dv01])
+    let eq = tranche_metrics(&deal, "EQ", &mkt, close, None, &[MetricId::Dv01])
         .expect("EQ metrics")
         .metrics[&MetricId::Dv01];
     let whole = deal

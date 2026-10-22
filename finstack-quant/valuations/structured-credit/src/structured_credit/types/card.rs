@@ -82,28 +82,6 @@ impl CardPortfolioSpec {
         }
     }
 
-    /// Set the seller's interest in the trust receivables.
-    ///
-    /// # Arguments
-    ///
-    /// * `seller_interest` - Seller's share of the receivables at the
-    ///   valuation date, in the pool currency; non-negative.
-    pub fn with_seller_interest(mut self, seller_interest: Money) -> Self {
-        self.seller_interest = Some(seller_interest);
-        self
-    }
-
-    /// Fix the investor allocation applied after the revolving period.
-    ///
-    /// # Arguments
-    ///
-    /// * `fixed_allocation_decimal` - Investor share of trust collections as a
-    ///   decimal in `(0, 1]`, replacing the floating share at the freeze.
-    pub fn with_fixed_allocation_decimal(mut self, fixed_allocation_decimal: f64) -> Self {
-        self.fixed_allocation_decimal = Some(fixed_allocation_decimal);
-        self
-    }
-
     /// Per-asset investor flow base once the allocation is fixed.
     ///
     /// The trust receivables at the freeze are the investor interest

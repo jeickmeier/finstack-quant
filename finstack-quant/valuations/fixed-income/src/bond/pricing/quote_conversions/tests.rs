@@ -1,7 +1,7 @@
 use super::*;
 use crate::bond::{Bond, BondSettlementConvention, CallPut, CallPutSchedule};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
@@ -35,13 +35,11 @@ fn b11_quote_set_propagates_applicable_metric_failure() {
             .expect("curve"),
     );
     let mut metrics = crate::FIXED_INCOME.metrics().clone();
-    metrics
-        .replace_metric(
-            MetricId::Ytm,
-            Arc::new(FailedYield),
-            &[InstrumentType::Bond],
-        )
-        .expect("replace metric");
+    metrics.replace_metric(
+        MetricId::Ytm,
+        Arc::new(FailedYield),
+        &[InstrumentType::Bond],
+    );
     let err = compute_quotes(
         &bond,
         &market,
@@ -206,107 +204,6 @@ fn overnight_asset_swap_forward_paths_use_observation_average() {
 
     assert!((expected_float_pv - term_float_pv).abs() > 1e-6);
     assert!((float_pv - expected_float_pv).abs() < 1e-14);
-}
-
-/// 31 CFR Part 356, Appendix B, section II.C long-first-period example.
-///
-/// 8.5% note issued 1990-03-01, first payment 1990-11-15, maturity
-/// 1995-05-15, priced at an 8.53% Treasury yield: 99.805118 per 100.
-#[test]
-fn treasury_actual_matches_cfr_long_first_coupon_example() {
-    let as_of = date!(1990 - 03 - 01);
-    let coupon = 8.50 / 2.0;
-    let fractional_coupon = coupon * 75.0 / 181.0;
-    let flows = vec![
-        (
-            date!(1990 - 11 - 15),
-            Money::new(coupon + fractional_coupon, Currency::USD).expect("valid test amount"),
-        ),
-        (
-            date!(1991 - 05 - 15),
-            Money::new(coupon, Currency::USD).expect("valid test amount"),
-        ),
-        (
-            date!(1991 - 11 - 15),
-            Money::new(coupon, Currency::USD).expect("valid test amount"),
-        ),
-        (
-            date!(1992 - 05 - 15),
-            Money::new(coupon, Currency::USD).expect("valid test amount"),
-        ),
-        (
-            date!(1992 - 11 - 15),
-            Money::new(coupon, Currency::USD).expect("valid test amount"),
-        ),
-        (
-            date!(1993 - 05 - 15),
-            Money::new(coupon, Currency::USD).expect("valid test amount"),
-        ),
-        (
-            date!(1993 - 11 - 15),
-            Money::new(coupon, Currency::USD).expect("valid test amount"),
-        ),
-        (
-            date!(1994 - 05 - 15),
-            Money::new(coupon, Currency::USD).expect("valid test amount"),
-        ),
-        (
-            date!(1994 - 11 - 15),
-            Money::new(coupon, Currency::USD).expect("valid test amount"),
-        ),
-        (
-            date!(1995 - 05 - 15),
-            Money::new(100.0 + coupon, Currency::USD).expect("valid test amount"),
-        ),
-    ];
-
-    let price = price_from_ytm_compounded_params(
-        DayCount::ActActIsma,
-        Tenor::semi_annual(),
-        &flows,
-        as_of,
-        0.0853,
-        YieldCompounding::TreasuryActual,
-    )
-    .expect("Treasury Appendix B price");
-
-    assert!(
-        (price - 99.805118).abs() < 5e-7,
-        "CFR long-first price mismatch: {price}"
-    );
-}
-
-#[test]
-fn treasury_actual_zero_coupon_round_trips() {
-    let as_of = date!(2025 - 01 - 01);
-    let flows = vec![(date!(2025 - 09 - 01), Money::from((100_i64, Currency::USD)))];
-    let frequency = Tenor::semi_annual();
-    let day_count = DayCount::Act365F;
-    let expected_yield = 0.05;
-    let price = price_from_ytm_compounded_params(
-        day_count,
-        frequency,
-        &flows,
-        as_of,
-        expected_yield,
-        YieldCompounding::TreasuryActual,
-    )
-    .expect("price");
-
-    let solved = crate::bond::pricing::ytm_solver::solve_ytm(
-        &flows,
-        as_of,
-        Money::new(price, Currency::USD).expect("valid test amount"),
-        crate::bond::pricing::ytm_solver::YtmPricingSpec {
-            day_count,
-            notional: Money::from((100_i64, Currency::USD)),
-            coupon_rate: 0.0,
-            compounding: YieldCompounding::TreasuryActual,
-            frequency,
-        },
-    )
-    .expect("yield");
-    assert!((solved - expected_yield).abs() < 1e-11);
 }
 
 #[test]
@@ -506,13 +403,11 @@ fn compute_quotes_preserves_custom_tree_and_metric_registries_for_oas_roundtrip(
         .expect("unique custom Tree pricer");
 
     let mut metrics = crate::FIXED_INCOME.metrics().clone();
-    metrics
-        .replace_metric(
-            MetricId::Ytm,
-            Arc::new(FixedYtmCalculator),
-            &[InstrumentType::Bond],
-        )
-        .expect("replace YTM for this test");
+    metrics.replace_metric(
+        MetricId::Ytm,
+        Arc::new(FixedYtmCalculator),
+        &[InstrumentType::Bond],
+    );
 
     let target_oas = 0.002;
     let quotes = compute_quotes(

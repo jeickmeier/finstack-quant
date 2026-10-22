@@ -20,8 +20,6 @@ use finstack_quant_valuations_core::instruments::MarketDependencies;
 /// Represents a spot equity position that can be priced using market data.
 /// The price can come from direct market quotes or be computed from
 /// underlying fundamentals.
-///
-/// See unit tests and `examples/` for usage.
 #[derive(
     Clone,
     Debug,
@@ -32,8 +30,6 @@ use finstack_quant_valuations_core::instruments::MarketDependencies;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-// Note: JsonSchema derive requires finstack-quant-core types to implement JsonSchema
-// #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Equity {
     /// Unique identifier for the equity
     pub id: InstrumentId,
@@ -194,12 +190,6 @@ impl Equity {
         self
     }
 
-    /// Set an explicit discrete dividend schedule.
-    pub fn with_discrete_dividends(mut self, dividends: Vec<(Date, f64)>) -> Self {
-        self.discrete_dividends = dividends;
-        self
-    }
-
     fn money_from_scalar(
         &self,
         scalar: &MarketScalar,
@@ -207,23 +197,14 @@ impl Equity {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
         let price = match scalar {
-            MarketScalar::Price(m) => self.convert_price_to_currency(*m, market, as_of),
-            MarketScalar::Unitless(v) => Ok(Money::new(*v, self.currency)?),
-        }?;
+            MarketScalar::Price(m) => market.convert_money(*m, self.currency, as_of)?.amount,
+            MarketScalar::Unitless(v) => Money::new(*v, self.currency)?,
+        };
         finstack_quant_core::validation::validate_f64_non_negative(
             price.amount(),
             "Equity market price",
         )?;
         Ok(price)
-    }
-
-    fn convert_price_to_currency(
-        &self,
-        price: Money,
-        market: &MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<Money> {
-        Ok(market.convert_money(price, self.currency, as_of)?.amount)
     }
 
     /// Get the effective number of shares held (defaults to 1).
@@ -335,20 +316,6 @@ impl Equity {
             s0.amount() / df_horizon * (-dy * t).exp()
         };
         Money::new(fwd, self.currency)
-    }
-
-    /// Calculate forward total value for the position
-    pub fn forward_value(
-        &self,
-        market: &MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        t: f64,
-    ) -> finstack_quant_core::Result<Money> {
-        let per_share = self.forward_price_per_share(market, as_of, t)?;
-        Money::new(
-            per_share.amount() * self.effective_quantity(),
-            self.currency,
-        )
     }
 }
 

@@ -1,6 +1,7 @@
-//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
-//!
-use super::config::{
+//! Copula selection, projected premium and protection schedules, discounting and
+//! settlement for `CdsTranchePricer`.
+
+use super::pricer::{
     CdsTranchePricer, DiscountAt, EffectiveStructure, ProjectedDiscountedRow, ProjectionInputs,
     BESPOKE_SETTLEMENT_DAYS, INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP,
 };
@@ -12,9 +13,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{Error as CoreError, Result};
+use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::{Copula, CopulaSpec, GaussianCopula};
-use finstack_quant_valuations_core::instruments::PayReceive;
 
 impl CdsTranchePricer {
     /// Return the copula instance constructed for this pricer.
@@ -68,7 +68,7 @@ impl CdsTranchePricer {
     pub fn with_copula(copula_spec: CopulaSpec) -> Result<Self> {
         let copula = copula_spec
             .build()
-            .map_err(|error| CoreError::Validation(error.to_string()))?;
+            .map_err(|error| Error::Validation(error.to_string()))?;
         Ok(Self {
             copula_spec,
             copula,
@@ -98,16 +98,23 @@ impl CdsTranchePricer {
         as_of: Date,
     ) -> Result<Money> {
         tranche.validate()?;
+        self.price_validated_tranche(tranche, market, as_of)
+    }
+
+    /// [`Self::price_tranche`] for a tranche the caller already validated.
+    pub(super) fn price_validated_tranche(
+        &self,
+        tranche: &CdsTranche,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<Money> {
         let discount_curve = market.get_discount(tranche.discount_curve_id.as_ref())?;
         let wiped_out = tranche.realized_loss >= tranche.detach_pct / 100.0;
         let net_pv = if wiped_out {
             // A wiped-out tranche has no remaining premium/protection legs, but
             // a separately contracted upfront can still be due.
             if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
-                let premium_sign = match tranche.side {
-                    PayReceive::Pay => -1.0,
-                    PayReceive::Receive => 1.0,
-                };
+                let premium_sign = tranche.side.sign();
                 amount.amount() * premium_sign * discount_curve.df_between_dates(as_of, date)?
             } else {
                 0.0
@@ -208,10 +215,7 @@ impl CdsTranchePricer {
             self.prepare_projection_inputs(tranche, market_ctx, as_of)?;
 
         let tranche_notional = tranche.notional.amount();
-        let premium_sign = match tranche.side {
-            PayReceive::Pay => -1.0,
-            PayReceive::Receive => 1.0,
-        };
+        let premium_sign = tranche.side.sign();
         let protection_sign = -premium_sign;
 
         let mut rows =
@@ -434,7 +438,7 @@ impl CdsTranchePricer {
         let known_count = periods.iter().filter(|p| p.accrual_end <= as_of).count();
         let mut el_curve = Vec::with_capacity(periods.len());
         for _ in 0..known_count {
-            el_curve.push(super::config::ElWdPoint {
+            el_curve.push(super::pricer::ElWdPoint {
                 el_fraction: self.calculate_prior_tranche_loss(tranche),
                 wd_fraction: self
                     .calculate_prior_tranche_writedown(tranche, index_data_arc.recovery_rate()),

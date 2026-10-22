@@ -38,8 +38,7 @@
 //!
 //! ```
 //! use finstack_quant_valuations_core::Error;
-//! use finstack_quant_valuations_core::pricer::PricingError;
-//! use finstack_quant_valuations_core::pricer::InstrumentType;
+//! use finstack_quant_valuations_core::pricer::{InstrumentType, PricingError};
 //!
 //! // Domain errors automatically wrap into the unified type
 //! let pricing_err: Error = PricingError::type_mismatch(
@@ -51,7 +50,7 @@
 //! let core_err: finstack_quant_core::Error = pricing_err.into();
 //! ```
 
-pub use crate::pricer::PricingError;
+use crate::pricer::PricingError;
 
 /// Unified error type for the valuations crate.
 ///

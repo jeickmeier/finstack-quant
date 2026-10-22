@@ -2,7 +2,7 @@
 //!
 //! # Test Organization
 //!
-//! - `mc`: Monte Carlo pricing tests (feature-gated)
+//! - `mc`: Monte Carlo pricing tests
 
 pub mod mc;
 

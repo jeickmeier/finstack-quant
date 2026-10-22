@@ -1,27 +1,22 @@
 //! Hull-White 1F Monte Carlo pricer for callable range accruals.
 
 use crate::exotics::callable_range_accrual::CallableRangeAccrual;
+use crate::exotics::hw1f_note::{zero_estimate, Hw1fNote, Hw1fNotePricer};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
 use finstack_quant_models::rates::clock::model_time;
-use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::{
     initial_short_rate_from_curve, prepare_hw1f_params, ExerciseBoundaryPayoff, Hw1fLsmcPricer,
-    Hw1fMcConfig, Hw1fMcPricer, Hw1fTermForward, PeriodForwardCoeffs, ShortRateBasis,
+    Hw1fMcPricer, Hw1fTermForward, PeriodForwardCoeffs, ShortRateBasis,
 };
-use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
-    resolve_hw1f_params, Hw1fParamFamily,
-};
-use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use finstack_quant_valuations_core::results::ValuationResult;
+use finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig;
+use finstack_quant_valuations_core::pricer::InstrumentType;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy)]
@@ -283,107 +278,49 @@ impl ExerciseBoundaryPayoff for CallableRangeAccrualPayoff {
 }
 
 /// Callable range accrual pricer using shared HW1F MC/LSMC infrastructure.
-#[derive(Debug, Clone)]
-pub struct CallableRangeAccrualPricer {
-    hw_params: Option<HullWhiteCalibrationParams>,
-    config: Hw1fMcConfig,
-}
+pub type CallableRangeAccrualPricer = Hw1fNotePricer<CallableRangeAccrual>;
 
-impl CallableRangeAccrualPricer {
-    /// Create a pricer requiring explicit or pre-calibrated HW1F parameters.
-    pub fn new() -> Self {
-        Self {
-            hw_params: None,
-            config: Hw1fMcConfig::default(),
-        }
+impl Hw1fNote for CallableRangeAccrual {
+    const INSTRUMENT_TYPE: InstrumentType = InstrumentType::CallableRangeAccrual;
+    const LABEL: &'static str = "CallableRangeAccrual";
+
+    fn note_id(&self) -> &InstrumentId {
+        &self.id
     }
 
-    /// Create a callable range accrual pricer with explicit HW1F parameters.
-    pub fn with_hw_params(hw_params: HullWhiteCalibrationParams) -> Self {
-        Self {
-            hw_params: Some(hw_params),
-            config: Hw1fMcConfig::default(),
-        }
+    fn hw1f_curve_id(&self) -> &str {
+        self.range_accrual.discount_curve_id.as_str()
     }
 
-    /// Set the Monte Carlo configuration (paths, seed, antithetic flag, time
-    /// steps) used by this pricer; instrument overrides still apply on top.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - Base Hull-White Monte Carlo configuration.
-    pub fn with_config(mut self, config: Hw1fMcConfig) -> Self {
-        self.config = config;
-        self
+    fn model_config(&self) -> &ModelConfig {
+        &self.instrument_pricing_overrides.model_config
     }
 
-    fn effective_hw_params(
+    fn error_curve_ids(&self) -> Vec<String> {
+        vec![self.range_accrual.discount_curve_id.as_str().to_string()]
+    }
+
+    fn hw1f_estimate(
         &self,
-        inst: &CallableRangeAccrual,
-        market: &MarketContext,
-    ) -> Result<HullWhiteCalibrationParams> {
-        resolve_hw1f_params(
-            Hw1fParamFamily::CapFloor,
-            inst.range_accrual.discount_curve_id.as_str(),
-            &inst.instrument_pricing_overrides.model_config,
-            self.hw_params,
-            &format!("CallableRangeAccrual {}", inst.id),
-            market,
-        )
-    }
-
-    fn effective_config(&self, inst: &CallableRangeAccrual) -> Hw1fMcConfig {
-        self.config.with_instrument_overrides(
-            &inst.id,
-            inst.instrument_pricing_overrides.model_config.mc_paths,
-            inst.instrument_pricing_overrides
-                .model_config
-                .mc_seed_scenario
-                .as_deref(),
-        )
-    }
-
-    fn price_estimate(
-        &self,
-        inst: &CallableRangeAccrual,
+        pricer: &CallableRangeAccrualPricer,
         market: &MarketContext,
         as_of: Date,
     ) -> Result<MoneyEstimate> {
+        let inst = self;
         inst.validate()?;
 
         // A callable range accrual carries the same historical-observation
         // state as its underlying range accrual.  Do not silently treat
         // already-fixed observations as out-of-range when a seasoned trade is
         // valued without that state.
-        let range = &inst.range_accrual;
-        let historical_count = range
-            .observation_dates
-            .iter()
-            .filter(|&&date| date <= as_of)
-            .count();
-        if historical_count > 0 {
-            let supplied_total = range.total_past_observations.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "CallableRangeAccrual '{}' requires total_past_observations for {historical_count} historical observations",
-                    inst.id
-                ))
-            })?;
-            let supplied_in_range = range.past_observations_in_range.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "CallableRangeAccrual '{}' requires past_observations_in_range for {historical_count} historical observations",
-                    inst.id
-                ))
-            })?;
-            if supplied_total != historical_count || supplied_in_range > supplied_total {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CallableRangeAccrual '{}' historical observation state is inconsistent: supplied total={supplied_total}, in_range={supplied_in_range}, expected total={historical_count}",
-                    inst.id
-                )));
-            }
-        }
+        inst.range_accrual.validate_historical_observations(
+            "CallableRangeAccrual",
+            &inst.id,
+            as_of,
+        )?;
 
         let discount_curve = market.get_discount(inst.range_accrual.discount_curve_id.as_ref())?;
-        let hw_params = self.effective_hw_params(inst, market)?;
+        let hw_params = pricer.effective_hw_params(inst, market)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
         // simulated short rate at each observation into the term reference rate.
         let term_forward = Hw1fTermForward::new(hw_params, discount_curve.as_ref(), as_of)?;
@@ -403,7 +340,7 @@ impl CallableRangeAccrualPricer {
         // from the spot fixing would offset the simulated short rate from the
         // curve and break the M6 repricing property.
         let r0 = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
-        let config = self.effective_config(inst);
+        let config = pricer.effective_config(inst);
         let payoff = CallableRangeAccrualPayoff::new(
             lower_bound,
             upper_bound,
@@ -443,82 +380,6 @@ impl CallableRangeAccrualPricer {
             currency: inst.range_accrual.notional.currency(),
         };
         lsmc.price(|| payoff.clone())
-    }
-
-    pub(crate) fn price_internal(
-        &self,
-        inst: &CallableRangeAccrual,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        Ok(self.price_estimate(inst, market, as_of)?.mean)
-    }
-}
-
-impl Default for CallableRangeAccrualPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Pricer for CallableRangeAccrualPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(
-            InstrumentType::CallableRangeAccrual,
-            ModelKey::MonteCarloHullWhite1F,
-        )
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let callable = finstack_quant_valuations_core::pricer::expect_inst::<CallableRangeAccrual>(
-            instrument,
-            InstrumentType::CallableRangeAccrual,
-        )?;
-        let estimate = self.price_estimate(callable, market, as_of).map_err(|e| {
-            PricingError::from_core(
-                e,
-                PricingErrorContext::from_instrument(instrument)
-                    .model(ModelKey::MonteCarloHullWhite1F)
-                    .curve_ids([callable
-                        .range_accrual
-                        .discount_curve_id
-                        .as_str()
-                        .to_string()]),
-            )
-        })?;
-
-        let mut result = ValuationResult::stamped(callable.id.as_str(), as_of, estimate.mean);
-        finstack_quant_valuations_core::instruments::common_impl::helpers::attach_mc_diagnostics(
-            &mut result,
-            &estimate,
-        );
-        Ok(result)
-    }
-
-    fn price_raw_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<f64, PricingError> {
-        let callable = finstack_quant_valuations_core::pricer::expect_inst::<CallableRangeAccrual>(
-            instrument,
-            InstrumentType::CallableRangeAccrual,
-        )?;
-        self.price_internal(callable, market, as_of)
-            .map(|m| m.amount())
-            .map_err(|e| {
-                PricingError::from_core(
-                    e,
-                    PricingErrorContext::from_instrument(instrument)
-                        .model(ModelKey::MonteCarloHullWhite1F),
-                )
-            })
     }
 }
 
@@ -651,23 +512,6 @@ fn initial_short_rate(inst: &CallableRangeAccrual, market: &MarketContext) -> Re
     Ok(rate)
 }
 
-fn zero_estimate(currency: finstack_quant_core::currency::Currency) -> MoneyEstimate {
-    let zero = Money::from((0_i64, currency));
-    MoneyEstimate {
-        mean: zero,
-        stderr: 0.0,
-        ci_95: (zero, zero),
-        num_paths: 0,
-        num_simulated_paths: 0,
-        std_dev: Some(0.0),
-        median: None,
-        percentile_25: None,
-        percentile_75: None,
-        min: Some(0.0),
-        max: Some(0.0),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -679,7 +523,10 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+    use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
     use finstack_quant_valuations_core::instruments::BermudanCallProvision;
+    use finstack_quant_valuations_core::pricer::Pricer;
     use time::Month;
 
     fn date(year: i32, month: Month, day: u8) -> Date {

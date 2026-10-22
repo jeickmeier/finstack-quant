@@ -412,12 +412,6 @@ impl finstack_quant_valuations_core::pricer::Pricer for BondFuturePricer {
     }
 }
 
-impl Default for BondFuturePricer {
-    fn default() -> Self {
-        Self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -747,6 +741,7 @@ mod tests {
             50.0,
             Tenor::quarterly(),
             DayCount::Act360,
+            None,
         )
         .expect("finite test rate");
 

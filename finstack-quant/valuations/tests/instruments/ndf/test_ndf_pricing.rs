@@ -335,13 +335,13 @@ fn test_ndf_instrument_key() {
 #[test]
 fn test_ndf_is_fixed() {
     let ndf_unfixed = Ndf::example().expect("example");
-    assert!(!ndf_unfixed.is_fixed());
+    assert!(!ndf_unfixed.observed_fixing.is_some());
 
     let ndf_fixed = Ndf::example()
         .expect("example")
         .with_observed_fixing(7.30)
         .expect("valid rate");
-    assert!(ndf_fixed.is_fixed());
+    assert!(ndf_fixed.observed_fixing.is_some());
 }
 
 #[test]

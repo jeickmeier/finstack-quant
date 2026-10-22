@@ -405,7 +405,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for ForwardRateAgre
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        self.validate()?;
         let pv = self.npv_raw(curves, as_of)?;
         finstack_quant_core::money::Money::new(pv, self.notional.currency())
     }

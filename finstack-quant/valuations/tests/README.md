@@ -76,16 +76,16 @@ every valuations crate dev-depends on. Import them by crate path from any
 target or `#[cfg(test)]` module:
 
 ```rust
-use finstack_quant_valuations_test_support::fixtures::{base_date, usd_discount_curve, STANDARD_NOTIONAL};
-use finstack_quant_valuations_test_support::builders::{test_market, TestMarketBuilder};
-use finstack_quant_valuations_test_support::tolerances::{TIGHT, STANDARD, LOOSE};
+use finstack_quant_valuations_test_support::fixtures::{base_date, usd_discount_curve};
+use finstack_quant_valuations_test_support::builders::TestMarketBuilder;
+use finstack_quant_valuations_test_support::tolerances::{ANALYTICAL, NUMERICAL, TIGHT};
 use finstack_quant_valuations_test_support::test_helpers::{dates, flat_discount_curve};
 use finstack_quant_valuations_test_support::{assert_parity, parity::ParityConfig};
 ```
 
-Two tolerance vocabularies coexist there: `tolerances::{TIGHT, STANDARD, LOOSE,
-PERCENT_*}` and `test_helpers::tolerances::{ANALYTICAL, NUMERICAL, ...}`. Do
-not mix them up.
+Tolerances come from one module, `tolerances`, whose tiers run from `TIGHT`
+through `ANALYTICAL`, `NUMERICAL`, `CURVE_PRICING`, `RELATIVE` and
+`BUMP_VS_ANALYTICAL` to `STATISTICAL`.
 
 **`support/`** holds the instrument builders that stay with this crate because
 they build instruments or need `finstack-quant-calibration` (`credit.rs`). Each

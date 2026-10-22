@@ -314,7 +314,7 @@ export function createService(native: {
     },
     scenarioTable(request) {
       return result(() =>
-        instruments.structuredCreditTrancheScenarioTable(
+        instruments.trancheScenarioTable(
           request.instrumentJson,
           request.trancheId,
           request.marketJson,

@@ -28,8 +28,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::format_bucket_label_cow;
-use finstack_quant_valuations_core::metrics::STANDARD_BUCKETS_YEARS;
+use finstack_quant_valuations_core::metrics::{format_bucket_label, STANDARD_BUCKETS_YEARS};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
 
@@ -128,18 +127,12 @@ impl MetricCalculator for Cs01Calculator {
 /// the partition below the first bucket, and an infinite `next` sentinel is
 /// rejected by the curve bump paths (NaN weight beyond the last bucket).
 fn key_rate_spec(i: usize, bump_bp: f64, buckets: &[f64]) -> BumpSpec {
-    let target = buckets[i];
-    if i == 0 && buckets.len() == 1 {
-        return BumpSpec::parallel_bp(bump_bp);
-    }
-    if i == 0 {
-        return BumpSpec::triangular_key_rate_first_bp(target, buckets[1], bump_bp);
-    }
-    let prev = buckets[i - 1];
-    if i + 1 == buckets.len() {
-        return BumpSpec::triangular_key_rate_last_bp(prev, target, bump_bp);
-    }
-    BumpSpec::triangular_key_rate_bp(prev, target, buckets[i + 1], bump_bp)
+    BumpSpec::triangular_key_rate_bucket_bp(
+        buckets[..i].last().copied(),
+        buckets[i],
+        buckets.get(i + 1).copied(),
+        bump_bp,
+    )
 }
 
 /// Key-rate (bucketed) CS01 calculator for convertible bonds.
@@ -184,7 +177,7 @@ impl MetricCalculator for BucketedCs01Calculator {
             let cs01 = setup.cs01(as_of, |bump_bp| {
                 key_rate_spec(i, bump_bp, &STANDARD_BUCKETS_YEARS)
             })?;
-            series.push((format_bucket_label_cow(t), cs01));
+            series.push((format_bucket_label(t), cs01));
             total += cs01;
         }
 

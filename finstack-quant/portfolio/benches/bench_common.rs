@@ -37,7 +37,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::equity::equity_option::{
-    EquityOption, EquityOptionParams,
+    EquityOption, EquityOptionMarketData, EquityOptionParams,
 };
 use finstack_quant_valuations::instruments::equity::spot::Equity;
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
@@ -58,7 +58,6 @@ use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap
 use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, CollateralType, Repo};
 use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
 use finstack_quant_valuations::instruments::CreditParams;
-use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
@@ -617,15 +616,14 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         )
         .with_exercise_style(ExerciseStyle::European)
         .with_settlement(SettlementType::Cash);
-        let underlying_params = EquityUnderlyingParams::new("AAPL", "EQUITY-SPOT", Currency::USD)
-            .with_div_yield_id("EQUITY-DIVYIELD");
-        let option = EquityOption::new(
+        let option = EquityOption::european_with_market_data(
             option_id.clone(),
-            &option_params,
-            &underlying_params,
-            "USD-OIS",
-            "EQUITY-VOL",
-        );
+            "AAPL",
+            option_params,
+            EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
+                .with_div_yield_id("EQUITY-DIVYIELD"),
+        )
+        .unwrap();
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(
@@ -709,7 +707,13 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             1 => (Currency::GBP, Currency::USD),
             _ => (Currency::USD, Currency::JPY),
         };
-        let fx_spot = FxSpot::new(fx_id.clone(), base_currency, quote_currency);
+        let fx_spot = FxSpot::builder()
+            .id(fx_id.as_str().into())
+            .base_currency(base_currency)
+            .quote_currency(quote_currency)
+            .notional(Money::from((1_i64, base_currency)))
+            .build()
+            .expect("valid FX spot");
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

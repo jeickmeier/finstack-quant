@@ -7,6 +7,7 @@ import {
   documentationFromBlocks,
   LEGACY_CATCH_ALL_THROW,
   stripCommentDelimiters,
+  stripRawStringDocPrefixes,
 } from './typescript-docs-shared.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -23,7 +24,7 @@ if (write && check) {
   process.exit(2);
 }
 const facadeText = readFileSync(facadePath, 'utf8');
-const rawText = readFileSync(rawPath, 'utf8');
+const rawText = stripRawStringDocPrefixes(readFileSync(rawPath, 'utf8'));
 
 function sourceFile(path, text) {
   return ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -315,20 +316,15 @@ function synchronizeTags(rawDocumentationText, facadeDocumentationText, node) {
 }
 
 // Raw wasm-bindgen class documented by a facade interface: `<Name>Constructor`
-// holds the statics of `<Name>`, and `<Name>Instrument` (the FX instrument
-// handles) holds the instance members of `<Name>`.
-function rawClassName(interfaceName, raw) {
+// holds the statics of `<Name>`; any other interface is the class itself.
+function rawClassName(interfaceName) {
   if (interfaceName.endsWith('Constructor')) return interfaceName.slice(0, -'Constructor'.length);
-  if (!raw.classes.has(interfaceName) && interfaceName.endsWith('Instrument')) {
-    const stripped = interfaceName.slice(0, -'Instrument'.length);
-    if (raw.classes.has(stripped)) return stripped;
-  }
   return interfaceName;
 }
 
 function candidateDocumentation(node, interfaceName, file, raw) {
   if (ts.isInterfaceDeclaration(node)) {
-    return raw.classes.get(rawClassName(interfaceName, raw))?.documentation ?? null;
+    return raw.classes.get(rawClassName(interfaceName))?.documentation ?? null;
   }
   if (
     !ts.isMethodSignature(node) &&
@@ -341,14 +337,14 @@ function candidateDocumentation(node, interfaceName, file, raw) {
   const name = memberName(node, file);
   if (!name) return null;
   if (interfaceName.endsWith('Constructor')) {
-    const source = raw.classes.get(rawClassName(interfaceName, raw));
+    const source = raw.classes.get(rawClassName(interfaceName));
     const scope = name === 'constructor' ? 'instance' : 'static';
     return source?.members.get(`${scope}:${name}`) ?? null;
   }
   if (interfaceName.endsWith('Namespace')) {
     return ts.isMethodSignature(node) ? (raw.functions.get(name) ?? null) : null;
   }
-  const source = raw.classes.get(rawClassName(interfaceName, raw));
+  const source = raw.classes.get(rawClassName(interfaceName));
   return source?.members.get(`instance:${name}`) ?? null;
 }
 

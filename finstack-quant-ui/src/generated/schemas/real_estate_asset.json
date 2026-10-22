@@ -4440,7 +4440,6 @@
       "description": "Real estate asset valuation instrument.\n\nSupports DCF (explicit NOI schedule) and direct capitalization valuation.",
       "properties": {
         "acquisition_costs": {
-          "default": [],
           "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation.",
           "items": {
             "$ref": "#/$defs/d_4ba43030fede59fe5993"
@@ -4456,7 +4455,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional appraisal override value."
         },
         "attributes": {
@@ -4465,7 +4463,6 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "cap_rate": {
-          "default": null,
           "description": "Capitalization rate for direct cap (annualized).",
           "format": "double",
           "type": [
@@ -4474,7 +4471,6 @@
           ]
         },
         "capex_schedule": {
-          "default": null,
           "description": "Capital expenditure schedule (date, amount). Values are treated as **positive outflows**.\n\nWhen present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow).",
           "items": {
             "maxItems": 2,
@@ -4504,7 +4500,6 @@
           "description": "Day count convention for year fractions."
         },
         "discount_rate": {
-          "default": null,
           "description": "Discount rate for DCF (annualized).",
           "format": "double",
           "type": [
@@ -4513,7 +4508,6 @@
           ]
         },
         "disposition_cost_decimal": {
-          "default": null,
           "description": "Optional disposition cost percentage applied to terminal value.\n\nA value of `0.02` represents 2% selling costs. Must be in \\([0, 1)\\).",
           "format": "double",
           "type": [
@@ -4522,7 +4516,6 @@
           ]
         },
         "disposition_costs": {
-          "default": [],
           "description": "Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.",
           "items": {
             "$ref": "#/$defs/d_4ba43030fede59fe5993"
@@ -4535,18 +4528,14 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "noi_schedule": {
-          "description": "Net operating income schedule (date, amount).",
+          "description": "Net operating income schedule (date, amount).\n\nEntries must be **annual** NOI amounts: cap-rate formulas (direct cap,\nexit-cap terminal value, going-in cap rate) apply a quoted annual cap\nrate to a single schedule entry, so a monthly or quarterly schedule\nwould understate those values by 12x/4x. Flows dated exactly on the\nvaluation `as_of` are included in PV undiscounted (t = 0).",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -4572,7 +4561,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional property type classification (for reporting)."
         },
         "purchase_price": {
@@ -4584,7 +4572,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional purchase price (useful for IRR / cap rate metrics)."
         },
         "sale_date": {
@@ -4596,7 +4583,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional sale/exit date that truncates the DCF horizon.\n\nWhen set, DCF only values unlevered flows up to and including `sale_date`.\nTerminal proceeds (if configured) are realized on `sale_date`."
         },
         "sale_price": {
@@ -4608,16 +4594,13 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional explicit gross sale price (terminal proceeds), before disposition costs.\n\nWhen set, this takes precedence over `terminal_cap_rate` for terminal proceeds."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "stabilized_noi": {
-          "default": null,
           "description": "Optional stabilized NOI override for direct cap.",
           "format": "double",
           "type": [
@@ -4626,7 +4609,6 @@
           ]
         },
         "terminal_cap_rate": {
-          "default": null,
           "description": "Optional terminal cap rate for DCF (uses last NOI).",
           "format": "double",
           "type": [
@@ -4635,8 +4617,7 @@
           ]
         },
         "terminal_growth_rate": {
-          "default": null,
-          "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is).\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
+          "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is, i.e. a trailing-NOI\nterminal value). Exactly **one** period of growth is applied to the last\nNOI on/before the exit date — it is not compounded over any gap between\nthe last scheduled NOI and a later `sale_date`.\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
           "format": "double",
           "type": [
             "number",

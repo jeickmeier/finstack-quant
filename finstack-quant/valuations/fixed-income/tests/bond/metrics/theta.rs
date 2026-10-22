@@ -156,7 +156,7 @@ fn theta_receives_coupon_and_redemption_once_at_maturity() {
         types::Rate,
     };
     use finstack_quant_valuations_core::instruments::PricingOptions;
-    use finstack_quant_valuations_core::metrics::collect_cashflows_in_period;
+    use finstack_quant_valuations_core::metrics::collect_period_cash;
     let maturity = date!(2025 - 07 - 02);
     let as_of = date!(2025 - 07 - 01);
     let bond = Bond::fixed(
@@ -186,18 +186,22 @@ fn theta_receives_coupon_and_redemption_once_at_maturity() {
     );
     assert!((result.measures["theta_carry"] - result.value.amount()).abs() < 1e-7);
     assert!(result.measures["theta"].abs() < 1e-7);
-    let direct =
-        collect_cashflows_in_period(&bond, &market, as_of, maturity, Currency::USD).unwrap();
+    let direct = collect_period_cash(&bond, &market, as_of, maturity, Currency::USD)
+        .unwrap()
+        .total
+        .amount();
     assert_eq!(direct, result.measures["theta_carry"]);
     assert_eq!(
-        collect_cashflows_in_period(
+        collect_period_cash(
             &bond,
             &market,
             maturity,
             maturity + time::Duration::days(1),
             Currency::USD
         )
-        .unwrap(),
+        .unwrap()
+        .total
+        .amount(),
         0.0
     );
     let settled = bond

@@ -1,5 +1,14 @@
-//! Trait implementations for Bond (Instrument and Monte Carlo).
+//! Trait implementations for Bond (Instrument, Monte Carlo and cashflow source).
+//!
+//! The cashflow schedule source produces a signed canonical schedule that
+//! preserves fees, signed notionals, and all valid cash events. PIK accretion
+//! retains its classification and amount for accrual and balance replay; dated
+//! settlement views omit the non-cash rows.
 
+use finstack_quant_cashflows::builder::CashflowRepresentation;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::impl_instrument_base;
 
@@ -21,12 +30,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         &self,
         model: finstack_quant_valuations_core::pricer::ModelKey,
     ) -> finstack_quant_core::Result<()> {
-        let has_embedded_options = self
-            .call_put
-            .as_ref()
-            .is_some_and(crate::bond::CallPutSchedule::has_options)
-            || self.return_floor.is_some();
-        if has_embedded_options {
+        if self.has_exercise_rights() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "instrument_cashflows: static cashflow rows cannot decompose the \
                  exercise-contingent value of bond '{}' under model '{}'; request the model \
@@ -48,7 +52,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         finstack_quant_core::money::Money::new(
-            self.base_value_raw_impl(curves, as_of)?,
+            finstack_quant_valuations_core::instruments::Instrument::base_value_raw(
+                self, curves, as_of,
+            )?,
             self.notional.currency(),
         )
     }
@@ -58,7 +64,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        self.base_value_raw_impl(curves, as_of)
+        // Instrument-native default path: the unshocked pricing-policy value
+        // without entering the public instrument lifecycle. Explicit registry
+        // pricing bypasses inference and calls `price_for_model_raw` with the
+        // caller-selected model.
+        self.price_for_model_raw(self.default_pricing_model(), curves, as_of)
     }
 
     fn base_value_raw_with_currency(
@@ -67,7 +77,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
         Ok((
-            self.base_value_raw_impl(curves, as_of)?,
+            finstack_quant_valuations_core::instruments::Instrument::base_value_raw(
+                self, curves, as_of,
+            )?,
             self.notional.currency(),
         ))
     }
@@ -81,24 +93,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
         }
-        match &self.cashflow_spec {
-            CashflowSpec::Floating(spec) => {
-                deps.add_forward_curve(spec.rate_spec.forward_curve_id.clone());
-                deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                    spec.rate_spec.forward_curve_id.as_str(),
-                ));
-            }
-            CashflowSpec::Amortizing { base, .. } => {
-                if let CashflowSpec::Floating(spec) = base.as_ref() {
-                    deps.add_forward_curve(spec.rate_spec.forward_curve_id.clone());
-                    deps.add_series_id(
-                        finstack_quant_core::market_data::fixings::fixing_series_id(
-                            spec.rate_spec.forward_curve_id.as_str(),
-                        ),
-                    );
-                }
-            }
-            _ => {}
+        if let Some(rate_spec) = self.cashflow_spec.floating_rate_spec() {
+            deps.add_forward_curve(rate_spec.forward_curve_id.clone());
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                rate_spec.forward_curve_id.as_str(),
+            ));
         }
         if let Some(call_put) = &self.call_put {
             for option in call_put.calls.iter().chain(&call_put.puts) {
@@ -130,11 +129,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         // Mirrors the guards in `base_value`: the shock is exact only for
         // bonds without embedded options, without an assigned credit curve,
         // and without a price-pinning quote other than `quoted_z_spread`.
-        self.return_floor.is_none()
-            && !self
-                .call_put
-                .as_ref()
-                .is_some_and(super::definitions::CallPutSchedule::has_options)
+        !self.has_exercise_rights()
             && self.credit_curve_id.is_none()
             && !self
                 .instrument_pricing_overrides
@@ -195,16 +190,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
     }
 }
 
-// Declare canonical market dependencies for DV01/CS01 calculators.
 impl Bond {
     /// Reject embedded bondholder or issuer rights that the Merton MC payoff
     /// kernel does not model.
     pub(crate) fn validate_merton_mc_embedded_rights(&self) -> finstack_quant_core::Result<()> {
-        let has_call_put = self
-            .call_put
-            .as_ref()
-            .is_some_and(super::definitions::CallPutSchedule::has_options);
-        if has_call_put || self.return_floor.is_some() {
+        if self.has_exercise_rights() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Merton MC pricing does not support embedded call, put, or return-floor rights for bond '{}'; select model 'tree' for rates-only optionality or 'rates_credit' for joint rates-credit optionality",
                 self.id
@@ -264,8 +254,8 @@ impl Bond {
         config: &finstack_quant_valuations_core::instruments::MertonMcConfig,
         discount_rate: f64,
         as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<crate::bond::pricing::engine::merton_mc::MertonMcResult> {
-        let run = crate::bond::pricing::engine::merton_mc::MertonMcRun::resolve(
+    ) -> finstack_quant_core::Result<crate::bond::pricing::merton_mc::MertonMcResult> {
+        let run = crate::bond::pricing::merton_mc::MertonMcRun::resolve(
             &self.id,
             &self.instrument_pricing_overrides.model_config,
         )?;
@@ -278,11 +268,11 @@ impl Bond {
     pub(crate) fn price_merton_mc_with_run(
         &self,
         config: &finstack_quant_valuations_core::instruments::MertonMcConfig,
-        run: &crate::bond::pricing::engine::merton_mc::MertonMcRun,
+        run: &crate::bond::pricing::merton_mc::MertonMcRun,
         discount_rate: f64,
         as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<crate::bond::pricing::engine::merton_mc::MertonMcResult> {
-        use crate::bond::pricing::engine::merton_mc::{MertonBondTerms, MertonMcEngine};
+    ) -> finstack_quant_core::Result<crate::bond::pricing::merton_mc::MertonMcResult> {
+        use crate::bond::pricing::merton_mc::{MertonBondTerms, MertonMcEngine};
         use finstack_quant_cashflows::builder::CouponType;
         use finstack_quant_valuations_core::instruments::{MertonMcConfig, PikMode, PikSchedule};
         use rust_decimal::prelude::ToPrimitive;
@@ -356,6 +346,32 @@ impl Bond {
         };
 
         MertonMcEngine::price_terms(&terms, config_ref, run, discount_rate)
+    }
+}
+
+impl finstack_quant_cashflows::CashflowScheduleSource for Bond {
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
+    }
+
+    fn raw_cashflow_schedule(
+        &self,
+        curves: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        let schedule = if let Some(ref custom) = self.custom_cashflows {
+            custom.clone()
+        } else {
+            self.full_cashflow_schedule(curves)?
+        };
+
+        let representation = if self.has_floating_coupons() {
+            CashflowRepresentation::Projected
+        } else {
+            CashflowRepresentation::Contractual
+        };
+
+        Ok(schedule.with_representation(representation))
     }
 }
 

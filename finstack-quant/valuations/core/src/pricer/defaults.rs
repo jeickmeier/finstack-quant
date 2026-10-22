@@ -93,15 +93,12 @@ fn validate_lmm_bermudan(label: &str, defaults: &LmmBermudanDefaults) -> Result<
         &format!("{label}.min_steps_between_exercises"),
         defaults.min_steps_between_exercises,
     )?;
-    let _seed = defaults.seed;
-    let _antithetic = defaults.antithetic;
     Ok(())
 }
 
 fn validate_merton_pik_bond(label: &str, defaults: &MertonPikBondDefaults) -> Result<()> {
     validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
     validate_positive_usize(&format!("{label}.steps_per_year"), defaults.steps_per_year)?;
-    let _antithetic = defaults.antithetic;
     Ok(())
 }
 
@@ -112,7 +109,6 @@ fn validate_revolving_credit(label: &str, defaults: &RevolvingCreditDefaults) ->
             defaults.num_paths
         )));
     }
-    let _antithetic = defaults.antithetic;
     Ok(())
 }
 

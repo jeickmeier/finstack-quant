@@ -1,16 +1,17 @@
 //! Spread calculators for structured credit (Z-spread, CS01, Spread Duration).
 
+use crate::structured_credit::metrics::discounted_flows;
 use crate::structured_credit::types::constants::{
     Z_SPREAD_INITIAL_BRACKET, Z_SPREAD_SOLVER_TOLERANCE,
 };
 use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::DatedFlows;
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -64,7 +65,7 @@ fn quoted_target_value(context: &mut MetricContext) -> Result<(f64, f64)> {
 /// - **RMBS (fixed)**: 100-250 bp typical
 /// - **CMBS (fixed)**: 75-200 bp typical
 ///
-pub struct ZSpreadCalculator;
+pub(crate) struct ZSpreadCalculator;
 
 impl MetricCalculator for ZSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
@@ -84,7 +85,7 @@ impl MetricCalculator for ZSpreadCalculator {
             &curve,
             Money::new(target, deal.pool.get_currency())?,
             settlement,
-        )? * 1e-4;
+        )? * ONE_BASIS_POINT;
         if !(Z_SPREAD_MIN..=Z_SPREAD_MAX).contains(&spread) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "structured-credit z-spread {spread} is outside [{Z_SPREAD_MIN}, {Z_SPREAD_MAX}]"
@@ -135,31 +136,15 @@ impl MetricCalculator for ZSpreadCalculator {
 /// - **CMBS AAA**: $4-$8 per $100 face
 ///
 /// For **floating-rate CLO**, `|CS01| >> |DV01|` (spread risk dominates IR risk).
-pub struct Cs01Calculator;
+pub(crate) struct Cs01Calculator;
 
 impl MetricCalculator for Cs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let base_spread = context
-            .computed
-            .get(&MetricId::ZSpread)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:ZSpread".to_string(),
-                })
-            })?;
+        let base_spread = context.computed_metric(&MetricId::ZSpread)?;
 
-        let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
-        })?;
+        let flows = context.require_cashflows()?;
 
-        let disc_curve_id = context.discount_curve_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "discount_curve_id".to_string(),
-            })
-        })?;
+        let disc_curve_id = context.require_discount_curve_id()?;
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
         let as_of = super::super::quote::settlement_date(
@@ -208,19 +193,11 @@ impl MetricCalculator for Cs01Calculator {
 /// For fixed-rate structures, spread duration ≈ modified duration.
 /// For floating-rate (CLO), spread duration >> IR duration.
 ///
-pub struct SpreadDurationCalculator;
+pub(crate) struct SpreadDurationCalculator;
 
 impl MetricCalculator for SpreadDurationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let cs01 = context
-            .computed
-            .get(&MetricId::Cs01)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Cs01".to_string(),
-                })
-            })?;
+        let cs01 = context.computed_metric(&MetricId::Cs01)?;
         if !cs01.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "structured-credit Z-spread CS01 must be finite; got {cs01}"
@@ -285,16 +262,7 @@ pub fn calculate_tranche_z_spread(
             "Z-spread target and cashflows must share one currency".into(),
         ));
     }
-    let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
-    let cached_flows: Vec<(f64, f64, f64)> = cashflows
-        .iter()
-        .filter(|(date, _)| *date > as_of)
-        .map(|(date, amount)| -> Result<(f64, f64, f64)> {
-            let t_from_as_of = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
-            let df = discount_curve.df_between_dates(as_of, *date)?;
-            Ok((t_from_as_of, df, amount.amount()))
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let cached_flows = discounted_flows(cashflows, discount_curve, as_of)?;
 
     let objective = |z: f64| -> f64 {
         let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
@@ -314,7 +282,7 @@ pub fn calculate_tranche_z_spread(
     let z_spread = solver.solve(objective, 0.0)?;
 
     // Convert to basis points
-    Ok(z_spread * 10_000.0)
+    Ok(z_spread * BASIS_POINTS_PER_UNIT)
 }
 
 /// Calculate tranche-specific CS01 (credit spread sensitivity).
@@ -346,32 +314,23 @@ pub fn calculate_tranche_z_spread(
 /// Sign convention follows the workspace canonical reference: long tranche /
 /// sell protection → negative; short tranche / buy protection → positive.
 pub fn calculate_tranche_cs01(
-    cashflows: &DatedFlows,
+    cashflows: &[(Date, Money)],
     discount_curve: &DiscountCurve,
     z_spread: f64,
     as_of: Date,
 ) -> Result<f64> {
-    let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
-
     let mut base_pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut bumped_pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let bumped_spread = z_spread + ONE_BASIS_POINT;
 
-    for (date, amount) in cashflows {
-        if *date <= as_of {
-            continue;
-        }
-
-        let t_from_as_of = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
-        let df = discount_curve.df_between_dates(as_of, *date)?;
-
+    for (t_from_as_of, df, amount) in discounted_flows(cashflows, discount_curve, as_of)? {
         // Base PV
         let df_base = df * (-z_spread * t_from_as_of).exp();
-        base_pv.add(amount.amount() * df_base);
+        base_pv.add(amount * df_base);
 
         // Bumped PV
         let df_bumped = df * (-bumped_spread * t_from_as_of).exp();
-        bumped_pv.add(amount.amount() * df_bumped);
+        bumped_pv.add(amount * df_bumped);
     }
 
     Ok(bumped_pv.total() - base_pv.total())
@@ -400,25 +359,19 @@ pub fn calculate_tranche_cs01(
 /// # Errors
 ///
 /// Returns an error if a year fraction or discount factor cannot be computed.
-pub fn calculate_tranche_spread_convexity(
+pub(crate) fn calculate_tranche_spread_convexity(
     cashflows: &DatedFlows,
     discount_curve: &DiscountCurve,
     z_spread: f64,
     as_of: Date,
 ) -> Result<f64> {
-    let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
     let mut base = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut up = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut down = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-    for (date, amount) in cashflows {
-        if *date <= as_of {
-            continue;
-        }
-        let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
-        let df = discount_curve.df_between_dates(as_of, *date)?;
-        base.add(amount.amount() * df * (-z_spread * t).exp());
-        up.add(amount.amount() * df * (-(z_spread + ONE_BASIS_POINT) * t).exp());
-        down.add(amount.amount() * df * (-(z_spread - ONE_BASIS_POINT) * t).exp());
+    for (t, df, amount) in discounted_flows(cashflows, discount_curve, as_of)? {
+        base.add(amount * df * (-z_spread * t).exp());
+        up.add(amount * df * (-(z_spread + ONE_BASIS_POINT) * t).exp());
+        down.add(amount * df * (-(z_spread - ONE_BASIS_POINT) * t).exp());
     }
     let pv = base.total();
     if pv <= 0.0 {
@@ -472,7 +425,7 @@ pub fn calculate_tranche_spread_convexity(
 /// fixed-rate, the price is not finite and positive, required
 /// discount/projection market data is unavailable, or the spread solve fails
 /// or exceeds the ±5000 bp bound.
-pub fn calculate_tranche_discount_margin(
+pub fn tranche_discount_margin(
     deal: &StructuredCredit,
     tranche_id: &str,
     market: &MarketContext,
@@ -480,16 +433,7 @@ pub fn calculate_tranche_discount_margin(
     market_price_pct: f64,
 ) -> Result<f64> {
     deal.validate_for_pricing()?;
-    let tranche = deal
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: format!("tranche:{tranche_id}"),
-            })
-        })?;
+    let tranche = deal.tranches.require(tranche_id)?;
 
     let RateSpec::Floating(_) = &tranche.coupon else {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -521,7 +465,7 @@ pub fn calculate_tranche_discount_margin(
         quote.settlement,
     )?;
 
-    Ok(checked_discount_margin_bp(z_spread_bp)? * 1e-4)
+    Ok(checked_discount_margin_bp(z_spread_bp)? * ONE_BASIS_POINT)
 }
 
 /// Discount margin in basis points from a floater's solved z-spread.
@@ -586,52 +530,28 @@ pub struct BucketedCs01Calculator;
 
 impl MetricCalculator for BucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        use finstack_quant_valuations_core::metrics::format_bucket_label_cow;
-        use finstack_quant_valuations_core::metrics::STANDARD_BUCKETS_YEARS;
+        use finstack_quant_valuations_core::metrics::{
+            format_bucket_label, STANDARD_BUCKETS_YEARS,
+        };
 
-        let base_spread = context
-            .computed
-            .get(&MetricId::ZSpread)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:ZSpread".to_string(),
-                })
-            })?;
+        let base_spread = context.computed_metric(&MetricId::ZSpread)?;
         let bumped_spread = base_spread + ONE_BASIS_POINT;
         let as_of = super::super::quote::settlement_date(
             context.instrument_as::<StructuredCredit>()?,
             context.as_of,
         )?;
 
-        let disc_curve_id = context.discount_curve_id.clone().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "discount_curve_id".to_string(),
-            })
-        })?;
+        let disc_curve_id = context.require_discount_curve_id().cloned()?;
 
         // Collect (year_fraction, discount_factor, amount) for surviving flows
         // into owned data, so no borrow of `context` outlives the curve/cashflow
         // reads — `store_bucketed_series` below needs `&mut context`.
-        let cached: Vec<(f64, f64, f64)> = {
-            let flows = context.cashflows.as_ref().ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "context.cashflows".to_string(),
-                })
-            })?;
+        let cached = {
+            let flows = context.require_cashflows()?;
             let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-            let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
             // Discount from `as_of` (settlement) so bucketed CS01 reconciles to the
             // parallel z-spread CS01, which now uses the same convention.
-            flows
-                .iter()
-                .filter(|(date, _)| *date > as_of)
-                .map(|(date, amount)| -> Result<(f64, f64, f64)> {
-                    let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
-                    let df = disc.df_between_dates(as_of, *date)?;
-                    Ok((t, df, amount.amount()))
-                })
-                .collect::<Result<Vec<_>>>()?
+            discounted_flows(flows, &disc, as_of)?
         };
 
         // Each cashflow's z-spread CS01 contribution, triangular-allocated to
@@ -650,7 +570,7 @@ impl MetricCalculator for BucketedCs01Calculator {
         let series: Vec<(std::borrow::Cow<'static, str>, f64)> = buckets
             .iter()
             .zip(bucket_pnl.iter())
-            .map(|(&t, &pnl)| (format_bucket_label_cow(t), pnl))
+            .map(|(&t, &pnl)| (format_bucket_label(t), pnl))
             .collect();
         let total: f64 = bucket_pnl.iter().sum();
 
@@ -725,7 +645,7 @@ mod zspread_quote_tests {
             MetricId::SpreadDuration,
         ] {
             let mut context = context_without_quote();
-            let err = crate::structured_credit::STRUCTURED_CREDIT
+            let err = crate::STRUCTURED_CREDIT
                 .metrics()
                 .compute(std::slice::from_ref(&requested), &mut context)
                 .expect_err("quote-dependent spread metrics must require an external quote");
@@ -745,7 +665,7 @@ mod zspread_quote_tests {
     #[test]
     fn spread_duration_normalizes_by_quote_reproducing_target() {
         let mut context = context_with_quote(90.0);
-        crate::structured_credit::STRUCTURED_CREDIT
+        crate::STRUCTURED_CREDIT
             .metrics()
             .compute(&[MetricId::SpreadDuration], &mut context)
             .expect("quoted spread duration");

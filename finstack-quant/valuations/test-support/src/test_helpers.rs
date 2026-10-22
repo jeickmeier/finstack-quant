@@ -22,7 +22,7 @@
 //! // Build curves with custom day count
 //! let disc = flat_discount_curve_with_day_count(0.05, as_of, "USD-OIS", DayCount::Act365F);
 //!
-//! // Use tolerance presets
+//! // Use tolerance presets from the crate's `tolerances` module
 //! approx_eq(actual, expected, tolerances::NUMERICAL, "test");
 //! ```
 
@@ -34,67 +34,6 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::approx_eq;
 use time::macros::date;
-
-/// Tolerance tiers for different test categories.
-///
-/// Use these standardized tolerances instead of ad-hoc hardcoded values
-/// to ensure consistency across the test suite.
-///
-/// ## Tolerance Hierarchy (strictest to loosest)
-///
-/// | Level | Constant | Value | Use Case |
-/// |-------|----------|-------|----------|
-/// | 1 | `ANALYTICAL` | 1e-6 (0.0001%) | Closed-form solutions (put-call parity, zero-coupon YTM) |
-/// | 2 | `NUMERICAL` | 1e-4 (0.01%) | Iterative methods (Newton-Raphson, tree pricing) |
-/// | 3 | `CURVE_PRICING` | 5e-3 (0.5%) | Curve-based valuations with convention differences |
-/// | 4 | `RELATIVE` | 1e-2 (1%) | Proportional comparisons, textbook benchmarks |
-/// | 5 | `BUMP_VS_ANALYTICAL` | 1.5e-2 (1.5%) | Bump-and-reprice vs analytical approximations |
-/// | 6 | `STATISTICAL` | 2e-2 (2%) | Monte Carlo and statistical tests |
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// use finstack_quant_valuations_test_support::test_helpers::tolerances;
-///
-/// // Use appropriate tolerance for test type
-/// assert!((actual - expected).abs() < tolerances::NUMERICAL);
-///
-/// // Or use the shared test-utils assertion
-/// approx_eq(actual, expected, tolerances::ANALYTICAL, "put-call parity");
-/// ```
-pub mod tolerances {
-    /// Analytical calculations (e.g., put-call parity, zero-coupon YTM).
-    /// These have closed-form solutions and should be very precise.
-    pub const ANALYTICAL: f64 = 1e-6; // 0.0001%
-
-    /// Numerical methods (e.g., tree pricing, Newton-Raphson solvers).
-    /// These involve iterative convergence and may have small residual errors.
-    pub const NUMERICAL: f64 = 1e-4; // 0.01%
-
-    /// Curve-based pricing with potential convention mismatches.
-    /// Accounts for compounding convention differences (e.g., semi-annual vs continuous).
-    pub const CURVE_PRICING: f64 = 5e-3; // 0.5%
-
-    /// Relative tolerance for scaling comparisons.
-    /// Used when comparing proportional changes across different scales.
-    pub const RELATIVE: f64 = 1e-2; // 1%
-
-    /// Bump-and-reprice vs analytical approximation comparisons.
-    ///
-    /// Used when comparing numerical bump-based sensitivities (e.g., DV01 computed
-    /// via curve parallel shift) against analytical approximations (e.g., DV01 ≈
-    /// -Price × ModDur × 0.0001). The difference arises from:
-    /// - Compounding convention mismatch (continuous vs periodic): ~0.6%
-    /// - Curve-based vs yield-based rate definitions
-    /// - Convexity effects (negligible for 1bp bumps)
-    ///
-    /// For par bonds on flat curves, actual differences are typically 0.5-1.5%.
-    pub const BUMP_VS_ANALYTICAL: f64 = 1.5e-2; // 1.5%
-
-    /// Statistical/Monte Carlo methods.
-    /// These have inherent sampling variance.
-    pub const STATISTICAL: f64 = 2e-2; // 2%
-}
 
 // Standard Test Dates
 
@@ -124,12 +63,6 @@ pub mod dates {
     /// Standard "today" date for tests: 2024-01-01
     pub const TODAY: Date = date!(2024 - 01 - 01);
 
-    /// Alternative "today" for tests needing a weekday: 2024-01-02 (Tuesday)
-    pub const TODAY_WEEKDAY: Date = date!(2024 - 01 - 02);
-
-    /// IMM date for quarterly rolls: 2024-03-20 (March IMM)
-    pub const IMM_DATE: Date = date!(2024 - 03 - 20);
-
     /// One year from TODAY
     pub fn one_year_hence() -> Date {
         date!(2025 - 01 - 01)
@@ -138,11 +71,6 @@ pub mod dates {
     /// Five years from TODAY
     pub fn five_years_hence() -> Date {
         date!(2029 - 01 - 01)
-    }
-
-    /// Ten years from TODAY
-    pub fn ten_years_hence() -> Date {
-        date!(2034 - 01 - 01)
     }
 
     /// Create a date with explicit year offset from TODAY
@@ -173,49 +101,7 @@ pub fn scaled_tolerance(base_tol: f64, value: f64, min_abs: f64) -> f64 {
 
 // Assertion Helpers
 
-/// Assert Money values are approximately equal.
-///
-/// Verifies currency matches and amounts are within tolerance.
-///
-/// # Arguments
-///
-/// * `actual` - Value produced by the code under test.
-/// * `expected` - Reference value; its currency must match `actual`.
-/// * `tolerance` - Maximum absolute difference between the two amounts.
-/// * `msg` - Label printed when the assertion fails.
-pub fn assert_money_eq(actual: Money, expected: Money, tolerance: f64, msg: &str) {
-    assert_eq!(
-        actual.currency(),
-        expected.currency(),
-        "{}: currency mismatch",
-        msg
-    );
-    approx_eq(actual.amount(), expected.amount(), tolerance, msg);
-}
-
 // Curve Builders - Discount Curves
-
-/// Create a flat discount curve for testing with simple knots.
-///
-/// Uses `dates::TODAY` as base date and LogLinear interpolation.
-/// For more control, use `flat_discount_curve()` or `flat_discount_curve_with_day_count()`.
-///
-/// # Arguments
-///
-/// * `rate` - Continuously compounded zero rate, as a decimal, applied at every knot.
-/// * `curve_id` - Identifier the market context is keyed by.
-pub fn flat_curve(rate: f64, curve_id: &str) -> DiscountCurve {
-    let base = dates::TODAY;
-    let t_max = 30.0; // 30 years
-    let df_max = (-rate * t_max).exp();
-
-    DiscountCurve::builder(curve_id)
-        .base_date(base)
-        .knots([(0.0, 1.0), (t_max, df_max)])
-        .interp(InterpStyle::LogLinear)
-        .build()
-        .unwrap()
-}
 
 /// Create a flat discount curve with custom rate and base date.
 ///
@@ -347,43 +233,6 @@ pub fn flat_forward_curve_with_tenor(
         .unwrap()
 }
 
-/// Create an upward-sloping forward curve for testing rate sensitivity.
-///
-/// Provides a realistic upward-sloping term structure for testing
-/// instruments sensitive to the shape of the forward curve.
-///
-/// # Arguments
-///
-/// * `base_rate` - Simple forward rate, as a decimal, at the short end of the curve.
-/// * `long_rate` - Simple forward rate, as a decimal, at the 30-year knot; interpolated between.
-/// * `base_date` - Curve base date; knot times are measured from it.
-/// * `curve_id` - Identifier the market context is keyed by.
-pub fn sloped_forward_curve(
-    base_rate: f64,
-    long_rate: f64,
-    base_date: Date,
-    curve_id: &str,
-) -> ForwardCurve {
-    // Linear interpolation between base_rate and long_rate
-    let rate_1y = base_rate + (long_rate - base_rate) * (1.0 / 30.0);
-    let rate_5y = base_rate + (long_rate - base_rate) * (5.0 / 30.0);
-    let rate_10y = base_rate + (long_rate - base_rate) * (10.0 / 30.0);
-
-    ForwardCurve::builder(curve_id, 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([
-            (0.0, base_rate),
-            (1.0, rate_1y),
-            (5.0, rate_5y),
-            (10.0, rate_10y),
-            (30.0, long_rate),
-        ])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap()
-}
-
 // Curve Builders - Hazard Curves
 
 /// Create a flat hazard curve with recovery rate.
@@ -442,49 +291,7 @@ pub fn flat_hazard_curve_with_knots(
         .unwrap()
 }
 
-/// Create a standard upward-sloping discount curve.
-///
-/// Useful for testing instruments sensitive to curve shape.
-///
-/// # Arguments
-///
-/// * `curve_id` - Identifier the market context is keyed by.
-pub fn upward_curve(curve_id: &str) -> DiscountCurve {
-    let base = dates::TODAY;
-
-    DiscountCurve::builder(curve_id)
-        .base_date(base)
-        .knots([
-            (0.0, 1.0),
-            (1.0, 0.97),
-            (2.0, 0.94),
-            (5.0, 0.85),
-            (10.0, 0.70),
-            (30.0, 0.40),
-        ])
-        .interp(InterpStyle::LogLinear)
-        .build()
-        .unwrap()
-}
-
 // Standard Market Context Builders
-
-/// Create a standard market context with USD and EUR curves.
-///
-/// Includes:
-/// - USD-OIS (5% flat discount)
-/// - USD-SOFR-3M (5.2% flat discount for 3M SOFR)
-/// - EUR-OIS (3% flat discount)
-/// - EUR-EURIBOR-6M (3.2% flat discount for 6M EURIBOR)
-///
-/// Uses `test_date()` as the base date (2025-01-01).
-pub fn standard_market() -> MarketContext {
-    MarketContext::new()
-        .insert(flat_curve(0.05, "USD-OIS"))
-        .insert(flat_curve(0.052, "USD-SOFR-3M"))
-        .insert(flat_curve(0.03, "EUR-OIS"))
-        .insert(flat_curve(0.032, "EUR-EURIBOR-6M"))
-}
 
 /// Create a USD swap market context with discount and forward curves.
 ///
@@ -575,66 +382,6 @@ pub fn year_fraction(start: Date, end: Date) -> f64 {
         .unwrap_or(0.0)
 }
 
-/// Black-Scholes analytical solution for European call (for validation)
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying price.
-/// * `strike` - Option strike in the same units as `spot`.
-/// * `rate` - Continuously compounded risk-free rate, as a decimal.
-/// * `vol` - Annualised volatility, as a decimal.
-/// * `time` - Time to expiry in years.
-/// * `div_yield` - Continuous dividend yield, as a decimal.
-pub fn black_scholes_call(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    vol: f64,
-    time: f64,
-    div_yield: f64,
-) -> f64 {
-    use finstack_quant_core::math::special_functions::norm_cdf;
-
-    if time <= 0.0 {
-        return (spot - strike).max(0.0);
-    }
-
-    let sqrt_t = time.sqrt();
-    let d1 = ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time) / (vol * sqrt_t);
-    let d2 = d1 - vol * sqrt_t;
-
-    let discount = (-rate * time).exp();
-    let forward_discount = (-(rate - div_yield) * time).exp();
-
-    spot * forward_discount * norm_cdf(d1) - strike * discount * norm_cdf(d2)
-}
-
-/// Black-Scholes analytical solution for European put (for validation)
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying price.
-/// * `strike` - Option strike in the same units as `spot`.
-/// * `rate` - Continuously compounded risk-free rate, as a decimal.
-/// * `vol` - Annualised volatility, as a decimal.
-/// * `time` - Time to expiry in years.
-/// * `div_yield` - Continuous dividend yield, as a decimal.
-pub fn black_scholes_put(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    vol: f64,
-    time: f64,
-    div_yield: f64,
-) -> f64 {
-    let call = black_scholes_call(spot, strike, rate, vol, time, div_yield);
-    let pv_strike = strike * (-rate * time).exp();
-    let pv_spot = spot * (-div_yield * time).exp();
-
-    // Put-call parity: P = C - S*e^(-qT) + K*e^(-rT)
-    call - pv_spot + pv_strike
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -654,31 +401,16 @@ mod tests {
         assert!((scaled_tolerance(1e-4, 0.0, 0.01) - 0.01).abs() < 1e-10);
     }
 
-    #[test]
-    fn test_tolerance_tiers_ordering() {
-        // Verify tolerance tiers are in expected order (strictest to loosest)
-        const _: () = {
-            assert!(tolerances::ANALYTICAL < tolerances::NUMERICAL);
-            assert!(tolerances::NUMERICAL < tolerances::CURVE_PRICING);
-            assert!(tolerances::CURVE_PRICING < tolerances::RELATIVE);
-            assert!(tolerances::RELATIVE < tolerances::BUMP_VS_ANALYTICAL);
-            assert!(tolerances::BUMP_VS_ANALYTICAL < tolerances::STATISTICAL);
-        };
-    }
-
     // Date Tests
 
     #[test]
     fn test_standard_dates() {
         // Verify date constants are correct
         assert_eq!(dates::TODAY, date!(2024 - 01 - 01));
-        assert_eq!(dates::TODAY_WEEKDAY, date!(2024 - 01 - 02));
-        assert_eq!(dates::IMM_DATE, date!(2024 - 03 - 20));
 
         // Verify date functions
         assert_eq!(dates::one_year_hence(), date!(2025 - 01 - 01));
         assert_eq!(dates::five_years_hence(), date!(2029 - 01 - 01));
-        assert_eq!(dates::ten_years_hence(), date!(2034 - 01 - 01));
     }
 
     #[test]
@@ -724,21 +456,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sloped_forward_curve() {
-        let curve = sloped_forward_curve(0.03, 0.06, dates::TODAY, "SLOPED");
-
-        // Start rate should be base_rate
-        assert!((curve.rate(0.0) - 0.03).abs() < 1e-6);
-
-        // End rate should be long_rate
-        assert!((curve.rate(30.0) - 0.06).abs() < 1e-6);
-
-        // Middle should be interpolated
-        let rate_15y = curve.rate(15.0);
-        assert!(rate_15y > 0.03 && rate_15y < 0.06);
-    }
-
-    #[test]
     fn test_flat_hazard_curve() {
         let curve = flat_hazard_curve(0.01, 0.40, dates::TODAY, "CREDIT");
         assert_eq!(curve.id().as_str(), "CREDIT");
@@ -750,13 +467,6 @@ mod tests {
     }
 
     // Market Context Tests
-
-    #[test]
-    fn test_standard_market_has_curves() {
-        let market = standard_market();
-        assert!(market.get_discount("USD-OIS").is_ok());
-        assert!(market.get_discount("EUR-OIS").is_ok());
-    }
 
     #[test]
     fn test_usd_swap_market() {
@@ -789,34 +499,6 @@ mod tests {
         assert!(market.get_hazard("CREDIT").is_ok());
     }
 
-    // Money Helper Tests
-
-    #[test]
-    fn test_money_helpers() {
-        let base = usd(100.0);
-        let bumped = usd(100.0 + tolerances::NUMERICAL * 0.5);
-        assert_money_eq(
-            base,
-            bumped,
-            tolerances::NUMERICAL,
-            "USD helper within tolerance",
-        );
-
-        let eur_value = eur(50.0);
-        assert_eq!(eur_value.currency(), Currency::EUR);
-    }
-
-    // Legacy Helper Tests
-
-    #[test]
-    fn test_upward_curve_builder() {
-        let curve = upward_curve("UPWARD");
-        assert_eq!(curve.id().as_str(), "UPWARD");
-        let df_short = curve.df(1.0);
-        let df_long = curve.df(10.0);
-        assert!(df_long < df_short);
-    }
-
     #[test]
     fn test_year_fraction_helper() {
         let start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
@@ -829,31 +511,5 @@ mod tests {
             yf
         );
         assert_eq!(standard_day_count(), DayCount::Act365F);
-    }
-
-    #[test]
-    fn test_black_scholes_put_call_parity() {
-        let spot = 100.0;
-        let strike = 100.0;
-        let rate = 0.05;
-        let vol = 0.20;
-        let time = 1.0;
-        let div = 0.0;
-
-        let call = black_scholes_call(spot, strike, rate, vol, time, div);
-        let put = black_scholes_put(spot, strike, rate, vol, time, div);
-
-        // Put-call parity: C - P = S - K*e^(-rT)
-        let lhs = call - put;
-        let rhs = spot - strike * (-rate * time).exp();
-
-        approx_eq(lhs, rhs, tolerances::ANALYTICAL, "Put-call parity");
-    }
-
-    #[test]
-    fn test_flat_curve_creation() {
-        let curve = flat_curve(0.05, "TEST");
-        assert_eq!(curve.id().as_str(), "TEST");
-        assert_eq!(curve.base_date(), dates::TODAY);
     }
 }

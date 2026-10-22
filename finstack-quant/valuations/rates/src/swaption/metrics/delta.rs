@@ -38,14 +38,14 @@ pub(crate) struct DeltaCalculator;
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &Swaption = context.instrument_as()?;
-        if context.pricing_model().is_some_and(|model| {
-            model == finstack_quant_valuations_core::pricer::ModelKey::HullWhite1F
-        }) {
-            return finstack_quant_valuations_core::metrics::sensitivities::option_greeks::selected_rate_greek(
+        if let Some(greek) =
+            finstack_quant_valuations_core::metrics::sensitivities::option_greeks::hw1f_rate_greek(
                 context,
                 option.get_discount_curve_id(),
                 false,
-            );
+            )
+        {
+            return greek;
         }
         let strike = option.strike_f64()?;
 

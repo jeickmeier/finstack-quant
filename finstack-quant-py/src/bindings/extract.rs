@@ -25,8 +25,9 @@ use crate::bindings::valuations::instruments::{
     serialize_typed_instrument_json, PyBond, PyTermLoan,
 };
 use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
+use crate::bindings::valuations::typed_convertible::PyConvertibleBond;
 use crate::bindings::valuations::typed_credit::{
-    PyCdsIndex, PyCdsOption, PyCdsTranche, PyConvertibleBond, PyCreditDefaultSwap,
+    PyCdsIndex, PyCdsOption, PyCdsTranche, PyCreditDefaultSwap,
 };
 use crate::bindings::valuations::typed_equity::PyEquityOption;
 use crate::bindings::valuations::typed_fx::{PyFxForward, PyFxOption};
@@ -97,8 +98,8 @@ impl InstrumentArg {
 /// # Extending this function
 ///
 /// Every typed instrument class is wired in here by adding exactly **one**
-/// cast arm that clones its `inner` into the matching [`InstrumentJson`]
-/// variant, ordered before the final envelope fallback. Update the fallback
+/// cast arm (its `inner` converts through `InstrumentJson::from`), ordered
+/// before the final envelope fallback. Update the fallback
 /// error message below to name each newly landed class.
 ///
 /// Currently wired: `Bond`, `TermLoan`, `InterestRateSwap`, `Swaption`,
@@ -107,33 +108,33 @@ impl InstrumentArg {
 /// `RevolvingCredit`, `AssetBackedFacility`, `CompositeInstrument`.
 pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
     macro_rules! typed {
-        ($($py:ty => $wrap:expr),+ $(,)?) => {
+        ($($py:ty),+ $(,)?) => {
             $(
                 if let Ok(typed) = obj.cast::<$py>() {
                     let inner = typed.borrow().inner.clone();
-                    return Ok(InstrumentArg::Typed(Box::new($wrap(inner))));
+                    return Ok(InstrumentArg::Typed(Box::new(InstrumentJson::from(inner))));
                 }
             )+
         };
     }
     typed!(
-        PyCompositeInstrument => InstrumentJson::from,
-        PyBond => InstrumentJson::Bond,
-        PyTermLoan => InstrumentJson::TermLoan,
-        PyRevolvingCredit => InstrumentJson::RevolvingCredit,
-        PyAssetBackedFacility => |inner| InstrumentJson::AssetBackedFacility(Box::new(inner)),
-        PyInterestRateSwap => InstrumentJson::InterestRateSwap,
-        PySwaption => InstrumentJson::Swaption,
-        PyCapFloor => InstrumentJson::CapFloor,
-        PyCreditDefaultSwap => InstrumentJson::CreditDefaultSwap,
-        PyCdsIndex => InstrumentJson::CdsIndex,
-        PyFxForward => InstrumentJson::FxForward,
-        PyFxOption => InstrumentJson::FxOption,
-        PyCdsOption => InstrumentJson::CdsOption,
-        PyCdsTranche => InstrumentJson::CdsTranche,
-        PyConvertibleBond => InstrumentJson::ConvertibleBond,
-        PyEquityOption => InstrumentJson::EquityOption,
-        PyStructuredCredit => |inner| InstrumentJson::StructuredCredit(Box::new(inner)),
+        PyCompositeInstrument,
+        PyBond,
+        PyTermLoan,
+        PyRevolvingCredit,
+        PyAssetBackedFacility,
+        PyInterestRateSwap,
+        PySwaption,
+        PyCapFloor,
+        PyCreditDefaultSwap,
+        PyCdsIndex,
+        PyFxForward,
+        PyFxOption,
+        PyCdsOption,
+        PyCdsTranche,
+        PyConvertibleBond,
+        PyEquityOption,
+        PyStructuredCredit,
     );
     envelope_json_text(obj).map(InstrumentArg::Envelope).map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(
@@ -415,16 +416,23 @@ pub fn extract_valuation_ref<'py>(
 
 /// Extract a decimal rate from a `float | int | Rate | Bps`.
 ///
-/// A `Rate` wrapper contributes `Rate::as_decimal()`; `Bps` is converted
-/// through `as_decimal()`. A bare number is taken as an already-decimal rate
-/// (`0.05` for 5%). No percent/bp coercion is applied to bare numbers — a
-/// caller holding basis points should pass a `Bps`. Percent quotes should be
-/// converted with `Rate::from_percent` before extraction.
+/// The one rate coercer of the bindings. A `Rate` wrapper contributes
+/// `Rate::as_decimal()`; `Bps` is converted through `as_decimal()`. A bare
+/// number is taken as an already-decimal rate (`0.05` for 5%). No percent/bp
+/// coercion is applied to bare numbers — a caller holding basis points should
+/// pass a `Bps`. Percent quotes should be converted with `Rate::from_percent`
+/// before extraction.
+///
+/// # Arguments
+///
+/// * `obj` - A Python `float`/`int` in decimal form, a
+///   `finstack_quant.core.types.Rate` or a `finstack_quant.core.types.Bps`.
+/// * `what` - Parameter name used in the `TypeError` message.
 ///
 /// # Errors
 ///
 /// Returns `TypeError` when `obj` is neither numeric nor a `Rate`/`Bps`.
-pub fn extract_rate_decimal(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
+pub fn extract_rate_decimal(obj: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
     if let Ok(rate) = obj.cast::<crate::bindings::core::types::PyRate>() {
         return Ok(rate.borrow().inner.as_decimal());
     }
@@ -433,7 +441,7 @@ pub fn extract_rate_decimal(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
     }
     obj.extract::<f64>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
-            "expected a decimal rate (float, e.g. 0.05 for 5%) or a Rate/Bps \
+            "{what}: expected a decimal rate (float, e.g. 0.05 for 5%) or a Rate/Bps \
              instance, got {}",
             obj.get_type()
                 .name()
@@ -445,16 +453,22 @@ pub fn extract_rate_decimal(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
 
 /// Extract a basis-point spread from a `float | int | Bps | Rate`.
 ///
-/// A `Bps` wrapper contributes its integer basis points as `f64`; a bare
-/// number is taken as already in basis points (`25.0` for 25 bp). A `Rate`
-/// reports its fractional basis points through the Rust `as_bp_f64` accessor,
-/// so a caller holding a decimal rate never has to
-/// rescale by hand.
+/// The one basis-point coercer of the bindings. A `Bps` wrapper contributes
+/// its integer basis points as `f64`; a bare number is taken as already in
+/// basis points (`25.0` for 25 bp). A `Rate` reports its fractional basis
+/// points through the Rust `as_bp_f64` accessor, so a caller holding a decimal
+/// rate never has to rescale by hand.
+///
+/// # Arguments
+///
+/// * `obj` - A Python `float`/`int` in basis points, a
+///   `finstack_quant.core.types.Bps` or a `finstack_quant.core.types.Rate`.
+/// * `what` - Parameter name used in the `TypeError` message.
 ///
 /// # Errors
 ///
 /// Returns `TypeError` when `obj` is neither numeric nor a `Bps`/`Rate`.
-pub fn extract_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
+pub fn extract_basis_points(obj: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
     if let Ok(bps) = obj.cast::<crate::bindings::core::types::PyBps>() {
         return Ok(f64::from(bps.borrow().inner.as_bp()));
     }
@@ -463,7 +477,7 @@ pub fn extract_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
     }
     obj.extract::<f64>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
-            "expected a spread in basis points (float, e.g. 25.0) or a Bps/Rate \
+            "{what}: expected a spread in basis points (float, e.g. 25.0) or a Bps/Rate \
              instance, got {}",
             obj.get_type()
                 .name()

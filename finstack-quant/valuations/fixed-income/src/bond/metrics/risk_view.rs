@@ -21,7 +21,6 @@
 //!   NOT used — wrong compounding basis).
 
 use crate::bond::metrics::effective::option_risk_bond_and_base_price;
-use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
 use crate::bond::Bond;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
@@ -29,15 +28,14 @@ use finstack_quant_valuations_core::pricer::ModelKey;
 use std::sync::Arc;
 
 pub(super) fn active_model_consumes_credit(context: &MetricContext, bond: &Bond) -> bool {
-    let model = context
-        .pricing_model()
-        .unwrap_or_else(|| bond.default_pricing_model());
-    matches!(model, ModelKey::HazardRate | ModelKey::RatesCredit)
+    matches!(
+        super::active_model(context, bond),
+        ModelKey::HazardRate | ModelKey::RatesCredit
+    )
 }
 
 pub(super) fn plain_rate_quote_requires_z_spread(context: &MetricContext, bond: &Bond) -> bool {
-    let has_options =
-        bond.return_floor.is_some() || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+    let has_options = bond.has_exercise_rights();
     bond.instrument_pricing_overrides
         .market_quotes
         .has_price_driver()
@@ -58,8 +56,7 @@ fn bond_risk_view(context: &mut MetricContext) -> finstack_quant_core::Result<Op
         {
             return Ok(None);
         }
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         let has_credit_curve = active_model_consumes_credit(context, bond)
             && !bond.market_dependencies()?.curves.credit_curves.is_empty();
         (bond.clone(), has_options || has_credit_curve)
@@ -76,20 +73,8 @@ fn bond_risk_view(context: &mut MetricContext) -> finstack_quant_core::Result<Op
     }
 
     // Plain rate → periodic quoted_z_spread clone (convention-correct).
-    let z = context
-        .computed
-        .get(&MetricId::ZSpread)
-        .copied()
-        .ok_or_else(|| {
-            finstack_quant_valuations_core::metrics::metric_not_found(MetricId::ZSpread)
-        })?;
-    let mut cleared = bond_clone;
-    clear_price_driving_overrides(&mut cleared);
-    cleared
-        .instrument_pricing_overrides
-        .market_quotes
-        .quoted_z_spread = Some(z);
-    Ok(Some(cleared))
+    let z = context.computed_metric(&MetricId::ZSpread)?;
+    Ok(Some(super::z_pinned(bond_clone, z)))
 }
 
 /// Run rate or quote-space spread risk against the quote-reproducing view.

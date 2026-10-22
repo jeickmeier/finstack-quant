@@ -5,7 +5,7 @@
 use crate::loan_quotes::oid_eir_schedule_from_flows;
 use crate::revolving_credit::RevolvingCredit;
 use finstack_quant_cashflows::CashflowScheduleSource;
-use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Computes the EIR amortization series from the origination date and
 /// returns the total amortization; stores `oid_eir_rate` and the dated
@@ -40,28 +40,6 @@ impl MetricCalculator for OidEirAmortizationCalculator {
             facility.commitment.currency(),
             spec.include_fees,
         )?;
-
-        context
-            .computed
-            .insert(MetricId::custom("oid_eir_rate"), eir.effective_rate);
-        if !eir.periods.is_empty() {
-            context.store_bucketed_series(
-                MetricId::custom("oid_eir_amortization"),
-                eir.periods
-                    .iter()
-                    .map(|p| (p.date.to_string(), p.oid_amortization.amount())),
-            );
-            context.store_bucketed_series(
-                MetricId::custom("oid_eir_carrying_value"),
-                eir.periods
-                    .iter()
-                    .map(|p| (p.date.to_string(), p.closing_balance.amount())),
-            );
-        }
-        Ok(eir
-            .periods
-            .iter()
-            .map(|p| p.oid_amortization.amount())
-            .sum())
+        Ok(eir.record(context))
     }
 }

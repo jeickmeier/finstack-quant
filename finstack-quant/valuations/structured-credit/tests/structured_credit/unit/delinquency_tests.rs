@@ -233,22 +233,20 @@ fn servicer_advancing_keeps_senior_interest_current() {
         vec![1.0, 1.0, 1.0],
         vec![0.0, 0.0, 0.0],
     ));
-    let advancing = abs(
-        DelinquencyModel::new(vec![1.0, 1.0, 1.0], vec![0.0, 0.0, 0.0]).with_advancing(
-            AdvancingPolicy::PrincipalAndInterest {
-                recoverability_cap_pct: 100.0,
-                reimburse_from_collections: false,
-            },
-        ),
-    );
-    let capped_out = abs(
-        DelinquencyModel::new(vec![1.0, 1.0, 1.0], vec![0.0, 0.0, 0.0]).with_advancing(
-            AdvancingPolicy::PrincipalAndInterest {
-                recoverability_cap_pct: 0.0,
-                reimburse_from_collections: false,
-            },
-        ),
-    );
+    let advancing = abs(DelinquencyModel {
+        advancing: AdvancingPolicy::PrincipalAndInterest {
+            recoverability_cap_pct: 100.0,
+            reimburse_from_collections: false,
+        },
+        ..DelinquencyModel::new(vec![1.0, 1.0, 1.0], vec![0.0, 0.0, 0.0])
+    });
+    let capped_out = abs(DelinquencyModel {
+        advancing: AdvancingPolicy::PrincipalAndInterest {
+            recoverability_cap_pct: 0.0,
+            reimburse_from_collections: false,
+        },
+        ..DelinquencyModel::new(vec![1.0, 1.0, 1.0], vec![0.0, 0.0, 0.0])
+    });
 
     let without = simulate(&no_advancing);
     let with = simulate(&advancing);
@@ -402,9 +400,10 @@ fn advancing(reimburse_from_collections: bool) -> AdvancingPolicy {
 /// coupon in every month.
 #[test]
 fn cures_repay_arrears_and_reimburse_the_servicer_first() {
-    let deal = abs_one_off(
-        DelinquencyModel::new(vec![1.0, 0.0], vec![0.0, 1.0]).with_advancing(advancing(false)),
-    );
+    let deal = abs_one_off(DelinquencyModel {
+        advancing: advancing(false),
+        ..DelinquencyModel::new(vec![1.0, 0.0], vec![0.0, 1.0])
+    });
     let periods = periods(&deal);
     let entry = periods[0].delinquent_balance.amount();
     assert!(
@@ -451,12 +450,14 @@ fn cures_repay_arrears_and_reimburse_the_servicer_first() {
 /// collections.
 #[test]
 fn non_recoverable_advances_come_off_the_top_of_collections_when_configured() {
-    let absorbed = abs_one_off(
-        DelinquencyModel::new(vec![1.0, 1.0], vec![0.0, 0.0]).with_advancing(advancing(false)),
-    );
-    let reimbursed = abs_one_off(
-        DelinquencyModel::new(vec![1.0, 1.0], vec![0.0, 0.0]).with_advancing(advancing(true)),
-    );
+    let absorbed = abs_one_off(DelinquencyModel {
+        advancing: advancing(false),
+        ..DelinquencyModel::new(vec![1.0, 1.0], vec![0.0, 0.0])
+    });
+    let reimbursed = abs_one_off(DelinquencyModel {
+        advancing: advancing(true),
+        ..DelinquencyModel::new(vec![1.0, 1.0], vec![0.0, 0.0])
+    });
     let absorbed = periods(&absorbed);
     let reimbursed = periods(&reimbursed);
     let entry = absorbed[0].delinquent_balance.amount();

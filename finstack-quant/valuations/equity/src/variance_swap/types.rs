@@ -15,7 +15,7 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::MarketDependencies;
 
-pub(crate) use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::PayReceive;
 
 fn default_observation_business_day_convention() -> BusinessDayConvention {
     BusinessDayConvention::Following
@@ -406,11 +406,6 @@ impl VarianceSwap {
             .unwrap_or(self.final_observation_date()?))
     }
 
-    /// Get the discount curve ID for this variance swap.
-    pub fn get_discount_curve_id(&self) -> &CurveId {
-        &self.discount_curve_id
-    }
-
     /// Calculate payoff given realized variance.
     pub fn payoff(&self, realized_variance: f64) -> finstack_quant_core::Result<Money> {
         let variance_diff = realized_variance - self.strike_variance;
@@ -419,26 +414,6 @@ impl VarianceSwap {
             self.notional.amount() * variance_diff * sign,
             self.notional.currency(),
         )
-    }
-
-    /// Get observation dates based on frequency.
-    ///
-    /// Day tenors use the calendar in
-    /// `attributes.meta["observation_calendar_id"]` (or `calendar_id`),
-    /// defaulting to weekends-only. Non-business start and maturity dates are
-    /// adjusted following and preceding, respectively.
-    pub fn observation_dates(&self) -> Result<Vec<Date>> {
-        pricer::observation_dates(self)
-    }
-
-    /// Calculate annualization factor based on observation frequency.
-    ///
-    /// Daily observations annualise with the contract's
-    /// `trading_days_per_year` (252 by default, Demeterfi et al., 1999):
-    /// σ²_annual = (trading_days_per_year/N) × Σ [ln(S_i/S_{i-1})]² for N
-    /// observations. Weekly and month-based frequencies use 52 and 12.
-    pub fn annualization_factor(&self) -> f64 {
-        pricer::annualization_factor(self)
     }
 
     /// Calculate the fraction of time elapsed in the observation period.
@@ -465,59 +440,6 @@ impl VarianceSwap {
             .unwrap_or(0.0)
             .clamp(0.0, total);
         (elapsed / total).clamp(0.0, 1.0)
-    }
-
-    /// Fraction of contractual variance samples observed by valuation date.
-    ///
-    /// Close-to-close and Yang-Zhang exclude the initial anchoring level;
-    /// other OHLC estimators count each observed bar. Uses the observation
-    /// schedule, including its calendar adjustments, rather than elapsed days.
-    ///
-    /// # Arguments
-    ///
-    /// * `as_of` - Valuation date; scheduled observations on this date are included. Dates before inception return zero and dates at or after the final observation return one.
-    pub fn realized_fraction_by_observations(&self, as_of: Date) -> Result<f64> {
-        pricer::realized_fraction_by_observations(self, as_of)
-    }
-
-    /// Get historical prices aligned to observation dates when available.
-    pub fn get_historical_prices(&self, market: &MarketContext, as_of: Date) -> Result<Vec<f64>> {
-        pricer::get_historical_prices(self, market, as_of)
-    }
-
-    /// Calculate partial realized variance for the elapsed period.
-    pub fn partial_realized_variance(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
-        pricer::partial_realized_variance(self, market, as_of)
-    }
-
-    /// Calculate implied forward variance for the remaining period.
-    ///
-    /// Uses the Carr-Madan (1998) replication formula when a volatility surface is available:
-    /// ```text
-    /// E[σ²] = (2·e^{rT}/T) × ∫ [V(K)/K²] dK − (2/T)·[(F/K₀ − 1) − ln(F/K₀)]
-    /// ```
-    /// where V(K) are OTM put/call prices, F is the forward price, and K₀ is the highest
-    /// strike at or below the forward. The anchor term is the EXACT Demeterfi et al.
-    /// log-contract correction (not its second-order Taylor expansion). For a
-    /// forward-starting swap (`as_of < start_date`) the pre-start leg is removed
-    /// via the total-variance identity. Sparse or missing surfaces error unless
-    /// the instrument carries an explicit flat implied-volatility override.
-    ///
-    /// References: Carr, P. & Madan, D. (1998). "Towards a Theory of Volatility Trading";
-    /// Demeterfi, Derman, Kamal & Zou (1999). "More Than You Ever Wanted to Know About
-    /// Volatility Swaps."
-    pub fn remaining_forward_variance(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
-        pricer::remaining_forward_variance(self, market, _as_of)
-    }
-
-    /// Seasoned mark-to-market expected variance: the day-count time-weighted
-    /// blend of realized-to-date and remaining forward variance.
-    ///
-    /// This is exactly the expected variance the pricer feeds into the payoff for
-    /// a partially-observed swap (`start_date <= as_of < maturity`), so the
-    /// `ExpectedVariance` metric and the swap's PV stay consistent (W-33).
-    pub fn seasoned_expected_variance(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
-        pricer::seasoned_expected_variance(self, market, as_of)
     }
 }
 
@@ -579,7 +501,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for VarianceSwap {
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 impl finstack_quant_cashflows::CashflowScheduleSource for VarianceSwap {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
         Ok(Some(self.notional))

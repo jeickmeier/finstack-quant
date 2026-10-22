@@ -25,7 +25,6 @@ pub(crate) fn compute_pv(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    inst.validate()?;
     let settlement_date = inst.effective_settlement_date()?;
     if as_of > settlement_date {
         return Ok(Money::from((0_i64, inst.notional.currency())));
@@ -43,13 +42,13 @@ pub(crate) fn compute_pv(
 }
 
 pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Result<Vec<Date>> {
-    finstack_quant_valuations_core::instruments::common_impl::pricing::variance_observations::variance_observation_dates(
+    finstack_quant_valuations_core::instruments::pricing::variance_observations::variance_observation_dates(
         inst.start_date,
         inst.maturity,
         inst.observation_frequency,
         inst.observation_business_day_convention,
         inst.observation_end_of_month,
-        finstack_quant_valuations_core::instruments::common_impl::pricing::variance_observations::VarianceCalendar::Joint {
+        finstack_quant_valuations_core::instruments::pricing::variance_observations::VarianceCalendar::Joint {
             base: &inst.base_calendar_id,
             quote: &inst.quote_calendar_id,
         },
@@ -57,88 +56,18 @@ pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Result<Vec<Date>> {
 }
 
 pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {
-    finstack_quant_valuations_core::instruments::common_impl::pricing::variance_observations::annualization_factor(
+    finstack_quant_valuations_core::instruments::pricing::variance_observations::annualization_factor(
         inst.observation_frequency,
         inst.trading_days_per_year,
     )
 }
 
 pub(crate) fn realized_fraction_by_observations(inst: &FxVarianceSwap, as_of: Date) -> Result<f64> {
-    Ok(realized_fraction_by_observations_with_dates(
-        inst,
-        as_of,
+    finstack_quant_valuations_core::instruments::pricing::variance_observations::realized_sample_fraction(
         &observation_dates(inst)?,
-    ))
-}
-
-/// Fraction of the observation period elapsed at `as_of`, measured by the
-/// instrument's day-count convention.
-///
-/// This descriptive calendar-time fraction is not the contractual variance
-/// weight. Pricing normalizes expected squared returns by the full number of
-/// scheduled return samples, including weekends and irregular observation gaps.
-pub(crate) fn time_elapsed_fraction(inst: &FxVarianceSwap, as_of: Date) -> Result<f64> {
-    let final_observation_date = observation_dates(inst)?
-        .last()
-        .copied()
-        .unwrap_or(inst.maturity);
-    if as_of <= inst.start_date {
-        return Ok(0.0);
-    }
-    if as_of >= final_observation_date {
-        return Ok(1.0);
-    }
-    let total = inst.day_count.year_fraction(
-        inst.start_date,
-        final_observation_date,
-        DayCountContext::default(),
-    )?;
-    if total <= 0.0 {
-        return Ok(0.0);
-    }
-    let elapsed = inst
-        .day_count
-        .year_fraction(inst.start_date, as_of, DayCountContext::default())?
-        .clamp(0.0, total);
-    Ok((elapsed / total).clamp(0.0, 1.0))
-}
-
-fn realized_fraction_by_observations_with_dates(
-    inst: &FxVarianceSwap,
-    as_of: Date,
-    all: &[Date],
-) -> f64 {
-    if all.is_empty() {
-        return 0.0;
-    }
-    if as_of >= all.last().copied().unwrap_or(inst.maturity) {
-        return 1.0;
-    }
-    let accrued = all.iter().filter(|&&d| d <= as_of).count();
-    use finstack_quant_core::math::stats::RealizedVarMethod;
-    let (realized, total) = match inst.realized_var_method {
-        RealizedVarMethod::CloseToClose | RealizedVarMethod::YangZhang => {
-            // Yang-Zhang's first close anchors the overnight return of the
-            // next bar; it is not itself an estimator sample.
-            (accrued.saturating_sub(1), all.len().saturating_sub(1))
-        }
-        RealizedVarMethod::Parkinson
-        | RealizedVarMethod::GarmanKlass
-        | RealizedVarMethod::RogersSatchell => (accrued, all.len()),
-    };
-    if total == 0 {
-        0.0
-    } else {
-        realized as f64 / total as f64
-    }
-}
-
-pub(crate) fn get_historical_prices(
-    inst: &FxVarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-) -> Result<Vec<f64>> {
-    get_historical_prices_with_dates(inst, context, as_of, &observation_dates(inst)?)
+        as_of,
+        inst.realized_var_method,
+    )
 }
 
 fn get_historical_prices_with_dates(
@@ -246,16 +175,7 @@ fn partial_realized_variance_with_dates(
     as_of: Date,
     obs_dates: &[Date],
 ) -> Result<f64> {
-    realized_variance_with_factor(inst, context, as_of, obs_dates, annualization_factor(inst))
-}
-
-fn realized_variance_with_factor(
-    inst: &FxVarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-    obs_dates: &[Date],
-    annualization_factor: f64,
-) -> Result<f64> {
+    let annualization_factor = annualization_factor(inst);
     if inst.realized_var_method.requires_ohlc() {
         let (open, high, low, close) =
             get_historical_ohlc_with_dates(inst, context, as_of, obs_dates)?;
@@ -935,13 +855,13 @@ mod tests {
     /// calendar-time weights do not change already fixed return contributions.
     #[test]
     fn fx_seasoned_mtm_uses_contractual_sample_normalization() {
-        use crate::fx_variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
+        use finstack_quant_valuations_core::instruments::PayReceive;
 
         let start = date!(2025 - 01 - 06); // Monday
         let maturity = date!(2025 - 06 - 30); // Monday
@@ -971,7 +891,24 @@ mod tests {
 
         let count_w =
             realized_fraction_by_observations(&swap, as_of).expect("observation fraction");
-        let time_w = time_elapsed_fraction(&swap, as_of).expect("time fraction");
+        // Calendar-time weight over the observation window: the counterfactual
+        // the observation-count weighting replaces.
+        let final_observation = *observation_dates(&swap)
+            .expect("observation schedule")
+            .last()
+            .expect("observation dates");
+        let time_w = swap
+            .day_count
+            .year_fraction(swap.start_date, as_of, DayCountContext::default())
+            .expect("elapsed")
+            / swap
+                .day_count
+                .year_fraction(
+                    swap.start_date,
+                    final_observation,
+                    DayCountContext::default(),
+                )
+                .expect("window");
         assert!(
             (count_w - time_w).abs() > 1e-4,
             "schedule must make count weight ({count_w}) differ from time weight ({time_w})"
@@ -1048,12 +985,12 @@ mod tests {
     /// r_low for [as_of, mat]) so the two lookups diverge materially.
     #[test]
     fn fx_variance_swap_forward_recovery_is_date_based() {
-        use crate::fx_variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
+        use finstack_quant_valuations_core::instruments::PayReceive;
 
         // Three dates:
         //   base_date  = 2025-01-02  (curve anchor)
@@ -1252,12 +1189,12 @@ mod tests {
     /// is `dom.df_between_dates(as_of, maturity)`.
     #[test]
     fn fx_variance_swap_terminal_discount_is_date_based() {
-        use crate::fx_variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
+        use finstack_quant_valuations_core::instruments::PayReceive;
 
         // Curve base date is well before the valuation date (a stale-but-valid
         // curve). `df(t)` is anchored at base_date, so feeding it

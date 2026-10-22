@@ -210,7 +210,7 @@ export default [
   {
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/coupon_barriers",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json#/$defs/Autocallable/properties/coupon_barriers",
-    "description": "Coupon barriers corresponding to observation dates."
+    "description": "Coupon barriers as ratios of initial spot.\n\nCoupon eligibility is independent of the autocall barrier. Each entry\ncorresponds to the observation date at the same index."
   },
   {
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/coupon_barriers/items",
@@ -244,7 +244,6 @@ export default [
   {
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/div_yield_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json#/$defs/Autocallable/properties/div_yield_id",
-    "default": null,
     "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
   },
   {
@@ -294,7 +293,6 @@ export default [
   {
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json#/$defs/Autocallable/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -303,14 +301,11 @@ export default [
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/memory_coupons",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json#/$defs/Autocallable/properties/memory_coupons",
     "default": false,
-    "description": "Memory (\"Phoenix\") coupon feature.\n\nMissed coupons accrue until a later coupon barrier is met."
+    "description": "Memory (\"Phoenix\") coupon feature.\n\nWhen enabled, a coupon whose coupon barrier is missed accrues until a\nlater observation meets its coupon barrier. The current and all accrued\ncoupons are then paid on that observation's payment date. Coupon\neligibility remains independent of autocall eligibility."
   },
   {
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json#/$defs/Autocallable/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -357,14 +352,14 @@ export default [
   {
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/path_model",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json#/$defs/Autocallable/properties/path_model",
-    "description": "Explicit path model selection; required to acknowledge model risk.",
+    "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation.",
     "ref": "#/$defs/EquityPathModel",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json#/$defs/EquityPathModel"
   },
   {
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/payment_dates",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json#/$defs/Autocallable/properties/payment_dates",
-    "description": "Contractual payment dates corresponding to observation dates."
+    "description": "Contractual payment dates for coupons and early redemption.\n\nEach entry corresponds to `observation_dates` at the same index."
   },
   {
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/payment_dates/items",
@@ -375,7 +370,6 @@ export default [
   {
     "path": "#/$defs/d_090a2e8da3e1c2418317/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json#/$defs/Autocallable/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"

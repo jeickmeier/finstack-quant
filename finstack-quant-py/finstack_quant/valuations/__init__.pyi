@@ -223,30 +223,11 @@ class ValuationResult:
         -------
         Money
             The valuation amount with its currency; ``value.amount`` is the
-            ``float`` view, ``price_decimal()`` the exact string.
+            ``float`` view, ``value.amount_decimal`` the exact ``decimal.Decimal``.
 
         Notes
         -----
         This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def price_decimal(self) -> str:
-        """
-        Return the exact Decimal price as a string, without a float round-trip.
-
-        Unlike the ``price`` property (a lossy ``float``), this preserves the
-        internal Decimal representation exactly. Pass the result to
-        ``decimal.Decimal`` for lossless arithmetic in Python.
-
-        Returns
-        -------
-        str
-            Exact decimal string of the valuation amount, e.g. ``"1000000.00"``.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
         """
         ...
 
@@ -456,36 +437,6 @@ class ValuationResult:
         Notes
         -----
         This method does not raise; it returns the derived mapping.
-        """
-        ...
-
-    def metric_keys(self) -> list[str]:
-        """
-        List metric keys present on this result.
-
-        Returns
-        -------
-        list[str]
-            All measure keys as strings.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def metric_count(self) -> int:
-        """
-        Count of measures stored on this result.
-
-        Returns
-        -------
-        int
-            Number of entries in the measures map.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
         """
         ...
 

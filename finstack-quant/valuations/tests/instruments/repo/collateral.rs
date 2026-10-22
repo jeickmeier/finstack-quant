@@ -3,12 +3,23 @@
 use super::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations::instruments::rates::repo::{
     CollateralSpec, CollateralType, Repo, RepoType,
 };
 use rust_decimal::Decimal;
+
+/// Collateral market value minus the haircut-implied required value.
+///
+/// The subtraction is currency-checked, so mixed-currency collateral errors.
+fn collateral_cushion(repo: &Repo, market: &MarketContext) -> finstack_quant_core::Result<f64> {
+    let value = repo.collateral.market_value(market)?;
+    Ok(value
+        .checked_sub(repo.required_collateral_value()?)?
+        .amount())
+}
 
 #[allow(unused_imports)]
 use finstack_quant_valuations::instruments::rates::repo as _;
@@ -215,7 +226,7 @@ fn test_adequately_collateralized() {
     // Collateral value: 1,020,000
     // Required: 1,020,000
     // Should be adequate
-    let is_adequate = repo.is_adequately_collateralized(&context).unwrap();
+    let is_adequate = collateral_cushion(&repo, &context).unwrap() >= 0.0;
     assert!(is_adequate);
 }
 
@@ -238,7 +249,7 @@ fn test_undercollateralized() {
     // Collateral value: 850,000
     // Required: 1,020,000
     // Should be inadequate
-    let is_adequate = repo.is_adequately_collateralized(&context).unwrap();
+    let is_adequate = collateral_cushion(&repo, &context).unwrap() >= 0.0;
     assert!(!is_adequate);
 }
 
@@ -263,7 +274,7 @@ fn test_overcollateralized() {
     // Collateral value: 1,050,000
     // Required: 1,020,000
     // Should be adequate with cushion
-    let is_adequate = repo.is_adequately_collateralized(&context).unwrap();
+    let is_adequate = collateral_cushion(&repo, &context).unwrap() >= 0.0;
     assert!(is_adequate);
 }
 
@@ -354,6 +365,6 @@ fn test_collateral_currency_safety() {
     .expect("Repo construction should succeed");
 
     // Should error due to currency mismatch
-    let result = repo.is_adequately_collateralized(&context);
+    let result = collateral_cushion(&repo, &context);
     assert!(result.is_err());
 }

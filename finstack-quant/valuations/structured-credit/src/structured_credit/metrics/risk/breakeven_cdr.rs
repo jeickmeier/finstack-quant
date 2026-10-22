@@ -62,7 +62,7 @@ const WRITEDOWN_EPS_FRACTION: f64 = 1e-4;
 ///
 /// Returns an error if the tranche cashflows cannot be projected for a probed
 /// CDR.
-pub fn calculate_tranche_breakeven_cdr(
+pub fn tranche_breakeven_cdr(
     deal: &StructuredCredit,
     tranche_id: &str,
     market: &MarketContext,
@@ -74,14 +74,7 @@ pub fn calculate_tranche_breakeven_cdr(
     // Scale the "first dollar of loss" threshold to this tranche.
     let original_balance = deal
         .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: format!("tranche:{tranche_id}"),
-            })
-        })?
+        .require(tranche_id)?
         .original_balance
         .amount()
         .abs();

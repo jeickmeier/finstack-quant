@@ -38,7 +38,7 @@
 //! - **Recovery rates**: Standard 40% for senior, 20% for subordinated
 //! - **Accrual-on-default**: analytical piecewise-constant integration over
 //!   hazard/discount knots (ISDA Standard Model; see
-//!   `cds::pricer::engine::accrual_on_default_isda_standard_model_cond`)
+//!   `cds::pricing::engine`)
 //!
 //! # ISDA Conventions
 //!
@@ -85,8 +85,6 @@ pub(crate) mod cs01;
 
 mod family;
 pub use family::CREDIT;
-
-extern crate self as finstack_quant_valuations_credit;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

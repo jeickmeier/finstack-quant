@@ -21,7 +21,7 @@ use finstack_quant_valuations::instruments::{
     OptionGreekKind, OptionGreeksProvider, OptionGreeksRequest,
 };
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations_test_support::builders::test_market;
+use finstack_quant_valuations_test_support::builders::TestMarketBuilder;
 use std::sync::Arc;
 use time::macros::date;
 
@@ -30,7 +30,7 @@ fn equity_option_provider_matches_registered_metrics_and_omits_foreign_rho() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
     let option = test_option(expiry).div_yield_id("SPOT_DIV").build();
-    let market = test_market(as_of).div_yield(0.02).build();
+    let market = TestMarketBuilder::new(as_of).div_yield(0.02).build();
 
     let metrics = [
         MetricId::Delta,

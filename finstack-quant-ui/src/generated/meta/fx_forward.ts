@@ -968,15 +968,24 @@ export default [
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/attributes",
-    "description": "Attributes for scenario selection and tagging.",
+    "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/base_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/base_calendar_id",
-    "default": null,
     "description": "Optional base currency calendar for business day adjustment."
+  },
+  {
+    "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/base_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/base_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/base_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/base_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/base_currency",
@@ -988,7 +997,6 @@ export default [
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/contract_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/contract_rate",
-    "default": null,
     "description": "Contract forward rate (quote per base). If None, valued at-market.",
     "format": "double"
   },
@@ -1016,7 +1024,6 @@ export default [
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -1031,9 +1038,6 @@ export default [
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -1048,8 +1052,17 @@ export default [
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/quote_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/quote_calendar_id",
-    "default": null,
     "description": "Optional quote currency calendar for business day adjustment."
+  },
+  {
+    "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/quote_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/quote_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/quote_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/quote_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/quote_currency",
@@ -1061,14 +1074,12 @@ export default [
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/quoted_spot",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/quoted_spot",
-    "default": null,
     "description": "Optional spot rate override (quote per base). If None, source from FxMatrix.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"

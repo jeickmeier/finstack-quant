@@ -9,11 +9,12 @@
 mod black;
 pub(crate) mod inputs;
 
-pub use black::EquityOptionGreeks;
-pub(crate) use black::{compute_greeks, compute_pv, SimpleEquityOptionBlackPricer};
+pub(crate) use black::{
+    compute_greeks, compute_pv, EquityOptionGreeks, SimpleEquityOptionBlackPricer,
+};
 pub(crate) use inputs::{
-    collect_inputs, has_future_discrete_dividends,
-    reject_future_discrete_dividends_for_stochastic_vol, require_european, resolve_lifecycle_value,
+    collect_inputs, has_future_discrete_dividends, model_error, model_inputs,
+    stochastic_vol_inputs, ModelInputs,
 };
 
 use crate::equity_option::types::EquityOption;
@@ -21,26 +22,12 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::heston::heston_price;
-use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::pricer::PricingError;
 
 /// Equity option Heston semi-analytical pricer (Fourier inversion).
 pub(crate) struct EquityOptionHestonFourierPricer;
-
-impl EquityOptionHestonFourierPricer {
-    /// Create a new Heston Fourier transform pricer
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for EquityOptionHestonFourierPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionHestonFourierPricer {
     fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {
@@ -68,72 +55,24 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionHestonFourie
             instrument,
             finstack_quant_valuations_core::pricer::InstrumentType::EquityOption,
         )?;
-
-        if let Some(pv) =
-            resolve_lifecycle_value(equity_option, market, as_of).map_err(|error| {
-                finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                    error.to_string(),
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        equity_option,
-                    )
-                    .model(finstack_quant_valuations_core::pricer::ModelKey::HestonFourier),
-                )
-            })?
-        {
-            return Ok(
-                finstack_quant_valuations_core::results::ValuationResult::stamped(
-                    equity_option.id(),
-                    as_of,
-                    pv,
-                ),
-            );
-        }
-        require_european(equity_option, "Heston Fourier").map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                e.to_string(),
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    equity_option,
-                )
-                .model(finstack_quant_valuations_core::pricer::ModelKey::HestonFourier),
-            )
-        })?;
-
-        reject_future_discrete_dividends_for_stochastic_vol(
+        let (spot, r, q, t) = match stochastic_vol_inputs(
             equity_option,
+            market,
             as_of,
             finstack_quant_valuations_core::pricer::ModelKey::HestonFourier,
             "Heston Fourier",
-        )?;
-
-        let inputs = collect_inputs(equity_option, market, as_of).map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                e.to_string(),
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    equity_option,
-                )
-                .model(finstack_quant_valuations_core::pricer::ModelKey::HestonFourier),
-            )
-        })?;
-        let (spot, r, q, _sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
-
-        if t <= 0.0 {
-            let intrinsic = match equity_option.option_type {
-                OptionType::Call => (spot - equity_option.strike).max(0.0),
-                OptionType::Put => (equity_option.strike - spot).max(0.0),
-            };
-            return Ok(finstack_quant_valuations_core::results::ValuationResult::stamped(
-                equity_option.id(),
-                as_of,
-                Money::new(intrinsic * equity_option.quantity, equity_option.currency).map_err(
-                    |error| {
-                        finstack_quant_valuations_core::pricer::PricingError::from_core(
-                            error,
-                            finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(equity_option),
-                        )
-                    },
-                )?,
-            ));
-        }
+        )? {
+            ModelInputs::Settled(pv) => {
+                return Ok(
+                    finstack_quant_valuations_core::results::ValuationResult::stamped(
+                        equity_option.id(),
+                        as_of,
+                        pv,
+                    ),
+                );
+            }
+            ModelInputs::Live(inputs) => (inputs.spot, inputs.r, inputs.q, inputs.t_vol),
+        };
 
         // Source production Heston parameters from explicit market scalars.
         // Validation is still enforced inside `HestonParams::new`.
@@ -193,7 +132,7 @@ mod tests {
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
     use finstack_quant_models::closed_form::vanilla::bs_greeks_unchecked;
-    use finstack_quant_models::types::ExerciseStyle;
+    use finstack_quant_models::types::{ExerciseStyle, OptionType};
     use finstack_quant_valuations_core::instruments::pricing_overrides::ThetaDayBasis;
     use finstack_quant_valuations_core::instruments::SettlementType;
     use finstack_quant_valuations_core::pricer::{ModelKey, Pricer};
@@ -501,7 +440,7 @@ mod tests {
         let mut opt = option(expiry, OptionType::Call, ExerciseStyle::European);
         opt.discrete_dividends = vec![(date(2025, 7, 1), 2.0)];
 
-        let err = EquityOptionHestonFourierPricer::new()
+        let err = EquityOptionHestonFourierPricer
             .price_dyn(&opt, &market(as_of, 100.0, 0.20, 0.03, 0.0), as_of)
             .expect_err("Heston Fourier must reject discrete dividends");
         let msg = err.to_string();

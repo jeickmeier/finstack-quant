@@ -101,13 +101,11 @@ pub enum EquityPathModel {
     AtmTermGbm,
 }
 
-extern crate self as finstack_quant_valuations_equity;
-
 /// Autocallable module - Autocallable structured notes.
 pub mod autocallable;
 /// Cliquet option module - Cliquet/ratchet options.
 pub mod cliquet_option;
-/// DCF equity module - Discounted cash flow for equity (renamed from dcf).
+/// DCF equity module - Discounted cash flow for equity.
 pub mod dcf_equity;
 pub(crate) mod dividend01;
 /// Exchange-listed equity, equity-index, and fixed-currency quanto futures.
@@ -120,7 +118,9 @@ pub mod equity_option;
 pub mod equity_total_return_future;
 /// Equity TRS module - Equity total return swaps.
 pub mod equity_trs;
-/// PE fund module - Private equity/markets funds (renamed from private_markets_fund).
+/// Observed-fixing lookup and validation shared by the seasoned instruments.
+pub(crate) mod past_fixings;
+/// PE fund module - Private equity/markets funds.
 pub mod pe_fund;
 /// Shared piecewise-constant GBM process and forward-vol/rate bootstrap for the
 /// equity path-dependent MC pricers (cliquet, autocallable).
@@ -135,6 +135,40 @@ pub mod vol_index_future;
 pub mod vol_index_future_option;
 
 mod family;
+
+/// Market dependencies of a single-name equity vol product: discount curve,
+/// spot scalar, volatility surface keyed on spot (and `strike` when the
+/// surface lookup is strike-specific), and the optional dividend-yield scalar.
+///
+/// # Arguments
+///
+/// * `discount_curve_id` - Discount curve for the payoff currency.
+/// * `spot_id` - Spot price scalar.
+/// * `vol_surface_id` - Implied-volatility surface.
+/// * `strike` - Absolute strike for the volatility lookup, or `None` for ATM-forward products.
+/// * `div_yield_id` - Continuous dividend-yield scalar, when the product uses one.
+pub(crate) fn equity_vol_dependencies(
+    discount_curve_id: &finstack_quant_core::types::CurveId,
+    spot_id: &finstack_quant_core::types::PriceId,
+    vol_surface_id: &finstack_quant_core::types::CurveId,
+    strike: Option<f64>,
+    div_yield_id: Option<&finstack_quant_core::types::PriceId>,
+) -> finstack_quant_valuations_core::instruments::MarketDependencies {
+    let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
+    deps.add_discount_curve(discount_curve_id.clone());
+    deps.add_market_scalar_id(spot_id.as_str());
+    deps.add_volatility_dependency(
+        finstack_quant_valuations_core::instruments::VolatilityDependency::new(
+            vol_surface_id.clone(),
+            Some(spot_id.clone()),
+            strike,
+        ),
+    );
+    if let Some(dividend_yield) = div_yield_id {
+        deps.add_market_scalar_id(dividend_yield.as_str());
+    }
+    deps
+}
 pub use family::EQUITY;
 
 /// Compiles the crate `README.md` Rust samples as doctests.

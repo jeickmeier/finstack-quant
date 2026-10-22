@@ -61,13 +61,13 @@ function touchEnvelope(fields = {}) {
 }
 
 test('FxBarrierOption.theta rolls the barrier state with spot held fixed', () => {
-  const option = valuations.fx.FxBarrierOption.fromJson(JSON.stringify(golden.instrument));
+  const option = valuations.instruments.FxBarrierOption.fromJson(JSON.stringify(golden.instrument));
   const theta = option.theta(MARKET, AS_OF);
   assert.ok(Number.isFinite(theta));
   assert.ok(theta < 0, `a long up-and-out call far from its barrier decays, got ${theta}`);
 
   // Spot 1.10 sits below the 1.25 barrier, so the roll observes no breach.
-  const observed = valuations.fx.FxBarrierOption.fromJson(
+  const observed = valuations.instruments.FxBarrierOption.fromJson(
     withSpec(golden.instrument, { observed_barrier_breached: false })
   );
   assert.equal(theta, observed.theta(MARKET, AS_OF));
@@ -82,10 +82,10 @@ test('FxBarrierOption.theta rolls the barrier state with spot held fixed', () =>
 });
 
 test('FxTouchOption.theta rolls the touch state with spot held fixed', () => {
-  const option = valuations.fx.FxTouchOption.fromJson(JSON.stringify(touchEnvelope()));
+  const option = valuations.instruments.FxTouchOption.fromJson(JSON.stringify(touchEnvelope()));
   const theta = option.theta(MARKET, AS_OF);
   assert.ok(Number.isFinite(theta));
-  const observed = valuations.fx.FxTouchOption.fromJson(
+  const observed = valuations.instruments.FxTouchOption.fromJson(
     JSON.stringify(touchEnvelope({ observed_barrier_breached: false }))
   );
   assert.equal(theta, observed.theta(MARKET, AS_OF));
@@ -95,7 +95,7 @@ test('FxTouchOption.theta rolls the touch state with spot held fixed', () => {
 test('FxBarrierOption.greeks includes theta for an option quoted through fx_spot_id', () => {
   const market = structuredClone(golden.market.data);
   market.prices['EURUSD-SPOT'] = { unitless: 1.1 };
-  const option = valuations.fx.FxBarrierOption.fromJson(
+  const option = valuations.instruments.FxBarrierOption.fromJson(
     withSpec(golden.instrument, { fx_spot_id: 'EURUSD-SPOT' })
   );
   const marketJson = JSON.stringify(market);

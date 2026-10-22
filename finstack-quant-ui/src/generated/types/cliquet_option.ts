@@ -386,7 +386,10 @@ export interface DE106C3Fc700775Eb2266 {
    */
   past_fixings?: [Date1, number][];
   /**
-   * Explicit path model selection; required to acknowledge model risk.
+   * Explicit path model selection.
+   *
+   * `AtmTermGbm` is an ATM-term-structure approximation and does not model
+   * equity strike skew; callers must opt into that limitation.
    */
   path_model: "atm_term_gbm";
   /**

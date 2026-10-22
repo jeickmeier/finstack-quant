@@ -4,8 +4,8 @@
 //! flow through the [`bloomberg_quadrature`](super::bloomberg_quadrature)
 //! numerical-quadrature engine. Greek metrics (delta, gamma, vega) live
 //! alongside their `MetricCalculator` definitions in the metrics module;
-//! the `CdsOption::{delta, gamma, vega}` methods are thin pass-throughs
-//! to those canonical implementations.
+//! the `CdsOption::{delta, gamma, vega}` methods validate the option and
+//! then call those canonical implementations.
 //!
 //! # References
 //!
@@ -25,10 +25,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
-use finstack_quant_valuations_core::pricer::expect_inst;
 
 /// Price the CDS option at `as_of` under the Bloomberg CDSO numerical
 /// quadrature model.
@@ -39,7 +37,6 @@ pub(crate) fn npv(
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<Money> {
     ensure_valuation_not_after_expiry(option, as_of)?;
-    option.validate_supported_configuration()?;
     let sigma = resolve_sigma(option, curves, as_of)?;
     let cds = synthetic_underlying_cds(option, as_of)?;
     bloomberg_quadrature::npv(option, &cds, curves, sigma, as_of)
@@ -72,7 +69,6 @@ pub(crate) fn theta(
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
     ensure_valuation_not_after_expiry(option, as_of)?;
-    option.validate_supported_configuration()?;
     let sigma = resolve_sigma(option, curves, as_of)?;
     let cds = synthetic_underlying_cds(option, as_of)?;
     bloomberg_quadrature::theta(option, &cds, curves, sigma, as_of)
@@ -125,37 +121,18 @@ pub(crate) fn implied_vol(
     if option.expiry <= as_of {
         return Ok(0.0);
     }
-    option.validate_supported_configuration()?;
 
     let cds = synthetic_underlying_cds(option, as_of)?;
-    // `BrentSolver` expects an `FnMut(f64) -> f64` and has no `Result` channel
-    // for in-iteration pricing failures. We squirrel away the first NPV error
-    // in a `RefCell<Option<Error>>` and return `f64::NAN` to trip Brent's
-    // built-in non-finite guard (`solver.rs` rejects NaN endpoints and
-    // mid-iteration NaN with its own `SolverConvergenceFailed`). On either
-    // path we surface the original (more informative) NPV error after Brent
-    // returns; do not "simplify" this pattern without restoring an error
-    // propagation channel.
-    let captured: std::cell::RefCell<Option<finstack_quant_core::Error>> =
-        std::cell::RefCell::new(None);
-    let f = |log_sigma: f64| -> f64 {
+    // The first NPV error aborts the solve and is surfaced as-is.
+    let f = |log_sigma: f64| -> Result<f64> {
         let sigma = log_sigma.exp();
-        match bloomberg_quadrature::npv(option, &cds, curves, sigma, as_of) {
-            Ok(m) => m.amount() - target_price,
-            Err(e) => {
-                captured.borrow_mut().get_or_insert(e);
-                f64::NAN
-            }
-        }
+        Ok(bloomberg_quadrature::npv(option, &cds, curves, sigma, as_of)?.amount() - target_price)
     };
 
     let ln_min = 1e-6_f64.ln();
     let ln_max = super::types::MAX_IMPLIED_VOL.ln();
-    let f_lo = f(ln_min);
-    let f_hi = f(ln_max);
-    if let Some(err) = captured.borrow_mut().take() {
-        return Err(err);
-    }
+    let f_lo = f(ln_min)?;
+    let f_hi = f(ln_max)?;
     if !f_lo.is_finite() || !f_hi.is_finite() || f_lo * f_hi > 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
                 "implied vol target outside model bounds: target={target_price}, f(σ_min)={f_lo:.3e}, f(σ_max)={f_hi:.3e}"
@@ -170,10 +147,7 @@ pub(crate) fn implied_vol(
     let solver = BrentSolver::new()
         .with_tolerance(1e-10)
         .with_bracket_bounds(ln_min, ln_max);
-    let log_sigma = solver.solve(f, initial_log_guess)?;
-    if let Some(err) = captured.into_inner() {
-        return Err(err);
-    }
+    let log_sigma = solver.solve_fallible(f, initial_log_guess)?;
     Ok(log_sigma.exp().max(1e-6))
 }
 
@@ -298,62 +272,6 @@ pub(crate) fn cds_with_bloomberg_protection_end_extension(
     let mut extended = cds.clone();
     extended.premium_leg.end += time::Duration::days(1);
     extended
-}
-
-// Registry pricer adapter
-
-/// Registry adapter that exposes the Bloomberg CDSO pricer to the
-/// instrument/model dispatcher.
-pub(crate) struct BloombergCdsoPricer;
-
-impl finstack_quant_valuations_core::pricer::Pricer for BloombergCdsoPricer {
-    fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {
-        finstack_quant_valuations_core::pricer::PricerKey::new(
-            finstack_quant_valuations_core::pricer::InstrumentType::CdsOption,
-            finstack_quant_valuations_core::pricer::ModelKey::BloombergCdso,
-        )
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> std::result::Result<
-        finstack_quant_valuations_core::results::ValuationResult,
-        finstack_quant_valuations_core::pricer::PricingError,
-    > {
-        let option = expect_inst::<CdsOption>(
-            instrument,
-            finstack_quant_valuations_core::pricer::InstrumentType::CdsOption,
-        )?;
-
-        let pv = npv(option, market, as_of).map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::from_core(
-                e,
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    option,
-                )
-                .model(finstack_quant_valuations_core::pricer::ModelKey::BloombergCdso),
-            )
-        })?;
-
-        Ok(
-            finstack_quant_valuations_core::results::ValuationResult::stamped(
-                option.id(),
-                as_of,
-                pv,
-            )
-            .with_details(
-                finstack_quant_valuations_core::results::ValuationDetails::CreditDerivative(
-                    finstack_quant_valuations_core::results::CreditDerivativeValuationDetails {
-                        model_key: finstack_quant_valuations_core::pricer::ModelKey::BloombergCdso,
-                        integration_method: None,
-                    },
-                ),
-            ),
-        )
-    }
 }
 
 #[cfg(test)]

@@ -16,7 +16,7 @@
 - Python bindings in `finstack-quant-py/` (PyO3); WASM bindings in `finstack-quant-wasm/` (wasm-bindgen)
 - Python binding Rust code lives under `finstack-quant-py/src/bindings/` (one subdirectory per crate domain)
 - WASM binding Rust code lives under `finstack-quant-wasm/src/api/` with a hand-written JS facade at `finstack-quant-wasm/index.js`
-- `.pyi` stubs in `finstack-quant-py/finstack_quant/` are derived from contract and binding code; structural parity tests live under `finstack-quant-py/tests/parity`, with behavioral parity tests alongside runtime tests such as `finstack-quant-py/tests/test_core_parity.py`
+- `.pyi` stubs in `finstack-quant-py/finstack_quant/` carry the Python types and are the single source of Python docstrings: `build.rs` compiles each stub docstring into the runtime `__doc__`, and converted PyO3 owners take it with `#[doc = pydoc!("<module>", "<qualname>")]` instead of `///` prose (`finstack-quant-py/tests/test_runtime_docs.py` checks runtime == stub); structural parity tests live under `finstack-quant-py/tests/parity`, with behavioral parity tests alongside runtime tests such as `finstack-quant-py/tests/test_core_parity.py`
 - Parity contract: `finstack-quant-py/parity_contract.toml`
 - Example notebooks in `finstack-quant-py/examples/notebooks/`; runner script: `run_all_notebooks.py`
 

@@ -113,18 +113,8 @@ impl ConvertibleBondValuator {
             .as_ref()
             .map(|id| market_context.get_hazard(id.as_str()))
             .transpose()?;
-        let survival_between = |start: Date, end: Date| -> Result<f64> {
-            if let Some(curve) = &hazard {
-                let survival = curve.survival_at_dates(&[start, end])?;
-                if survival[0] <= 0.0 {
-                    return Err(Error::Validation(
-                        "convertible requires positive survival at valuation".into(),
-                    ));
-                }
-                Ok(survival[1] / survival[0])
-            } else {
-                Ok(1.0)
-            }
+        let survival_between = |start: Date, end: Date| {
+            super::engine::conditional_survival(hazard.as_deref(), start, end)
         };
         let mut coupon_map: FxHashMap<usize, f64> = FxHashMap::default();
         let mut principal_map: FxHashMap<usize, f64> = FxHashMap::default();
@@ -153,7 +143,7 @@ impl ConvertibleBondValuator {
             };
             let tail_recovery = if cf.kind.is_principal_like() && cf.date > bond.maturity {
                 bond.recovery_rate.unwrap_or(0.0)
-                    * finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight(
+                    * finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
                         rf_curve.df_between_dates(bond.maturity, cf.date)?,
                         survival_between(bond.maturity, cf.date)?,
                     )?
@@ -353,7 +343,7 @@ impl ConvertibleBondValuator {
                     .map_or(bond.notional.amount(), |(_, balance)| balance.amount())
                     .max(0.0);
                 let weight =
-                    finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight(
+                    finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
                         rf_curve.df_between_dates(left, right)?,
                         survival_between(left, right)?,
                     )?;
@@ -372,18 +362,10 @@ impl ConvertibleBondValuator {
             ..
         } = &bond.conversion.policy
         {
-            if *lower_conversion_price <= 0.0 || *upper_conversion_price <= 0.0 {
-                return Err(Error::Validation(format!(
-                    "Conversion prices must be positive: lower={}, upper={}",
-                    lower_conversion_price, upper_conversion_price
-                )));
-            }
-            if *lower_conversion_price > *upper_conversion_price {
-                return Err(Error::Validation(format!(
-                    "MandatoryVariable conversion bounds inverted: lower={lower_conversion_price} \
-                     must be <= upper={upper_conversion_price}"
-                )));
-            }
+            super::engine::validate_mandatory_variable_bounds(
+                *lower_conversion_price,
+                *upper_conversion_price,
+            )?;
         }
 
         Ok(Self {
@@ -545,15 +527,12 @@ impl ConvertibleBondValuator {
                 upper_conversion_price,
                 lower_conversion_price,
                 ..
-            } => {
-                if spot <= *lower_conversion_price {
-                    (self.face_value / lower_conversion_price) * spot
-                } else if spot <= *upper_conversion_price {
-                    self.face_value
-                } else {
-                    (self.face_value / upper_conversion_price) * spot
-                }
-            }
+            } => super::engine::mandatory_variable_value(
+                self.face_value,
+                *lower_conversion_price,
+                *upper_conversion_price,
+                spot,
+            ),
             _ => spot * self.conversion_ratio,
         };
         base * ratio_accretion * self.principal_by_step[step] / self.face_value

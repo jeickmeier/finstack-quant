@@ -40,19 +40,9 @@ pub(crate) struct Cs01Calculator;
 impl MetricCalculator for Cs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let provider = context.recalibration_provider("cs01")?;
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .credit_spread_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
         let idx: &CdsIndex = context.instrument_as()?;
-        crate::cds_index::pricer::CdsIndexPricer::new().cs01(
-            idx,
-            &context.curves,
-            context.as_of,
-            provider.as_ref(),
-            bump_bp,
-        )
+        idx.cs01_with_bump(&context.curves, context.as_of, provider.as_ref(), bump_bp)
     }
 }
 
@@ -93,10 +83,7 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
             return Ok(0.0);
         }
 
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
         let bump_bp = defaults.credit_spread_bump_bp;
 
         let credit_ids = index_credit_curve_ids(&index)?;
