@@ -599,6 +599,7 @@ pub fn bump_hazard_spreads(
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<HazardCurve> {
+    bump.validate()?;
     let request = HazardParRecalibration {
         hazard,
         context,
