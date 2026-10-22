@@ -47,6 +47,8 @@ fn create_test_market(base_date: Date) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[80.0, 90.0, 100.0, 110.0, 120.0],
         &[0.25; 20], // 20 = 4 expiries × 5 strikes
+        Default::default(),
+        None,
     )
     .unwrap();
 
