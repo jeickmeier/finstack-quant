@@ -208,31 +208,55 @@ pub(crate) fn build_schedule_period(
         )));
     }
     let adjusted_end = adjust(accrual_end, business_day_convention, cal)?;
+    let adjusted_start = if adjust_accrual_dates {
+        adjust(accrual_start, business_day_convention, cal)?
+    } else {
+        accrual_start
+    };
+    assemble_period(
+        (accrual_start, accrual_end),
+        (adjusted_start, adjusted_end),
+        payment_lag_days,
+        adjust_accrual_dates,
+        cal,
+    )
+}
+
+// Both callers validate raw bounds and lag before adjusting anchors. Schedule
+// generation shares each adjusted anchor between its adjacent periods.
+fn assemble_period(
+    raw_bounds: (Date, Date),
+    adjusted_bounds: (Date, Date),
+    payment_lag_days: i32,
+    adjust_accrual_dates: bool,
+    cal: &dyn HolidayCalendar,
+) -> finstack_quant_core::Result<SchedulePeriod> {
+    let (raw_start, raw_end) = raw_bounds;
+    let (adjusted_start, adjusted_end) = adjusted_bounds;
     let payment_date = if payment_lag_days == 0 {
         adjusted_end
     } else {
         adjusted_end.add_business_days(payment_lag_days, cal)?
     };
-    let (acc_start, acc_end) = if adjust_accrual_dates {
-        let adj_start = adjust(accrual_start, business_day_convention, cal)?;
-        if adj_start >= adjusted_end {
+    let (accrual_start, accrual_end) = if adjust_accrual_dates {
+        if adjusted_start >= adjusted_end {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "accrual adjustment collapsed period [{accrual_start}, {accrual_end}) to zero \
-                 length (adjusted to [{adj_start}, {adjusted_end}))"
+                "accrual adjustment collapsed period [{raw_start}, {raw_end}) to zero length \
+                 (adjusted to [{adjusted_start}, {adjusted_end}))"
             )));
         }
-        (adj_start, adjusted_end)
+        adjusted_bounds
     } else {
-        (accrual_start, accrual_end)
+        raw_bounds
     };
     Ok(SchedulePeriod {
-        accrual_start: acc_start,
-        accrual_end: acc_end,
+        accrual_start,
+        accrual_end,
         payment_date,
         reset_date: None,
         accrual_year_fraction: 0.0,
-        unadjusted_start: accrual_start,
-        unadjusted_end: accrual_end,
+        unadjusted_start: raw_start,
+        unadjusted_end: raw_end,
     })
 }
 
@@ -404,36 +428,13 @@ pub(crate) fn generate_periods_with_adjustment(
 
     let mut periods = Vec::with_capacity(dates.len() - 1);
     for (raw, adj) in dates.windows(2).zip(adjusted.windows(2)) {
-        let (raw_start, raw_end) = (raw[0], raw[1]);
-        let adjusted_end = adj[1];
-        let payment_date = if payment_lag_days == 0 {
-            adjusted_end
-        } else {
-            adjusted_end.add_business_days(payment_lag_days, cal)?
-        };
-
-        let (accrual_start, accrual_end) = if adjust_accrual_dates {
-            let (adj_start, adj_end) = (adj[0], adjusted_end);
-            if adj_start >= adj_end {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "accrual adjustment collapsed period [{raw_start}, {raw_end}) to zero length \
-                     (adjusted to [{adj_start}, {adj_end}))"
-                )));
-            }
-            (adj_start, adj_end)
-        } else {
-            (raw_start, raw_end)
-        };
-
-        periods.push(SchedulePeriod {
-            accrual_start,
-            accrual_end,
-            payment_date,
-            reset_date: None,
-            accrual_year_fraction: 0.0,
-            unadjusted_start: raw_start,
-            unadjusted_end: raw_end,
-        });
+        periods.push(assemble_period(
+            (raw[0], raw[1]),
+            (adj[0], adj[1]),
+            payment_lag_days,
+            adjust_accrual_dates,
+            cal,
+        )?);
     }
 
     Ok(periods)
@@ -625,6 +626,89 @@ mod tests {
             1,
             "only the genuine stub period is tagged"
         );
+    }
+
+    #[test]
+    fn explicit_periods_match_generated_periods_across_adjustments_and_lags() {
+        for calendar_id in ["weekends_only", "usny"] {
+            let calendar = calendar_by_id_strict(calendar_id).expect("calendar");
+            for convention in [
+                BusinessDayConvention::Unadjusted,
+                BusinessDayConvention::Following,
+                BusinessDayConvention::ModifiedFollowing,
+                BusinessDayConvention::Preceding,
+            ] {
+                for adjust_accrual in [false, true] {
+                    for lag in [0, 2] {
+                        let periods = generate_periods_with_adjustment(
+                            d(2025, 1, 31),
+                            d(2025, 12, 31),
+                            Tenor::monthly(),
+                            StubKind::None,
+                            convention,
+                            true,
+                            lag,
+                            calendar_id,
+                            adjust_accrual,
+                            RollRule::None,
+                        )
+                        .expect("generated monthly periods");
+                        for period in periods {
+                            let explicit = build_schedule_period(
+                                period.unadjusted_start,
+                                period.unadjusted_end,
+                                convention,
+                                lag,
+                                calendar,
+                                adjust_accrual,
+                            )
+                            .expect("explicit period");
+                            assert_eq!(explicit.accrual_start, period.accrual_start);
+                            assert_eq!(explicit.accrual_end, period.accrual_end);
+                            assert_eq!(explicit.payment_date, period.payment_date);
+                            assert_eq!(explicit.unadjusted_start, period.unadjusted_start);
+                            assert_eq!(explicit.unadjusted_end, period.unadjusted_end);
+                            assert_eq!(explicit.reset_date, period.reset_date);
+                            assert_eq!(
+                                explicit.accrual_year_fraction,
+                                period.accrual_year_fraction
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn explicit_and_generated_periods_reject_collapsed_accrual_bounds() {
+        let start = d(2025, 1, 4);
+        let end = d(2025, 1, 5);
+        let calendar = calendar_by_id_strict("weekends_only").expect("calendar");
+        let explicit = build_schedule_period(
+            start,
+            end,
+            BusinessDayConvention::Following,
+            2,
+            calendar,
+            true,
+        )
+        .expect_err("weekend accrual boundaries both adjust to Monday");
+        let generated = generate_periods_with_adjustment(
+            start,
+            end,
+            Tenor::daily(),
+            StubKind::None,
+            BusinessDayConvention::Following,
+            false,
+            2,
+            "weekends_only",
+            true,
+            RollRule::None,
+        )
+        .expect_err("generated boundaries also collapse");
+        assert_eq!(explicit.to_string(), generated.to_string());
+        assert!(explicit.to_string().contains("collapsed period"));
     }
 
     #[test]

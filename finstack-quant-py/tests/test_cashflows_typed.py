@@ -245,15 +245,14 @@ class TestBuilderSpecs:
             index_floor_bp=Decimal("0"),
         )
         spec.validate()
-        bad = FloatingRateSpec(
-            forward_curve_id="USD-SOFR-3M",
-            spread_bp=Decimal("200"),
-            reset_frequency="3M",
-            index_floor_bp=Decimal("100"),
-            index_cap_bp=Decimal("50"),
-        )
         with pytest.raises(ValueError, match="index_floor_bp"):
-            bad.validate()
+            FloatingRateSpec(
+                forward_curve_id="USD-SOFR-3M",
+                spread_bp=Decimal("200"),
+                reset_frequency="3M",
+                index_floor_bp=Decimal("100"),
+                index_cap_bp=Decimal("50"),
+            )
 
     def test_schedule_params_and_fixed_coupon_defaults_match_json(self) -> None:
         """Typed constructors must not hand-re-encode private Rust serde defaults.
@@ -1441,7 +1440,7 @@ class TestTypedTwinsAndWire:
             Notional.par(1.0, "USD"),
             FeeBase.undrawn(Money(10.0, "USD")),
             FeeSpec.periodic_bp(FeeBase.DRAWN, 25, "3M", DayCount.ACT_360, "weekends_only"),
-            PrepaymentModelSpec.psa_100(),
+            PrepaymentModelSpec.psa(1.0),
             RecoveryModelSpec(0.4, 12),
         ]
         for spec in specs:
@@ -1489,10 +1488,10 @@ class TestTypedTwinsAndWire:
         assert str(FixedCouponSpec("0.05", params).rate) == "0.05"
 
     def test_credit_rate_error_text(self) -> None:
-        from finstack_quant.cashflows.builder import cpr_to_smm
+        from finstack_quant.cashflows.builder import annual_to_monthly
 
         with pytest.raises(ValueError, match=r"must be a decimal in \[0,1\]"):
-            cpr_to_smm(-0.05)
+            annual_to_monthly(-0.05)
 
     def test_period_aggregation_wire(self) -> None:
         import pickle
@@ -1612,3 +1611,65 @@ def test_build_as_of_uses_fixings_after_curve_anchor() -> None:
     coupon = next(flow for flow in schedule.get_flows() if flow.kind == CFKind.FLOAT_RESET)
     assert coupon.rate == pytest.approx(0.06, abs=1e-12)
     assert coupon.amount.amount == pytest.approx(15_000.0, abs=1e-8)
+
+
+@pytest.mark.parametrize("rate", [0.0, 0.02, 0.06, 0.5, 1.0])
+def test_credit_rate_conversions_roundtrip(rate: float) -> None:
+    from finstack_quant.cashflows.builder import annual_to_monthly, monthly_to_annual
+
+    monthly = annual_to_monthly(annual=rate)
+    assert monthly_to_annual(monthly=monthly) == pytest.approx(rate, abs=1e-14)
+
+
+def test_credit_rate_conversion_boundaries_and_errors() -> None:
+    import math
+
+    from finstack_quant.cashflows.builder import annual_to_monthly, monthly_to_annual
+
+    for convert, name in [(annual_to_monthly, "annual"), (monthly_to_annual, "monthly")]:
+        assert math.copysign(1.0, convert(-0.0)) == 1.0
+        for invalid in [-0.01, 1.01, float("nan"), float("inf"), -float("inf")]:
+            with pytest.raises(ValueError, match=rf"{name} must be a decimal in \[0,1\]"):
+                convert(invalid)
+
+
+@pytest.mark.parametrize(
+    ("fields", "message"),
+    [
+        ({"reset_lag_days": -1}, "reset_lag_days"),
+        ({"index_floor_bp": "100", "index_cap_bp": "50"}, "index_floor_bp"),
+        ({"all_in_floor_bp": "100", "all_in_cap_bp": "50"}, "all_in_floor_bp"),
+    ],
+)
+def test_floating_rate_constructor_and_json_reject_invalid_fields(fields: dict[str, int | str], message: str) -> None:
+    import json
+
+    from finstack_quant.cashflows.builder import FloatingRateSpec
+
+    with pytest.raises(ValueError, match=message):
+        FloatingRateSpec("USD-SOFR", "0", "3M", **fields)
+    payload = json.loads(FloatingRateSpec("USD-SOFR", "0", "3M").to_json())
+    payload.update(fields)
+    with pytest.raises(ValueError, match=message):
+        FloatingRateSpec.from_json(json.dumps(payload))
+
+
+def test_floating_rate_valid_equal_bounds_preserve_json_and_pickle() -> None:
+    import pickle
+
+    from finstack_quant.cashflows.builder import FloatingRateSpec
+
+    spec = FloatingRateSpec(
+        "USD-SOFR",
+        "0",
+        "3M",
+        reset_lag_days=0,
+        index_floor_bp="50",
+        index_cap_bp="50",
+        all_in_floor_bp="75",
+        all_in_cap_bp="75",
+    )
+    spec.validate()
+    assert FloatingRateSpec.from_json(spec.to_json()).to_json() == spec.to_json()
+    restored = pickle.loads(pickle.dumps(spec))  # noqa: S301 - locally serialized test fixture
+    assert restored.to_json() == spec.to_json()

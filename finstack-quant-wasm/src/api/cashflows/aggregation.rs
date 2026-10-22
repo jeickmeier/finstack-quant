@@ -1,13 +1,13 @@
 //! Currency-preserving aggregation of dated cashflows.
 
 use super::schedule::dated_flows_arg;
-use crate::utils::input::{js_f64_seq, js_string_seq};
+use crate::utils::input::{js_f64_seq, js_string, js_string_seq};
 use crate::utils::wire::js_wire;
 use crate::utils::{parse_iso_dates, to_js_err, to_js_value};
 use finstack_quant_cashflows::aggregation::{
     aggregate_by_period as rust_aggregate_by_period,
     aggregate_cashflows_checked as rust_aggregate_cashflows_checked,
-    calendar_year_ladder as rust_calendar_year_ladder,
+    calendar_year_ladder as rust_calendar_year_ladder, PeriodAggregation,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Period;
@@ -24,6 +24,41 @@ pub fn aggregate_by_period(flows: JsValue, periods: JsValue) -> Result<JsValue, 
     let flows = dated_flows_arg(&flows, "flows")?;
     let periods = js_wire::<Vec<Period>>(&periods, "periods")?;
     to_js_value(&rust_aggregate_by_period(&flows, &periods).map_err(to_js_err)?)
+}
+
+/// Read one period's currency totals using the canonical Rust label lookup.
+///
+/// @param aggregation - Period-to-currency map with currency-tagged Money values; currency keys must agree with their amounts.
+/// @param period - Exact case-sensitive PeriodId display label, such as `"2025Q1"`; whitespace is not trimmed and aliases are not parsed.
+/// @returns An independent currency map, including an empty map for a stored empty bucket, or null for an absent or malformed label. No FX conversion is performed.
+/// @throws If aggregation has an invalid wire shape or mismatched currencies (kind `validation`), or period is not a string (kind `invalid_type`).
+#[wasm_bindgen(js_name = periodAggregationGetPeriod)]
+pub fn period_aggregation_get_period(
+    aggregation: JsValue,
+    period: JsValue,
+) -> Result<JsValue, JsValue> {
+    let aggregation = js_wire::<PeriodAggregation>(&aggregation, "aggregation")?;
+    let period = js_string(&period, "period")?;
+    to_js_value(&aggregation.get_period(&period))
+}
+
+/// Read one period-and-currency amount using the canonical Rust lookup.
+///
+/// @param aggregation - Period-to-currency map with currency-tagged Money values; currency keys must agree with their amounts.
+/// @param period - Exact case-sensitive PeriodId display label; whitespace is not trimmed and aliases are not parsed.
+/// @param currency - ISO-4217 currency code of the requested total; no FX conversion is performed.
+/// @returns The Money value or null if the period or currency is absent; a malformed period label is a miss.
+/// @throws If aggregation or currency has an invalid wire shape, or currency keys disagree with amounts (kind `validation`), or period is not a string (kind `invalid_type`).
+#[wasm_bindgen(js_name = periodAggregationGetAmount)]
+pub fn period_aggregation_get_amount(
+    aggregation: JsValue,
+    period: JsValue,
+    currency: JsValue,
+) -> Result<JsValue, JsValue> {
+    let aggregation = js_wire::<PeriodAggregation>(&aggregation, "aggregation")?;
+    let period = js_string(&period, "period")?;
+    let currency = js_wire::<Currency>(&currency, "currency")?;
+    to_js_value(&aggregation.get_amount(&period, currency))
 }
 
 /// Sum dated amounts that must all be in one currency.

@@ -815,7 +815,7 @@ mod tests {
         let cashflows = generate_cashflows(&mbs, as_of, Some(1)).expect("should generate");
         let first = cashflows.first().expect("at least one cashflow");
 
-        // Pricer must propagate exactly what cpr_to_smm produced (no extra clamp).
+        // Pricer must propagate exactly what annual_to_monthly produced (no extra clamp).
         assert!(
             (first.smm - expected_smm).abs() < 1e-12,
             "SMM must reach the pricer unclamped: expected {expected_smm}, got {}",

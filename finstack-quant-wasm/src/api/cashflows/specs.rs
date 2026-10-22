@@ -215,15 +215,6 @@ pub fn default_model_spec_cumulative_default_fraction(
 
 // --- PrepaymentModelSpec ---------------------------------------------------------
 
-/// 100% PSA, the standard prepayment assumption.
-///
-/// @returns `PrepaymentModelSpec` wire object `{ curve: "psa", speed_multiplier: 1.0 }`.
-/// @throws If the model cannot be serialized.
-#[wasm_bindgen(js_name = prepaymentModelSpecPsa100)]
-pub fn prepayment_model_spec_psa_100() -> Result<JsValue, JsValue> {
-    to_js_value(&PrepaymentModelSpec::psa_100())
-}
-
 /// Check a prepayment model's curve parameters.
 ///
 /// @param spec - `PrepaymentModelSpec` wire object.

@@ -234,7 +234,7 @@ mod period_flow_waterfall_integration {
     }
 
     fn schedule(flows: Vec<CashFlow>, notional: f64, issue_date: Date) -> CashFlowSchedule {
-        CashFlowSchedule::from_parts(
+        CashFlowSchedule::from_flows(
             flows,
             Notional::par(notional, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -243,6 +243,7 @@ mod period_flow_waterfall_integration {
                 ..CashFlowMeta::default()
             },
         )
+        .expect("valid cashflow rows")
     }
 
     /// PIK compounding regression (review: SCALE_CLAMP_MAX froze PIK after

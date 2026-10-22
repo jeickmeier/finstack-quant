@@ -2,7 +2,7 @@
 
 use super::super::expected_shocked_smm;
 use super::traits::{PrepaymentState, StochasticPrepayment};
-use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
+use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 
 /// Two-state Markov prepayment model with factor-shocked CPR.
 #[derive(Debug, Clone)]
@@ -74,7 +74,7 @@ impl RegimeSwitchingPrepay {
         }
         let z = factors.first().copied().unwrap_or(0.0);
         let shock = (self.factor_loading * z * self.cpr_volatility).exp();
-        clamped_cpr_to_smm(cpr * shock * burnout)
+        annual_to_monthly_clamped(cpr * shock * burnout)
     }
 }
 
@@ -133,11 +133,12 @@ mod tests {
     #[test]
     fn expected_smm_averages_monthly_rates_instead_of_annual_cpr() {
         let model = RegimeSwitchingPrepay::new(0.04, 0.80, 0.5, 0.5, 0.4, 0.0);
-        let expected = 0.5 * clamped_cpr_to_smm(0.04) + 0.5 * clamped_cpr_to_smm(0.80);
+        let expected =
+            0.5 * annual_to_monthly_clamped(0.04) + 0.5 * annual_to_monthly_clamped(0.80);
         assert!((expected - 0.064455390488875).abs() < 1e-14);
         assert!((model.expected_smm(1) - expected).abs() < 1e-14);
         assert!((model.conditional_smm(1, &[0.0], 0.05, 1.0) - expected).abs() < 1e-14);
-        assert_eq!(model.expected_smm(0), clamped_cpr_to_smm(0.04));
+        assert_eq!(model.expected_smm(0), annual_to_monthly_clamped(0.04));
     }
 
     #[test]
@@ -183,8 +184,8 @@ mod tests {
     fn sampled_path_retains_regime_between_months_even_without_factor_volatility() {
         let model = RegimeSwitchingPrepay::new(0.04, 0.80, 0.25, 0.10, 0.4, 0.0);
         let mut state = model.initial_state(0, 0.0);
-        let low = clamped_cpr_to_smm(0.04);
-        let high = clamped_cpr_to_smm(0.80);
+        let low = annual_to_monthly_clamped(0.04);
+        let high = annual_to_monthly_clamped(0.80);
         let sample = |month, state: &mut PrepaymentState, u| {
             model.sample_smm(month, &[0.0], 0.05, 1.0, state, u)
         };

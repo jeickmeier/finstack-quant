@@ -434,7 +434,7 @@ impl CompiledFloatingCoupon {
             ));
         }
         let all_in_rate =
-            calculate_floating_rate(constrained_index_rate, self.settlement_rate_params());
+            calculate_floating_rate(constrained_index_rate, &self.economics.rate_params);
         let total_amount = notional * accrual_factor * all_in_rate;
         let cash_amount = total_amount * self.economics.cash_fraction;
         let pik_amount = total_amount * self.economics.pik_fraction;
@@ -566,7 +566,7 @@ impl CompiledFloatingCoupon {
             }
         };
         let amount =
-            notional * elapsed * calculate_floating_rate(index_rate, self.settlement_rate_params());
+            notional * elapsed * calculate_floating_rate(index_rate, &self.economics.rate_params);
         if amount.is_finite() {
             Ok(amount)
         } else {
@@ -574,10 +574,6 @@ impl CompiledFloatingCoupon {
                 "floating coupon accrued amount is non-finite".to_string(),
             ))
         }
-    }
-
-    fn settlement_rate_params(&self) -> &FloatingRateParams {
-        &self.economics.rate_params
     }
 }
 

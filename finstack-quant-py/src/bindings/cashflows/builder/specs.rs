@@ -1,13 +1,15 @@
 //! Spec-type bindings for `finstack_quant_cashflows::builder`.
 
+use crate::bindings::cashflows::aggregation::extract_dated_flows;
 use crate::bindings::macros::wire_methods;
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase, FeeSpec,
     FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
     FloatingRateSpec, Notional, OvernightIndexConstraintApplication, PrepaymentModelSpec,
     PrincipalExchange, RecoveryModelSpec, RollRule, ScheduleParams, StepUpCouponSpec,
 };
-use finstack_quant_core::dates::{BusinessDayConvention, Date, StubKind};
+use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::money::Money;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
@@ -61,14 +63,6 @@ pub(crate) fn date_decimal_pairs(
     items
         .iter()
         .map(|(d, v)| Ok((py_to_date(d)?, decimal_from_any(v)?)))
-        .collect()
-}
-
-/// Extract a list of `(date, Money)` pairs.
-fn date_money_pairs(items: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Vec<(Date, Money)>> {
-    items
-        .iter()
-        .map(|(d, m)| Ok((py_to_date(d)?, m.inner)))
         .collect()
 }
 
@@ -636,14 +630,14 @@ impl PyScheduleParams {
     ) -> PyResult<Self> {
         let business_day_convention = match business_day_convention {
             Some(obj) => extract_business_day_convention(obj)?,
-            None => BusinessDayConvention::ModifiedFollowing,
+            None => BusinessDayConvention::default(),
         };
         let inner = ScheduleParams {
             frequency: extract_tenor(frequency)?,
             day_count: day_count.inner,
             business_day_convention,
             calendar_id: calendar_id.into(),
-            stub: stub.map_or(StubKind::ShortFront, |s| s.inner),
+            stub: stub.map_or(ScheduleParams::DEFAULT_STUB, |s| s.inner),
             end_of_month,
             payment_lag_days,
             adjust_accrual_dates,
@@ -805,61 +799,7 @@ impl PyFixedCouponSpec {
     }
 }
 
-/// Canonical floating-rate specification (index, spread, gearing, floors and
-/// caps, reset conventions, overnight compounding, fallback).
-///
-/// Parameters mirror the Rust struct field-for-field. ``*_bp`` values are
-/// basis points and accept ``decimal.Decimal`` (lossless), ``float``, ``int``
-/// or a numeric ``str``.
-///
-/// Parameters
-/// ----------
-/// forward_curve_id : str
-///     Forward curve identifier (e.g. ``"USD-SOFR"``).
-/// spread_bp : Decimal, float or str
-///     Spread over the index in basis points.
-/// reset_frequency : Tenor or str
-///     Fallback compiled term tenor when ``index_tenor`` is omitted and no
-///     forward curve resolves; the term tenor must be positive. The bare builder
-///     observes one lagged term fixing per coupon accrual start, without extra
-///     resets inside a payment period. Resolved curves own their quoted tenor;
-///     overnight coupons use their daily observation schedule.
-/// gearing : Decimal, float or str, default 1
-///     Multiplier applied to the index (and spread when
-///     ``gearing_includes_spread``).
-/// gearing_includes_spread : bool, default True
-///     Whether gearing also scales the spread.
-/// index_floor_bp, all_in_floor_bp, all_in_cap_bp, index_cap_bp : Decimal, float or str, optional
-///     Floors and caps in basis points.
-/// overnight_index_constraints : OvernightIndexConstraintApplication, optional
-///     Where floors/caps apply on overnight legs (default DAILY).
-/// index_tenor : Tenor or str, optional
-///     Explicit compiled term tenor when no forward curve resolves; when
-///     omitted, ``reset_frequency`` supplies it. Resolved curves own their
-///     quoted tenor; a disagreement exceeding 10% warns at build. Ignored
-///     for overnight coupons.
-/// reset_lag_days : int, default 2
-///     Fixing lag in business days (non-negative).
-/// fixing_calendar_id : str, optional
-///     Calendar for fixing-date rolls.
-/// compounding : FloatingLegCompounding, optional
-///     How each period's fixings combine into the rate. ``None`` lets the
-///     pricing instrument resolve it from the rate-index registry (the bare
-///     cashflow builder then projects one term forward).
-/// overnight_basis : DayCount, optional
-///     Day count for overnight compounding.
-/// fallback : FloatingRateFallback, optional
-///     Missing-market-data policy (default ERROR). A missing curve or absent
-///     fixing series may use an explicit fallback. Supplied historical gaps
-///     before the curve base date always fail; complete supplied observations
-///     need no forward curve. Curve, date, day-count and arithmetic errors
-///     are never replaced with fallback rates.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows.builder import FloatingRateSpec
-/// >>> FloatingRateSpec.sofr(50).forward_curve_id
-/// 'USD-SOFR'
+#[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec")]
 #[pyclass(
     name = "FloatingRateSpec",
     module = "finstack_quant.cashflows.builder",
@@ -881,7 +821,7 @@ wire_methods!(
 
 #[pymethods]
 impl PyFloatingRateSpec {
-    /// Construct a floating-rate spec; see the class docstring for parameters.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.__init__")]
     #[new]
     #[pyo3(
         signature = (forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=FloatingRateSpec::DEFAULT_GEARING_INCLUDES_SPREAD, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=FloatingRateSpec::DEFAULT_RESET_LAG_DAYS, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback=None),
@@ -906,28 +846,28 @@ impl PyFloatingRateSpec {
         overnight_basis: Option<PyRef<'_, PyDayCount>>,
         fallback: Option<PyRef<'_, PyFloatingRateFallback>>,
     ) -> PyResult<Self> {
-        Ok(Self {
-            inner: FloatingRateSpec {
-                forward_curve_id: finstack_quant_core::types::CurveId::from(forward_curve_id),
-                spread_bp: decimal_from_any(spread_bp)?,
-                gearing: gearing.map_or(Ok(FloatingRateSpec::DEFAULT_GEARING), decimal_from_any)?,
-                gearing_includes_spread,
-                index_floor_bp: index_floor_bp.map(decimal_from_any).transpose()?,
-                all_in_floor_bp: all_in_floor_bp.map(decimal_from_any).transpose()?,
-                all_in_cap_bp: all_in_cap_bp.map(decimal_from_any).transpose()?,
-                index_cap_bp: index_cap_bp.map(decimal_from_any).transpose()?,
-                overnight_index_constraints: overnight_index_constraints
-                    .map(|c| c.inner)
-                    .unwrap_or_default(),
-                reset_frequency: extract_tenor(reset_frequency)?,
-                index_tenor: index_tenor.map(extract_tenor).transpose()?,
-                reset_lag_days,
-                fixing_calendar_id: fixing_calendar_id.map(Into::into),
-                compounding: compounding.map(|m| m.inner),
-                overnight_basis: overnight_basis.map(|d| d.inner),
-                fallback: fallback.map(|f| f.inner.clone()).unwrap_or_default(),
-            },
-        })
+        let inner = FloatingRateSpec {
+            forward_curve_id: finstack_quant_core::types::CurveId::from(forward_curve_id),
+            spread_bp: decimal_from_any(spread_bp)?,
+            gearing: gearing.map_or(Ok(FloatingRateSpec::DEFAULT_GEARING), decimal_from_any)?,
+            gearing_includes_spread,
+            index_floor_bp: index_floor_bp.map(decimal_from_any).transpose()?,
+            all_in_floor_bp: all_in_floor_bp.map(decimal_from_any).transpose()?,
+            all_in_cap_bp: all_in_cap_bp.map(decimal_from_any).transpose()?,
+            index_cap_bp: index_cap_bp.map(decimal_from_any).transpose()?,
+            overnight_index_constraints: overnight_index_constraints
+                .map(|c| c.inner)
+                .unwrap_or_default(),
+            reset_frequency: extract_tenor(reset_frequency)?,
+            index_tenor: index_tenor.map(extract_tenor).transpose()?,
+            reset_lag_days,
+            fixing_calendar_id: fixing_calendar_id.map(Into::into),
+            compounding: compounding.map(|m| m.inner),
+            overnight_basis: overnight_basis.map(|d| d.inner),
+            fallback: fallback.map(|f| f.inner.clone()).unwrap_or_default(),
+        };
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// USD SOFR compounded in arrears (ARRC / ISDA 2021): index ``USD-SOFR``,
@@ -1335,7 +1275,7 @@ impl PyAmortizationSpec {
     fn step_remaining(schedule: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Self> {
         Ok(Self {
             inner: AmortizationSpec::StepRemaining {
-                schedule: date_money_pairs(schedule)?,
+                schedule: extract_dated_flows(schedule)?,
             },
         })
     }
@@ -1400,7 +1340,7 @@ impl PyAmortizationSpec {
     fn custom_principal(items: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Self> {
         Ok(Self {
             inner: AmortizationSpec::CustomPrincipal {
-                items: date_money_pairs(items)?,
+                items: extract_dated_flows(items)?,
             },
         })
     }
@@ -1779,10 +1719,10 @@ impl PyFeeSpec {
                 day_count: day_count.inner,
                 business_day_convention: match business_day_convention {
                     Some(obj) => extract_business_day_convention(obj)?,
-                    None => BusinessDayConvention::ModifiedFollowing,
+                    None => BusinessDayConvention::default(),
                 },
                 calendar_id: calendar_id.to_string(),
-                stub: stub.map_or(StubKind::ShortFront, |s| s.inner),
+                stub: stub.map_or(ScheduleParams::DEFAULT_STUB, |s| s.inner),
                 accrual_basis: accrual_basis.map(|a| a.inner.clone()).unwrap_or_default(),
             },
         })
@@ -1943,15 +1883,6 @@ impl PyPrepaymentModelSpec {
     fn psa(speed_multiplier: f64) -> Self {
         Self {
             inner: PrepaymentModelSpec::psa(speed_multiplier),
-        }
-    }
-
-    /// 100% PSA (standard prepayment assumption).
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn psa_100() -> Self {
-        Self {
-            inner: PrepaymentModelSpec::psa_100(),
         }
     }
 

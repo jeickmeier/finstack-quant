@@ -1663,8 +1663,7 @@ fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
         .build(Some(&market))
         .expect_err("preceding historical fixing must be supplied");
     assert!(
-        err.to_string().contains("2025-01-03")
-            && err.to_string().contains("historical fixings are missing"),
+        err.to_string().contains("2025-01-03") && err.to_string().contains("FIXING:USD-SOFR-ON"),
         "error should identify the required Friday fixing: {err}"
     );
 
@@ -1688,7 +1687,7 @@ fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
 
 /// With the default `Error` fallback, a coupon whose projection start is
 /// strictly before the curve base date fails with a descriptive error naming
-/// the date and index (historical fixings are not supported).
+/// the date and index requiring historical fixings.
 #[test]
 fn test_seasoned_coupon_before_curve_base_errors_by_default() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();

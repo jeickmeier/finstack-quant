@@ -120,12 +120,13 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         // Explicit schedule dates still cannot turn a hedge notional into funding.
         let mut dated_meta = raw.get_meta().clone();
         dated_meta.issue_date = Some(period.start);
-        let dated = CashFlowSchedule::from_parts(
+        let dated = CashFlowSchedule::from_flows(
             raw.get_flows().to_vec(),
             raw.get_notional().clone(),
             raw.get_day_count(),
             dated_meta,
-        );
+        )
+        .expect("valid cashflow rows");
         let (_, closing, funding, _) = calculate_period_flows(
             &swap,
             &period,
@@ -403,15 +404,18 @@ fn no_funding_schedule(initial: f64, issue: Date) -> ScheduleInstrument {
     } else {
         vec![]
     };
-    ScheduleInstrument::new(CashFlowSchedule::from_parts(
-        flows,
-        Notional::par(initial, Currency::USD).expect("valid decimal principal"),
-        DayCount::Act365F,
-        CashFlowMeta {
-            issue_date: Some(issue),
-            ..Default::default()
-        },
-    ))
+    ScheduleInstrument::new(
+        CashFlowSchedule::from_flows(
+            flows,
+            Notional::par(initial, Currency::USD).expect("valid decimal principal"),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                ..Default::default()
+            },
+        )
+        .expect("valid cashflow rows"),
+    )
 }
 
 fn empty_debt_context() -> (
@@ -798,7 +802,7 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
                 Money::new(100.0 - initial_face, Currency::USD).expect("funded face"),
             )
             .with_principal_date(issue);
-            let schedule = CashFlowSchedule::from_parts(
+            let schedule = CashFlowSchedule::from_flows(
                 vec![
                     funding,
                     CashFlow::new(
@@ -816,7 +820,8 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
                     issue_date: Some(issue),
                     ..Default::default()
                 },
-            );
+            )
+            .expect("valid cashflow rows");
             let bond = Bond::fixed(
                 InstrumentId::new("BOND"),
                 Money::from((100_i64, Currency::USD)),
@@ -884,43 +889,6 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
             }
         }
     }
-}
-
-#[test]
-fn oid_funding_rejects_cash_currency_different_from_principal() {
-    let period = build_periods("2025Q1..2025Q1", None)
-        .expect("valid period")
-        .periods
-        .remove(0);
-    let instrument = ScheduleInstrument::new(CashFlowSchedule::from_parts(
-        vec![CashFlow::new(
-            date!(2025 - 04 - 01),
-            None,
-            Money::from((-98_i64, Currency::EUR)),
-            CFKind::Notional,
-            0.0,
-            None,
-        )
-        .with_principal_delta(Money::from((100_i64, Currency::USD)))
-        .with_principal_date(date!(2025 - 01 - 15))],
-        Notional::par(0.0, Currency::USD).expect("initial face"),
-        DayCount::Act365F,
-        CashFlowMeta {
-            issue_date: Some(date!(2025 - 01 - 15)),
-            ..Default::default()
-        },
-    ));
-    let zero = Money::from((0_i64, Currency::USD));
-    let error = calculate_period_flows(
-        &instrument,
-        &period,
-        zero,
-        &MarketContext::new(),
-        period.start,
-        None,
-    )
-    .expect_err("funding cash and principal must use the instrument currency");
-    assert!(error.to_string().contains("Currency mismatch"));
 }
 
 #[test]

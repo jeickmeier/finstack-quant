@@ -219,7 +219,7 @@ export type TenorUnit = "days" | "weeks" | "months" | "years";
  * test date is the last entry with date <= test_date. If no entry applies,
  * [`ThresholdSchedule::threshold_for`] returns `None`.
  */
-export type ThresholdSchedule = [unknown, unknown][];
+export type ThresholdSchedule = [DateWire, number][];
 /**
  * Rounding modes supported by the library.
  *

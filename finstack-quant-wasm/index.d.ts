@@ -13906,49 +13906,26 @@ export interface CashflowsNamespace {
   datedFlowsJson(scheduleJson: JsonInput): string;
 
   /**
-   * Convert an annual CPR (constant prepayment rate) to a monthly SMM.
+   * Convert annual conditional prepayment or default mortality to monthly mortality.
    *
-   * Uses the standard relationship `SMM = 1 - (1 - CPR)^(1/12)`.
+   * Uses `monthly = 1 - (1 - annual)^(1/12)` with twelve monthly periods.
    *
-   * @param cpr - Annualized CPR as a decimal in `[0, 1]` (0.06 means 6%).
-   * @returns Monthly SMM as a decimal.
-   * @throws If `cpr` is negative, non-finite, or above 1.0.
+   * @param annual - Finite annual mortality as a decimal in `[0, 1]` (CPR or CDR); no calendar day-count adjustment applies.
+   * @returns Monthly mortality as a decimal; zero and one map to themselves.
+   * @throws If `annual` is not a number (kind `invalid_type`), is non-finite, or lies outside `[0, 1]` (kind `validation`).
    */
-  cprToSmm(cpr: number): number;
+  annualToMonthly(annual: number): number;
 
   /**
-   * Convert a monthly SMM (single monthly mortality) to an annual CPR.
+   * Convert monthly conditional prepayment or default mortality to annual mortality.
    *
-   * Uses `CPR = 1 - (1 - SMM)^12`.
+   * Uses `annual = 1 - (1 - monthly)^12` with twelve monthly periods.
    *
-   * @param smm - Monthly SMM as a decimal in `[0, 1]`.
-   * @returns Annualized CPR as a decimal.
-   * @throws If `smm` is negative, non-finite, or above 1.0.
+   * @param monthly - Finite monthly mortality as a decimal in `[0, 1]` (SMM or MDR); no calendar day-count adjustment applies.
+   * @returns Annual mortality as a decimal; zero and one map to themselves.
+   * @throws If `monthly` is not a number (kind `invalid_type`), is non-finite, or lies outside `[0, 1]` (kind `validation`).
    */
-  smmToCpr(smm: number): number;
-
-  /**
-   * Convert an annual CDR (constant default rate) to a monthly MDR.
-   *
-   * Default and prepayment mortality rates share the same annual-to-monthly
-   * conversion kernel: `MDR = 1 - (1 - CDR)^(1/12)`.
-   *
-   * @param cdr - Constant annual default rate as a decimal in `[0, 1]`.
-   * @returns Monthly MDR as a decimal.
-   * @throws If `cdr` is negative, non-finite, or above 1.0.
-   */
-  cdrToMdr(cdr: number): number;
-
-  /**
-   * Convert a monthly MDR (monthly default rate) to an annual CDR.
-   *
-   * Uses `CDR = 1 - (1 - MDR)^12`.
-   *
-   * @param mdr - Monthly default rate as a decimal in `[0, 1]`.
-   * @returns Annualized CDR as a decimal.
-   * @throws If `mdr` is negative, non-finite, or above 1.0.
-   */
-  mdrToCdr(mdr: number): number;
+  monthlyToAnnual(monthly: number): number;
 
   /**
    * Convert an ABS speed to the single-month mortality for a seasoning month.
@@ -14117,6 +14094,34 @@ export interface CashflowsNamespace {
     flows: readonly DatedFlowJson[],
     periods: readonly generated.core.Period[]
   ): generated.cashflows.PeriodAggregation;
+
+  /**
+   * Read one period's currency totals using the canonical Rust label lookup.
+   *
+   * @param aggregation - Period-to-currency map with currency-tagged Money values; currency keys must agree with their amounts.
+   * @param period - Exact case-sensitive PeriodId display label, such as `"2025Q1"`; whitespace is not trimmed and aliases are not parsed.
+   * @returns An independent currency map, including an empty map for a stored empty bucket, or null for an absent or malformed label. No FX conversion is performed.
+   * @throws If aggregation has an invalid wire shape or mismatched currencies (kind `validation`), or period is not a string (kind `invalid_type`).
+   */
+  periodAggregationGetPeriod(
+    aggregation: generated.cashflows.PeriodAggregation,
+    period: string
+  ): Record<string, MoneyValue> | null;
+
+  /**
+   * Read one period-and-currency amount using the canonical Rust lookup.
+   *
+   * @param aggregation - Period-to-currency map with currency-tagged Money values; currency keys must agree with their amounts.
+   * @param period - Exact case-sensitive PeriodId display label; whitespace is not trimmed and aliases are not parsed.
+   * @param currency - ISO-4217 currency code of the requested total; no FX conversion is performed.
+   * @returns The Money value or null if the period or currency is absent; a malformed period label is a miss.
+   * @throws If aggregation or currency has an invalid wire shape, or currency keys disagree with amounts (kind `validation`), or period is not a string (kind `invalid_type`).
+   */
+  periodAggregationGetAmount(
+    aggregation: generated.cashflows.PeriodAggregation,
+    period: string,
+    currency: generated.core.Currency
+  ): MoneyValue | null;
 
   /**
    * Sum dated amounts that must all be in one currency.
@@ -14314,14 +14319,6 @@ export interface CashflowsNamespace {
     spec: generated.cashflows.DefaultModelSpec,
     seasoningMonths: number
   ): number | undefined;
-
-  /**
-   * 100% PSA, the standard prepayment assumption.
-   *
-   * @returns `PrepaymentModelSpec` wire object `{ curve: "psa", speed_multiplier: 1.0 }`.
-   * @throws If the model cannot be serialized.
-   */
-  prepaymentModelSpecPsa100(): generated.cashflows.PrepaymentModelSpec;
 
   /**
    * Check a prepayment model's curve parameters.

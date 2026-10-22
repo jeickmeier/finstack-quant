@@ -22,7 +22,7 @@
 
 use super::traits::StochasticDefault;
 use crate::correlation::{Copula, CopulaSpec};
-use finstack_quant_cashflows::builder::clamped_cdr_to_mdr;
+use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 
 /// Copula-based stochastic default model.
 ///
@@ -77,7 +77,7 @@ impl CopulaBasedDefault {
             ))
         })?;
         let base_cdr = base_cdr.clamp(0.0, 1.0);
-        let base_mdr = clamped_cdr_to_mdr(base_cdr);
+        let base_mdr = annual_to_monthly_clamped(base_cdr);
         let default_threshold =
             copula_spec.default_threshold(base_mdr.clamp(1e-10, 1.0 - 1e-10))?;
 
@@ -103,7 +103,7 @@ impl StochasticDefault for CopulaBasedDefault {
     }
 
     fn expected_mdr(&self, _seasoning: u32) -> f64 {
-        clamped_cdr_to_mdr(self.base_cdr)
+        annual_to_monthly_clamped(self.base_cdr)
     }
 }
 

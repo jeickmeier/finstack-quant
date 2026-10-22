@@ -332,7 +332,7 @@ pub fn make_quarterly_periods(base: Date, n_quarters: u32) -> Vec<Period> {
     periods
 }
 
-pub fn make_dated_flows(n: usize, base: Date) -> finstack_quant_cashflows::DatedFlows {
+pub fn make_dated_flows(n: usize, base: Date) -> Vec<(Date, Money)> {
     (0..n)
         .map(|i| {
             let days = (i as i64) * 90 + 90;

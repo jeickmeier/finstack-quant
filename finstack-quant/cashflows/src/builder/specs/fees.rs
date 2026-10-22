@@ -75,7 +75,7 @@ pub enum FeeAccrualBasis {
 
 impl FeeAccrualBasis {
     /// Returns true if this is the default variant (for serde skip_serializing_if).
-    pub fn is_default(&self) -> bool {
+    fn is_default(&self) -> bool {
         matches!(self, Self::PointInTime)
     }
 }

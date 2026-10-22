@@ -327,12 +327,12 @@ pub(crate) fn rebuild_residual_interest(
             "Preserved principal claims must match future economic repayments",
         ));
     }
-    Ok(CashFlowSchedule::from_parts(
+    Ok(CashFlowSchedule::from_flows(
         flows,
         schedule.get_notional().clone(),
         schedule.get_day_count(),
         schedule.get_meta().clone(),
-    ))
+    )?)
 }
 
 fn principal_change(flow: &CashFlow) -> f64 {
@@ -361,7 +361,7 @@ mod tests {
     use time::Month;
 
     fn schedule(flows: Vec<CashFlow>, notional: f64, issue: Date) -> CashFlowSchedule {
-        CashFlowSchedule::from_parts(
+        CashFlowSchedule::from_flows(
             flows,
             Notional::par(notional, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -370,6 +370,7 @@ mod tests {
                 ..CashFlowMeta::default()
             },
         )
+        .expect("valid cashflow rows")
     }
 
     #[test]

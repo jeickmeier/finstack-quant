@@ -10,8 +10,8 @@ use rust_decimal::Decimal;
 
 use super::types::{CreditSpreadProcessSpec, DrawRepaySpec, RevolvingCredit, UtilizationProcess};
 use crate::loan_terms::UpfrontFee;
-use finstack_quant_cashflows::builder::FeeTier;
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_cashflows::builder::{FeeTier, FloatingRateFallback};
 use finstack_quant_core::validation;
 
 /// Validate a dated step schedule: strictly increasing, after the commitment
@@ -446,11 +446,14 @@ impl RevolvingCredit {
                      forward curve's own tenor"
                         .to_string()
                 })?;
-                validation::require_with(spec.fallback.is_default(), || {
-                    "RevolvingCredit does not support a floating-rate fallback: a missing \
+                validation::require_with(
+                    matches!(spec.fallback, FloatingRateFallback::Error),
+                    || {
+                        "RevolvingCredit does not support a floating-rate fallback: a missing \
                      curve or fixing is an error"
-                        .to_string()
-                })?;
+                            .to_string()
+                    },
+                )?;
                 let _ = finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
                 let _ = finstack_quant_valuations_core::instruments::pricing::overnight_conventions::resolved_overnight_compounding(
                     spec.forward_curve_id.as_str(),

@@ -34,7 +34,7 @@
 
 use super::super::expected_shocked_smm;
 use super::traits::StochasticPrepayment;
-use finstack_quant_cashflows::builder::{clamped_cpr_to_smm, PSA_RAMP_MONTHS};
+use finstack_quant_cashflows::builder::{annual_to_monthly_clamped, PSA_RAMP_MONTHS};
 
 /// Refinancing slope parameter (lambda) of the arctangent incentive response.
 const REFI_SLOPE: f64 = 20.0;
@@ -128,7 +128,7 @@ impl StochasticPrepayment for RichardRollPrepay {
         let shock = (self.factor_loading * z * self.cpr_volatility).exp();
         let shocked_cpr = (base_conditional_cpr * shock).clamp(0.0, 1.0);
 
-        clamped_cpr_to_smm(shocked_cpr)
+        annual_to_monthly_clamped(shocked_cpr)
     }
 
     fn expected_smm(&self, seasoning: u32) -> f64 {

@@ -60,7 +60,7 @@ export type AmortizationSpec =
         /**
          * Ordered list of `(date, remaining_principal_after_date)`.
          */
-        schedule: [unknown, unknown][];
+        schedule: [DateWire, Money][];
       };
     }
   | {
@@ -100,7 +100,7 @@ export type AmortizationSpec =
         /**
          * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
          */
-        items: [unknown, unknown][];
+        items: [DateWire, Money][];
       };
     };
 /**
@@ -941,7 +941,7 @@ export type PikSchedule =
       uniform: PikMode;
     }
   | {
-      stepped: [unknown, unknown][];
+      stepped: [number, PikMode][];
     };
 /**
  * Per-coupon PIK behavior for the MC engine.
@@ -2826,7 +2826,7 @@ export interface StepUpCouponSpec {
    * applied here. The rate is set at accrual start (per market
    * convention for step-up bonds).
    */
-  step_schedule: [unknown, unknown][];
+  step_schedule: [DateWire, DecimalWire][];
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.
@@ -2933,7 +2933,7 @@ export interface CashFlowAccrual {
    * @minItems 2
    * @maxItems 2
    */
-  coupon_period?: [unknown, unknown] | null;
+  coupon_period?: [DateWire, DateWire] | null;
   /**
    * Day-count convention used for the accrual factor.
    */
@@ -3426,7 +3426,7 @@ export interface MertonMcConfig {
    * these factors instead of the flat `discount_rate`. The flat rate is
    * still used for the Merton risk-neutral drift.
    */
-  cashflow_dfs?: [unknown, unknown][] | null;
+  cashflow_dfs?: [number, number][] | null;
   /**
    * Optional dynamic (notional-dependent) recovery rate model.
    *
@@ -3482,7 +3482,7 @@ export interface MertonMcCalibrationSpec {
    * @minItems 2
    * @maxItems 2
    */
-  bracket?: [unknown, unknown] | null;
+  bracket?: [number, number] | null;
   /**
    * Number of independent MC estimators used during calibration iterations (low paths).
    */
@@ -4168,7 +4168,7 @@ export interface CapFloor {
    * @minItems 2
    * @maxItems 2
    */
-  premium?: [unknown, unknown] | null;
+  premium?: [DateWire, Money] | null;
   /**
    * Option type
    */
@@ -7109,7 +7109,7 @@ export interface PercentileSeries {
    * Period → ordered list of `(percentile, value)` pairs.
    */
   values: {
-    [k: string]: [unknown, unknown][];
+    [k: string]: [number, number][];
   };
   [k: string]: unknown;
 }

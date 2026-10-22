@@ -68,6 +68,25 @@ use indexmap::IndexMap;
 pub struct PeriodAggregation(IndexMap<PeriodId, IndexMap<Currency, Money>>);
 
 impl PeriodAggregation {
+    /// Read one period's currency totals by its exact display label.
+    ///
+    /// # Arguments
+    ///
+    /// * `period` - Exact case-sensitive `PeriodId` display label, such as
+    ///   `"2025Q1"`. Whitespace is not trimmed and aliases are not parsed.
+    ///
+    /// # Returns
+    ///
+    /// A borrowed currency map, including an empty map if one was supplied
+    /// during construction, or `None` for an absent or malformed label.
+    #[must_use]
+    pub fn get_period(&self, period: &str) -> Option<&IndexMap<Currency, Money>> {
+        self.0
+            .iter()
+            .find(|(id, _)| id.to_string() == period)
+            .map(|(_, per_currency)| per_currency)
+    }
+
     /// Amount aggregated for one period code and currency.
     ///
     /// # Arguments
@@ -83,10 +102,8 @@ impl PeriodAggregation {
     /// flows in `currency`.
     #[must_use]
     pub fn get_amount(&self, period: &str, currency: Currency) -> Option<Money> {
-        self.0
-            .iter()
-            .find(|(id, _)| id.to_string() == period)
-            .and_then(|(_, per_currency)| per_currency.get(&currency))
+        self.get_period(period)
+            .and_then(|per_currency| per_currency.get(&currency))
             .copied()
     }
 
@@ -162,7 +179,7 @@ trait HasDate {
     fn flow_date(&self) -> Date;
 }
 
-impl HasDate for crate::DatedFlow {
+impl HasDate for (Date, Money) {
     fn flow_date(&self) -> Date {
         self.0
     }
@@ -320,14 +337,14 @@ fn validate_periods(periods: &[Period]) -> finstack_quant_core::Result<()> {
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn aggregate_by_period(
-    flows: &[crate::DatedFlow],
+    flows: &[(Date, Money)],
     periods: &[Period],
 ) -> finstack_quant_core::Result<PeriodAggregation> {
     validate_periods(periods)?;
     if flows.is_empty() || periods.is_empty() {
         return Ok(PeriodAggregation::default());
     }
-    let sorted: std::borrow::Cow<'_, [crate::DatedFlow]> =
+    let sorted: std::borrow::Cow<'_, [(Date, Money)]> =
         if flows.windows(2).all(|w| w[0].0 <= w[1].0) {
             std::borrow::Cow::Borrowed(flows)
         } else {
@@ -382,7 +399,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 /// assert_eq!(total.currency(), Currency::USD);
 /// ```
 pub fn aggregate_cashflows_checked(
-    flows: &[crate::DatedFlow],
+    flows: &[(Date, Money)],
     target: Currency,
 ) -> finstack_quant_core::Result<Money> {
     let mut acc = NeumaierAccumulator::default();
@@ -975,6 +992,30 @@ mod period_aggregation_tests {
     use super::*;
 
     #[test]
+    fn exact_period_lookup_preserves_empty_buckets_and_currency_totals() {
+        let totals: PeriodAggregation = serde_json::from_str(
+            r#"{"2025Q1":{"USD":{"amount":"100.25","currency":"USD"},"EUR":{"amount":"40","currency":"EUR"}},"2025Q2":{}}"#,
+        ).expect("valid aggregation");
+        let first = totals.get_period("2025Q1").expect("present period");
+        assert_eq!(first.len(), 2);
+        assert_eq!(
+            totals.get_amount("2025Q1", Currency::USD),
+            first.get(&Currency::USD).copied()
+        );
+        assert!(totals
+            .get_period("2025Q2")
+            .expect("present empty period")
+            .is_empty());
+        assert_eq!(totals.get_amount("2025Q2", Currency::USD), None);
+        for missing in ["2025Q3", "2025q1", " 2025Q1", "nope", ""] {
+            assert!(
+                totals.get_period(missing).is_none(),
+                "unexpected match for {missing:?}"
+            );
+        }
+    }
+
+    #[test]
     fn checked_map_construction_rejects_currency_mismatch() {
         let period = PeriodId::quarter(2025, 1).expect("valid period");
         let mut per_currency = IndexMap::new();
@@ -1287,7 +1328,7 @@ mod period_contract_tests {
         assert!((pv - 200.0).abs() < 1e-12, "expected 200, got {pv}");
 
         // Nominal aggregation still includes the historical flows.
-        let dated: Vec<crate::DatedFlow> = flows.iter().map(|cf| (cf.date, cf.amount)).collect();
+        let dated: Vec<(Date, Money)> = flows.iter().map(|cf| (cf.date, cf.amount)).collect();
         let nominal = aggregate_by_period(&dated, &periods).expect("nominal aggregation");
         let total = nominal[&PeriodId::annual(2025)][&Currency::USD].amount();
         assert!((total - 350.0).abs() < 1e-12, "expected 350, got {total}");
@@ -1657,7 +1698,7 @@ mod credit_pv_tests {
         // when materialized as Money; that must surface as Err, not a panic.
         let base = d(2025, 1, 1);
         let periods = vec![make_period(base, d(2026, 1, 1))];
-        let flows: Vec<crate::DatedFlow> = vec![
+        let flows: Vec<(Date, Money)> = vec![
             (
                 d(2025, 3, 1),
                 Money::new(7.0e28, Currency::USD).expect("valid money fixture"),

@@ -25,9 +25,9 @@ fn psa_smm_golden_values() {
     // 100% PSA ramps to 6% CPR over 30 months, then stays flat
     // SMM = 1 - (1 - CPR)^(1/12)
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
-    use finstack_quant_cashflows::builder::{cpr_to_smm, smm_to_cpr};
+    use finstack_quant_cashflows::builder::{annual_to_monthly, monthly_to_annual};
 
-    let model = PrepaymentModelSpec::psa_100();
+    let model = PrepaymentModelSpec::psa(1.0);
 
     // Month 0: 0% CPR → 0% SMM
     let smm_0 = model.smm(0).unwrap();
@@ -39,7 +39,7 @@ fn psa_smm_golden_values() {
 
     // Month 15: 3% CPR (halfway through ramp) → ~0.2536% SMM
     let smm_15 = model.smm(15).unwrap();
-    let cpr_15 = smm_to_cpr(smm_15).expect("valid SMM");
+    let cpr_15 = monthly_to_annual(smm_15).expect("valid SMM");
     assert!(
         (cpr_15 - 0.03).abs() < RATE_TOLERANCE,
         "PSA at month 15 should be 3% CPR, got {}",
@@ -48,7 +48,7 @@ fn psa_smm_golden_values() {
 
     // Month 30: 6% CPR (end of ramp) → ~0.5143% SMM
     let smm_30 = model.smm(30).unwrap();
-    let expected_smm_30 = cpr_to_smm(0.06).unwrap();
+    let expected_smm_30 = annual_to_monthly(0.06).unwrap();
     assert!(
         (smm_30 - expected_smm_30).abs() < RATE_TOLERANCE,
         "PSA at month 30 should be {} SMM, got {}",
@@ -68,7 +68,7 @@ fn psa_smm_golden_values() {
     // 150% PSA should be 1.5x the base values
     let model_150 = PrepaymentModelSpec::psa(1.5);
     let smm_30_150 = model_150.smm(30).unwrap();
-    let cpr_30_150 = smm_to_cpr(smm_30_150).expect("valid SMM");
+    let cpr_30_150 = monthly_to_annual(smm_30_150).expect("valid SMM");
     assert!(
         (cpr_30_150 - 0.09).abs() < RATE_TOLERANCE,
         "150% PSA at month 30 should be 9% CPR, got {}",
@@ -83,7 +83,7 @@ fn sda_mdr_golden_values() {
     // SDA (Standard Default Assumption) Model Golden Values — PSA/BMA 100 SDA:
     // 0.02%/month ramp to 0.60% CDR at month 30, flat plateau months 30-60,
     // linear decline to 0.03% CDR by month 120, flat thereafter.
-    use finstack_quant_cashflows::builder::smm_to_cpr;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::DefaultModelSpec;
 
     let model = DefaultModelSpec::sda(1.0);
@@ -98,7 +98,7 @@ fn sda_mdr_golden_values() {
 
     // Month 15: 0.30% CDR (halfway to peak)
     let mdr_15 = model.mdr(15).unwrap();
-    let cdr_15 = smm_to_cpr(mdr_15).expect("valid SMM");
+    let cdr_15 = monthly_to_annual(mdr_15).expect("valid SMM");
     assert!(
         (cdr_15 - 0.003).abs() < RATE_TOLERANCE,
         "SDA at month 15 should be 0.30% CDR, got {}",
@@ -107,7 +107,7 @@ fn sda_mdr_golden_values() {
 
     // Month 30: 0.60% CDR (peak)
     let mdr_30 = model.mdr(30).unwrap();
-    let cdr_30 = smm_to_cpr(mdr_30).expect("valid SMM");
+    let cdr_30 = monthly_to_annual(mdr_30).expect("valid SMM");
     assert!(
         (cdr_30 - 0.006).abs() < RATE_TOLERANCE,
         "SDA at month 30 should be 0.60% CDR (peak), got {}",
@@ -116,7 +116,7 @@ fn sda_mdr_golden_values() {
 
     // Month 60: still 0.60% CDR (end of plateau)
     let mdr_60 = model.mdr(60).unwrap();
-    let cdr_60 = smm_to_cpr(mdr_60).expect("valid SMM");
+    let cdr_60 = monthly_to_annual(mdr_60).expect("valid SMM");
     assert!(
         (cdr_60 - 0.006).abs() < RATE_TOLERANCE,
         "SDA at month 60 should be 0.60% CDR (plateau), got {}",
@@ -125,7 +125,7 @@ fn sda_mdr_golden_values() {
 
     // Month 90: 0.315% CDR (halfway down the 60-month decline)
     let mdr_90 = model.mdr(90).unwrap();
-    let cdr_90 = smm_to_cpr(mdr_90).expect("valid SMM");
+    let cdr_90 = monthly_to_annual(mdr_90).expect("valid SMM");
     assert!(
         (cdr_90 - 0.00315).abs() < RATE_TOLERANCE,
         "SDA at month 90 should be 0.315% CDR (mid-decline), got {}",
@@ -134,7 +134,7 @@ fn sda_mdr_golden_values() {
 
     // Month 120: 0.03% CDR (terminal)
     let mdr_120 = model.mdr(120).unwrap();
-    let cdr_120 = smm_to_cpr(mdr_120).expect("valid SMM");
+    let cdr_120 = monthly_to_annual(mdr_120).expect("valid SMM");
     assert!(
         (cdr_120 - 0.0003).abs() < RATE_TOLERANCE,
         "SDA at month 120 should be 0.03% CDR (terminal), got {}",
@@ -143,7 +143,7 @@ fn sda_mdr_golden_values() {
 
     // Month 200: still 0.03% CDR (flat after terminal)
     let mdr_200 = model.mdr(200).unwrap();
-    let cdr_200 = smm_to_cpr(mdr_200).expect("valid SMM");
+    let cdr_200 = monthly_to_annual(mdr_200).expect("valid SMM");
     assert!(
         (cdr_200 - 0.0003).abs() < RATE_TOLERANCE,
         "SDA at month 200 should still be 0.03% CDR, got {}",
@@ -157,13 +157,13 @@ fn sda_mdr_golden_values() {
 fn cpr_smm_conversion_roundtrip_precision() {
     // Formula: SMM = 1 - (1 - CPR)^(1/12)
     //          CPR = 1 - (1 - SMM)^12
-    use finstack_quant_cashflows::builder::{cpr_to_smm, smm_to_cpr};
+    use finstack_quant_cashflows::builder::{annual_to_monthly, monthly_to_annual};
 
     let test_cprs = [0.0, 0.01, 0.03, 0.06, 0.10, 0.15, 0.20, 0.50];
 
     for &cpr in &test_cprs {
-        let smm = cpr_to_smm(cpr).unwrap();
-        let cpr_back = smm_to_cpr(smm).expect("valid SMM");
+        let smm = annual_to_monthly(cpr).unwrap();
+        let cpr_back = monthly_to_annual(smm).expect("valid SMM");
 
         assert!(
             (cpr - cpr_back).abs() < FACTOR_TOLERANCE,
@@ -180,7 +180,7 @@ fn cpr_smm_conversion_roundtrip_precision() {
 
     // Verify specific golden value: 6% CPR ≈ 0.5143% SMM
     // Using exact calculation: SMM = 1 - (1 - 0.06)^(1/12) ≈ 0.005143
-    let smm_6pct = cpr_to_smm(0.06).unwrap();
+    let smm_6pct = annual_to_monthly(0.06).unwrap();
     let expected_smm = 1.0 - (1.0 - 0.06_f64).powf(1.0 / 12.0);
     assert!(
         (smm_6pct - expected_smm).abs() < FACTOR_TOLERANCE,
@@ -191,15 +191,15 @@ fn cpr_smm_conversion_roundtrip_precision() {
 }
 
 #[test]
-fn smm_to_cpr_rejects_invalid_smm() {
-    use finstack_quant_cashflows::builder::smm_to_cpr;
+fn monthly_to_annual_rejects_invalid_smm() {
+    use finstack_quant_cashflows::builder::monthly_to_annual;
 
     assert!(
-        smm_to_cpr(-0.01).is_err(),
+        monthly_to_annual(-0.01).is_err(),
         "negative SMM should be rejected"
     );
     assert!(
-        smm_to_cpr(1.01).is_err(),
+        monthly_to_annual(1.01).is_err(),
         "SMM above 100% should be rejected"
     );
 }
@@ -210,13 +210,13 @@ fn smm_to_cpr_rejects_invalid_smm() {
 fn psa_matches_industry_standard_ramp() {
     // Reference: Bond Market Association PSA Standard Prepayment Model
     // 100% PSA: Linear ramp from 0% CPR at month 0 to 6% CPR at month 30
-    use finstack_quant_cashflows::builder::smm_to_cpr;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
-    let model = PrepaymentModelSpec::psa_100();
+    let model = PrepaymentModelSpec::psa(1.0);
 
     // Month 1: 0.2% CPR (1/30 * 6%)
-    let cpr_1 = smm_to_cpr(model.smm(1).unwrap()).expect("valid SMM");
+    let cpr_1 = monthly_to_annual(model.smm(1).unwrap()).expect("valid SMM");
     assert!(
         (cpr_1 - 0.002).abs() < RATE_TOLERANCE,
         "PSA month 1 should be 0.2% CPR, got {}",
@@ -224,7 +224,7 @@ fn psa_matches_industry_standard_ramp() {
     );
 
     // Month 10: 2.0% CPR (10/30 * 6%)
-    let cpr_10 = smm_to_cpr(model.smm(10).unwrap()).expect("valid SMM");
+    let cpr_10 = monthly_to_annual(model.smm(10).unwrap()).expect("valid SMM");
     assert!(
         (cpr_10 - 0.02).abs() < RATE_TOLERANCE,
         "PSA month 10 should be 2.0% CPR, got {}",
@@ -232,7 +232,7 @@ fn psa_matches_industry_standard_ramp() {
     );
 
     // Month 20: 4.0% CPR (20/30 * 6%)
-    let cpr_20 = smm_to_cpr(model.smm(20).unwrap()).expect("valid SMM");
+    let cpr_20 = monthly_to_annual(model.smm(20).unwrap()).expect("valid SMM");
     assert!(
         (cpr_20 - 0.04).abs() < RATE_TOLERANCE,
         "PSA month 20 should be 4.0% CPR, got {}",
@@ -242,7 +242,7 @@ fn psa_matches_industry_standard_ramp() {
     // Verify ramp is linear for all months 1-30
     for month in 1..=30 {
         let expected_cpr = (month as f64 / 30.0) * 0.06;
-        let actual_cpr = smm_to_cpr(model.smm(month).unwrap()).expect("valid SMM");
+        let actual_cpr = monthly_to_annual(model.smm(month).unwrap()).expect("valid SMM");
         assert!(
             (actual_cpr - expected_cpr).abs() < RATE_TOLERANCE,
             "PSA month {} should be {:.4}% CPR, got {:.4}%",
@@ -255,17 +255,17 @@ fn psa_matches_industry_standard_ramp() {
 
 #[test]
 fn psa_multiplier_scales_correctly() {
-    use finstack_quant_cashflows::builder::smm_to_cpr;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
     // 50% PSA, 100% PSA, 200% PSA at month 30
     let psa_50 = PrepaymentModelSpec::psa(0.5);
-    let psa_100 = PrepaymentModelSpec::psa_100();
+    let psa_100 = PrepaymentModelSpec::psa(1.0);
     let psa_200 = PrepaymentModelSpec::psa(2.0);
 
-    let cpr_50 = smm_to_cpr(psa_50.smm(30).unwrap()).expect("valid SMM");
-    let cpr_100 = smm_to_cpr(psa_100.smm(30).unwrap()).expect("valid SMM");
-    let cpr_200 = smm_to_cpr(psa_200.smm(30).unwrap()).expect("valid SMM");
+    let cpr_50 = monthly_to_annual(psa_50.smm(30).unwrap()).expect("valid SMM");
+    let cpr_100 = monthly_to_annual(psa_100.smm(30).unwrap()).expect("valid SMM");
+    let cpr_200 = monthly_to_annual(psa_200.smm(30).unwrap()).expect("valid SMM");
 
     assert!(
         (cpr_50 - 0.03).abs() < RATE_TOLERANCE,
@@ -297,15 +297,15 @@ fn psa_multiplier_scales_correctly() {
 #[test]
 fn psa_terminal_rate_is_flat() {
     // After month 30, PSA should stay flat at terminal rate
-    use finstack_quant_cashflows::builder::smm_to_cpr;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
-    let model = PrepaymentModelSpec::psa_100();
+    let model = PrepaymentModelSpec::psa(1.0);
     let terminal_cpr = 0.06;
 
     // Test various months after the ramp
     for month in [31, 50, 100, 200, 360] {
-        let actual_cpr = smm_to_cpr(model.smm(month).unwrap()).expect("valid SMM");
+        let actual_cpr = monthly_to_annual(model.smm(month).unwrap()).expect("valid SMM");
         assert!(
             (actual_cpr - terminal_cpr).abs() < RATE_TOLERANCE,
             "PSA month {} should be terminal 6% CPR, got {}",
@@ -322,7 +322,7 @@ fn sda_matches_industry_standard_curve() {
     // Reference: PSA/BMA Standard Default Assumption curve (100 SDA)
     // 0.02%/month ramp to 0.60% CDR at month 30, flat plateau through month
     // 60, linear decline to 0.03% CDR by month 120, flat thereafter.
-    use finstack_quant_cashflows::builder::smm_to_cpr;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::DefaultModelSpec;
 
     let model = DefaultModelSpec::sda(1.0);
@@ -330,7 +330,7 @@ fn sda_matches_industry_standard_curve() {
     // Verify ramp phase (months 1-30): 0.02% CDR per month
     for month in 1..=30 {
         let expected_cdr = (month as f64 / 30.0) * 0.006;
-        let actual_cdr = smm_to_cpr(model.mdr(month).unwrap()).expect("valid SMM");
+        let actual_cdr = monthly_to_annual(model.mdr(month).unwrap()).expect("valid SMM");
         assert!(
             (actual_cdr - expected_cdr).abs() < RATE_TOLERANCE,
             "SDA month {} (ramp) should be {:.4}% CDR, got {:.4}%",
@@ -342,7 +342,7 @@ fn sda_matches_industry_standard_curve() {
 
     // Verify plateau phase (months 31-60): flat 0.60% CDR
     for month in 31..=60 {
-        let actual_cdr = smm_to_cpr(model.mdr(month).unwrap()).expect("valid SMM");
+        let actual_cdr = monthly_to_annual(model.mdr(month).unwrap()).expect("valid SMM");
         assert!(
             (actual_cdr - 0.006).abs() < RATE_TOLERANCE,
             "SDA month {} (plateau) should be 0.60% CDR, got {:.4}%",
@@ -355,7 +355,7 @@ fn sda_matches_industry_standard_curve() {
     for month in 61..=120 {
         let months_past_plateau = (month - 60) as f64;
         let expected_cdr = 0.006 - (months_past_plateau / 60.0) * (0.006 - 0.0003);
-        let actual_cdr = smm_to_cpr(model.mdr(month).unwrap()).expect("valid SMM");
+        let actual_cdr = monthly_to_annual(model.mdr(month).unwrap()).expect("valid SMM");
         assert!(
             (actual_cdr - expected_cdr).abs() < RATE_TOLERANCE,
             "SDA month {} (decline) should be {:.4}% CDR, got {:.4}%",
@@ -367,7 +367,7 @@ fn sda_matches_industry_standard_curve() {
 
     // Verify terminal phase (month 121+): flat 0.03% CDR
     for month in [121, 200, 360] {
-        let actual_cdr = smm_to_cpr(model.mdr(month).unwrap()).expect("valid SMM");
+        let actual_cdr = monthly_to_annual(model.mdr(month).unwrap()).expect("valid SMM");
         assert!(
             (actual_cdr - 0.0003).abs() < RATE_TOLERANCE,
             "SDA month {} (terminal) should be 0.03% CDR, got {}",
@@ -379,15 +379,15 @@ fn sda_matches_industry_standard_curve() {
 
 #[test]
 fn sda_multiplier_scales_correctly() {
-    use finstack_quant_cashflows::builder::smm_to_cpr;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::DefaultModelSpec;
 
     let sda_100 = DefaultModelSpec::sda(1.0);
     let sda_200 = DefaultModelSpec::sda(2.0);
 
     // At peak (month 30)
-    let cdr_100_peak = smm_to_cpr(sda_100.mdr(30).unwrap()).expect("valid SMM");
-    let cdr_200_peak = smm_to_cpr(sda_200.mdr(30).unwrap()).expect("valid SMM");
+    let cdr_100_peak = monthly_to_annual(sda_100.mdr(30).unwrap()).expect("valid SMM");
+    let cdr_200_peak = monthly_to_annual(sda_200.mdr(30).unwrap()).expect("valid SMM");
 
     assert!(
         (cdr_100_peak - 0.006).abs() < RATE_TOLERANCE,
@@ -403,8 +403,8 @@ fn sda_multiplier_scales_correctly() {
     );
 
     // At terminal (month 150)
-    let cdr_100_term = smm_to_cpr(sda_100.mdr(150).unwrap()).expect("valid SMM");
-    let cdr_200_term = smm_to_cpr(sda_200.mdr(150).unwrap()).expect("valid SMM");
+    let cdr_100_term = monthly_to_annual(sda_100.mdr(150).unwrap()).expect("valid SMM");
+    let cdr_200_term = monthly_to_annual(sda_200.mdr(150).unwrap()).expect("valid SMM");
 
     assert!(
         (cdr_100_term - 0.0003).abs() < RATE_TOLERANCE,
@@ -422,7 +422,7 @@ fn sda_multiplier_scales_correctly() {
 fn cmbs_lockout_boundary_months() {
     // The lockout boundary is inclusive: seasoning == lockout_months is still
     // locked out (SMM = 0); lockout_months + 1 prepays at the configured CPR.
-    use finstack_quant_cashflows::builder::{smm_to_cpr, PrepaymentModelSpec};
+    use finstack_quant_cashflows::builder::{monthly_to_annual, PrepaymentModelSpec};
 
     let spec = PrepaymentModelSpec::cmbs_with_lockout(60, 0.10);
 
@@ -439,7 +439,7 @@ fn cmbs_lockout_boundary_months() {
         "seasoning == lockout_months + 1 should prepay, got {}",
         smm_after_lockout
     );
-    let cpr_after = smm_to_cpr(smm_after_lockout).expect("valid SMM");
+    let cpr_after = monthly_to_annual(smm_after_lockout).expect("valid SMM");
     assert!(
         (cpr_after - 0.10).abs() < RATE_TOLERANCE,
         "post-lockout CPR should be 10%, got {}",
@@ -510,7 +510,7 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
     let default_date = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::December, 1).unwrap();
 
-    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
             CashFlow::new(
                 default_date,
@@ -532,7 +532,8 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
         Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    );
+    )
+    .expect("valid cashflow rows");
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base)
@@ -572,7 +573,7 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     let default_date = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::December, 1).unwrap();
 
-    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
             CashFlow::new(
                 default_date,
@@ -594,7 +595,8 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
         Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    );
+    )
+    .expect("valid cashflow rows");
 
     let periods = vec![Period {
         id: PeriodId::annual(2025),
@@ -703,7 +705,7 @@ mod property_tests {
         fn psa_smm_monotonic_during_ramp(month1 in 0u32..30, month2 in 0u32..30) {
             use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
-            let model = PrepaymentModelSpec::psa_100();
+            let model = PrepaymentModelSpec::psa(1.0);
             let smm1 = model.smm(month1).unwrap();
             let smm2 = model.smm(month2).unwrap();
 
@@ -721,7 +723,7 @@ mod property_tests {
         fn psa_smm_constant_after_ramp(month in 30u32..500) {
             use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
-            let model = PrepaymentModelSpec::psa_100();
+            let model = PrepaymentModelSpec::psa(1.0);
             let smm_30 = model.smm(30).unwrap();
             let smm_month = model.smm(month).unwrap();
 
@@ -755,10 +757,10 @@ mod property_tests {
         /// Property: CPR -> SMM -> CPR roundtrip preserves value
         #[test]
         fn cpr_smm_roundtrip(cpr in 0.0f64..0.99) {
-            use finstack_quant_cashflows::builder::{cpr_to_smm, smm_to_cpr};
+            use finstack_quant_cashflows::builder::{annual_to_monthly, monthly_to_annual};
 
-            let smm = cpr_to_smm(cpr).unwrap();
-            let cpr_back = smm_to_cpr(smm).expect("valid SMM");
+            let smm = annual_to_monthly(cpr).unwrap();
+            let cpr_back = monthly_to_annual(smm).expect("valid SMM");
 
             prop_assert!(
                 (cpr - cpr_back).abs() < FACTOR_TOLERANCE,
@@ -770,9 +772,9 @@ mod property_tests {
         /// Property: SMM < CPR for all positive rates (monthly < annual)
         #[test]
         fn smm_less_than_cpr(cpr in 0.001f64..0.99) {
-            use finstack_quant_cashflows::builder::cpr_to_smm;
+            use finstack_quant_cashflows::builder::annual_to_monthly;
 
-            let smm = cpr_to_smm(cpr).unwrap();
+            let smm = annual_to_monthly(cpr).unwrap();
 
             prop_assert!(
                 smm < cpr,
@@ -799,11 +801,11 @@ mod property_tests {
         /// Property: SDA MDR reaches terminal rate after month 120
         #[test]
         fn sda_mdr_terminal_after_120(month in 120u32..500) {
-            use finstack_quant_cashflows::builder::{smm_to_cpr, DefaultModelSpec};
+            use finstack_quant_cashflows::builder::{monthly_to_annual, DefaultModelSpec};
 
             let model = DefaultModelSpec::sda(1.0);
             let mdr = model.mdr(month).unwrap();
-            let cdr = smm_to_cpr(mdr).expect("valid SMM");
+            let cdr = monthly_to_annual(mdr).expect("valid SMM");
 
             // Terminal rate for 100% SDA is 0.03% CDR
             prop_assert!(
