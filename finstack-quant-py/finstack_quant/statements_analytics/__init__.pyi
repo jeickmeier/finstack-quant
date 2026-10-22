@@ -627,7 +627,7 @@ class ScorecardConfig:
     ----------
     rating_scale : str
         Rating-scale identifier used to interpret metric thresholds; defaults
-        to the ``"S&P"`` scale.
+        to the canonical ``"sp"`` scale.
     metrics : list[ScorecardMetric]
         Weighted metric definitions used to calculate the composite rating.
     min_rating : str or None
@@ -641,7 +641,7 @@ class ScorecardConfig:
     >>> from finstack_quant.statements_analytics import ScorecardConfig
     >>> config = ScorecardConfig(period="2025Q1")
     >>> (config.rating_scale, config.period, config.metrics)
-    ('S&P', '2025Q1', [])
+    ('sp', '2025Q1', [])
 
     """
 
@@ -677,7 +677,7 @@ class ScorecardConfig:
     @property
     def rating_scale(self) -> str:
         """
-        Rating scale identifier (e.g. ``"S&P"``, ``"Moody's"``, ``"Fitch"``).
+        Configured rating scale identifier (for example ``"sp"`` or ``"moodys"``).
 
         Returns
         -------
@@ -1013,7 +1013,7 @@ class CreditScorecardExtension:
     --------
     >>> from finstack_quant.statements_analytics import ScorecardConfig, CreditScorecardExtension
     >>> CreditScorecardExtension(ScorecardConfig()).config().rating_scale
-    'S&P'
+    'sp'
 
     """
 
