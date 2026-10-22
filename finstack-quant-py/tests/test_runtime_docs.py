@@ -100,6 +100,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
         "Registry.get_dependencies",
         "ForecastSpec.overrides",
         "Adjustment.cap_base_mode",
+        "Adjustment.with_cap",
         "CheckConfig.min_severity",
         "CheckFinding.severity",
         "FinancialModelSpec.to_dataframe",

@@ -6602,39 +6602,20 @@ class Adjustment:
         """
         ...
 
-    def with_cap(self, base_node: str | None, value: float) -> Adjustment:
-        """Return a copy capped at ``value``.
+    def with_cap(self, base_node: str | None, value: float, base_mode: str) -> Adjustment:
+        """Return a capped copy using an explicit self-referential base mode.
 
         Parameters
         ----------
         base_node : str or None
-            Node the cap is measured against; ``None`` caps on an absolute
-            amount in the target node's units.
+            Node whose value sets the cap base, or ``None`` for an absolute cap.
         value : float
-            Cap magnitude: an absolute amount when ``base_node`` is ``None``,
-            otherwise a decimal fraction of that node's value.
-
-        Returns
-        -------
-        Adjustment
-            Capped copy; the receiver is unchanged.
-
-        This method rewrites an in-memory field and does not raise.
-
-        """
-        ...
-
-    def with_cap_mode(self, base_node: str | None, value: float, base_mode: str) -> Adjustment:
-        """Return a copy capped at ``value`` under an explicit base mode.
-
-        Parameters
-        ----------
-        base_node : str or None
-            Node the cap is measured against, or ``None`` for an absolute cap.
-        value : float
-            Cap magnitude, interpreted per ``base_mode``.
+            Maximum magnitude: a decimal fraction of the base node (0.20 means
+            20%), or an absolute amount in the target metric's units.
         base_mode : str
-            How the base value is read across periods (e.g. ``"same_period"``).
+            ``"reported"`` uses the pre-adjustment target value;
+            ``"progressive"`` includes earlier adjustments. Only affects a
+            cap whose base node is the normalization target itself.
 
         Returns
         -------
@@ -6644,7 +6625,7 @@ class Adjustment:
         Raises
         ------
         ValueError
-            If ``base_mode`` is not a recognized mode.
+            If ``base_mode`` is neither ``"reported"`` nor ``"progressive"``.
 
         """
         ...
