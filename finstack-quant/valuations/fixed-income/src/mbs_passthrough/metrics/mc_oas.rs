@@ -147,7 +147,7 @@ fn simulate_rate_paths(
     seed: u64,
 ) -> Vec<RatePath> {
     let dt = 1.0 / 12.0; // Monthly steps
-    let kappa = params.kappa;
+    let kappa = params.model.kappa;
     let exp_kappa_dt = (-kappa * dt).exp();
 
     // θ(t) is piecewise-constant; precompute the per-step drift term using

@@ -365,32 +365,6 @@ impl FractionalNoiseGenerator for WindowedConditionalFbm {
     }
 }
 
-/// Create a fBM generator for the given time grid and Hurst exponent.
-///
-/// Uses exact [`CholeskyFbm`] generation for every grid size. Refining the
-/// grid therefore preserves the fractional Brownian covariance, including
-/// cumulative-level variances. Setup costs O(n³), storage and each path O(n²).
-/// The approximate [`WindowedConditionalFbm`] requires explicit selection:
-/// truncating long-range dependence can materially alter level variances,
-/// even when individual increment variances are accurate.
-///
-/// # Arguments
-///
-/// * `times` - Strictly increasing, finite, non-negative time grid in years;
-///   at least two nodes are required.
-/// * `hurst` - Fractional-Brownian-motion Hurst exponent in `(0, 1)` that
-///   controls path roughness and increment dependence.
-///
-/// # Errors
-///
-/// Returns [`Error::Validation`] if the time grid or Hurst exponent is invalid.
-pub fn create_fbm_generator(
-    times: &[f64],
-    hurst: f64,
-) -> Result<Box<dyn FractionalNoiseGenerator>> {
-    Ok(Box::new(CholeskyFbm::new(times, hurst)?))
-}
-
 /// Validate that a time grid is strictly increasing with at least two finite
 /// non-negative values.
 fn validate_time_grid(times: &[f64]) -> Result<()> {
@@ -659,7 +633,7 @@ mod tests {
     #[test]
     fn factory_auto_selects_cholesky_for_small_grid() {
         let times = uniform_grid(1.0, 50);
-        let gen = create_fbm_generator(&times, 0.3).unwrap();
+        let gen = CholeskyFbm::new(&times, 0.3).unwrap();
         assert_eq!(gen.num_steps(), 50);
     }
 
@@ -670,7 +644,7 @@ mod tests {
         for n in [199, 200, 300] {
             for h in [0.1, 0.7] {
                 let times = uniform_grid(1.0, n);
-                let gen = create_fbm_generator(&times, h).unwrap();
+                let gen = CholeskyFbm::new(&times, h).unwrap();
                 let middle = n / 2;
                 let mut terminal_var = 0.0;
                 let mut middle_var = 0.0;

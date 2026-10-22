@@ -50,11 +50,17 @@ pub const SEED: u64 = 42;
 pub const SS_RHO: f64 = -0.3;
 
 pub fn gbm() -> GbmProcess {
-    GbmProcess::with_params(RATE, DIV, VOL).expect("valid GBM")
+    finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(RATE, DIV, VOL)
+        .map(GbmProcess::new)
+        .expect("valid GBM")
 }
 
 pub fn heston() -> HestonProcess {
-    HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid Heston")
+    finstack_quant_models::closed_form::HestonPricingParams::new(
+        0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04,
+    )
+    .map(HestonProcess::new)
+    .expect("valid Heston")
 }
 
 pub fn hw1f() -> HullWhite1FProcess {
@@ -64,7 +70,9 @@ pub fn hw1f() -> HullWhite1FProcess {
 }
 
 pub fn cir() -> CirProcess {
-    CirProcess::with_params(2.0, 0.04, 0.3).expect("valid CIR")
+    finstack_quant_models::monte_carlo::process::cir::CirParams::new(2.0, 0.04, 0.3)
+        .map(CirProcess::new)
+        .expect("valid CIR")
 }
 
 pub fn schwartz_smith() -> SchwartzSmithProcess {

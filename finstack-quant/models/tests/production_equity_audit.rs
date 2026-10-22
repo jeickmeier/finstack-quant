@@ -56,7 +56,8 @@ fn m12_grid_knot_dividend_is_applied_exactly_once() {
     use finstack_quant_models::monte_carlo::process::gbm_dividends::{Dividend, GbmWithDividends};
     use finstack_quant_models::monte_carlo::traits::Discretization;
     let knot = 9.0 / 365.0;
-    let process = GbmWithDividends::with_params(0.0, 0.0, 0.0, vec![(knot, Dividend::Cash(2.0))])
+    let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.0, 0.0, 0.0)
+        .and_then(|params| GbmWithDividends::new(params, vec![(knot, Dividend::Cash(2.0))]))
         .expect("process");
     let scheme = ExactGbmWithDividends::new();
     let mut spot = [100.0];

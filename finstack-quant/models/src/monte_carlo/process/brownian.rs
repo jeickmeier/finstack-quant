@@ -71,20 +71,6 @@ impl BrownianProcess {
         Self { params }
     }
 
-    /// Create a Brownian process from `mu` and `sigma`.
-    ///
-    /// # Arguments
-    ///
-    /// * `mu` - Constant drift per year.
-    /// * `sigma` - Constant diffusion scale per square root year.
-    ///
-    /// # Errors
-    ///
-    /// Returns the validation errors of [`BrownianParams::new`].
-    pub fn with_params(mu: f64, sigma: f64) -> finstack_quant_core::Result<Self> {
-        Ok(Self::new(BrownianParams::new(mu, sigma)?))
-    }
-
     /// Drift parameter μ.
     pub fn mu(&self) -> f64 {
         self.params.mu
@@ -244,7 +230,9 @@ mod tests {
 
     #[test]
     fn test_brownian_drift_diffusion() {
-        let proc = BrownianProcess::with_params(0.1, 0.3).unwrap();
+        let proc = crate::monte_carlo::process::brownian::BrownianParams::new(0.1, 0.3)
+            .map(BrownianProcess::new)
+            .unwrap();
         let mut mu = [0.0];
         let mut sig = [0.0];
         proc.drift(0.0, &[0.0], &mut mu);

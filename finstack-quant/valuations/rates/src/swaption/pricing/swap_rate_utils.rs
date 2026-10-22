@@ -26,9 +26,9 @@ pub fn hw_bond_price(
     maturity_time: f64,
     discount_curve_fn: impl Fn(f64) -> f64,
 ) -> f64 {
-    let b = hw_b(params.kappa, t, maturity_time);
+    let b = hw_b(params.model.kappa, t, maturity_time);
     let ln_a = hw_ln_a(
-        params.kappa,
+        params.model.kappa,
         params.sigma_at_time(t),
         t,
         maturity_time,
@@ -53,7 +53,7 @@ mod tests {
         maturity_time: f64,
         discount_curve_fn: impl Fn(f64) -> f64,
     ) -> f64 {
-        let kappa = params.kappa;
+        let kappa = params.model.kappa;
         let sigma = params.sigma_at_time(t);
         let B = hw_b(kappa, t, maturity_time);
         let tau = maturity_time - t;
@@ -102,7 +102,7 @@ mod tests {
     #[allow(non_snake_case)]
     fn test_bond_price_exact_a_reproduces_curve_non_flat() {
         let params = HullWhite1FParams::new(0.2, 0.015, 0.03).expect("valid Hull-White parameters");
-        let kappa = params.kappa;
+        let kappa = params.model.kappa;
         let sigma = params.sigma_at_time(0.0);
 
         // Non-flat (humped) discount curve: instantaneous forward varies in t,

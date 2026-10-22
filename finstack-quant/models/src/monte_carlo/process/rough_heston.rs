@@ -74,7 +74,6 @@ use super::super::traits::{PathState, StateKey, StochasticProcess};
 use crate::monte_carlo::traits::ProcessMetadata;
 use crate::volatility::heston::HestonParams;
 use finstack_quant_core::math::fractional::HurstExponent;
-use std::ops::Deref;
 
 /// Rough Heston model parameters.
 ///
@@ -139,14 +138,6 @@ impl From<RawRoughHestonParams> for RoughHestonParams {
                 rho: raw.rho,
             },
         }
-    }
-}
-
-impl Deref for RoughHestonParams {
-    type Target = HestonParams;
-
-    fn deref(&self) -> &Self::Target {
-        &self.model
     }
 }
 
@@ -227,7 +218,7 @@ impl StochasticProcess for RoughHestonProcess {
         // dS/dt = (r − q) S
         out[0] = (self.params.r - self.params.q) * s;
         // dv/dt = κ(θ − v) — formal; not used by the Volterra discretization
-        out[1] = self.params.kappa * (self.params.theta - v);
+        out[1] = self.params.model.kappa * (self.params.model.theta - v);
     }
 
     /// Formal diffusion — mirrors classical Heston coefficients for metadata.
@@ -240,7 +231,7 @@ impl StochasticProcess for RoughHestonProcess {
         // σ_S = √v · S
         out[0] = v.sqrt() * s;
         // σ_v = σᵥ √v — formal
-        out[1] = self.params.sigma_v * v.sqrt();
+        out[1] = self.params.model.sigma_v * v.sqrt();
     }
 
     fn dedicated_scheme(&self) -> Option<&'static str> {
@@ -259,13 +250,13 @@ impl ProcessMetadata for RoughHestonProcess {
         params.add_param("r", self.params.r);
         params.add_param("q", self.params.q);
         params.add_param("H", self.params.hurst.value());
-        params.add_param("kappa", self.params.kappa);
-        params.add_param("theta", self.params.theta);
-        params.add_param("sigma_v", self.params.sigma_v);
-        params.add_param("rho", self.params.rho);
-        params.add_param("v0", self.params.v0);
+        params.add_param("kappa", self.params.model.kappa);
+        params.add_param("theta", self.params.model.theta);
+        params.add_param("sigma_v", self.params.model.sigma_v);
+        params.add_param("rho", self.params.model.rho);
+        params.add_param("v0", self.params.model.v0);
 
-        let correlation = vec![1.0, self.params.rho, self.params.rho, 1.0];
+        let correlation = vec![1.0, self.params.model.rho, self.params.model.rho, 1.0];
 
         params
             .with_correlation(correlation)

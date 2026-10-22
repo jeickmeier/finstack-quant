@@ -10,8 +10,7 @@
 
 use super::{TimeGridSpec, MAX_STORED_VALUES};
 use crate::monte_carlo::rng::fbm::{
-    create_fbm_generator, FractionalNoiseGenerator, WindowedConditionalFbm,
-    WindowedConditionalFbmConfig,
+    CholeskyFbm, FractionalNoiseGenerator, WindowedConditionalFbm, WindowedConditionalFbmConfig,
 };
 use crate::monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
 use finstack_quant_core::math::time_grid::TimeGrid;
@@ -131,7 +130,7 @@ impl FractionalNoise {
             }
             FbmSpec::Cholesky {} => {
                 bounded(num_steps)?;
-                create_fbm_generator(time_grid.times(), hurst)?
+                Box::new(CholeskyFbm::new(time_grid.times(), hurst)?)
             }
             FbmSpec::WindowedConditional { near_field_size } => {
                 // The generator caps the window at the number of steps; its

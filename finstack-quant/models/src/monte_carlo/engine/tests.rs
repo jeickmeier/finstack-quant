@@ -1371,7 +1371,9 @@ fn test_engine_antithetic_records_simulated_path_count() {
     let requested = 1024usize;
     let grid = TimeGrid::uniform(0.5, 16).expect("valid grid");
     let payoff = European::new(OptionType::Call, 100.0, 0.5, 16);
-    let process = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid gbm");
+    let process = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2)
+        .map(GbmProcess::new)
+        .expect("valid gbm");
     let disc = ExactGbm::new();
     let discount = (-0.05_f64 * 0.5).exp();
 
@@ -1456,9 +1458,13 @@ mod correlation_regression {
         let discount = (-0.03_f64).exp();
 
         let h_neg =
-            HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+            crate::closed_form::HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04)
+                .map(HestonProcess::new)
+                .expect("valid");
         let h_pos =
-            HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, 0.7, 0.04).expect("valid");
+            crate::closed_form::HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, 0.7, 0.04)
+                .map(HestonProcess::new)
+                .expect("valid");
 
         let est_neg = engine
             .price(
@@ -1508,7 +1514,9 @@ mod correlation_regression {
         let payoff = European::new(OptionType::Call, 100.0, 1.0, 100);
         let discount = (-0.03_f64).exp();
 
-        let h0 = HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, 0.0, 0.04).expect("valid");
+        let h0 = crate::closed_form::HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, 0.0, 0.04)
+            .map(HestonProcess::new)
+            .expect("valid");
 
         let euler = config
             .price(

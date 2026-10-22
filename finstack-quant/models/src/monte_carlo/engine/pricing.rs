@@ -399,7 +399,7 @@ impl McEngine {
     /// );
     ///
     /// let rng = PhiloxRng::new(11);
-    /// let process = GbmProcess::with_params(0.03, 0.01, 0.20).unwrap();
+    /// let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).unwrap();
     /// let disc = ExactGbm::new();
     /// let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
     /// let discount_factor = (-0.03_f64).exp();
@@ -522,7 +522,7 @@ impl McEngine {
     /// );
     ///
     /// let rng = PhiloxRng::new(5);
-    /// let process = GbmProcess::with_params(0.03, 0.01, 0.20).unwrap();
+    /// let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).unwrap();
     /// let disc = ExactGbm::new();
     /// let payoff = European::new(OptionType::Call, 100.0, 1.0, 12);
     /// let discount_factor = (-0.03_f64).exp();

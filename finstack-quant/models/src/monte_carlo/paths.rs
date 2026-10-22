@@ -146,16 +146,6 @@ impl PathPoint {
             .collect()
     }
 
-    /// Get principal flows (convenience method).
-    pub fn principal_flows(&self) -> Vec<(f64, f64)> {
-        self.get_cashflows_by_type(CashflowType::Principal)
-    }
-
-    /// Get interest flows (convenience method).
-    pub fn interest_flows(&self) -> Vec<(f64, f64)> {
-        self.get_cashflows_by_type(CashflowType::Interest)
-    }
-
     /// Get total cashflow amount at this timestep.
     pub fn total_cashflow(&self) -> f64 {
         self.cashflows.iter().map(|(_, amt, _)| amt).sum()
@@ -508,8 +498,14 @@ mod tests {
         let mut point2 = PathPoint::new(1, 0.5);
         point2.add_typed_cashflow(0.5, 100.0, CashflowType::Interest);
         point2.add_typed_cashflow(0.5, 50.0, CashflowType::Principal);
-        assert_eq!(point2.principal_flows().len(), 1);
-        assert_eq!(point2.interest_flows().len(), 1);
+        assert_eq!(
+            point2.get_cashflows_by_type(CashflowType::Principal).len(),
+            1
+        );
+        assert_eq!(
+            point2.get_cashflows_by_type(CashflowType::Interest).len(),
+            1
+        );
         assert_eq!(point2.total_cashflow_by_type(CashflowType::Interest), 100.0);
     }
 

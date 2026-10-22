@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::volatility::heston::HestonParams;
 
 /// Relative price tolerance for residual integration mass and no-arbitrage bounds.
@@ -71,14 +69,6 @@ impl TryFrom<RawHestonPricingParams> for HestonPricingParams {
             raw.rho,
             raw.v0,
         )
-    }
-}
-
-impl Deref for HestonPricingParams {
-    type Target = HestonParams;
-
-    fn deref(&self) -> &Self::Target {
-        &self.model
     }
 }
 

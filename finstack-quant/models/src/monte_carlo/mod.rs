@@ -68,7 +68,7 @@
 //!     .expect("positive path count")
 //!     .with_seed(19)
 //!     .with_parallel(false);
-//! let process = GbmProcess::with_params(0.03, 0.01, 0.20).unwrap();
+//! let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).unwrap();
 //! let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 //! let result = pricer
 //!     .price(&process, 100.0, 1.0, 252, &payoff, Currency::USD, (-0.03_f64).exp())
