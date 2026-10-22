@@ -109,7 +109,7 @@ impl PyPeriodKind {
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.dates import PeriodId
-/// >>> (PeriodId.parse("2025Q2").code, PeriodId.parse("2025Q2") < PeriodId.parse("2025Q3"))
+/// >>> (str(PeriodId.parse("2025Q2")), PeriodId.parse("2025Q2") < PeriodId.parse("2025Q3"))
 /// ('2025Q2', True)
 #[pyclass(
     name = "PeriodId",
@@ -273,7 +273,7 @@ impl PyPeriodId {
 /// --------
 /// >>> from finstack_quant.core.dates import build_periods
 /// >>> period = build_periods("2024Q1..Q1").periods[0]
-/// >>> (period.id.code, period.start.isoformat(), period.end.isoformat(), period.is_actual)
+/// >>> (str(period.id), period.start.isoformat(), period.end.isoformat(), period.is_actual)
 /// ('2024Q1', '2024-01-01', '2024-04-01', False)
 #[pyclass(
     name = "Period",
@@ -350,7 +350,7 @@ wire_methods!(PyPeriod, Period, "Period");
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.dates import build_periods
-/// >>> [period.id.code for period in build_periods("2024Q1..Q2")]
+/// >>> [str(period.id) for period in build_periods("2024Q1..Q2")]
 /// ['2024Q1', '2024Q2']
 #[pyclass(
     name = "PeriodPlan",
