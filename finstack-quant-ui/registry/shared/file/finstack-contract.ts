@@ -3,6 +3,8 @@ import type { RoundingStamp } from "@/lib/finstack/format/format";
 import type {
   ValuationResult,
   CalibrationResultEnvelope,
+  CalibrationEnvelope,
+  CalibrationValidationReport,
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
@@ -117,7 +119,9 @@ export interface WorkerApi {
   /** Canonicalize the complete market through its native constructor. */
   validateMarket(marketJson: string): Promise<Envelope<string>>;
   /** Full envelope includes prior_market, quote sets, data and every plan setting. */
-  validateCalibration(envelopeJson: string): Promise<Envelope<string>>;
+  validateCalibration(
+    envelopeJson: string,
+  ): Promise<Envelope<CalibrationEnvelope>>;
   validateStatementModel(modelJson: string): Promise<Envelope<string>>;
   statementNodeIds(modelJson: string): Promise<Envelope<string[]>>;
   validateStatementFormula(formula: string): Promise<Envelope<string>>;
@@ -143,8 +147,8 @@ export interface WorkerApi {
   rollupStatement(
     request: StatementRollupRequest,
   ): Promise<Envelope<StatementResult>>;
-  /** Static diagnostics as the exact `CalibrationValidationReport` wire JSON (native `dryRunJson`). */
-  dryRun(envelopeJson: string): Promise<Envelope<string>>;
+  /** Structured static diagnostics returned by native `dryRun`. */
+  dryRun(envelopeJson: string): Promise<Envelope<CalibrationValidationReport>>;
   calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
   sampleFxDelta(request: FxDeltaSampleRequest): Promise<Envelope<number[]>>;

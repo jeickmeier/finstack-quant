@@ -11,9 +11,8 @@
 //! step would surface as a [`EnvelopeError::MissingDependency`] rather than a
 //! cycle.
 //!
-//! [`dry_run`] parses a JSON envelope and returns the typed report;
-//! [`dry_run_json`] is its JSON-string wire twin for cross-binding
-//! consumption (Python / WASM). [`parse_envelope`] and [`validate_calibration`]
+//! [`dry_run`] parses a JSON envelope and returns the typed report.
+//! [`parse_envelope`] and [`validate_calibration`]
 //! are the shared strict-load and fail-fast policies every host entry point
 //! uses.
 
@@ -161,7 +160,7 @@ pub(super) fn escape_json_pointer(segment: &str) -> String {
 
 /// Return the first static validation error of `envelope`, if any.
 ///
-/// [`validate_calibration_json`] and the host bindings use this fail-fast
+/// Host bindings use this fail-fast
 /// policy; [`engine::calibrate`](super::engine::calibrate) applies the same
 /// first-error rule while building its dependency graph, and [`validate`]
 /// reports every error instead.
@@ -197,50 +196,6 @@ pub fn validate_calibration(envelope: &CalibrationEnvelope) -> Result<(), Envelo
 /// as an error.
 pub fn dry_run(envelope_json: &str) -> Result<CalibrationValidationReport, EnvelopeError> {
     Ok(validate(&parse_envelope(envelope_json)?))
-}
-
-/// JSON-string wire twin of [`dry_run`].
-///
-/// Returns the report serialized as pretty-printed JSON.
-///
-/// # Arguments
-///
-/// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse and
-///   run through static, solver-free validation.
-///
-/// # Errors
-///
-/// Returns [`EnvelopeError::StrictLoad`] if strict contract ingestion
-/// rejects the envelope, or [`EnvelopeError::JsonSerialize`] if the report
-/// cannot be serialized.
-pub fn dry_run_json(envelope_json: &str) -> Result<String, EnvelopeError> {
-    dry_run(envelope_json)?.to_json_pretty()
-}
-
-/// Validate a calibration envelope JSON string and return its canonical form.
-///
-/// This is the Rust-owned implementation used by host-language bindings. It
-/// centralizes the parse and pretty-serialization path so Python and WASM do
-/// not each reimplement the same validation logic.
-///
-/// Static validation is fail-fast ([`validate_calibration`]): the first
-/// envelope error is returned. [`dry_run`] lists every static error without
-/// solving.
-///
-/// # Arguments
-///
-/// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse,
-///   statically validate, and reserialize in canonical pretty JSON form.
-///
-/// # Errors
-///
-/// Returns [`EnvelopeError::StrictLoad`] if strict loading rejects the
-/// document, the first static validation error, or
-/// [`EnvelopeError::JsonSerialize`] if the envelope cannot be serialized.
-pub fn validate_calibration_json(envelope_json: &str) -> Result<String, EnvelopeError> {
-    let envelope = parse_envelope(envelope_json)?;
-    validate_calibration(&envelope)?;
-    serialize_pretty_json(&envelope, "CalibrationEnvelope")
 }
 
 impl CalibrationValidationReport {
@@ -736,11 +691,12 @@ mod tests {
     }
 
     #[test]
-    fn validate_json_and_execute_reject_semantically_invalid_envelopes() {
+    fn validate_and_execute_reject_semantically_invalid_envelopes() {
         let semantic = semantically_invalid_envelope();
         let json = serde_json::to_string(&semantic).expect("serialize semantic fixture");
-        let error = validate_calibration_json(&json)
-            .expect_err("validate_calibration_json must enforce semantic validation");
+        let parsed = parse_envelope(&json).expect("strict parse");
+        let error =
+            validate_calibration(&parsed).expect_err("validation must enforce semantic validation");
         assert!(matches!(error, EnvelopeError::UndefinedQuoteSet { .. }));
 
         let duplicate = duplicate_price_envelope();
@@ -788,7 +744,10 @@ mod tests {
     fn dry_run_returns_pretty_json() {
         let env = empty_envelope("smoke");
         let json = serde_json::to_string(&env).expect("serialize");
-        let report_json = dry_run_json(&json).expect("dry_run_json");
+        let report_json = dry_run(&json)
+            .expect("dry run")
+            .to_json_pretty()
+            .expect("serialize report");
         assert!(report_json.contains("\"errors\""));
         assert!(report_json.contains("\"dependency_graph\""));
         let report = dry_run(&json).expect("dry_run");
@@ -796,7 +755,7 @@ mod tests {
         assert_eq!(
             report.to_json_pretty().expect("pretty report"),
             report_json,
-            "the JSON twin must serialize the typed report"
+            "report serialization must be deterministic"
         );
     }
 
@@ -972,7 +931,10 @@ mod tests {
             }));
 
         let json = serde_json::to_string(&env).expect("serialize");
-        let report_json = dry_run_json(&json).expect("dry_run_json");
+        let report_json = dry_run(&json)
+            .expect("dry run")
+            .to_json_pretty()
+            .expect("serialize report");
         assert!(report_json.contains("\"kind\": \"quote_data_invalid\""));
         assert!(report_json.contains("\"quote_id\": \"CDS-ACME-5Y\""));
     }
@@ -1321,7 +1283,7 @@ mod canonical_validation_tests {
     }
 
     #[test]
-    fn validate_calibration_json_returns_canonical_envelope() {
+    fn validated_envelope_round_trips() {
         let envelope = CalibrationEnvelope {
             schema_url: None,
             schema: crate::api::schema::CalibrationSchema::CURRENT,
@@ -1337,7 +1299,9 @@ mod canonical_validation_tests {
         };
         let json = serde_json::to_string(&envelope).expect("serialize envelope");
 
-        let canonical = validate_calibration_json(&json).expect("canonical envelope");
+        let parsed = parse_envelope(&json).expect("strict parse");
+        validate_calibration(&parsed).expect("validate");
+        let canonical = parsed.to_json_pretty().expect("serialize envelope");
         let reparsed: CalibrationEnvelope =
             serde_json::from_str(&canonical).expect("canonical JSON should parse");
 

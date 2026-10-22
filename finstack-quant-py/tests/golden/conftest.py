@@ -18,7 +18,7 @@ import time
 from types import ModuleType
 import warnings
 
-from finstack_quant.calibration import validate_calibration_json
+from finstack_quant.calibration import validate_calibration
 from finstack_quant.core.market_data import MarketContext
 
 from .pricing_validation import requested_metrics, validate_requested_metrics, validated_instrument_json
@@ -366,7 +366,7 @@ def _validate_pricing_body(fixture: GoldenFixture) -> None:
             raise AssertionError(f"market.data is not a valid MarketContext: {exc}") from exc
     elif kind == "envelope":
         try:
-            validate_calibration_json(json.dumps(market["envelope"]))
+            validate_calibration(json.dumps(market["envelope"]))
         except Exception as exc:
             raise AssertionError(f"market.envelope is not a valid CalibrationEnvelope: {exc}") from exc
     else:

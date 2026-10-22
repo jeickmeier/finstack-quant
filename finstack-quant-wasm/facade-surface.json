@@ -219,7 +219,6 @@
       "cdsQuoteUpfront",
       "cdsTrancheQuote",
       "dryRun",
-      "dryRunJson",
       "inflationQuoteInflationSwap",
       "inflationQuoteYoyInflationSwap",
       "rateBoundsEmergingMarkets",
@@ -234,7 +233,6 @@
       "validateCalendarSpread",
       "validateCalendarSpreadWithForwards",
       "validateCalibration",
-      "validateCalibrationJson",
       "validateSurface",
       "validateSurfaceWithForwards",
       "validateVolBounds",
@@ -250,13 +248,7 @@
   "calibration.validateCalibration": {
     "kind": "function"
   },
-  "calibration.validateCalibrationJson": {
-    "kind": "function"
-  },
   "calibration.dryRun": {
-    "kind": "function"
-  },
-  "calibration.dryRunJson": {
     "kind": "function"
   },
   "calibration.calibrateBermudanLmmBaseVol": {

@@ -15,7 +15,7 @@ vi.mock("@/hooks/core/use-market-validator/use-market-validator", () => ({
   useMarketValidator: () => pending.validate,
 }));
 vi.mock("@/hooks/calibration/use-calibrate/use-calibrate", () => ({
-  useCalibrationValidator: () => async (json: string) => json,
+  useCalibrationValidator: () => async (json: string) => JSON.parse(json),
   useCalibrationDryRun: () => ({}),
   useCalibrate: (request: string | null) => ({
     data: request ? cases[0]!.result : undefined,

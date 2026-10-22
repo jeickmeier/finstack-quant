@@ -19,7 +19,7 @@ for (const fixture of inventory.filter((f) => f.kind === "calibration-input")) {
   cases.push({
     source: fixture.source,
     sha256: createHash("sha256").update(json).digest("hex"),
-    input: JSON.parse(native.validateCalibrationJson(json)),
+    input: native.validateCalibration(json),
     result: native.calibrate(json),
   });
 }

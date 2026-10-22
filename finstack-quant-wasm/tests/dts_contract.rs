@@ -556,13 +556,7 @@ fn calibration_dts_owns_calibration_surface() {
     let calibration = interface_block(&dts, "CalibrationNamespace");
     let valuations = interface_block(&dts, "ValuationsNamespace");
 
-    for name in [
-        "calibrate(",
-        "validateCalibrationJson(",
-        "dryRun(",
-        "dryRunJson(",
-        "calibrateBermudanLmmBaseVol(",
-    ] {
+    for name in ["calibrate(", "dryRun(", "calibrateBermudanLmmBaseVol("] {
         assert!(
             calibration.contains(name),
             "calibration interface missing {name}"

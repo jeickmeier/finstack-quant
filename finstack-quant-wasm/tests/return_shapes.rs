@@ -161,7 +161,6 @@ fn json_suffixed_exports_return_strings() {
         ("CovenantsNamespace", "validateCovenantReportJson"),
         ("CovenantsNamespace", "validateCovenantEngineJson"),
         ("ValuationsNamespace", "valuationResultToJson"),
-        ("CalibrationNamespace", "dryRunJson"),
         ("AttributionNamespace", "attributePnlEnvelopeJson"),
     ] {
         let ret = declared(&dts, owner, export);

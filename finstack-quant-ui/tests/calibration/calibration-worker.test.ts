@@ -29,11 +29,11 @@ beforeAll(async () => {
 afterAll(async () => worker?.close());
 for (const fixture of cases)
   it(`preserves complete native validation, dry-run and solve: ${fixture.source}`, async () => {
-    expect(unwrap(await worker.proxy.validateCalibration(fixture.json))).toBe(
-      native.validateCalibrationJson(fixture.json),
-    );
-    expect(unwrap(await worker.proxy.dryRun(fixture.json))).toBe(
-      native.dryRunJson(fixture.json),
+    expect(
+      unwrap(await worker.proxy.validateCalibration(fixture.json)),
+    ).toEqual(native.validateCalibration(fixture.json));
+    expect(unwrap(await worker.proxy.dryRun(fixture.json))).toEqual(
+      native.dryRun(fixture.json),
     );
     expect(unwrap(await worker.proxy.calibrate(fixture.json))).toEqual(
       native.calibrate(fixture.json),
@@ -80,8 +80,8 @@ it("retains every structured failure field, including absent and available solve
       expect(result.ok ? undefined : result.error[key]).toEqual(direct![key]);
   }
   const report = unwrap(await worker.proxy.dryRun(JSON.stringify(missing)));
-  expect(report).toBe(native.dryRunJson(JSON.stringify(missing)));
-  expect(JSON.parse(report).errors.length).toBeGreaterThan(0);
+  expect(report).toEqual(native.dryRun(JSON.stringify(missing)));
+  expect(report.errors.length).toBeGreaterThan(0);
 });
 it("keys all quotes, prior markets, settings and sessions, and hands the returned market into native pricing", async () => {
   const calls: string[] = [];

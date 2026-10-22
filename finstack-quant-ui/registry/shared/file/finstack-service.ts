@@ -36,7 +36,7 @@ export function createService(native: {
   };
   calibration: Pick<
     typeof calibration,
-    "calibrate" | "dryRunJson" | "validateCalibrationJson"
+    "calibrate" | "dryRun" | "validateCalibration"
   >;
   statements: Pick<
     typeof statements,
@@ -139,7 +139,7 @@ export function createService(native: {
       return result(() => market(json).json);
     },
     validateCalibration(json) {
-      return result(() => native.calibration.validateCalibrationJson(json));
+      return result(() => native.calibration.validateCalibration(json));
     },
     validateStatementModel(json) {
       return result(() => native.statements.validateFinancialModelJson(json));
@@ -266,7 +266,7 @@ export function createService(native: {
       );
     },
     dryRun(json) {
-      return result(() => native.calibration.dryRunJson(json));
+      return result(() => native.calibration.dryRun(json));
     },
     calibrate(json) {
       return result(() => native.calibration.calibrate(json));
