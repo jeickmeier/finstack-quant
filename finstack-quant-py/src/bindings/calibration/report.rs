@@ -469,8 +469,10 @@ impl PyCalibrationValidationReport {
         serde_to_py(py, &self.inner.errors)
     }
 
-    /// Dependency graph as a dict with ``initial_ids`` and ``nodes``
-    /// (``step_index``, ``step_id``, ``kind``, ``reads``, ``writes``).
+    #[doc = pydoc!(
+        "finstack_quant.calibration",
+        "CalibrationValidationReport.dependency_graph"
+    )]
     #[getter]
     fn dependency_graph<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.dependency_graph)
