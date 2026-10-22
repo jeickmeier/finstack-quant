@@ -349,9 +349,11 @@ test('core.FxMatrix quote updates invalidate cached crosses', () => {
     const fx = new core.FxMatrix();
     const policy = core.FxConversionPolicy.cashflowDate();
     const date = '2025-01-02';
-    fx.setQuote('GBP', 'USD', 1.25);
+    fx.setQuotes([['GBP', 'USD', 1.25]]);
     const setEurUsd = (rate) =>
-      pinned ? fx.setQuoteOn('EUR', 'USD', date, policy, rate) : fx.setQuote('EUR', 'USD', rate);
+      pinned
+        ? fx.setQuoteOn('EUR', 'USD', date, policy, rate)
+        : fx.setQuotes([['EUR', 'USD', rate]]);
     setEurUsd(1.1);
     assert.ok(Math.abs(fx.rate('EUR', 'GBP', date).rate - 0.88) < 1e-12);
     setEurUsd(1.2);
@@ -474,4 +476,11 @@ test('core.FxMatrix rate returns FxRateResult with rate/triangulated getters', (
   const reused = fx.rate('EUR', 'USD', '2025-01-15', policy);
   assert.equal(reused.rate, 1.1);
   assert.match(policy.toString(), /cashflow/i);
+});
+
+test('FxMatrix exposes the atomic batch setter without a singleton alias', () => {
+  assert.equal('setQuote' in core.FxMatrix.prototype, false);
+  const fx = new core.FxMatrix();
+  fx.setQuotes([['EUR', 'USD', 1.1]]);
+  assert.equal(fx.rate('EUR', 'USD', '2025-01-02').rate, 1.1);
 });

@@ -193,7 +193,7 @@ fn market_context_roundtrip() {
 
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::USD, Currency::EUR, 1.1)
+        .set_quotes(&[(Currency::USD, Currency::EUR, 1.1)])
         .expect("valid test quote");
     let fx = FxMatrix::try_with_config(fx_provider, FxConfig::default()).expect("valid FxConfig");
 
@@ -573,9 +573,9 @@ fn market_context_restore_uses_quote_only_fx_snapshot() {
         },
     )
     .expect("valid FxConfig");
-    fx.set_quote(Currency::USD, Currency::EUR, 1.10)
+    fx.set_quotes(&[(Currency::USD, Currency::EUR, 1.10)])
         .expect("valid test quote");
-    fx.set_quote(Currency::USD, Currency::GBP, 0.80)
+    fx.set_quotes(&[(Currency::USD, Currency::GBP, 0.80)])
         .expect("valid test quote");
 
     let ctx = MarketContext::new().insert_fx(fx);

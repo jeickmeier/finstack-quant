@@ -20,7 +20,7 @@ fn market() -> MarketContext {
     let as_of = date!(2025 - 01 - 01);
     let provider = Arc::new(SimpleFxProvider::new());
     provider
-        .set_quote(Currency::EUR, Currency::USD, 1.1)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("FX quote");
     let mut market = MarketContext::new().insert_fx(FxMatrix::new(provider));
     for id in ["USD-OIS", "EUR-OIS"] {

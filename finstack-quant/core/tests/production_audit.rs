@@ -13,7 +13,7 @@ fn m9_global_source_precedes_orientation_and_pinned_fixing() {
     let on = date!(2025 - 01 - 02);
     let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
     matrix
-        .set_quote(Currency::USD, Currency::EUR, 0.8)
+        .set_quotes(&[(Currency::USD, Currency::EUR, 0.8)])
         .expect("global");
     matrix
         .set_quote_on(
@@ -45,7 +45,7 @@ fn m9_global_source_precedes_orientation_and_pinned_fixing() {
     assert_eq!(forward, 1.25);
     assert!((forward * reverse - 1.0).abs() < 1e-12);
     matrix
-        .set_quote(Currency::USD, Currency::GBP, 0.8)
+        .set_quotes(&[(Currency::USD, Currency::GBP, 0.8)])
         .expect("pivot leg");
     let cross = matrix
         .rate(FxQuery::new(
@@ -68,7 +68,7 @@ fn m9_snapshot_preserves_provider_below_pinned_source() {
     let on = date!(2025 - 01 - 02);
     let provider = SimpleFxProvider::new();
     provider
-        .set_quote(Currency::USD, Currency::EUR, 0.8)
+        .set_quotes(&[(Currency::USD, Currency::EUR, 0.8)])
         .expect("provider quote");
     let matrix = FxMatrix::new(Arc::new(provider));
     matrix

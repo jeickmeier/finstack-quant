@@ -26,7 +26,7 @@ fn test_fx_equity_curve_combo() {
     // Setup FX
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::EUR, Currency::USD, 1.1)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("valid rate");
     let fx_matrix = FxMatrix::new(fx_provider);
 

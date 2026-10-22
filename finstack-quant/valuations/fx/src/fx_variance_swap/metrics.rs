@@ -168,7 +168,7 @@ mod expected_variance_tests {
             .expect("eur curve");
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
 
         let swap = FxVarianceSwap::builder()

@@ -664,7 +664,7 @@ mod tests {
     #[test]
     fn test_fx_spot_shift_applied() -> Result<()> {
         let provider = SimpleFxProvider::new();
-        provider.set_quote(Currency::EUR, Currency::USD, 1.20)?;
+        provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.20)])?;
         let base_market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
 
         let scenario = MarketScenario::new(

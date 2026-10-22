@@ -160,11 +160,11 @@ def test_active_volatility_override_separates_scalar_and_node_risk() -> None:
 
 def test_fx_source_precedence_is_independent_of_orientation() -> None:
     fx = FxMatrix()
-    fx.set_quote("USD", "EUR", 0.8)
+    fx.set_quotes([("USD", "EUR", 0.8)])
     fx.set_quote_on("EUR", "USD", "2025-01-02", "cashflow_date", 1.3)
     assert fx.rate("EUR", "USD", "2025-01-02").rate == pytest.approx(1.25)
     assert fx.rate("USD", "EUR", "2025-01-02").rate == pytest.approx(0.8)
-    fx.set_quote("USD", "GBP", 0.8)
+    fx.set_quotes([("USD", "GBP", 0.8)])
     assert fx.rate("EUR", "GBP", "2025-01-02").rate == pytest.approx(1.0)
 
 

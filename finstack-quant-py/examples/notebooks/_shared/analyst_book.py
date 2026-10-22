@@ -304,7 +304,7 @@ def build_market(stage: str = "base", as_of: date = AS_OF) -> MarketContext:
         )
     )
     fx = FxMatrix()
-    fx.set_quote(Currency("EUR"), Currency("USD"), 1.08)
+    fx.set_quotes([(Currency("EUR"), Currency("USD"), 1.08)])
     market.insert_fx(fx)
     # Overnight observations enter with the first compounding lesson, before
     # the later term-SOFR forward curve and payer swap are introduced.

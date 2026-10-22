@@ -4219,7 +4219,7 @@ class FxRateResult:
     >>> import datetime
     >>> from finstack_quant.core.market_data import FxMatrix
     >>> matrix = FxMatrix()
-    >>> matrix.set_quote("EUR", "USD", 1.1)
+    >>> matrix.set_quotes([("EUR", "USD", 1.1)])
     >>> result = matrix.rate("EUR", "USD", datetime.date(2025, 1, 1))
     >>> (result.rate, result.triangulated, float(result))
     (1.1, False, 1.1)
@@ -4339,7 +4339,7 @@ class ConvertedMoney:
     >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
     >>> from finstack_quant.core.money import Money
     >>> fx = FxMatrix()
-    >>> fx.set_quote("EUR", "USD", 1.1)
+    >>> fx.set_quotes([("EUR", "USD", 1.1)])
     >>> converted = MarketContext().insert_fx(fx).convert_money(Money(10.0, "EUR"), "USD", "2025-01-02")
     >>> (converted.amount.currency.code, converted.rate.rate)
     ('USD', 1.1)
@@ -4817,31 +4817,6 @@ class FxMatrix:
         >>> FxMatrix.from_dict({"EURUSD": 1.1}).rate("EUR", "USD", datetime.date(2025, 1, 1)).rate
         1.1
 
-        """
-        ...
-
-    def set_quote(
-        self,
-        base: Union[Currency, str],
-        quote: Union[Currency, str],
-        rate: float,
-    ) -> None:
-        """
-        Set an explicit pair-global FX quote.
-
-        Parameters
-        ----------
-        base : Currency or str
-            Base (from) currency.
-        quote : Currency or str
-            Quote (to) currency.
-        rate : float
-            Conversion rate ``1 base = rate quote``; finite and positive.
-
-        Raises
-        ------
-        ValueError
-            If ``rate`` is non-finite or non-positive, or a code is unknown.
         """
         ...
 
@@ -6243,7 +6218,7 @@ class MarketContext:
         >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
         >>> from finstack_quant.core.money import Money
         >>> fx = FxMatrix()
-        >>> fx.set_quote("EUR", "USD", 1.1)
+        >>> fx.set_quotes([("EUR", "USD", 1.1)])
         >>> ctx = MarketContext().insert_fx(fx)
         >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
         >>> (round(converted.amount.amount, 6), converted.rate.triangulated)

@@ -19,11 +19,7 @@ use wasm_bindgen_test::*;
 fn fx_matrix_rate_returns_structured_result() {
     let matrix = JsFxMatrix::new();
     matrix
-        .set_quote(
-            JsValue::from("EUR"),
-            JsValue::from("USD"),
-            JsValue::from(1.10),
-        )
+        .set_quotes(serde_wasm_bindgen::to_value(&[("EUR", "USD", 1.10)]).expect("quote array"))
         .unwrap();
 
     let result = matrix
@@ -130,11 +126,7 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
 fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
     let matrix = JsFxMatrix::new();
     matrix
-        .set_quote(
-            JsValue::from("GBP"),
-            JsValue::from("USD"),
-            JsValue::from(1.25),
-        )
+        .set_quotes(serde_wasm_bindgen::to_value(&[("GBP", "USD", 1.25)]).expect("quote array"))
         .unwrap();
 
     let result = matrix
@@ -417,12 +409,8 @@ fn discount_curve_flat_uses_continuous_compounding() {
 #[wasm_bindgen_test]
 fn fx_matrix_quote_and_rate() {
     let m = JsFxMatrix::new();
-    m.set_quote(
-        JsValue::from("USD"),
-        JsValue::from("EUR"),
-        JsValue::from(0.92),
-    )
-    .expect("set quote");
+    m.set_quotes(serde_wasm_bindgen::to_value(&[("USD", "EUR", 0.92)]).expect("quote array"))
+        .expect("set quote");
     let r = m
         .rate(
             JsValue::from("USD"),

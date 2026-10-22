@@ -170,7 +170,7 @@ test('FxDeltaVolSurface round trips JSON and exposes its quotes', () => {
 
 test('FxRateResult round trips its JSON', () => {
   const fx = new core.FxMatrix();
-  fx.setQuote('EUR', 'USD', 1.1);
+  fx.setQuotes([['EUR', 'USD', 1.1]]);
   const result = fx.rate('EUR', 'USD', '2025-01-02');
   const back = core.FxRateResult.fromJson(result.toJson());
   assert.equal(back.rate, result.rate);

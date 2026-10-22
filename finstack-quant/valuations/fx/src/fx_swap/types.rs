@@ -387,7 +387,7 @@ mod tests {
         let fx_provider = {
             let provider = Arc::new(SimpleFxProvider::new());
             provider
-                .set_quote(Currency::EUR, Currency::USD, 1.10)
+                .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
                 .expect("valid EUR/USD quote");
             provider
         };

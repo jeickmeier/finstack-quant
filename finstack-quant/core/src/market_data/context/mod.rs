@@ -393,7 +393,7 @@ mod tests {
     fn convert_money_uses_fx_matrix_rate() {
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.1)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .expect("valid rate");
         let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
         let eur = Money::from((1_000_i64, Currency::EUR));
@@ -411,7 +411,7 @@ mod tests {
 
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 2.0)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 2.0)])
             .expect("valid rate");
         let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
         let amount = rust_decimal::Decimal::from_str("10000000000000000.1").expect("valid decimal");

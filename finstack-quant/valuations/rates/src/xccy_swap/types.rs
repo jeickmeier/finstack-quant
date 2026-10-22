@@ -1478,7 +1478,7 @@ mod tests {
         };
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("set EUR/USD rate");
         let market = MarketContext::new()
             .insert(curve("USD-OIS", 0.02))
@@ -1550,7 +1550,7 @@ mod tests {
 
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("set EUR/USD rate");
         let fx = FxMatrix::new(provider);
 

@@ -668,7 +668,7 @@ test('MarketContext inserts change the context in place and share curve data', (
   assert.throws(() => context.fxRequired(), kind('not_found'));
   const matrix = fx();
   context.insertFx(matrix);
-  matrix.setQuote('USD', 'JPY', 150.0);
+  matrix.setQuotes([['USD', 'JPY', 150.0]]);
   assert.equal(context.fx.rate('USD', 'JPY', '2025-01-02').rate, 150.0);
   assert.deepEqual(market().getPrice('SPX'), { unitless: 5900.0 });
   assert.deepEqual(market().getPrice('ACME'), { price: { amount: '12.5', currency: 'USD' } });

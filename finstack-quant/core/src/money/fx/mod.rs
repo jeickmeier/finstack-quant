@@ -20,7 +20,7 @@
 //! use time::Month;
 //!
 //! let provider = Arc::new(SimpleFxProvider::new());
-//! provider.set_quote(Currency::EUR, Currency::USD, 1.1);
+//! provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.1)]);
 //!
 //! let matrix = FxMatrix::new(provider.clone());
 //! let date = Date::from_calendar_date(2024, Month::January, 5).expect("Valid date");
@@ -59,7 +59,7 @@ mod tests {
     #[test]
     fn with_bumped_rate_rejects_non_positive_result() {
         let provider = Arc::new(SimpleFxProvider::new());
-        let _ = provider.set_quote(Currency::EUR, Currency::USD, 1.10);
+        let _ = provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.10)]);
         let matrix = FxMatrix::new(provider);
 
         let result =

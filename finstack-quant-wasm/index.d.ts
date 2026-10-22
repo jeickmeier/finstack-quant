@@ -3867,7 +3867,7 @@ export interface FxRateResult extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const matrix = new core.FxMatrix();
- * matrix.setQuote("EUR", "USD", 1.1);
+ * matrix.setQuotes([["EUR", "USD", 1.1]]);
  * const result = matrix.rate(
  *   "EUR",
  *   "USD",
@@ -3924,7 +3924,7 @@ export interface ConvertedMoney extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const fx = new core.FxMatrix();
- * fx.setQuote("EUR", "USD", 1.1);
+ * fx.setQuotes([["EUR", "USD", 1.1]]);
  * const market = new core.MarketContext();
  * market.insertFx(fx);
  * const usd = new core.Currency("USD");
@@ -3951,15 +3951,6 @@ export interface ConvertedMoneyConstructor {
  * Foreign-exchange rate matrix for currency conversion.
  */
 export interface FxMatrix extends WasmOwned {
-  /**
-   * Set an explicit FX quote.
-   *
-   * @param base - Base (from) currency ISO code.
-   * @param quote - Quote (to) currency ISO code.
-   * @param rate - Conversion rate.
-   * @throws Error - Throws a JavaScript exception if either currency code is invalid or `rate` is non-finite or not strictly positive.
-   */
-  setQuote(base: string, quote: string, rate: number): void;
   /**
    * Set an authoritative quote scoped to one date and conversion policy.
    * @param base - Base currency code of the FX quote, where the rate is quote per base.
@@ -4006,7 +3997,7 @@ export interface FxMatrix extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const matrix = new core.FxMatrix();
- * matrix.setQuote("EUR", "USD", 1.1);
+ * matrix.setQuotes([["EUR", "USD", 1.1]]);
  * console.log(matrix.rate("EUR", "USD", "2026-01-02").rate);
  * ```
  */
@@ -4307,7 +4298,7 @@ export interface MarketContext extends WasmOwned {
   /**
    * Attach the FX matrix used for currency conversion (Rust `MarketContext::insert_fx_mut`).
    *
-   * @param fx - FX matrix to attach; it replaces any matrix already attached and is shared, so later `setQuote` calls on it are visible here.
+   * @param fx - FX matrix to attach; it replaces any matrix already attached and is shared, so later `setQuotes` calls on it are visible here.
    * @returns This context, updated in place, so calls can be chained.
    */
   insertFx(fx: FxMatrix): MarketContext;

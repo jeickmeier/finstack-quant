@@ -1018,7 +1018,7 @@ mod tests {
 
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.15)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.15)])
             .expect("valid quote");
         let market = MarketContext::new().insert_fx(FxMatrix::new(provider));
 
