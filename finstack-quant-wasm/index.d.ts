@@ -23744,13 +23744,6 @@ export interface ValuationInstrumentsNamespace {
     waterfall: generated.valuations.Waterfall | string
   ): generated.valuations.CoverageTestSpec[];
   /**
-   * The grid cells of a structured-credit scenario table.
-   * @param table - `ScenarioTable` plain object or JSON string, as returned by `trancheScenarioTable`.
-   * @returns `ScenarioCell` plain objects: `cpr`, `cdr`, `severity`, `price`, `wal` and `writedown` per grid point.
-   * @throws Error - Throws with kind `validation` if `table` does not match the `ScenarioTable` schema.
-   */
-  scenarioTableCells(table: ScenarioTable | string): ScenarioCell[];
-  /**
    * `AmortizationEvent::Date`: revolving stops on a scheduled date.
    * @param date - Date revolving stops, as an ISO-8601 string.
    * @returns The `AmortizationEvent` plain object.

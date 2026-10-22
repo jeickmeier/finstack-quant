@@ -2231,11 +2231,11 @@ excluded = { coverage_tests_dataframe = "pandas" }
 [parity.members."finstack_quant.valuations.instruments.StochasticPricingResult"]
 excluded = { draw_option_cost_dataframe = "pandas" }
 
+# ScenarioTable.cells is a read-only Python property of the stored wire field.
+# The ScenarioTable type mapping carries it to WASM; no computed-member alias is needed.
+
 [parity.members."finstack_quant.valuations.instruments.Tranche"]
 renames = { builder = { js = "valuations.instruments.trancheBuilder", reason = "WASM `Tranche` values are plain objects; the Rust Tranche::builder entry point is a free function returning the TrancheBuilder class" } }
-
-[parity.members."finstack_quant.valuations.instruments.ScenarioTable"]
-renames = { cells = { js = "valuations.instruments.scenarioTableCells", reason = "WASM `ScenarioTable` values are plain objects; the Rust constructor or method is a free function" } }
 
 [parity.members."finstack_quant.valuations.instruments.CdsTrancheParams"]
 renames = { equity_tranche = { js = "valuations.instruments.cdsTrancheParamsEquityTranche", reason = "WASM `CdsTrancheParams` values are plain objects; the Rust constructor or method is a free function" }, mezzanine_tranche = { js = "valuations.instruments.cdsTrancheParamsMezzanineTranche", reason = "WASM `CdsTrancheParams` values are plain objects; the Rust constructor or method is a free function" } }
