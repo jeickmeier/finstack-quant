@@ -6,7 +6,7 @@
 use super::{
     FactorCorrelatedPrepay, RegimeSwitchingPrepay, RichardRollPrepay, StochasticPrepayment,
 };
-use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
+use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
 /// Stochastic prepayment model specification.
@@ -237,8 +237,12 @@ impl StochasticPrepaySpec {
             | StochasticPrepaySpec::FactorCorrelated {
                 base_spec: spec, ..
             } => spec.smm(1).unwrap_or(0.0),
-            StochasticPrepaySpec::RichardRoll { base_cpr, .. } => clamped_cpr_to_smm(*base_cpr),
-            StochasticPrepaySpec::RegimeSwitching { low_cpr, .. } => clamped_cpr_to_smm(*low_cpr),
+            StochasticPrepaySpec::RichardRoll { base_cpr, .. } => {
+                annual_to_monthly_clamped(*base_cpr)
+            }
+            StochasticPrepaySpec::RegimeSwitching { low_cpr, .. } => {
+                annual_to_monthly_clamped(*low_cpr)
+            }
         }
     }
 }

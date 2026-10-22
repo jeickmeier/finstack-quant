@@ -81,11 +81,10 @@ const EXPORTED_KEYS = [
   'accruedInterestAmount',
   'aggregateByPeriod',
   'aggregateCashflowsChecked',
+  'annualToMonthly',
   'buildCashflowSchedule',
   'buildCashflowScheduleJson',
   'calendarYearLadder',
-  'cdrToMdr',
-  'cprToSmm',
   'datedFlows',
   'datedFlowsJson',
   'defaultModelSpecCumulativeDefaultFraction',
@@ -103,8 +102,8 @@ const EXPORTED_KEYS = [
   'floatingRateSpecSonia',
   'floatingRateSpecValidate',
   'materializeFixings',
-  'mdrToCdr',
   'mergeCashflowSchedules',
+  'monthlyToAnnual',
   'notionalPar',
   'notionalValidate',
   'prepaymentModelSpecSmm',
@@ -125,7 +124,6 @@ const EXPORTED_KEYS = [
   'scheduleParamsUsdTreasury',
   'scheduleParamsValidate',
   'schema',
-  'smmToCpr',
   'validateCashflowScheduleJson',
 ];
 
@@ -563,5 +561,32 @@ test('cashflows accrual preserves ICMA reference periods and ISDA termination da
       frequency: { count: 6, unit: 'months' },
     });
     assert.ok(Math.abs(accruedInterest(raw, asOf, cfg) - expected) < 1e-8);
+  }
+});
+
+test('canonical credit-rate conversions preserve boundaries and reject invalid rates', () => {
+  for (const rate of [0, 0.02, 0.06, 0.5, 1]) {
+    const monthly = cashflows.annualToMonthly(rate);
+    assert.ok(Math.abs(cashflows.monthlyToAnnual(monthly) - rate) < 1e-14);
+  }
+  for (const [convert, name] of [
+    [cashflows.annualToMonthly, 'annual'],
+    [cashflows.monthlyToAnnual, 'monthly'],
+  ]) {
+    assert.ok(Object.is(convert(-0), 0));
+    for (const invalid of [-0.01, 1.01, NaN, Infinity, -Infinity]) {
+      assert.throws(
+        () => convert(invalid),
+        (error) => {
+          assert.equal(error.kind, 'validation');
+          assert.match(error.message, new RegExp(`${name} must be a decimal`));
+          return true;
+        }
+      );
+    }
+    assert.throws(
+      () => convert('0.06'),
+      (error) => error.kind === 'invalid_type'
+    );
   }
 });

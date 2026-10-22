@@ -204,8 +204,8 @@ impl DefaultModelSpec {
             )));
         }
 
-        use crate::builder::credit_rates::cdr_to_mdr;
-        cdr_to_mdr(cdr)
+        use crate::builder::credit_rates::annual_to_monthly;
+        annual_to_monthly(cdr)
     }
 
     /// Cumulative defaults through a seasoning month as a decimal fraction of

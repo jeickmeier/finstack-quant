@@ -295,7 +295,7 @@ python_package = "finstack_quant.cashflows.builder"
 # CashflowRepresentation (credit metadata
 # carried inside schedule JSON); evaluate_fee_tiers / FeeTier / RateSpec /
 # PrincipalEventSpec (spec internals reachable through the spec types); and the
-# credit-rate helpers clamped_cpr_to_smm / clamped_cdr_to_mdr / psa_cpr /
+# credit-rate helpers annual_to_monthly_clamped / psa_cpr /
 # PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR. The FloatingRateSpec
 # DEFAULT_GEARING / DEFAULT_GEARING_INCLUDES_SPREAD / DEFAULT_RESET_LAG_DAYS
 # constants are Rust-only; the Python constructor defaults read them.
@@ -308,8 +308,8 @@ public = [
     "OvernightIndexConstraintApplication", "PrepaymentModelSpec",
     "PrincipalExchange",
     "RecoveryModelSpec", "RollRule", "ScheduleParams", "StepUpCouponSpec",
-    "abs_to_smm", "cdr_to_mdr", "cpr_to_smm", "mdr_to_cdr",
-    "merge_cashflow_schedules", "smm_to_cpr",
+    "abs_to_smm", "annual_to_monthly", "monthly_to_annual",
+    "merge_cashflow_schedules",
 ]
 
 [crates.cashflows.module_symbols.fixings]

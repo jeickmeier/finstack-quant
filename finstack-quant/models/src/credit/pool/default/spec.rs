@@ -7,7 +7,7 @@ use super::{
     CopulaBasedDefault, FactorCorrelatedDefault, IntensityProcessDefault, StochasticDefault,
 };
 use crate::correlation::CopulaSpec;
-use finstack_quant_cashflows::builder::clamped_cdr_to_mdr;
+use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 
 /// Stochastic default model specification.
@@ -202,7 +202,7 @@ impl StochasticDefaultSpec {
             } => spec
                 .mdr(1)
                 .ok()
-                .and_then(|mdr| finstack_quant_cashflows::builder::mdr_to_cdr(mdr).ok())
+                .and_then(|mdr| finstack_quant_cashflows::builder::monthly_to_annual(mdr).ok())
                 .unwrap_or(0.0),
             StochasticDefaultSpec::Copula { base_cdr, .. } => *base_cdr,
             StochasticDefaultSpec::IntensityProcess { base_hazard, .. } => *base_hazard,
@@ -213,7 +213,7 @@ impl StochasticDefaultSpec {
     ///
     /// Returns the unconditional expected MDR before factor shocks are applied.
     pub fn base_mdr(&self) -> f64 {
-        clamped_cdr_to_mdr(self.base_rate())
+        annual_to_monthly_clamped(self.base_rate())
     }
 }
 

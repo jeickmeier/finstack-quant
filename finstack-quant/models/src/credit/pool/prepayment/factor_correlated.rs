@@ -25,8 +25,8 @@
 
 use super::super::expected_shocked_smm;
 use super::traits::StochasticPrepayment;
-use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
-use finstack_quant_cashflows::builder::smm_to_cpr;
+use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
+use finstack_quant_cashflows::builder::monthly_to_annual;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
 /// Factor-correlated prepayment model.
@@ -67,7 +67,7 @@ impl FactorCorrelatedPrepay {
         self.base_spec
             .smm(seasoning)
             .ok()
-            .and_then(|smm| smm_to_cpr(smm).ok())
+            .and_then(|smm| monthly_to_annual(smm).ok())
             .unwrap_or(0.0)
     }
 }
@@ -93,7 +93,7 @@ impl StochasticPrepayment for FactorCorrelatedPrepay {
         let shocked_cpr = (base_cpr * shock * burnout).clamp(0.0, 1.0);
 
         // Convert CPR to SMM
-        clamped_cpr_to_smm(shocked_cpr)
+        annual_to_monthly_clamped(shocked_cpr)
     }
 
     fn expected_smm(&self, seasoning: u32) -> f64 {
@@ -143,7 +143,7 @@ mod tests {
         let model = FactorCorrelatedPrepay::new(base, 0.4, 0.20);
 
         let smm = model.conditional_smm(12, &[0.0], 0.05, 1.0);
-        let expected_smm = clamped_cpr_to_smm(0.10);
+        let expected_smm = annual_to_monthly_clamped(0.10);
 
         assert!(
             (smm - expected_smm).abs() < 1e-6,

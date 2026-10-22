@@ -78,7 +78,7 @@ fn test_clo_default_prepayment_model() {
     // Assert: CLO should use constant CPR
     assert!(
         (clo.credit_model.prepayment_spec.smm(36).unwrap()
-            - finstack_quant_cashflows::builder::cpr_to_smm(0.20).unwrap())
+            - finstack_quant_cashflows::builder::annual_to_monthly(0.20).unwrap())
         .abs()
             < 1e-12
     ); // 20% CPR standard
@@ -104,14 +104,14 @@ fn test_clo_default_assumptions() {
     // Assert: CLO standard assumptions
     assert!(
         (clo.credit_model.default_spec.mdr(36).unwrap()
-            - finstack_quant_cashflows::builder::cdr_to_mdr(0.02).unwrap())
+            - finstack_quant_cashflows::builder::annual_to_monthly(0.02).unwrap())
         .abs()
             < 1e-12
     ); // 2% CDR
     assert_eq!(clo.credit_model.recovery_spec.rate, 0.60); // 60% recovery
     assert!(
         (clo.credit_model.prepayment_spec.smm(36).unwrap()
-            - finstack_quant_cashflows::builder::cpr_to_smm(0.20).unwrap())
+            - finstack_quant_cashflows::builder::annual_to_monthly(0.20).unwrap())
         .abs()
             < 1e-12
     ); // 20% CPR
@@ -152,7 +152,7 @@ fn test_abs_default_assumptions() {
     // Assert: Auto ABS standard assumptions
     assert!(
         (abs.credit_model.default_spec.mdr(36).unwrap()
-            - finstack_quant_cashflows::builder::cdr_to_mdr(0.02).unwrap())
+            - finstack_quant_cashflows::builder::annual_to_monthly(0.02).unwrap())
         .abs()
             < 1e-12
     ); // 2% CDR
@@ -203,7 +203,7 @@ fn test_rmbs_default_prepayment_model() {
     // Assert: RMBS should use PSA model
     assert!(
         (rmbs.credit_model.prepayment_spec.smm(36).unwrap()
-            - finstack_quant_cashflows::builder::cpr_to_smm(0.06).unwrap())
+            - finstack_quant_cashflows::builder::annual_to_monthly(0.06).unwrap())
         .abs()
             < 1e-12
     ); // 100% PSA terminal = 6% CPR
@@ -231,7 +231,7 @@ fn test_rmbs_default_assumptions() {
     // Assert: RMBS standard assumptions
     assert!(
         (rmbs.credit_model.default_spec.mdr(36).unwrap()
-            - finstack_quant_cashflows::builder::cdr_to_mdr(0.006).unwrap())
+            - finstack_quant_cashflows::builder::annual_to_monthly(0.006).unwrap())
         .abs()
             < 1e-12
     ); // 0.6% CDR
@@ -277,14 +277,14 @@ fn test_cmbs_default_assumptions() {
     // Assert: CMBS standard assumptions
     assert!(
         (cmbs.credit_model.default_spec.mdr(36).unwrap()
-            - finstack_quant_cashflows::builder::cdr_to_mdr(0.005).unwrap())
+            - finstack_quant_cashflows::builder::annual_to_monthly(0.005).unwrap())
         .abs()
             < 1e-12
     ); // 0.5% CDR
     assert_eq!(cmbs.credit_model.recovery_spec.rate, 0.65); // 65% recovery
     assert!(
         (cmbs.credit_model.prepayment_spec.smm(121).unwrap()
-            - finstack_quant_cashflows::builder::cpr_to_smm(0.10).unwrap())
+            - finstack_quant_cashflows::builder::annual_to_monthly(0.10).unwrap())
         .abs()
             < 1e-12
     ); // 10% CPR
