@@ -12528,56 +12528,7 @@ class CdsTranche:
         (DayCount.ACT_360, 'following')
         """
         ...
-    def expected_loss(self, market: MarketContext | str) -> float:
-        """
-        Expected tranche loss as a fraction of tranche notional (mirrors Rust
-        ``CdsTranche::expected_loss``).
 
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market carrying the credit index and discount curve.
-
-        Returns
-        -------
-        float
-            Expected loss fraction in ``[0, 1]``.
-
-        Raises
-        ------
-        KeyError
-            If the credit index is missing from ``market``.
-        RuntimeError
-            If the loss-distribution integration fails.
-        """
-        ...
-    def jump_to_default(
-        self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
-    ) -> float:
-        """
-        Jump-to-default exposure (mirrors Rust ``CdsTranche::jump_to_default``):
-        PV impact of one constituent defaulting immediately.
-
-        Parameters
-        ----------
-        market : MarketContext | str
-            Market carrying the credit index and discount curve.
-        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date.
-
-        Returns
-        -------
-        float
-            Jump-to-default PV change in notional currency units.
-
-        Raises
-        ------
-        KeyError
-            If the credit index is missing from ``market``.
-        RuntimeError
-            If the loss-distribution integration fails.
-        """
-        ...
     @property
     def index_name(self) -> str:
         """

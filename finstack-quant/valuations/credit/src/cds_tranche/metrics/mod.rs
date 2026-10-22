@@ -15,7 +15,7 @@
 mod cs01;
 mod recovery01;
 
-use crate::cds_tranche::CdsTranche;
+use crate::cds_tranche::{CdsTranche, CdsTranchePricer};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -56,7 +56,7 @@ pub(crate) struct Correlation01Calculator;
 impl MetricCalculator for Correlation01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let tranche: &CdsTranche = context.instrument_as()?;
-        tranche.correlation_delta(&context.curves, context.as_of)
+        CdsTranchePricer::new().calculate_correlation_delta(tranche, &context.curves, context.as_of)
     }
 }
 
@@ -70,7 +70,7 @@ impl MetricCalculator for ExpectedLossCalculator {
         let tranche: &CdsTranche = context.instrument_as()?;
         // Propagate error when credit index data is missing rather than silently
         // returning zero, which would mask missing market data in risk reports.
-        tranche.expected_loss(&context.curves)
+        CdsTranchePricer::new().calculate_expected_loss(tranche, &context.curves)
     }
 }
 
@@ -84,7 +84,7 @@ impl MetricCalculator for JumpToDefaultCalculator {
         let tranche: &CdsTranche = context.instrument_as()?;
         // Propagate error when credit index data is missing rather than silently
         // returning zero, which would mask missing market data in risk reports.
-        tranche.jump_to_default(&context.curves, context.as_of)
+        CdsTranchePricer::new().calculate_jump_to_default(tranche, &context.curves, context.as_of)
     }
 }
 
@@ -97,7 +97,7 @@ pub(crate) struct ParSpreadCalculator;
 impl MetricCalculator for ParSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let tranche: &CdsTranche = context.instrument_as()?;
-        tranche.par_spread(&context.curves, context.as_of)
+        CdsTranchePricer::new().calculate_par_spread(tranche, &context.curves, context.as_of)
     }
 }
 
@@ -111,6 +111,6 @@ impl MetricCalculator for SpreadDv01Calculator {
         let tranche: &CdsTranche = context.instrument_as()?;
         // Propagate error when credit index data is missing rather than silently
         // returning zero, which would mask missing market data in risk reports.
-        tranche.spread_dv01(&context.curves, context.as_of)
+        CdsTranchePricer::new().calculate_spread_dv01(tranche, &context.curves, context.as_of)
     }
 }

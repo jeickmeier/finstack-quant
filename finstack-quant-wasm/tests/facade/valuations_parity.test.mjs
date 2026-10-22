@@ -328,14 +328,14 @@ test('credit instruments match Python', () => {
     instruments.cdsIndexParamsItraxxEurope(40, 1, 100).index_name,
     golden.data.itraxx_index_name
   );
-  // Without the credit index data both loss methods are lookup misses, as in Python.
+  // Without the credit index data both loss metrics are lookup misses, as in Python.
   const example = instruments.CdsTranche.example();
   assert.throws(
-    () => example.expectedLoss(golden.equity.market),
+    () => example.metric(golden.equity.market, '2024-06-20', 'expected_loss'),
     (e) => e.kind === 'not_found'
   );
   assert.throws(
-    () => example.jumpToDefault(golden.equity.market, '2024-06-20'),
+    () => example.metric(golden.equity.market, '2024-06-20', 'jump_to_default'),
     (e) => e.kind === 'not_found'
   );
 });

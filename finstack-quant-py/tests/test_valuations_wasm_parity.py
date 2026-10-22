@@ -483,10 +483,10 @@ def test_tranche_builder_requires_both_points() -> None:
         builder.build()
 
 
-def test_tranche_loss_methods_report_missing_index_data_as_a_lookup_miss() -> None:
+def test_tranche_loss_metrics_report_missing_index_data_as_a_lookup_miss() -> None:
     tranche = ins.CdsTranche.example()
     market = cef_cases._equity_market()
     with pytest.raises(KeyError):
-        tranche.expected_loss(market)
+        tranche.metric(market, AS_OF, "expected_loss")
     with pytest.raises(KeyError):
-        tranche.jump_to_default(market, AS_OF)
+        tranche.metric(market, AS_OF, "jump_to_default")

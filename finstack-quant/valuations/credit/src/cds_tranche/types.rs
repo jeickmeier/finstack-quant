@@ -347,53 +347,6 @@ impl CdsTranche {
         tranche.calendar_id = None;
         Ok(tranche)
     }
-
-    /// Calculate spread DV01 (sensitivity to 1bp change in running coupon)
-    pub fn spread_dv01(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_spread_dv01(self, market, as_of)
-    }
-
-    /// Calculate the par spread (running coupon in basis points).
-    pub fn par_spread(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_par_spread(self, market, as_of)
-    }
-
-    /// Calculate expected loss metric
-    pub fn expected_loss(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_expected_loss(self, market)
-    }
-
-    /// Calculate jump-to-default metric
-    pub fn jump_to_default(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_jump_to_default(self, market, as_of)
-    }
-
-    /// Calculate correlation delta (Correlation01): PV change per **1%
-    /// (0.01 absolute)** base-correlation shift, matching `Recovery01` units.
-    pub fn correlation_delta(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pricer = pricing::CdsTranchePricer::new();
-        pricer.calculate_correlation_delta(self, market, as_of)
-    }
 }
 
 // Attributable is provided via blanket impl for all Instrument types
