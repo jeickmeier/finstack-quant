@@ -1,13 +1,9 @@
-"""Runtime checks for the compiled-in JSON Schema accessors.
+"""Runtime checks for the public JSON Schema namespaces.
 
-Four crates embed their published JSON Schemas with ``include_str!`` and expose
-them through ``<crate>::schema``. These tests pin the Python mirror of those
-namespaces: the module topology, the ``__all__`` surface, the JSON text each
-accessor returns, the ``KeyError``/``ValueError`` mapping, and — critically —
-that the compiled-in copy still equals the schema file checked into the repo.
-That last check is the regression guard: it fails the moment a schema file is
-regenerated without rebuilding the extension, which is the only way a
-"compiled-in schemas cannot drift" claim can quietly become false.
+These tests pin module topology, the ``__all__`` surface, returned schema text,
+and the ``KeyError``/``ValueError`` mapping. Statements use the canonical Rust
+schema registry. Returned documents must match the checked-in artifacts, so
+stale generated files or extension builds are detected at the host boundary.
 """
 
 from __future__ import annotations
@@ -39,9 +35,6 @@ SCHEMA_MODULES: dict[str, ModuleType] = {
 
 # Zero-argument accessors that return a single JSON Schema document as text.
 DOCUMENT_ACCESSORS: list[tuple[str, str]] = [
-    ("finstack_quant.statements.schema", "financial_model_spec_schema"),
-    ("finstack_quant.statements.schema", "normalization_config_schema"),
-    ("finstack_quant.statements.schema", "statement_result_schema"),
     ("finstack_quant.valuations.schema", "instrument_envelope_schema"),
     ("finstack_quant.valuations.schema", "valuation_result_schema"),
 ]
@@ -50,17 +43,17 @@ DOCUMENT_ACCESSORS: list[tuple[str, str]] = [
 COMPILED_VS_CHECKED_IN: list[tuple[str, str, str]] = [
     (
         "finstack_quant.statements.schema",
-        "financial_model_spec_schema",
+        "financial_model_spec.schema.json",
         "finstack-quant/statements/schemas/statements/1/financial_model_spec.schema.json",
     ),
     (
         "finstack_quant.statements.schema",
-        "normalization_config_schema",
+        "normalization_config.schema.json",
         "finstack-quant/statements/schemas/statements/1/normalization_config.schema.json",
     ),
     (
         "finstack_quant.statements.schema",
-        "statement_result_schema",
+        "statement_result.schema.json",
         "finstack-quant/statements/schemas/statements/1/statement_result.schema.json",
     ),
     (
@@ -90,11 +83,8 @@ EXPECTED_EXPORTS: dict[str, list[str]] = {
         "validate",
     ],
     "finstack_quant.statements.schema": [
-        "financial_model_spec_schema",
         "get",
         "index",
-        "normalization_config_schema",
-        "statement_result_schema",
         "validate",
     ],
     "finstack_quant.valuations.schema": [
@@ -250,7 +240,9 @@ def test_compiled_schema_matches_checked_in_artifact(
     """
     artifact = REPO_ROOT / relative_path
     assert artifact.is_file(), f"missing generated schema artifact: {relative_path}"
-    compiled = json.loads(getattr(SCHEMA_MODULES[module_path], accessor)())
+    module = SCHEMA_MODULES[module_path]
+    text = module.get(accessor) if accessor.endswith(".schema.json") else getattr(module, accessor)()
+    compiled = json.loads(text)
     assert compiled == json.loads(artifact.read_text(encoding="utf-8"))
 
 

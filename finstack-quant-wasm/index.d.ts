@@ -7505,12 +7505,12 @@ export interface FactorSchemaNamespace {
 }
 
 /**
- * Registry and named accessors of the statements JSON Schemas.
+ * Registry of the canonical statements JSON Schemas.
  * @example
  * ```typescript
  * import init, { statements } from "finstack-quant-wasm";
  * await init();
- * const document = statements.schema.financialModelSpecSchema();
+ * const document = statements.schema.get("financial_model_spec.schema.json");
  * console.log(document.title);
  * ```
  */
@@ -7540,24 +7540,7 @@ export interface StatementsSchemaNamespace {
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and a `TypeError` (kind `invalid_type`) if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
   validate(selector: string, payload: string | object): SchemaValidationFailure[];
-  /**
-   * JSON Schema of a serialized `FinancialModelSpec`.
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
-   */
-  financialModelSpecSchema(): Record<string, unknown>;
-  /**
-   * JSON Schema of a serialized `NormalizationConfig`.
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
-   */
-  normalizationConfigSchema(): Record<string, unknown>;
-  /**
-   * JSON Schema of a serialized `StatementResult`.
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
-   */
-  statementResultSchema(): Record<string, unknown>;
+
 }
 
 /**
@@ -31585,7 +31568,7 @@ export interface MixedNodeBuilderConstructor {
  */
 export interface StatementsNamespace {
   /**
-   * Registry and named accessors of the statements JSON Schemas.
+   * Registry of the canonical statements JSON Schemas.
    */
   schema: StatementsSchemaNamespace;
   /**

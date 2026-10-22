@@ -57,7 +57,7 @@ exclusive end date.
 | `capital_structure` | `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`, `CapitalStructureCashflows`, `CashflowBreakdown`, `CapitalStructureState`, `PrincipalClaim`, `execute_waterfall`, `calculate_period_flows` |
 | `checks` | `CheckSuite`, `CheckSuiteSpec`, `Check`, `CheckReport`, `FormulaCheckSpec`, and the `builtins` implementations |
 | `adjustments` | `normalize`, `merge_into_results`, `NormalizationConfig`, `Adjustment`, `AdjustmentValue`, `AdjustmentCap` |
-| `schema` | `financial_model_spec_schema`, `statement_result_schema`, `normalization_config_schema` |
+| `schema` | `ARTIFACTS` schema registry |
 | `error` | `Error`, `Result`; both are also re-exported at the crate root |
 | `prelude` | The `builder`, `checks`, `error`, and `types` surfaces, the headline `evaluator` items (`Evaluator`, `NumericMode`, `PreparedEvaluation`, `StatementResult`), `registry::Registry`, and core `Money`, `Currency`, `Date`, `PeriodId`, `Tenor` |
 

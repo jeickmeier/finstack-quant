@@ -233,31 +233,3 @@ pub fn cashflows_schema_resources() -> Result<JsValue, JsValue> {
         .collect();
     to_js_value(&documents)
 }
-
-/// JSON Schema of a serialized `FinancialModelSpec`.
-/// @returns JSON Schema document.
-/// @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
-#[wasm_bindgen(js_name = financialModelSpecSchema)]
-pub fn financial_model_spec_schema() -> Result<JsValue, JsValue> {
-    to_js_value(
-        finstack_quant_statements::schema::financial_model_spec_schema().map_err(to_js_err)?,
-    )
-}
-
-/// JSON Schema of a serialized `StatementResult`.
-/// @returns JSON Schema document.
-/// @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
-#[wasm_bindgen(js_name = statementResultSchema)]
-pub fn statement_result_schema() -> Result<JsValue, JsValue> {
-    to_js_value(finstack_quant_statements::schema::statement_result_schema().map_err(to_js_err)?)
-}
-
-/// JSON Schema of a serialized `NormalizationConfig`.
-/// @returns JSON Schema document.
-/// @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
-#[wasm_bindgen(js_name = normalizationConfigSchema)]
-pub fn normalization_config_schema() -> Result<JsValue, JsValue> {
-    to_js_value(
-        finstack_quant_statements::schema::normalization_config_schema().map_err(to_js_err)?,
-    )
-}

@@ -4078,14 +4078,7 @@
   },
   "statements.schema": {
     "kind": "namespace",
-    "keys": [
-      "financialModelSpecSchema",
-      "get",
-      "index",
-      "normalizationConfigSchema",
-      "statementResultSchema",
-      "validate"
-    ]
+    "keys": ["get", "index", "validate"]
   },
   "statements.schema.index": {
     "kind": "function"
@@ -4094,15 +4087,6 @@
     "kind": "function"
   },
   "statements.schema.validate": {
-    "kind": "function"
-  },
-  "statements.schema.financialModelSpecSchema": {
-    "kind": "function"
-  },
-  "statements.schema.normalizationConfigSchema": {
-    "kind": "function"
-  },
-  "statements.schema.statementResultSchema": {
     "kind": "function"
   },
   "statements_analytics": {
