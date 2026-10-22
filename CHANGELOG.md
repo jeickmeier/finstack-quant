@@ -31,6 +31,8 @@
 
 #### Changed
 
+- Capital-structure runtime state, dated principal claims, and waterfall execution are crate-private. The evaluator owns their lifecycle; the unused cumulative-principal accumulator and redundant waterfall period argument are removed.
+
 - `PikToggleSpec.target_instrument_ids` is a required list across Rust, Python, and JSON. Missing and null target lists are rejected; validation requires at least one borrowing-debt target.
 
 - Waterfall failures leave capital-structure runtime state unchanged. Successful allocations commit balances, PIK state, and carried claims together.

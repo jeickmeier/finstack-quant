@@ -1,7 +1,7 @@
 //! Mutable runtime state for waterfall evaluation.
 //!
-//! [`CapitalStructureState`] tracks opening/closing balances and cumulative
-//! metrics across periods. It is mutated by the waterfall engine during
+//! [`CapitalStructureState`] tracks opening/closing balances, PIK mode, and
+//! dated unpaid or advance claims across periods. It is mutated by the waterfall engine during
 //! sequential evaluation and is therefore the runtime counterpart to the
 //! static [`WaterfallSpec`](super::WaterfallSpec).
 
@@ -19,48 +19,45 @@ use indexmap::IndexMap;
 
 /// Capital structure state tracking for dynamic evaluation.
 ///
-/// Maintains opening/closing balances and cumulative metrics across periods.
+/// Maintains balances, PIK mode, and dated unpaid or advance claims across periods.
 ///
 /// This state is mutated by the waterfall engine during sequential evaluation
 /// and is therefore the runtime counterpart to the static [`WaterfallSpec`](super::WaterfallSpec).
 #[derive(Debug, Clone, Default)]
-pub struct CapitalStructureState {
+pub(crate) struct CapitalStructureState {
     /// Opening balances by instrument ID at the start of the current period
-    pub opening_balances: IndexMap<String, Money>,
+    pub(crate) opening_balances: IndexMap<String, Money>,
 
     /// Closing balances by instrument ID at the end of the current period
-    pub closing_balances: IndexMap<String, Money>,
-
-    /// Cumulative principal payments by instrument
-    pub cumulative_principal: IndexMap<String, Money>,
+    pub(crate) closing_balances: IndexMap<String, Money>,
 
     /// Current PIK mode by instrument (true = PIK enabled, false = cash)
-    pub pik_mode: IndexMap<String, bool>,
+    pub(crate) pik_mode: IndexMap<String, bool>,
 
     /// Number of consecutive periods each instrument has been in PIK mode.
     /// Used for hysteresis: PIK stays active until `min_periods_in_pik` is met.
-    pub pik_periods_active: IndexMap<String, usize>,
+    pub(crate) pik_periods_active: IndexMap<String, usize>,
 
     /// Unpaid interest/fee shortfall per instrument from the prior period's
     /// available-cash cap. Carried forward as a claim in the next period's
     /// interest category and re-recorded if it remains unpaid.
-    pub interest_shortfall: IndexMap<String, Money>,
+    pub(crate) interest_shortfall: IndexMap<String, Money>,
 
     /// Unpaid scheduled-principal claims from prior available-cash caps.
     /// Original payment and economic principal dates survive each carry so
     /// early and delayed settlements affect outstanding exactly once.
-    pub principal_shortfall: IndexMap<String, Vec<PrincipalClaim>>,
+    pub(crate) principal_shortfall: IndexMap<String, Vec<PrincipalClaim>>,
 
     /// Principal cash already paid whose economic reduction occurs in a
     /// future period. These lots reserve repayment capacity until that date;
     /// otherwise an intermediate reporting period could repay the same debt twice.
-    pub principal_advance_payments: IndexMap<String, Vec<PrincipalClaim>>,
+    pub(crate) principal_advance_payments: IndexMap<String, Vec<PrincipalClaim>>,
 
     /// Unpaid fee shortfall per instrument from the prior period's
     /// available-cash cap. Carried forward as a claim in the next period's
     /// *fee* category (kept separate from `interest_shortfall` so fee arrears
     /// are not demoted into the interest rung) and re-recorded if unpaid.
-    pub fee_shortfall: IndexMap<String, Money>,
+    pub(crate) fee_shortfall: IndexMap<String, Money>,
 
     /// Newly funded principal (draws plus explicit or implicit issuance face) per
     /// instrument for the *current* period, computed by
@@ -68,12 +65,12 @@ pub struct CapitalStructureState {
     /// separate from cash proceeds. The waterfall consumes it to recover the
     /// payable balance (`opening + funding`) and the draw-aware closing
     /// balance. Overwritten each period; instruments with no draw record zero.
-    pub period_new_funding: IndexMap<String, Money>,
+    pub(crate) period_new_funding: IndexMap<String, Money>,
 
     /// Residual cashflow schedule per instrument, rebuilt after each period's
     /// outstanding change so the next coupon is `outstanding × rate ×
     /// accrual_factor` rather than a scale of the original schedule.
-    pub residual_schedules: IndexMap<String, CashFlowSchedule>,
+    pub(crate) residual_schedules: IndexMap<String, CashFlowSchedule>,
 
     /// Dated current-period claims, supplied by market-aware evaluation or
     /// explicitly by callers allocating schedules with separate cash dates.
@@ -82,34 +79,26 @@ pub struct CapitalStructureState {
 
 impl CapitalStructureState {
     /// Create a new empty state.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Get opening balance for an instrument, defaulting to zero if not present.
-    pub fn get_opening_balance(&self, instrument_id: &str, currency: Currency) -> Money {
+    pub(crate) fn get_opening_balance(&self, instrument_id: &str, currency: Currency) -> Money {
         self.opening_balances
             .get(instrument_id)
             .copied()
             .unwrap_or_else(|| Money::from((0_i64, currency)))
     }
 
-    /// Get closing balance for an instrument, defaulting to zero if not present.
-    pub fn get_closing_balance(&self, instrument_id: &str, currency: Currency) -> Money {
-        self.closing_balances
-            .get(instrument_id)
-            .copied()
-            .unwrap_or_else(|| Money::from((0_i64, currency)))
-    }
-
     /// Update closing balance for an instrument.
-    pub fn set_closing_balance(&mut self, instrument_id: String, balance: Money) {
+    pub(crate) fn set_closing_balance(&mut self, instrument_id: String, balance: Money) {
         self.closing_balances.insert(instrument_id, balance);
     }
 
     /// Net new funding recorded for an instrument in the current period,
     /// defaulting to zero if not present.
-    pub fn get_period_new_funding(&self, instrument_id: &str, currency: Currency) -> Money {
+    pub(crate) fn get_period_new_funding(&self, instrument_id: &str, currency: Currency) -> Money {
         self.period_new_funding
             .get(instrument_id)
             .copied()
@@ -120,7 +109,7 @@ impl CapitalStructureState {
     ///
     /// Closing balances are cleared after promotion so matured instruments
     /// (balance == 0) do not carry stale data into the next evaluation cycle.
-    pub fn advance_period(&mut self) {
+    pub(crate) fn advance_period(&mut self) {
         self.opening_balances = std::mem::take(&mut self.closing_balances);
         self.period_principal_flows.clear();
     }
@@ -145,7 +134,7 @@ impl CapitalStructureState {
     ///
     /// Returns a capital-structure error for an empty/reversed period,
     /// negative claims, or cash dates outside the reporting interval.
-    pub fn set_period_principal_flows(
+    pub(crate) fn set_period_principal_flows(
         &mut self,
         instrument_id: impl Into<String>,
         period: &Period,
@@ -196,7 +185,7 @@ impl CapitalStructureState {
     ///
     /// Returns a capital-structure error when a residual rate cannot be
     /// inferred or a schedule currency does not match the closing balance.
-    pub fn rebuild_residuals(&mut self, from_date: Date) -> Result<()> {
+    pub(crate) fn rebuild_residuals(&mut self, from_date: Date) -> Result<()> {
         let updates: Vec<(String, Money)> = self
             .closing_balances
             .iter()

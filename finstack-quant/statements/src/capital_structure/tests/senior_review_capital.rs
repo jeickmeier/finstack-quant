@@ -1,6 +1,7 @@
 //! Regression coverage for capital-structure review findings.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+use crate::capital_structure::waterfall::execute_waterfall;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
@@ -16,8 +17,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{
-    calculate_period_flows, execute_waterfall, CapitalStructureState, CashflowBreakdown,
-    EcfSweepSpec, PaymentPriority, PikToggleSpec, WaterfallSpec,
+    calculate_period_flows, CapitalStructureState, CashflowBreakdown, EcfSweepSpec,
+    PaymentPriority, PikToggleSpec, WaterfallSpec,
 };
 use finstack_quant_statements::evaluator::EvaluationContext;
 use finstack_quant_statements::evaluator::Evaluator;
@@ -956,11 +957,10 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
                 if issue > periods[0].start { 100.0 } else { 0.0 }
             );
             if waterfall {
-                let (period, context, mut state, _) = empty_debt_context();
+                let (_, context, mut state, _) = empty_debt_context();
                 state.opening_balances.insert("TL".into(), opening);
                 state.period_new_funding.insert("TL".into(), funding);
                 let result = execute_waterfall(
-                    &period,
                     &context,
                     &WaterfallSpec::default(),
                     &mut state,
@@ -1197,7 +1197,7 @@ fn loan_swept_after_issuance_stays_repaid_in_later_periods() {
 #[test]
 fn named_prepayment_without_its_priority_is_rejected_before_state_changes() {
     for mandatory in [true, false] {
-        let (period, context, mut state, flows) = empty_debt_context();
+        let (_, context, mut state, flows) = empty_debt_context();
         let spec = WaterfallSpec {
             mandatory_prepay_node: mandatory.then(|| "20".into()),
             voluntary_prepay_node: (!mandatory).then(|| "20".into()),
@@ -1213,18 +1213,17 @@ fn named_prepayment_without_its_priority_is_rejected_before_state_changes() {
             .expect_err("sizing nodes require their payment priority")
             .to_string()
             .contains(node_name));
-        let error = execute_waterfall(&period, &context, &spec, &mut state, &flows)
+        let error = execute_waterfall(&context, &spec, &mut state, &flows)
             .expect_err("invalid waterfall must not allocate principal");
         assert!(error.to_string().contains(node_name));
         assert_eq!(state.opening_balances["TL"].amount(), 100.0);
         assert!(state.closing_balances.is_empty());
-        assert!(state.cumulative_principal.is_empty());
     }
 }
 
 #[test]
 fn named_prepayment_priorities_consume_the_shared_cash_pool() {
-    let (period, context, mut state, flows) = empty_debt_context();
+    let (_, context, mut state, flows) = empty_debt_context();
     let spec = WaterfallSpec {
         priority_of_payments: vec![
             PaymentPriority::Fees,
@@ -1238,7 +1237,7 @@ fn named_prepayment_priorities_consume_the_shared_cash_pool() {
         voluntary_prepay_node: Some("20".into()),
         ..Default::default()
     };
-    let result = execute_waterfall(&period, &context, &spec, &mut state, &flows)
+    let result = execute_waterfall(&context, &spec, &mut state, &flows)
         .expect("configured priorities cap their payments");
     let debt = &result.flows["TL"];
     let equity = result.equity_distribution.expect("waterfall residual");
@@ -1279,12 +1278,12 @@ fn positive_ecf_requires_sweep_even_with_other_prepayment_priorities() {
 
 #[test]
 fn ecf_sweep_priority_pays_the_sized_sweep_and_preserves_cash() {
-    let (period, context, mut state, flows) = empty_debt_context();
+    let (_, context, mut state, flows) = empty_debt_context();
     let spec = WaterfallSpec {
         ecf_sweep: Some(ecf_sweep()),
         ..Default::default()
     };
-    let result = execute_waterfall(&period, &context, &spec, &mut state, &flows)
+    let result = execute_waterfall(&context, &spec, &mut state, &flows)
         .expect("positive ECF has its Sweep priority");
     let debt = &result.flows["TL"];
     let equity = result.equity_distribution.expect("waterfall residual");

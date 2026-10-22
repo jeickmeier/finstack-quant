@@ -10,6 +10,3 @@ mod money_integration_tests;
 
 #[path = "integration/term_loan_integration_tests.rs"]
 mod term_loan_integration_tests;
-
-#[path = "integration/waterfall_tests.rs"]
-mod waterfall_tests;
