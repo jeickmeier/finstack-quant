@@ -79,7 +79,7 @@ pub(crate) mod compiler;
 mod parser;
 
 pub use crate::utils::formula::extract_all_identifiers;
-pub use ast::{BinOp, StmtExpr, UnaryOp};
+pub use ast::StmtExpr;
 pub use compiler::compile;
 pub use parser::parse_formula;
 

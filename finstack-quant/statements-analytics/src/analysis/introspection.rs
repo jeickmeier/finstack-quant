@@ -1,7 +1,8 @@
 //! Model introspection: dependency tracing, formula explanation, and tree visualization.
 
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_statements::dsl::{BinOp, StmtExpr};
+use finstack_quant_core::expr::BinOp;
+use finstack_quant_statements::dsl::StmtExpr;
 use finstack_quant_statements::evaluator::{CellSource, DependencyGraph, StatementResult};
 use finstack_quant_statements::types::{FinancialModelSpec, ForecastSpec, NodeType};
 use finstack_quant_statements::{Error, Result};

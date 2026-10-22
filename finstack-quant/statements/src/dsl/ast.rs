@@ -1,7 +1,7 @@
 //! Abstract Syntax Tree for the Statements DSL.
 
 use crate::types::NodeId;
-use serde::{Deserialize, Serialize};
+use finstack_quant_core::expr::{BinOp, UnaryOp};
 
 /// Statements DSL expression AST.
 ///
@@ -69,50 +69,6 @@ pub enum StmtExpr {
     },
 }
 
-/// Binary operators.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum BinOp {
-    /// Addition (+)
-    Add,
-    /// Subtraction (-)
-    Sub,
-    /// Multiplication (*)
-    Mul,
-    /// Division (/)
-    Div,
-    /// Modulo (%)
-    Mod,
-
-    /// Equal (==)
-    Eq,
-    /// Not equal (!=)
-    Ne,
-    /// Less than (<)
-    Lt,
-    /// Less than or equal (<=)
-    Le,
-    /// Greater than (>)
-    Gt,
-    /// Greater than or equal (>=)
-    Ge,
-
-    /// Logical AND
-    And,
-    /// Logical OR
-    Or,
-}
-
-/// Unary operators.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum UnaryOp {
-    /// Negation (-)
-    Neg,
-    /// Logical NOT
-    Not,
-}
-
 /// Binding strength used when rendering an expression back to source text.
 ///
 /// Higher binds tighter. Mirrors the parser's precedence ladder so the
@@ -135,23 +91,21 @@ fn precedence(expr: &StmtExpr) -> u8 {
     }
 }
 
-impl std::fmt::Display for BinOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Add => "+",
-            Self::Sub => "-",
-            Self::Mul => "*",
-            Self::Div => "/",
-            Self::Mod => "%",
-            Self::Eq => "==",
-            Self::Ne => "!=",
-            Self::Lt => "<",
-            Self::Le => "<=",
-            Self::Gt => ">",
-            Self::Ge => ">=",
-            Self::And => "and",
-            Self::Or => "or",
-        })
+fn binary_symbol(op: BinOp) -> &'static str {
+    match op {
+        BinOp::Add => "+",
+        BinOp::Sub => "-",
+        BinOp::Mul => "*",
+        BinOp::Div => "/",
+        BinOp::Mod => "%",
+        BinOp::Eq => "==",
+        BinOp::Ne => "!=",
+        BinOp::Lt => "<",
+        BinOp::Le => "<=",
+        BinOp::Gt => ">",
+        BinOp::Ge => ">=",
+        BinOp::And => "and",
+        BinOp::Or => "or",
     }
 }
 
@@ -181,7 +135,7 @@ impl std::fmt::Display for StmtExpr {
             Self::BinOp { op, left, right } => {
                 let level = precedence(self);
                 child(f, left, precedence(left) < level)?;
-                write!(f, " {op} ")?;
+                write!(f, " {} ", binary_symbol(*op))?;
                 // Left-associative: a right operand at the same level needs
                 // parentheses to preserve `a - (b - c)`.
                 child(f, right, precedence(right) <= level)
