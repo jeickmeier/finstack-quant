@@ -206,43 +206,13 @@ wire_methods!(PyPikToggleSpec, PikToggleSpec, "PikToggleSpec");
 
 #[pymethods]
 impl PyPikToggleSpec {
-    /// Construct a PIK toggle spec.
-    ///
-    /// Parameters
-    /// ----------
-    /// liquidity_metric : str
-    ///     Node reference or DSL formula for the liquidity signal (a balance
-    ///     such as ``"cash_balance"`` or a ratio such as
-    ///     ``"ebitda / interest_expense"``).
-    /// threshold : float
-    ///     PIK triggers when ``metric < threshold``. Expressed in the same
-    ///     units as ``liquidity_metric`` — currency amount for a balance,
-    ///     unitless for a ratio.
-    /// target_instrument_ids : list[str] | None
-    ///     Explicit nonempty borrowing-debt identifiers whose cash coupons may
-    ///     capitalize into principal. Instrument-level PIK capability is not
-    ///     modeled, so ``None`` and empty lists are rejected by :meth:`validate`
-    ///     and :meth:`WaterfallSpec.validate` (they do not mean "every
-    ///     instrument"); model validation also rejects hedge or option targets.
-    ///     Construction stores this specification unvalidated.
-    /// min_periods_in_pik : int
-    ///     Hysteresis floor counted in **periods** on the model's own cadence
-    ///     (not months): once triggered, PIK stays on for at least this many
-    ///     periods. Default 0 lets PIK toggle every period.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.__init__")]
     #[new]
-    #[pyo3(
-        signature = (
-            liquidity_metric,
-            threshold,
-            target_instrument_ids=None,
-            min_periods_in_pik=0,
-        ),
-        text_signature = "(liquidity_metric, threshold, target_instrument_ids=None, min_periods_in_pik=0)"
-    )]
+    #[pyo3(signature = (liquidity_metric, threshold, target_instrument_ids, min_periods_in_pik=0))]
     fn new(
         liquidity_metric: String,
         threshold: f64,
-        target_instrument_ids: Option<Vec<String>>,
+        target_instrument_ids: Vec<String>,
         min_periods_in_pik: usize,
     ) -> Self {
         Self {
@@ -255,69 +225,35 @@ impl PyPikToggleSpec {
         }
     }
 
-    /// Validate the toggle on its own (the Rust ``PikToggleSpec::validate``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``target_instrument_ids`` is ``None`` or empty.
-    #[pyo3(text_signature = "($self)")]
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.validate")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(statements_to_py)
     }
 
-    /// Node reference or DSL formula producing the liquidity signal.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     A node id (``"cash_balance"``) or an expression
-    ///     (``"ebitda / interest_expense"``). Whether the value is monetary
-    ///     or a unitless ratio depends on the expression — the threshold must
-    ///     use the same units.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.liquidity_metric")]
     #[getter]
     fn liquidity_metric(&self) -> &str {
         &self.inner.liquidity_metric
     }
 
-    /// Level below which interest accrues as PIK instead of cash.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Threshold in the **same units as the liquidity metric** — a
-    ///     currency amount when the metric is a balance, a unitless ratio
-    ///     when it is a coverage ratio. PIK triggers when
-    ///     ``metric < threshold``.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.threshold")]
     #[getter]
     fn threshold(&self) -> f64 {
         self.inner.threshold
     }
 
-    /// Explicit borrowing-debt targets, or ``None`` in an incomplete specification.
-    ///
-    /// ``None`` and empty lists fail waterfall validation. Model validation
-    /// rejects swaps and options because their cashflows cannot capitalize
-    /// into borrowing principal.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.target_instrument_ids")]
     #[getter]
-    fn target_instrument_ids(&self) -> Option<Vec<String>> {
+    fn target_instrument_ids(&self) -> Vec<String> {
         self.inner.target_instrument_ids.clone()
     }
 
-    /// Hysteresis floor: minimum time PIK stays on once triggered.
-    ///
-    /// Returns
-    /// -------
-    /// int
-    ///     Count in **periods** on the model's own cadence (quarters for a
-    ///     quarterly model), not months. ``0`` disables hysteresis, letting
-    ///     PIK toggle every period.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.min_periods_in_pik")]
     #[getter]
     fn min_periods_in_pik(&self) -> usize {
         self.inner.min_periods_in_pik
     }
 
-    /// Return the representation with metric, threshold and hysteresis.
     fn __repr__(&self) -> String {
         format!(
             "PikToggleSpec(liquidity_metric={:?}, threshold={}, min_periods_in_pik={})",

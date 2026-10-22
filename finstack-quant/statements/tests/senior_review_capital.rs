@@ -314,7 +314,7 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
         }),
         ..Default::default()
     };
-    for targets in [Some(vec!["IRS".into()]), None] {
+    for targets in [vec!["IRS".into()], Vec::new()] {
         let error = {
             let mut model_builder = ModelBuilder::new("hedge-pik");
             model_builder.add_debt(
@@ -333,7 +333,7 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
                 .build()
                 .expect_err("hedge payments cannot become borrowing principal")
         };
-        assert!(error.to_string().contains(if targets.is_some() {
+        assert!(error.to_string().contains(if !targets.is_empty() {
             "hedge or option"
         } else {
             "must explicitly list"
@@ -342,7 +342,7 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
     {
         let mut model_builder = ModelBuilder::new("debt-pik");
         model_builder.add_debt("TL", FinancialStatementInstrument::TermLoan(loan(as_of)));
-        model_builder.waterfall(waterfall(Some(vec!["TL".into()])));
+        model_builder.waterfall(waterfall(vec!["TL".into()]));
         model_builder
             .periods("2025..2025", None)
             .expect("annual period");

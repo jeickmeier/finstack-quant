@@ -5515,7 +5515,7 @@ class PikToggleSpec:
         self,
         liquidity_metric: str,
         threshold: float,
-        target_instrument_ids: list[str] | None = None,
+        target_instrument_ids: list[str],
         min_periods_in_pik: int = 0,
     ) -> None:
         """
@@ -5527,10 +5527,10 @@ class PikToggleSpec:
             Model metric or node identifier compared with the trigger threshold.
         threshold : float
             Liquidity threshold in the metric's units that activates PIK logic.
-        target_instrument_ids : list[str] or None, default None
+        target_instrument_ids : list[str]
             Explicit nonempty borrowing-debt identifiers whose cash coupons may
             capitalize into principal. Instrument-level PIK capability is not
-            modeled, so ``None`` or an empty list is rejected by
+            modeled, so an empty list is rejected by
             :meth:`validate` and :meth:`WaterfallSpec.validate` (it does not
             mean "every instrument"); model validation also rejects hedge or
             option targets. Construction stores the specification unvalidated.
@@ -5539,9 +5539,11 @@ class PikToggleSpec:
             (not months): once triggered, PIK stays on for at least this many
             periods. Default 0 lets PIK toggle every period.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        TypeError
+            If targets are omitted or are not a list of strings. Domain validation
+            is performed by :meth:`validate`.
         """
         ...
     @staticmethod
@@ -5568,7 +5570,7 @@ class PikToggleSpec:
         Examples
         --------
         >>> from finstack_quant.statements import PikToggleSpec
-        >>> toggle = PikToggleSpec("cash", 100.0)
+        >>> toggle = PikToggleSpec("cash", 100.0, ["TL"])
         >>> PikToggleSpec.from_json(toggle.to_json()).threshold
         100.0
 
@@ -5583,7 +5585,7 @@ class PikToggleSpec:
         Raises
         ------
         ValueError
-            If ``target_instrument_ids`` is ``None`` or empty.
+            If ``target_instrument_ids`` is empty.
         """
         ...
 
@@ -5661,14 +5663,13 @@ class PikToggleSpec:
 
     def __repr__(self) -> str: ...
     @property
-    def target_instrument_ids(self) -> list[str] | None:
+    def target_instrument_ids(self) -> list[str]:
         """Return explicit borrowing-debt targets for coupon capitalization.
 
         Returns
         -------
-        list[str] | None
-            Stored identifiers, or None in an incomplete specification. None and
-            empty lists fail waterfall validation; swaps and options fail model
+        list[str]
+            Stored identifiers. Empty lists fail waterfall validation; swaps and options fail model
             validation because they cannot capitalize into borrowing principal.
 
         Notes

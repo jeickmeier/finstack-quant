@@ -1379,7 +1379,7 @@ export default [
   {
     "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/target_instrument_ids",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec/properties/target_instrument_ids",
-    "description": "Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.\n\nMust be a non-empty list: instrument-level PIK capability is not\nmodeled, so `None` or an empty list is rejected by\n[`PikToggleSpec::validate`] rather than meaning \"every instrument\".\nSwaps and options cannot be PIK targets."
+    "description": "Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.\n\nMust be a non-empty list: instrument-level PIK capability is not\nmodeled, so an empty list is rejected by [`PikToggleSpec::validate`]\nrather than meaning \"every instrument\".\nSwaps and options cannot be PIK targets."
   },
   {
     "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/target_instrument_ids/items",

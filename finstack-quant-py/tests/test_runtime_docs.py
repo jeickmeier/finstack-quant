@@ -98,6 +98,11 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
     ),
     "finstack_quant.statements": (
         "CapitalStructureCashflows.get_component",
+        "PikToggleSpec.validate",
+        "PikToggleSpec.liquidity_metric",
+        "PikToggleSpec.threshold",
+        "PikToggleSpec.target_instrument_ids",
+        "PikToggleSpec.min_periods_in_pik",
         "ModelBuilder",
         "MixedNodeBuilder",
         "Registry.get_dependencies",

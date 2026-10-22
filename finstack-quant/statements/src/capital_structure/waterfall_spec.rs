@@ -471,11 +471,11 @@ pub struct PikToggleSpec {
     /// Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.
     ///
     /// Must be a non-empty list: instrument-level PIK capability is not
-    /// modeled, so `None` or an empty list is rejected by
-    /// [`PikToggleSpec::validate`] rather than meaning "every instrument".
+    /// modeled, so an empty list is rejected by [`PikToggleSpec::validate`]
+    /// rather than meaning "every instrument".
     /// Swaps and options cannot be PIK targets.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub target_instrument_ids: Option<Vec<String>>,
+    #[cfg_attr(feature = "json-schema", schemars(length(min = 1)))]
+    pub target_instrument_ids: Vec<String>,
 
     /// Minimum number of periods PIK must stay active once triggered (hysteresis).
     /// Prevents oscillation when the metric hovers near the threshold.
@@ -492,13 +492,9 @@ impl PikToggleSpec {
     ///
     /// # Errors
     ///
-    /// Returns a build error when `target_instrument_ids` is `None` or empty.
+    /// Returns a build error when `target_instrument_ids` is empty.
     pub fn validate(&self) -> Result<()> {
-        if self
-            .target_instrument_ids
-            .as_ref()
-            .is_none_or(|targets| targets.is_empty())
-        {
+        if self.target_instrument_ids.is_empty() {
             return Err(Error::build(
                 "PikToggleSpec: `target_instrument_ids` must explicitly list the \
                  instruments that can PIK. Instrument-level PIK capability is not \
@@ -610,7 +606,7 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: None,
+                target_instrument_ids: Vec::new(),
                 min_periods_in_pik: 0,
             }),
             ..spec_with(default_priority_of_payments())
@@ -637,12 +633,12 @@ mod tests {
         let mut pik = PikToggleSpec {
             liquidity_metric: "liquidity".into(),
             threshold: 100.0,
-            target_instrument_ids: Some(Vec::new()),
+            target_instrument_ids: Vec::new(),
             min_periods_in_pik: 0,
         };
         let err = pik.validate().expect_err("empty PIK targets are rejected");
         assert!(err.to_string().contains("target_instrument_ids"), "{err}");
-        pik.target_instrument_ids = Some(vec!["TL-PIK".into()]);
+        pik.target_instrument_ids = vec!["TL-PIK".into()];
         pik.validate().expect("explicit PIK targets are valid");
     }
 
@@ -715,5 +711,26 @@ mod tests {
             .validate()
             .expect_err("duplicate class ids must be rejected");
         assert!(err.to_string().contains("duplicate payment class id"));
+    }
+    #[test]
+    fn pik_targets_are_required_on_the_wire_and_nonempty_when_validated() {
+        for value in [
+            serde_json::json!({"liquidity_metric":"cash","threshold":1.0}),
+            serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":null}),
+        ] {
+            assert!(serde_json::from_value::<PikToggleSpec>(value).is_err());
+        }
+        let mut value = serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":[]});
+        assert!(serde_json::from_value::<PikToggleSpec>(value.clone())
+            .expect("vector parses")
+            .validate()
+            .is_err());
+        value["target_instrument_ids"] = serde_json::json!(["TL"]);
+        let spec: PikToggleSpec = serde_json::from_value(value.clone()).expect("explicit targets");
+        spec.validate().expect("valid targets");
+        assert_eq!(
+            serde_json::to_value(spec).expect("serialize")["target_instrument_ids"],
+            value["target_instrument_ids"]
+        );
     }
 }

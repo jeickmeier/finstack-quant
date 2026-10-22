@@ -324,7 +324,7 @@ fn execute_waterfall_inner(
     if let Some(targets) = waterfall_spec
         .pik_toggle
         .as_ref()
-        .and_then(|p| p.target_instrument_ids.as_ref())
+        .map(|p| &p.target_instrument_ids)
     {
         for target in targets {
             if !contractual_flows.contains_key(target) {
@@ -355,17 +355,14 @@ fn execute_waterfall_inner(
     // Evaluate PIK mode BEFORE ECF so that ECF cash-interest deduction
     // correctly reflects actual cash interest paid (instruments in PIK mode
     // pay zero cash interest that period).
-    let (pik_enable, pik_targets): (Option<bool>, Option<HashSet<String>>) =
+    let (pik_enable, pik_targets): (Option<bool>, HashSet<String>) =
         if let Some(pik_spec) = &waterfall_spec.pik_toggle {
             (
                 Some(evaluate_pik_toggle(context, pik_spec, &mut warnings)?),
-                pik_spec
-                    .target_instrument_ids
-                    .as_ref()
-                    .map(|ids| ids.iter().cloned().collect()),
+                pik_spec.target_instrument_ids.iter().cloned().collect(),
             )
         } else {
-            (None, None)
+            (None, HashSet::new())
         };
 
     // Apply PIK mode transitions to `state` before using it for ECF.
@@ -380,7 +377,7 @@ fn execute_waterfall_inner(
             state,
             contractual_flows,
             enable_pik,
-            pik_targets.as_ref(),
+            &pik_targets,
             min_periods_in_pik,
         );
     }
@@ -1318,7 +1315,7 @@ mod tests {
                 liquidity_metric: "cash".into(),
                 threshold: 1_000_000.0, // always below => PIK on
                 min_periods_in_pik: 0,
-                target_instrument_ids: Some(vec!["TL-1".to_string()]),
+                target_instrument_ids: vec!["TL-1".to_string()],
             }),
             ..Default::default()
         };
@@ -1367,7 +1364,7 @@ mod tests {
                 liquidity_metric: "liquidity / 0".into(),
                 threshold: 1.0,
                 min_periods_in_pik: 0,
-                target_instrument_ids: Some(vec!["TL-1".to_string()]),
+                target_instrument_ids: vec!["TL-1".to_string()],
             }),
             ..Default::default()
         };
@@ -1470,7 +1467,7 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-PIK".into()]),
+                target_instrument_ids: vec!["TL-PIK".into()],
                 min_periods_in_pik: 0,
             }),
             ..Default::default()
@@ -1530,7 +1527,7 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-PIK".into()]),
+                target_instrument_ids: vec!["TL-PIK".into()],
                 min_periods_in_pik: 3,
             }),
             ..Default::default()
@@ -1720,7 +1717,7 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-1".into()]),
+                target_instrument_ids: vec!["TL-1".into()],
                 min_periods_in_pik: 0,
             }),
             ..Default::default()
@@ -2421,7 +2418,7 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-PIK".into()]),
+                target_instrument_ids: vec!["TL-PIK".into()],
                 min_periods_in_pik: 0,
             }),
             ..Default::default()
@@ -2821,7 +2818,7 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-1".into()]),
+                target_instrument_ids: vec!["TL-1".into()],
                 min_periods_in_pik: 3,
             }),
             mandatory_prepay_node: Some("0".into()),

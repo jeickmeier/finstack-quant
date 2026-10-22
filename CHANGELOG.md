@@ -31,6 +31,8 @@
 
 #### Changed
 
+- `PikToggleSpec.target_instrument_ids` is a required list across Rust, Python, and JSON. Missing and null target lists are rejected; validation requires at least one borrowing-debt target.
+
 - Waterfall failures leave capital-structure runtime state unchanged. Successful allocations commit balances, PIK state, and carried claims together.
 
 - Accounting identity checks report period-level error findings when sums, differences, tolerances, or materiality calculations overflow. They publish no non-finite comparison payload for that period and continue checking later periods.

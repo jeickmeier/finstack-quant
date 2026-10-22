@@ -279,7 +279,7 @@ fn pik_preserves_earned_accrual_in_coupon_and_noncoupon_periods() {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "cash".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["loan".into()]),
+                target_instrument_ids: vec!["loan".into()],
                 min_periods_in_pik: 0,
             }),
             ..Default::default()
