@@ -270,15 +270,45 @@ pub(crate) fn rolling_sortino(
     }
     let w = window as f64;
     let mut out = DatedSeries::with_capacity(RollingMetric::Sortino, n - window + 1);
-    let mut date_idx = window - 1;
-    rolling_sortino_kernel(returns, n, window, mar, |sum, sum_ds| {
-        let m = sum / w - mar;
+    let (mut sum, mut sum_ds) = recompute_sum_sum_ds(&returns[..window], mar);
+    let mut downside_scale = sum_ds;
+    let mut steps_since_recompute = 0_usize;
+    for i in window - 1..n {
+        if i >= window {
+            let add = returns[i];
+            let rem = returns[i - window];
+            // Keep insertion and removal separate so a departing positive outlier
+            // cannot erase the small returns retained in the compensation term.
+            sum.add(add);
+            sum.add(-rem);
+            if add < mar {
+                let d = mar - add;
+                sum_ds += d * d;
+            }
+            downside_scale = downside_scale.max(sum_ds);
+            if rem < mar {
+                let d = mar - rem;
+                sum_ds -= d * d;
+            }
+            steps_since_recompute += 1;
+            if !sum.total().is_finite()
+                || !sum_ds.is_finite()
+                || sum_ds < 0.0
+                || (downside_scale > 0.0 && sum_ds <= f64::EPSILON.sqrt() * downside_scale)
+                || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
+            {
+                let start = i + 1 - window;
+                (sum, sum_ds) = recompute_sum_sum_ds(&returns[start..=i], mar);
+                downside_scale = sum_ds;
+                steps_since_recompute = 0;
+            }
+        }
+        let m = sum.total() / w - mar;
         let dd = (sum_ds / w).sqrt();
         out.values
             .push(annualized_ratio_or_sign_infinity(m, dd, ann_factor));
-        out.dates.push(dates[date_idx]);
-        date_idx += 1;
-    });
+        out.dates.push(dates[i]);
+    }
     out
 }
 
@@ -384,50 +414,6 @@ where
             steps_since_recompute = 0;
         }
         emit(mean, m2);
-    }
-}
-
-/// Kernel for the Sortino sliding window.
-///
-/// Maintains `(sum, sum_ds)` where `sum_ds = Σ min(r - mar,0)²` and calls
-/// `emit(sum, sum_ds)` for every completed window.
-fn rolling_sortino_kernel<F>(returns: &[f64], n: usize, window: usize, mar: f64, mut emit: F)
-where
-    F: FnMut(f64, f64),
-{
-    let (mut sum, mut sum_ds) = recompute_sum_sum_ds(&returns[..window], mar);
-    let mut downside_scale = sum_ds;
-    emit(sum.total(), sum_ds);
-    let mut steps_since_recompute = 0_usize;
-    for i in window..n {
-        let add = returns[i];
-        let rem = returns[i - window];
-        // Keep insertion and removal separate so a departing positive outlier
-        // cannot erase the small returns retained in the compensation term.
-        sum.add(add);
-        sum.add(-rem);
-        if add < mar {
-            let d = mar - add;
-            sum_ds += d * d;
-        }
-        downside_scale = downside_scale.max(sum_ds);
-        if rem < mar {
-            let d = mar - rem;
-            sum_ds -= d * d;
-        }
-        steps_since_recompute += 1;
-        if !sum.total().is_finite()
-            || !sum_ds.is_finite()
-            || sum_ds < 0.0
-            || (downside_scale > 0.0 && sum_ds <= f64::EPSILON.sqrt() * downside_scale)
-            || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
-        {
-            let start = i + 1 - window;
-            (sum, sum_ds) = recompute_sum_sum_ds(&returns[start..=i], mar);
-            downside_scale = sum_ds;
-            steps_since_recompute = 0;
-        }
-        emit(sum.total(), sum_ds);
     }
 }
 
