@@ -98,7 +98,7 @@
 - Rust is the canonical API design. Type and function names in Python/WASM must match Rust exactly (exceptions only for documented host-language collisions)
 - All logic stays in Rust crates; bindings do only type conversion, wrapper construction, error mapping
 - Python binding tree: `finstack-quant-py/src/bindings/{core,analytics,margin,...}/`; `lib.rs` delegates to `bindings::register_root`
-- WASM binding tree: `finstack-quant-wasm/src/api/{core_ns,analytics,margin,...}/`; public API via `index.js` facade, not raw pkg/
+- WASM binding tree: `finstack-quant-wasm/src/api/{core,analytics,margin,...}/`; public API via `index.js` facade, not raw pkg/
 - Wrapper pattern: `pub(crate) inner: RustType` with `from_inner()` constructor
 - Error handling: centralized `core_to_py()` in `errors.rs` (Python), `JsValue::from_str` (WASM); never use `.unwrap()` or `.expect()` in non-test binding code
 - Module registration: every submodule sets `__all__` via `PyList` in `register()`; no dynamic export discovery

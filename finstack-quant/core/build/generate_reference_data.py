@@ -13,9 +13,6 @@ from pathlib import Path
 import re
 
 CRATE_ROOT = Path(__file__).resolve().parents[1]
-# The WASM currency factories derive from the same CSV; written only when the
-# sibling crate is present (tests redirect CRATE_ROOT to a scratch directory).
-WASM_CURRENCY_STATICS = CRATE_ROOT.parent.parent / "finstack-quant-wasm/src/api/core/currency_statics.rs"
 # The cache year range is read from the crate that ships this script, not from
 # `CRATE_ROOT` (which tests redirect to a scratch directory).
 ALGO_SOURCE = Path(__file__).resolve().parents[1] / "src" / "dates" / "calendar" / "algo.rs"
@@ -270,27 +267,37 @@ def main() -> None:
     """Write tables, or fail without mutation when --check detects drift."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--crate-root", type=Path, default=CRATE_ROOT)
+    parser.add_argument("--wasm-root", type=Path)
     args = parser.parse_args()
+    crate_root = args.crate_root.resolve()
+    wasm_root = (args.wasm_root or crate_root.parent.parent / "finstack-quant-wasm").resolve()
+    generated = crate_root / "src/generated"
+    currencies = currency_rows(crate_root / "data/iso_4217.csv")
     outputs = {
-        "currency_generated.rs": render_currency(currency_rows(CRATE_ROOT / "data/iso_4217.csv")),
-        WASM_CURRENCY_STATICS: render_wasm_currency_factories(currency_rows(CRATE_ROOT / "data/iso_4217.csv")),
-        "cny_generated.rs": render_cny(date_rows(CRATE_ROOT / "data/chinese_new_year.csv")),
-        "festivals_generated.rs": render_festivals({
-            name: date_rows(CRATE_ROOT / "data" / f"{name}.csv") for name in FESTIVAL_TABLES
+        generated / "currency_generated.rs": render_currency(currencies),
+        generated / "cny_generated.rs": render_cny(date_rows(crate_root / "data/chinese_new_year.csv")),
+        generated / "festivals_generated.rs": render_festivals({
+            name: date_rows(crate_root / "data" / f"{name}.csv") for name in FESTIVAL_TABLES
         }),
     }
+    # Core can be generated without a sibling WASM checkout.
+    wasm_directory = wasm_root / "src/api/core"
+    if wasm_directory.is_dir():
+        outputs[wasm_directory / "currency_statics.rs"] = render_wasm_currency_factories(currencies)
     stale = []
-    for name, expected in outputs.items():
-        path = name if isinstance(name, Path) else CRATE_ROOT / "src/generated" / name
-        if isinstance(name, Path) and not path.parent.is_dir():
+    for path, expected in outputs.items():
+        actual = path.read_text(encoding="utf-8") if path.exists() else None
+        if actual == expected:
             continue
         if args.check:
-            if not path.exists() or path.read_text(encoding="utf-8") != expected:
-                stale.append(name)
+            stale.append(path)
         else:
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(expected, encoding="utf-8")
     if stale:
-        raise SystemExit(f"Stale generated reference data: {', '.join(stale)}; run mise run gen-write")
+        paths = ", ".join(str(path) for path in stale)
+        raise SystemExit(f"Stale generated reference data: {paths}; run mise run gen-write")
 
 
 if __name__ == "__main__":

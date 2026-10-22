@@ -29,42 +29,68 @@ def test_missing_calendar_year_rejected(tmp_path: Path) -> None:
         reference_data.date_rows(path)
 
 
-@pytest.mark.parametrize("table", ["currency_generated.rs", "cny_generated.rs", "festivals_generated.rs"])
-def test_check_detects_drift_without_overwriting_it(tmp_path: Path, table: str) -> None:
-    """Report stale generated files without modifying them during verification."""
-    (tmp_path / "src/generated").mkdir(parents=True)
-    (tmp_path / "data").mkdir()
+@pytest.fixture
+def generation_roots(tmp_path: Path) -> tuple[Path, Path]:
+    """Copy authoritative inputs into isolated Rust and WASM output roots."""
+    crate_root = tmp_path / "core"
+    wasm_root = tmp_path / "wasm"
+    (crate_root / "data").mkdir(parents=True)
+    (wasm_root / "src/api/core").mkdir(parents=True)
     for filename in [
         "iso_4217.csv",
         "chinese_new_year.csv",
         *[f"{name}.csv" for name in reference_data.FESTIVAL_TABLES],
     ]:
-        (tmp_path / "data" / filename).write_bytes((reference_data.CRATE_ROOT / "data" / filename).read_bytes())
-    with (
-        patch.object(reference_data, "CRATE_ROOT", tmp_path),
-        patch.object(reference_data, "WASM_CURRENCY_STATICS", tmp_path / "currency_statics.rs"),
-        patch("sys.argv", ["generate"]),
-    ):
+        (crate_root / "data" / filename).write_bytes((reference_data.CRATE_ROOT / "data" / filename).read_bytes())
+    return crate_root, wasm_root
+
+
+def run_generator(roots: tuple[Path, Path], *, check: bool = False) -> None:
+    """Invoke the production CLI with both destinations explicitly isolated."""
+    crate_root, wasm_root = roots
+    arguments = ["generate", "--crate-root", str(crate_root), "--wasm-root", str(wasm_root)]
+    if check:
+        arguments.append("--check")
+    with patch("sys.argv", arguments):
         reference_data.main()
-        output = tmp_path / "src/generated" / table
-        output.write_text("stale table\n")
-        with patch("sys.argv", ["generate", "--check"]), pytest.raises(SystemExit, match="Stale generated"):
-            reference_data.main()
-        assert output.read_text() == "stale table\n"
+
+
+@pytest.mark.parametrize(
+    "table", ["currency_generated.rs", "cny_generated.rs", "festivals_generated.rs", "currency_statics.rs"]
+)
+def test_check_detects_drift_without_overwriting_it(generation_roots: tuple[Path, Path], table: str) -> None:
+    """Report stale Rust or WASM files without changing their bytes."""
+    crate_root, wasm_root = generation_roots
+    run_generator(generation_roots)
+    directory = wasm_root / "src/api/core" if table == "currency_statics.rs" else crate_root / "src/generated"
+    output = directory / table
+    output.write_text("stale table\n")
+    with pytest.raises(SystemExit, match="Stale generated reference data") as error:
+        run_generator(generation_roots, check=True)
+    assert str(output) in str(error.value)
+    assert output.read_text() == "stale table\n"
+
+
+def test_generation_is_isolated_and_idempotent(generation_roots: tuple[Path, Path], tmp_path: Path) -> None:
+    """Explicit roots override defaults, and unchanged output is never rewritten."""
+    with patch.object(reference_data, "CRATE_ROOT", tmp_path / "unselected"):
+        run_generator(generation_roots)
+        outputs = [path for root in generation_roots for path in root.rglob("*.rs")]
+        before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in outputs}
+        run_generator(generation_roots)
+        run_generator(generation_roots, check=True)
+    assert len(outputs) == 4
+    assert before == {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in outputs}
+    assert not (tmp_path / "unselected").exists()
 
 
 @pytest.mark.parametrize("name", reference_data.FESTIVAL_TABLES)
-def test_every_festival_input_requires_the_complete_year_range(tmp_path: Path, name: str) -> None:
-    """The drift gate rejects a missing year in any maintained festival table."""
-    (tmp_path / "src/generated").mkdir(parents=True)
-    (tmp_path / "data").mkdir()
-    for filename in ["iso_4217.csv", "chinese_new_year.csv", *[f"{n}.csv" for n in reference_data.FESTIVAL_TABLES]]:
-        (tmp_path / "data" / filename).write_bytes((reference_data.CRATE_ROOT / "data" / filename).read_bytes())
-    path = tmp_path / "data" / f"{name}.csv"
+def test_every_festival_input_requires_the_complete_year_range(generation_roots: tuple[Path, Path], name: str) -> None:
+    """Reject a missing year before writing any Rust or WASM output."""
+    crate_root, wasm_root = generation_roots
+    path = crate_root / "data" / f"{name}.csv"
     path.write_text("\n".join(path.read_text().splitlines()[:-1]) + "\n")
-    with (
-        patch.object(reference_data, "CRATE_ROOT", tmp_path),
-        patch("sys.argv", ["generate", "--check"]),
-        pytest.raises(ValueError, match="one date per year"),
-    ):
-        reference_data.main()
+    with pytest.raises(ValueError, match="one date per year"):
+        run_generator(generation_roots)
+    assert not list(crate_root.rglob("*.rs"))
+    assert not list(wasm_root.rglob("*.rs"))
