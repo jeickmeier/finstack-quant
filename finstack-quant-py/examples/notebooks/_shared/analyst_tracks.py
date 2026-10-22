@@ -39,6 +39,7 @@ from finstack_quant.portfolio import Portfolio
 from finstack_quant.valuations.instruments import (
     AssetPool,
     ConvertibleBond,
+    StandardDealParams,
     StructuredCredit,
     Tranche,
     TrancheStructure,
@@ -432,7 +433,9 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
             .detach_pct(detach)
             .build()
         )
-    deal = StructuredCredit.new_clo("ANALYST-CLO", pool, TrancheStructure(notes), AS_OF, maturity, "USD-OIS")
+    deal = StructuredCredit.new_standard(
+        "clo", StandardDealParams("ANALYST-CLO", pool, TrancheStructure(notes), AS_OF, maturity, "USD-OIS")
+    )
     payload = json.loads(deal.to_json())
     spec = payload["instrument"]["spec"]
     spec.update({

@@ -23,7 +23,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Tra
 /// >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
 /// >>> from finstack_quant.core.money import Money
 /// >>> from finstack_quant.valuations.instruments import (
-/// ...     AssetPool, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+/// ...     AssetPool, PoolAsset, StandardDealParams, StructuredCredit, Tranche, TrancheStructure,
 /// ... )
 /// >>> as_of, maturity = datetime.date(2024, 1, 15), datetime.date(2031, 1, 15)
 /// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_assets([
@@ -34,8 +34,12 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Tra
 /// ...     .seniority("senior").original_balance(Money(80_000_000.0, Currency("USD")))
 /// ...     .coupon_fixed(0.05).maturity(maturity).build()
 /// ... )
-/// >>> deal = StructuredCredit.new_clo(
-/// ...     "CLO-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC", calendar_id="nyse"
+/// >>> deal = StructuredCredit.new_standard(
+/// ...     "clo",
+/// ...     StandardDealParams(
+/// ...         "CLO-1", pool, TrancheStructure([note]), as_of, maturity,
+/// ...         "USD-SOFR-DISC", calendar_id="nyse",
+/// ...     ),
 /// ... )
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
 /// >>> flows = deal.tranche_cashflows("A", market, as_of)

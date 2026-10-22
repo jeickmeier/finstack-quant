@@ -68,13 +68,17 @@ fn discount_curve(base_date: Date) -> DiscountCurve {
 fn build_sc(id: &str, pool_balance: f64) -> StructuredCredit {
     let pool = simple_pool(pool_balance);
     let tranches = single_tranche_structure(pool_balance);
-    StructuredCredit::new_abs(
-        id,
-        pool,
-        tranches,
-        closing_date(),
-        legal_maturity(),
-        "USD-OIS",
+    StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: id.into(),
+            pool,
+            tranches,
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
@@ -240,37 +244,53 @@ fn enable_stochastic_populates_specs_for_each_deal_family() {
     let tranches = || single_tranche_structure(1_000_000.0);
     let (close, legal) = (closing_date(), legal_maturity());
     for sc in [
-        StructuredCredit::new_rmbs(
-            "RMBS",
-            pool(DealType::Rmbs),
-            tranches(),
-            close,
-            legal,
-            "USD-OIS",
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "RMBS".into(),
+                pool: pool(DealType::Rmbs),
+                tranches: tranches(),
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         ),
-        StructuredCredit::new_clo(
-            "CLO",
-            pool(DealType::Clo),
-            tranches(),
-            close,
-            legal,
-            "USD-OIS",
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO".into(),
+                pool: pool(DealType::Clo),
+                tranches: tranches(),
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         ),
-        StructuredCredit::new_cmbs(
-            "CMBS",
-            pool(DealType::Cmbs),
-            tranches(),
-            close,
-            legal,
-            "USD-OIS",
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CMBS".into(),
+                pool: pool(DealType::Cmbs),
+                tranches: tranches(),
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         ),
-        StructuredCredit::new_abs(
-            "CARD",
-            pool(DealType::Card),
-            tranches(),
-            close,
-            legal,
-            "USD-OIS",
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CARD".into(),
+                pool: pool(DealType::Card),
+                tranches: tranches(),
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         ),
     ] {
         let mut sc = sc.expect("valid structured-credit dates");
@@ -500,13 +520,17 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
     )
     .unwrap();
 
-    let mut sc = StructuredCredit::new_abs(
-        "ABS-LARGE-PV",
-        pool,
-        TrancheStructure::new(vec![tranche]).unwrap(),
-        close,
-        maturity,
-        "USD-OIS",
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-LARGE-PV".into(),
+            pool,
+            tranches: TrancheStructure::new(vec![tranche]).unwrap(),
+            closing_date: close,
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -606,13 +630,17 @@ fn philox_rng_discipline_determinism_and_stream_sanity() {
         maturity,
     )
     .unwrap();
-    let mut sc = StructuredCredit::new_abs(
-        "ABS-PHILOX",
-        pool,
-        TrancheStructure::new(vec![tranche]).unwrap(),
-        close,
-        maturity,
-        "USD-OIS",
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-PHILOX".into(),
+            pool,
+            tranches: TrancheStructure::new(vec![tranche]).unwrap(),
+            closing_date: close,
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -963,7 +991,7 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             ])
             .unwrap();
             let mut sc =
-                StructuredCredit::new_abs("REFERENCE", pool, tranches, start, end, "USD-OIS")
+                StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "REFERENCE".into(), pool, tranches, closing_date: start, maturity: end, discount_curve_id: "USD-OIS".into(), calendar_id: None })
                     .expect("valid structured-credit dates")
                     .with_calendar_id("nyse");
             sc.frequency = Tenor::quarterly();

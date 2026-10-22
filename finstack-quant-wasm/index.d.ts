@@ -22016,29 +22016,8 @@ export interface StructuredCredit extends WasmOwned {
  *   .maturity("2029-01-01")
  *   .build();
  * const zero = { amount: "0", currency: "USD" as const };
- * const structuredCredit = valuations.instruments.StructuredCredit.newClo(
- *   "DEAL-1",
- *   {
- *     id: "POOL-1",
- *     deal_type: "clo",
- *     currency: "USD",
- *     assets: [],
- *     cumulative_defaults: zero,
- *     cumulative_recoveries: zero,
- *     cumulative_prepayments: zero,
- *     cumulative_scheduled_amortization: zero,
- *     collection_account: zero,
- *     reserve_account: zero,
- *     excess_spread_account: zero,
- *     reserve_account_rate: 0,
- *     reserve_interest_destination: { kind: "waterfall" },
- *   },
- *   valuations.instruments.trancheStructureFromBalances([tranche]),
- *   "2024-01-01",
- *   "2029-01-01",
- *   "USD-OIS"
- * );
- * console.log(structuredCredit.id, structuredCredit.dealType); // "DEAL-1", "clo"
+ * const structuredCredit = valuations.instruments.StructuredCredit.example();
+ * console.log(structuredCredit.id, structuredCredit.dealType); // "CLO-EXAMPLE", "clo"
  * structuredCredit.free();
  * ```
  */
@@ -22070,88 +22049,28 @@ export interface StructuredCreditConstructor {
    */
   example(): StructuredCredit;
   /**
-   * Create an asset-backed security deal (mirrors Rust `StructuredCredit::new_abs`).
-   * @param id - Unique instrument identifier.
-   * @param pool - Collateral `AssetPool` (plain object or JSON string).
-   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
-   * @param closingDate - Deal closing date as an ISO-8601 string.
-   * @param maturity - Legal final maturity as an ISO-8601 string.
-   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
-   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
-   * @returns The validated deal with the deal type's standard waterfall and assumptions.
-   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
+   * Construct a validated standard structured-credit deal from registry assumptions.
+   * @example
+   * ```typescript
+   * import init, { valuations } from "finstack-quant-wasm";
+   * await init();
+   * const example = valuations.instruments.StructuredCredit.example();
+   * const { id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id } = example.toDict();
+   * const deal = valuations.instruments.StructuredCredit.newStandard("clo", {
+   *   id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id,
+   * });
+   * console.log(deal.dealType); // "clo"
+   * deal.free();
+   * example.free();
+   * ```
+   * @param dealType - Registry family: `abs`, `clo`, `cmbs` or `rmbs`; other deal types are rejected.
+   * @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar.
+   * @returns The deal with its selected registry assumptions and validated structure.
+   * @throws Error - Throws with kind `validation` for an unsupported profile, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
    */
-  newAbs(
-    id: string,
-    pool: generated.valuations.AssetPool | string,
-    tranches: generated.valuations.TrancheStructure | string,
-    closingDate: string,
-    maturity: string,
-    discountCurveId: string,
-    calendarId?: string | null
-  ): StructuredCredit;
-  /**
-   * Create a collateralized loan obligation (mirrors Rust `StructuredCredit::new_clo`).
-   * @param id - Unique instrument identifier.
-   * @param pool - Collateral `AssetPool` (plain object or JSON string).
-   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
-   * @param closingDate - Deal closing date as an ISO-8601 string.
-   * @param maturity - Legal final maturity as an ISO-8601 string.
-   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
-   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
-   * @returns The validated deal with the deal type's standard waterfall and assumptions.
-   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
-   */
-  newClo(
-    id: string,
-    pool: generated.valuations.AssetPool | string,
-    tranches: generated.valuations.TrancheStructure | string,
-    closingDate: string,
-    maturity: string,
-    discountCurveId: string,
-    calendarId?: string | null
-  ): StructuredCredit;
-  /**
-   * Create a commercial mortgage-backed security deal (mirrors Rust `StructuredCredit::new_cmbs`).
-   * @param id - Unique instrument identifier.
-   * @param pool - Collateral `AssetPool` (plain object or JSON string).
-   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
-   * @param closingDate - Deal closing date as an ISO-8601 string.
-   * @param maturity - Legal final maturity as an ISO-8601 string.
-   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
-   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
-   * @returns The validated deal with the deal type's standard waterfall and assumptions.
-   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
-   */
-  newCmbs(
-    id: string,
-    pool: generated.valuations.AssetPool | string,
-    tranches: generated.valuations.TrancheStructure | string,
-    closingDate: string,
-    maturity: string,
-    discountCurveId: string,
-    calendarId?: string | null
-  ): StructuredCredit;
-  /**
-   * Create a residential mortgage-backed security deal (mirrors Rust `StructuredCredit::new_rmbs`).
-   * @param id - Unique instrument identifier.
-   * @param pool - Collateral `AssetPool` (plain object or JSON string).
-   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
-   * @param closingDate - Deal closing date as an ISO-8601 string.
-   * @param maturity - Legal final maturity as an ISO-8601 string.
-   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
-   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
-   * @returns The validated deal with the deal type's standard waterfall and assumptions.
-   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
-   */
-  newRmbs(
-    id: string,
-    pool: generated.valuations.AssetPool | string,
-    tranches: generated.valuations.TrancheStructure | string,
-    closingDate: string,
-    maturity: string,
-    discountCurveId: string,
-    calendarId?: string | null
+  newStandard(
+    dealType: 'abs' | 'clo' | 'cmbs' | 'rmbs',
+    params: generated.valuations.StandardDealParams | string
   ): StructuredCredit;
 }
 

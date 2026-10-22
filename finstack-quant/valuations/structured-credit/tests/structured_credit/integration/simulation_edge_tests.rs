@@ -163,24 +163,32 @@ fn test_mid_period_maturity_caps_interest_accrual() {
         .assets
         .push(make_asset("A_MID", balance, rate, mid_maturity, false));
 
-    let clo_far = StructuredCredit::new_clo(
-        "CLO_FAR",
-        pool_far,
-        single_tranche_high_coupon(balance),
-        closing_date(),
-        legal_maturity(),
-        "USD_OIS",
+    let clo_far = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO_FAR".into(),
+            pool: pool_far,
+            tranches: single_tranche_high_coupon(balance),
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
-    let clo_mid = StructuredCredit::new_clo(
-        "CLO_MID",
-        pool_mid,
-        single_tranche_high_coupon(balance),
-        closing_date(),
-        legal_maturity(),
-        "USD_OIS",
+    let clo_mid = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO_MID".into(),
+            pool: pool_mid,
+            tranches: single_tranche_high_coupon(balance),
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -237,13 +245,17 @@ fn test_pre_defaulted_asset_generates_zero_pool_interest() {
     pool.assets
         .push(make_asset("DEFAULTED", balance, rate, maturity, true));
 
-    let clo = StructuredCredit::new_clo(
-        "CLO_DEFAULT",
-        pool,
-        single_tranche_high_coupon(balance),
-        closing_date(),
-        legal_maturity(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO_DEFAULT".into(),
+            pool,
+            tranches: single_tranche_high_coupon(balance),
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -298,24 +310,32 @@ fn test_pre_defaulted_asset_does_not_affect_performing_pool_flows() {
         .push(make_asset("DEFAULTED", balance, rate, maturity, true));
 
     // Both tranches sized to the performing balance so interest dynamics match
-    let clo_perf = StructuredCredit::new_clo(
-        "CLO_PERF",
-        pool_perf,
-        single_tranche_high_coupon(balance),
-        closing_date(),
-        legal_maturity(),
-        "USD_OIS",
+    let clo_perf = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO_PERF".into(),
+            pool: pool_perf,
+            tranches: single_tranche_high_coupon(balance),
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
-    let clo_mixed = StructuredCredit::new_clo(
-        "CLO_MIXED",
-        pool_mixed,
-        single_tranche_high_coupon(balance),
-        closing_date(),
-        legal_maturity(),
-        "USD_OIS",
+    let clo_mixed = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO_MIXED".into(),
+            pool: pool_mixed,
+            tranches: single_tranche_high_coupon(balance),
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -376,13 +396,17 @@ fn test_reinvestment_end_reconciles_pool_outstanding() {
         criteria: ReinvestmentCriteria::default(),
     });
 
-    let clo = StructuredCredit::new_clo(
-        "CLO_REINVEST",
-        pool,
-        single_tranche(balance * 2.0),
-        closing_date(),
-        legal_maturity(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO_REINVEST".into(),
+            pool,
+            tranches: single_tranche(balance * 2.0),
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -472,13 +496,17 @@ fn test_reinvestment_vs_no_reinvestment_produces_consistent_results() {
         criteria: ReinvestmentCriteria::default(),
     });
 
-    let clo_reinvest = StructuredCredit::new_clo(
-        "CLO_REINVEST",
-        pool_reinvest,
-        single_tranche(balance * 2.0),
-        closing_date(),
-        legal_maturity(),
-        "USD_OIS",
+    let clo_reinvest = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO_REINVEST".into(),
+            pool: pool_reinvest,
+            tranches: single_tranche(balance * 2.0),
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -493,13 +521,17 @@ fn test_reinvestment_vs_no_reinvestment_produces_consistent_results() {
         .push(make_asset("LOAN_2", balance, rate, maturity, false));
     // No reinvestment_period set
 
-    let clo_no_reinvest = StructuredCredit::new_clo(
-        "CLO_NO_REINVEST",
-        pool_no_reinvest,
-        single_tranche(balance * 2.0),
-        closing_date(),
-        legal_maturity(),
-        "USD_OIS",
+    let clo_no_reinvest = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO_NO_REINVEST".into(),
+            pool: pool_no_reinvest,
+            tranches: single_tranche(balance * 2.0),
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");

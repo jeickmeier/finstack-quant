@@ -89,10 +89,20 @@ fn starved_abs(tranches: TrancheStructure) -> StructuredCredit {
         maturity(),
         DayCount::Act360,
     ));
-    let mut deal =
-        StructuredCredit::new_abs("ABS-CLAIMS", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-CLAIMS".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     deal.fees = None;
     deal.principal_covers_senior_interest = Some(true);
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.30);
@@ -152,7 +162,7 @@ fn a_non_deferrable_class_b_coupon_is_covered_from_principal() {
     );
 }
 
-/// `new_clo` keeps the seniority claim convention: the senior coupon is
+/// `new_standard(DealType::Clo, ...)` keeps the seniority claim convention: the senior coupon is
 /// non-deferrable, the mezzanine defers as a tracked claim (`pik_enabled`
 /// stays off — accreting deferred interest into the balance would report
 /// write-downs above the original face).
@@ -166,13 +176,17 @@ fn new_clo_mezzanine_defers_while_the_senior_claim_is_non_deferrable() {
         maturity(),
         DayCount::Act360,
     ));
-    let clo = StructuredCredit::new_clo(
-        "CLO-CLAIMS",
-        pool,
-        capital_structure(),
-        close(),
-        maturity(),
-        "USD-OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO-CLAIMS".into(),
+            pool,
+            tranches: capital_structure(),
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates");
     let pik: Vec<(&str, bool)> = clo

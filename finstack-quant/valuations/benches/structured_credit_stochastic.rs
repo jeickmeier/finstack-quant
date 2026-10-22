@@ -57,14 +57,7 @@ fn single_tranche_structure(balance: f64) -> TrancheStructure {
 }
 
 fn create_deal(id: &str, balance: f64) -> StructuredCredit {
-    StructuredCredit::new_abs(
-        id,
-        simple_pool(balance),
-        single_tranche_structure(balance),
-        closing_date(),
-        legal_maturity(),
-        "USD-OIS",
-    )
+    StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: id.into(), pool: simple_pool(balance), tranches: single_tranche_structure(balance), closing_date: closing_date(), maturity: legal_maturity(), discount_curve_id: "USD-OIS".into(), calendar_id: None })
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
 }

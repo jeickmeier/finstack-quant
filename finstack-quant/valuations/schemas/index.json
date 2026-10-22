@@ -181,6 +181,15 @@
       "type_name": "ScenarioPricingOverrides"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
+      "bytes": 229361,
+      "kind": "component",
+      "path": "schemas/common/1/standard_deal_params.schema.json",
+      "summary": "Inputs for the standard structured-credit registry constructor.",
+      "title": "StandardDealParams",
+      "type_name": "StandardDealParams"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/swaption_conventions.schema.json",
       "bytes": 1678,
       "kind": "component",

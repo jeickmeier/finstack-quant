@@ -1454,13 +1454,17 @@ mod tests {
             Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
         )
         .expect("senior tranche");
-        let mut deal = StructuredCredit::new_abs(
-            id,
-            pool,
-            TrancheStructure::new(vec![senior]).expect("structure"),
-            test_date(),
-            Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
-            "USD-OIS",
+        let mut deal = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Abs,
+            crate::structured_credit::StandardDealParams {
+                id: id.into(),
+                pool,
+                tranches: TrancheStructure::new(vec![senior]).expect("structure"),
+                closing_date: test_date(),
+                maturity: Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates");
         deal.calendar_id = Some("nyse".into());
@@ -1537,13 +1541,17 @@ mod tests {
             maturity,
         )
         .expect("tranche");
-        let mut instrument = StructuredCredit::new_abs(
-            "ABS",
-            pool,
-            TrancheStructure::new(vec![tranche]).expect("structure"),
-            test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Abs,
+            crate::structured_credit::StandardDealParams {
+                id: "ABS".into(),
+                pool,
+                tranches: TrancheStructure::new(vec![tranche]).expect("structure"),
+                closing_date: test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -2044,13 +2052,17 @@ mod per_name_copula_tests {
             .expect("equity"),
         ])
         .expect("structure");
-        let mut sc = StructuredCredit::new_abs(
-            "CLO-PER-NAME",
-            pool,
-            tranches,
-            close(),
-            maturity(),
-            "USD-OIS",
+        let mut sc = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Abs,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-PER-NAME".into(),
+                pool,
+                tranches,
+                closing_date: close(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");

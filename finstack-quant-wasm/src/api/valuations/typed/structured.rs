@@ -18,12 +18,11 @@ use crate::api::valuations::pricing::parse_market;
 use crate::utils::input::{
     from_js_json, js_f64, js_opt_f64, js_opt_string_seq, js_string, json_text, opt_json_text,
 };
-use crate::utils::wire::js_date;
+use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    self as sc, AssetPool, DealType, OasConfig, ScenarioGrid, StandardDealParams, StructuredCredit,
-    TrancheStructure,
+    self as sc, DealType, OasConfig, ScenarioGrid, StandardDealParams, StructuredCredit,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
@@ -257,55 +256,6 @@ pub fn tranche_metrics(
     )
     .map_err(to_js_err)?;
     to_js_value(&result)
-}
-
-/// A deal-type constructor `(id, pool, tranches, closingDate, maturity, discountCurveId, calendarId?)`.
-macro_rules! deal_constructor {
-    ($(#[$doc:meta])* $name:ident as $js_name:ident, $deal_type:ident) => {
-        #[wasm_bindgen(js_class = StructuredCredit)]
-        impl JsStructuredCredit {
-            $(#[$doc])*
-            /// @param id - Unique instrument identifier.
-            /// @param pool - Collateral `AssetPool` (plain object or JSON string).
-            /// @param tranches - Liability `TrancheStructure` (plain object or JSON string).
-            /// @param closing_date - Deal closing date as an ISO-8601 string.
-            /// @param maturity - Legal final maturity as an ISO-8601 string.
-            /// @param discount_curve_id - Discount curve identifier used to value tranche cashflows.
-            /// @param calendar_id - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
-            /// @returns The validated deal with the deal type's standard waterfall and assumptions.
-            /// @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
-            #[allow(clippy::too_many_arguments)]
-            #[wasm_bindgen(js_name = $js_name)]
-            pub fn $name(
-                id: JsValue,
-                pool: JsValue,
-                tranches: JsValue,
-                closing_date: JsValue,
-                maturity: JsValue,
-                discount_curve_id: JsValue,
-                calendar_id: Option<JsValue>,
-            ) -> Result<JsStructuredCredit, JsValue> {
-                let pool: AssetPool = from_js_json(&pool, "pool")?;
-                let tranches: TrancheStructure = from_js_json(&tranches, "tranches")?;
-                let params = StandardDealParams {
-                    id: js_string(&id, "id")?.into(),
-                    pool,
-                    tranches,
-                    closing_date: js_date(&closing_date, "closingDate")?,
-                    maturity: js_date(&maturity, "maturity")?,
-                    discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?.into(),
-                    calendar_id: crate::utils::input::js_opt_string(
-                        calendar_id.as_ref(),
-                        "calendarId",
-                    )?
-                    .map(Into::into),
-                };
-                StructuredCredit::new_standard(DealType::$deal_type, params)
-                    .map(|inner| Self { inner })
-                    .map_err(to_js_err)
-            }
-        }
-    };
 }
 
 instrument_class!(
@@ -775,25 +725,25 @@ handle_setters!(JsTrancheBuilder, "TrancheBuilder", {
         deferred_interest as deferredInterest => JsMoney,
 });
 
-deal_constructor!(
-    /// Create an asset-backed security deal (mirrors Rust `StructuredCredit::new_abs`).
-    new_abs as newAbs, Abs
-);
-deal_constructor!(
-    /// Create a collateralized loan obligation (mirrors Rust `StructuredCredit::new_clo`).
-    new_clo as newClo, Clo
-);
-deal_constructor!(
-    /// Create a commercial mortgage-backed security deal (mirrors Rust `StructuredCredit::new_cmbs`).
-    new_cmbs as newCmbs, Cmbs
-);
-deal_constructor!(
-    /// Create a residential mortgage-backed security deal (mirrors Rust `StructuredCredit::new_rmbs`).
-    new_rmbs as newRmbs, Rmbs
-);
-
 #[wasm_bindgen(js_class = StructuredCredit)]
 impl JsStructuredCredit {
+    /// Construct a validated standard deal from its registry profile and input record.
+    /// @param deal_type - Registry family: `abs`, `clo`, `cmbs` or `rmbs`; other deal types are rejected.
+    /// @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar.
+    /// @returns The deal with its selected registry assumptions and validated structure.
+    /// @throws Error - Throws with kind `validation` for an unsupported profile, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
+    #[wasm_bindgen(js_name = newStandard)]
+    pub fn new_standard(
+        deal_type: JsValue,
+        params: JsValue,
+    ) -> Result<JsStructuredCredit, JsValue> {
+        let deal_type: DealType = js_wire(&deal_type, "dealType")?;
+        let params: StandardDealParams = from_js_json(&params, "params")?;
+        StructuredCredit::new_standard(deal_type, params)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
     /// Return a copy of this deal with the deal type's standard fee schedule.
     ///
     /// Mirrors Rust `StructuredCredit::with_standard_fees`; the receiver is not modified.

@@ -1020,13 +1020,17 @@ mod cases {
         .expect("tranche");
         let mut instrument = StructuredCredit {
             cleanup_call_decimal: Some(0.10),
-            ..StructuredCredit::new_abs(
-                "ABS-CLEANUP",
-                pool,
-                TrancheStructure::new(vec![tranche]).expect("structure"),
-                cleanup_test_date(),
-                maturity,
-                "USD-OIS",
+            ..StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Abs,
+                crate::structured_credit::StandardDealParams {
+                    id: "ABS-CLEANUP".into(),
+                    pool,
+                    tranches: TrancheStructure::new(vec![tranche]).expect("structure"),
+                    closing_date: cleanup_test_date(),
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
@@ -1168,13 +1172,17 @@ mod cases {
                 maturity,
             )
             .expect("tranche");
-            let mut instrument = StructuredCredit::new_clo(
-                "CLO-REINVEST",
-                pool,
-                TrancheStructure::new(vec![tranche]).expect("structure"),
-                cc_test_date(),
-                maturity,
-                "USD-OIS",
+            let mut instrument = StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Clo,
+                crate::structured_credit::StandardDealParams {
+                    id: "CLO-REINVEST".into(),
+                    pool,
+                    tranches: TrancheStructure::new(vec![tranche]).expect("structure"),
+                    closing_date: cc_test_date(),
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
@@ -1274,13 +1282,17 @@ mod cases {
             .expect("equity"),
         ])
         .expect("structure");
-        let mut instrument = StructuredCredit::new_clo(
-            "CLO-LOSS-CAP",
-            pool,
-            tranches,
-            cc_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-LOSS-CAP".into(),
+                pool,
+                tranches,
+                closing_date: cc_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -1366,13 +1378,17 @@ mod cases {
             .expect("equity"),
         ])
         .expect("structure");
-        let mut instrument = StructuredCredit::new_clo(
-            "CLO-CONSERVE",
-            pool,
-            tranches,
-            cc_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-CONSERVE".into(),
+                pool,
+                tranches,
+                closing_date: cc_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -1844,13 +1860,17 @@ mod cases {
             maturity,
         )
         .expect("tranche");
-        let mut instrument = StructuredCredit::new_abs(
-            "ABS-RESERVE",
-            pool,
-            TrancheStructure::new(vec![tranche]).expect("structure"),
-            cleanup_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Abs,
+            crate::structured_credit::StandardDealParams {
+                id: "ABS-RESERVE".into(),
+                pool,
+                tranches: TrancheStructure::new(vec![tranche]).expect("structure"),
+                closing_date: cleanup_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -1939,13 +1959,17 @@ mod cases {
                 mk("JR", junior_seniority, 0.0, 20.0, 2_000_000.0),
             ])
             .expect("structure");
-            let mut deal = StructuredCredit::new_abs(
-                "ABS-SPREAD",
-                pool,
-                tranches,
-                cleanup_test_date(),
-                maturity,
-                "USD-OIS",
+            let mut deal = StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Abs,
+                crate::structured_credit::StandardDealParams {
+                    id: "ABS-SPREAD".into(),
+                    pool,
+                    tranches,
+                    closing_date: cleanup_test_date(),
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
@@ -2100,13 +2124,17 @@ mod cases {
             maturity,
         )
         .expect("equity");
-        let mut instrument = StructuredCredit::new_clo(
-            "CLO-OC",
-            pool,
-            TrancheStructure::new(vec![senior, equity]).expect("structure"),
-            cleanup_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-OC".into(),
+                pool,
+                tranches: TrancheStructure::new(vec![senior, equity]).expect("structure"),
+                closing_date: cleanup_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -2171,13 +2199,17 @@ mod cases {
             ),
         ])
         .expect("structure");
-        let mut instrument = StructuredCredit::new_clo(
-            "CLO-MEZZ",
-            pool,
-            tranches,
-            cleanup_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-MEZZ".into(),
+                pool,
+                tranches,
+                closing_date: cleanup_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -2609,13 +2641,17 @@ mod cases {
         .expect("equity tranche");
         let mut instrument = StructuredCredit {
             cleanup_call_decimal: Some(0.10),
-            ..StructuredCredit::new_abs(
-                "ABS-BIG-RECOVERY-QUEUE",
-                pool,
-                TrancheStructure::new(vec![senior, equity]).expect("structure"),
-                start,
-                maturity,
-                "USD-OIS",
+            ..StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Abs,
+                crate::structured_credit::StandardDealParams {
+                    id: "ABS-BIG-RECOVERY-QUEUE".into(),
+                    pool,
+                    tranches: TrancheStructure::new(vec![senior, equity]).expect("structure"),
+                    closing_date: start,
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
@@ -2871,13 +2907,17 @@ mod cases {
                 .expect("equity"),
             ])
             .expect("structure");
-            let mut instrument = StructuredCredit::new_abs(
-                "ABS-TAIL-RECOVERY",
-                pool,
-                tranches,
-                closing,
-                maturity,
-                "USD-OIS",
+            let mut instrument = StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Abs,
+                crate::structured_credit::StandardDealParams {
+                    id: "ABS-TAIL-RECOVERY".into(),
+                    pool,
+                    tranches,
+                    closing_date: closing,
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse");

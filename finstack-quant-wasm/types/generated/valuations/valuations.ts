@@ -20042,6 +20042,41 @@ export interface ScenarioTable {
   tranche_id: string;
 }
 /**
+ * Inputs for the standard structured-credit registry constructor.
+ */
+export interface StandardDealParams {
+  /**
+   * Optional holiday calendar for payment-date adjustment. Construction accepts
+   * `None`; simulation requires a calendar before generating payment dates.
+   */
+  calendar_id?: Id | null;
+  /**
+   * Contractual deal inception; the first accrual boundary is one registry
+   * payment period later (capped at maturity).
+   */
+  closing_date: DateWire;
+  /**
+   * Market-context discount curve used for tranche PV.
+   */
+  discount_curve_id: Id;
+  /**
+   * Stable deal identifier used for pricing results and risk labels.
+   */
+  id: Id;
+  /**
+   * Legal final date, strictly after closing.
+   */
+  maturity: DateWire;
+  /**
+   * Current collateral balances and contractual asset terms, in the pool currency.
+   */
+  pool: AssetPool;
+  /**
+   * Capital structure, current note balances and coupon terms.
+   */
+  tranches: TrancheStructure;
+}
+/**
  * Market conventions of one swaption market.
  */
 export interface SwaptionConventions {

@@ -141,13 +141,17 @@ fn test_clo_warf_calculator_matches_weighted_average_factors() {
         .with_rating(CreditRating::B),
     );
 
-    let instrument = StructuredCredit::new_clo(
-        "TEST_CLO_WARF",
-        pool,
-        tranche_structure(),
-        as_of(),
-        maturity_date(),
-        "USD-OIS",
+    let instrument = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_CLO_WARF".into(),
+            pool,
+            tranches: tranche_structure(),
+            closing_date: as_of(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates");
     let mut context = metric_context(instrument);
@@ -172,13 +176,17 @@ fn test_clo_warf_calculator_uses_default_factor_for_missing_ratings() {
         DayCount::Thirty360,
     ));
 
-    let instrument = StructuredCredit::new_clo(
-        "TEST_CLO_UNRATED",
-        pool,
-        tranche_structure(),
-        as_of(),
-        maturity_date(),
-        "USD-OIS",
+    let instrument = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_CLO_UNRATED".into(),
+            pool,
+            tranches: tranche_structure(),
+            closing_date: as_of(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates");
     let mut context = metric_context(instrument);
@@ -202,13 +210,17 @@ fn test_rmbs_cpr_and_cdr_use_current_deal_seasoning() {
         maturity_date(),
         DayCount::Thirty360,
     ));
-    let mut instrument = StructuredCredit::new_rmbs(
-        "TEST_RMBS_SPEEDS",
-        pool,
-        tranche_structure(),
-        Date::from_calendar_date(2025, Month::January, 1).unwrap(),
-        maturity_date(),
-        "USD-OIS",
+    let mut instrument = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_RMBS_SPEEDS".into(),
+            pool,
+            tranches: tranche_structure(),
+            closing_date: Date::from_calendar_date(2025, Month::January, 1).unwrap(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates");
     instrument.credit_model.prepayment_spec = PrepaymentModelSpec::psa(1.0);

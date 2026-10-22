@@ -115,9 +115,20 @@ fn baseline() -> StructuredCredit {
     let mut deal = StructuredCredit {
         fees: Some(DealFees::clo_standard(Currency::USD)),
         coverage_triggers: vec![CoverageTestSpec::oc("A", 1.20)],
-        ..StructuredCredit::new_clo("CLO-KNOBS", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse")
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-KNOBS".into(),
+                pool,
+                tranches,
+                closing_date: close(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse")
     };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);

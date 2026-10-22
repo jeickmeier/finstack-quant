@@ -64,10 +64,20 @@ fn deal(index_floor_bp: Option<f64>) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_clo("CLO-FLOOR", pool, tranches, close(), maturity, "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO-FLOOR".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 0);

@@ -343,13 +343,17 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
     .expect("structure");
     let mut deal = StructuredCredit {
         coverage_triggers: vec![CoverageTestSpec::oc("A", 1.54)],
-        ..StructuredCredit::new_clo(
-            "CLO-DEFAULTED-VALUATION",
-            pool,
-            tranches,
-            close,
-            maturity(),
-            "USD-OIS",
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-DEFAULTED-VALUATION".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse")

@@ -30,6 +30,7 @@ from finstack_quant.valuations.instruments import (
     HedgeSwap,
     InterestRateSwap,
     PoolAsset,
+    StandardDealParams,
     StructuredCredit,
     Tranche,
     TrancheCashflows,
@@ -230,14 +231,17 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
         "modified_rate": 0.04,
     }
     pool = AssetPool("P", "rmbs", USD).with_assets([npl])
-    deal = StructuredCredit.new_rmbs(
-        "NPL-1",
-        pool,
-        TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
-        CLOSE,
-        MATURITY,
-        "USD-OIS",
-        calendar_id="nyse",
+    deal = StructuredCredit.new_standard(
+        "rmbs",
+        StandardDealParams(
+            "NPL-1",
+            pool,
+            TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
+            CLOSE,
+            MATURITY,
+            "USD-OIS",
+            calendar_id="nyse",
+        ),
     )
     assert deal.pool.assets[0].liquidation["modified_rate"] == 0.04
     periods = deal.run_simulation_with_diagnostics(_market(), CLOSE).periods
@@ -248,14 +252,17 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
     npl["default_date"] = "2023-06-01"
     npl["recovery_amount"] = {"amount": "40000000", "currency": "USD"}
     with pytest.raises(ValueError, match="liquidation"):
-        StructuredCredit.new_rmbs(
-            "NPL-2",
-            AssetPool("P", "rmbs", USD).with_assets([npl]),
-            TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
-            CLOSE,
-            MATURITY,
-            "USD-OIS",
-            calendar_id="nyse",
+        StructuredCredit.new_standard(
+            "rmbs",
+            StandardDealParams(
+                "NPL-2",
+                AssetPool("P", "rmbs", USD).with_assets([npl]),
+                TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
+                CLOSE,
+                MATURITY,
+                "USD-OIS",
+                calendar_id="nyse",
+            ),
         )
 
 
@@ -490,14 +497,17 @@ def test_hedge_swaps_and_call_assumptions_are_typed_and_round_trip() -> None:
 
 def test_typed_constructors_accept_the_payment_calendar() -> None:
     pool = AssetPool("P", "clo", USD).with_assets(_loans())
-    deal = StructuredCredit.new_clo(
-        "CLO-CAL",
-        pool,
-        TrancheStructure([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
-        CLOSE,
-        MATURITY,
-        "USD-OIS",
-        calendar_id="nyse",
+    deal = StructuredCredit.new_standard(
+        "clo",
+        StandardDealParams(
+            "CLO-CAL",
+            pool,
+            TrancheStructure([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
+            CLOSE,
+            MATURITY,
+            "USD-OIS",
+            calendar_id="nyse",
+        ),
     )
     assert deal.calendar_id == "nyse"
     flows = deal.tranche_cashflows("A", _market(), CLOSE)

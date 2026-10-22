@@ -111,13 +111,17 @@ fn clo(tests: Vec<CoverageTestSpec>) -> (StructuredCredit, Date) {
     .expect("structure");
     let mut deal = StructuredCredit {
         coverage_triggers: tests,
-        ..StructuredCredit::new_clo(
-            "CLO-COVERAGE-POSITION",
-            pool,
-            tranches,
-            close,
-            maturity,
-            "USD-OIS",
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-COVERAGE-POSITION".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse")

@@ -124,8 +124,19 @@ fn p1_deal_call_proceeds_include_final_stub_collateral_interest() {
     ])
     .expect("structure");
     let mut deal = quiet(
-        StructuredCredit::new_clo("P1", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "P1".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         0.0,
     );
     deal.call_assumption = Some(CallAssumption::new(d(2026, 1, 1), 100.0));
@@ -213,8 +224,19 @@ fn seasoned_abs(
     ])
     .expect("structure");
     let deal = quiet(
-        StructuredCredit::new_abs("P2", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "P2".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         cpr,
     );
     (deal, close)
@@ -301,8 +323,19 @@ fn p3_commercial_mortgage_amortization_term_produces_the_balloon() {
     ])
     .expect("structure");
     let deal = quiet(
-        StructuredCredit::new_cmbs("P3", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "P3".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         0.0,
     );
     let run = run_simulation_with_diagnostics(&deal, &market(close), close).expect("run");
@@ -457,7 +490,7 @@ fn p6_clo_standard_rules_carry_performing_collateral_at_par() {
         let mut deal = StructuredCredit {
             coverage_triggers: vec![CoverageTestSpec::oc("A", 1.10)],
             ..quiet(
-                StructuredCredit::new_clo("P6", pool, tranches, close, legal, "USD-OIS")
+                StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "P6".into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None })
                     .expect("valid structured-credit dates"),
                 0.0,
             )
@@ -510,8 +543,19 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
     ])
     .expect("structure");
     let mut deal = quiet(
-        StructuredCredit::new_clo("P7", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "P7".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         0.0,
     );
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
@@ -636,8 +680,19 @@ fn p8_stochastic_price_uses_the_same_face_as_deterministic() {
     ])
     .expect("structure");
     let deal = quiet(
-        StructuredCredit::new_abs("P8", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "P8".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         0.0,
     );
     let mkt = market(close);
@@ -718,8 +773,19 @@ fn card_accumulation_uses_a_fixed_investor_allocation() {
     ])
     .expect("structure");
     let mut deal = quiet(
-        StructuredCredit::new_abs("CARD", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CARD".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         0.0,
     );
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
@@ -787,8 +853,19 @@ fn cumulative_loss_curve_is_based_on_the_original_pool_balance() {
     ])
     .expect("structure");
     let mut deal = quiet(
-        StructuredCredit::new_abs("CNL", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CNL".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         0.0,
     );
     let curve: Vec<f64> = (1..=36).map(|m| 3.0 * f64::from(m) / 36.0).collect();
@@ -850,8 +927,19 @@ fn deal_call_values_unresolved_npl_rows_at_net_proceeds() {
     ])
     .expect("structure");
     let mut deal = quiet(
-        StructuredCredit::new_rmbs("NPL-CALL", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "NPL-CALL".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         0.0,
     );
     deal.call_assumption = Some(CallAssumption::new(d(2026, 1, 1), 100.0));
@@ -908,8 +996,19 @@ fn cleanup_call_feasibility_counts_the_stub_collections() {
     ])
     .expect("structure");
     let mut deal = quiet(
-        StructuredCredit::new_clo("CLEANUP", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLEANUP".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         0.0,
     );
     deal.cleanup_call_decimal = Some(0.10);
@@ -969,7 +1068,7 @@ fn rating_haircuts_key_by_rating_bucket() {
         let mut deal = StructuredCredit {
             coverage_triggers: vec![CoverageTestSpec::oc("A", 1.10)],
             ..quiet(
-                StructuredCredit::new_clo("HC", pool, tranches, close, legal, "USD-OIS")
+                StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "HC".into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None })
                     .expect("valid structured-credit dates"),
                 0.0,
             )
@@ -1029,8 +1128,19 @@ fn tranche_dv01_is_per_tranche_and_sums_to_the_deal() {
     ])
     .expect("structure");
     let deal = quiet(
-        StructuredCredit::new_clo("DV01", pool, tranches, close, legal, "USD-OIS")
-            .expect("valid structured-credit dates"),
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "DV01".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates"),
         0.0,
     );
     let mkt = market(close);

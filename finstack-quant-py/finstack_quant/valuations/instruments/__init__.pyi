@@ -103,6 +103,7 @@ __all__ = [
     "ProtectionLegSpec",
     "RepLine",
     "ScenarioTable",
+    "StandardDealParams",
     "StructuredCredit",
     "StructuredCreditBuilder",
     "Swaption",
@@ -23855,6 +23856,7 @@ class Waterfall:
     >>> from finstack_quant.valuations.instruments import (
     ...     AssetPool,
     ...     PoolAsset,
+    ...     StandardDealParams,
     ...     StructuredCredit,
     ...     Tranche,
     ...     TrancheStructure,
@@ -23875,8 +23877,17 @@ class Waterfall:
     ...     .maturity(maturity)
     ...     .build()
     ... )
-    >>> deal = StructuredCredit.new_clo(
-    ...     "CLO-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC", calendar_id="nyse"
+    >>> deal = StructuredCredit.new_standard(
+    ...     "clo",
+    ...     StandardDealParams(
+    ...         "CLO-1",
+    ...         pool,
+    ...         TrancheStructure([note]),
+    ...         as_of,
+    ...         maturity,
+    ...         "USD-SOFR-DISC",
+    ...         calendar_id="nyse",
+    ...     ),
     ... )
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
     >>> waterfall = deal.create_waterfall()
@@ -24058,6 +24069,7 @@ class TrancheCashflows:
     >>> from finstack_quant.valuations.instruments import (
     ...     AssetPool,
     ...     PoolAsset,
+    ...     StandardDealParams,
     ...     StructuredCredit,
     ...     Tranche,
     ...     TrancheStructure,
@@ -24078,8 +24090,17 @@ class TrancheCashflows:
     ...     .maturity(maturity)
     ...     .build()
     ... )
-    >>> deal = StructuredCredit.new_clo(
-    ...     "CLO-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC", calendar_id="nyse"
+    >>> deal = StructuredCredit.new_standard(
+    ...     "clo",
+    ...     StandardDealParams(
+    ...         "CLO-1",
+    ...         pool,
+    ...         TrancheStructure([note]),
+    ...         as_of,
+    ...         maturity,
+    ...         "USD-SOFR-DISC",
+    ...         calendar_id="nyse",
+    ...     ),
     ... )
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
     >>> flows = deal.tranche_cashflows("A", market, as_of)
@@ -24943,13 +24964,257 @@ class PoolStats:
         """
         ...
 
+class StandardDealParams:
+    """Input record for a standard structured-credit registry profile.
+
+    Calendar omission is accepted during construction; deterministic simulation
+    needs an explicit payment calendar. Balances retain their pool currency,
+    rates retain decimal units, and dates are contractual calendar dates.
+
+    Parameters
+    ----------
+    id : str
+        Stable instrument identifier used in pricing results.
+    pool : AssetPool
+        Collateral balances and terms in the pool currency.
+    tranches : TrancheStructure
+        Liability capital structure and coupon terms.
+    closing_date : datetime.date | datetime.datetime | pandas.Timestamp | str
+        Contractual inception date or ISO-8601 YYYY-MM-DD string. A timezone-aware
+        timestamp contributes its wall-clock date without timezone conversion.
+    maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
+        Legal final date or ISO-8601 YYYY-MM-DD string, validated by ``new_standard``
+        to follow closing. Timezone-aware inputs retain their wall-clock date.
+    discount_curve_id : str
+        Identifier of the market discount curve used for tranche valuation.
+    calendar_id : str | None
+        Payment holiday-calendar identifier; defaults to None and must be
+        supplied before simulation.
+
+    Raises
+    ------
+    ValueError
+        If a date string is malformed or its calendar components are invalid.
+    TypeError
+        If either date is not a string or an object with integer year/month/day attributes.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
+    >>> deal = StructuredCredit.example()
+    >>> params = StandardDealParams(
+    ...     deal.id, deal.pool, deal.tranches, deal.closing_date, deal.maturity, deal.discount_curve_id
+    ... )
+    >>> params.calendar_id is None
+    True
+    """
+    def __init__(
+        self,
+        id: str,
+        pool: AssetPool,
+        tranches: TrancheStructure,
+        closing_date: datetime.date | str,
+        maturity: datetime.date | str,
+        discount_curve_id: str,
+        calendar_id: str | None = None,
+    ) -> None:
+        """Store standard-deal inputs without selecting assumptions.
+
+        Parameters
+        ----------
+        id : str
+            Stable instrument identifier used in pricing results.
+        pool : AssetPool
+            Collateral balances and terms in the pool currency.
+        tranches : TrancheStructure
+            Liability capital structure and coupon terms.
+        closing_date : datetime.date | datetime.datetime | pandas.Timestamp | str
+            Contractual inception date or ISO-8601 YYYY-MM-DD string. A timezone-aware
+            timestamp contributes its wall-clock date without timezone conversion.
+        maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
+            Legal final date or ISO-8601 YYYY-MM-DD string, validated by ``new_standard``
+            to follow closing. Timezone-aware inputs retain their wall-clock date.
+        discount_curve_id : str
+            Identifier of the market discount curve used for tranche valuation.
+        calendar_id : str | None
+            Payment holiday-calendar identifier; defaults to None and must be
+            supplied before simulation.
+
+        Raises
+        ------
+        ValueError
+            If a date string is malformed or its calendar components are invalid.
+        TypeError
+            If either date is not a string or an object with integer year/month/day attributes.
+        """
+        ...
+    @property
+    def id(self) -> str:
+        """Stable deal identifier.
+
+        Returns
+        -------
+        str
+            Stable deal identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns an owned view of the stored input.
+        """
+        ...
+    @property
+    def pool(self) -> AssetPool:
+        """Collateral pool in its stated currency.
+
+        Returns
+        -------
+        AssetPool
+            Collateral pool in its stated currency.
+
+        Notes
+        -----
+        This accessor does not raise; it returns an owned view of the stored input.
+        """
+        ...
+    @property
+    def tranches(self) -> TrancheStructure:
+        """Liability capital structure.
+
+        Returns
+        -------
+        TrancheStructure
+            Liability capital structure.
+
+        Notes
+        -----
+        This accessor does not raise; it returns an owned view of the stored input.
+        """
+        ...
+    @property
+    def closing_date(self) -> datetime.date:
+        """Contractual inception date.
+
+        Returns
+        -------
+        datetime.date
+            Contractual inception date.
+
+        Raises
+        ------
+        ValueError
+            If the stored date is outside the Python ``datetime.date`` year range
+            (1 through 9999).
+        """
+        ...
+    @property
+    def maturity(self) -> datetime.date:
+        """Legal final maturity date.
+
+        Returns
+        -------
+        datetime.date
+            Legal final maturity date.
+
+        Raises
+        ------
+        ValueError
+            If the stored date is outside the Python ``datetime.date`` year range
+            (1 through 9999).
+        """
+        ...
+    @property
+    def discount_curve_id(self) -> str:
+        """Market discount-curve lookup identifier.
+
+        Returns
+        -------
+        str
+            Market discount-curve lookup identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns an owned view of the stored input.
+        """
+        ...
+    @property
+    def calendar_id(self) -> str | None:
+        """Optional payment holiday-calendar identifier.
+
+        Returns
+        -------
+        str | None
+            Optional payment holiday-calendar identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns an owned view of the stored input.
+        """
+        ...
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize inputs to their canonical Rust field mapping.
+
+        Returns
+        -------
+        dict[str, Any]
+            Canonical fields, including null calendar when absent.
+
+        Raises
+        ------
+        ValueError
+            If the input record cannot be serialized to a Python mapping.
+        """
+        ...
+    def to_json(self) -> str:
+        """Serialize canonical inputs as JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON record.
+
+        Raises
+        ------
+        ValueError
+            If the input record cannot be serialized to JSON.
+        """
+        ...
+    @staticmethod
+    def from_json(json: str) -> StandardDealParams:
+        """Deserialize the canonical Rust input record.
+
+        Parameters
+        ----------
+        json : str
+            Canonical input JSON, with ISO calendar dates and nested pool/tranches.
+
+        Returns
+        -------
+        StandardDealParams
+            Decoded inputs, without selecting registry assumptions.
+
+        Raises
+        ------
+        ValueError
+            If JSON is malformed or does not match the input schema.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import StandardDealParams
+        >>> try:
+        ...     StandardDealParams.from_json("{}")
+        ... except ValueError:
+        ...     print("invalid inputs")
+        invalid inputs
+        """
+        ...
+
 class StructuredCredit:
     """
     Structured-credit deal (ABS/CLO/CMBS/RMBS) with pool, tranches, and waterfall.
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import StructuredCredit
+    >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
     >>> builder = StructuredCredit.builder()
     >>> builder.id("EXAMPLE") is builder
     True
@@ -24966,8 +25231,7 @@ class StructuredCredit:
         builder fields have no default), which the corresponding setters
         (``market_conditions``, ``waterfall_rules``, ``fees``,
         ``credit_model``, ``hedge_swaps`` ...) can override with typed
-        objects, dicts or JSON strings. Prefer :meth:`new_abs` / :meth:`new_clo` /
-        :meth:`new_cmbs` / :meth:`new_rmbs` for registry-calibrated deal-type
+        objects, dicts or JSON strings. Prefer :meth:`new_standard` for registry-calibrated deal-type
         defaults; use this builder for full manual control.
 
         Returns
@@ -24981,7 +25245,7 @@ class StructuredCredit:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import StructuredCredit
+        >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
         >>> builder = StructuredCredit.builder()
         >>> builder.id("EXAMPLE") is builder
         True
@@ -24989,323 +25253,42 @@ class StructuredCredit:
         ...
 
     @staticmethod
-    def new_abs(
-        id: str,
-        pool: AssetPool,
-        tranches: TrancheStructure,
-        closing_date: datetime.date,
-        maturity: datetime.date,
-        discount_curve_id: str,
-        calendar_id: str | None = None,
-    ) -> StructuredCredit:
-        """
-        Create a new ABS deal with registry-calibrated defaults.
+    def new_standard(deal_type: str, params: StandardDealParams) -> StructuredCredit:
+        """Construct a validated deal using a standard registry profile.
 
         Parameters
         ----------
-        id : str
-            Unique instrument identifier.
-        pool : AssetPool
-            Asset pool definition.
-        tranches : TrancheStructure
-            Tranche capital structure.
-        closing_date : datetime.date
-            Deal closing date (issuance).
-        maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-            Legal final maturity date.
-        discount_curve_id : str
-            Discount curve identifier for valuation.
-        calendar_id : str, optional
-            Holiday calendar for the payment schedule (e.g. ``"nyse"``);
-            required before pricing, so pass it here or set it on the JSON.
+        deal_type : str
+            Standard family: ``abs``, ``clo``, ``cmbs`` or ``rmbs``.
+        params : StandardDealParams
+            Collateral, liabilities, dates and market identifiers. A missing
+            payment calendar is accepted here but must be supplied before simulation.
 
         Returns
         -------
         StructuredCredit
-            The validated ABS deal.
+            The deal with its registry assumptions and validated structure.
 
         Raises
         ------
         ValueError
-            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
+            If the family is unsupported or the deal fails pricing validation.
 
         Examples
         --------
-        >>> import datetime
-        >>> from finstack_quant.core.currency import Currency
-        >>> from finstack_quant.core.dates import DayCount
-        >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.valuations.instruments import (
-        ...     AssetPool,
-        ...     RepLine,
-        ...     StructuredCredit,
-        ...     Tranche,
-        ...     TrancheStructure,
+        >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
+        >>> example = StructuredCredit.example()
+        >>> params = StandardDealParams(
+        ...     example.id,
+        ...     example.pool,
+        ...     example.tranches,
+        ...     example.closing_date,
+        ...     example.maturity,
+        ...     example.discount_curve_id,
+        ...     example.calendar_id,
         ... )
-        >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
-        ...     RepLine(
-        ...         "LINE-1",
-        ...         Money(80_000_000.0, Currency("USD")),
-        ...         0.07,
-        ...         datetime.date(2031, 1, 15),
-        ...         12,
-        ...         DayCount.ACT_360,
-        ...         asset_type={"type": "first_lien_loan"},
-        ...     )
-        ... ])
-        >>> senior = (
-        ...     Tranche
-        ...     .builder()
-        ...     .id("A")
-        ...     .attach_pct(10.0)
-        ...     .detach_pct(100.0)
-        ...     .seniority("senior")
-        ...     .original_balance(Money(72_000_000.0, Currency("USD")))
-        ...     .coupon_fixed(0.05)
-        ...     .maturity(datetime.date(2031, 1, 15))
-        ...     .build()
-        ... )
-        >>> equity = (
-        ...     Tranche
-        ...     .builder()
-        ...     .id("E")
-        ...     .attach_pct(0.0)
-        ...     .detach_pct(10.0)
-        ...     .seniority("equity")
-        ...     .original_balance(Money(8_000_000.0, Currency("USD")))
-        ...     .coupon_fixed(0.0)
-        ...     .maturity(datetime.date(2031, 1, 15))
-        ...     .build()
-        ... )
-        >>> deal = StructuredCredit.new_abs(
-        ...     "ABS-1",
-        ...     pool,
-        ...     TrancheStructure([senior, equity]),
-        ...     datetime.date(2024, 1, 15),
-        ...     datetime.date(2031, 1, 15),
-        ...     "USD-SOFR-DISC",
-        ... )
-        >>> "ABS-1" in repr(deal)
+        >>> StructuredCredit.new_standard("clo", params).id == example.id
         True
-        """
-        ...
-
-    @staticmethod
-    def new_clo(
-        id: str,
-        pool: AssetPool,
-        tranches: TrancheStructure,
-        closing_date: datetime.date,
-        maturity: datetime.date,
-        discount_curve_id: str,
-        calendar_id: str | None = None,
-    ) -> StructuredCredit:
-        """
-        Create a new CLO deal with registry-calibrated defaults.
-
-        Same signature as :meth:`new_abs`; only the deal-type calibration
-        (prepayment/default/recovery specs, frequency, fees) differs.
-
-        Parameters
-        ----------
-        id : str
-            Unique instrument identifier.
-        pool : AssetPool
-            Asset pool definition.
-        tranches : TrancheStructure
-            Tranche capital structure.
-        closing_date : datetime.date
-            Deal closing date (issuance).
-        maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-            Legal final maturity date.
-        discount_curve_id : str
-            Discount curve identifier for valuation.
-        calendar_id : str, optional
-            Holiday calendar for the payment schedule (e.g. ``"nyse"``);
-            required before pricing, so pass it here or set it on the JSON.
-
-        Returns
-        -------
-        StructuredCredit
-            The validated CLO deal.
-
-        Raises
-        ------
-        ValueError
-            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
-
-        Examples
-        --------
-        >>> import datetime
-        >>> from finstack_quant.core.currency import Currency
-        >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.valuations.instruments import Tranche
-        >>> tranche = (
-        ...     Tranche
-        ...     .builder()
-        ...     .id("A")
-        ...     .attach_pct(0.0)
-        ...     .detach_pct(100.0)
-        ...     .seniority("senior")
-        ...     .original_balance(Money(100.0, Currency("USD")))
-        ...     .coupon_fixed(0.05)
-        ...     .maturity(datetime.date(2029, 1, 1))
-        ...     .build()
-        ... )
-        >>> from finstack_quant.valuations.instruments import AssetPool, StructuredCredit, TrancheStructure
-        >>> pool = AssetPool("P", "clo", Currency("USD"))
-        >>> deal = StructuredCredit.new_clo(
-        ...     "D", pool, TrancheStructure([tranche]), datetime.date(2024, 1, 1), datetime.date(2029, 1, 1), "USD-OIS"
-        ... )
-        >>> (deal.id, "Clo" in repr(deal))
-        ('D', True)
-
-        """
-        ...
-
-    @staticmethod
-    def new_cmbs(
-        id: str,
-        pool: AssetPool,
-        tranches: TrancheStructure,
-        closing_date: datetime.date,
-        maturity: datetime.date,
-        discount_curve_id: str,
-        calendar_id: str | None = None,
-    ) -> StructuredCredit:
-        """
-        Create a new CMBS deal with registry-calibrated defaults.
-
-        Same signature as :meth:`new_abs`; only the deal-type calibration
-        (prepayment/default/recovery specs, frequency, fees) differs.
-
-        Parameters
-        ----------
-        id : str
-            Unique instrument identifier.
-        pool : AssetPool
-            Asset pool definition.
-        tranches : TrancheStructure
-            Tranche capital structure.
-        closing_date : datetime.date
-            Deal closing date (issuance).
-        maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-            Legal final maturity date.
-        discount_curve_id : str
-            Discount curve identifier for valuation.
-        calendar_id : str, optional
-            Holiday calendar for the payment schedule (e.g. ``"nyse"``);
-            required before pricing, so pass it here or set it on the JSON.
-
-        Returns
-        -------
-        StructuredCredit
-            The validated CMBS deal.
-
-        Raises
-        ------
-        ValueError
-            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
-
-        Examples
-        --------
-        >>> import datetime
-        >>> from finstack_quant.core.currency import Currency
-        >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.valuations.instruments import Tranche
-        >>> tranche = (
-        ...     Tranche
-        ...     .builder()
-        ...     .id("A")
-        ...     .attach_pct(0.0)
-        ...     .detach_pct(100.0)
-        ...     .seniority("senior")
-        ...     .original_balance(Money(100.0, Currency("USD")))
-        ...     .coupon_fixed(0.05)
-        ...     .maturity(datetime.date(2029, 1, 1))
-        ...     .build()
-        ... )
-        >>> from finstack_quant.valuations.instruments import AssetPool, StructuredCredit, TrancheStructure
-        >>> pool = AssetPool("P", "cmbs", Currency("USD"))
-        >>> deal = StructuredCredit.new_cmbs(
-        ...     "D", pool, TrancheStructure([tranche]), datetime.date(2024, 1, 1), datetime.date(2029, 1, 1), "USD-OIS"
-        ... )
-        >>> (deal.id, "Cmbs" in repr(deal))
-        ('D', True)
-
-        """
-        ...
-
-    @staticmethod
-    def new_rmbs(
-        id: str,
-        pool: AssetPool,
-        tranches: TrancheStructure,
-        closing_date: datetime.date,
-        maturity: datetime.date,
-        discount_curve_id: str,
-        calendar_id: str | None = None,
-    ) -> StructuredCredit:
-        """
-        Create a new RMBS deal with registry-calibrated defaults.
-
-        Same signature as :meth:`new_abs`; only the deal-type calibration
-        (prepayment/default/recovery specs, frequency, fees) differs.
-
-        Parameters
-        ----------
-        id : str
-            Unique instrument identifier.
-        pool : AssetPool
-            Asset pool definition.
-        tranches : TrancheStructure
-            Tranche capital structure.
-        closing_date : datetime.date
-            Deal closing date (issuance).
-        maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-            Legal final maturity date.
-        discount_curve_id : str
-            Discount curve identifier for valuation.
-        calendar_id : str, optional
-            Holiday calendar for the payment schedule (e.g. ``"nyse"``);
-            required before pricing, so pass it here or set it on the JSON.
-
-        Returns
-        -------
-        StructuredCredit
-            The validated RMBS deal.
-
-        Raises
-        ------
-        ValueError
-            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
-
-        Examples
-        --------
-        >>> import datetime
-        >>> from finstack_quant.core.currency import Currency
-        >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.valuations.instruments import Tranche
-        >>> tranche = (
-        ...     Tranche
-        ...     .builder()
-        ...     .id("A")
-        ...     .attach_pct(0.0)
-        ...     .detach_pct(100.0)
-        ...     .seniority("senior")
-        ...     .original_balance(Money(100.0, Currency("USD")))
-        ...     .coupon_fixed(0.05)
-        ...     .maturity(datetime.date(2029, 1, 1))
-        ...     .build()
-        ... )
-        >>> from finstack_quant.valuations.instruments import AssetPool, StructuredCredit, TrancheStructure
-        >>> pool = AssetPool("P", "rmbs", Currency("USD"))
-        >>> deal = StructuredCredit.new_rmbs(
-        ...     "D", pool, TrancheStructure([tranche]), datetime.date(2024, 1, 1), datetime.date(2029, 1, 1), "USD-OIS"
-        ... )
-        >>> (deal.id, "Rmbs" in repr(deal))
-        ('D', True)
-
         """
         ...
 
@@ -25340,7 +25323,7 @@ class StructuredCredit:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import StructuredCredit
+        >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
         >>> try:
         ...     StructuredCredit.from_json("{}")
         ... except ValueError as exc:
@@ -26299,7 +26282,7 @@ class StructuredCredit:
 
         Examples
         --------
-        >>> from finstack_quant.valuations.instruments import StructuredCredit
+        >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
         >>> StructuredCredit.example().id
         'CLO-EXAMPLE'
         """
@@ -26533,7 +26516,7 @@ class StructuredCreditBuilder:
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import StructuredCredit
+    >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
     >>> isinstance(StructuredCredit.builder(), StructuredCredit.builder().__class__)
     True
     """
@@ -31956,6 +31939,7 @@ class StochasticPricingResult:
     >>> from finstack_quant.valuations.instruments import (
     ...     AssetPool,
     ...     RepLine,
+    ...     StandardDealParams,
     ...     StructuredCredit,
     ...     Tranche,
     ...     TrancheStructure,
@@ -31984,7 +31968,9 @@ class StochasticPricingResult:
     ...     .maturity(maturity)
     ...     .build()
     ... )
-    >>> deal = StructuredCredit.new_abs("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
+    >>> deal = StructuredCredit.new_standard(
+    ...     "abs", StandardDealParams("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
+    ... )
     >>> envelope = json.loads(deal.to_json())
     >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
     >>> deal = StructuredCredit.from_json(json.dumps(envelope))
@@ -32368,6 +32354,7 @@ class SimulationDiagnostics:
     >>> from finstack_quant.valuations.instruments import (
     ...     AssetPool,
     ...     RepLine,
+    ...     StandardDealParams,
     ...     StructuredCredit,
     ...     Tranche,
     ...     TrancheStructure,
@@ -32396,7 +32383,9 @@ class SimulationDiagnostics:
     ...     .maturity(maturity)
     ...     .build()
     ... )
-    >>> deal = StructuredCredit.new_abs("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
+    >>> deal = StructuredCredit.new_standard(
+    ...     "abs", StandardDealParams("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
+    ... )
     >>> envelope = json.loads(deal.to_json())
     >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
     >>> deal = StructuredCredit.from_json(json.dumps(envelope))
@@ -33650,7 +33639,7 @@ def calculate_pool_stats(pool: AssetPool, as_of: datetime.date | str) -> PoolSta
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import StructuredCredit, calculate_pool_stats
+    >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit, calculate_pool_stats
     >>> stats = calculate_pool_stats(StructuredCredit.example().pool, "2024-01-01")
     >>> stats.wac, round(stats.weighted_avg_maturity, 1)
     (0.07, 10.0)

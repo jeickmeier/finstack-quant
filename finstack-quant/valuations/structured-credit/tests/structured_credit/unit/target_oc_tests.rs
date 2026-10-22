@@ -83,13 +83,17 @@ fn auto_abs(senior: f64) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal = StructuredCredit::new_abs(
-        "ABS-TARGET-OC",
-        pool,
-        tranches,
-        close(),
-        maturity(),
-        "USD-OIS",
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-TARGET-OC".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
