@@ -566,16 +566,6 @@ fn apply_swap_spread(swap: &mut InterestRateSwap, spread_decimal: &Option<f64>) 
 
     // `spread_decimal` is in decimal format (e.g. 0.0010 for 10bp).
     let spread_bp_f64 = *spread_decimal * 10_000.0;
-    if !spread_bp_f64.is_finite() {
-        let kind = if spread_bp_f64.is_nan() {
-            finstack_quant_core::NonFiniteKind::NaN
-        } else if spread_bp_f64.is_sign_positive() {
-            finstack_quant_core::NonFiniteKind::PosInfinity
-        } else {
-            finstack_quant_core::NonFiniteKind::NegInfinity
-        };
-        return Err(finstack_quant_core::InputError::NonFiniteValue { kind }.into());
-    }
     swap.float_leg.spread_bp = finstack_quant_core::decimal::f64_to_decimal(spread_bp_f64)?;
     Ok(())
 }

@@ -1,6 +1,6 @@
 //! Prepared quote envelopes for calibration pipelines.
 
-use crate::build::cds::{build_cds_instrument, cds_pillar_maturity};
+use crate::build::cds::build_cds_instrument;
 use crate::build::rates::build_rate_instrument_with_dates;
 use crate::build::xccy::build_xccy_instrument;
 use crate::build::BuildCtx;
@@ -166,8 +166,8 @@ pub(crate) fn prepare_cds_quote(
     day_count: DayCount,
     base_date: Date,
 ) -> Result<PreparedQuote<CdsQuote>> {
-    let maturity_date = cds_pillar_maturity(build_ctx.as_of(), quote.pillar())?;
     let instrument = build_cds_instrument(&quote, build_ctx)?;
+    let maturity_date = instrument.premium_leg.end;
     let instrument: Arc<dyn Instrument> = Arc::new(instrument);
 
     let pillar_time =
