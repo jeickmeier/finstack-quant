@@ -830,9 +830,11 @@ mod tests {
             residual: -0.02,
             slope: -3.0,
         };
-        let config = CalibrationConfig::default()
-            .with_tolerance(0.1)
-            .with_compute_diagnostics(true);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(0.1),
+            compute_diagnostics: true,
+            ..Default::default()
+        };
 
         // Both opt-in approximate knots settle at the lower bound, with distinct
         // nonzero residuals. Down bumps fail, so the diagnostic must subtract the

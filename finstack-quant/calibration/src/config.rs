@@ -512,15 +512,16 @@ fn market_freshness_is_default(policy: &MarketFreshnessPolicy) -> bool {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_calibration::CalibrationConfig;
+/// use finstack_quant_calibration::{CalibrationConfig, SolverConfig};
 ///
 /// // Create a default config
 /// let config = CalibrationConfig::default();
 ///
 /// // Customize tolerance settings
-/// let custom = CalibrationConfig::default()
-///     .with_tolerance(1e-14)  // Solver convergence tolerance
-///     .with_max_iterations(200);
+/// let custom = CalibrationConfig {
+///     solver: SolverConfig::default().with_tolerance(1e-14).with_max_iterations(200),
+///     ..Default::default()
+/// };
 /// ```
 ///
 /// # References
@@ -819,30 +820,6 @@ impl CalibrationConfig {
         self
     }
 
-    /// Set the solver tolerance.
-    #[must_use]
-    pub fn with_tolerance(mut self, tolerance: f64) -> Self {
-        self.solver = self.solver.with_tolerance(tolerance);
-        self
-    }
-
-    /// Set the maximum number of iterations.
-    #[must_use]
-    pub fn with_max_iterations(mut self, max_iterations: usize) -> Self {
-        self.solver = self.solver.with_max_iterations(max_iterations);
-        self
-    }
-
-    /// Enable or disable detailed calibration diagnostics.
-    ///
-    /// When enabled, the solver will compute condition number, per-quote
-    /// quality metrics, and other diagnostic information after calibration.
-    #[must_use]
-    pub fn with_compute_diagnostics(mut self, enabled: bool) -> Self {
-        self.compute_diagnostics = enabled;
-        self
-    }
-
     /// Overlay a partial JSON object onto this configuration.
     ///
     /// Objects merge recursively (only the supplied leaves change); arrays
@@ -1133,11 +1110,17 @@ mod fx_and_hierarchy_settings_tests {
     #[test]
     fn solver_settings_are_checked_before_configuration_or_solver_use() {
         for tolerance in [0.0, -1e-8, f64::NAN, f64::INFINITY] {
-            let config = CalibrationConfig::default().with_tolerance(tolerance);
+            let config = CalibrationConfig {
+                solver: crate::SolverConfig::default().with_tolerance(tolerance),
+                ..Default::default()
+            };
             assert!(config.validate().is_err());
             assert!(config.create_lm_solver().is_err());
         }
-        let config = CalibrationConfig::default().with_max_iterations(0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_max_iterations(0),
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
         assert!(config.create_lm_solver().is_err());
     }

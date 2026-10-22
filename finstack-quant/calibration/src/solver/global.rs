@@ -1500,7 +1500,10 @@ mod tests {
         let tol = 0.1;
         let target = TestTarget::from_len(4, vec![tol; 4]);
         let quotes = vec![0usize, 1usize, 2usize, 3usize];
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
         let (_curve, report) =
             optimize(&target, &quotes, &config, tol, true).expect("optimization should complete");
 
@@ -1526,7 +1529,10 @@ mod tests {
         // Weighted L2 = 0.015 << tol=0.1, but max |r| = 0.15 > 0.1.
         let target = TestTarget::from_len(2, vec![0.15, 0.0]).with_weights(vec![0.01, 0.01]);
         let quotes = vec![0usize, 1usize];
-        let config = CalibrationConfig::default().with_tolerance(1e-12);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1e-12),
+            ..Default::default()
+        };
         let (_curve, report) =
             optimize(&target, &quotes, &config, 0.1, true).expect("optimization should complete");
         assert!(
@@ -1547,7 +1553,10 @@ mod tests {
     fn success_gate_rejects_old_weighted_sqrt_n_success_case() {
         let target = TestTarget::from_len(2, vec![-0.5, 0.0]).with_weights(vec![0.01, 0.01]);
         let quotes = vec![0usize, 1usize];
-        let config = CalibrationConfig::default().with_tolerance(1e-12);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1e-12),
+            ..Default::default()
+        };
 
         // The 4th arg is the *validation/success* tolerance (distinct from the LM
         // solver tolerance set via `with_tolerance`).
@@ -1661,7 +1670,10 @@ mod tests {
     fn max_abs_residual_metadata_uses_absolute_value() {
         let target = TestTarget::from_len(2, vec![-0.02, -0.01]);
         let quotes = vec![0usize, 1usize];
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
 
         let (_curve, report) = optimize(
             &target,
@@ -1689,7 +1701,10 @@ mod tests {
     fn rejects_length_mismatch_between_times_and_initials() {
         let target = TestTarget::new(vec![1.0, 2.0], vec![0.0], vec![0.0, 0.0]);
         let quotes = vec![0usize, 1usize];
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
 
         let err = optimize(
             &target,
@@ -1713,7 +1728,10 @@ mod tests {
     fn rejects_non_increasing_times() {
         let target = TestTarget::new(vec![1.0, 0.5], vec![0.0, 0.0], vec![0.0, 0.0]);
         let quotes = vec![0usize, 1usize];
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
 
         let err = optimize(
             &target,
@@ -1737,7 +1755,10 @@ mod tests {
     fn rejects_non_finite_inputs() {
         let target = TestTarget::new(vec![f64::NAN], vec![f64::INFINITY], vec![0.0]);
         let quotes = vec![0usize];
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
 
         let err = optimize(
             &target,
@@ -1764,7 +1785,10 @@ mod tests {
             .with_weights(vec![4.0, 1.0])
             .with_key_prefix("TEST");
         let quotes = vec![5usize, 7usize];
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
 
         let (_curve, report) = optimize(
             &target,
@@ -1794,7 +1818,10 @@ mod tests {
     fn supports_overdetermined_least_squares() {
         let target = TestTarget::new(vec![1.0, 2.0], vec![0.0, 0.0], vec![0.01, -0.02, 0.03]);
         let quotes = vec![10usize, 11usize, 12usize];
-        let config = CalibrationConfig::default().with_tolerance(1e12);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1e12),
+            ..Default::default()
+        };
 
         let (_curve, report) = optimize(
             &target,
@@ -1866,7 +1893,10 @@ mod tests {
             fail_once: AtomicBool::new(false),
         };
         let quotes = vec![0usize, 1usize];
-        let config = CalibrationConfig::default().with_tolerance(1e12);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1e12),
+            ..Default::default()
+        };
 
         let (_curve, report) = optimize(
             &target,
@@ -1971,9 +2001,12 @@ mod tests {
             targets: vec![0.5; 10],
         };
         let quotes: Vec<usize> = (0..10).collect();
-        let config = CalibrationConfig::default()
-            .with_tolerance(1e-12)
-            .with_max_iterations(50);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default()
+                .with_tolerance(1e-12)
+                .with_max_iterations(50),
+            ..Default::default()
+        };
 
         let (_curve, report) = optimize(
             &target,
@@ -1991,7 +2024,10 @@ mod tests {
     fn rejects_empty_active_quotes() {
         let target = TestTarget::from_len(1, vec![0.0]);
         let quotes: Vec<usize> = Vec::new();
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
 
         let err = optimize(
             &target,
@@ -2011,7 +2047,10 @@ mod tests {
     fn rejects_underdetermined_least_squares_system() {
         let target = TestTarget::new(vec![1.0, 2.0, 3.0], vec![0.0, 0.0, 0.0], vec![0.01, 0.02]);
         let quotes = vec![0usize, 1usize];
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
 
         let err = optimize(
             &target,
@@ -2033,7 +2072,10 @@ mod tests {
     #[test]
     fn rejects_invalid_and_zero_residual_weights() {
         let quotes = vec![0usize, 1usize];
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
 
         for weights in [vec![-1.0, 1.0], vec![f64::NAN, 1.0]] {
             let target = TestTarget::from_len(2, vec![0.01, 0.02]).with_weights(weights);
@@ -2076,7 +2118,10 @@ mod tests {
     fn success_tolerance_override_controls_report_success() {
         let target = TestTarget::from_len(1, vec![0.15]);
         let quotes = vec![0usize];
-        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            ..Default::default()
+        };
 
         let (_curve, report) = optimize(&target, &quotes, &config, 0.1, true)
             .expect("optimization should still complete");
@@ -2096,9 +2141,11 @@ mod tests {
     fn compute_diagnostics_populates_report_when_enabled() {
         let target = TestTarget::from_len(1, vec![0.01]);
         let quotes = vec![0usize];
-        let config = CalibrationConfig::default()
-            .with_tolerance(1.0)
-            .with_compute_diagnostics(true);
+        let config = CalibrationConfig {
+            solver: crate::SolverConfig::default().with_tolerance(1.0),
+            compute_diagnostics: true,
+            ..Default::default()
+        };
 
         let (_curve, report) = optimize(
             &target,

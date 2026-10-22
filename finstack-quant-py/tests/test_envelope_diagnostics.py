@@ -197,7 +197,7 @@ def test_unusable_solver_settings_are_rejected_everywhere(solver: dict) -> None:
     with pytest.raises(ValueError, match=r"solver (tolerance|max_iterations)"):
         SolverConfig(**solver)
     with pytest.raises(ValueError, match=r"solver (tolerance|max_iterations)"):
-        CalibrationConfig(**solver)
+        CalibrationConfig(solver=solver)
 
 
 def test_dry_run_json_is_the_wire_twin_of_dry_run() -> None:
