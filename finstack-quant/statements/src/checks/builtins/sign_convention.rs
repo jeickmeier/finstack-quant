@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::checks::helpers::get_node_value;
 use crate::checks::{Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity};
 use crate::types::NodeId;
 use crate::Result;
@@ -44,7 +43,7 @@ impl Check for SignConventionCheck {
             // Preserve positive-node findings before negative-node findings.
             for (nodes, positive) in [(&self.positive_nodes, true), (&self.negative_nodes, false)] {
                 for node in nodes {
-                    let Some(val) = get_node_value(context.results, node, pid) else {
+                    let Some(val) = context.results.get(node.as_str(), pid) else {
                         continue;
                     };
                     let message = if !val.is_finite() {

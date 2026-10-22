@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use finstack_quant_statements::checks::{get_finite_node_value, get_node_value};
+use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
     Severity, SignConventionPolicy,
@@ -64,7 +64,10 @@ impl Check for DividendReconciliation {
                     [&self.dividends_cf_node, &self.dividends_equity_node]
                         .into_iter()
                         .filter(|n| {
-                            get_node_value(context.results, n, pid).is_some_and(|v| !v.is_finite())
+                            context
+                                .results
+                                .get(n.as_str(), pid)
+                                .is_some_and(|v| !v.is_finite())
                         })
                         .cloned()
                         .collect();

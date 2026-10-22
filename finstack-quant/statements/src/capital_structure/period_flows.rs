@@ -185,7 +185,7 @@ pub fn calculate_period_flows(
     }
     let currency = full_schedule.get_notional().initial.currency();
     if opening_balance.amount() != 0.0 && opening_balance.currency() != currency {
-        return Err(crate::error::Error::currency_mismatch(
+        return Err(crate::error::Error::CurrencyMismatch(
             currency,
             opening_balance.currency(),
         ));
@@ -224,13 +224,13 @@ pub fn calculate_period_flows(
         if let Some(principal) = funding_principal(flow) {
             has_funding_leg = true;
             if principal.currency() != currency {
-                return Err(crate::error::Error::currency_mismatch(
+                return Err(crate::error::Error::CurrencyMismatch(
                     currency,
                     principal.currency(),
                 ));
             }
             if flow.amount.currency() != currency {
-                return Err(crate::error::Error::currency_mismatch(
+                return Err(crate::error::Error::CurrencyMismatch(
                     currency,
                     flow.amount.currency(),
                 ));
@@ -305,7 +305,7 @@ pub fn calculate_period_flows(
             // classifier does not perform. Reject rather than let `Money`
             // arithmetic panic on a currency mismatch.
             if cf.amount.currency() != currency {
-                return Err(crate::error::Error::currency_mismatch(
+                return Err(crate::error::Error::CurrencyMismatch(
                     currency,
                     cf.amount.currency(),
                 ));

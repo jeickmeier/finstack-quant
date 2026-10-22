@@ -159,7 +159,7 @@ impl DependencyGraph {
         let mut visited: IndexSet<NodeId> = IndexSet::new();
         for node_id in self.dependencies.keys() {
             if let Some(cycle) = self.dfs_cycle(node_id.as_str(), &mut visited) {
-                return Err(Error::circular_dependency(cycle));
+                return Err(Error::CircularDependency(cycle));
             }
         }
         Ok(())
