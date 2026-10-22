@@ -267,6 +267,14 @@ fn base_correlation_step_builds_curve_and_reprices_settlement_quoted_trades() {
     }
     let index = market.get_credit_index("CDX").expect("credit index");
     assert_eq!(index.base_correlation_curve().id().as_str(), "CDX_CORR");
+    assert_eq!(
+        index.base_correlation_curve().correlations(),
+        curve.correlations()
+    );
+    assert_eq!(
+        index.base_correlation_curve().detachment_points(),
+        curve.detachment_points()
+    );
 
     for quote in &quotes {
         let tranche = build_tranche(quote, base_date, notional);
