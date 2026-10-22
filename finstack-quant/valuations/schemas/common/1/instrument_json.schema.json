@@ -1180,7 +1180,7 @@
         },
         "cumulative_scheduled_amortization": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the original-balance denominator in\n[`current_loss_percentage`](super::StructuredCredit::current_loss_percentage),\nso it must be stated: omitting it understates the denominator and\noverstates the reported loss rate."
+          "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the reconstructed original balance\n([`AssetPool::original_balance_or_reconstructed`]) when no explicit\n`original_balance` is supplied."
         },
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -1858,7 +1858,7 @@
           "type": "number"
         },
         "coupon_barriers": {
-          "description": "Coupon barriers corresponding to observation dates.",
+          "description": "Coupon barriers as ratios of initial spot.\n\nCoupon eligibility is independent of the autocall barrier. Each entry\ncorresponds to the observation date at the same index.",
           "items": {
             "format": "double",
             "type": "number"
@@ -1890,7 +1890,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
         },
         "expiry": {
@@ -1921,19 +1920,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "memory_coupons": {
           "default": false,
-          "description": "Memory (\"Phoenix\") coupon feature.\n\nMissed coupons accrue until a later coupon barrier is met.",
+          "description": "Memory (\"Phoenix\") coupon feature.\n\nWhen enabled, a coupon whose coupon barrier is missed accrues until a\nlater observation meets its coupon barrier. The current and all accrued\ncoupons are then paid on that observation's payment date. Coupon\neligibility remains independent of autocall eligibility.",
           "type": "boolean"
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -1968,10 +1963,10 @@
         },
         "path_model": {
           "$ref": "#/$defs/EquityPathModel",
-          "description": "Explicit path model selection; required to acknowledge model risk."
+          "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation."
         },
         "payment_dates": {
-          "description": "Contractual payment dates corresponding to observation dates.",
+          "description": "Contractual payment dates for coupons and early redemption.\n\nEach entry corresponds to `observation_dates` at the same index.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
           },
@@ -1979,7 +1974,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
@@ -2516,10 +2510,10 @@
     },
     "BermudanSchedule": {
       "additionalProperties": false,
-      "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates.",
+      "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates.\n\nEach exercise date is the notification (decision) date on which the holder\nelects to exercise, as in QuantLib's `BermudanExercise`; any contractual\nnotice period is already reflected in where the dates sit, so the schedule\ncarries no separate notice lag.",
       "properties": {
         "exercise_dates": {
-          "description": "Exercise dates (must be sorted, typically on swap coupon dates)",
+          "description": "Exercise notification (decision) dates, sorted; typically one notice\nperiod before the swap coupon dates they enter on.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
           },
@@ -2536,17 +2530,10 @@
           ],
           "default": null,
           "description": "Lockout period end (no exercise before this date)"
-        },
-        "notice_days": {
-          "description": "Notice period in business days before exercise",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
         }
       },
       "required": [
-        "exercise_dates",
-        "notice_days"
+        "exercise_dates"
       ],
       "type": "object"
     },
@@ -4285,10 +4272,6 @@
           ],
           "description": "Payment date of the exercise proceeds, defaulting to legal expiry.\nMust be on or after expiry and before CDS maturity. Discounting uses\nthis date; spread variance ends at legal expiry."
         },
-        "exercise_style": {
-          "$ref": "#/$defs/ExerciseStyle",
-          "description": "Exercise style"
-        },
         "expiry": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Option expiry date"
@@ -4323,17 +4306,6 @@
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (Call = right to buy protection, Put = right to sell protection)"
-        },
-        "premium_settlement_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
         },
         "protection_start_convention": {
           "$ref": "#/$defs/ProtectionStartConvention",
@@ -4405,7 +4377,6 @@
         "id",
         "strike",
         "option_type",
-        "exercise_style",
         "expiry",
         "underlying_maturity",
         "notional",
@@ -4632,24 +4603,9 @@
         }
       ]
     },
-    "ClawbackSettle": {
-      "description": "Clawback settlement trigger.",
-      "oneOf": [
-        {
-          "const": "fund_end",
-          "description": "Settle at fund termination",
-          "type": "string"
-        },
-        {
-          "const": "periodic",
-          "description": "Settle at configured period ends before subsequent distributions.\nEuropean settlements update fund allocation balances. American settlements\nstay at fund level and do not rewrite individual deal entitlements.",
-          "type": "string"
-        }
-      ]
-    },
     "ClawbackSpec": {
       "additionalProperties": false,
-      "description": "Clawback specification for GP carry reconciliation.",
+      "description": "Clawback specification for GP carry reconciliation, settled at fund end\n(the date of the last fund event).",
       "properties": {
         "holdback_decimal": {
           "description": "Optional share of GP carry held back until settlement, as a decimal\nfraction in `[0, 1]` (`0.2` = 20%)",
@@ -4658,15 +4614,8 @@
             "number",
             "null"
           ]
-        },
-        "settle_on": {
-          "$ref": "#/$defs/ClawbackSettle",
-          "description": "When to settle clawback"
         }
       },
-      "required": [
-        "settle_on"
-      ],
       "type": "object"
     },
     "ClearingStatus": {
@@ -4726,7 +4675,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
         },
         "expiry": {
@@ -4758,7 +4706,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "local_cap": {
@@ -4773,9 +4720,6 @@
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -4803,7 +4747,7 @@
         },
         "path_model": {
           "$ref": "#/$defs/EquityPathModel",
-          "description": "Explicit path model selection; required to acknowledge model risk."
+          "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation."
         },
         "payoff_type": {
           "$ref": "#/$defs/CliquetPayoffType",
@@ -4819,7 +4763,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
@@ -5836,7 +5779,7 @@
     },
     "CommodityForward": {
       "additionalProperties": false,
-      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_forward if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T) = Discount factor to settlement date\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations_core::instruments::Position;\nuse finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
+      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_forward if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T_pay) = Discount factor to the payment date (see below)\n\n# Settlement\n\nThe forward fixes on `maturity` (the last pricing date) and pays\n[`CommodityForward::payment_date`]: `maturity` plus the effective settlement\nlag in business days on the effective settlement calendar, adjusted by the\neffective business-day convention (for example T+2 on the CME calendar for\nWTI). The value is zero once the payment date is before `as_of`.\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations_core::instruments::Position;\nuse finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -6176,17 +6119,6 @@
           "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")",
           "type": "string"
         },
-        "convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CommodityConvention"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
-        },
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency for pricing"
@@ -6253,15 +6185,6 @@
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)."
-        },
-        "premium_settlement_days": {
-          "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
         },
         "quantity": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -8386,7 +8309,7 @@
     },
     "DelinquencyModel": {
       "additionalProperties": false,
-      "description": "Roll-rate delinquency model with optional servicer advancing and loan\nmodification.\n\n`roll_rates[b]` and `cure_rates[b]` are monthly transition probabilities\nfor the balance in bucket `b` (bucket 0 = 30 days past due). The balance\nthat neither rolls nor cures stays in its bucket. The roll out of the last\nbucket is the charge-off, so a 30/60/90 model with charge-off at 120 days\nhas three entries.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_structured_credit::structured_credit::{\n    AdvancingPolicy, DelinquencyModel,\n};\n\nlet model = DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])\n    .with_advancing(AdvancingPolicy::PrincipalAndInterest {\n        recoverability_cap_pct: 100.0,\n        reimburse_from_collections: false,\n    });\nassert_eq!(model.buckets(), 3);\n```",
+      "description": "Roll-rate delinquency model with optional servicer advancing and loan\nmodification.\n\n`roll_rates[b]` and `cure_rates[b]` are monthly transition probabilities\nfor the balance in bucket `b` (bucket 0 = 30 days past due). The balance\nthat neither rolls nor cures stays in its bucket. The roll out of the last\nbucket is the charge-off, so a 30/60/90 model with charge-off at 120 days\nhas three entries.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_structured_credit::structured_credit::{\n    AdvancingPolicy, DelinquencyModel,\n};\n\nlet model = DelinquencyModel {\n    advancing: AdvancingPolicy::PrincipalAndInterest {\n        recoverability_cap_pct: 100.0,\n        reimburse_from_collections: false,\n    },\n    ..DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])\n};\nassert_eq!(model.buckets(), 3);\n```",
       "properties": {
         "advancing": {
           "$ref": "#/$defs/AdvancingPolicy",
@@ -8633,7 +8556,6 @@
           "description": "Currency for all cashflows."
         },
         "dilution_securities": {
-          "default": [],
           "description": "Dilutive securities (options, warrants, RSUs, convertibles) for treasury stock method.",
           "items": {
             "$ref": "#/$defs/DilutionSecurity"
@@ -8668,28 +8590,22 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "mid_year_convention": {
           "default": false,
-          "description": "Discount curve identifier, used for risk attribution only.\n\nDiscounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`\nregardless of whether this curve is loaded (the\nprevious behavior silently switched risky flows to risk-free curve\ndiscounting). WACC sensitivity is exposed separately as `dcf::wacc01`.\nMid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon).",
+          "description": "Mid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon).",
           "type": "boolean"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "shares_outstanding": {
-          "default": null,
           "description": "Basic shares outstanding for per-share value calculation.",
           "format": "double",
           "type": [
@@ -8698,7 +8614,6 @@
           ]
         },
         "terminal_flow_override": {
-          "default": null,
           "description": "Annualized terminal flow used by growth-perpetuity terminal values.\n\nGordon Growth and H-Model capitalize an *annual* flow with annual\nWACC and growth rates. When the explicit `flows` grid is sub-annual\n(e.g. quarterly), the last flow is a period flow, not an annual one;\nset this to the trailing-twelve-month aggregate of the final\nexplicit year so the terminal value is computed on a consistent\nannual basis (Koller et al., Damodaran). When `None`, the last\nexplicit flow is used directly (correct for annual grids).\n\nIgnored by `ExitMultiple` terminal values.",
           "format": "double",
           "type": [
@@ -8723,7 +8638,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Private company valuation discounts (DLOM, DLOC)."
         },
         "wacc": {
@@ -9099,7 +9013,7 @@
     },
     "Equity": {
       "additionalProperties": false,
-      "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals.\n\nSee unit tests and `examples/` for usage.",
+      "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -9667,7 +9581,6 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "discrete_dividends": {
-          "default": [],
           "description": "Optional discrete cash dividends `(ex_date, amount)` for the underlying.\n\nWhen non-empty, pricing uses explicit period dividend pass-through and does\nnot add continuous-yield dividend return to avoid double counting.",
           "items": {
             "maxItems": 2,
@@ -9687,7 +9600,7 @@
         },
         "dividend_settlement": {
           "$ref": "#/$defs/TrsDividendSettlement",
-          "description": "Settlement timing for explicit manufactured dividends."
+          "description": "Settlement timing for explicit manufactured dividends.\n\nThis field is mandatory because dividend-date and period-end settlement\ndiffer by the funding carry between the two dates."
         },
         "dividend_tax_rate": {
           "default": 0.0,
@@ -9713,7 +9626,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
@@ -9725,14 +9637,10 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional OTC margin specification for VM/IM.\n\nEquity TRS use SIMM equity bucket for margin calculation."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -9740,8 +9648,7 @@
           "description": "Notional amount for the swap."
         },
         "past_fixings": {
-          "default": [],
-          "description": "Observed underlying levels at past reset (period-start) dates.\n\nFor a seasoned TRS valued inside a return period, the total-return leg\nmust anchor the current period to the level *observed* at the period\nstart so the realized spot move enters the PV (equity delta). Provide\n`(reset_date, level)` pairs for every period-start date on or before\nthe valuation date; the first period may use `initial_level` instead.\nPricing errors when the current period's start level is unavailable.",
+          "description": "Observed underlying levels at contractual reset boundaries.\n\nProvide `(reset_date, level)` for each boundary on or before the\nvaluation date that is needed by an unpaid return period. This includes\nthe final period end when payment lag leaves its cashflow outstanding.\nThe first boundary may use `initial_level`; a boundary equal to `as_of`\nmay use live spot. Pricing errors when any other required fixing is\nunavailable.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -9760,7 +9667,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "schedule": {
@@ -9769,7 +9675,7 @@
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
-          "description": "Trade side (receive/pay total return)."
+          "description": "Trade side: `receive` receives the total-return leg and pays financing;\n`pay` pays the total return and receives financing."
         },
         "underlying": {
           "$ref": "#/$defs/EquityUnderlyingParams",
@@ -11922,22 +11828,24 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
-          "description": "Optional base currency calendar for business day adjustment.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar for business day adjustment."
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency (foreign currency, numerator of the pair)."
         },
         "contract_rate": {
-          "default": null,
           "description": "Contract forward rate (quote per base). If None, valued at-market.",
           "format": "double",
           "type": [
@@ -11959,7 +11867,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
@@ -11968,9 +11875,6 @@
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -11978,19 +11882,21 @@
           "description": "Notional amount in base currency."
         },
         "quote_calendar_id": {
-          "default": null,
-          "description": "Optional quote currency calendar for business day adjustment.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quote currency calendar for business day adjustment."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Quote currency (domestic currency, denominator of the pair, PV currency)."
         },
         "quoted_spot": {
-          "default": null,
           "description": "Optional spot rate override (quote per base). If None, source from FxMatrix.",
           "format": "double",
           "type": [
@@ -12000,7 +11906,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         }
       },
@@ -12207,11 +12112,15 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -12231,7 +12140,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional quote-currency discount curve for PV-ing the settlement\ncashflow. When absent the settlement amount is reported undiscounted\n(a 1–2 day effect for standard spot lags)."
         },
         "id": {
@@ -12240,14 +12148,10 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -12255,11 +12159,15 @@
           "description": "Notional amount in base currency."
         },
         "quote_calendar_id": {
-          "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -12275,7 +12183,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "settlement_date": {
@@ -12288,10 +12195,10 @@
             }
           ],
           "default": null,
-          "description": "Optional explicit settlement (value) date"
+          "description": "Optional explicit settlement (value) date. When set it is only\nbusiness-day adjusted and `settlement_days` is ignored."
         },
         "settlement_days": {
-          "description": "Optional T+N settlement lag in business days when `settlement_date` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
+          "description": "Optional contractual T+N settlement lag in business days when\n`settlement_date` is not provided.\n\n`None` uses the pair-aware default from\n[`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value\noverrides that default.",
           "format": "uint32",
           "minimum": 0,
           "type": [
@@ -12315,30 +12222,32 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
-          "description": "Optional base currency calendar for spot/settlement adjustment metadata.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar for spot/settlement adjustment metadata."
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency (foreign)."
+          "description": "Base currency (foreign)"
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Domestic discount curve id (quote currency)."
+          "description": "Domestic discount curve id (quote currency)"
         },
         "far_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Far leg settlement date (forward leg)."
+          "description": "Far leg settlement date (forward leg)"
         },
         "far_rate": {
-          "default": null,
           "description": "Optional far leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to far settlement.",
           "format": "double",
           "type": [
@@ -12348,30 +12257,25 @@
         },
         "foreign_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Foreign discount curve id (base currency)."
+          "description": "Foreign discount curve id (base currency)"
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier."
+          "description": "Unique instrument identifier"
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "near_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Near leg settlement date (spot leg)."
+          "description": "Near leg settlement date (spot leg)"
         },
         "near_rate": {
-          "default": null,
           "description": "Optional near leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to near settlement.",
           "format": "double",
           "type": [
@@ -12381,23 +12285,25 @@
         },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount in base currency (exchanged on near, reversed on far)."
+          "description": "Notional amount in base currency (exchanged on near, reversed on far)"
         },
         "quote_calendar_id": {
-          "default": null,
-          "description": "Optional quote currency calendar for spot/settlement adjustment metadata.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quote currency calendar for spot/settlement adjustment metadata."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Quote currency (domestic)."
+          "description": "Quote currency (domestic)"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         }
       },
@@ -14598,23 +14504,25 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
-          "description": "Optional base currency calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar."
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency (restricted/non-deliverable currency, numerator)."
         },
         "contract_rate": {
-          "default": null,
-          "description": "Contract forward rate. Interpretation depends on `quote_convention`.\n`None` values the NDF at-market.",
+          "description": "Contract forward rate. Interpretation depends on `quote_convention`:\n- BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)\n- SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)\n\n`None` values the NDF at-market: the contract rate equals the market\nforward, so the settlement amount and PV are zero.",
           "format": "double",
           "type": [
             "number",
@@ -14638,8 +14546,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Official fixing source/benchmark enum for type-safe specification."
+          "description": "Official fixing source/benchmark enum for type-safe specification.\n\nUse this field for validated fixing sources.\nSee [`NdfFixingSource`] for supported benchmarks and their typical currencies."
         },
         "foreign_discount_curve_id": {
           "anyOf": [
@@ -14650,8 +14557,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional foreign (base) currency discount curve ID."
+          "description": "Optional foreign (base) currency discount curve ID.\nRequired for pre-fixing forward estimation unless `quoted_forward`\nis supplied."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -14659,7 +14565,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
@@ -14668,9 +14573,6 @@
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -14678,8 +14580,7 @@
           "description": "Notional amount in base currency."
         },
         "observed_fixing": {
-          "default": null,
-          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
+          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.\nIf Some, NDF is post-fixing.",
           "format": "double",
           "type": [
             "number",
@@ -14691,8 +14592,7 @@
           "description": "Quote convention for contract_rate and observed_fixing."
         },
         "quoted_forward": {
-          "default": null,
-          "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+          "description": "Explicit pre-fixing forward rate in `quote_convention` units.\n\nUse this for NDF market quotes or basis-adjusted forwards when a base\ncurrency discount curve is unavailable.",
           "format": "double",
           "type": [
             "number",
@@ -14700,8 +14600,7 @@
           ]
         },
         "quoted_spot": {
-          "default": null,
-          "description": "Optional spot rate override for forward rate calculation.",
+          "description": "Optional spot rate override for forward rate calculation.\nInterpretation depends on `quote_convention`.",
           "format": "double",
           "type": [
             "number",
@@ -14710,16 +14609,18 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "settlement_calendar_id": {
-          "default": null,
-          "description": "Optional settlement currency calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional settlement currency calendar."
         },
         "settlement_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -16525,14 +16426,14 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and grouping."
+          "description": "Attributes for scenario selection and grouping"
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency (equity denomination)."
+          "description": "Base currency (equity denomination)"
         },
         "correlation": {
-          "description": "Correlation between equity price and FX rate.",
+          "description": "Correlation between equity price and FX rate",
           "format": "double",
           "type": "number"
         },
@@ -16550,20 +16451,19 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional dividend-yield scalar ID."
+          "description": "Optional dividend-yield scalar ID"
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve ID (domestic currency)."
+          "description": "Discount curve ID (domestic currency)"
         },
         "expiry": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Option expiry date."
+          "description": "Option expiry date"
         },
         "foreign_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve ID (foreign currency)."
+          "description": "Discount curve ID (foreign currency)"
         },
         "fx_spot_id": {
           "anyOf": [
@@ -16574,8 +16474,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional FX rate identifier."
+          "description": "Optional FX rate identifier.\n\nThe referenced scalar must be quoted as **quote currency per unit of\nbase currency** (e.g. for base JPY / quote USD, USD-per-JPY ≈ 0.0071,\nconventionally named `JPYUSD`). The pricer compounds it with\n`exp((r_quote − r_base)·t)` to obtain the ATM forward for the FX vol\nlookup, so an inverted quote (JPY-per-USD) silently mislocates the\nsmile. `validate()` rejects ids whose embedded pair name contradicts\nthis direction."
         },
         "fx_vol_surface_id": {
           "anyOf": [
@@ -16586,36 +16485,30 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional FX volatility surface ID."
+          "description": "Optional FX volatility surface ID.\n\nMust be calibrated in the same **quote-per-base** direction as\n`fx_spot_id` so absolute-strike lookups at the CIRP forward land on\nthe correct smile. `validate()` rejects ids whose embedded pair name\ncontradicts this direction."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier."
+          "description": "Unique instrument identifier"
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Strike-equivalent domestic reference notional."
+          "description": "Strike-equivalent domestic reference notional.\n\nWhen `quantity` and `payoff_fx_rate` are supplied, this must\nequal `quantity * payoff_fx_rate * strike`."
         },
         "option_type": {
           "$ref": "#/$defs/OptionType",
-          "description": "Option type (call or put)."
+          "description": "Option type (call or put)"
         },
         "payoff_fx_rate": {
-          "default": null,
-          "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.",
+          "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.\n\nExample: for a JPY-underlying option settled in USD at a fixed 140 JPY/USD\nconversion, `payoff_fx_rate` is `1.0 / 140.0` USD per JPY.",
           "format": "double",
           "type": [
             "number",
@@ -16623,8 +16516,7 @@
           ]
         },
         "quantity": {
-          "default": null,
-          "description": "Number of underlying units covered by the option payoff.",
+          "description": "Number of underlying units covered by the option payoff.\n\nQuanto pricing is performed per unit of the underlying in the base currency.\nThis quantity converts the per-unit price into contract-level exposure.",
           "format": "double",
           "type": [
             "number",
@@ -16633,16 +16525,15 @@
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Quote currency (payment/settlement currency)."
+          "description": "Quote currency (payment/settlement currency)"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Equity spot price identifier."
+          "description": "Equity spot price identifier"
         },
         "strike": {
           "description": "Per-unit strike of the equity underlying, in `base_currency` price units.",
@@ -16650,12 +16541,12 @@
           "type": "number"
         },
         "underlying_ticker": {
-          "description": "Underlying equity ticker symbol.",
+          "description": "Underlying equity ticker symbol",
           "type": "string"
         },
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Equity volatility surface ID."
+          "description": "Equity volatility surface ID"
         }
       },
       "required": [
@@ -17124,7 +17015,6 @@
       "description": "Real estate asset valuation instrument.\n\nSupports DCF (explicit NOI schedule) and direct capitalization valuation.",
       "properties": {
         "acquisition_costs": {
-          "default": [],
           "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
@@ -17140,7 +17030,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional appraisal override value."
         },
         "attributes": {
@@ -17149,7 +17038,6 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "cap_rate": {
-          "default": null,
           "description": "Capitalization rate for direct cap (annualized).",
           "format": "double",
           "type": [
@@ -17158,7 +17046,6 @@
           ]
         },
         "capex_schedule": {
-          "default": null,
           "description": "Capital expenditure schedule (date, amount). Values are treated as **positive outflows**.\n\nWhen present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow).",
           "items": {
             "maxItems": 2,
@@ -17188,7 +17075,6 @@
           "description": "Day count convention for year fractions."
         },
         "discount_rate": {
-          "default": null,
           "description": "Discount rate for DCF (annualized).",
           "format": "double",
           "type": [
@@ -17197,7 +17083,6 @@
           ]
         },
         "disposition_cost_decimal": {
-          "default": null,
           "description": "Optional disposition cost percentage applied to terminal value.\n\nA value of `0.02` represents 2% selling costs. Must be in \\([0, 1)\\).",
           "format": "double",
           "type": [
@@ -17206,7 +17091,6 @@
           ]
         },
         "disposition_costs": {
-          "default": [],
           "description": "Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
@@ -17219,18 +17103,14 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "noi_schedule": {
-          "description": "Net operating income schedule (date, amount).",
+          "description": "Net operating income schedule (date, amount).\n\nEntries must be **annual** NOI amounts: cap-rate formulas (direct cap,\nexit-cap terminal value, going-in cap rate) apply a quoted annual cap\nrate to a single schedule entry, so a monthly or quarterly schedule\nwould understate those values by 12x/4x. Flows dated exactly on the\nvaluation `as_of` are included in PV undiscounted (t = 0).",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -17256,7 +17136,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional property type classification (for reporting)."
         },
         "purchase_price": {
@@ -17268,7 +17147,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional purchase price (useful for IRR / cap rate metrics)."
         },
         "sale_date": {
@@ -17280,7 +17158,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional sale/exit date that truncates the DCF horizon.\n\nWhen set, DCF only values unlevered flows up to and including `sale_date`.\nTerminal proceeds (if configured) are realized on `sale_date`."
         },
         "sale_price": {
@@ -17292,16 +17169,13 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional explicit gross sale price (terminal proceeds), before disposition costs.\n\nWhen set, this takes precedence over `terminal_cap_rate` for terminal proceeds."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "stabilized_noi": {
-          "default": null,
           "description": "Optional stabilized NOI override for direct cap.",
           "format": "double",
           "type": [
@@ -17310,7 +17184,6 @@
           ]
         },
         "terminal_cap_rate": {
-          "default": null,
           "description": "Optional terminal cap rate for DCF (uses last NOI).",
           "format": "double",
           "type": [
@@ -17319,8 +17192,7 @@
           ]
         },
         "terminal_growth_rate": {
-          "default": null,
-          "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is).\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
+          "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is, i.e. a trailing-NOI\nterminal value). Exactly **one** period of growth is applied to the last\nNOI on/before the exit date — it is not compounded over any gap between\nthe last scheduled NOI and a later `sale_date`.\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
           "format": "double",
           "type": [
             "number",
@@ -20178,7 +20050,7 @@
               "type": "null"
             }
           ],
-          "description": "Custom payment waterfall used verbatim for pricing.\n\n`None` (the default) synthesizes the canonical sequential template from\nthe tranche structure ([`Waterfall::standard_sequential`]) plus any\n[`Self::fees`]. When set, this waterfall is authoritative:\n[`Self::create_waterfall`] returns it (with deal-level\n[`Self::coverage_triggers`] appended) and no template is synthesized.\n[`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,\ncontrolled accumulation) still apply — they rewrite tiers generically by\n`payment_type`, so they compose with custom structures.\n\nThe waterfall also **defines each tranche's interest claim** (not just\ncash allocation): an uncapped `TrancheInterest` recipient owes the full\ncoupon accrual, a `CappedTrancheInterest` recipient owes the capped\ncoupon (the capped-off portion is never owed and never defers), and a\ndebt tranche with **no** interest recipient owes nothing (a\nprincipal-only class). Equity is exempt: its interest/principal split\nis a reporting convention driven by the tranche's metadata coupon.\n\nConstraints, enforced by [`Self::with_waterfall`] and re-checked at\npricing time so JSON-supplied deals get identical errors:\n- every tranche referenced by a tier recipient or coverage trigger must\n  exist in `tranches`, and tranche-keyed recipients must not target an\n  equity tranche (the engine records equity flows under\n  [`RecipientType::Equity`], paid via `ResidualCash`);\n- at most one interest-type recipient may name a given tranche (the\n  claim definition must be unambiguous);\n- `fees` must be `None` — senior fees are expressed as *leading*\n  [`PaymentType::Fee`] tiers of the custom waterfall, which then feed\n  the IC numerator and excess-spread/reserve sizing exactly like\n  template fees (fee tiers ranked below note interest are junior fees\n  and are deliberately not netted as senior claims);\n- the waterfall's `currency` must match the pool currency."
+          "description": "Custom payment waterfall used verbatim for pricing.\n\n`None` (the default) synthesizes the canonical sequential template from\nthe tranche structure ([`Waterfall::standard_sequential`]) plus any\n[`Self::fees`]. When set, this waterfall is authoritative:\n[`Self::create_waterfall`] returns it (with deal-level\n[`Self::coverage_triggers`] appended) and no template is synthesized.\n[`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,\ncontrolled accumulation) still apply — they rewrite tiers generically by\n`payment_type`, so they compose with custom structures.\n\nThe waterfall also **defines each tranche's interest claim** (not just\ncash allocation): an uncapped `TrancheInterest` recipient owes the full\ncoupon accrual, a `CappedTrancheInterest` recipient owes the capped\ncoupon (the capped-off portion is never owed and never defers), and a\ndebt tranche with **no** interest recipient owes nothing (a\nprincipal-only class). Equity is exempt: its interest/principal split\nis a reporting convention driven by the tranche's metadata coupon.\n\nConstraints, enforced by `validate_invariants` and at pricing time so\nevery construction path gets identical errors:\n- every tranche referenced by a tier recipient or coverage trigger must\n  exist in `tranches`, and tranche-keyed recipients must not target an\n  equity tranche (the engine records equity flows under\n  [`RecipientType::Equity`], paid via `ResidualCash`);\n- at most one interest-type recipient may name a given tranche (the\n  claim definition must be unambiguous);\n- `fees` must be `None` — senior fees are expressed as *leading*\n  [`PaymentType::Fee`] tiers of the custom waterfall, which then feed\n  the IC numerator and excess-spread/reserve sizing exactly like\n  template fees (fee tiers ranked below note interest are junior fees\n  and are deliberately not netted as senior claims);\n- the waterfall's `currency` must match the pool currency."
         },
         "waterfall_rules": {
           "anyOf": [
@@ -21438,16 +21310,12 @@
     },
     "VolatilityIndexFuture": {
       "additionalProperties": false,
-      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
+      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "default": {},
           "description": "Attributes for scenario selection and tagging"
-        },
-        "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -21477,7 +21345,6 @@
       "required": [
         "id",
         "terms",
-        "discount_curve_id",
         "vol_index_curve_id"
       ],
       "type": "object"
@@ -21671,7 +21538,7 @@
         },
         {
           "const": "american",
-          "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation. Periodic fund settlements do not reinstate an\nindividual deal's gross carry capacity or reassign returned capital to a\ndeal; later distributions continue to use that deal's original history.",
+          "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation settled once at fund end.",
           "type": "string"
         }
       ]

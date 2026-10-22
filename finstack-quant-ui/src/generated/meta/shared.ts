@@ -1364,7 +1364,7 @@ export default [
   {
     "path": "#/$defs/AssetPool/properties/cumulative_scheduled_amortization",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AssetPool/properties/cumulative_scheduled_amortization",
-    "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the original-balance denominator in\n[`current_loss_percentage`](super::StructuredCredit::current_loss_percentage),\nso it must be stated: omitting it understates the denominator and\noverstates the reported loss rate.",
+    "description": "Cumulative scheduled amortization (level-pay principal for amortizing assets).\n\nPart of the reconstructed original balance\n([`AssetPool::original_balance_or_reconstructed`]) when no explicit\n`original_balance` is supplied.",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
@@ -1925,7 +1925,7 @@ export default [
   {
     "path": "#/$defs/Autocallable/properties/coupon_barriers",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Autocallable/properties/coupon_barriers",
-    "description": "Coupon barriers corresponding to observation dates."
+    "description": "Coupon barriers as ratios of initial spot.\n\nCoupon eligibility is independent of the autocall barrier. Each entry\ncorresponds to the observation date at the same index."
   },
   {
     "path": "#/$defs/Autocallable/properties/coupon_barriers/items",
@@ -1959,7 +1959,6 @@ export default [
   {
     "path": "#/$defs/Autocallable/properties/div_yield_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Autocallable/properties/div_yield_id",
-    "default": null,
     "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
   },
   {
@@ -2009,7 +2008,6 @@ export default [
   {
     "path": "#/$defs/Autocallable/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Autocallable/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -2018,14 +2016,11 @@ export default [
     "path": "#/$defs/Autocallable/properties/memory_coupons",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Autocallable/properties/memory_coupons",
     "default": false,
-    "description": "Memory (\"Phoenix\") coupon feature.\n\nMissed coupons accrue until a later coupon barrier is met."
+    "description": "Memory (\"Phoenix\") coupon feature.\n\nWhen enabled, a coupon whose coupon barrier is missed accrues until a\nlater observation meets its coupon barrier. The current and all accrued\ncoupons are then paid on that observation's payment date. Coupon\neligibility remains independent of autocall eligibility."
   },
   {
     "path": "#/$defs/Autocallable/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Autocallable/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -2072,14 +2067,14 @@ export default [
   {
     "path": "#/$defs/Autocallable/properties/path_model",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Autocallable/properties/path_model",
-    "description": "Explicit path model selection; required to acknowledge model risk.",
+    "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation.",
     "ref": "#/$defs/EquityPathModel",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityPathModel"
   },
   {
     "path": "#/$defs/Autocallable/properties/payment_dates",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Autocallable/properties/payment_dates",
-    "description": "Contractual payment dates corresponding to observation dates."
+    "description": "Contractual payment dates for coupons and early redemption.\n\nEach entry corresponds to `observation_dates` at the same index."
   },
   {
     "path": "#/$defs/Autocallable/properties/payment_dates/items",
@@ -2090,7 +2085,6 @@ export default [
   {
     "path": "#/$defs/Autocallable/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Autocallable/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -2692,12 +2686,12 @@ export default [
   {
     "path": "#/$defs/BermudanSchedule",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSchedule",
-    "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates."
+    "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates.\n\nEach exercise date is the notification (decision) date on which the holder\nelects to exercise, as in QuantLib's `BermudanExercise`; any contractual\nnotice period is already reflected in where the dates sit, so the schedule\ncarries no separate notice lag."
   },
   {
     "path": "#/$defs/BermudanSchedule/properties/exercise_dates",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSchedule/properties/exercise_dates",
-    "description": "Exercise dates (must be sorted, typically on swap coupon dates)"
+    "description": "Exercise notification (decision) dates, sorted; typically one notice\nperiod before the swap coupon dates they enter on."
   },
   {
     "path": "#/$defs/BermudanSchedule/properties/exercise_dates/items",
@@ -2720,13 +2714,6 @@ export default [
   {
     "path": "#/$defs/BermudanSchedule/properties/lockout_end/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSchedule/properties/lockout_end/anyOf/1"
-  },
-  {
-    "path": "#/$defs/BermudanSchedule/properties/notice_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSchedule/properties/notice_days",
-    "description": "Notice period in business days before exercise",
-    "format": "uint32",
-    "minimum": 0
   },
   {
     "path": "#/$defs/BermudanSwaption",
@@ -4598,13 +4585,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/exercise_settlement_date/anyOf/1"
   },
   {
-    "path": "#/$defs/CdsOption/properties/exercise_style",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/exercise_style",
-    "description": "Exercise style",
-    "ref": "#/$defs/ExerciseStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExerciseStyle"
-  },
-  {
     "path": "#/$defs/CdsOption/properties/expiry",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/expiry",
     "description": "Option expiry date",
@@ -4658,21 +4638,6 @@ export default [
     "description": "Option type (Call = right to buy protection, Put = right to sell protection)",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType"
-  },
-  {
-    "path": "#/$defs/CdsOption/properties/premium_settlement_date",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/premium_settlement_date",
-    "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
-  },
-  {
-    "path": "#/$defs/CdsOption/properties/premium_settlement_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/CdsOption/properties/premium_settlement_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/1"
   },
   {
     "path": "#/$defs/CdsOption/properties/protection_start_convention",
@@ -5182,39 +5147,15 @@ export default [
     "description": "Principal exchange or notional flow.\n\nUsed for initial notional payment (at inception), final notional repayment\n(at maturity), or intermediate notional exchanges in cross-currency swaps.\nFor bonds: initial = purchase price, final = par redemption."
   },
   {
-    "path": "#/$defs/ClawbackSettle",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSettle",
-    "description": "Clawback settlement trigger."
-  },
-  {
-    "path": "#/$defs/ClawbackSettle/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSettle/oneOf/0",
-    "const": "fund_end",
-    "description": "Settle at fund termination"
-  },
-  {
-    "path": "#/$defs/ClawbackSettle/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSettle/oneOf/1",
-    "const": "periodic",
-    "description": "Settle at configured period ends before subsequent distributions.\nEuropean settlements update fund allocation balances. American settlements\nstay at fund level and do not rewrite individual deal entitlements."
-  },
-  {
     "path": "#/$defs/ClawbackSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSpec",
-    "description": "Clawback specification for GP carry reconciliation."
+    "description": "Clawback specification for GP carry reconciliation, settled at fund end\n(the date of the last fund event)."
   },
   {
     "path": "#/$defs/ClawbackSpec/properties/holdback_decimal",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSpec/properties/holdback_decimal",
     "description": "Optional share of GP carry held back until settlement, as a decimal\nfraction in `[0, 1]` (`0.2` = 20%)",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/ClawbackSpec/properties/settle_on",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSpec/properties/settle_on",
-    "description": "When to settle clawback",
-    "ref": "#/$defs/ClawbackSettle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSettle"
   },
   {
     "path": "#/$defs/ClearingStatus",
@@ -5270,7 +5211,6 @@ export default [
   {
     "path": "#/$defs/CliquetOption/properties/div_yield_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CliquetOption/properties/div_yield_id",
-    "default": null,
     "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
   },
   {
@@ -5319,7 +5259,6 @@ export default [
   {
     "path": "#/$defs/CliquetOption/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CliquetOption/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -5339,9 +5278,6 @@ export default [
   {
     "path": "#/$defs/CliquetOption/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CliquetOption/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -5377,7 +5313,7 @@ export default [
   {
     "path": "#/$defs/CliquetOption/properties/path_model",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CliquetOption/properties/path_model",
-    "description": "Explicit path model selection; required to acknowledge model risk.",
+    "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation.",
     "ref": "#/$defs/EquityPathModel",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityPathModel"
   },
@@ -5403,7 +5339,6 @@ export default [
   {
     "path": "#/$defs/CliquetOption/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CliquetOption/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -6634,7 +6569,7 @@ export default [
   {
     "path": "#/$defs/CommodityForward",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommodityForward",
-    "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_forward if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T) = Discount factor to settlement date\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations_core::instruments::Position;\nuse finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```"
+    "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_forward if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T_pay) = Discount factor to the payment date (see below)\n\n# Settlement\n\nThe forward fixes on `maturity` (the last pricing date) and pays\n[`CommodityForward::payment_date`]: `maturity` plus the effective settlement\nlag in business days on the effective settlement calendar, adjusted by the\neffective business-day convention (for example T+2 on the CME calendar for\nWTI). The value is zero once the payment date is before `as_of`.\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations_core::instruments::Position;\nuse finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```"
   },
   {
     "path": "#/$defs/CommodityForward/properties/attributes",
@@ -7039,21 +6974,6 @@ export default [
     "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")"
   },
   {
-    "path": "#/$defs/CommoditySpotOption/properties/convention",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/convention",
-    "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
-  },
-  {
-    "path": "#/$defs/CommoditySpotOption/properties/convention/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/convention/anyOf/0",
-    "ref": "#/$defs/CommodityConvention",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommodityConvention"
-  },
-  {
-    "path": "#/$defs/CommoditySpotOption/properties/convention/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/convention/anyOf/1"
-  },
-  {
     "path": "#/$defs/CommoditySpotOption/properties/currency",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/currency",
     "description": "Base currency for pricing",
@@ -7157,13 +7077,6 @@ export default [
     "description": "Option type (call or put).",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType"
-  },
-  {
-    "path": "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/premium_settlement_days",
-    "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
-    "format": "uint32",
-    "minimum": 0
   },
   {
     "path": "#/$defs/CommoditySpotOption/properties/quantity",
@@ -14966,7 +14879,7 @@ export default [
   {
     "path": "#/$defs/DelinquencyModel",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DelinquencyModel",
-    "description": "Roll-rate delinquency model with optional servicer advancing and loan\nmodification.\n\n`roll_rates[b]` and `cure_rates[b]` are monthly transition probabilities\nfor the balance in bucket `b` (bucket 0 = 30 days past due). The balance\nthat neither rolls nor cures stays in its bucket. The roll out of the last\nbucket is the charge-off, so a 30/60/90 model with charge-off at 120 days\nhas three entries.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_structured_credit::structured_credit::{\n    AdvancingPolicy, DelinquencyModel,\n};\n\nlet model = DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])\n    .with_advancing(AdvancingPolicy::PrincipalAndInterest {\n        recoverability_cap_pct: 100.0,\n        reimburse_from_collections: false,\n    });\nassert_eq!(model.buckets(), 3);\n```"
+    "description": "Roll-rate delinquency model with optional servicer advancing and loan\nmodification.\n\n`roll_rates[b]` and `cure_rates[b]` are monthly transition probabilities\nfor the balance in bucket `b` (bucket 0 = 30 days past due). The balance\nthat neither rolls nor cures stays in its bucket. The roll out of the last\nbucket is the charge-off, so a 30/60/90 model with charge-off at 120 days\nhas three entries.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_structured_credit::structured_credit::{\n    AdvancingPolicy, DelinquencyModel,\n};\n\nlet model = DelinquencyModel {\n    advancing: AdvancingPolicy::PrincipalAndInterest {\n        recoverability_cap_pct: 100.0,\n        reimburse_from_collections: false,\n    },\n    ..DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])\n};\nassert_eq!(model.buckets(), 3);\n```"
   },
   {
     "path": "#/$defs/DelinquencyModel/properties/advancing",
@@ -15237,7 +15150,6 @@ export default [
   {
     "path": "#/$defs/DiscountedCashFlow/properties/dilution_securities",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/dilution_securities",
-    "default": [],
     "description": "Dilutive securities (options, warrants, RSUs, convertibles) for treasury stock method."
   },
   {
@@ -15283,7 +15195,6 @@ export default [
   {
     "path": "#/$defs/DiscountedCashFlow/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -15291,9 +15202,6 @@ export default [
   {
     "path": "#/$defs/DiscountedCashFlow/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -15302,12 +15210,11 @@ export default [
     "path": "#/$defs/DiscountedCashFlow/properties/mid_year_convention",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/mid_year_convention",
     "default": false,
-    "description": "Discount curve identifier, used for risk attribution only.\n\nDiscounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`\nregardless of whether this curve is loaded (the\nprevious behavior silently switched risky flows to risk-free curve\ndiscounting). WACC sensitivity is exposed separately as `dcf::wacc01`.\nMid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon)."
+    "description": "Mid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon)."
   },
   {
     "path": "#/$defs/DiscountedCashFlow/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -15315,14 +15222,12 @@ export default [
   {
     "path": "#/$defs/DiscountedCashFlow/properties/shares_outstanding",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/shares_outstanding",
-    "default": null,
     "description": "Basic shares outstanding for per-share value calculation.",
     "format": "double"
   },
   {
     "path": "#/$defs/DiscountedCashFlow/properties/terminal_flow_override",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/terminal_flow_override",
-    "default": null,
     "description": "Annualized terminal flow used by growth-perpetuity terminal values.\n\nGordon Growth and H-Model capitalize an *annual* flow with annual\nWACC and growth rates. When the explicit `flows` grid is sub-annual\n(e.g. quarterly), the last flow is a period flow, not an annual one;\nset this to the trailing-twelve-month aggregate of the final\nexplicit year so the terminal value is computed on a consistent\nannual basis (Koller et al., Damodaran). When `None`, the last\nexplicit flow is used directly (correct for annual grids).\n\nIgnored by `ExitMultiple` terminal values.",
     "format": "double"
   },
@@ -15343,7 +15248,6 @@ export default [
   {
     "path": "#/$defs/DiscountedCashFlow/properties/valuation_discounts",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/valuation_discounts",
-    "default": null,
     "description": "Private company valuation discounts (DLOM, DLOC)."
   },
   {
@@ -15765,7 +15669,7 @@ export default [
   {
     "path": "#/$defs/Equity",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Equity",
-    "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals.\n\nSee unit tests and `examples/` for usage."
+    "description": "Simple equity (spot) instrument.\n\nRepresents a spot equity position that can be priced using market data.\nThe price can come from direct market quotes or be computed from\nunderlying fundamentals."
   },
   {
     "path": "#/$defs/Equity/properties/attributes",
@@ -16470,7 +16374,6 @@ export default [
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/discrete_dividends",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/discrete_dividends",
-    "default": [],
     "description": "Optional discrete cash dividends `(ex_date, amount)` for the underlying.\n\nWhen non-empty, pricing uses explicit period dividend pass-through and does\nnot add continuous-yield dividend return to avoid double counting."
   },
   {
@@ -16491,7 +16394,7 @@ export default [
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/dividend_settlement",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/dividend_settlement",
-    "description": "Settlement timing for explicit manufactured dividends.",
+    "description": "Settlement timing for explicit manufactured dividends.\n\nThis field is mandatory because dividend-date and period-end settlement\ndiffer by the funding carry between the two dates.",
     "ref": "#/$defs/TrsDividendSettlement",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrsDividendSettlement"
   },
@@ -16525,7 +16428,6 @@ export default [
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -16533,7 +16435,6 @@ export default [
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/margin_spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/margin_spec",
-    "default": null,
     "description": "Optional OTC margin specification for VM/IM.\n\nEquity TRS use SIMM equity bucket for margin calculation."
   },
   {
@@ -16549,9 +16450,6 @@ export default [
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -16566,8 +16464,7 @@ export default [
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/past_fixings",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/past_fixings",
-    "default": [],
-    "description": "Observed underlying levels at past reset (period-start) dates.\n\nFor a seasoned TRS valued inside a return period, the total-return leg\nmust anchor the current period to the level *observed* at the period\nstart so the realized spot move enters the PV (equity delta). Provide\n`(reset_date, level)` pairs for every period-start date on or before\nthe valuation date; the first period may use `initial_level` instead.\nPricing errors when the current period's start level is unavailable."
+    "description": "Observed underlying levels at contractual reset boundaries.\n\nProvide `(reset_date, level)` for each boundary on or before the\nvaluation date that is needed by an unpaid return period. This includes\nthe final period end when payment lag leaves its cashflow outstanding.\nThe first boundary may use `initial_level`; a boundary equal to `as_of`\nmay use live spot. Pricing errors when any other required fixing is\nunavailable."
   },
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/past_fixings/items",
@@ -16587,7 +16484,6 @@ export default [
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -16602,7 +16498,7 @@ export default [
   {
     "path": "#/$defs/EquityTotalReturnSwap/properties/side",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnSwap/properties/side",
-    "description": "Trade side (receive/pay total return).",
+    "description": "Trade side: `receive` receives the total-return leg and pays financing;\n`pay` pays the total return and receives financing.",
     "ref": "#/$defs/PayReceive",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayReceive"
   },
@@ -19007,15 +18903,24 @@ export default [
   {
     "path": "#/$defs/FxForward/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/attributes",
-    "description": "Attributes for scenario selection and tagging.",
+    "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
     "path": "#/$defs/FxForward/properties/base_calendar_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/base_calendar_id",
-    "default": null,
     "description": "Optional base currency calendar for business day adjustment."
+  },
+  {
+    "path": "#/$defs/FxForward/properties/base_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/base_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxForward/properties/base_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/base_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/FxForward/properties/base_currency",
@@ -19027,7 +18932,6 @@ export default [
   {
     "path": "#/$defs/FxForward/properties/contract_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/contract_rate",
-    "default": null,
     "description": "Contract forward rate (quote per base). If None, valued at-market.",
     "format": "double"
   },
@@ -19055,7 +18959,6 @@ export default [
   {
     "path": "#/$defs/FxForward/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -19070,9 +18973,6 @@ export default [
   {
     "path": "#/$defs/FxForward/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -19087,8 +18987,17 @@ export default [
   {
     "path": "#/$defs/FxForward/properties/quote_calendar_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/quote_calendar_id",
-    "default": null,
     "description": "Optional quote currency calendar for business day adjustment."
+  },
+  {
+    "path": "#/$defs/FxForward/properties/quote_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/quote_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxForward/properties/quote_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/quote_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/FxForward/properties/quote_currency",
@@ -19100,14 +19009,12 @@ export default [
   {
     "path": "#/$defs/FxForward/properties/quoted_spot",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/quoted_spot",
-    "default": null,
     "description": "Optional spot rate override (quote per base). If None, source from FxMatrix.",
     "format": "double"
   },
   {
     "path": "#/$defs/FxForward/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -19370,6 +19277,16 @@ export default [
     "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
   },
   {
+    "path": "#/$defs/FxSpot/properties/base_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/base_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxSpot/properties/base_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/base_calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/FxSpot/properties/base_currency",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/base_currency",
     "description": "Base currency (the currency being priced)",
@@ -19387,7 +19304,6 @@ export default [
   {
     "path": "#/$defs/FxSpot/properties/domestic_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/domestic_discount_curve_id",
-    "default": null,
     "description": "Optional quote-currency discount curve for PV-ing the settlement\ncashflow. When absent the settlement amount is reported undiscounted\n(a 1–2 day effect for standard spot lags)."
   },
   {
@@ -19410,7 +19326,6 @@ export default [
   {
     "path": "#/$defs/FxSpot/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -19418,9 +19333,6 @@ export default [
   {
     "path": "#/$defs/FxSpot/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -19438,6 +19350,16 @@ export default [
     "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
   },
   {
+    "path": "#/$defs/FxSpot/properties/quote_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/quote_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxSpot/properties/quote_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/quote_calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/FxSpot/properties/quote_currency",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/quote_currency",
     "description": "Quote currency (the currency used for pricing)",
@@ -19453,7 +19375,6 @@ export default [
   {
     "path": "#/$defs/FxSpot/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -19462,7 +19383,7 @@ export default [
     "path": "#/$defs/FxSpot/properties/settlement_date",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/settlement_date",
     "default": null,
-    "description": "Optional explicit settlement (value) date"
+    "description": "Optional explicit settlement (value) date. When set it is only\nbusiness-day adjusted and `settlement_days` is ignored."
   },
   {
     "path": "#/$defs/FxSpot/properties/settlement_date/anyOf/0",
@@ -19477,7 +19398,7 @@ export default [
   {
     "path": "#/$defs/FxSpot/properties/settlement_days",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot/properties/settlement_days",
-    "description": "Optional T+N settlement lag in business days when `settlement_date` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
+    "description": "Optional contractual T+N settlement lag in business days when\n`settlement_date` is not provided.\n\n`None` uses the pair-aware default from\n[`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value\noverrides that default.",
     "format": "uint32",
     "minimum": 0
   },
@@ -19489,62 +19410,69 @@ export default [
   {
     "path": "#/$defs/FxSwap/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/attributes",
-    "description": "Attributes for scenario selection and tagging.",
+    "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
     "path": "#/$defs/FxSwap/properties/base_calendar_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/base_calendar_id",
-    "default": null,
     "description": "Optional base currency calendar for spot/settlement adjustment metadata."
+  },
+  {
+    "path": "#/$defs/FxSwap/properties/base_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/base_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxSwap/properties/base_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/base_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/FxSwap/properties/base_currency",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/base_currency",
-    "description": "Base currency (foreign).",
+    "description": "Base currency (foreign)",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
     "path": "#/$defs/FxSwap/properties/domestic_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/domestic_discount_curve_id",
-    "description": "Domestic discount curve id (quote currency).",
+    "description": "Domestic discount curve id (quote currency)",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/FxSwap/properties/far_date",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/far_date",
-    "description": "Far leg settlement date (forward leg).",
+    "description": "Far leg settlement date (forward leg)",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/FxSwap/properties/far_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/far_rate",
-    "default": null,
     "description": "Optional far leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to far settlement.",
     "format": "double"
   },
   {
     "path": "#/$defs/FxSwap/properties/foreign_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/foreign_discount_curve_id",
-    "description": "Foreign discount curve id (base currency).",
+    "description": "Foreign discount curve id (base currency)",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/FxSwap/properties/id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/id",
-    "description": "Unique instrument identifier.",
+    "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/FxSwap/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -19552,9 +19480,6 @@ export default [
   {
     "path": "#/$defs/FxSwap/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -19562,41 +19487,48 @@ export default [
   {
     "path": "#/$defs/FxSwap/properties/near_date",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/near_date",
-    "description": "Near leg settlement date (spot leg).",
+    "description": "Near leg settlement date (spot leg)",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/FxSwap/properties/near_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/near_rate",
-    "default": null,
     "description": "Optional near leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to near settlement.",
     "format": "double"
   },
   {
     "path": "#/$defs/FxSwap/properties/notional",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/notional",
-    "description": "Notional amount in base currency (exchanged on near, reversed on far).",
+    "description": "Notional amount in base currency (exchanged on near, reversed on far)",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
     "path": "#/$defs/FxSwap/properties/quote_calendar_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/quote_calendar_id",
-    "default": null,
     "description": "Optional quote currency calendar for spot/settlement adjustment metadata."
+  },
+  {
+    "path": "#/$defs/FxSwap/properties/quote_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/quote_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxSwap/properties/quote_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/quote_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/FxSwap/properties/quote_currency",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/quote_currency",
-    "description": "Quote currency (domestic).",
+    "description": "Quote currency (domestic)",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
     "path": "#/$defs/FxSwap/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSwap/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -23376,15 +23308,24 @@ export default [
   {
     "path": "#/$defs/Ndf/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/attributes",
-    "description": "Attributes for scenario selection and tagging.",
+    "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
     "path": "#/$defs/Ndf/properties/base_calendar_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/base_calendar_id",
-    "default": null,
     "description": "Optional base currency calendar."
+  },
+  {
+    "path": "#/$defs/Ndf/properties/base_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/base_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/Ndf/properties/base_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/base_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/Ndf/properties/base_currency",
@@ -23396,8 +23337,7 @@ export default [
   {
     "path": "#/$defs/Ndf/properties/contract_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/contract_rate",
-    "default": null,
-    "description": "Contract forward rate. Interpretation depends on `quote_convention`.\n`None` values the NDF at-market.",
+    "description": "Contract forward rate. Interpretation depends on `quote_convention`:\n- BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)\n- SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)\n\n`None` values the NDF at-market: the contract rate equals the market\nforward, so the settlement amount and PV are zero.",
     "format": "double"
   },
   {
@@ -23417,8 +23357,7 @@ export default [
   {
     "path": "#/$defs/Ndf/properties/fixing_source",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/fixing_source",
-    "default": null,
-    "description": "Official fixing source/benchmark enum for type-safe specification."
+    "description": "Official fixing source/benchmark enum for type-safe specification.\n\nUse this field for validated fixing sources.\nSee [`NdfFixingSource`] for supported benchmarks and their typical currencies."
   },
   {
     "path": "#/$defs/Ndf/properties/fixing_source/anyOf/0",
@@ -23433,8 +23372,7 @@ export default [
   {
     "path": "#/$defs/Ndf/properties/foreign_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/foreign_discount_curve_id",
-    "default": null,
-    "description": "Optional foreign (base) currency discount curve ID."
+    "description": "Optional foreign (base) currency discount curve ID.\nRequired for pre-fixing forward estimation unless `quoted_forward`\nis supplied."
   },
   {
     "path": "#/$defs/Ndf/properties/foreign_discount_curve_id/anyOf/0",
@@ -23456,7 +23394,6 @@ export default [
   {
     "path": "#/$defs/Ndf/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -23471,9 +23408,6 @@ export default [
   {
     "path": "#/$defs/Ndf/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -23488,8 +23422,7 @@ export default [
   {
     "path": "#/$defs/Ndf/properties/observed_fixing",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/observed_fixing",
-    "default": null,
-    "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
+    "description": "Observed fixing rate. Interpretation depends on `quote_convention`.\nIf Some, NDF is post-fixing.",
     "format": "double"
   },
   {
@@ -23502,21 +23435,18 @@ export default [
   {
     "path": "#/$defs/Ndf/properties/quoted_forward",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/quoted_forward",
-    "default": null,
-    "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+    "description": "Explicit pre-fixing forward rate in `quote_convention` units.\n\nUse this for NDF market quotes or basis-adjusted forwards when a base\ncurrency discount curve is unavailable.",
     "format": "double"
   },
   {
     "path": "#/$defs/Ndf/properties/quoted_spot",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/quoted_spot",
-    "default": null,
-    "description": "Optional spot rate override for forward rate calculation.",
+    "description": "Optional spot rate override for forward rate calculation.\nInterpretation depends on `quote_convention`.",
     "format": "double"
   },
   {
     "path": "#/$defs/Ndf/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -23524,8 +23454,17 @@ export default [
   {
     "path": "#/$defs/Ndf/properties/settlement_calendar_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/settlement_calendar_id",
-    "default": null,
     "description": "Optional settlement currency calendar."
+  },
+  {
+    "path": "#/$defs/Ndf/properties/settlement_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/settlement_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/Ndf/properties/settlement_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Ndf/properties/settlement_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/Ndf/properties/settlement_currency",
@@ -25352,21 +25291,21 @@ export default [
   {
     "path": "#/$defs/QuantoOption/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/attributes",
-    "description": "Attributes for scenario selection and grouping.",
+    "description": "Attributes for scenario selection and grouping",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
     "path": "#/$defs/QuantoOption/properties/base_currency",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/base_currency",
-    "description": "Base currency (equity denomination).",
+    "description": "Base currency (equity denomination)",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
     "path": "#/$defs/QuantoOption/properties/correlation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/correlation",
-    "description": "Correlation between equity price and FX rate.",
+    "description": "Correlation between equity price and FX rate",
     "format": "double"
   },
   {
@@ -25380,8 +25319,7 @@ export default [
   {
     "path": "#/$defs/QuantoOption/properties/div_yield_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/div_yield_id",
-    "default": null,
-    "description": "Optional dividend-yield scalar ID."
+    "description": "Optional dividend-yield scalar ID"
   },
   {
     "path": "#/$defs/QuantoOption/properties/div_yield_id/anyOf/0",
@@ -25396,29 +25334,28 @@ export default [
   {
     "path": "#/$defs/QuantoOption/properties/domestic_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/domestic_discount_curve_id",
-    "description": "Discount curve ID (domestic currency).",
+    "description": "Discount curve ID (domestic currency)",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/QuantoOption/properties/expiry",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/expiry",
-    "description": "Option expiry date.",
+    "description": "Option expiry date",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/QuantoOption/properties/foreign_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/foreign_discount_curve_id",
-    "description": "Discount curve ID (foreign currency).",
+    "description": "Discount curve ID (foreign currency)",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/QuantoOption/properties/fx_spot_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/fx_spot_id",
-    "default": null,
-    "description": "Optional FX rate identifier."
+    "description": "Optional FX rate identifier.\n\nThe referenced scalar must be quoted as **quote currency per unit of\nbase currency** (e.g. for base JPY / quote USD, USD-per-JPY ≈ 0.0071,\nconventionally named `JPYUSD`). The pricer compounds it with\n`exp((r_quote − r_base)·t)` to obtain the ATM forward for the FX vol\nlookup, so an inverted quote (JPY-per-USD) silently mislocates the\nsmile. `validate()` rejects ids whose embedded pair name contradicts\nthis direction."
   },
   {
     "path": "#/$defs/QuantoOption/properties/fx_spot_id/anyOf/0",
@@ -25433,8 +25370,7 @@ export default [
   {
     "path": "#/$defs/QuantoOption/properties/fx_vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/fx_vol_surface_id",
-    "default": null,
-    "description": "Optional FX volatility surface ID."
+    "description": "Optional FX volatility surface ID.\n\nMust be calibrated in the same **quote-per-base** direction as\n`fx_spot_id` so absolute-strike lookups at the CIRP forward land on\nthe correct smile. `validate()` rejects ids whose embedded pair name\ncontradicts this direction."
   },
   {
     "path": "#/$defs/QuantoOption/properties/fx_vol_surface_id/anyOf/0",
@@ -25449,14 +25385,13 @@ export default [
   {
     "path": "#/$defs/QuantoOption/properties/id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/id",
-    "description": "Unique instrument identifier.",
+    "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/QuantoOption/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -25464,9 +25399,6 @@ export default [
   {
     "path": "#/$defs/QuantoOption/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -25474,42 +25406,39 @@ export default [
   {
     "path": "#/$defs/QuantoOption/properties/notional",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/notional",
-    "description": "Strike-equivalent domestic reference notional.",
+    "description": "Strike-equivalent domestic reference notional.\n\nWhen `quantity` and `payoff_fx_rate` are supplied, this must\nequal `quantity * payoff_fx_rate * strike`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
     "path": "#/$defs/QuantoOption/properties/option_type",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/option_type",
-    "description": "Option type (call or put).",
+    "description": "Option type (call or put)",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType"
   },
   {
     "path": "#/$defs/QuantoOption/properties/payoff_fx_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/payoff_fx_rate",
-    "default": null,
-    "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.",
+    "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.\n\nExample: for a JPY-underlying option settled in USD at a fixed 140 JPY/USD\nconversion, `payoff_fx_rate` is `1.0 / 140.0` USD per JPY.",
     "format": "double"
   },
   {
     "path": "#/$defs/QuantoOption/properties/quantity",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/quantity",
-    "default": null,
-    "description": "Number of underlying units covered by the option payoff.",
+    "description": "Number of underlying units covered by the option payoff.\n\nQuanto pricing is performed per unit of the underlying in the base currency.\nThis quantity converts the per-unit price into contract-level exposure.",
     "format": "double"
   },
   {
     "path": "#/$defs/QuantoOption/properties/quote_currency",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/quote_currency",
-    "description": "Quote currency (payment/settlement currency).",
+    "description": "Quote currency (payment/settlement currency)",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
     "path": "#/$defs/QuantoOption/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -25517,7 +25446,7 @@ export default [
   {
     "path": "#/$defs/QuantoOption/properties/spot_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/spot_id",
-    "description": "Equity spot price identifier.",
+    "description": "Equity spot price identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
@@ -25530,12 +25459,12 @@ export default [
   {
     "path": "#/$defs/QuantoOption/properties/underlying_ticker",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/underlying_ticker",
-    "description": "Underlying equity ticker symbol."
+    "description": "Underlying equity ticker symbol"
   },
   {
     "path": "#/$defs/QuantoOption/properties/vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/QuantoOption/properties/vol_surface_id",
-    "description": "Equity volatility surface ID.",
+    "description": "Equity volatility surface ID",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
@@ -26070,7 +25999,6 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/acquisition_costs",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/acquisition_costs",
-    "default": [],
     "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation."
   },
   {
@@ -26082,7 +26010,6 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/appraisal_value",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/appraisal_value",
-    "default": null,
     "description": "Optional appraisal override value."
   },
   {
@@ -26106,14 +26033,12 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/cap_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/cap_rate",
-    "default": null,
     "description": "Capitalization rate for direct cap (annualized).",
     "format": "double"
   },
   {
     "path": "#/$defs/RealEstateAsset/properties/capex_schedule",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/capex_schedule",
-    "default": null,
     "description": "Capital expenditure schedule (date, amount). Values are treated as **positive outflows**.\n\nWhen present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow)."
   },
   {
@@ -26148,21 +26073,18 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/discount_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/discount_rate",
-    "default": null,
     "description": "Discount rate for DCF (annualized).",
     "format": "double"
   },
   {
     "path": "#/$defs/RealEstateAsset/properties/disposition_cost_decimal",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/disposition_cost_decimal",
-    "default": null,
     "description": "Optional disposition cost percentage applied to terminal value.\n\nA value of `0.02` represents 2% selling costs. Must be in \\([0, 1)\\).",
     "format": "double"
   },
   {
     "path": "#/$defs/RealEstateAsset/properties/disposition_costs",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/disposition_costs",
-    "default": [],
     "description": "Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds."
   },
   {
@@ -26181,7 +26103,6 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -26189,9 +26110,6 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -26199,7 +26117,7 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/noi_schedule",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/noi_schedule",
-    "description": "Net operating income schedule (date, amount)."
+    "description": "Net operating income schedule (date, amount).\n\nEntries must be **annual** NOI amounts: cap-rate formulas (direct cap,\nexit-cap terminal value, going-in cap rate) apply a quoted annual cap\nrate to a single schedule entry, so a monthly or quarterly schedule\nwould understate those values by 12x/4x. Flows dated exactly on the\nvaluation `as_of` are included in PV undiscounted (t = 0)."
   },
   {
     "path": "#/$defs/RealEstateAsset/properties/noi_schedule/items",
@@ -26219,7 +26137,6 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/property_type",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/property_type",
-    "default": null,
     "description": "Optional property type classification (for reporting)."
   },
   {
@@ -26235,7 +26152,6 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/purchase_price",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/purchase_price",
-    "default": null,
     "description": "Optional purchase price (useful for IRR / cap rate metrics)."
   },
   {
@@ -26251,7 +26167,6 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/sale_date",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/sale_date",
-    "default": null,
     "description": "Optional sale/exit date that truncates the DCF horizon.\n\nWhen set, DCF only values unlevered flows up to and including `sale_date`.\nTerminal proceeds (if configured) are realized on `sale_date`."
   },
   {
@@ -26267,7 +26182,6 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/sale_price",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/sale_price",
-    "default": null,
     "description": "Optional explicit gross sale price (terminal proceeds), before disposition costs.\n\nWhen set, this takes precedence over `terminal_cap_rate` for terminal proceeds."
   },
   {
@@ -26283,7 +26197,6 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -26291,22 +26204,19 @@ export default [
   {
     "path": "#/$defs/RealEstateAsset/properties/stabilized_noi",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/stabilized_noi",
-    "default": null,
     "description": "Optional stabilized NOI override for direct cap.",
     "format": "double"
   },
   {
     "path": "#/$defs/RealEstateAsset/properties/terminal_cap_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/terminal_cap_rate",
-    "default": null,
     "description": "Optional terminal cap rate for DCF (uses last NOI).",
     "format": "double"
   },
   {
     "path": "#/$defs/RealEstateAsset/properties/terminal_growth_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/terminal_growth_rate",
-    "default": null,
-    "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is).\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
+    "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is, i.e. a trailing-NOI\nterminal value). Exactly **one** period of growth is applied to the last\nNOI on/before the exit date — it is not compounded over any gap between\nthe last scheduled NOI and a later `sale_date`.\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
     "format": "double"
   },
   {
@@ -29364,7 +29274,7 @@ export default [
   {
     "path": "#/$defs/StructuredCredit/properties/waterfall",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit/properties/waterfall",
-    "description": "Custom payment waterfall used verbatim for pricing.\n\n`None` (the default) synthesizes the canonical sequential template from\nthe tranche structure ([`Waterfall::standard_sequential`]) plus any\n[`Self::fees`]. When set, this waterfall is authoritative:\n[`Self::create_waterfall`] returns it (with deal-level\n[`Self::coverage_triggers`] appended) and no template is synthesized.\n[`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,\ncontrolled accumulation) still apply — they rewrite tiers generically by\n`payment_type`, so they compose with custom structures.\n\nThe waterfall also **defines each tranche's interest claim** (not just\ncash allocation): an uncapped `TrancheInterest` recipient owes the full\ncoupon accrual, a `CappedTrancheInterest` recipient owes the capped\ncoupon (the capped-off portion is never owed and never defers), and a\ndebt tranche with **no** interest recipient owes nothing (a\nprincipal-only class). Equity is exempt: its interest/principal split\nis a reporting convention driven by the tranche's metadata coupon.\n\nConstraints, enforced by [`Self::with_waterfall`] and re-checked at\npricing time so JSON-supplied deals get identical errors:\n- every tranche referenced by a tier recipient or coverage trigger must\n  exist in `tranches`, and tranche-keyed recipients must not target an\n  equity tranche (the engine records equity flows under\n  [`RecipientType::Equity`], paid via `ResidualCash`);\n- at most one interest-type recipient may name a given tranche (the\n  claim definition must be unambiguous);\n- `fees` must be `None` — senior fees are expressed as *leading*\n  [`PaymentType::Fee`] tiers of the custom waterfall, which then feed\n  the IC numerator and excess-spread/reserve sizing exactly like\n  template fees (fee tiers ranked below note interest are junior fees\n  and are deliberately not netted as senior claims);\n- the waterfall's `currency` must match the pool currency."
+    "description": "Custom payment waterfall used verbatim for pricing.\n\n`None` (the default) synthesizes the canonical sequential template from\nthe tranche structure ([`Waterfall::standard_sequential`]) plus any\n[`Self::fees`]. When set, this waterfall is authoritative:\n[`Self::create_waterfall`] returns it (with deal-level\n[`Self::coverage_triggers`] appended) and no template is synthesized.\n[`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,\ncontrolled accumulation) still apply — they rewrite tiers generically by\n`payment_type`, so they compose with custom structures.\n\nThe waterfall also **defines each tranche's interest claim** (not just\ncash allocation): an uncapped `TrancheInterest` recipient owes the full\ncoupon accrual, a `CappedTrancheInterest` recipient owes the capped\ncoupon (the capped-off portion is never owed and never defers), and a\ndebt tranche with **no** interest recipient owes nothing (a\nprincipal-only class). Equity is exempt: its interest/principal split\nis a reporting convention driven by the tranche's metadata coupon.\n\nConstraints, enforced by `validate_invariants` and at pricing time so\nevery construction path gets identical errors:\n- every tranche referenced by a tier recipient or coverage trigger must\n  exist in `tranches`, and tranche-keyed recipients must not target an\n  equity tranche (the engine records equity flows under\n  [`RecipientType::Equity`], paid via `ResidualCash`);\n- at most one interest-type recipient may name a given tranche (the\n  claim definition must be unambiguous);\n- `fees` must be `None` — senior fees are expressed as *leading*\n  [`PaymentType::Fee`] tiers of the custom waterfall, which then feed\n  the IC numerator and excess-spread/reserve sizing exactly like\n  template fees (fee tiers ranked below note interest are junior fees\n  and are deliberately not netted as senior claims);\n- the waterfall's `currency` must match the pool currency."
   },
   {
     "path": "#/$defs/StructuredCredit/properties/waterfall_rules",
@@ -30808,7 +30718,7 @@ export default [
   {
     "path": "#/$defs/VolatilityIndexFuture",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityIndexFuture",
-    "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```"
+    "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```"
   },
   {
     "path": "#/$defs/VolatilityIndexFuture/properties/attributes",
@@ -30817,13 +30727,6 @@ export default [
     "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
-  },
-  {
-    "path": "#/$defs/VolatilityIndexFuture/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityIndexFuture/properties/discount_curve_id",
-    "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/VolatilityIndexFuture/properties/id",
@@ -31110,7 +31013,7 @@ export default [
     "path": "#/$defs/WaterfallStyle/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/WaterfallStyle/oneOf/1",
     "const": "american",
-    "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation. Periodic fund settlements do not reinstate an\nindividual deal's gross carry capacity or reassign returned capital to a\ndeal; later distributions continue to use that deal's original history."
+    "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation settled once at fund end."
   },
   {
     "path": "#/$defs/WaterfallTier",
@@ -31980,12 +31883,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CFKind",
     "ref": "#/$defs/CFKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CFKind"
-  },
-  {
-    "path": "#/properties/ClawbackSettle",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/ClawbackSettle",
-    "ref": "#/$defs/ClawbackSettle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSettle"
   },
   {
     "path": "#/properties/ClawbackSpec",
