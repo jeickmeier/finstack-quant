@@ -96,7 +96,7 @@ fn test_df_from_yield_annual() {
     let df = df_from_yield(
         ytm,
         t,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
         Tenor::annual(),
     )
     .unwrap();
@@ -181,7 +181,7 @@ fn test_df_from_yield_validation_errors_cover_multiple_compounding_modes() {
     assert!(df_from_yield(
         -1.5,
         1.0,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
         Tenor::annual()
     )
     .is_err());
@@ -233,7 +233,7 @@ fn test_df_from_yield_zero_ytm() {
     let df_annual = df_from_yield(
         0.0,
         t,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
         Tenor::annual(),
     )
     .unwrap();
@@ -257,7 +257,7 @@ fn test_df_from_yield_high_ytm() {
     let df = df_from_yield(
         ytm,
         t,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
         Tenor::annual(),
     )
     .unwrap();
@@ -284,7 +284,7 @@ fn test_price_from_ytm_compounded_params_single_flow() {
         &flows,
         as_of,
         ytm,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
     )
     .unwrap();
 
@@ -389,7 +389,7 @@ fn test_price_from_ytm_compounded_params_past_flows_ignored() {
         &flows,
         as_of,
         ytm,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
     )
     .unwrap();
 
@@ -422,7 +422,7 @@ fn test_price_from_ytm_compounded_params_zero_ytm() {
         &flows,
         as_of,
         0.0,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
     )
     .unwrap();
 
@@ -442,7 +442,7 @@ fn test_price_from_ytm_compounded_params_empty_flows() {
         &flows,
         as_of,
         0.05,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
     )
     .unwrap();
 
@@ -466,7 +466,7 @@ fn test_price_from_ytm_compounded_params_different_day_counts() {
         &flows,
         as_of,
         ytm,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
     )
     .unwrap();
 
@@ -476,7 +476,7 @@ fn test_price_from_ytm_compounded_params_different_day_counts() {
         &flows,
         as_of,
         ytm,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
     )
     .unwrap();
 
@@ -505,7 +505,7 @@ fn test_price_from_ytm_compounded_params_long_maturity() {
         &flows,
         as_of,
         ytm,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
     )
     .unwrap();
 
@@ -533,7 +533,7 @@ fn test_price_from_ytm_compounded_params_continuous_vs_annual() {
         &flows,
         as_of,
         ytm,
-        YieldCompounding::Rate(Compounding::Annual),
+        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
     )
     .unwrap();
 

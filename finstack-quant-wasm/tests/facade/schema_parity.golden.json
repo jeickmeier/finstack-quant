@@ -112,7 +112,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1255814
+            "bytes": 1255617
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -1211,15 +1211,7 @@
       "llm": {
         "id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
         "title": "AmortizationSpec",
-        "keys": [
-          "$defs",
-          "$id",
-          "$schema",
-          "description",
-          "examples",
-          "oneOf",
-          "title"
-        ],
+        "keys": ["$defs", "$id", "$schema", "description", "examples", "oneOf", "title"],
         "definitions": ["Currency", "Date", "DecimalWire", "Money"]
       },
       "report": [
@@ -1993,7 +1985,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1150051
+            "bytes": 1149854
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2014,7 +2006,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
             "type_name": "ScenarioEnvelope",
             "kind": "input",
-            "bytes": 103151
+            "bytes": 102983
           },
           {
             "path": "schemas/scenarios/1/template_metadata.schema.json",
@@ -2115,7 +2107,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 382198
+            "bytes": 382001
           },
           {
             "path": "schemas/statements/1/metric_registry.schema.json",
@@ -2668,7 +2660,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 63653
+            "bytes": 63456
           },
           {
             "path": "schemas/common/1/ir_future_conventions.schema.json",
@@ -3572,7 +3564,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1255814
+            "bytes": 1255617
           },
           {
             "domain": "attribution",
@@ -4452,7 +4444,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1150051
+            "bytes": 1149854
           },
           {
             "domain": "scenarios",
@@ -4476,7 +4468,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
             "type_name": "ScenarioEnvelope",
             "kind": "input",
-            "bytes": 103151
+            "bytes": 102983
           },
           {
             "domain": "scenarios",
@@ -4500,7 +4492,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 382198
+            "bytes": 382001
           },
           {
             "domain": "statements",
@@ -4668,7 +4660,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 63653
+            "bytes": 63456
           },
           {
             "domain": "valuations",
@@ -5888,12 +5880,7 @@
           "title",
           "type"
         ],
-        "definitions": [
-          "Adjustment",
-          "AdjustmentCap",
-          "AdjustmentValue",
-          "CapBaseMode"
-        ]
+        "definitions": ["Adjustment", "AdjustmentCap", "AdjustmentValue", "CapBaseMode"]
       },
       "statement_result_schema": {
         "id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
@@ -6056,15 +6043,7 @@
     "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
       "title": "FeeSpec",
-      "keys": [
-        "$defs",
-        "$id",
-        "$schema",
-        "description",
-        "examples",
-        "oneOf",
-        "title"
-      ],
+      "keys": ["$defs", "$id", "$schema", "description", "examples", "oneOf", "title"],
       "definitions": ["FeeAccrualBasis", "FeeBase", "StubKind"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json": {
@@ -6142,11 +6121,7 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "CashFlowMeta",
-        "CashflowRepresentation",
-        "ProjectedFixing"
-      ]
+      "definitions": ["CashFlowMeta", "CashflowRepresentation", "ProjectedFixing"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json",

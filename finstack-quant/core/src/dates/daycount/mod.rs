@@ -817,6 +817,7 @@ mod tests {
 
     #[test]
     fn daycount_from_str_rejects_retired_spellings() {
+        // schema-rejection-test: retired spellings must never regain parser support.
         for rejected in [
             "1/1",
             "ACT/360",

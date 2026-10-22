@@ -77,7 +77,7 @@ mise run rust-lint && mise run rust-test
 - `finstack-quant/core/src/market_data/surfaces/vol_surface.rs`
 - `finstack-quant/core/src/market_data/surfaces/mod.rs`
 - `finstack-quant-py/src/bindings/core/market_data/surfaces.rs`
-- `finstack-quant-wasm/src/api/core_ns/market_data/surfaces.rs`
+- `finstack-quant-wasm/src/api/core/surfaces.rs`
 - `finstack-quant-py/finstack_quant/core.pyi`
 - `parity_contract.toml`
 

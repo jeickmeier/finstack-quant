@@ -19,7 +19,7 @@ Both flavors are simplification opportunities. This reference tells you how to d
 For any Rust type or function `Foo` in `finstack-quant/<crate>/src/...`:
 
 - **Python binding** lives under `finstack-quant-py/src/bindings/<crate>/` (mirrors Rust crate tree exactly).
-- **WASM binding** lives under `finstack-quant-wasm/src/api/<crate_ns>/` where `<crate_ns>` is e.g. `core_ns`, `analytics`, `margin`, etc.
+- **WASM binding** lives under `finstack-quant-wasm/src/api/<namespace>/` where `<namespace>` is e.g. `core`, `analytics`, `margin`, etc.
 - **Python type stubs** are at `finstack-quant-py/finstack_quant/*.pyi` — derived from the binding code and the parity contract.
 - **JS facade** is at `finstack-quant-wasm/index.js` — hand-written, not auto-generated from pkg/.
 - **Parity contract** is at `finstack-quant-py/parity_contract.toml`.

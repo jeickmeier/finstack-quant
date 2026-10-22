@@ -889,7 +889,9 @@
   "Compounding": {
    "simple": "simple",
    "continuous": "continuous",
-   "annual": "annual",
+   "periodic(1)": {
+    "periodic": 1
+   },
    "semi_annual": {
     "periodic": 2
    },

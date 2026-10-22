@@ -1778,9 +1778,12 @@ fn tiny_annual_zero_rate_avoids_subtractive_cancellation() {
         .build()
         .unwrap();
     let expected = (1.0 - df) / df;
-    assert!((curve.zero_rate(1.0, Compounding::Annual) - expected).abs() < 1e-23);
+    assert!(
+        (curve.zero_rate(1.0, Compounding::Periodic(std::num::NonZeroU32::MIN)) - expected).abs()
+            < 1e-23
+    );
     for convention in [
-        Compounding::Annual,
+        Compounding::Periodic(std::num::NonZeroU32::MIN),
         Compounding::Continuous,
         Compounding::Simple,
         Compounding::Periodic(4.try_into().unwrap()),

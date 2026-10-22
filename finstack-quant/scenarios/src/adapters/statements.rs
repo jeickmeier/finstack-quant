@@ -367,7 +367,7 @@ mod tests {
         for compounding in [
             Compounding::Simple,
             Compounding::Continuous,
-            Compounding::Annual,
+            Compounding::Periodic(std::num::NonZeroU32::MIN),
         ] {
             binding.compounding = compounding;
             update_rate_from_binding(&binding, &mut model, &market, None).expect("forward binding");

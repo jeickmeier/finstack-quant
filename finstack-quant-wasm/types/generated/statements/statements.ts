@@ -1002,7 +1002,7 @@ export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "lever
  *
  * ```text
  * DF = e^(-r_cc × t)                    [Continuous]
- *    = (1 + r_ann)^(-t)                 [Annual]
+ *    = (1 + r_ann)^(-t)                 [Periodic(1)]
  *    = (1 + r_per/n)^(-n×t)             [Periodic(n)]
  *    = 1 / (1 + r_simple × t)           [Simple]
  * ```
@@ -1016,7 +1016,6 @@ export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "lever
  */
 export type Compounding =
   | "continuous"
-  | "annual"
   | {
       periodic: number;
     }

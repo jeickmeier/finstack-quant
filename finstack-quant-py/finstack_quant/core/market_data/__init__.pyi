@@ -228,7 +228,7 @@ class DiscountCurve:
             ``(0, 1.0)`` discount-factor anchor is added when no ``t = 0``
             pillar is given.
         compounding : str, optional
-            ``"continuous"`` (default), ``"simple"``, ``"annual"``,
+            ``"continuous"`` (default), ``"simple"``, ``"periodic(1)"``,
             ``"semi_annual"``, ``"quarterly"`` or ``"monthly"``.
 
         Returns
@@ -247,7 +247,7 @@ class DiscountCurve:
         --------
         >>> from finstack_quant.core.market_data import DiscountCurve
         >>> curve = DiscountCurve.from_zero_rates(
-        ...     "USD-OIS", "2025-01-01", [(1.0, 0.05), (2.0, 0.05)], compounding="annual"
+        ...     "USD-OIS", "2025-01-01", [(1.0, 0.05), (2.0, 0.05)], compounding="periodic(1)"
         ... )
         >>> round(curve.df(2.0), 6)
         0.907029
@@ -377,7 +377,7 @@ class DiscountCurve:
             Year fraction from ``base_date``, or a date converted with the
             curve day count.
         compounding : str, optional
-            ``"continuous"`` (default), ``"simple"``, ``"annual"``,
+            ``"continuous"`` (default), ``"simple"``, ``"periodic(1)"``,
             ``"semi_annual"``, ``"quarterly"`` or ``"monthly"``.
 
         Returns
