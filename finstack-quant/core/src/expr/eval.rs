@@ -457,7 +457,7 @@ impl CompiledExpr {
     ) -> crate::Result<()> {
         match fun {
             Function::Abs => Self::eval_unary_into(arg_slices, out, f64::abs),
-            Function::Sign => Self::eval_sign_into(arg_slices, out),
+            Function::Sign => Self::eval_unary_into(arg_slices, out, Self::sign_or_zero),
             Function::Pow => Self::eval_pow_into(arg_slices, out),
             Function::Round => Self::eval_round_into(arg_slices, out)?,
             Function::Floor => Self::eval_unary_into(arg_slices, out, f64::floor),

@@ -1,6 +1,6 @@
 //! Internal rounding helpers backing `Money` arithmetic.
 //!
-//! Amounts are stored as `Decimal` values (`AmountRepr`) to provide accounting-grade
+//! Amounts are stored as `Decimal` values to provide accounting-grade
 //! precision and deterministic arithmetic. The routines here provide Decimal arithmetic
 //! on that representation and expose helpers that honour [`RoundingMode`](crate::config::RoundingMode).
 //!
@@ -12,38 +12,21 @@ use crate::decimal::f64_to_decimal;
 use crate::{Error, InputError};
 use rust_decimal::Decimal;
 
-/// Internal numeric representation for `Money` amounts.
-/// Uses Decimal for accounting-grade precision and deterministic arithmetic.
-pub(crate) type AmountRepr = Decimal;
-
-/// Convert a Decimal representation to f64.
-///
-/// # Invariant
-///
-/// All `Decimal` values within the monetary range (which is a subset of f64's range)
-/// can be converted to f64. The `rust_decimal::Decimal` type has a max of ~7.9e28,
-/// which is well within f64's range of ~1.8e308.
-///
 #[inline]
-pub(crate) fn amount_from_repr(x: AmountRepr) -> f64 {
-    x.as_f64()
-}
-
-#[inline]
-pub(crate) fn repr_add(a: AmountRepr, b: AmountRepr) -> Result<AmountRepr, Error> {
+pub(crate) fn repr_add(a: Decimal, b: Decimal) -> Result<Decimal, Error> {
     a.checked_add(b)
         .ok_or_else(|| InputError::ConversionOverflow.into())
 }
 
 #[inline]
-pub(crate) fn repr_sub(a: AmountRepr, b: AmountRepr) -> Result<AmountRepr, Error> {
+pub(crate) fn repr_sub(a: Decimal, b: Decimal) -> Result<Decimal, Error> {
     a.checked_sub(b)
         .ok_or_else(|| InputError::ConversionOverflow.into())
 }
 
 /// Fallible multiplication by an `f64` scalar (no silent substitution).
 #[inline]
-pub(crate) fn repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error> {
+pub(crate) fn repr_mul_f64(a: Decimal, rhs: f64) -> Result<Decimal, Error> {
     let rhs_decimal = f64_to_decimal(rhs)?;
     // Checked Decimal multiply: a finite, representable scalar can still drive
     // the product past Decimal's range (~7.9e28). Surface that as an error so
@@ -55,7 +38,7 @@ pub(crate) fn repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error>
 
 /// Fallible division by an `f64` scalar (no silent substitution).
 #[inline]
-pub(crate) fn repr_div_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error> {
+pub(crate) fn repr_div_f64(a: Decimal, rhs: f64) -> Result<Decimal, Error> {
     // `f64_to_decimal` rejects NaN / ±Inf first, so the exact-zero check below
     // only ever sees finite input. Division by any non-zero divisor (however
     // small) is representable as a Decimal; division by exact 0.0 is not.
@@ -109,7 +92,7 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn amount_from_repr_converts_normal_values() {
+    fn decimal_conversion_converts_normal_values() {
         // Normal monetary amounts should convert without issues
         let cases = [
             ("0.0", 0.0),
@@ -120,7 +103,7 @@ mod tests {
         ];
         for (decimal_str, expected) in cases {
             let decimal = Decimal::from_str(decimal_str).expect("Valid decimal string");
-            let result = amount_from_repr(decimal);
+            let result = decimal.as_f64();
             assert!(
                 (result - expected).abs() < 1e-10,
                 "Expected {} but got {}",
@@ -131,19 +114,19 @@ mod tests {
     }
 
     #[test]
-    fn amount_from_repr_handles_large_values_within_f64_range() {
+    fn decimal_conversion_handles_large_values_within_f64_range() {
         // Decimal max is ~7.9e28, which is within f64 range
         // Test with a large value that should still convert
         let large = Decimal::from_str("1000000000000000.0").expect("Valid decimal"); // 1 quadrillion
-        let result = amount_from_repr(large);
+        let result = large.as_f64();
         assert!(result > 0.0, "Large value should not silently become 0");
         assert!((result - 1e15).abs() < 1e5);
     }
 
     #[test]
-    fn amount_from_repr_preserves_sign() {
+    fn decimal_conversion_preserves_sign() {
         let negative = Decimal::from_str("-999999999.99").expect("Valid decimal");
-        let result = amount_from_repr(negative);
+        let result = negative.as_f64();
         assert!(result < 0.0, "Negative value must remain negative");
         assert!((result - (-999_999_999.99)).abs() < 1e-2);
     }

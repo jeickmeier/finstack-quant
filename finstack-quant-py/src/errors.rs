@@ -52,6 +52,7 @@
 //! computation errors raise `KeyError` / `RuntimeError`. The WASM binding
 //! reports the same kind as the error's `kind` property.
 
+use finstack_quant_core::format_chain;
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
@@ -110,12 +111,6 @@ pyo3::create_exception!(
     ContractValidationError,
     "Persisted contract resource limit exceeded (inherits ContractValidationError)."
 );
-
-/// Flatten an error and its `source()` chain into one message (see
-/// [`finstack_quant_core::format_chain`]).
-fn format_chain(err: &(dyn std::error::Error + 'static)) -> String {
-    finstack_quant_core::format_chain(err)
-}
 
 /// Build the builtin exception for a Rust-owned error kind: `NotFound` →
 /// `KeyError`, `Validation` → `ValueError`, `Computation` → `RuntimeError`.

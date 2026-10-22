@@ -46,7 +46,7 @@ impl CompiledExpr {
     /// Expression `sign`: positive → `1`, negative → `-1`, both zeros → `0`.
     ///
     /// `f64::signum` preserves the sign of zero, so it is not this function.
-    fn sign_or_zero(value: f64) -> f64 {
+    pub(super) fn sign_or_zero(value: f64) -> f64 {
         if value.is_nan() {
             f64::NAN
         } else if value > 0.0 {
@@ -56,10 +56,6 @@ impl CompiledExpr {
         } else {
             0.0
         }
-    }
-
-    pub(super) fn eval_sign_into(arg_results: &[&[f64]], out: &mut [f64]) {
-        Self::eval_unary_into(arg_results, out, Self::sign_or_zero);
     }
 
     pub(super) fn eval_pow_into(arg_results: &[&[f64]], out: &mut [f64]) {

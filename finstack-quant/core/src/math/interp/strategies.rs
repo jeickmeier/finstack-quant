@@ -180,7 +180,7 @@ impl InterpolationStrategy for LogLinearStrategy {
                     self.log_values.first().copied().unwrap_or(f64::NAN).exp()
                 }
                 ExtrapolationPolicy::FlatForward => {
-                    let slope = log_segment_slope(&self.log_values, knots, 0, 1);
+                    let slope = segment_slope(knots, &self.log_values, 0, 1);
                     let first_log = self.log_values.first().copied().unwrap_or(f64::NAN);
                     let extrapolated_log = first_log + slope * (x - knots[0]);
                     extrapolated_log.exp()
@@ -193,7 +193,7 @@ impl InterpolationStrategy for LogLinearStrategy {
                 }
                 ExtrapolationPolicy::FlatForward => {
                     let n = knots.len();
-                    let slope = log_segment_slope(&self.log_values, knots, n - 2, n - 1);
+                    let slope = segment_slope(knots, &self.log_values, n - 2, n - 1);
                     let last_log = self.log_values.last().copied().unwrap_or(f64::NAN);
                     let extrapolated_log = last_log + slope * (x - knots[n - 1]);
                     extrapolated_log.exp()
@@ -236,7 +236,7 @@ impl InterpolationStrategy for LogLinearStrategy {
             |policy| match policy {
                 ExtrapolationPolicy::FlatZero => 0.0,
                 ExtrapolationPolicy::FlatForward => {
-                    let slope = log_segment_slope(&self.log_values, knots, 0, 1);
+                    let slope = segment_slope(knots, &self.log_values, 0, 1);
                     let extrapolated_log = self.log_values[0] + slope * (x - knots[0]);
                     extrapolated_log.exp() * slope
                 }
@@ -246,7 +246,7 @@ impl InterpolationStrategy for LogLinearStrategy {
                 ExtrapolationPolicy::FlatZero => 0.0,
                 ExtrapolationPolicy::FlatForward => {
                     let n = knots.len();
-                    let slope = log_segment_slope(&self.log_values, knots, n - 2, n - 1);
+                    let slope = segment_slope(knots, &self.log_values, n - 2, n - 1);
                     let extrapolated_log = self.log_values[n - 1] + slope * (x - knots[n - 1]);
                     extrapolated_log.exp() * slope
                 }
@@ -268,20 +268,6 @@ impl InterpolationStrategy for LogLinearStrategy {
         // Derivative: f(x) * (slope in log space)
         f_val * slope
     }
-}
-
-#[inline]
-fn log_segment_slope(
-    log_values: &[f64],
-    knots: &[f64],
-    left_index: usize,
-    right_index: usize,
-) -> f64 {
-    let x0 = knots[left_index];
-    let x1 = knots[right_index];
-    let y0 = log_values[left_index];
-    let y1 = log_values[right_index];
-    (y1 - y0) / (x1 - x0)
 }
 
 /// Strategy for piecewise quadratic forward interpolation (smooth forwards).
