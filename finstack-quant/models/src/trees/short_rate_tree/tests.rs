@@ -29,6 +29,7 @@ fn failed_recalibration_preserves_rates_times_and_transition_lattice() {
     let curve = create_flat_curve(0.05);
     for config in [
         ShortRateTreeConfig::ho_lee(8, 0.01),
+        ShortRateTreeConfig::bdt(8, 0.2),
         ShortRateTreeConfig::black_karasinski(8, 0.2, 0.1),
     ] {
         let mut tree = ShortRateTree::new(config);
@@ -47,7 +48,6 @@ fn failed_recalibration_preserves_rates_times_and_transition_lattice() {
         assert_eq!(tree.bk_trinomial.is_some(), before.bk_trinomial.is_some());
         let quality = tree.calibration_result().expect("quality");
         let before_quality = before.calibration_result().expect("previous quality");
-        assert_eq!(quality.converged, before_quality.converged);
         assert_eq!(quality.max_error_bp, before_quality.max_error_bp);
         let value_after = tree
             .price(
@@ -231,7 +231,7 @@ fn ho_lee_noncontinuous_compounding_reprices_curve() {
 
         let quality = tree.calibration_result().expect("quality");
         assert!(
-            quality.converged && quality.max_error_bp < 0.1,
+            quality.max_error_bp < 0.1,
             "{compounding:?}: calibration must reprice the curve to <0.1bp, \
              got {quality:?}"
         );
@@ -310,8 +310,7 @@ fn ho_lee_calibration_succeeds_for_a_normal_volatility_tree() {
     let mut tree = ShortRateTree::new(ShortRateTreeConfig::ho_lee(60, 0.01));
     tree.calibrate(&curve, 5.0)
         .expect("a normal-volatility Ho-Lee tree must calibrate");
-    let quality = tree.calibration_result().expect("quality");
-    assert!(quality.converged, "quality={quality:?}");
+    tree.calibration_result().expect("quality");
 }
 
 #[test]
@@ -348,7 +347,6 @@ fn test_bdt_calibration_populates_quality_metrics() {
 
     assert_eq!(tree.rates.len(), 7);
     let quality = tree.calibration_result().expect("calibration result");
-    assert!(quality.converged);
     assert!(quality.max_error_bp.is_finite());
 }
 
@@ -510,7 +508,7 @@ fn bk_trinomial_reprices_curve_to_a_tenth_bp() {
 
     let quality = tree.calibration_result().expect("quality");
     assert!(
-        quality.converged && quality.max_error_bp < 0.1,
+        quality.max_error_bp < 0.1,
         "BK calibration must reprice the curve to <0.1bp, got {quality:?}"
     );
 
@@ -742,24 +740,18 @@ fn test_calibration_result_quality_helpers_cover_thresholds() {
     let good = TreeCalibrationResult {
         max_error_bp: 0.05,
         max_error_step: 2,
-        fallback_count: 0,
-        converged: true,
     };
     assert!(good.is_acceptable());
 
     let acceptable_only = TreeCalibrationResult {
         max_error_bp: 0.5,
         max_error_step: 3,
-        fallback_count: 0,
-        converged: true,
     };
     assert!(acceptable_only.is_acceptable());
 
     let poor = TreeCalibrationResult {
         max_error_bp: 2.0,
         max_error_step: 1,
-        fallback_count: 1,
-        converged: true,
     };
     assert!(!poor.is_acceptable());
 }
@@ -786,7 +778,7 @@ fn compounding_conventions_stay_finite_for_deeply_negative_rates() {
 }
 
 #[test]
-fn bdt_calibrates_near_zero_flat_curve_without_fallbacks() {
+fn bdt_calibrates_near_zero_flat_curve() {
     let curve = create_flat_curve(0.0001);
     let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(12, 0.20));
 
@@ -794,7 +786,6 @@ fn bdt_calibrates_near_zero_flat_curve_without_fallbacks() {
         .expect("near-zero BDT calibration");
 
     let quality = tree.calibration_result().expect("quality");
-    assert_eq!(quality.fallback_count, 0);
     assert!(quality.is_acceptable(), "quality={quality:?}");
     for step in 0..=12 {
         for node in 0..=step {
@@ -813,7 +804,6 @@ fn bdt_calibrates_high_rate_flat_curve_with_finite_rates() {
         .expect("high-rate BDT calibration");
 
     let quality = tree.calibration_result().expect("quality");
-    assert_eq!(quality.fallback_count, 0);
     assert!(quality.is_acceptable(), "quality={quality:?}");
     for step in 0..=12 {
         for node in 0..=step {
@@ -862,7 +852,6 @@ fn bdt_calibration_succeeds_for_a_normal_well_posed_tree() {
     tree.calibrate(&curve, 5.0)
         .expect("a well-posed BDT tree must calibrate");
     let quality = tree.calibration_result().expect("quality");
-    assert!(quality.converged, "quality={quality:?}");
     assert!(quality.is_acceptable(), "quality={quality:?}");
 }
 
@@ -1220,4 +1209,40 @@ fn periodic_oas_is_added_to_each_node_rate_on_its_own_compounding() {
     // Compounding the spread on its own would discount more.
     let standalone = (1.0 + z / 2.0).powf(-4.0) * (1.0_f64 + 0.015 / 2.0).powf(-4.0);
     assert!(semiannual > standalone);
+}
+
+#[test]
+fn bdt_solver_failure_is_immediate_and_preserves_previous_calibration() {
+    let curve = create_flat_curve(0.05);
+    let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(4, 0.1));
+    tree.calibrate(&curve, 1.0).expect("initial calibration");
+    let before = tree.clone();
+    // A finite positive discount curve whose 1000% rate lies outside the
+    // supported node-rate bound makes the first drift objective unbracketable.
+    let unsupported = create_flat_curve(10.0);
+    let error = tree
+        .calibrate(&unsupported, 1.0)
+        .expect_err("unbracketable drift");
+    assert!(
+        error
+            .to_string()
+            .contains("BDT calibration solver failed at step 0"),
+        "{error}"
+    );
+    assert_eq!(tree.rates, before.rates);
+    assert_eq!(tree.time_steps, before.time_steps);
+    assert_eq!(
+        tree.calibration_result().expect("quality").max_error_bp,
+        before
+            .calibration_result()
+            .expect("previous quality")
+            .max_error_bp
+    );
+    assert_eq!(
+        tree.price(0.0, Compounding::Continuous, &ConstantValuator)
+            .expect("price"),
+        before
+            .price(0.0, Compounding::Continuous, &ConstantValuator)
+            .expect("previous price")
+    );
 }
