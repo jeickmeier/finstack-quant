@@ -4,9 +4,9 @@ use crate::build::cds::build_cds_instrument;
 use crate::build::rates::build_rate_instrument_with_dates;
 use crate::build::xccy::build_xccy_instrument;
 use crate::build::BuildCtx;
-use crate::quotes::cds::CdsQuote;
-use crate::quotes::rates::RateQuote;
-use crate::quotes::xccy::XccyQuote;
+use crate::quotes::CdsQuote;
+use crate::quotes::RateQuote;
+use crate::quotes::XccyQuote;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -184,8 +184,8 @@ pub(crate) fn prepare_cds_quote(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quotes::ids::{Pillar, QuoteId};
-    use crate::quotes::rates::RateQuote;
+    use crate::quotes::RateQuote;
+    use crate::quotes::{Pillar, QuoteId};
     use finstack_quant_core::FxHashMap;
     use time::Month;
 
@@ -239,7 +239,7 @@ mod tests {
         let quote = RateQuote::Swap {
             id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
             index: finstack_quant_core::types::IndexId::new("USD-SOFR-OIS"),
-            pillar: crate::quotes::ids::Pillar::Tenor(
+            pillar: crate::quotes::Pillar::Tenor(
                 finstack_quant_core::dates::Tenor::new(
                     5,
                     finstack_quant_core::dates::TenorUnit::Years,

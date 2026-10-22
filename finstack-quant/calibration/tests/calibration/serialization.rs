@@ -13,12 +13,12 @@ use finstack_quant_calibration::api::schema::{
     InflationCurveParams, StepParams, SurfaceExtrapolationPolicy, SviSurfaceParams,
     SwaptionVolParams, VolSurfaceParams,
 };
-use finstack_quant_calibration::quotes::cds::CdsQuote;
-use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
-use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::rates::RateQuote;
-use finstack_quant_calibration::quotes::vol::VolQuote;
+use finstack_quant_calibration::quotes::CdsQuote;
+use finstack_quant_calibration::quotes::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::RateQuote;
+use finstack_quant_calibration::quotes::VolQuote;
+use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_calibration::CalibrationMethod;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

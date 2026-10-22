@@ -11,8 +11,8 @@ use crate::hull_white::{
     PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionFloatingPeriod, SwaptionQuote,
     SwaptionSchedule,
 };
-use crate::quotes::vol::VolQuote;
 use crate::quotes::MarketQuote;
+use crate::quotes::VolQuote;
 use crate::targets::base_correlation::BaseCorrelationTarget;
 use crate::targets::discount::DiscountCurveTarget;
 use crate::targets::forward::ForwardCurveTarget;
@@ -704,8 +704,8 @@ mod tests {
         contractual_swaption_price, scheduled_cap_floor_implied_normal_vol,
         scheduled_cap_floor_price,
     };
-    use crate::quotes::cds_tranche::CdsTrancheQuote;
-    use crate::quotes::ids::QuoteId;
+    use crate::quotes::CdsTrancheQuote;
+    use crate::quotes::QuoteId;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
     use finstack_quant_core::market_data::term_structures::{

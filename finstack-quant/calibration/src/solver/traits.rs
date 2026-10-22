@@ -20,7 +20,7 @@ pub(crate) struct TimeGridAndGuesses<Q> {
 /// to times, building curves from partial knots, and calculating pricing
 /// residuals.
 pub(crate) trait BootstrapTarget {
-    /// Type of input quote (e.g., [`RateQuote`](crate::quotes::rates::RateQuote)).
+    /// Type of input quote (e.g., [`RateQuote`](crate::quotes::RateQuote)).
     type Quote;
 
     /// Type of the curve being built (e.g., [`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)).

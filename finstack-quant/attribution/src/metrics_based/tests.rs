@@ -800,10 +800,7 @@ fn exact_credit_recipe_curve(
     quotes: &[(Date, &str, f64)],
 ) -> finstack_quant_core::market_data::term_structures::HazardCurve {
     use finstack_quant_calibration::api::schema::HazardCurveParams;
-    use finstack_quant_calibration::quotes::{
-        cds::CdsQuote,
-        ids::{Pillar, QuoteId},
-    };
+    use finstack_quant_calibration::quotes::{CdsQuote, Pillar, QuoteId};
     use finstack_quant_calibration::CalibrationMethod;
     use finstack_quant_core::dates::DayCountContext;
     use finstack_quant_core::market_data::term_structures::{
@@ -998,7 +995,7 @@ fn credit_duplicate_display_labels_match_exact_quote_id_and_pillar() {
 
 #[test]
 fn credit_rejects_invalid_serialized_closing_pillar() {
-    use finstack_quant_calibration::quotes::ids::Pillar;
+    use finstack_quant_calibration::quotes::Pillar;
     use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_core::types::CurveId;

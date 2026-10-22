@@ -90,7 +90,7 @@ pub(crate) fn extract_credit_keyrates(
     market_t1: &MarketContext,
     provider: &dyn RecalibrationProvider,
 ) -> Result<FxHashMap<CurveId, Vec<CreditKeyRateBucket>>> {
-    use finstack_quant_calibration::quotes::cds::CdsQuote;
+    use finstack_quant_calibration::quotes::CdsQuote;
     let mut result = FxHashMap::default();
     for curve_id in curve_ids {
         let prefix = format!("bucketed_cs01::{curve_id}::");

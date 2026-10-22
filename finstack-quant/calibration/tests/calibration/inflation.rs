@@ -4,9 +4,9 @@ use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, InflationCurveParams, StepParams,
 };
-use finstack_quant_calibration::quotes::ids::QuoteId;
-use finstack_quant_calibration::quotes::inflation::InflationQuote;
+use finstack_quant_calibration::quotes::InflationQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::QuoteId;
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};

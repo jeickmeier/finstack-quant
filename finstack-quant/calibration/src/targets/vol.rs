@@ -3,8 +3,8 @@
 use crate::api::schema::SurfaceExtrapolationPolicy;
 use crate::api::schema::VolSurfaceParams;
 use crate::config::CalibrationConfig;
-use crate::quotes::vol::VolQuote;
 use crate::quotes::MarketQuote;
+use crate::quotes::VolQuote;
 use crate::targets::util::{
     extract_equity_option_quotes, interpolate_total_variance, resolve_equity_forward_inputs,
     resolve_equity_spot, surface_quote_residuals,
@@ -340,7 +340,7 @@ fn interpolate_total_variance_vol(
 mod tests {
     use super::*;
 
-    use crate::quotes::ids::QuoteId;
+    use crate::quotes::QuoteId;
     use finstack_quant_core::dates::{Date, DateExt};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;

@@ -4,11 +4,11 @@ use super::cache::KeyedOnceCache;
 use crate::api::schema::{DiscountCurveParams, ForwardCurveParams, StepParams};
 use crate::config::CalibrationMethod;
 use crate::config::RatesStepConventions;
-use crate::quotes::ids::Pillar;
-#[cfg(test)]
-use crate::quotes::ids::QuoteId;
-use crate::quotes::rates::RateQuote;
 use crate::quotes::MarketQuote;
+use crate::quotes::Pillar;
+#[cfg(test)]
+use crate::quotes::QuoteId;
+use crate::quotes::RateQuote;
 use crate::step_runtime;
 use crate::targets::discount::DiscountCurveTarget;
 use crate::targets::rate_recipe::{ois_compounding_from_recipe, rate_quotes_from_recipe};

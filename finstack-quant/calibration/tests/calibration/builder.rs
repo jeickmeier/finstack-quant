@@ -6,9 +6,9 @@ use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, DiscountCurveParams, StepParams,
 };
-use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::rates::RateQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::RateQuote;
+use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};

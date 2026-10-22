@@ -5,9 +5,9 @@ use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, DiscountCurveParams, StepParams,
 };
-use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::rates::RateQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::RateQuote;
+use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
@@ -40,7 +40,7 @@ fn build_discount_quotes(_base_date: Date) -> Vec<MarketQuote> {
 }
 
 fn build_credit_quotes() -> Vec<MarketQuote> {
-    use finstack_quant_calibration::quotes::cds::CdsQuote;
+    use finstack_quant_calibration::quotes::CdsQuote;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,
     };

@@ -10,7 +10,7 @@
 
 use crate::api::schema::{CalibrationStep, StepParams};
 use crate::config::CalibrationConfig;
-use crate::quotes::cds_tranche::CdsTrancheQuote;
+use crate::quotes::CdsTrancheQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -156,7 +156,7 @@ fn validate_xccy_basis_step(
 
 /// Require at least one rate quote for a discount or forward curve step.
 fn require_rate_quotes(quotes: &[MarketQuote]) -> Result<()> {
-    let rates_quotes: Vec<crate::quotes::rates::RateQuote> = quotes.extract_quotes();
+    let rates_quotes: Vec<crate::quotes::RateQuote> = quotes.extract_quotes();
     if rates_quotes.is_empty() {
         return Err(finstack_quant_core::Error::Input(
             finstack_quant_core::InputError::TooFewPoints,
@@ -194,7 +194,7 @@ fn validate_hazard_step(
         )));
     }
 
-    let cds_quotes: Vec<crate::quotes::cds::CdsQuote> = quotes.extract_quotes();
+    let cds_quotes: Vec<crate::quotes::CdsQuote> = quotes.extract_quotes();
     if cds_quotes.is_empty() {
         return Err(finstack_quant_core::Error::Input(
             finstack_quant_core::InputError::TooFewPoints,
@@ -204,13 +204,13 @@ fn validate_hazard_step(
     for q in &cds_quotes {
         q.validate()?;
         match q {
-            crate::quotes::cds::CdsQuote::CdsParSpread {
+            crate::quotes::CdsQuote::CdsParSpread {
                 entity,
                 recovery_rate,
                 convention,
                 ..
             }
-            | crate::quotes::cds::CdsQuote::CdsUpfront {
+            | crate::quotes::CdsQuote::CdsUpfront {
                 entity,
                 recovery_rate,
                 convention,
@@ -351,7 +351,7 @@ fn validate_base_correlation_step(
 
     context.get_credit_index(&p.index_id)?;
 
-    let tranche_quotes: Vec<crate::quotes::cds_tranche::CdsTrancheQuote> = quotes.extract_quotes();
+    let tranche_quotes: Vec<crate::quotes::CdsTrancheQuote> = quotes.extract_quotes();
     if tranche_quotes.is_empty() {
         return Err(finstack_quant_core::Error::Input(
             finstack_quant_core::InputError::TooFewPoints,
@@ -380,8 +380,8 @@ mod tests {
     use super::*;
     use crate::api::schema::{DiscountCurveParams, StepParams, StudentTParams, SviSurfaceParams};
     use crate::config::CalibrationMethod;
-    use crate::quotes::cds_tranche::CdsTrancheQuote;
-    use crate::quotes::ids::{Pillar, QuoteId};
+    use crate::quotes::CdsTrancheQuote;
+    use crate::quotes::{Pillar, QuoteId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, Tenor, TenorUnit};
     use finstack_quant_core::market_data::term_structures::{
@@ -457,7 +457,7 @@ mod tests {
         let ctx = MarketContext::new();
 
         // Create a valid deposit quote
-        let quote = MarketQuote::Rates(crate::quotes::rates::RateQuote::Deposit {
+        let quote = MarketQuote::Rates(crate::quotes::RateQuote::Deposit {
             id: QuoteId::new("DEP-1M"),
             index: IndexId::new("USD-SOFR"),
             pillar: Pillar::Tenor(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture")),

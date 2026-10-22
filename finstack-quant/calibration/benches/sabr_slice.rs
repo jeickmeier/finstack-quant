@@ -2,9 +2,9 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use finstack_quant_calibration::api::schema::{StepParams, VolSurfaceParams};
-use finstack_quant_calibration::quotes::ids::QuoteId;
-use finstack_quant_calibration::quotes::vol::VolQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::QuoteId;
+use finstack_quant_calibration::quotes::VolQuote;
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;

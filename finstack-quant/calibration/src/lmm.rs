@@ -69,33 +69,33 @@ use finstack_quant_valuations_rates::swaption::BermudanSwaption;
 /// slice of a Bermudan exercise schedule, expressed in LMM forward-rate
 /// coordinates, already trimmed to the earliest eligible exercise.
 #[derive(Debug, Clone)]
-pub(crate) struct CoTerminalSlice<'a> {
+struct CoTerminalSlice<'a> {
     /// Tenor dates `T_0..T_N` (year fractions, length `N+1`).
-    pub tenors: &'a [f64],
+    tenors: &'a [f64],
     /// Accrual factors `τ_i = T_{i+1} − T_i` (length `N`).
-    pub accrual_factors: &'a [f64],
+    accrual_factors: &'a [f64],
     /// Initial forward rates `F_i(0)` (length `N`).
-    pub initial_forwards: &'a [f64],
+    initial_forwards: &'a [f64],
     /// Displacements `d_i` (length `N`).
-    pub displacements: &'a [f64],
+    displacements: &'a [f64],
     /// Unscaled factor-loading shapes `ĝ_i` per forward (length `N`).
-    pub loading_shapes: &'a [[f64; 3]],
+    loading_shapes: &'a [[f64; 3]],
 }
 
 /// Rebonato decomposition of the co-terminal swap: shape factor plus the
 /// basket levels needed to convert between Black and displaced vols.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct RebonatoFactors {
+struct RebonatoFactors {
     /// Shape factor `R` linking `base_vol` to the *displaced* swaption vol.
-    pub shape_factor: f64,
+    shape_factor: f64,
     /// Unshifted forward swap rate `S = Σ w_i F_i`.
-    pub swap_rate: f64,
+    swap_rate: f64,
     /// Shifted basket level `S + d = Σ w_i (F_i + d_i)`.
-    pub shifted_level: f64,
+    shifted_level: f64,
 }
 
 /// Full Rebonato decomposition; see [`RebonatoFactors`].
-pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFactors> {
+fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFactors> {
     let n = slice.accrual_factors.len();
     if n == 0 || slice.tenors.len() != n + 1 {
         return None;
@@ -182,7 +182,7 @@ pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFa
 ///
 /// Returns `None` for invalid expiry or volatility, a degenerate swap, or an
 /// ATM premium that cannot be converted to a positive finite loading scale.
-pub(crate) fn calibrate_base_vol(
+fn calibrate_base_vol(
     factors: &RebonatoFactors,
     market_swaption_vol: f64,
     expiry: f64,

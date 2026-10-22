@@ -22,8 +22,8 @@ use finstack_quant_core::{Error, Result};
 /// Creating a rates quote:
 /// ```rust
 /// use finstack_quant_calibration::quotes::MarketQuote;
-/// use finstack_quant_calibration::quotes::rates::RateQuote;
-/// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+/// use finstack_quant_calibration::quotes::RateQuote;
+/// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 /// use finstack_quant_core::types::IndexId;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
@@ -74,9 +74,7 @@ impl MarketQuote {
     /// Validate quote-domain invariants before calibration.
     pub fn validate(&self) -> Result<()> {
         if self.id().trim().is_empty() {
-            return Err(Error::Validation(
-                crate::quotes::ids::EMPTY_QUOTE_ID.to_string(),
-            ));
+            return Err(Error::Validation(super::ids::EMPTY_QUOTE_ID.to_string()));
         }
 
         match self {

@@ -2,8 +2,8 @@
 //!
 use crate::build::xccy::build_xccy_instrument;
 use crate::build::BuildCtx;
-use crate::quotes::ids::{Pillar, QuoteId};
-use crate::quotes::xccy::XccyQuote;
+use crate::quotes::XccyQuote;
+use crate::quotes::{Pillar, QuoteId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_valuations_core::instruments::Instrument;

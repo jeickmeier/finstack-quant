@@ -6,8 +6,8 @@
 use crate::api::schema::ParametricCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
-use crate::quotes::rates::RateQuote;
 use crate::quotes::MarketQuote;
+use crate::quotes::RateQuote;
 use crate::solver::global;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::solver::traits::TimeGridAndGuesses;

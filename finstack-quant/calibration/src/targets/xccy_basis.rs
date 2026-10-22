@@ -26,10 +26,10 @@
 use crate::api::schema::XccyBasisParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
-use crate::quotes::rates::RateQuote;
-use crate::quotes::xccy::XccyQuote;
 use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
+use crate::quotes::RateQuote;
+use crate::quotes::XccyQuote;
 use crate::solver::bootstrap;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::{
@@ -157,7 +157,7 @@ impl XccyBasisTarget {
         // Rates-side preflight: foreign-currency deposits/FRAs/swaps that constrain the
         // foreign discount curve directly. Required to be present today because the
         // bootstrap solver needs short-end anchors.
-        let rates_quotes: Vec<crate::quotes::rates::RateQuote> = quotes.extract_quotes();
+        let rates_quotes: Vec<crate::quotes::RateQuote> = quotes.extract_quotes();
         let has_rates = !rates_quotes.is_empty();
 
         // XCCY-side preflight: dealer-screen `XccyQuote` quotes (par-spread on
@@ -371,7 +371,7 @@ impl BootstrapTarget for XccyBasisTarget {
 #[cfg(test)]
 mod xccy_quote_calibration_tests {
     use super::*;
-    use crate::quotes::ids::{Pillar, QuoteId};
+    use crate::quotes::{Pillar, QuoteId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};

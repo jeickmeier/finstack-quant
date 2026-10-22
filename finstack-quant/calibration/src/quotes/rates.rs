@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// Deposit quote:
 /// ```rust
-/// use finstack_quant_calibration::quotes::rates::RateQuote;
-/// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+/// use finstack_quant_calibration::quotes::RateQuote;
+/// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 /// use finstack_quant_core::types::IndexId;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
@@ -35,8 +35,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// Swap quote:
 /// ```rust
-/// use finstack_quant_calibration::quotes::rates::RateQuote;
-/// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+/// use finstack_quant_calibration::quotes::RateQuote;
+/// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 /// use finstack_quant_core::types::IndexId;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
@@ -137,8 +137,8 @@ impl RateQuote {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_calibration::quotes::rates::RateQuote;
-    /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+    /// use finstack_quant_calibration::quotes::RateQuote;
+    /// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
     /// use finstack_quant_core::types::IndexId;
     ///
     /// # fn example() -> finstack_quant_core::Result<()> {
@@ -172,8 +172,8 @@ impl RateQuote {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_calibration::quotes::rates::RateQuote;
-    /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+    /// use finstack_quant_calibration::quotes::RateQuote;
+    /// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
     /// use finstack_quant_core::types::IndexId;
     ///
     /// # fn example() -> finstack_quant_core::Result<()> {
@@ -209,8 +209,8 @@ impl RateQuote {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_calibration::quotes::rates::RateQuote;
-    /// use finstack_quant_calibration::quotes::ids::QuoteId;
+    /// use finstack_quant_calibration::quotes::RateQuote;
+    /// use finstack_quant_calibration::quotes::QuoteId;
     /// use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
     /// use time::macros::date;
     ///
@@ -284,8 +284,8 @@ impl RateQuote {
     ///
     /// Bumping a deposit rate:
     /// ```rust
-    /// use finstack_quant_calibration::quotes::rates::RateQuote;
-    /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+    /// use finstack_quant_calibration::quotes::RateQuote;
+    /// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
     /// use finstack_quant_core::types::IndexId;
     ///
     /// # fn example() -> finstack_quant_core::Result<()> {

@@ -5,9 +5,9 @@
 
 use crate::calibration::calibration_support::execute_step;
 use finstack_quant_calibration::api::schema::{DiscountCurveParams, StepParams};
-use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::rates::RateQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::RateQuote;
+use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod, ResidualWeightingScheme};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};

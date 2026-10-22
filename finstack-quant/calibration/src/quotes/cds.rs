@@ -35,8 +35,8 @@ fn is_standard_upfront_running_coupon_bp(coupon_bp: f64) -> bool {
 ///
 /// Par spread quote:
 /// ```rust
-/// use finstack_quant_calibration::quotes::cds::CdsQuote;
-/// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+/// use finstack_quant_calibration::quotes::CdsQuote;
+/// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::currency::Currency;
 ///
@@ -58,8 +58,8 @@ fn is_standard_upfront_running_coupon_bp(coupon_bp: f64) -> bool {
 ///
 /// Upfront quote:
 /// ```rust
-/// use finstack_quant_calibration::quotes::cds::CdsQuote;
-/// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+/// use finstack_quant_calibration::quotes::CdsQuote;
+/// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::currency::Currency;
 ///
@@ -127,8 +127,8 @@ impl CdsQuote {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_calibration::quotes::cds::CdsQuote;
-    /// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+    /// use finstack_quant_calibration::quotes::CdsQuote;
+    /// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
     /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
     /// use finstack_quant_core::currency::Currency;
     ///

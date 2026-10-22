@@ -5,9 +5,9 @@ use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationSchema,
     CalibrationStep, StepParams,
 };
-use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
-use finstack_quant_calibration::quotes::ids::QuoteId;
+use finstack_quant_calibration::quotes::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::QuoteId;
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::currency::Currency;

@@ -2,8 +2,8 @@
 //!
 use crate::api::schema::{SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams};
 use crate::config::CalibrationConfig;
-use crate::quotes::vol::VolQuote;
 use crate::quotes::MarketQuote;
+use crate::quotes::VolQuote;
 use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{
@@ -1030,7 +1030,7 @@ fn to_basis_points(value: f64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quotes::ids::QuoteId;
+    use crate::quotes::QuoteId;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;

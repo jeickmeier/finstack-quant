@@ -2,8 +2,8 @@
 
 use crate::build::helpers::resolve_spot_date;
 use crate::build::BuildCtx;
-use crate::quotes::cds::CdsQuote;
-use crate::quotes::ids::Pillar;
+use crate::quotes::CdsQuote;
+use crate::quotes::Pillar;
 use finstack_quant_core::dates::{
     is_cds_date, next_cds_date, next_semiannual_cds_maturity, prev_cds_date,
     prev_cds_semiannual_roll, BusinessDayConvention, Date, DateExt, Tenor,
@@ -225,8 +225,8 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quotes::cds::CdsQuote;
-    use crate::quotes::ids::{Pillar, QuoteId};
+    use crate::quotes::CdsQuote;
+    use crate::quotes::{Pillar, QuoteId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::FxHashMap;

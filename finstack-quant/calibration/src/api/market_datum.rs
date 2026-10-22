@@ -5,13 +5,13 @@
 //! (quote, scalar, surface, etc.) and is serialized with a `kind` tag so the
 //! envelope can carry a heterogeneous list in JSON/YAML.
 
-use crate::quotes::cds::CdsQuote;
-use crate::quotes::cds_tranche::CdsTrancheQuote;
-use crate::quotes::inflation::InflationQuote;
-use crate::quotes::rates::RateQuote;
-use crate::quotes::vol::VolQuote;
-use crate::quotes::xccy::XccyQuote;
+use crate::quotes::CdsQuote;
+use crate::quotes::CdsTrancheQuote;
+use crate::quotes::InflationQuote;
 use crate::quotes::MarketQuote;
+use crate::quotes::RateQuote;
+use crate::quotes::VolQuote;
+use crate::quotes::XccyQuote;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::CreditIndexState;
 use finstack_quant_core::market_data::dividends::DividendSchedule;
@@ -206,8 +206,8 @@ mod tests {
 
     #[test]
     fn rate_quote_id_kind_and_as_quote() {
-        use crate::quotes::ids::{Pillar, QuoteId};
-        use crate::quotes::rates::RateQuote;
+        use crate::quotes::RateQuote;
+        use crate::quotes::{Pillar, QuoteId};
         use finstack_quant_core::dates::{Tenor, TenorUnit};
         use finstack_quant_core::types::IndexId;
 

@@ -12,9 +12,9 @@
 
 use crate::instruments::test_support::calibration::execute_step;
 use finstack_quant_calibration::api::schema::{HazardCurveParams, StepParams};
-use finstack_quant_calibration::quotes::cds::CdsQuote;
-use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
+use finstack_quant_calibration::quotes::CdsQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_calibration::CalibrationMethod;
 use finstack_quant_core::currency::Currency;

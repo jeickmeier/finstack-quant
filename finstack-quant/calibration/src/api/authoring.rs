@@ -7,13 +7,13 @@
 //! into [`CalibrationStep::from_wire_fields`].
 
 use crate::api::schema::CalibrationStep;
-use crate::quotes::cds::CdsQuote;
-use crate::quotes::cds_tranche::CdsTrancheQuote;
-use crate::quotes::ids::{Pillar, QuoteId};
-use crate::quotes::inflation::InflationQuote;
-use crate::quotes::rates::RateQuote;
-use crate::quotes::vol::VolQuote;
-use crate::quotes::xccy::XccyQuote;
+use crate::quotes::CdsQuote;
+use crate::quotes::CdsTrancheQuote;
+use crate::quotes::InflationQuote;
+use crate::quotes::RateQuote;
+use crate::quotes::VolQuote;
+use crate::quotes::XccyQuote;
+use crate::quotes::{Pillar, QuoteId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::surfaces::VolQuoteType;

@@ -12,7 +12,7 @@
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::config::{CalibrationConfig, CalibrationMethod, RatesStepConventions};
-use crate::quotes::ids::QuoteId;
+use crate::quotes::QuoteId;
 use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::config::ResultsMeta;

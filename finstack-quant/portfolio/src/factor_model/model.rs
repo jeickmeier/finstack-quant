@@ -1625,11 +1625,7 @@ pub(super) mod tests {
         use finstack_quant_calibration::api::{
             engine, market_datum::MarketDatum, prior_market::PriorMarketObject, schema::*,
         };
-        use finstack_quant_calibration::quotes::{
-            cds::CdsQuote,
-            ids::{Pillar, QuoteId},
-            MarketQuote,
-        };
+        use finstack_quant_calibration::quotes::{CdsQuote, MarketQuote, Pillar, QuoteId};
         use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
         let quotes: Vec<MarketQuote> = [1, 5, 10]
             .into_iter()
