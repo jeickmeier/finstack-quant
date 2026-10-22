@@ -1,5 +1,6 @@
 //! Market-data insertion and mutation APIs.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::market_data::dividends::DividendSchedule;
@@ -9,7 +10,7 @@ use crate::market_data::term_structures::CreditIndexData;
 use crate::money::fx::FxMatrix;
 use crate::types::CurveId;
 
-use super::{CurveStorage, MarketContext};
+use super::{CreditIndexState, CurveStorage, MarketContext};
 
 impl MarketContext {
     /// Insert a generic curve storage entry.
@@ -427,6 +428,57 @@ impl MarketContext {
         let key = CurveId::from(id.as_ref());
         Arc::make_mut(&mut self.credit_indices).insert(key, Arc::new(data));
         Ok(self)
+    }
+
+    /// Restore and insert a credit index from its persisted curve references.
+    ///
+    /// Every referenced curve must already exist in this context. Resolves the
+    /// canonical curve handles, validates constituent data, and then inserts the
+    /// aggregate under `state.id`. Failure leaves the context unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Borrowed snapshot containing the index lookup ID, positive
+    ///   constituent count, finite decimal recoveries in `[0, 1]`, and IDs of
+    ///   hazard/base-correlation curves already in this context. Optional issuer
+    ///   curves must cover every constituent; supplied weights must cover those
+    ///   issuers, be finite and nonnegative, and sum to one. Omitted issuer curves
+    ///   use the index hazard curve, omitted recoveries use the index recovery,
+    ///   and omitted weights are equal. Existing data under `state.id` is replaced
+    ///   only after all references and values pass validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a referenced curve is absent or has the wrong type,
+    /// or constituent counts, recoveries, issuer maps or weights are invalid.
+    pub fn insert_credit_index_state(&mut self, state: &CreditIndexState) -> crate::Result<()> {
+        let index_curve = self.get_hazard(&state.index_credit_curve_id)?;
+        let base_corr = self.get_base_correlation(&state.base_correlation_curve_id)?;
+        let mut builder = CreditIndexData::builder()
+            .num_constituents(state.num_constituents)
+            .recovery_rate(state.recovery_rate)
+            .index_credit_curve(index_curve)
+            .base_correlation_curve(base_corr);
+        if let Some(issuer_ids) = &state.issuer_credit_curve_ids {
+            let mut issuer_curves = BTreeMap::new();
+            for (issuer, curve_id) in issuer_ids {
+                issuer_curves.insert(issuer.clone(), self.get_hazard(curve_id)?);
+            }
+            builder = builder.issuer_curves(issuer_curves);
+        }
+        if let Some(recovery_rates) = &state.issuer_recovery_rates {
+            builder = builder.issuer_recovery_rates(
+                recovery_rates
+                    .iter()
+                    .map(|(key, value)| (key.clone(), *value)),
+            );
+        }
+        if let Some(weights) = &state.issuer_weights {
+            builder =
+                builder.issuer_weights(weights.iter().map(|(key, value)| (key.clone(), *value)));
+        }
+        self.insert_credit_index_mut(&state.id, builder.build()?)?;
+        Ok(())
     }
 
     /// Insert an FX matrix, mutating in place.

@@ -20,10 +20,8 @@ use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::config::CalibrationConfig;
 use finstack_quant_core::market_data::context::{build_snapshot_fx_matrix, MarketContext};
-use finstack_quant_core::market_data::term_structures::{CreditIndexData, PriceCurveKind};
+use finstack_quant_core::market_data::term_structures::PriceCurveKind;
 use finstack_quant_core::types::CurveId;
-use std::collections::BTreeMap;
-use std::sync::Arc;
 
 /// Materialize a [`MarketContext`] from the canonical envelope inputs.
 ///
@@ -163,44 +161,8 @@ pub(crate) fn build_initial_context(
 
     // 4. Reconstruct credit indices last — `get_hazard` /
     //    `get_base_correlation` need every relevant curve already present.
-    //    Mirrors `state_serde::try_from(MarketContextState)`.
     for credit_state in credit_states {
-        let index_curve = ctx.get_hazard(&credit_state.index_credit_curve_id)?;
-        let base_corr = ctx.get_base_correlation(&credit_state.base_correlation_curve_id)?;
-        let issuer_curves = if let Some(issuer_ids) = credit_state.issuer_credit_curve_ids.as_ref()
-        {
-            let mut map = BTreeMap::new();
-            for (issuer, curve_id) in issuer_ids {
-                let curve = ctx.get_hazard(curve_id)?;
-                map.insert(issuer.clone(), curve);
-            }
-            Some(map)
-        } else {
-            None
-        };
-
-        let mut builder = CreditIndexData::builder()
-            .num_constituents(credit_state.num_constituents)
-            .recovery_rate(credit_state.recovery_rate)
-            .index_credit_curve(Arc::clone(&index_curve))
-            .base_correlation_curve(Arc::clone(&base_corr));
-        if let Some(issuer_curves) = issuer_curves {
-            builder = builder.issuer_curves(issuer_curves);
-        }
-        if let Some(recovery_rates) = credit_state.issuer_recovery_rates.as_ref() {
-            builder = builder.issuer_recovery_rates(
-                recovery_rates
-                    .iter()
-                    .map(|(key, value)| (key.clone(), *value)),
-            );
-        }
-        if let Some(weights) = credit_state.issuer_weights.as_ref() {
-            builder =
-                builder.issuer_weights(weights.iter().map(|(key, value)| (key.clone(), *value)));
-        }
-        let data = builder.build()?;
-
-        ctx.insert_credit_index_mut(&credit_state.id, data)?;
+        ctx.insert_credit_index_state(credit_state)?;
     }
 
     // 5. Attach hierarchy if configured.
@@ -316,7 +278,7 @@ mod tests {
             PriorMarketObject::HazardCurve(hazard),
             PriorMarketObject::BaseCorrelationCurve(correlation),
         ];
-        let data = vec![MarketDatum::CreditIndex(CreditIndexState {
+        let mut state = CreditIndexState {
             id: "CDX".to_string(),
             num_constituents: 0,
             recovery_rate: 0.4,
@@ -325,13 +287,50 @@ mod tests {
             issuer_credit_curve_ids: None,
             issuer_recovery_rates: None,
             issuer_weights: None,
-        })];
+        };
 
-        let error = build_initial_context(&prior, &data, &CalibrationConfig::default())
-            .expect_err("zero constituents must be rejected");
+        let error = build_initial_context(
+            &prior,
+            &[MarketDatum::CreditIndex(state.clone())],
+            &CalibrationConfig::default(),
+        )
+        .expect_err("zero constituents must be rejected");
         assert!(
             matches!(error, finstack_quant_core::Error::Validation(_)),
             "{error}"
         );
+
+        state.num_constituents = 2;
+        for heterogeneous in [false, true] {
+            if heterogeneous {
+                state.issuer_credit_curve_ids = Some(
+                    [
+                        ("A".into(), "CDX-HAZARD".into()),
+                        ("B".into(), "CDX-HAZARD".into()),
+                    ]
+                    .into(),
+                );
+                state.issuer_recovery_rates = Some([("A".into(), 0.3)].into());
+                state.issuer_weights = Some([("A".into(), 0.25), ("B".into(), 0.75)].into());
+            }
+            let ctx = build_initial_context(
+                &prior,
+                &[MarketDatum::CreditIndex(state.clone())],
+                &CalibrationConfig::default(),
+            )
+            .expect("valid index state");
+            let snapshot =
+                finstack_quant_core::market_data::context::MarketContextState::try_from(&ctx)
+                    .expect("snapshot");
+            assert_eq!(
+                serde_json::to_value(&snapshot.credit_indices[0]).expect("stored state"),
+                serde_json::to_value(&state).expect("input state")
+            );
+            let restored = MarketContext::try_from(snapshot).expect("core restoration");
+            assert_eq!(
+                serde_json::to_value(&restored).expect("restored"),
+                serde_json::to_value(&ctx).expect("calibration")
+            );
+        }
     }
 }
