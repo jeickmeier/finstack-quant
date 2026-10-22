@@ -582,6 +582,6 @@ impl FacilityProjection {
             "residual",
             TableColumnData::Float64(by_date.values().map(|row| row[3]).collect()),
         ));
-        TableEnvelope::new(columns)
+        TableEnvelope::new(columns, Default::default())
     }
 }

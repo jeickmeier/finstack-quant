@@ -164,7 +164,7 @@ fn column_to_arrow(column: &TableColumn) -> Result<(Field, ArrayRef)> {
 /// let table = TableEnvelope::new(vec![TableColumn::new(
 ///     "pv",
 ///     TableColumnData::Float64(vec![101.5, 99.25]),
-/// )])
+/// )], Default::default())
 /// .unwrap();
 /// assert_eq!(to_record_batch(&table).unwrap().num_rows(), 2);
 /// ```
@@ -210,7 +210,7 @@ mod tests {
         table_meta.insert("kind".to_string(), json!("unit_test"));
         table_meta.insert("orientation".to_string(), json!("long"));
 
-        TableEnvelope::new_with_metadata(
+        TableEnvelope::new(
             vec![
                 TableColumn::new("id", TableColumnData::String(vec!["a".into(), "b".into()]))
                     .with_role(TableColumnRole::Dimension),
@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn to_record_batch_preserves_row_count_for_zero_column_table() {
-        let table = TableEnvelope::new(vec![]).unwrap();
+        let table = TableEnvelope::new(vec![], Default::default()).unwrap();
         let batch = to_record_batch(&table).unwrap();
         assert_eq!(batch.num_rows(), 0);
         assert_eq!(batch.num_columns(), 0);

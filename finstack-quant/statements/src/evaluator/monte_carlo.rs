@@ -203,7 +203,9 @@ impl MonteCarloResults {
                 .with_role(TableColumnRole::Measure),
             );
         }
-        TableEnvelope::new(columns).map(Some).map_err(Into::into)
+        TableEnvelope::new(columns, Default::default())
+            .map(Some)
+            .map_err(Into::into)
     }
 
     /// Estimate the probability that a metric exceeds a threshold in any forecast period.
@@ -479,7 +481,7 @@ impl MonteCarloAccumulator {
             let mut metadata = IndexMap::new();
             metadata.insert("layout".to_string(), json!("long"));
             metadata.insert("source".to_string(), json!("statement_monte_carlo_paths"));
-            Some(TableEnvelope::new_with_metadata(
+            Some(TableEnvelope::new(
                 vec![
                     TableColumn::new("path_id", TableColumnData::UInt32(self.path_ids))
                         .with_role(TableColumnRole::Dimension),
