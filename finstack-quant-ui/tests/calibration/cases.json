@@ -345,7 +345,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -393,7 +392,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -983,7 +981,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -1031,7 +1028,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -1090,7 +1086,6 @@
               "lm_termination_reason": "ConvergedResidualNorm",
               "residual_closure_evals": "11",
               "residual_evals": "11",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "tolerance_definition": "max_abs_residual",
@@ -1927,7 +1922,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -1974,7 +1968,6 @@
               "calibration_type": "hazard_curve",
               "curve_id": "ISSUER-A-CDS",
               "entity": "Issuer-A",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -2024,7 +2017,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -2860,7 +2852,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -2907,7 +2898,6 @@
               "calibration_type": "hazard_curve",
               "curve_id": "CDX-NA-IG-46",
               "entity": "CDX.NA.IG.46",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -2957,7 +2947,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -3956,7 +3945,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -4003,7 +3991,6 @@
               "calibration_type": "hazard_curve",
               "curve_id": "CDX-NA-IG-46",
               "entity": "CDX.NA.IG.46",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -4049,7 +4036,6 @@
             "validation_passed": true,
             "convergence_reason": "generic bootstrap calibration converged: max_residual (7.89e-13) within tolerance (1.00e-3)",
             "metadata": {
-              "residual_units": "discounted_upfront_fraction",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -4098,7 +4084,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -5086,7 +5071,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -5133,7 +5117,6 @@
               "calibration_type": "hazard_curve",
               "curve_id": "CDX-NA-IG-46",
               "entity": "CDX.NA.IG.46",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -5186,7 +5169,6 @@
               "calibrated_expiries": "0.109589,0.361644,0.610959",
               "calibrated_expiry_count": "3",
               "expiry_extrapolation_policy": "clamp",
-              "residual_units": "quoted_volatility",
               "sabr_parameters_at_bounds": "T=0.109589:nu;T=0.361644:nu;T=0.610959:nu",
               "sabr_residual_evaluations": "T=0.109589:388;T=0.361644:347;T=0.610959:371",
               "sabr_winning_iterations": "T=0.109589:26;T=0.361644:22;T=0.610959:23",
@@ -5280,7 +5262,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -6338,7 +6319,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -6386,7 +6366,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -6445,7 +6424,6 @@
               "lm_termination_reason": "ConvergedResidualNorm",
               "residual_closure_evals": "11",
               "residual_evals": "11",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "tolerance_definition": "max_abs_residual",
@@ -6519,7 +6497,6 @@
               "clamped_target_points": "0",
               "failed_buckets": "0",
               "interpolated_target_points": "6",
-              "residual_units": "quoted_volatility",
               "sabr_extrapolation_policy": "clamp",
               "sabr_parameters_at_bounds": "T=1.000000,tenor=10.000000:rho;T=2.002740,tenor=10.000000:rho",
               "sabr_residual_evaluations": "T=1.000000,tenor=2.000000:85;T=1.000000,tenor=5.000000:210;T=1.000000,tenor=10.000000:160;T=2.002740,tenor=2.000000:125;T=2.002740,tenor=5.000000:165;T=2.002740,tenor=10.000000:160;T=5.002740,tenor=2.000000:160;T=5.002740,tenor=5.000000:140;T=5.002740,tenor=10.000000:140",
@@ -7170,7 +7147,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -7221,7 +7197,6 @@
               "calibrated_expiries": "0.252055,0.504110,1.000000",
               "calibrated_expiry_count": "3",
               "expiry_extrapolation_policy": "clamp",
-              "residual_units": "quoted_volatility",
               "sabr_parameters_at_bounds": "T=0.252055:rho;T=0.504110:rho;T=1.000000:rho",
               "sabr_residual_evaluations": "T=0.252055:188;T=0.504110:167;T=1.000000:196",
               "sabr_winning_iterations": "T=0.252055:10;T=0.504110:9;T=1.000000:11",
@@ -7315,7 +7290,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -7517,7 +7491,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -7728,7 +7701,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -8011,7 +7983,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -9040,7 +9011,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -9087,7 +9057,6 @@
               "calibration_type": "hazard_curve",
               "curve_id": "CDX-NA-IG-46",
               "entity": "CDX.NA.IG.46",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -9134,7 +9103,6 @@
             "convergence_reason": "generic bootstrap calibration converged: max_residual (9.21e-5) within tolerance (1.00e-3)",
             "metadata": {
               "approximate_knots": "3.000000,7.000000,10.000000,15.000000,30.000000",
-              "residual_units": "discounted_upfront_fraction",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -9183,7 +9151,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"
@@ -9578,7 +9545,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
@@ -9626,7 +9592,6 @@
               "calibration_type": "discount_curve",
               "currency": "USD",
               "curve_id": "USD-OIS",
-              "residual_units": "pv_per_unit_notional",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "generic_bootstrap"

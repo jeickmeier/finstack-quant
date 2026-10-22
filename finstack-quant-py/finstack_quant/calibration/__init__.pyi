@@ -3956,8 +3956,8 @@ class CalibrationReport:
         Returns
         -------
         str | None
-            Wire name of the solver method. ``None`` only for a report rebuilt
-            from JSON written before the field existed.
+            Wire name of the solver method, or ``None`` for a manually constructed
+            report with no solver method supplied.
         """
 
     @property
@@ -3972,16 +3972,16 @@ class CalibrationReport:
         ``"discounted_upfront_fraction"`` is the discounted tranche value as a
         fraction of tranche notional; and
         ``"absolute_residual_over_step_tolerance"`` is the dimensionless
-        ``|residual| / step_tolerance`` used by the plan-level report. The same
-        string is mirrored in ``metadata["residual_units"]``.
+        ``|residual| / step_tolerance`` used by the plan-level report.
+        This typed field is authoritative; metadata supplies no fallback.
 
         This property does not raise.
 
         Returns
         -------
         str | None
-            Wire name of the residual units. ``None`` only for a report rebuilt
-            from JSON written before the field existed.
+            Wire name of the residual units, or ``None`` when a manually constructed
+            report supplies no units. Missing units are unknown.
         """
 
     @property

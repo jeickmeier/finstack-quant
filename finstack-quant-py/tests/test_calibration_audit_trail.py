@@ -34,8 +34,7 @@ def test_step_report_states_solver_method_and_residual_units() -> None:
 
     assert report.solver_method in SOLVER_METHODS
     assert report.residual_units == "pv_per_unit_notional"
-    # The typed field and the metadata entry are written together.
-    assert report.metadata["residual_units"] == report.residual_units
+    assert "residual_units" not in report.metadata
     # Only the equity SABR and SVI surface steps fit per-expiry smiles.
     assert report.fitted_slices == []
 
@@ -48,17 +47,18 @@ def test_plan_report_is_marked_as_an_aggregate_in_ratio_units() -> None:
     plan = calibrate(GOLDEN["envelope"]).report
     assert plan.solver_method == "plan_execution"
     assert plan.residual_units == "absolute_residual_over_step_tolerance"
-    assert plan.metadata["residual_units"] == plan.residual_units
+    assert "residual_units" not in plan.metadata
 
 
-def test_report_json_without_the_typed_fields_still_loads() -> None:
+def test_manually_authored_report_without_units_has_unknown_units() -> None:
     wire = json.loads(calibrate(GOLDEN["envelope"]).step_report("USD-OIS").to_json())
     del wire["solver_method"]
     del wire["residual_units"]
-    legacy = CalibrationReport.from_json(json.dumps(wire))
-    assert legacy.solver_method is None
-    assert legacy.residual_units is None
-    assert legacy.fitted_slices == []
+    wire["metadata"]["residual_units"] = "quoted_volatility"
+    manual = CalibrationReport.from_json(json.dumps(wire))
+    assert manual.solver_method is None
+    assert manual.residual_units is None
+    assert manual.fitted_slices == []
 
 
 def test_diagnostics_jacobian_follows_the_solver_method() -> None:

@@ -47,9 +47,7 @@ export function residualPanels(
     groups.set(group, rows);
   }
   const units =
-    typeof report.metadata.residual_units === "string"
-      ? report.metadata.residual_units
-      : "Solver units (quote convention unavailable)";
+    report.residual_units ?? "Solver units (quote convention unavailable)";
   return [...groups].map(([group, points]) => ({
     key: JSON.stringify([stepId, group]),
     stepId,

@@ -445,17 +445,15 @@ pub struct CalibrationReport {
     ///
     /// Set by every calibrator in this crate. `None` only on reports built
     /// directly through [`Self::new`] or `Self::for_type_with_tolerance`
-    /// without a solver, and on JSON written before this field existed.
+    /// without a solver.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solver_method: Option<SolverMethod>,
 
     /// Units of [`Self::residuals`], [`Self::max_residual`] and [`Self::rmse`].
     ///
-    /// Set by every calibrator in this crate and mirrored as the
-    /// `residual_units` entry of [`Self::metadata`]. `None` only on reports
-    /// built directly through [`Self::new`] or
-    /// `Self::for_type_with_tolerance` without a solver, and on JSON
-    /// written before this field existed.
+    /// Set by every calibrator in this crate. `None` on reports built directly
+    /// through [`Self::new`] or `Self::for_type_with_tolerance` without a solver.
+    /// Missing units are unknown; metadata does not supply a fallback.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub residual_units: Option<ResidualUnits>,
 
@@ -630,8 +628,6 @@ impl CalibrationReport {
     #[must_use]
     pub(crate) fn with_residual_units(mut self, units: ResidualUnits) -> Self {
         self.residual_units = Some(units);
-        self.metadata
-            .insert("residual_units".to_string(), units.as_str().to_string());
         self
     }
 
@@ -1259,15 +1255,12 @@ mod tests {
     }
 
     #[test]
-    fn typed_method_and_units_round_trip_and_mirror_metadata() {
+    fn typed_method_and_units_round_trip_without_metadata_mirror() {
         let residuals = BTreeMap::from([("Q1".to_string(), 1e-10)]);
         let report = CalibrationReport::for_type_with_tolerance("yield_curve", residuals, 3, 1e-8)
             .with_solver_method(SolverMethod::SequentialBootstrap)
             .with_residual_units(ResidualUnits::PvPerUnitNotional);
-        assert_eq!(
-            report.metadata.get("residual_units").map(String::as_str),
-            Some("pv_per_unit_notional")
-        );
+        assert!(!report.metadata.contains_key("residual_units"));
 
         let json = serde_json::to_value(&report).expect("serialize report");
         assert_eq!(json["solver_method"], "sequential_bootstrap");
@@ -1282,12 +1275,11 @@ mod tests {
             Some(ResidualUnits::PvPerUnitNotional)
         );
 
-        // Reports written before the typed fields existed still deserialize.
-        let mut legacy = serde_json::to_value(&report).expect("serialize report");
-        let object = legacy.as_object_mut().expect("report object");
-        object.remove("solver_method");
-        object.remove("residual_units");
-        let restored: CalibrationReport = serde_json::from_value(legacy).expect("legacy report");
+        let manual = CalibrationReport::new(BTreeMap::new(), 0, true, "Manually authored report");
+        let json = serde_json::to_value(&manual).expect("serialize manual report");
+        assert!(json.get("solver_method").is_none());
+        assert!(json.get("residual_units").is_none());
+        let restored: CalibrationReport = serde_json::from_value(json).expect("manual report");
         assert!(restored.solver_method.is_none());
         assert!(restored.residual_units.is_none());
     }

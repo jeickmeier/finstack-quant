@@ -933,10 +933,7 @@ mod tests {
             (report.rmse_ratio.expect("plan aggregation sets rmse_ratio") - expected).abs() < 1e-12
         );
         assert!((report.objective_value - expected).abs() < 1e-12);
-        assert_eq!(
-            report.metadata.get("residual_units").map(String::as_str),
-            Some("absolute_residual_over_step_tolerance")
-        );
+        assert!(!report.metadata.contains_key("residual_units"));
         assert_eq!(
             report.residual_units,
             Some(crate::ResidualUnits::AbsoluteResidualOverStepTolerance)

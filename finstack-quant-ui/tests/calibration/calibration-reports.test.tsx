@@ -101,9 +101,7 @@ it("separates deposit/swap and unlike steps and isolates missing input identitie
     residualPanels("USD-OIS", report).every((p) => p.points.length === 1),
   ).toBe(true);
   const plan = reports[0]!.result.result.report;
-  expect(residualPanels("Plan", plan)[0]!.units).toBe(
-    plan.metadata.residual_units,
-  );
+  expect(residualPanels("Plan", plan)[0]!.units).toBe(plan.residual_units);
   const duplicate = [
     reports[0]!.input.market_data![0]!,
     reports[0]!.input.market_data![0]!,
@@ -183,4 +181,30 @@ it("preserves actual native structured failures with available and unavailable s
     />,
   );
   expect(screen.getByText("Solver diagnostics unavailable")).toBeTruthy();
+});
+
+it("uses typed residual units and leaves missing units unknown", () => {
+  const source = reports[0]!.result.result.step_reports["USD-OIS"]!;
+  const report: NativeReport = {
+    ...source,
+    metadata: { residual_units: "obsolete-units" },
+  };
+  expect(
+    residualPanels("Typed", report).every(
+      (panel) => panel.units === source.residual_units,
+    ),
+  ).toBe(true);
+  const manual = { ...report };
+  delete manual.residual_units;
+  expect(
+    residualPanels("Manual", manual).every(
+      (panel) => panel.units === "Solver units (quote convention unavailable)",
+    ),
+  ).toBe(true);
+  render(<CalibrationReport stepId="Manual" report={manual} />);
+  expect(
+    screen.getByRole("columnheader", {
+      name: "Residual (solver units; quote convention unavailable)",
+    }),
+  ).toBeTruthy();
 });

@@ -135,7 +135,7 @@
               "type": "null"
             }
           ],
-          "description": "Units of [`Self::residuals`], [`Self::max_residual`] and [`Self::rmse`].\n\nSet by every calibrator in this crate and mirrored as the\n`residual_units` entry of [`Self::metadata`]. `None` only on reports\nbuilt directly through [`Self::new`] or\n`Self::for_type_with_tolerance` without a solver, and on JSON\nwritten before this field existed."
+          "description": "Units of [`Self::residuals`], [`Self::max_residual`] and [`Self::rmse`].\n\nSet by every calibrator in this crate. `None` on reports built directly\nthrough [`Self::new`] or `Self::for_type_with_tolerance` without a solver.\nMissing units are unknown; metadata does not supply a fallback."
         },
         "residuals": {
           "additionalProperties": {
@@ -193,7 +193,7 @@
               "type": "null"
             }
           ],
-          "description": "Numerical procedure that produced this report.\n\nSet by every calibrator in this crate. `None` only on reports built\ndirectly through [`Self::new`] or `Self::for_type_with_tolerance`\nwithout a solver, and on JSON written before this field existed."
+          "description": "Numerical procedure that produced this report.\n\nSet by every calibrator in this crate. `None` only on reports built\ndirectly through [`Self::new`] or `Self::for_type_with_tolerance`\nwithout a solver."
         },
         "success": {
           "description": "User-facing success flag. True only if both fitting and validation passed.",
@@ -3387,7 +3387,6 @@
             "market_freshness_status": "unverified",
             "market_quote_side": "mid",
             "raw_residuals": "retained_in_step_reports",
-            "residual_units": "absolute_residual_over_step_tolerance",
             "solver_tolerance": "1.00e-12",
             "type": "plan_execution"
           },
