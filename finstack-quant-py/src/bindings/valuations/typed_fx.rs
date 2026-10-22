@@ -123,8 +123,8 @@ impl PyFxForward {
     ///     Quote-currency holiday calendar; ``None`` uses weekends only.
     /// settlement_days : int | None
     ///     T+N spot lag in business days (non-negative); ``None`` uses the market standard for
-    ///     the pair (``FxForward.standard_settlement_days``): T+1 for USD/CAD,
-    ///     USD/TRY, USD/RUB and T+2 otherwise.
+    ///     the pair (``finstack_quant.core.dates.fx_standard_settlement_days``): T+1 for USD/CAD,
+    ///     USD/TRY, USD/PHP, USD/RUB and T+2 otherwise.
     /// business_day_convention : BusinessDayConvention | str | None
     ///     Roll rule applied to the maturity: a ``BusinessDayConvention`` or a
     ///     canonical name accepted by ``adjust``, ignoring surrounding whitespace
@@ -198,40 +198,6 @@ end_of_month=False)"
             )
             .map_err(core_to_py)?;
         Ok(Self { inner })
-    }
-
-    /// Market-standard spot lag (business days) for a currency pair.
-    ///
-    /// Mirrors Rust ``FxForward::standard_settlement_days``.
-    ///
-    /// Parameters
-    /// ----------
-    /// base : Currency | str
-    ///     Base currency of the pair.
-    /// quote : Currency | str
-    ///     Quote currency of the pair.
-    ///
-    /// Returns
-    /// -------
-    /// int
-    ///     ``1`` for USD/CAD, USD/TRY, USD/RUB (either order); ``2`` otherwise.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a currency code is not ISO-4217.
-    #[staticmethod]
-    #[pyo3(text_signature = "(base, quote)")]
-    fn standard_settlement_days(
-        base: &Bound<'_, PyAny>,
-        quote: &Bound<'_, PyAny>,
-    ) -> PyResult<u32> {
-        Ok(
-            finstack_quant_valuations::instruments::fx::fx_forward::FxForward::standard_settlement_days(
-                crate::bindings::core::currency::extract_currency(base)?,
-                crate::bindings::core::currency::extract_currency(quote)?,
-            ),
-        )
     }
 
     /// Return a copy whose contract rate is ``spot_rate + forward_points``.

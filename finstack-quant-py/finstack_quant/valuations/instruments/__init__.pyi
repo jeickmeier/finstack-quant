@@ -15099,7 +15099,7 @@ class FxForward:
         settlement_days : int | None
             Contractual T+N spot lag in business days (non-negative), honored as
             given (for example ``1`` for tom-next); ``None`` uses
-            :meth:`FxForward.standard_settlement_days` for the pair.
+            :func:`finstack_quant.core.dates.fx_standard_settlement_days` for the pair.
         business_day_convention : BusinessDayConvention | str | None
             Roll rule applied to the maturity: a ``BusinessDayConvention`` or a
             canonical name accepted by ``adjust``, ignoring surrounding whitespace
@@ -15129,36 +15129,6 @@ class FxForward:
         ... )
         >>> fwd.contract_rate is None
         True
-        """
-        ...
-    @staticmethod
-    def standard_settlement_days(base: Currency | str, quote: Currency | str) -> int:
-        """
-        Market-standard spot lag (business days) for a currency pair (mirrors
-        Rust ``FxForward::standard_settlement_days``).
-
-        Parameters
-        ----------
-        base : Currency | str
-            Base currency of the pair.
-        quote : Currency | str
-            Quote currency of the pair.
-
-        Returns
-        -------
-        int
-            ``1`` for USD/CAD, USD/TRY, USD/RUB (either order); ``2`` otherwise.
-
-        Raises
-        ------
-        ValueError
-            If a currency code is not ISO-4217.
-
-        Examples
-        --------
-        >>> from finstack_quant.valuations.instruments import FxForward
-        >>> FxForward.standard_settlement_days("EUR", "USD")
-        2
         """
         ...
     def with_forward_points(self, spot_rate: float, forward_points: float) -> FxForward:

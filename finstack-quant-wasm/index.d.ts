@@ -7691,6 +7691,23 @@ export interface CoreNamespace {
    */
   Tenor: TenorConstructor;
   /**
+   * Return the market-standard FX spot lag in business days for a currency pair.
+   * No holiday calendars or instrument-specific settlement overrides apply.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * console.log(core.fxStandardSettlementDays("USD", "CAD")); // 1
+   * console.log(core.fxStandardSettlementDays("EUR", "USD")); // 2
+   * ```
+   * @param base - Base (foreign) currency ISO-4217 code; case-insensitive, with no surrounding whitespace.
+   * @param quote - Quote (domestic) currency ISO-4217 code; reversing the pair preserves the lag.
+   * @returns One business day for USD/CAD, USD/TRY, USD/PHP and USD/RUB in either order; two otherwise, including USD/MXN and EUR/CAD.
+   * @throws TypeError - With kind `invalid_type` if either currency is not a string.
+   * @throws Error - With kind `validation` if either code is not a recognized ISO-4217 currency.
+   */
+  fxStandardSettlementDays(base: string, quote: string): number;
+  /**
    * Create a date and return it as epoch days (days since 1970-01-01).
    * @returns Days since 1970-01-01 (Unix epoch).
    * @param year - Integral calendar year supported by the Rust date type.
@@ -24540,7 +24557,7 @@ export interface FxConstructor<T extends FxHandle> {
  * import init, { valuations } from "finstack-quant-wasm";
  * await init();
  * const forward = valuations.instruments.FxForward.example().withForwardPoints(1.1, 0.002);
- * console.log(valuations.instruments.FxForward.standardSettlementDays("EUR", "USD"), forward.id);
+ * console.log(forward.id);
  * forward.free();
  * ```
  */
@@ -24551,14 +24568,6 @@ export interface FxForwardConstructor extends FxConstructor<FxForward> {
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
   example(): FxForward;
-  /**
-   * Market-standard spot lag in business days for a currency pair (mirrors Rust `FxForward::standard_settlement_days`).
-   * @param base - Base (foreign) currency ISO code.
-   * @param quote - Quote (domestic) currency ISO code.
-   * @returns Spot lag in business days (1 or 2).
-   * @throws Error - Throws with kind `validation` if a currency code is not ISO-4217.
-   */
-  standardSettlementDays(base: string, quote: string): number;
   /**
    * Build an at-market forward from a trade date and a standard FX tenor (mirrors Rust `FxForward::from_trade_date`).
    * @param id - Unique instrument identifier.

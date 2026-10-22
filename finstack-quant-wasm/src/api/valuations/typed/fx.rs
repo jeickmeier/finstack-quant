@@ -214,24 +214,6 @@ fx_option!(
 
 #[wasm_bindgen(js_class = FxForward)]
 impl JsFxForward {
-    /// Market-standard spot lag in business days for a currency pair.
-    ///
-    /// Mirrors Rust `FxForward::standard_settlement_days`: T+1 for USD/CAD,
-    /// USD/TRY and USD/RUB, T+2 otherwise.
-    /// @param base - Base (foreign) currency ISO code.
-    /// @param quote - Quote (domestic) currency ISO code.
-    /// @returns Spot lag in business days (1 or 2).
-    /// @throws Error - Throws with kind `validation` if a currency code is not ISO-4217.
-    #[wasm_bindgen(js_name = standardSettlementDays)]
-    pub fn standard_settlement_days(base: JsValue, quote: JsValue) -> Result<u32, JsValue> {
-        Ok(
-            instruments::fx::fx_forward::FxForward::standard_settlement_days(
-                js_currency(&base, "base")?,
-                js_currency(&quote, "quote")?,
-            ),
-        )
-    }
-
     /// Build an at-market forward from a trade date and a standard FX tenor.
     ///
     /// Mirrors Rust `FxForward::from_trade_date`: spot is rolled from
