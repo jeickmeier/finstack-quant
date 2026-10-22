@@ -5,14 +5,14 @@ use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, 
 
 use super::{invalid_return_series, Performance};
 use crate::drawdown::{
-    burke_ratio, deepest, max_drawdown_duration, mean_drawdown, mean_episode_drawdown, pain_index,
-    pain_ratio, sterling_ratio, ulcer_index, worst_episode_depths,
+    burke_ratio, deepest, max_drawdown_duration, mean_episode_drawdown, pain_index, pain_ratio,
+    sterling_ratio, ulcer_index, worst_episode_depths,
 };
 use crate::returns::comp_total;
 use crate::risk_metrics;
 use crate::risk_metrics::CagrDayCount;
 use finstack_quant_core::dates::HolidayCalendar;
-use finstack_quant_core::math::stats::variance;
+use finstack_quant_core::math::stats::{mean, variance};
 
 impl Performance {
     /// Compound annual growth rate for each ticker.
@@ -237,7 +237,7 @@ impl Performance {
     ///
     /// One non-positive mean drawdown per ticker in column order.
     pub fn mean_drawdown(&self) -> Vec<f64> {
-        self.map_tickers(|i| mean_drawdown(self.active_drawdown_values(i)))
+        self.map_tickers(|i| mean(self.active_drawdown_values(i)))
     }
 
     /// Historical Value-at-Risk for each ticker (not annualized).

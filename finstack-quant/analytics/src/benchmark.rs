@@ -1189,13 +1189,13 @@ pub(crate) fn multi_factor_greeks(
     } else {
         f64::NAN
     };
-    let dof = n as f64 - k as f64 - 1.0;
-    let residual_var = if dof > 0.0 { ss_res / dof } else { 0.0 };
+    let dof = (n - k - 1) as f64;
+    let residual_var = ss_res / dof;
     let residual_vol = residual_var.sqrt() * response_scale * ann_factor.sqrt();
     let alpha = alpha_per_period * ann_factor;
     crate::regression::ensure_finite(&[alpha, residual_vol])?;
 
-    let adjusted_r_squared = if dof > 0.0 && r_sq.is_finite() {
+    let adjusted_r_squared = if r_sq.is_finite() {
         1.0 - (1.0 - r_sq) * (n as f64 - 1.0) / dof
     } else {
         f64::NAN

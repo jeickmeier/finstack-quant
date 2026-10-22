@@ -376,9 +376,6 @@ impl Performance {
 
     fn common_active_span(&self) -> TickerSpan {
         let n = self.ticker_names.len();
-        if n == 0 {
-            return TickerSpan::new(0, 0);
-        }
         let mut span = self.active_span_for_ticker(0);
         for i in 1..n {
             span = span.intersect(self.active_span_for_ticker(i));

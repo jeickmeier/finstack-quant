@@ -7,11 +7,9 @@
 //! - [`to_drawdown_series`]: per-period drawdown depth as a time series.
 //! - [`drawdown_details`]: structured episodes (start, valley, recovery).
 //! - [`mean_episode_drawdown`]: scalar average of the worst N episode minima.
-//! - [`mean_drawdown`]: arithmetic mean of a drawdown path.
 
 use crate::risk_metrics::ratio_or_sign_infinity;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::math::stats::mean;
 
 /// Drawdown episode with start, valley, optional recovery, and max drawdown.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -366,23 +364,6 @@ pub(crate) fn deepest(drawdown: &[f64]) -> f64 {
         return f64::NAN;
     }
     drawdown.iter().copied().fold(0.0_f64, f64::min)
-}
-
-/// Arithmetic mean of a pre-computed drawdown path.
-///
-/// Since drawdown values are non-positive, the result is typically negative
-/// or zero. Returns `0.0` for an empty slice.
-///
-/// For the average of the worst-N *episode* minima (the Sterling-style
-/// measure), use [`mean_episode_drawdown`] instead.
-///
-/// # Arguments
-///
-/// * `drawdowns` - Slice of per-period drawdown depths (from
-///   [`to_drawdown_series`]).
-#[must_use]
-pub(crate) fn mean_drawdown(drawdowns: &[f64]) -> f64 {
-    mean(drawdowns)
 }
 
 /// Sterling ratio: risk-adjusted return using average drawdown.
