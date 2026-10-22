@@ -15,6 +15,7 @@ use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     ColumnSchema,
 };
+use crate::bindings::pydoc::pydoc;
 use crate::errors::display_to_py;
 use finstack_quant_statements_analytics::extensions as rust_scorecards;
 use pyo3::prelude::*;
@@ -258,11 +259,10 @@ pub struct PyScorecardReport {
 
 #[pymethods]
 impl PyScorecardReport {
-    /// ``"success"`` or ``"failed"`` — the canonical serde discriminant of
-    /// the Rust ``ScorecardStatus`` enum.
+    #[doc = pydoc!("finstack_quant.statements_analytics", "ScorecardReport.status")]
     #[getter]
-    fn status(&self) -> String {
-        super::serde_variant_str(&self.inner.status)
+    fn status(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.status)
     }
 
     /// Human-readable summary of the run.
@@ -299,22 +299,10 @@ impl PyScorecardReport {
         serde_json::to_string(&self.inner.data).map_err(display_to_py)
     }
 
-    /// Export the report header as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``status``, ``message``, ``rating``, ``rating_scale``,
-    /// ``period``, ``total_score``, ``partial``, ``weight_coverage``,
-    /// ``warning_count``, ``error_count``.
-    ///
-    /// ``period`` is the rated period-id string. ``weight_coverage`` is a
-    /// decimal fraction in ``[0, 1]``: the included metric weight over the
-    /// configured metric weight, so ``0.8`` means a fifth of the configured
-    /// weight was excluded. ``partial`` is ``True`` when any metric was
-    /// excluded or errored. Fields absent from the report payload are
-    /// ``None``. Per-metric detail lives in
-    /// ``to_metric_scores_dataframe``.
+    #[doc = pydoc!("finstack_quant.statements_analytics", "ScorecardReport.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let row = serde_json::json!({
-            "status": self.status(),
+            "status": self.status()?,
             "message": self.inner.message,
             "rating": self.data_field("rating"),
             "rating_scale": self.data_field("rating_scale"),
@@ -364,13 +352,13 @@ impl PyScorecardReport {
         serde_rows_to_dataframe_with_schema(py, &rows, &METRIC_SCORE_COLUMNS)
     }
 
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "ScorecardReport(status='{}', warnings={}, errors={})",
-            self.status(),
+            self.status()?,
             self.inner.warnings.len(),
             self.inner.errors.len()
-        )
+        ))
     }
 }
 

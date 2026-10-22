@@ -975,16 +975,18 @@ class ForecastMethod:
 
     @property
     def kind(self) -> str:
-        """Return the canonical snake_case forecast discriminant.
+        """
+        Return the canonical snake_case forecast discriminant.
 
         Returns
         -------
         str
             Wire method name, such as "growth_pct" or "log_normal".
 
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -1570,9 +1572,10 @@ class NodeType:
             ``"value"``, ``"calculated"``, or ``"mixed"``, matching the JSON
             schema rename for :class:`NodeType`.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -2044,7 +2047,8 @@ class FinancialModelSpec:
         ...
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Export one descriptive row for each configured model node.
+        """
+        Export one descriptive row for each configured model node.
 
         Returns
         -------
@@ -2057,6 +2061,9 @@ class FinancialModelSpec:
             If pandas is unavailable.
         ValueError
             If a node description cannot be converted to the documented column schema.
+
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -6420,12 +6427,15 @@ class MetricDefinition:
         """
         Result unit (e.g. ``"ratio"``, ``"percent"``), or ``None``.
 
-        This property does not raise.
-
         Returns
         -------
         str | None
             Result unit (e.g. ``"ratio"``, ``"percent"``), or ``None``.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -6760,12 +6770,15 @@ class Adjustment:
         """
         Cap base mode, or ``None`` when uncapped.
 
-        This property does not raise.
-
         Returns
         -------
         str | None
             Cap base mode, or ``None`` when uncapped.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -6912,12 +6925,15 @@ class CheckConfig:
         """
         Lowest severity retained in the report.
 
-        This property does not raise.
-
         Returns
         -------
         str
             Lowest severity retained in the report.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -7103,12 +7119,15 @@ class FormulaCheckSpec:
         """
         Classification bucket.
 
-        This property does not raise.
-
         Returns
         -------
         str
             Classification bucket.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -7117,12 +7136,15 @@ class FormulaCheckSpec:
         """
         Severity assigned to findings from this check.
 
-        This property does not raise.
-
         Returns
         -------
         str
             Severity assigned to findings from this check.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -7219,12 +7241,15 @@ class CheckFinding:
         """
         ``"info"``, ``"warning"`` or ``"error"``.
 
-        This property does not raise.
-
         Returns
         -------
         str
             ``"info"``, ``"warning"`` or ``"error"``.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 

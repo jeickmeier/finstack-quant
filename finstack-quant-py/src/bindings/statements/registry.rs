@@ -2,6 +2,7 @@
 
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::statements_to_py;
 use pyo3::prelude::*;
 
@@ -58,14 +59,14 @@ impl PyMetricDefinition {
         self.inner.category.as_deref()
     }
 
-    /// Unit type as its snake_case name (``"percentage"``, ``"currency"``,
-    /// ``"ratio"``, ``"count"``, ``"time_period"``), or ``None``.
+    #[doc = pydoc!("finstack_quant.statements", "MetricDefinition.unit_type")]
     #[getter]
-    fn unit_type(&self) -> Option<String> {
+    fn unit_type(&self) -> PyResult<Option<String>> {
         self.inner
             .unit_type
             .as_ref()
-            .map(crate::bindings::statements_analytics::serde_variant_str)
+            .map(crate::bindings::extract::label)
+            .transpose()
     }
 
     /// Node identifiers the formula requires as inputs.

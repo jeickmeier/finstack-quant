@@ -2,6 +2,7 @@
 
 use super::evaluator::PyStatementResult;
 use crate::bindings::macros::wire_methods;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{statements_to_py, value_error};
 use finstack_quant_statements::adjustments::{
     Adjustment, AdjustmentValue, AppliedAdjustment, CapBaseMode, NormalizationConfig,
@@ -198,13 +199,14 @@ impl PyAdjustment {
         self.inner.cap.as_ref().map(|cap| cap.value)
     }
 
-    /// Cap base mode (``"reported"`` / ``"progressive"``), or ``None``.
+    #[doc = pydoc!("finstack_quant.statements", "Adjustment.cap_base_mode")]
     #[getter]
-    fn cap_base_mode(&self) -> Option<String> {
+    fn cap_base_mode(&self) -> PyResult<Option<String>> {
         self.inner
             .cap
             .as_ref()
-            .map(|cap| crate::bindings::statements_analytics::serde_variant_str(&cap.base_mode))
+            .map(|cap| crate::bindings::extract::label(&cap.base_mode))
+            .transpose()
     }
 
     /// Return ``Adjustment(id=..., name=..., value_type=..., has_cap=...)``.

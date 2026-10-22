@@ -49,7 +49,7 @@ pub fn normalization_config_add_adjustment(
 /// adjustment identifiers.
 #[wasm_bindgen(js_name = validateNormalizationConfigJson)]
 pub fn validate_normalization_config_json(json: JsValue) -> Result<String, JsValue> {
-    crate::api::statements::validated_json(&json, NormalizationConfig::validate)
+    crate::utils::input::validated_json(&json, NormalizationConfig::validate)
 }
 
 /// Normalize a target metric by applying an adjustment catalog period by period.
