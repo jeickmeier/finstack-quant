@@ -118,7 +118,7 @@ Formulas are parsed by `nom` into a `StmtExpr` AST and compiled to
   `count`) with pandas-parity `min_periods` semantics.
 - Historical statistics over a node's own series: `std`, `var`, `median`,
   `rank`, `quantile`, `ewm_mean`, `ewm_std`, `ewm_var`.
-- Calendar aggregates: `ttm`/`ltm`, `ytd`, `qtd`, `fiscal_ytd`, `annualize`,
+- Calendar aggregates: `ttm`, `ytd`, `qtd`, `fiscal_ytd`, `annualize`,
   `annualize_rate`.
 
 There is no `lead()`: forward-looking references would leak future values into

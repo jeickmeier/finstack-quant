@@ -115,7 +115,7 @@ def statements_cases() -> dict[str, Any]:
                 st.ForecastSpec.curve([0.05, 0.04]),
                 st.ForecastSpec.normal(100.0, 10.0, 7),
                 st.ForecastSpec.log_normal(0.0, 0.2, 7),
-                st.ForecastSpec.override({Q2: 125.0}),
+                st.ForecastSpec.overrides({Q2: 125.0}),
                 st.ForecastSpec.seasonal([1.0, 2.0, 3.0, 4.0], 4, "additive"),
                 st.ForecastSpec.time_series([1.0, 2.0, 3.0]),
                 st.ForecastSpec.fade_to_target(50.0),
@@ -156,7 +156,7 @@ def statements_cases() -> dict[str, Any]:
             "first": first,
             "has": [registry.has(first), registry.has("fin.no_such_metric")],
             "definition": doc(registry.get(first)),
-            "dependencies": registry.dependencies(first),
+            "dependencies": registry.get_dependencies(first),
         },
     }
 

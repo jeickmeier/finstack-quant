@@ -13,6 +13,18 @@ from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics import run_checks
 
 
+def test_canonical_forecast_and_registry_names() -> None:
+    assert not hasattr(s.ForecastSpec, "override")
+    assert s.ForecastSpec.overrides({"2025Q2": 120.0}).method.kind == "override"
+    registry = s.Registry.with_builtins()
+    assert not hasattr(registry, "dependencies")
+    assert "fin.gross_profit" in registry.get_dependencies("fin.gross_margin")
+    assert s.parse_formula("ltm(revenue)") == "ltm(revenue)"
+    with pytest.raises(ValueError, match="Function 'ltm' is not supported"):
+        s.parse_and_compile("ltm(revenue)")
+    assert s.parse_and_compile("ttm(revenue)") is None
+
+
 @pytest.mark.parametrize("ready", [False, True])
 @pytest.mark.parametrize(
     "method",

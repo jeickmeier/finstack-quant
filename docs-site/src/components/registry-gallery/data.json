@@ -12280,7 +12280,7 @@
       },
       {
         "path": "finstack-quant-wasm/index.d.ts",
-        "sha256": "1da96eb384ca9cdc71699a838682179dbd9103373f4240cc2fc38db44586f651"
+        "sha256": "e88020d83302ba7ee969fc2f64b919717e876701a8aecbc43131844a32c89b17"
       },
       {
         "path": "finstack-quant-wasm/src/utils/mod.rs",
@@ -13606,7 +13606,7 @@
           "type": "monetary",
           "currency": "USD"
         },
-        "formula_text": "ltm(ebitda)"
+        "formula_text": "ttm(ebitda)"
       },
       "leverage": {
         "node_id": "leverage",
@@ -15048,25 +15048,28 @@
         "check_id": "leverage_covenant",
         "check_name": "Gross leverage <= 3.50x",
         "category": "credit_reasonableness",
-        "passed": false,
+        "passed": true,
         "findings": [
           {
             "check_id": "leverage_covenant",
-            "severity": "error",
-            "message": "Leverage above 3.50x in 2024Q1",
-            "period": "2024Q1"
+            "severity": "warning",
+            "message": "Gross leverage <= 3.50x: insufficient data for 2024Q1: missing or non-finite inputs [leverage]",
+            "period": "2024Q1",
+            "nodes": ["leverage"]
           },
           {
             "check_id": "leverage_covenant",
-            "severity": "error",
-            "message": "Leverage above 3.50x in 2024Q2",
-            "period": "2024Q2"
+            "severity": "warning",
+            "message": "Gross leverage <= 3.50x: insufficient data for 2024Q2: missing or non-finite inputs [leverage]",
+            "period": "2024Q2",
+            "nodes": ["leverage"]
           },
           {
             "check_id": "leverage_covenant",
-            "severity": "error",
-            "message": "Leverage above 3.50x in 2024Q3",
-            "period": "2024Q3"
+            "severity": "warning",
+            "message": "Gross leverage <= 3.50x: insufficient data for 2024Q3: missing or non-finite inputs [leverage]",
+            "period": "2024Q3",
+            "nodes": ["leverage"]
           }
         ]
       },
@@ -15159,10 +15162,10 @@
     ],
     "summary": {
       "total_checks": 6,
-      "passed": 4,
-      "failed": 2,
-      "errors": 10,
-      "warnings": 0,
+      "passed": 5,
+      "failed": 1,
+      "errors": 7,
+      "warnings": 3,
       "infos": 0
     }
   },
@@ -15645,7 +15648,7 @@
           "type": "monetary",
           "currency": "USD"
         },
-        "formula_text": "ltm(ebitda)"
+        "formula_text": "ttm(ebitda)"
       },
       "leverage": {
         "node_id": "leverage",
@@ -16194,7 +16197,7 @@
           "type": "monetary",
           "currency": "USD"
         },
-        "formula_text": "ltm(ebitda)"
+        "formula_text": "ttm(ebitda)"
       },
       "leverage": {
         "node_id": "leverage",
@@ -16761,7 +16764,7 @@
           "type": "monetary",
           "currency": "USD"
         },
-        "formula_text": "ltm(ebitda)"
+        "formula_text": "ttm(ebitda)"
       },
       "leverage": {
         "node_id": "leverage",

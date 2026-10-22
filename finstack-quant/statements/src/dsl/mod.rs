@@ -43,7 +43,7 @@
 //! | `quantile(node, q)` | 2 | Historical linear quantile of a statement-node or `cs.*` reference over finite observations, retaining the series' units and currency. `q` is a scalar level in `[0, 1]`. |
 //! | `ewm_mean(expr, alpha)` | 2 | Exponentially weighted moving mean over the expression's historical series (pandas `adjust=False, ignore_na=False`: decay advances across NaN gaps). Requires `0 < alpha <= 1`. |
 //! | `ewm_std(expr, alpha[, unbiased])`, `ewm_var(expr, alpha[, unbiased])` | 2-3 | Exponentially weighted variance or standard deviation (pandas `adjust=False, ignore_na=False`). The optional `unbiased` flag is pandas' `bias` toggle: nonzero (default) applies the `bias=False` correction, `0` returns the biased variance. Requires `0 < alpha <= 1`. |
-//! | `ttm(expr)`, `ltm(expr)` | 1 | Trailing-twelve-month sum. Quarterly models require 4 quarters; monthly models require 12 months. |
+//! | `ttm(expr)` | 1 | Trailing-twelve-month sum. Quarterly models require 4 quarters; monthly models require 12 months. |
 //! | `ytd(expr)` | 1 | Calendar year-to-date finite sum. |
 //! | `qtd(expr)` | 1 | Quarter-to-date finite sum for monthly models. |
 //! | `fiscal_ytd(expr, start_month)` | 2 | Fiscal year-to-date finite sum using a 1-12 fiscal start month. |

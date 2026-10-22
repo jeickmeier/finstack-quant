@@ -331,8 +331,8 @@ fn infer_call_dimension(
         // behave identically under this rule.
         "abs" | "lag" | "shift" | "cumsum" | "cummin" | "cummax" | "diff" | "rolling_mean"
         | "rolling_sum" | "rolling_min" | "rolling_max" | "rolling_median" | "rolling_std"
-        | "ewm_mean" | "ewm_std" | "median" | "std" | "ttm" | "ltm" | "ytd" | "qtd"
-        | "fiscal_ytd" | "annualize" | "round" | "floor" | "ceil" => {
+        | "ewm_mean" | "ewm_std" | "median" | "std" | "ttm" | "ytd" | "qtd" | "fiscal_ytd"
+        | "annualize" | "round" | "floor" | "ceil" => {
             require_scalar_arguments(func, auxiliary_dims)?;
             Ok(first_arg_dimension(&arg_dims))
         }
@@ -420,7 +420,7 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
         "mean" => Some(Function::Mean),
         "min" => Some(Function::Min),
         "max" => Some(Function::Max),
-        "ttm" | "ltm" => Some(Function::Ttm),
+        "ttm" => Some(Function::Ttm),
         "ytd" => Some(Function::Ytd),
         "qtd" => Some(Function::Qtd),
         "fiscal_ytd" => Some(Function::FiscalYtd),
@@ -493,7 +493,7 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
             Function::Ttm => {
                 if compiled_args.len() != 1 {
                     return Err(crate::error::Error::eval(
-                        "ttm()/ltm() require exactly 1 argument",
+                        "ttm() requires exactly 1 argument",
                     ));
                 }
             }
@@ -613,7 +613,7 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
         Err(crate::error::Error::eval(format!(
             "Function '{}' is not supported. \
              Supported functions include: lag, diff, pct_change, rolling_*, ewm_*, std, var, median, \
-             sum, mean, min, max, ttm/ltm, ytd, qtd, fiscal_ytd, annualize, growth_rate, abs, sign, coalesce, \
+             sum, mean, min, max, ttm, ytd, qtd, fiscal_ytd, annualize, growth_rate, abs, sign, coalesce, \
              pow, round, floor, ceil, ln, exp, log10, sqrt, clamp, is_missing",
             func_name
         )))

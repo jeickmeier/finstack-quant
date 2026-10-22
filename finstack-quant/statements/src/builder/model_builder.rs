@@ -1008,7 +1008,7 @@ impl ModelBuilder {
         qualified_id: &str,
         registry: &crate::registry::Registry,
     ) -> Result<&mut Self> {
-        let dependencies = registry.get_metric_dependencies(qualified_id)?;
+        let dependencies = registry.get_dependencies(qualified_id)?;
 
         let namespace = qualified_id
             .split('.')

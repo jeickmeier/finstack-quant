@@ -177,28 +177,11 @@ impl PyRegistry {
         })
     }
 
-    /// Transitive registry dependencies of a metric, dependencies first.
-    ///
-    /// Parameters
-    /// ----------
-    /// qualified_id : str
-    ///     Fully qualified metric identifier.
-    ///
-    /// Returns
-    /// -------
-    /// list[str]
-    ///     Fully qualified ids in an order suitable for model construction;
-    ///     the metric itself is excluded, as are model inputs that are not
-    ///     registry metrics.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``qualified_id`` is not registered.
+    #[doc = pydoc!("finstack_quant.statements", "Registry.get_dependencies")]
     #[pyo3(text_signature = "($self, qualified_id)")]
-    fn dependencies(&self, qualified_id: &str) -> PyResult<Vec<String>> {
+    fn get_dependencies(&self, qualified_id: &str) -> PyResult<Vec<String>> {
         self.inner
-            .get_metric_dependencies(qualified_id)
+            .get_dependencies(qualified_id)
             .map_err(statements_to_py)
     }
 

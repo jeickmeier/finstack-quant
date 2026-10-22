@@ -170,7 +170,7 @@ test('statements matches the cross-host golden', () => {
       first,
       has: [registry.has(first), registry.has('fin.no_such_metric')],
       definition: registry.get(first),
-      dependencies: registry.dependencies(first),
+      dependencies: registry.getDependencies(first),
     },
   };
   registry.free();
