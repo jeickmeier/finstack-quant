@@ -485,7 +485,7 @@ impl JsRevolvingCredit {
         let market = parse_market(&market_json)?;
         let as_of = js_date(&as_of, "asOf")?;
         let result =
-            finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer::price_with_paths(
+            finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(
                 &self.inner,
                 &market,
                 as_of,
