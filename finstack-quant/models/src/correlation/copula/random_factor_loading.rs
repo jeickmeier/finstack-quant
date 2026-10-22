@@ -177,7 +177,7 @@ impl RandomFactorLoadingCopula {
     /// A non-negative stress-correlation proxy. Vanishes when
     /// `loading_volatility == 0`.
     #[must_use]
-    pub fn stress_correlation_proxy(&self, correlation: f64) -> f64 {
+    fn stress_proxy(&self, correlation: f64) -> f64 {
         let mean_loading = self.loading_location(correlation);
         if mean_loading.is_nan() {
             return f64::NAN;
@@ -396,7 +396,7 @@ impl Copula for RandomFactorLoadingCopula {
     }
 
     fn stress_correlation_proxy(&self, correlation: f64) -> finstack_quant_core::Result<f64> {
-        let proxy = RandomFactorLoadingCopula::stress_correlation_proxy(self, correlation);
+        let proxy = self.stress_proxy(correlation);
         if proxy.is_finite() {
             Ok(proxy)
         } else {
@@ -508,7 +508,9 @@ mod tests {
     #[test]
     fn test_stress_proxy_small_but_positive() {
         let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
-        let lambda = copula.stress_correlation_proxy(0.5);
+        let lambda = copula
+            .stress_correlation_proxy(0.5)
+            .expect("valid correlation");
 
         // RFL stress proxy is small and non-negative.
         assert!(lambda >= 0.0);
@@ -518,9 +520,38 @@ mod tests {
     #[test]
     fn test_stress_proxy_zero_loading_vol_is_gaussian_limit() {
         let copula = RandomFactorLoadingCopula::new(0.0).expect("valid loading vol");
-        assert_eq!(copula.stress_correlation_proxy(0.0), 0.0);
-        assert_eq!(copula.stress_correlation_proxy(0.5), 0.0);
-        assert_eq!(copula.stress_correlation_proxy(0.99), 0.0);
+        assert_eq!(
+            copula
+                .stress_correlation_proxy(0.0)
+                .expect("valid correlation"),
+            0.0
+        );
+        assert_eq!(
+            copula
+                .stress_correlation_proxy(0.5)
+                .expect("valid correlation"),
+            0.0
+        );
+        assert_eq!(
+            copula
+                .stress_correlation_proxy(0.99)
+                .expect("valid correlation"),
+            0.0
+        );
+    }
+
+    #[test]
+    fn stress_proxy_rejects_invalid_correlations_through_the_public_trait() {
+        let copula = RandomFactorLoadingCopula::new(0.15).expect("valid loading vol");
+        for correlation in [f64::NAN, f64::INFINITY, -0.01, 1.01] {
+            assert!(copula.stress_correlation_proxy(correlation).is_err());
+        }
+        for correlation in [0.0, 0.5, 1.0] {
+            assert!(copula
+                .stress_correlation_proxy(correlation)
+                .expect("valid correlation")
+                .is_finite());
+        }
     }
 
     #[test]

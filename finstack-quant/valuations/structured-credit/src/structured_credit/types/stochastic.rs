@@ -54,7 +54,7 @@ impl StructuredCredit {
             ),
             DealType::Cmbs => (
                 // CMBS has minimal prepayment due to lockout/defeasance
-                StochasticPrepaySpec::deterministic(PrepaymentModelSpec::constant_cpr(0.02)),
+                StochasticPrepaySpec::Deterministic(PrepaymentModelSpec::constant_cpr(0.02)),
                 StochasticDefaultSpec::gaussian_copula(0.02, 0.20),
                 cmbs_correlation_structure()?,
             ),

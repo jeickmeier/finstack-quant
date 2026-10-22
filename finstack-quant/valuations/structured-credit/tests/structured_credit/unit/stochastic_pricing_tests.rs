@@ -521,7 +521,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         1.0, // factor_loading: full single-factor exposure
         0.5, // correlation: 50% systemic loading → meaningful path spread
     ));
-    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
         sc.credit_model.prepayment_spec.clone(),
     ));
     sc.credit_model.correlation_structure =
@@ -623,7 +623,7 @@ fn philox_rng_discipline_determinism_and_stream_sanity() {
         1.0,
         0.4,
     ));
-    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
         sc.credit_model.prepayment_spec.clone(),
     ));
     sc.credit_model.correlation_structure =
@@ -883,7 +883,7 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
                     1.0,
                     0.5,
                 ));
-            sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+            sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
                 sc.credit_model.prepayment_spec.clone(),
             ));
             sc.credit_model.correlation_structure =
