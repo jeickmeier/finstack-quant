@@ -19757,14 +19757,6 @@ export interface CdsTranche extends WasmOwned {
    */
   readonly attributes: generated.valuations.CdsTranche['attributes'];
   /**
-   * Jump-to-default exposure (mirrors Rust `CdsTranche::jump_to_default`): PV impact of one constituent defaulting immediately.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the curves and quotes this instrument needs.
-   * @param asOf - ISO-8601 valuation date.
-   * @returns Jump-to-default PV change in notional currency units.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the calculation fails.
-   */
-  jumpToDefault(marketJson: JsonInput, asOf: string): number;
-  /**
    * Underlying index name.
    * @returns The index name.
    */
@@ -19913,13 +19905,6 @@ export interface CdsTranche extends WasmOwned {
    * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
    */
   metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
-  /**
-   * Expected tranche loss at maturity (mirrors Rust `CdsTranche::expected_loss`).
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the credit index data.
-   * @returns Expected loss of the tranche in the notional currency.
-   * @throws Error - Throws with kind `not_found` if the credit index data is missing, kind `validation` if the market JSON is malformed, and kind `computation` if the loss model fails.
-   */
-  expectedLoss(marketJson: JsonInput): number;
 }
 
 /**

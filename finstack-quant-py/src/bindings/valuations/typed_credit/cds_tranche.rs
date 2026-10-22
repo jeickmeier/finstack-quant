@@ -9,7 +9,6 @@ use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
@@ -399,69 +398,6 @@ impl PyCdsTranche {
         )
         .map_err(core_to_py)?;
         Ok(Self { inner })
-    }
-
-    /// Expected tranche loss as a fraction of tranche notional.
-    ///
-    /// Mirrors Rust ``CdsTranche::expected_loss``.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market carrying the credit index and discount curve.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Expected loss fraction in ``[0, 1]``.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If the credit index is missing from ``market``.
-    /// RuntimeError
-    ///     If the loss-distribution integration fails.
-    #[pyo3(text_signature = "($self, market)")]
-    fn expected_loss(&self, py: Python<'_>, market: &Bound<'_, PyAny>) -> PyResult<f64> {
-        let market = extract_market(py, market)?;
-        self.inner.expected_loss(&market).map_err(core_to_py)
-    }
-
-    /// Jump-to-default exposure of the tranche.
-    ///
-    /// Mirrors Rust ``CdsTranche::jump_to_default``: PV impact of one
-    /// constituent defaulting immediately.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market carrying the credit index and discount curve.
-    /// as_of : datetime.date | str
-    ///     Valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Jump-to-default PV change in notional currency units.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If the credit index is missing from ``market``.
-    /// RuntimeError
-    ///     If the loss-distribution integration fails.
-    #[pyo3(text_signature = "($self, market, as_of)")]
-    fn jump_to_default(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-    ) -> PyResult<f64> {
-        let market = extract_market(py, market)?;
-        let as_of = py_to_date(as_of)?;
-        self.inner
-            .jump_to_default(&market, as_of)
-            .map_err(core_to_py)
     }
 
     /// Scheduled maturity.

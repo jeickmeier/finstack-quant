@@ -430,15 +430,6 @@ factories!(JsCdsTranche, "CdsTranche", finstack_quant_valuations::instruments::c
         example as example,
 });
 
-market_metrics!(JsCdsTranche, "CdsTranche", {
-        /// Jump-to-default exposure (mirrors Rust `CdsTranche::jump_to_default`): PV impact of one constituent defaulting immediately.
-        /// @param market_json - Canonical market-context JSON (string or plain object) supplying the curves and quotes this instrument needs.
-        /// @param as_of - ISO-8601 valuation date.
-        /// @returns Jump-to-default PV change in notional currency units.
-        /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the calculation fails.
-        jump_to_default as jumpToDefault,
-});
-
 builder_class!(
     /// Fluent builder for `CdsTranche`; one setter per Rust `FinancialBuilder` setter.
     ///
@@ -841,16 +832,6 @@ impl JsCdsTranche {
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
-    }
-
-    /// Expected tranche loss at maturity (mirrors Rust `CdsTranche::expected_loss`).
-    /// @param market_json - Canonical market-context JSON (string or plain object) supplying the credit index data.
-    /// @returns Expected loss of the tranche in the notional currency.
-    /// @throws Error - Throws with kind `not_found` if the credit index data is missing, kind `validation` if the market JSON is malformed, and kind `computation` if the loss model fails.
-    #[wasm_bindgen(js_name = expectedLoss)]
-    pub fn expected_loss(&self, market_json: JsValue) -> Result<f64, JsValue> {
-        let market = parse_market(&market_json)?;
-        self.inner.expected_loss(&market).map_err(to_js_err)
     }
 }
 

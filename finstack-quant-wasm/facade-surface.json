@@ -4980,16 +4980,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson", "standard"],
-    "methods": [
-      "expectedLoss",
-      "free",
-      "jumpToDefault",
-      "marketDependencies",
-      "metric",
-      "price",
-      "toDict",
-      "toJson"
-    ],
+    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
     "getters": [
       "attachPct",
       "attributes",
