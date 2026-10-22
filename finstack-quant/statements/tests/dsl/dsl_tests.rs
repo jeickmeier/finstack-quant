@@ -1,65 +1,63 @@
 //! Public-boundary tests for the statements formula DSL.
 
-use finstack_quant_core::expr::{BinOp as CoreBinOp, ExprNode, Function, UnaryOp as CoreUnaryOp};
-use finstack_quant_statements::dsl::{
-    parse_and_compile, parse_formula, BinOp as StmtBinOp, StmtExpr, UnaryOp as StmtUnaryOp,
-};
+use finstack_quant_core::expr::{BinOp, ExprNode, Function, UnaryOp};
+use finstack_quant_statements::dsl::{parse_and_compile, parse_formula, StmtExpr};
 
 #[test]
 fn operators_precedence_and_conditionals_parse_and_compile_consistently() {
     let binary_cases = [
-        ("lhs + rhs", StmtBinOp::Add, CoreBinOp::Add),
-        ("lhs - rhs", StmtBinOp::Sub, CoreBinOp::Sub),
-        ("lhs * rhs", StmtBinOp::Mul, CoreBinOp::Mul),
-        ("lhs / rhs", StmtBinOp::Div, CoreBinOp::Div),
-        ("lhs % rhs", StmtBinOp::Mod, CoreBinOp::Mod),
-        ("lhs == rhs", StmtBinOp::Eq, CoreBinOp::Eq),
-        ("lhs != rhs", StmtBinOp::Ne, CoreBinOp::Ne),
-        ("lhs < rhs", StmtBinOp::Lt, CoreBinOp::Lt),
-        ("lhs <= rhs", StmtBinOp::Le, CoreBinOp::Le),
-        ("lhs > rhs", StmtBinOp::Gt, CoreBinOp::Gt),
-        ("lhs >= rhs", StmtBinOp::Ge, CoreBinOp::Ge),
-        ("lhs and rhs", StmtBinOp::And, CoreBinOp::And),
-        ("lhs or rhs", StmtBinOp::Or, CoreBinOp::Or),
+        ("lhs + rhs", BinOp::Add),
+        ("lhs - rhs", BinOp::Sub),
+        ("lhs * rhs", BinOp::Mul),
+        ("lhs / rhs", BinOp::Div),
+        ("lhs % rhs", BinOp::Mod),
+        ("lhs == rhs", BinOp::Eq),
+        ("lhs != rhs", BinOp::Ne),
+        ("lhs < rhs", BinOp::Lt),
+        ("lhs <= rhs", BinOp::Le),
+        ("lhs > rhs", BinOp::Gt),
+        ("lhs >= rhs", BinOp::Ge),
+        ("lhs and rhs", BinOp::And),
+        ("lhs or rhs", BinOp::Or),
     ];
 
-    for (formula, statement_op, core_op) in binary_cases {
+    for (formula, operator) in binary_cases {
         let parsed = parse_formula(formula).expect("binary expression should parse");
         assert!(
-            matches!(parsed, StmtExpr::BinOp { op, .. } if op == statement_op),
+            matches!(parsed, StmtExpr::BinOp { op, .. } if op == operator),
             "statement operator mapping changed for {formula}"
         );
 
         let compiled = parse_and_compile(formula).expect("binary expression should compile");
         assert!(
-            matches!(compiled.node, ExprNode::BinOp { op, .. } if op == core_op),
+            matches!(compiled.node, ExprNode::BinOp { op, .. } if op == operator),
             "core operator mapping changed for {formula}"
         );
     }
 
     let unary_cases = [
-        ("-revenue", StmtUnaryOp::Neg, CoreUnaryOp::Neg),
-        ("!flag", StmtUnaryOp::Not, CoreUnaryOp::Not),
-        ("not revenue > 0", StmtUnaryOp::Not, CoreUnaryOp::Not),
+        ("-revenue", UnaryOp::Neg),
+        ("!flag", UnaryOp::Not),
+        ("not revenue > 0", UnaryOp::Not),
     ];
 
-    for (formula, statement_op, core_op) in unary_cases {
+    for (formula, operator) in unary_cases {
         let parsed = parse_formula(formula).expect("unary expression should parse");
         assert!(
-            matches!(parsed, StmtExpr::UnaryOp { op, .. } if op == statement_op),
+            matches!(parsed, StmtExpr::UnaryOp { op, .. } if op == operator),
             "statement unary mapping changed for {formula}"
         );
 
         let compiled = parse_and_compile(formula).expect("unary expression should compile");
         assert!(
-            matches!(compiled.node, ExprNode::UnaryOp { op, .. } if op == core_op),
+            matches!(compiled.node, ExprNode::UnaryOp { op, .. } if op == operator),
             "core unary mapping changed for {formula}"
         );
     }
 
     let precedence = parse_formula("1 + 2 * 3").expect("precedence expression should parse");
     let StmtExpr::BinOp {
-        op: StmtBinOp::Add,
+        op: BinOp::Add,
         left,
         right,
     } = precedence
@@ -67,38 +65,23 @@ fn operators_precedence_and_conditionals_parse_and_compile_consistently() {
         panic!("addition should be the top-level precedence node");
     };
     assert_eq!(*left, StmtExpr::Literal(1.0));
-    assert!(matches!(
-        *right,
-        StmtExpr::BinOp {
-            op: StmtBinOp::Mul,
-            ..
-        }
-    ));
+    assert!(matches!(*right, StmtExpr::BinOp { op: BinOp::Mul, .. }));
 
     let grouped = parse_formula("(1 + 2) * 3").expect("grouped expression should parse");
     let StmtExpr::BinOp {
-        op: StmtBinOp::Mul,
+        op: BinOp::Mul,
         left,
         ..
     } = grouped
     else {
         panic!("multiplication should be the top-level grouped node");
     };
-    assert!(matches!(
-        *left,
-        StmtExpr::BinOp {
-            op: StmtBinOp::Add,
-            ..
-        }
-    ));
+    assert!(matches!(*left, StmtExpr::BinOp { op: BinOp::Add, .. }));
 
     let nested_grouped = parse_formula("((1 + 2) * 3) / 4").expect("nested grouping should parse");
     assert!(matches!(
         nested_grouped,
-        StmtExpr::BinOp {
-            op: StmtBinOp::Div,
-            ..
-        }
+        StmtExpr::BinOp { op: BinOp::Div, .. }
     ));
 
     let compact = parse_formula("revenue-cogs").expect("compact expression should parse");
@@ -117,20 +100,8 @@ fn operators_precedence_and_conditionals_parse_and_compile_consistently() {
     else {
         panic!("if() should lower to the statements conditional node");
     };
-    assert!(matches!(
-        *condition,
-        StmtExpr::BinOp {
-            op: StmtBinOp::Gt,
-            ..
-        }
-    ));
-    assert!(matches!(
-        *then_expr,
-        StmtExpr::BinOp {
-            op: StmtBinOp::Mul,
-            ..
-        }
-    ));
+    assert!(matches!(*condition, StmtExpr::BinOp { op: BinOp::Gt, .. }));
+    assert!(matches!(*then_expr, StmtExpr::BinOp { op: BinOp::Mul, .. }));
     assert_eq!(*else_expr, StmtExpr::Literal(0.0));
 
     let compiled = parse_and_compile(conditional).expect("conditional should compile");
@@ -144,17 +115,11 @@ fn operators_precedence_and_conditionals_parse_and_compile_consistently() {
     };
     assert!(matches!(
         condition.node,
-        ExprNode::BinOp {
-            op: CoreBinOp::Gt,
-            ..
-        }
+        ExprNode::BinOp { op: BinOp::Gt, .. }
     ));
     assert!(matches!(
         then_expr.node,
-        ExprNode::BinOp {
-            op: CoreBinOp::Mul,
-            ..
-        }
+        ExprNode::BinOp { op: BinOp::Mul, .. }
     ));
     assert!(matches!(else_expr.node, ExprNode::Literal(value) if value == 0.0));
 }

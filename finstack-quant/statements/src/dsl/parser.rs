@@ -1,8 +1,9 @@
 //! Parser for Statements DSL formulas.
 
-use crate::dsl::ast::{BinOp, StmtExpr, UnaryOp};
+use crate::dsl::ast::StmtExpr;
 use crate::error::{Error, Result};
 use crate::types::NodeId;
+use finstack_quant_core::expr::{BinOp, UnaryOp};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},

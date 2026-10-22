@@ -1,10 +1,10 @@
 //! Compiler from Statements DSL AST to core Expr.
 
-use crate::dsl::ast::{BinOp as StmtBinOp, StmtExpr, UnaryOp as StmtUnaryOp};
+use crate::dsl::ast::StmtExpr;
 use crate::error::Result;
 use crate::types::{NodeId, NodeValueType};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::expr::{BinOp as CoreBinOp, Expr, Function, UnaryOp as CoreUnaryOp};
+use finstack_quant_core::expr::{BinOp, Expr, Function, UnaryOp};
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,9 +67,11 @@ pub fn compile(ast: &StmtExpr) -> Result<Expr> {
             Ok(Expr::cs_ref(component.clone(), instrument_or_total.clone()))
         }
 
-        StmtExpr::BinOp { op, left, right } => compile_bin_op(*op, left, right),
+        StmtExpr::BinOp { op, left, right } => {
+            Ok(Expr::bin_op(*op, compile(left)?, compile(right)?))
+        }
 
-        StmtExpr::UnaryOp { op, operand } => compile_unary_op(*op, operand),
+        StmtExpr::UnaryOp { op, operand } => Ok(Expr::unary_op(*op, compile(operand)?)),
 
         StmtExpr::Call { func, args } => compile_function_call(func, args),
 
@@ -137,8 +139,8 @@ fn infer_dimension(
                 instrument_currencies,
             )?;
             match op {
-                StmtUnaryOp::Neg => Ok(dim),
-                StmtUnaryOp::Not => require_scalar_arguments("logical negation", &[dim]),
+                UnaryOp::Neg => Ok(dim),
+                UnaryOp::Not => require_scalar_arguments("logical negation", &[dim]),
             }
         }
         StmtExpr::BinOp { op, left, right } => {
@@ -199,26 +201,17 @@ fn node_value_type_to_dimension(value_type: &NodeValueType) -> Dimension {
     }
 }
 
-fn infer_bin_op_dimension(op: StmtBinOp, left: Dimension, right: Dimension) -> Result<Dimension> {
+fn infer_bin_op_dimension(op: BinOp, left: Dimension, right: Dimension) -> Result<Dimension> {
     match op {
-        StmtBinOp::Add | StmtBinOp::Sub => {
-            compatible_dimensions("arithmetic operands", left, right)
-        }
-        StmtBinOp::Mul => multiply_dimensions(left, right),
-        StmtBinOp::Div => divide_dimensions(left, right),
-        StmtBinOp::Mod => require_scalar_arguments("modulo", &[left, right]),
-        StmtBinOp::Eq
-        | StmtBinOp::Ne
-        | StmtBinOp::Lt
-        | StmtBinOp::Le
-        | StmtBinOp::Gt
-        | StmtBinOp::Ge => {
+        BinOp::Add | BinOp::Sub => compatible_dimensions("arithmetic operands", left, right),
+        BinOp::Mul => multiply_dimensions(left, right),
+        BinOp::Div => divide_dimensions(left, right),
+        BinOp::Mod => require_scalar_arguments("modulo", &[left, right]),
+        BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
             compatible_dimensions("comparison operands", left, right)?;
             Ok(Dimension::Scalar)
         }
-        StmtBinOp::And | StmtBinOp::Or => {
-            require_scalar_arguments("logical operands", &[left, right])
-        }
+        BinOp::And | BinOp::Or => require_scalar_arguments("logical operands", &[left, right]),
     }
 }
 
@@ -388,43 +381,6 @@ fn combine_arg_dimensions(context: &str, arg_dims: Vec<Dimension>) -> Result<Dim
         return Ok(Dimension::Unknown);
     };
     iter.try_fold(first, |acc, dim| compatible_dimensions(context, acc, dim))
-}
-
-/// Compile binary operations.
-fn compile_bin_op(op: StmtBinOp, left: &StmtExpr, right: &StmtExpr) -> Result<Expr> {
-    let left_expr = compile(left)?;
-    let right_expr = compile(right)?;
-
-    // Map statement BinOp to core BinOp
-    let core_op = match op {
-        StmtBinOp::Add => CoreBinOp::Add,
-        StmtBinOp::Sub => CoreBinOp::Sub,
-        StmtBinOp::Mul => CoreBinOp::Mul,
-        StmtBinOp::Div => CoreBinOp::Div,
-        StmtBinOp::Mod => CoreBinOp::Mod,
-        StmtBinOp::Eq => CoreBinOp::Eq,
-        StmtBinOp::Ne => CoreBinOp::Ne,
-        StmtBinOp::Lt => CoreBinOp::Lt,
-        StmtBinOp::Le => CoreBinOp::Le,
-        StmtBinOp::Gt => CoreBinOp::Gt,
-        StmtBinOp::Ge => CoreBinOp::Ge,
-        StmtBinOp::And => CoreBinOp::And,
-        StmtBinOp::Or => CoreBinOp::Or,
-    };
-
-    Ok(Expr::bin_op(core_op, left_expr, right_expr))
-}
-
-/// Compile unary operations.
-fn compile_unary_op(op: StmtUnaryOp, operand: &StmtExpr) -> Result<Expr> {
-    let operand_expr = compile(operand)?;
-
-    let core_op = match op {
-        StmtUnaryOp::Neg => CoreUnaryOp::Neg,
-        StmtUnaryOp::Not => CoreUnaryOp::Not,
-    };
-
-    Ok(Expr::unary_op(core_op, operand_expr))
 }
 
 /// Compile function calls.
@@ -714,11 +670,7 @@ mod tests {
 
     #[test]
     fn test_compile_addition() {
-        let ast = StmtExpr::bin_op(
-            StmtBinOp::Add,
-            StmtExpr::literal(1.0),
-            StmtExpr::literal(2.0),
-        );
+        let ast = StmtExpr::bin_op(BinOp::Add, StmtExpr::literal(1.0), StmtExpr::literal(2.0));
 
         let expr = compile(&ast).expect("should compile successfully");
 
