@@ -389,8 +389,8 @@ fn test_bloomberg_usd_ois_calibration_accuracy() {
         report.max_residual
     );
     assert_eq!(
-        report.metadata.get("residual_units").map(String::as_str),
-        Some("absolute_residual_over_step_tolerance")
+        report.residual_units,
+        Some(finstack_quant_calibration::ResidualUnits::AbsoluteResidualOverStepTolerance)
     );
 
     // Bloomberg DF matching: calibrated curve vs reference discount factors

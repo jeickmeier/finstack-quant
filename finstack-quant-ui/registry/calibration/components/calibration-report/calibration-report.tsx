@@ -109,7 +109,7 @@ export function CalibrationReport({
               {
                 id: "residual",
                 header:
-                  report.metadata.residual_units ??
+                  report.residual_units ??
                   "Residual (solver units; quote convention unavailable)",
                 accessorFn: (r) => r.residual,
               },

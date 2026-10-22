@@ -5377,11 +5377,9 @@ export interface CalibrationReport {
   /**
    * Units of [`Self::residuals`], [`Self::max_residual`] and [`Self::rmse`].
    *
-   * Set by every calibrator in this crate and mirrored as the
-   * `residual_units` entry of [`Self::metadata`]. `None` only on reports
-   * built directly through [`Self::new`] or
-   * `Self::for_type_with_tolerance` without a solver, and on JSON
-   * written before this field existed.
+   * Set by every calibrator in this crate. `None` on reports built directly
+   * through [`Self::new`] or `Self::for_type_with_tolerance` without a solver.
+   * Missing units are unknown; metadata does not supply a fallback.
    */
   residual_units?: ResidualUnits | null;
   /**
@@ -5413,7 +5411,7 @@ export interface CalibrationReport {
    *
    * Set by every calibrator in this crate. `None` only on reports built
    * directly through [`Self::new`] or `Self::for_type_with_tolerance`
-   * without a solver, and on JSON written before this field existed.
+   * without a solver.
    */
   solver_method?: SolverMethod | null;
   /**

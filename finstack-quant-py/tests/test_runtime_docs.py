@@ -91,6 +91,9 @@ _INSTRUMENT_MACRO_OWNERS = (
 CONVERTED: dict[str, tuple[str, ...] | None] = {
     "finstack_quant.calibration": (
         "CalibrationConfig",
+        "CalibrationReport.metadata",
+        "CalibrationReport.solver_method",
+        "CalibrationReport.residual_units",
         "CalibrationEnvelope.__init__",
         "CalibrationStep.discount",
         "CalibrationStep.forward",

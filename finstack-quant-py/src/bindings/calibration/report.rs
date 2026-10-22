@@ -2,6 +2,7 @@
 
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py};
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_calibration::api::validate::CalibrationValidationReport;
 use finstack_quant_calibration::{CalibrationDiagnostics, CalibrationReport, QuoteQuality};
 use numpy::PyArray1;
@@ -316,7 +317,7 @@ impl PyCalibrationReport {
         self.inner.convergence_reason.clone()
     }
 
-    /// Domain metadata (``type``, ``residual_units``, solver statistics, ...).
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationReport.metadata")]
     #[getter]
     fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
@@ -362,23 +363,13 @@ impl PyCalibrationReport {
         self.inner.success_tolerance
     }
 
-    /// Numerical procedure that produced this report, as its wire name.
-    ///
-    /// One of ``"sequential_bootstrap"``, ``"global_fit_lm_weighted_lsq"``,
-    /// ``"per_slice_least_squares"``, ``"scalar_root_find"``,
-    /// ``"scalar_minimization"`` or ``"plan_execution"``. ``None`` only for a
-    /// report rebuilt from JSON written before the field existed.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationReport.solver_method")]
     #[getter]
     fn solver_method(&self) -> Option<&'static str> {
         self.inner.solver_method.map(|method| method.as_str())
     }
 
-    /// Units of ``residuals``, ``max_residual`` and ``rmse``, as a wire name.
-    ///
-    /// One of ``"pv_per_unit_notional"``, ``"quoted_volatility"``,
-    /// ``"discounted_upfront_fraction"`` or
-    /// ``"absolute_residual_over_step_tolerance"``. ``None`` only for a report
-    /// rebuilt from JSON written before the field existed.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationReport.residual_units")]
     #[getter]
     fn residual_units(&self) -> Option<&'static str> {
         self.inner.residual_units.map(|units| units.as_str())

@@ -278,6 +278,10 @@ test('calibrationResultStepReport, its JSON twin and residuals read one step', (
   const expected = GOLDEN.step_report;
   const report = calibration.calibrationResultStepReport(result, 'USD-OIS');
   assert.equal(report.success, expected.success);
+  assert.equal(report.residual_units, 'pv_per_unit_notional');
+  assert.equal(Object.hasOwn(report.metadata, 'residual_units'), false);
+  assert.equal(result.result.report.residual_units, 'absolute_residual_over_step_tolerance');
+  assert.equal(Object.hasOwn(result.result.report.metadata, 'residual_units'), false);
   assert.equal(report.iterations, expected.iterations);
   assert.deepEqual(Object.keys(report.residuals).sort(), expected.residual_ids);
   assert.equal(
