@@ -53,12 +53,14 @@ fn kind_rank(kind: CFKind) -> u8 {
 /// 2. **Kind rank** — see [`kind_rank`]. Coupons sort before fees, fees before
 ///    amortization, amortization before prepayment, etc.
 /// 3. **Currency** — lexicographic on the ISO code.
-/// 4. **Amount** — `f64::total_cmp`, so signed values sort consistently and
-///    NaN handling is well-defined.
-/// 5. **Reset date** — `Option<Date>` ordering, with `None` first.
+/// 4. **Amount** — exact Decimal value, without conversion to floating point.
+/// 5. **Reset and principal dates** — `Option<Date>` ordering, with `None` first.
 /// 6. **Accrual factor** — `f64::total_cmp`.
 /// 7. **Rate** — `Option<f64>` ordering, with `None` first, then `total_cmp`.
 /// 8. **Accrual metadata** — period, day-count rank, then projected index rate.
+/// 9. **Principal delta** — currency, then exact Decimal value.
+/// 10. **Representation ties** — actual kind, day-count variant, and Decimal
+///     encodings distinguish rows whose preceding comparison keys are equal.
 ///
 /// This is the canonical order downstream consumers
 /// (`outstanding_by_date`, `pv_by_period`, accrual, dataframe export, etc.)
@@ -74,7 +76,7 @@ fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
         .cmp(&b.date)
         .then_with(|| kind_rank(a.kind).cmp(&kind_rank(b.kind)))
         .then_with(|| a.amount.currency().cmp(&b.amount.currency()))
-        .then_with(|| a.amount.amount().total_cmp(&b.amount.amount()))
+        .then_with(|| a.amount.amount_decimal().cmp(&b.amount.amount_decimal()))
         .then_with(|| a.reset_date.cmp(&b.reset_date))
         .then_with(|| a.principal_date.cmp(&b.principal_date))
         .then_with(|| a.accrual_factor.total_cmp(&b.accrual_factor))
@@ -90,12 +92,34 @@ fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
                     (Some(x), Some(y)) => x
                         .currency()
                         .cmp(&y.currency())
-                        .then_with(|| x.amount().total_cmp(&y.amount())),
+                        .then_with(|| x.amount_decimal().cmp(&y.amount_decimal())),
                     (None, Some(_)) => std::cmp::Ordering::Less,
                     (Some(_), None) => std::cmp::Ordering::Greater,
                     _ => std::cmp::Ordering::Equal,
                 }
             })
+        })
+        // Retain the existing economic precedence before resolving representation ties.
+        .then_with(|| (a.kind as usize).cmp(&(b.kind as usize)))
+        .then_with(|| {
+            a.accrual
+                .as_ref()
+                .map(|value| value.day_count as usize)
+                .cmp(&b.accrual.as_ref().map(|value| value.day_count as usize))
+        })
+        .then_with(|| {
+            a.amount
+                .amount_decimal()
+                .serialize()
+                .cmp(&b.amount.amount_decimal().serialize())
+        })
+        .then_with(|| {
+            a.principal_delta
+                .map(|value| value.amount_decimal().serialize())
+                .cmp(
+                    &b.principal_delta
+                        .map(|value| value.amount_decimal().serialize()),
+                )
         })
 }
 
@@ -1355,6 +1379,147 @@ mod tests {
             0.0,
             None,
         )
+    }
+
+    fn assert_every_row_order_is_canonical(rows: Vec<CashFlow>) {
+        fn canonical_json(rows: &[CashFlow]) -> String {
+            let schedule = CashFlowSchedule::from_flows(
+                rows.to_vec(),
+                Notional::par(1_000.0, Currency::USD).expect("notional"),
+                DayCount::Act360,
+                CashFlowMeta::default(),
+            )
+            .expect("valid rows");
+            serde_json::to_string(schedule.get_flows()).expect("serializable rows")
+        }
+        fn visit(rows: &mut [CashFlow], index: usize, expected: &str) {
+            if index == rows.len() {
+                assert_eq!(canonical_json(rows), expected);
+                return;
+            }
+            for next in index..rows.len() {
+                rows.swap(index, next);
+                visit(rows, index + 1, expected);
+                rows.swap(index, next);
+            }
+        }
+        let expected = canonical_json(&rows);
+        visit(&mut rows.clone(), 0, &expected);
+        let schedules: Vec<_> = rows
+            .into_iter()
+            .map(|row| {
+                CashFlowSchedule::from_flows(
+                    vec![row],
+                    Notional::par(1_000.0, Currency::USD).expect("notional"),
+                    DayCount::Act360,
+                    CashFlowMeta::default(),
+                )
+                .expect("valid row")
+            })
+            .collect();
+        for order in [schedules.clone(), schedules.into_iter().rev().collect()] {
+            let merged = merge_cashflow_schedules(
+                order,
+                Notional::par(1_000.0, Currency::USD).expect("notional"),
+                DayCount::Act360,
+            );
+            assert_eq!(
+                serde_json::to_string(merged.get_flows()).expect("serializable merge"),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_order_distinguishes_kinds_with_shared_economic_ranks() {
+        let date = Date::from_calendar_date(2025, Month::June, 15).expect("date");
+        for (first, second) in [
+            (CFKind::Fixed, CFKind::FloatReset),
+            (CFKind::Fee, CFKind::CommitmentFee),
+            (CFKind::Recovery, CFKind::AccruedOnDefault),
+            (CFKind::Notional, CFKind::RevolvingDraw),
+            (CFKind::InitialMarginPost, CFKind::MarginInterest),
+        ] {
+            assert_eq!(kind_rank(first), kind_rank(second));
+            assert_every_row_order_is_canonical(vec![
+                flow(date, 1.0, first),
+                flow(date, 1.0, second),
+            ]);
+        }
+    }
+
+    #[test]
+    fn canonical_order_preserves_exact_decimal_values_and_representation() {
+        let date = Date::from_calendar_date(2025, Month::June, 15).expect("date");
+        let money = |value| Money::from_decimal_str(value, Currency::USD).expect("exact money");
+        let low = money("1.000000000000000001");
+        let high = money("1.000000000000000002");
+        assert_eq!(low.amount(), high.amount(), "fixture must collide as f64");
+        let with_amount = |amount| CashFlow {
+            amount,
+            ..flow(date, 1.0, CFKind::Fixed)
+        };
+        assert_eq!(
+            compare_flows(&with_amount(low), &with_amount(high)),
+            std::cmp::Ordering::Less
+        );
+        assert_every_row_order_is_canonical(vec![
+            with_amount(high),
+            with_amount(low),
+            with_amount(money("1.0")),
+            with_amount(money("1.00")),
+        ]);
+        let with_delta = |value| flow(date, 1.0, CFKind::Notional).with_principal_delta(value);
+        assert_eq!(
+            compare_flows(&with_delta(low), &with_delta(high)),
+            std::cmp::Ordering::Less
+        );
+        assert_every_row_order_is_canonical(vec![
+            with_delta(high),
+            with_delta(low),
+            with_delta(money("1.0")),
+            with_delta(money("1.00")),
+        ]);
+    }
+
+    #[test]
+    fn canonical_order_distinguishes_all_day_count_metadata() {
+        let start = Date::from_calendar_date(2025, Month::March, 15).expect("start");
+        let end = Date::from_calendar_date(2025, Month::June, 15).expect("end");
+        let conventions = [
+            DayCount::OneOne,
+            DayCount::Act360,
+            DayCount::Act365F,
+            DayCount::Act365L,
+            DayCount::Thirty360,
+            DayCount::ThirtyE360,
+            DayCount::ThirtyE360Isda,
+            DayCount::Thirty360It,
+            DayCount::Nl365,
+            DayCount::ActAct,
+            DayCount::ActActIsma,
+            DayCount::ActActAfb,
+            DayCount::Bus252,
+        ];
+        let with_day_count = |day_count| {
+            flow(end, 1.0, CFKind::Fixed).with_accrual(CashFlowAccrual {
+                start,
+                end,
+                day_count,
+                projected_index_rate: None,
+                calendar_id: Some("weekends_only".into()),
+                coupon_period: Some((start, end)),
+                end_is_termination_date: false,
+            })
+        };
+        for (index, first) in conventions.iter().enumerate() {
+            for second in &conventions[index + 1..] {
+                assert_every_row_order_is_canonical(vec![
+                    with_day_count(*first),
+                    with_day_count(*second),
+                ]);
+            }
+        }
     }
 
     #[test]
