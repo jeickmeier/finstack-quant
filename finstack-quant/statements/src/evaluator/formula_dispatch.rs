@@ -13,7 +13,10 @@ use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::formula::{
     collect_expression_values_sorted, eval_error, evaluate_formula, require_args, require_min_args,
 };
-use crate::evaluator::formula_aggregates::evaluate_historical_function;
+use crate::evaluator::formula_aggregates::{
+    evaluate_cumulative_function, evaluate_period_aggregate_function, evaluate_rolling_function,
+    evaluate_statistical_function,
+};
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
 use finstack_quant_core::math::{stats::quantile, summation::kahan_sum, ZERO_TOLERANCE};
 
@@ -50,18 +53,16 @@ pub(crate) fn evaluate_function(
         | Function::RollingMedian
         | Function::RollingMin
         | Function::RollingMax
-        | Function::RollingCount
-        | Function::Std
-        | Function::Var
-        | Function::Median
-        | Function::CumSum
-        | Function::CumProd
-        | Function::CumMin
-        | Function::CumMax
-        | Function::Ytd
-        | Function::Qtd
-        | Function::FiscalYtd
-        | Function::Ttm => evaluate_historical_function(func, args, context, node_id),
+        | Function::RollingCount => evaluate_rolling_function(func, args, context, node_id),
+        Function::Std | Function::Var | Function::Median => {
+            evaluate_statistical_function(func, args, context, node_id)
+        }
+        Function::CumSum | Function::CumProd | Function::CumMin | Function::CumMax => {
+            evaluate_cumulative_function(func, args, context, node_id)
+        }
+        Function::Ytd | Function::Qtd | Function::FiscalYtd | Function::Ttm => {
+            evaluate_period_aggregate_function(func, args, context, node_id)
+        }
 
         // Exponentially-weighted statistics
         Function::EwmMean => crate::evaluator::formula_ewm::eval_ewm_mean(args, context, node_id),

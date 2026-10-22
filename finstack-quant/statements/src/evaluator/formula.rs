@@ -24,7 +24,8 @@
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::formula_helpers::{
-    collect_cs_values_sorted, collect_historical_values_sorted, is_truthy,
+    collect_cs_values_sorted, collect_historical_values_sorted, collect_rolling_window_values,
+    is_truthy,
 };
 use crate::evaluator::results::EvalWarning;
 use finstack_quant_core::dates::PeriodId;
@@ -32,10 +33,6 @@ use finstack_quant_core::expr::{Expr, ExprNode, Function};
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
-
-pub(crate) use crate::evaluator::formula_helpers::{
-    collect_all_historical_values, collect_rolling_window_values,
-};
 
 fn annotate_error(err: Error, node_id: Option<&str>) -> Error {
     match (node_id, err) {
@@ -182,7 +179,7 @@ pub(crate) fn evaluate_integer_arg(
 pub(crate) fn build_context_for_period(
     target_period: PeriodId,
     context: &EvaluationContext,
-) -> Result<EvaluationContext> {
+) -> EvaluationContext {
     // Share the full columnar history. The period_id on the new context
     // determines what is "current"; aggregate functions filter by ordering.
     let mut period_context = EvaluationContext::new_with_history(
@@ -212,7 +209,7 @@ pub(crate) fn build_context_for_period(
         period_context.current_values = row.to_vec();
     }
 
-    Ok(period_context)
+    period_context
 }
 
 /// Visible statement and capital-structure dates for historical expressions.
@@ -238,7 +235,7 @@ pub(crate) fn collect_expression_values_sorted(
     node_id: Option<&str>,
 ) -> Result<Rc<BTreeMap<PeriodId, f64>>> {
     match &expr.node {
-        ExprNode::Column(name) => return collect_historical_values_sorted(name, context),
+        ExprNode::Column(name) => return Ok(collect_historical_values_sorted(name, context)),
         ExprNode::CsRef {
             component,
             instrument_or_total,
@@ -255,7 +252,7 @@ pub(crate) fn collect_expression_values_sorted(
 
     let mut values = BTreeMap::new();
     for period in expression_periods(context) {
-        let mut period_context = build_context_for_period(period, context)?;
+        let mut period_context = build_context_for_period(period, context);
         let value = evaluate_formula(expr, &mut period_context, node_id)?;
         values.insert(period, value);
     }
@@ -275,14 +272,14 @@ pub(crate) fn collect_expression_range_values(
     node_id: Option<&str>,
 ) -> Result<Vec<f64>> {
     if let ExprNode::Column(name) = &expr.node {
-        let sorted = collect_historical_values_sorted(name, context)?;
+        let sorted = collect_historical_values_sorted(name, context);
         return Ok(sorted.range(start..=end).map(|(_, value)| *value).collect());
     }
     let periods = expression_periods(context);
     periods
         .range(start..=end)
         .map(|period| {
-            let mut historical = build_context_for_period(*period, context)?;
+            let mut historical = build_context_for_period(*period, context);
             evaluate_formula(expr, &mut historical, node_id)
         })
         .collect()
@@ -356,7 +353,7 @@ pub(crate) fn collect_expression_window_values(
 
     match &expr.node {
         ExprNode::Column(name) => {
-            return collect_rolling_window_values(name, context, window_size);
+            return Ok(collect_rolling_window_values(name, context, window_size));
         }
         ExprNode::Literal(value) => {
             let total = expression_periods(context).len();
@@ -370,7 +367,7 @@ pub(crate) fn collect_expression_window_values(
 
         let mut values = Vec::with_capacity(window_size);
         for period in periods.iter().rev().take(window_size) {
-            let mut period_context = build_context_for_period(*period, context)?;
+            let mut period_context = build_context_for_period(*period, context);
             let value = evaluate_formula(expr, &mut period_context, node_id)?;
             values.push(value);
         }
@@ -617,8 +614,7 @@ mod tests {
             std::sync::Arc::new(IndexMap::new()),
         );
 
-        let historical =
-            build_context_for_period(q1, &context).expect("historical context should build");
+        let historical = build_context_for_period(q1, &context);
 
         assert_eq!(historical.current_values, vec![Some(40.0), Some(100.0)]);
         assert_eq!(historical.get_value("cogs").expect("cogs"), 40.0);
@@ -726,6 +722,29 @@ mod tests {
         .expect("ewm_var");
 
         assert!((value - 1.1).abs() < 1e-9, "got {value}");
+    }
+
+    #[test]
+    fn ewm_preserves_current_overlay_and_excludes_future_rows() {
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
+        let mut context = build_context_with_history(
+            p2,
+            "series",
+            vec![(p1, 1.0), (p2, 999.0), (p3, 999.0)],
+            3.0,
+        );
+        let args = [Expr::column("series"), Expr::literal(0.5)];
+        let value = evaluate_function(&Function::EwmMean, &args, &mut context, None)
+            .expect("current overlay");
+        assert_eq!(value, 2.0);
+
+        context.current_values[0] = None;
+        context.invalidate_sorted_cache("series");
+        let value = evaluate_function(&Function::EwmMean, &args, &mut context, None)
+            .expect("historical values only");
+        assert_eq!(value, 1.0);
     }
 
     #[test]
