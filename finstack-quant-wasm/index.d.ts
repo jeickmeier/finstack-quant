@@ -14155,7 +14155,7 @@ export interface CashflowsNamespace {
    * The four arrays are parallel: entry `i` of each describes flow `i`.
    *
    * @param dates - ISO-8601 flow dates; the calendar year of each date is its bucket.
-   * @param kinds - Cashflow kind labels as Rust displays them (`"fixed"`, `"notional"`, `"pre_payment"`; also `"coupon"` and `"principal"`), ASCII case ignored; principal-like kinds go to `principal`, all others to `non_principal`.
+   * @param kinds - Canonical cashflow kind labels (`"fixed"`, `"notional"`, `"pre_payment"`), with surrounding whitespace and ASCII case ignored; principal-like kinds go to `principal`, all others to `non_principal`.
    * @param amounts - Flow amounts in one currency's units.
    * @param pvs - Present value of each flow, in the same units as `amounts`.
    * @returns `{ year, non_principal, principal, pv }` rows in ascending year order.

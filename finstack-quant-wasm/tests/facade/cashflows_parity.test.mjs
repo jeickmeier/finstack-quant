@@ -708,6 +708,12 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     () => cashflows.calendarYearLadder(['2025-01-01'], ['fixed'], [1], []),
     kind('validation', /equal lengths/)
   );
+  for (const label of ['coupon', 'principal']) {
+    assert.throws(
+      () => cashflows.calendarYearLadder(['2025-01-01'], [label], [1], [0.9]),
+      kind('validation', /unknown cashflow kind/)
+    );
+  }
   assert.throws(
     () => cashflows.mergeCashflowSchedules('nope', cashflows.notionalPar(1, 'USD'), 'act_360'),
     kind('invalid_type', /^schedules: /)

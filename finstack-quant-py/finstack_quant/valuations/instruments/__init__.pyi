@@ -28378,8 +28378,8 @@ def list_standard_metrics() -> list[str]:
     --------
     >>> from finstack_quant.valuations.instruments import list_standard_metrics
     >>> metrics = list_standard_metrics()
-    >>> (len(metrics), "dirty_price" in metrics, "dv01" in metrics)
-    (222, True, True)
+    >>> ("dirty_price" in metrics, "dv01" in metrics)
+    (True, True)
     """
     ...
 

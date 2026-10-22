@@ -291,9 +291,9 @@ fn aggregate_cashflows_checked(
 /// dates : list[datetime.date]
 ///     Payment dates; the Gregorian year of each date is the bucket.
 /// kinds : list[str]
-///     Cashflow kind labels (``"fixed"``, ``"notional"``, ``"coupon"``,
-///     ``"principal"``, …). ASCII case is ignored. Unknown labels raise
-///     ``ValueError``.
+///     Canonical cashflow kind labels (``"fixed"``, ``"notional"``,
+///     ``"pre_payment"``). Surrounding whitespace and ASCII case are ignored.
+///     Unknown labels raise ``ValueError``.
 /// amounts : list[float]
 ///     Signed finite cashflow amounts, one per date, in native currency units.
 /// pvs : list[float]
@@ -317,7 +317,7 @@ fn aggregate_cashflows_checked(
 /// >>> from finstack_quant.cashflows.aggregation import calendar_year_ladder
 /// >>> calendar_year_ladder(
 /// ...     [datetime.date(2027, 3, 15), datetime.date(2034, 3, 15)],
-/// ...     ["coupon", "principal"],
+/// ...     ["fixed", "notional"],
 /// ...     [100.0, 1000.0],
 /// ...     [90.0, 700.0],
 /// ... )

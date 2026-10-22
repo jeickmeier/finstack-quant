@@ -1190,13 +1190,14 @@ class TestAggregation:
         assert rows[0] == (2027, 150.0, 0.0, 130.0)
         assert rows[1] == (2034, 0.0, 1000.0, 700.0)
 
-    def test_calendar_year_ladder_rejects_unknown_kind(self) -> None:
+    @pytest.mark.parametrize("label", ["mystery", "coupon", "principal"])
+    def test_calendar_year_ladder_rejects_unknown_kind(self, label: str) -> None:
         from finstack_quant.cashflows.aggregation import calendar_year_ladder
 
         with pytest.raises(ValueError, match="unknown cashflow kind"):
             calendar_year_ladder(
                 [dt.date(2027, 3, 15)],
-                ["mystery"],
+                [label],
                 [100.0],
                 [90.0],
             )

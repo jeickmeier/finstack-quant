@@ -12,7 +12,7 @@ from finstack_quant.valuations.instruments import metric_metadata
 def test_instrument_cashflows_keep_both_currency_ladders_and_every_flow() -> None:
     frame = pd.DataFrame({
         "date": [dt.date(2025, 6, 30)] * 3,
-        "kind": ["coupon", "coupon", "principal"],
+        "kind": ["fixed", "fixed", "notional"],
         "amount": [1000000.0, 2000000.0, 3000000.0],
         "currency": ["USD", "EUR", "EUR"],
         "pv": [900000.0, 1800000.0, 2700000.0],
