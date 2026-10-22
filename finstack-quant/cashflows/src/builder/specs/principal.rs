@@ -46,7 +46,7 @@ pub enum PrincipalExchange {
 impl PrincipalExchange {
     /// Returns `true` for the default [`Self::InitialAndFinal`] variant.
     #[must_use]
-    pub fn is_initial_and_final(&self) -> bool {
+    pub(crate) fn is_initial_and_final(&self) -> bool {
         matches!(self, Self::InitialAndFinal)
     }
 }

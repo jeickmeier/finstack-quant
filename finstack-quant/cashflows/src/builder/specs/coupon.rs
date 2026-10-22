@@ -318,7 +318,7 @@ impl FloatingRateFallback {
     ///
     /// Used by serde `skip_serializing_if` to omit the field from JSON
     /// when it carries the default value.
-    pub fn is_default(&self) -> bool {
+    fn is_default(&self) -> bool {
         matches!(self, Self::Error)
     }
 
@@ -366,7 +366,7 @@ pub enum OvernightIndexConstraintApplication {
 
 impl OvernightIndexConstraintApplication {
     /// Returns true for the default daily application mode.
-    pub fn is_default(&self) -> bool {
+    fn is_default(&self) -> bool {
         matches!(self, Self::Daily)
     }
 }

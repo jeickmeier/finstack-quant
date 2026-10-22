@@ -175,7 +175,7 @@ fn resolve_floating_rate_fallback(
     spread_bp: f64,
     fallback: &FloatingRateFallback,
 ) -> finstack_quant_core::Result<f64> {
-    if !fallback.is_default() {
+    if !matches!(fallback, FloatingRateFallback::Error) {
         warn!(
             reset_date = %reset_date,
             spread_bp = %spread_bp,

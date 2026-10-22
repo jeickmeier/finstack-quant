@@ -67,7 +67,7 @@ impl RollRule {
     /// Used by serde to keep the default rule off the wire so existing
     /// payloads are unchanged.
     #[must_use]
-    pub fn is_none(&self) -> bool {
+    fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
 }
