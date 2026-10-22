@@ -138,22 +138,22 @@ def test_swap_with_two_receiving_legs_reports_interest_income(
     assert float(flow["interest_expense_cash"]["amount"]) == 0.0
     income = float(flow["interest_income_cash"]["amount"])
     assert income > 0.0
-    assert results.cs_cashflows.get_interest_cash("IRS", "2025") == 0.0
-    assert results.cs_cashflows.get_debt_balance("IRS", "2025") == 0.0
-    assert results.cs_cashflows.get_accrued_interest("IRS", "2025") == 0.0
+    assert results.cs_cashflows.get_component("interest_expense_cash", "IRS", "2025") == 0.0
+    assert results.cs_cashflows.get_component("debt_balance", "IRS", "2025") == 0.0
+    assert results.cs_cashflows.get_component("accrued_interest", "IRS", "2025") == 0.0
     assert float(flow["principal_payment"]["amount"]) == 0.0
     assert results.get("income", "2025") == pytest.approx(income)
     # STMT-007: interest-income and per-currency totals are reachable typed.
     cs = results.cs_cashflows
-    assert cs.get_interest_income("IRS", "2025") == pytest.approx(income)
+    assert cs.get_component("interest_income", "IRS", "2025") == pytest.approx(income)
     usd_totals = cs.totals_by_currency["USD"]["2025"]
     assert usd_totals["interest_income_cash"].amount == pytest.approx(income)
     assert usd_totals["interest_expense_cash"].amount == 0.0
     if cs.reporting_currency is not None:
-        assert cs.get_total_interest_income("2025") == pytest.approx(income)
-        assert cs.get_total_interest_cash("2025") == 0.0
-        assert cs.get_total_interest_pik("2025") == 0.0
-        assert cs.get_total_accrued_interest("2025") == 0.0
+        assert cs.get_component("interest_income", "total", "2025") == pytest.approx(income)
+        assert cs.get_component("interest_expense_cash", "total", "2025") == 0.0
+        assert cs.get_component("interest_expense_pik", "total", "2025") == 0.0
+        assert cs.get_component("accrued_interest", "total", "2025") == 0.0
 
 
 def test_merge_into_results_writes_normalized_node() -> None:

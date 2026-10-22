@@ -577,32 +577,44 @@ fn test_capital_structure_cashflows_accessors() {
 
     // Test accessors
     assert_eq!(
-        cs.get_interest("INST-001", &period).expect("interest"),
+        cs.get_component("interest_expense", "INST-001", &period)
+            .expect("interest"),
         10_000.0
     );
     assert_eq!(
-        cs.get_principal("INST-001", &period).expect("principal"),
+        cs.get_component("principal_payment", "INST-001", &period)
+            .expect("principal"),
         25_000.0
     );
     assert_eq!(
-        cs.get_debt_balance("INST-001", &period).expect("balance"),
+        cs.get_component("debt_balance", "INST-001", &period)
+            .expect("balance"),
         500_000.0
     );
     assert_eq!(
-        cs.get_total_interest(&period).expect("total interest"),
+        cs.get_component("interest_expense", "total", &period)
+            .expect("total interest"),
         10_000.0
     );
     assert_eq!(
-        cs.get_total_principal(&period).expect("total principal"),
+        cs.get_component("principal_payment", "total", &period)
+            .expect("total principal"),
         25_000.0
     );
     assert_eq!(
-        cs.get_total_debt_balance(&period).expect("total balance"),
+        cs.get_component("debt_balance", "total", &period)
+            .expect("total balance"),
         500_000.0
     );
 
     // Test missing instrument
-    assert!(cs.get_interest("NONEXISTENT", &period).is_err());
-    assert!(cs.get_principal("NONEXISTENT", &period).is_err());
-    assert!(cs.get_debt_balance("NONEXISTENT", &period).is_err());
+    assert!(cs
+        .get_component("interest_expense", "NONEXISTENT", &period)
+        .is_err());
+    assert!(cs
+        .get_component("principal_payment", "NONEXISTENT", &period)
+        .is_err());
+    assert!(cs
+        .get_component("debt_balance", "NONEXISTENT", &period)
+        .is_err());
 }

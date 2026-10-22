@@ -4279,9 +4279,9 @@ export interface OvernightCouponConvention {
  * that downstream consumers can drill down or report aggregates.
  *
  * Monetary fields are stored as [`Money`] to preserve currency identity. The
- * accessor methods return raw `f64` amounts in the reporting currency for
- * convenience; callers that need full currency fidelity should inspect the
- * underlying maps directly.
+ * component accessor returns raw `f64` amounts in the instrument's native
+ * currency or the reporting currency for totals. Callers that need currency
+ * metadata should inspect the underlying maps directly.
  */
 export interface CapitalStructureCashflows {
   /**

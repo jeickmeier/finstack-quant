@@ -97,6 +97,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
         "ScorecardReport.status",
     ),
     "finstack_quant.statements": (
+        "CapitalStructureCashflows.get_component",
         "ModelBuilder",
         "MixedNodeBuilder",
         "Registry.get_dependencies",

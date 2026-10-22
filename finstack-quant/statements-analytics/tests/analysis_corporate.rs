@@ -174,7 +174,7 @@ fn test_cs_cashflows_populated_on_statement_result() {
 
     // Debt balance should be positive
     let total_balance_q1 = cs
-        .get_total_debt_balance(&q1)
+        .get_component("debt_balance", "total", &q1)
         .expect("total debt balance Q1");
     assert!(
         total_balance_q1 > 0.0,

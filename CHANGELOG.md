@@ -31,6 +31,8 @@
 
 #### Changed
 
+- `CapitalStructureCashflows::get_component(component, instrument_or_total, period_id)` replaces the 16 per-component and total getters in Rust and Python; WASM exposes `capitalStructureCashflowsGetComponent`. Instrument lookups retain native currency and `total` reads the reporting-currency aggregate.
+
 - `Evaluator::evaluate_prepared` evaluates a model's capital structure exactly as `Evaluator::evaluate` does (an empty market as of the first period's start), so prepared evaluation now yields `cs_cashflows` and `cs.*` values. Before, it skipped the capital structure.
 - `ModelBuilder::with_builtin_metrics` no longer overwrites a node the model already defines with the same id.
 - `ModelBuilder` has one mutable configuration API: setters return `&mut Self` or `Result<&mut Self>` and rejected setters preserve the accumulated model. `build` and `mixed` consume the builder; `MixedNodeBuilder::build` returns its parent builder. The consuming setter and `try_*` twins are removed. `ModelBuilder::new` is the construction entry point, and `build` rejects a model without a timeline.

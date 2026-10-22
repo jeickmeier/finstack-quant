@@ -115,19 +115,19 @@ fn test_reporting_totals_sum_without_fx_when_same_currency() {
 
     // Debt balance totals should sum across instruments even without FX matrix present.
     let total_balance = cashflows
-        .get_total_debt_balance(&period_id)
+        .get_component("debt_balance", "total", &period_id)
         .expect("total debt balance");
     assert_eq!(total_balance, 3_000_000.0);
 
     // Accrued interest totals should be consistent with per-instrument values.
     let a1 = cashflows
-        .get_accrued_interest("BOND-1", &period_id)
+        .get_component("accrued_interest", "BOND-1", &period_id)
         .expect("accrued 1");
     let a2 = cashflows
-        .get_accrued_interest("BOND-2", &period_id)
+        .get_component("accrued_interest", "BOND-2", &period_id)
         .expect("accrued 2");
     let total_accrued = cashflows
-        .get_total_accrued_interest(&period_id)
+        .get_component("accrued_interest", "total", &period_id)
         .expect("total accrued");
     assert!(
         (total_accrued - (a1 + a2)).abs() < 1e-9,

@@ -139,17 +139,17 @@ def statements_cases() -> dict[str, Any]:
         },
         "builtin_check_names": st.CheckSuiteSpec.builtin_check_names(),
         "cs": {
-            "interest": cs.get_interest("TL-A", Q1),
-            "interest_cash": cs.get_interest_cash("TL-A", Q1),
-            "interest_pik": cs.get_interest_pik("TL-A", Q1),
-            "principal": cs.get_principal("TL-A", Q1),
-            "debt_balance": cs.get_debt_balance("TL-A", Q1),
-            "fees": cs.get_fees("TL-A", Q1),
-            "accrued_interest": cs.get_accrued_interest("TL-A", Q1),
-            "total_interest": cs.get_total_interest(Q1),
-            "total_principal": cs.get_total_principal(Q1),
-            "total_debt_balance": cs.get_total_debt_balance(Q1),
-            "total_fees": cs.get_total_fees(Q1),
+            "interest": cs.get_component("interest_expense", "TL-A", Q1),
+            "interest_cash": cs.get_component("interest_expense_cash", "TL-A", Q1),
+            "interest_pik": cs.get_component("interest_expense_pik", "TL-A", Q1),
+            "principal": cs.get_component("principal_payment", "TL-A", Q1),
+            "debt_balance": cs.get_component("debt_balance", "TL-A", Q1),
+            "fees": cs.get_component("fees", "TL-A", Q1),
+            "accrued_interest": cs.get_component("accrued_interest", "TL-A", Q1),
+            "total_interest": cs.get_component("interest_expense", "total", Q1),
+            "total_principal": cs.get_component("principal_payment", "total", Q1),
+            "total_debt_balance": cs.get_component("debt_balance", "total", Q1),
+            "total_fees": cs.get_component("fees", "total", Q1),
         },
         "registry": {
             "count": len(registry.metric_ids()),
@@ -358,3 +358,46 @@ def test_python_matches_the_cross_host_golden(section: str, cases: Any) -> None:
         EXPECTED_PATH.write_text(json.dumps(pinned, indent=2, sort_keys=True) + "\n")
     expected = json.loads(EXPECTED_PATH.read_text())[section]
     assert_matches(actual, expected, section)
+
+
+@pytest.mark.parametrize("scope", ["TL-A", "total"])
+@pytest.mark.parametrize(
+    ("component", "expected"),
+    [
+        ("interest_expense", 35.0),
+        ("interest_expense_cash", 30.0),
+        ("interest_expense_pik", 5.0),
+        ("interest_income", 0.0),
+        ("principal_payment", 100.0),
+        ("debt_balance", 900.0),
+        ("fees", 2.0),
+        ("accrued_interest", 1.5),
+    ],
+)
+def test_cashflow_component_lookup(scope: str, component: str, expected: float) -> None:
+    cashflows = st.CapitalStructureCashflows.from_json(json.dumps(INPUTS["cs_cashflows"]))
+    assert cashflows.get_component(component, scope, Q1) == expected
+
+
+def test_cashflow_component_errors() -> None:
+    cashflows = st.CapitalStructureCashflows.from_json(json.dumps(INPUTS["cs_cashflows"]))
+    for component, scope, period in [("unknown", "TL-A", Q1), ("fees", "missing", Q1), ("fees", "total", Q2)]:
+        with pytest.raises(RuntimeError):
+            cashflows.get_component(component, scope, period)
+    with pytest.raises(ValueError, match="period"):
+        cashflows.get_component("fees", "total", "bad period")
+
+
+def test_cashflow_lookup_preserves_currency_guards() -> None:
+    payload = json.loads(json.dumps(INPUTS["cs_cashflows"]))
+    payload["reporting_currency"] = None
+    payload["totals"] = {}
+    payload["totals_by_currency"] = {"USD": {}, "EUR": {}}
+    cashflows = st.CapitalStructureCashflows.from_json(json.dumps(payload))
+    assert cashflows.get_component("interest_expense", "TL-A", Q1) == 35.0
+    with pytest.raises(RuntimeError, match="Multiple currencies"):
+        cashflows.get_component("fees", "total", Q1)
+    payload["by_instrument"]["TL-A"][Q1]["interest_expense_pik"]["currency"] = "EUR"
+    cashflows = st.CapitalStructureCashflows.from_json(json.dumps(payload))
+    with pytest.raises(RuntimeError, match="Currency mismatch"):
+        cashflows.get_component("interest_expense", "TL-A", Q1)

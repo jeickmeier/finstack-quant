@@ -114,25 +114,25 @@ fn test_capital_structure_cashflows_serialization() {
     // Verify round-trip
     assert_eq!(
         deserialized
-            .get_interest("BOND-001", &period)
+            .get_component("interest_expense", "BOND-001", &period)
             .expect("interest"),
         5_000.0
     );
     assert_eq!(
         deserialized
-            .get_principal("BOND-001", &period)
+            .get_component("principal_payment", "BOND-001", &period)
             .expect("principal"),
         10_000.0
     );
     assert_eq!(
         deserialized
-            .get_debt_balance("BOND-001", &period)
+            .get_component("debt_balance", "BOND-001", &period)
             .expect("balance"),
         100_000.0
     );
     assert_eq!(
         deserialized
-            .get_total_interest(&period)
+            .get_component("interest_expense", "total", &period)
             .expect("total interest"),
         5_000.0
     );

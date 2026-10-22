@@ -7504,390 +7504,38 @@ class CapitalStructureCashflows:
         """
         ...
 
-    def get_interest(self, instrument_id: str, period: str) -> float:
-        """Total interest accrued on one instrument in one period.
+    def get_component(self, component: str, instrument_or_total: str, period_id: str) -> float:
+        """Read a capital-structure component for an instrument or reporting total.
 
         Parameters
         ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period id (e.g. ``"2025Q1"``).
+        component : str
+            One of ``interest_expense`` (cash plus PIK), ``interest_expense_cash``,
+            ``interest_expense_pik``, ``interest_income``, ``principal_payment``,
+            ``debt_balance``, ``fees``, or ``accrued_interest``. Flows are positive
+            payment or receipt magnitudes; debt balance is closing principal.
+            Rate hedges have zero debt balance and debt accrued interest.
+        instrument_or_total : str
+            Instrument identifier for a native-currency amount, or ``"total"``
+            for the reporting-currency aggregate. No FX conversion is performed
+            by this accessor.
+        period_id : str
+            Reporting-period label such as ``"2025Q1"`` present in the result.
 
         Returns
         -------
         float
-            Interest amount in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_interest_cash(self, instrument_id: str, period: str) -> float:
-        """Cash-paid portion of the period's interest.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Cash interest in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_interest_pik(self, instrument_id: str, period: str) -> float:
-        """Payment-in-kind portion of the period's interest.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            PIK interest in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_principal(self, instrument_id: str, period: str) -> float:
-        """Principal repaid on one instrument in one period.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Principal repayment in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_debt_balance(self, instrument_id: str, period: str) -> float:
-        """Return borrowing principal at the inclusive reporting-period end.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Capital-structure identifier of the debt or rate hedge to inspect.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Closing borrowing principal in the instrument's native currency.
-            Rate hedges, including interest-rate swaps, return zero; their trade
-            notional is not borrowing principal.
+            Requested component in major units of the selected currency.
+            Absent optional interest income is zero.
 
         Raises
         ------
         ValueError
-            If period is not a valid reporting-period label.
+            If ``period_id`` is not a valid reporting-period label.
         RuntimeError
-            If the instrument-period breakdown is absent.
-
-        """
-        ...
-
-    def get_fees(self, instrument_id: str, period: str) -> float:
-        """Fees charged on one instrument in one period.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Fee amount in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_accrued_interest(self, instrument_id: str, period: str) -> float:
-        """Return debt interest accrued but unpaid at the inclusive period end.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Capital-structure identifier of the debt or rate hedge to inspect.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Unpaid debt coupon accrual in the instrument's native currency.
-            Rate hedges, including interest-rate swaps, return zero; this debt
-            accrual accessor does not report hedge mark-to-market or leg accruals.
-
-        Raises
-        ------
-        ValueError
-            If period is not a valid reporting-period label.
-        RuntimeError
-            If the instrument-period breakdown is absent.
-
-        """
-        ...
-
-    def get_total_interest(self, period: str) -> float:
-        """Interest across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Total interest in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the period is unknown.
-
-        """
-        ...
-
-    def get_total_principal(self, period: str) -> float:
-        """Principal repaid across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Total principal in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the period is unknown.
-
-        """
-        ...
-
-    def get_total_debt_balance(self, period: str) -> float:
-        """Closing debt across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Total closing balance in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the period is unknown.
-
-        """
-        ...
-
-    def get_total_fees(self, period: str) -> float:
-        """Fees across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Total fees in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the period is unknown.
-
-        """
-        ...
-
-    def get_total_interest_cash(self, period: str) -> float:
-        """Cash interest expense across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            Cash interest expense in the reporting currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the period has no totals or the instruments span several
-            currencies without a reporting currency.
-
-        """
-        ...
-
-    def get_total_interest_income(self, period: str) -> float:
-        """Cash interest received (net hedge receipts and negative-rate coupon receipts) across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            Interest income in the reporting currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the period has no totals or the instruments span several
-            currencies without a reporting currency.
-
-        """
-        ...
-
-    def get_total_interest_pik(self, period: str) -> float:
-        """PIK (non-cash) interest accrued across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            PIK interest in the reporting currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the period has no totals or the instruments span several
-            currencies without a reporting currency.
-
-        """
-        ...
-
-    def get_total_accrued_interest(self, period: str) -> float:
-        """Accrued-but-unpaid debt interest at period end across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            Accrued interest in the reporting currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the period has no totals or the instruments span several
-            currencies without a reporting currency.
-
-        """
-        ...
-
-    def get_interest_income(self, instrument_id: str, period: str) -> float:
-        """Cash interest received for one instrument and period.
-
-        Includes net hedge receipts and receipts from negative-rate debt
-        coupons; zero when nothing was received.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Capital-structure identifier of the instrument to inspect.
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            Interest income in the instrument's native currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the instrument-period breakdown is absent.
-
+            If the component, instrument, or period is unknown, reporting totals
+            are unavailable for multiple currencies, or cash and PIK currencies
+            differ when requesting total interest expense.
         """
         ...
 
@@ -7897,7 +7545,7 @@ class CapitalStructureCashflows:
 
         Populated for every evaluation with capital-structure flows, including
         multi-currency structures without a reporting currency, where
-        ``to_totals_dataframe`` and the ``get_total_*`` accessors have nothing
+        ``to_totals_dataframe`` and the ``get_component(..., "total", ...)`` lookups have nothing
         to report.
 
         Returns
