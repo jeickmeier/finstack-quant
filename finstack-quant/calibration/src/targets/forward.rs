@@ -194,11 +194,6 @@ impl ForwardCurveTarget {
         )
     }
 
-    /// Quote-derived initial rate for the simultaneous solver.
-    fn initial_guess(&self, pq: &PreparedQuote<RateQuote>) -> f64 {
-        pq.quote.implied_rate()
-    }
-
     /// Resolve all contractual projection intervals represented by a prepared quote.
     fn reset_intervals(&self, pq: &PreparedQuote<RateQuote>) -> Result<Vec<(Date, Date)>> {
         match pq.quote.as_ref() {
@@ -375,7 +370,7 @@ impl GlobalSolveTarget for ForwardCurveTarget {
         let mut entries = Vec::with_capacity(quotes.len());
         let mut deposits = Vec::new();
         for pq in quotes {
-            let initial = self.initial_guess(pq);
+            let initial = pq.quote.implied_rate();
             if matches!(pq.quote.as_ref(), RateQuote::Deposit { .. }) {
                 let (start, end) = self.reset_intervals(pq)?.first().copied().ok_or_else(|| {
                     finstack_quant_core::Error::Calibration {
@@ -1070,17 +1065,6 @@ mod tests {
     #[test]
     fn futures_initial_guess_subtracts_convexity_adjustment() {
         let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        let target = ForwardCurveTarget::new(ForwardCurveTargetParams {
-            base_date,
-            currency: Currency::USD,
-            fwd_curve_id: CurveId::new("fwd"),
-            tenor_years: 1.0,
-            solve_interp: InterpStyle::Linear,
-            config: CalibrationConfig::default(),
-            time_day_count: DayCount::Act365F,
-            residual_notional: 1.0,
-            base_context: MarketContext::new(),
-        });
 
         let quote = PreparedQuote::new(
             Arc::new(RateQuote::Futures {
@@ -1095,7 +1079,7 @@ mod tests {
             1.0,
         );
 
-        let guess = target.initial_guess(&quote);
+        let guess = quote.quote.implied_rate();
         assert!((guess - 0.014).abs() < 1e-12, "expected 1.40%, got {guess}");
     }
 

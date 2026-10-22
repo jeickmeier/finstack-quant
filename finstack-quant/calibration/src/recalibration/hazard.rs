@@ -85,10 +85,6 @@ struct HazardRecalibrationKey {
     source_fingerprint: String,
 }
 
-fn hazard_source_fingerprint(hazard: &HazardCurve) -> finstack_quant_core::Result<String> {
-    finstack_quant_core::canonical::content_hash(hazard)
-}
-
 /// Batch-local cache for hazard-curve recalibrations used by spread risk and
 /// scenario ParCDS delivery.
 ///
@@ -137,7 +133,7 @@ fn recalibrate_from_par_spreads_cached(
         doc_clause: request.doc_clause,
         cds_valuation_convention: request.cds_valuation_convention,
         bump: hazard_bump_key(&request),
-        source_fingerprint: hazard_source_fingerprint(request.hazard)?,
+        source_fingerprint: finstack_quant_core::canonical::content_hash(request.hazard)?,
     };
     cache
         .entries
@@ -993,8 +989,10 @@ mod tests {
         )
         .expect("high deal quote override");
 
-        let low_fingerprint = hazard_source_fingerprint(&low_quote).expect("source hash");
-        let high_fingerprint = hazard_source_fingerprint(&high_quote).expect("source hash");
+        let low_fingerprint =
+            finstack_quant_core::canonical::content_hash(&low_quote).expect("source hash");
+        let high_fingerprint =
+            finstack_quant_core::canonical::content_hash(&high_quote).expect("source hash");
         assert_ne!(
             low_fingerprint, high_fingerprint,
             "deal curves with distinct replay quotes must not alias in the batch cache"
