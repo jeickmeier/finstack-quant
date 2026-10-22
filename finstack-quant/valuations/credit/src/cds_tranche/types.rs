@@ -348,34 +348,6 @@ impl CdsTranche {
         Ok(tranche)
     }
 
-    /// Model upfront: the tranche PV at its contractual running coupon.
-    ///
-    /// A computed analytic, distinct from the contractual `upfront` field
-    /// (which this PV already includes).
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market context holding the discount curve and the credit
-    ///   index data named by the tranche.
-    /// * `as_of` - Valuation date.
-    ///
-    /// # Returns
-    ///
-    /// The model upfront in the tranche notional currency (signed by side).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the tranche is invalid or required market data
-    /// is missing.
-    pub fn model_upfront(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let pv = pricing::CdsTranchePricer::new().price_tranche(self, market, as_of)?;
-        Ok(pv.amount())
-    }
-
     /// Calculate spread DV01 (sensitivity to 1bp change in running coupon)
     pub fn spread_dv01(
         &self,
