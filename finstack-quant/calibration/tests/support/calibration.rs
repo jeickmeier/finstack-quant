@@ -1,7 +1,5 @@
 use finstack_quant_calibration::api::engine;
-use finstack_quant_calibration::api::market_datum::{
-    DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum,
-};
+use finstack_quant_calibration::api::market_datum::{FxSpotDatum, MarketDatum, PriceDatum};
 use finstack_quant_calibration::api::prior_market::PriorMarketObject;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams,
@@ -101,7 +99,7 @@ pub(crate) fn split_market_context_state(
         state
             .dividends
             .into_iter()
-            .map(|schedule| MarketDatum::DividendSchedule(DividendScheduleDatum { schedule })),
+            .map(MarketDatum::DividendSchedule),
     );
     data.extend(
         state

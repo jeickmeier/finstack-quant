@@ -1,5 +1,6 @@
 """Calibration bindings preserve canonical validation and loading limits."""
 
+from collections.abc import Callable
 import json
 
 import pytest
@@ -11,7 +12,6 @@ from finstack_quant.calibration import (
     CalibrationStep,
     CdsQuote,
     CdsTrancheQuote,
-    DividendScheduleDatum,
     FxSpotDatum,
     InflationQuote,
     PriceDatum,
@@ -30,6 +30,7 @@ from finstack_quant.calibration import (
     validate_vol_bounds,
 )
 from finstack_quant.calibration.hull_white import CapFloorQuote, SwaptionQuote
+from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import VolSurface
 from finstack_quant.portfolio import ContractLimitExceededError
 
@@ -171,7 +172,7 @@ def test_typed_market_data_feeds_the_envelope() -> None:
         CdsTrancheQuote("IG-3-7", "CDX.NA.IG", 42, 0.03, 0.07, "2031-06-20", 0.01, 100.0, "USD", "isda_na"),
         FxSpotDatum("EURUSD", "EUR", "USD", 1.1),
         PriceDatum("AAPL", 187.5),
-        DividendScheduleDatum({"id": "AAPL-DIVS", "underlying": "AAPL", "events": []}),
+        {"kind": "dividend_schedule", "id": "AAPL-DIVS", "underlying": "AAPL", "events": []},
     ]
     envelope = CalibrationEnvelope(plan, market_data=[*quotes, *data])
     kinds = [datum["kind"] for datum in envelope.market_data[2:]]
@@ -185,7 +186,7 @@ def test_typed_market_data_feeds_the_envelope() -> None:
         "dividend_schedule",
     ]
     assert calibrate(envelope).success
-    for datum in data:
+    for datum in data[:-1]:
         assert type(datum).from_json(datum.to_json()).to_json() == datum.to_json()
 
 
@@ -264,3 +265,49 @@ def test_partial_validation_config_json_uses_canonical_rust_defaults() -> None:
     loaded = ValidationConfig.from_json('{"max_hazard_rate": 2.0}')
     assert loaded.to_dict() == direct.to_dict()
     assert loaded.to_dict()["max_forward_rate"] == ValidationConfig().to_dict()["max_forward_rate"]
+
+
+def test_dividend_schedule_uses_direct_wire_fields() -> None:
+    from finstack_quant import calibration
+
+    datum = {
+        "kind": "dividend_schedule",
+        "id": "AAPL-DIVS",
+        "underlying": "AAPL",
+        "currency": "USD",
+        "events": [{"date": "2026-08-15", "kind": {"cash": {"amount": "0.25", "currency": "USD"}}}],
+    }
+    envelope = CalibrationEnvelope(CalibrationPlan([]), market_data=[datum])
+    assert envelope.market_data == [datum]
+    assert CalibrationEnvelope.from_json(envelope.to_json()).market_data == [datum]
+    assert calibrate(envelope).success
+    assert not hasattr(calibration, "DividendScheduleDatum")
+    with pytest.raises(ValueError, match="schedule"):
+        CalibrationEnvelope(
+            CalibrationPlan([]),
+            market_data=[{"kind": "dividend_schedule", "schedule": {k: v for k, v in datum.items() if k != "kind"}}],
+        )
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda currency: CalibrationStep.discount("USD-OIS", currency, "2026-05-08"),
+        lambda currency: CdsQuote.par_spread("CDS", "ACME", currency, "xr14", "5Y", 125.0, 0.4),
+        lambda currency: CdsQuote.upfront("CDS", "ACME", currency, "xr14", "5Y", 100.0, 0.01, 0.4),
+        lambda currency: CdsTrancheQuote(
+            "IG-3-7", "CDX.NA.IG", 42, 0.03, 0.07, "2031-06-20", 0.01, 100.0, currency, "isda_na"
+        ),
+    ],
+)
+def test_calibration_currency_conversion_uses_the_core_contract(
+    factory: Callable[[object], CdsQuote | CdsTrancheQuote | CalibrationStep],
+) -> None:
+    class CurrencyLike:
+        code = "USD"
+
+    assert factory("USD").to_json() == factory(Currency("USD")).to_json()
+    with pytest.raises(TypeError, match="Currency or str"):
+        factory(CurrencyLike())
+    with pytest.raises(ValueError, match=r"currency|Currency"):
+        factory("NOT-A-CURRENCY")

@@ -233,15 +233,13 @@ fn equity_cash_dividends() -> std::result::Result<MarketDatum, Box<dyn std::erro
     // The provider's schedule identifier need not contain the equity ticker.
     Ok(serde_json::from_value(serde_json::json!({
         "kind": "dividend_schedule",
-        "schedule": {
-            "id": "PAYMENTS-42",
-            "underlying": "AAPL",
-            "currency": "USD",
-            "events": [{
-                "date": "2025-07-02",
-                "kind": {"cash": {"amount": "0.25", "currency": "USD"}}
-            }]
-        }
+        "id": "PAYMENTS-42",
+        "underlying": "AAPL",
+        "currency": "USD",
+        "events": [{
+            "date": "2025-07-02",
+            "kind": {"cash": {"amount": "0.25", "currency": "USD"}}
+        }]
     }))?)
 }
 

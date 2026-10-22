@@ -6,12 +6,14 @@
 
 use super::config::extract_config;
 use super::quotes::extract_market_datum;
+use crate::bindings::core::currency::extract_currency;
 use crate::bindings::date_utils::extract_date_iso;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pickle_support::reduce_via_json;
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::bindings::pydoc::pydoc;
+use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::prior_market::PriorMarketObject;
 use finstack_quant_calibration::api::schema::{
@@ -21,18 +23,6 @@ use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde_json::{Map, Value};
-
-/// ISO-4217 code from a ``Currency`` object (``str(currency)``) or a plain string.
-pub(crate) fn currency_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(code) = obj.getattr("code") {
-        if let Ok(code) = code.extract::<String>() {
-            return Ok(code);
-        }
-    }
-    obj.extract::<String>().map_err(|_| {
-        value_error("expected a currency code string (e.g. 'USD') or a core.Currency instance")
-    })
-}
 
 /// Deserialize a JSON object into `T` with a labelled error.
 pub(crate) fn from_value<T: serde::de::DeserializeOwned>(value: Value, label: &str) -> PyResult<T> {
@@ -150,31 +140,7 @@ fn fields(pairs: Vec<(&str, Value)>) -> Map<String, Value> {
 
 #[pymethods]
 impl PyCalibrationStep {
-    /// Discount-curve bootstrap step.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (also the default quote-set name and, unless
-    ///     ``curve_id`` is given, the curve identifier).
-    /// currency : str | Currency
-    ///     Curve currency.
-    /// base_date : datetime.date | str
-    ///     Curve base (valuation) date.
-    /// quote_set : str | None, default None
-    ///     Quote-set name in ``plan.quote_sets``; defaults to ``id``.
-    /// curve_id : str | None, default None
-    ///     Identifier of the produced curve; defaults to ``id``.
-    /// **params
-    ///     Optional wire fields: ``method`` (``"bootstrap"`` | ``"global"``),
-    ///     ``interpolation`` (``"log_linear"`` default, ``"linear"``,
-    ///     ``"monotone_convex"``, ...), ``extrapolation`` (``"flat_forward"``),
-    ///     ``pricing_discount_id``, ``pricing_forward_id``, ``conventions``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.discount")]
     #[staticmethod]
     #[pyo3(signature = (id, currency, base_date, quote_set = None, curve_id = None, **params))]
     #[pyo3(text_signature = "(id, currency, base_date, quote_set=None, curve_id=None, **params)")]
@@ -190,36 +156,16 @@ impl PyCalibrationStep {
     ) -> PyResult<Self> {
         let f = fields(vec![
             ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            ("currency", Value::String(currency_code(currency)?)),
+            (
+                "currency",
+                Value::String(extract_currency(currency)?.to_string()),
+            ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);
         Self::build(py, "discount", id, quote_set, f, params)
     }
 
-    /// Forward (index projection) curve step discounted on an existing curve.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name and curve id).
-    /// currency : str | Currency
-    ///     Curve currency.
-    /// base_date : datetime.date | str
-    ///     Curve base date.
-    /// tenor_years : float
-    ///     Index accrual tenor in years (``0.25`` for 3M).
-    /// discount_curve_id : str
-    ///     Identifier of the discount curve used to price the quotes.
-    /// quote_set, curve_id
-    ///     As in ``discount``.
-    /// **params
-    ///     Optional wire fields: ``method``, ``interpolation``
-    ///     (``"monotone_convex"`` default), ``conventions``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.forward")]
     #[staticmethod]
     #[pyo3(signature = (id, currency, base_date, tenor_years, discount_curve_id, quote_set = None, curve_id = None, **params))]
     #[pyo3(
@@ -239,7 +185,10 @@ impl PyCalibrationStep {
     ) -> PyResult<Self> {
         let f = fields(vec![
             ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            ("currency", Value::String(currency_code(currency)?)),
+            (
+                "currency",
+                Value::String(extract_currency(currency)?.to_string()),
+            ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("tenor_years", Value::from(tenor_years)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
@@ -247,36 +196,7 @@ impl PyCalibrationStep {
         Self::build(py, "forward", id, quote_set, f, params)
     }
 
-    /// Hazard-curve bootstrap step from CDS quotes.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name and curve id).
-    /// entity : str
-    ///     Reference entity.
-    /// currency : str | Currency
-    ///     Curve currency.
-    /// base_date : datetime.date | str
-    ///     Curve base date.
-    /// discount_curve_id : str
-    ///     Discount curve used for CDS present values.
-    /// recovery_rate : float
-    ///     Assumed recovery rate as a decimal.
-    /// seniority : str, optional
-    ///     Debt seniority (``"senior"``, ``"subordinated"``, ...). ``None`` uses
-    ///     the Rust authoring default
-    ///     ``CalibrationStep::DEFAULT_HAZARD_SENIORITY`` (``"senior"``).
-    /// quote_set, curve_id
-    ///     As in ``discount``.
-    /// **params
-    ///     Optional wire fields: ``notional``, ``method``,
-    ///     ``par_interp``, ``doc_clause``, ``cds_valuation_convention``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.hazard")]
     #[staticmethod]
     #[pyo3(signature = (id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority = None, quote_set = None, curve_id = None, **params))]
     #[pyo3(
@@ -300,7 +220,10 @@ impl PyCalibrationStep {
             ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("entity", Value::String(entity.into())),
             ("seniority", seniority.map_or(Value::Null, Value::from)),
-            ("currency", Value::String(currency_code(currency)?)),
+            (
+                "currency",
+                Value::String(extract_currency(currency)?.to_string()),
+            ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
             ("recovery_rate", Value::from(recovery_rate)),
@@ -308,37 +231,7 @@ impl PyCalibrationStep {
         Self::build(py, "hazard", id, quote_set, f, params)
     }
 
-    /// Inflation (CPI projection) curve step from inflation-swap quotes.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name and curve id).
-    /// currency : str | Currency
-    ///     Curve currency.
-    /// base_date : datetime.date | str
-    ///     Valuation and calibration-instrument start date. The output curve's
-    ///     reference CPI date is this date minus ``observation_lag``.
-    /// discount_curve_id : str
-    ///     Discount curve used for swap present values.
-    /// index : str
-    ///     Inflation index identifier (e.g. ``"USA-CPI-U"``).
-    /// observation_lag : str
-    ///     Whole-month observation lag (e.g. ``"3M"``, up to 255 months), or
-    ///     no lag (``""``, ``"none"``, ``"0"``, ``"0M"``, or ``"0D"``).
-    ///     Parsing is case-insensitive. Calibration rejects nonzero day lags.
-    /// base_cpi : float
-    ///     Contractual reference CPI at the start date after observation lag and
-    ///     monthly interpolation. Supplied index fixings must reproduce this level.
-    /// quote_set, curve_id
-    ///     As in ``discount``.
-    /// **params
-    ///     Optional wire fields: ``notional``, ``method``, ``interpolation``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.inflation")]
     #[staticmethod]
     #[pyo3(signature = (id, currency, base_date, discount_curve_id, index, observation_lag, base_cpi, quote_set = None, curve_id = None, **params))]
     #[pyo3(
@@ -360,7 +253,10 @@ impl PyCalibrationStep {
     ) -> PyResult<Self> {
         let f = fields(vec![
             ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            ("currency", Value::String(currency_code(currency)?)),
+            (
+                "currency",
+                Value::String(extract_currency(currency)?.to_string()),
+            ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
             ("index", Value::String(index.into())),
@@ -419,33 +315,7 @@ impl PyCalibrationStep {
         Self::build(py, "vol_surface", id, quote_set, f, params)
     }
 
-    /// Swaption volatility cube step from swaption vol quotes.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name and surface id).
-    /// base_date : datetime.date | str
-    ///     Surface base date.
-    /// discount_curve_id : str
-    ///     Discount curve for forward-swap-rate construction.
-    /// currency : str | Currency
-    ///     Surface currency.
-    /// quote_set, vol_surface_id
-    ///     As in ``vol_surface``.
-    /// **params
-    ///     Optional wire fields: ``forward_id``, ``vol_convention``,
-    ///     ``sabr_beta``, ``target_expiries``, ``target_tenors``,
-    ///     ``calendar_id``, ``fixed_day_count``,
-    ///     ``swap_index``, ``vol_tolerance``,
-    ///     ``sabr_extrapolation``, ``allow_sabr_missing_bucket_fallback``.
-    ///     ``target_expiries`` are ACT/365F years from ``base_date``;
-    ///     ``fixed_day_count`` controls coupon accruals only.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.swaption_vol")]
     #[staticmethod]
     #[pyo3(signature = (id, base_date, discount_curve_id, currency, quote_set = None, vol_surface_id = None, **params))]
     #[pyo3(
@@ -469,40 +339,15 @@ impl PyCalibrationStep {
             ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
-            ("currency", Value::String(currency_code(currency)?)),
+            (
+                "currency",
+                Value::String(extract_currency(currency)?.to_string()),
+            ),
         ]);
         Self::build(py, "swaption_vol", id, quote_set, f, params)
     }
 
-    /// Index-tranche base-correlation step.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name).
-    /// index_id : str
-    ///     Credit index identifier (the curve is written as ``"{index_id}_CORR"``).
-    /// series : int
-    ///     Index series number.
-    /// maturity_years : float
-    ///     Tranche maturity in years.
-    /// base_date : datetime.date | str
-    ///     Valuation date.
-    /// discount_curve_id : str
-    ///     Discount curve for tranche present values.
-    /// currency : str | Currency
-    ///     Index currency.
-    /// quote_set
-    ///     As in ``discount``.
-    /// **params
-    ///     Optional wire fields: ``notional``, ``frequency``, ``day_count``,
-    ///     ``business_day_convention``, ``calendar_id``, ``detachment_points``,
-    ///     ``roll_rule``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.base_correlation")]
     #[staticmethod]
     #[pyo3(signature = (id, index_id, series, maturity_years, base_date, discount_curve_id, currency, quote_set = None, **params))]
     #[pyo3(
@@ -527,7 +372,10 @@ impl PyCalibrationStep {
             ("maturity_years", Value::from(maturity_years)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
-            ("currency", Value::String(currency_code(currency)?)),
+            (
+                "currency",
+                Value::String(extract_currency(currency)?.to_string()),
+            ),
         ]);
         Self::build(py, "base_correlation", id, quote_set, f, params)
     }
@@ -578,29 +426,7 @@ impl PyCalibrationStep {
         Self::build(py, "student_t", id, quote_set, f, params)
     }
 
-    /// Hull-White one-factor calibration to swaption quotes.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name).
-    /// curve_id : str
-    ///     Discount curve the model is calibrated on (scalars are written as
-    ///     ``"{curve_id}_HW1F"``).
-    /// currency : str | Currency
-    ///     Model currency.
-    /// base_date : datetime.date | str
-    ///     Valuation date.
-    /// quote_set
-    ///     ATM swaption quotes; calibration rejects strikes differing from the
-    ///     contractual forward by more than 1e-8 in decimal rate units.
-    /// **params
-    ///     Optional wire fields: ``initial_kappa``, ``initial_sigma``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.hull_white")]
     #[staticmethod]
     #[pyo3(signature = (id, curve_id, currency, base_date, quote_set = None, **params))]
     #[pyo3(text_signature = "(id, curve_id, currency, base_date, quote_set=None, **params)")]
@@ -616,44 +442,16 @@ impl PyCalibrationStep {
     ) -> PyResult<Self> {
         let f = fields(vec![
             ("curve_id", Value::String(curve_id.into())),
-            ("currency", Value::String(currency_code(currency)?)),
+            (
+                "currency",
+                Value::String(extract_currency(currency)?.to_string()),
+            ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);
         Self::build(py, "hull_white", id, quote_set, f, params)
     }
 
-    /// Hull-White one-factor calibration to cap/floor quotes.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name).
-    /// discount_curve_id : str
-    ///     Discounting curve and output-key prefix. Scalar fits write
-    ///     ``"{discount_curve_id}_CAPFLOOR_HW1F_KAPPA"`` and
-    ///     ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA"``. Piecewise fits write
-    ///     the same kappa scalar and a sigma series at
-    ///     ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE"``.
-    /// forward_curve_id : str
-    ///     Curve projecting the caplet forwards.
-    /// index_id : str
-    ///     Term-rate index identifier (e.g. ``"EUR-EURIBOR-3M"``). Rust derives
-    ///     payment and fixing dates, calendars, accruals, and settlement from its
-    ///     conventions. Overnight indices are rejected by this calibration model.
-    /// currency : str | Currency
-    ///     Model currency, which must match the index conventions.
-    /// base_date : datetime.date | str
-    ///     Valuation date.
-    /// quote_set
-    ///     As in ``discount``.
-    /// **params
-    ///     Optional wire fields: ``fixed_kappa``, ``initial_kappa``,
-    ///     ``initial_sigma``, ``volatility_mode``. ``fit_tolerance`` is required.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.cap_floor_hull_white")]
     #[staticmethod]
     #[pyo3(signature = (id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quote_set = None, **params))]
     #[pyo3(
@@ -675,7 +473,10 @@ impl PyCalibrationStep {
             ("discount_curve_id", Value::String(discount_curve_id.into())),
             ("forward_curve_id", Value::String(forward_curve_id.into())),
             ("index_id", Value::String(index_id.into())),
-            ("currency", Value::String(currency_code(currency)?)),
+            (
+                "currency",
+                Value::String(extract_currency(currency)?.to_string()),
+            ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);
         Self::build(py, "cap_floor_hull_white", id, quote_set, f, params)
@@ -727,30 +528,7 @@ impl PyCalibrationStep {
         Self::build(py, "svi_surface", id, quote_set, f, params)
     }
 
-    /// Cross-currency basis curve step.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name and curve id).
-    /// currency : str | Currency
-    ///     Foreign (collateral) currency of the produced discount curve.
-    /// base_date : datetime.date | str
-    ///     Curve base date.
-    /// fx_spot : float
-    ///     Spot FX rate used to translate the basis quotes.
-    /// domestic_discount_id : str
-    ///     Domestic discount curve the basis is measured against.
-    /// quote_set, curve_id
-    ///     As in ``discount``.
-    /// **params
-    ///     Optional wire fields: ``method``, ``interpolation``,
-    ///     ``extrapolation``, ``conventions``, ``basis_spread_curve_id``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.xccy_basis")]
     #[staticmethod]
     #[pyo3(signature = (id, currency, base_date, fx_spot, domestic_discount_id, quote_set = None, curve_id = None, **params))]
     #[pyo3(
@@ -770,7 +548,10 @@ impl PyCalibrationStep {
     ) -> PyResult<Self> {
         let f = fields(vec![
             ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            ("currency", Value::String(currency_code(currency)?)),
+            (
+                "currency",
+                Value::String(extract_currency(currency)?.to_string()),
+            ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("fx_spot", Value::from(fx_spot)),
             (
@@ -1040,22 +821,7 @@ impl PyCalibrationEnvelope {
 
 #[pymethods]
 impl PyCalibrationEnvelope {
-    /// Assemble a request envelope.
-    ///
-    /// Parameters
-    /// ----------
-    /// plan : CalibrationPlan
-    ///     Plain plan to execute; its quote IDs resolve in ``market_data``.
-    /// market_data : list[MarketDatum | dict] | None, default None
-    ///     Flat market data: typed quotes and datums or ``{"kind": ...}`` dicts.
-    ///     Duplicate kind-and-ID inputs are rejected during validation.
-    /// prior_market : list[dict] | None, default None
-    ///     Pre-built calibrated objects as ``{"kind": ..., ...}`` dicts.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a market-data or prior-market entry has an invalid shape.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationEnvelope.__init__")]
     #[new]
     #[pyo3(signature = (plan, market_data = None, prior_market = None))]
     #[pyo3(text_signature = "(plan, market_data=None, prior_market=None)")]

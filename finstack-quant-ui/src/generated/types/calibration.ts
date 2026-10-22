@@ -430,8 +430,20 @@ export type D_826Db27Dbb673D9F5F86 =
           };
     }
   | {
+      /**
+       * Quote currency for cash dividends (optional metadata).
+       */
+      currency?: Currency3 | null;
+      /**
+       * Sorted events by date (ascending).
+       */
+      events: D_63A8Cdf0B3369D8089A3[];
+      id: Id4;
       kind: "dividend_schedule";
-      schedule: D_7D8265A72B3Debd33F3E;
+      /**
+       * Optional display symbol/ticker for convenience.
+       */
+      underlying?: string | null;
     }
   | {
       /**
@@ -5252,24 +5264,6 @@ export interface Money {
     | "ZAR"
     | "ZMW"
     | "ZWL";
-}
-/**
- * The dividend schedule itself.
- */
-export interface D_7D8265A72B3Debd33F3E {
-  /**
-   * Quote currency for cash dividends (optional metadata).
-   */
-  currency?: Currency3 | null;
-  /**
-   * Sorted events by date (ascending).
-   */
-  events: D_63A8Cdf0B3369D8089A3[];
-  id: Id4;
-  /**
-   * Optional display symbol/ticker for convenience.
-   */
-  underlying?: string | null;
 }
 /**
  * A dated dividend event.

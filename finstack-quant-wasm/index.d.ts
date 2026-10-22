@@ -323,13 +323,6 @@ export type PriceDatum = Omit<
   'kind'
 >;
 /**
- * Payload of a `MarketDatum` tagged `kind: "dividend_schedule"` (Rust `DividendScheduleDatum`); twin of Python `calibration.DividendScheduleDatum`.
- */
-export type DividendScheduleDatum = Omit<
-  Extract<generated.calibration.MarketDatum, { kind: 'dividend_schedule' }>,
-  'kind'
->;
-/**
  * Payload of a `MarketDatum` tagged `kind: "collateral"` (Rust `CollateralEntry`); twin of Python `calibration.CollateralEntry`.
  */
 export type CollateralEntry = Omit<

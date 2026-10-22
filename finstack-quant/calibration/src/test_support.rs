@@ -1,6 +1,6 @@
 //! Helpers shared by crate-private calibration unit tests.
 
-use crate::api::market_datum::{DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum};
+use crate::api::market_datum::{FxSpotDatum, MarketDatum, PriceDatum};
 use crate::api::prior_market::PriorMarketObject;
 use crate::quotes::MarketQuote;
 use crate::quotes::QuoteId;
@@ -77,7 +77,7 @@ fn split_market_context_state(
         state
             .dividends
             .into_iter()
-            .map(|schedule| MarketDatum::DividendSchedule(DividendScheduleDatum { schedule })),
+            .map(MarketDatum::DividendSchedule),
     );
     data.extend(
         state

@@ -3,7 +3,7 @@
   "schema": "finstack_quant.calibration/1",
   "plan": {
     "id": "equity_spots_dividends_snapshot",
-    "description": "Snapshot-only example: equity spot prices and a quarterly AAPL dividend schedule supplied as market_data entries, with no calibration steps. Demonstrates Track B for equities \u2014 non-bootstrapped equity marks loaded directly as MarketScalar and DividendSchedule values. This is a standalone subset of the market_data entries in 08_equity_vol_surface.json, presented without the vol_surface calibration step. Spot prices use the MarketScalar::Price(Money) shape. The AAPL dividend schedule uses four quarterly cash dividends of $0.25 each, matching standard US large-cap quarterly payout conventions.",
+    "description": "Snapshot-only example: equity spot prices and a quarterly AAPL dividend schedule supplied as market_data entries, with no calibration steps. Demonstrates Track B for equities — non-bootstrapped equity marks loaded directly as MarketScalar and DividendSchedule values. This is a standalone subset of the market_data entries in 08_equity_vol_surface.json, presented without the vol_surface calibration step. Spot prices use the MarketScalar::Price(Money) shape. The AAPL dividend schedule uses four quarterly cash dividends of $0.25 each, matching standard US large-cap quarterly payout conventions.",
     "quote_sets": {},
     "steps": [],
     "settings": {}
@@ -31,49 +31,47 @@
     },
     {
       "kind": "dividend_schedule",
-      "schedule": {
-        "id": "AAPL-DIVS",
-        "underlying": "AAPL",
-        "currency": "USD",
-        "events": [
-          {
-            "date": "2026-08-15",
-            "kind": {
-              "cash": {
-                "amount": "0.25",
-                "currency": "USD"
-              }
-            }
-          },
-          {
-            "date": "2026-11-15",
-            "kind": {
-              "cash": {
-                "amount": "0.25",
-                "currency": "USD"
-              }
-            }
-          },
-          {
-            "date": "2027-02-15",
-            "kind": {
-              "cash": {
-                "amount": "0.25",
-                "currency": "USD"
-              }
-            }
-          },
-          {
-            "date": "2027-05-15",
-            "kind": {
-              "cash": {
-                "amount": "0.25",
-                "currency": "USD"
-              }
+      "id": "AAPL-DIVS",
+      "underlying": "AAPL",
+      "currency": "USD",
+      "events": [
+        {
+          "date": "2026-08-15",
+          "kind": {
+            "cash": {
+              "amount": "0.25",
+              "currency": "USD"
             }
           }
-        ]
-      }
+        },
+        {
+          "date": "2026-11-15",
+          "kind": {
+            "cash": {
+              "amount": "0.25",
+              "currency": "USD"
+            }
+          }
+        },
+        {
+          "date": "2027-02-15",
+          "kind": {
+            "cash": {
+              "amount": "0.25",
+              "currency": "USD"
+            }
+          }
+        },
+        {
+          "date": "2027-05-15",
+          "kind": {
+            "cash": {
+              "amount": "0.25",
+              "currency": "USD"
+            }
+          }
+        }
+      ]
     }
   ],
   "prior_market": []

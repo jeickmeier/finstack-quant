@@ -17,8 +17,8 @@ mod validation;
 use config::{PyCalibrationConfig, PyRateBounds, PySolverConfig, PyValidationConfig};
 use envelope::{PyCalibrationEnvelope, PyCalibrationPlan, PyCalibrationStep};
 use quotes::{
-    PyCdsQuote, PyCdsTrancheQuote, PyDividendScheduleDatum, PyFxSpotDatum, PyInflationQuote,
-    PyPriceDatum, PyRateQuote, PyVolQuote, PyXccyQuote,
+    PyCdsQuote, PyCdsTrancheQuote, PyFxSpotDatum, PyInflationQuote, PyPriceDatum, PyRateQuote,
+    PyVolQuote, PyXccyQuote,
 };
 use report::{
     PyCalibrationDiagnostics, PyCalibrationReport, PyCalibrationValidationReport, PyQuoteQuality,
@@ -324,7 +324,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationValidationReport>()?;
     m.add_class::<PyCdsQuote>()?;
     m.add_class::<PyCdsTrancheQuote>()?;
-    m.add_class::<PyDividendScheduleDatum>()?;
     m.add_class::<PyFxSpotDatum>()?;
     m.add_class::<PyInflationQuote>()?;
     m.add_class::<PyPriceDatum>()?;
@@ -385,7 +384,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "CalibrationValidationReport",
                 "CdsQuote",
                 "CdsTrancheQuote",
-                "DividendScheduleDatum",
                 "FxSpotDatum",
                 "InflationQuote",
                 "PriceDatum",

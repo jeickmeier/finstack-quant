@@ -1619,46 +1619,6 @@
         }
       ]
     },
-    "DividendSchedule": {
-      "additionalProperties": false,
-      "description": "Dividend schedule for an equity or ETF underlying.\n\nContains a time-ordered sequence of dividend events used for pricing equity\nderivatives and calculating total return. The schedule can be referenced by\nmultiple instruments via its [`CurveId`] in the market context.\n\n# Usage in Pricing\n\n- **Discrete dividends**: Subtract PV of future dividends from spot for option pricing\n- **Ex-dividend adjustments**: Reduce forward price by dividend amount\n- **Dividend futures**: Sum dividends in contract period\n- **Total return**: Include dividend reinvestment in performance\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::dividends::DividendSchedule;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet schedule = DividendSchedule::builder(\"AAPL-DIVS\")\n    .underlying(\"AAPL\")\n    .currency(Currency::USD)\n    .cash(\n        Date::from_calendar_date(2025, Month::March, 15).expect(\"Valid date\"),\n        Money::new(0.24, Currency::USD).expect(\"valid money fixture\")\n    ).build().expect(\"Valid dividends\");\n\nassert_eq!(schedule.get_events().len(), 1);\n```",
-      "properties": {
-        "currency": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Quote currency for cash dividends (optional metadata)."
-        },
-        "events": {
-          "description": "Sorted events by date (ascending).",
-          "items": {
-            "$ref": "#/$defs/DividendEvent"
-          },
-          "type": "array"
-        },
-        "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique identifier of this schedule in the market context."
-        },
-        "underlying": {
-          "description": "Optional display symbol/ticker for convenience.",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "id",
-        "events"
-      ],
-      "type": "object"
-    },
     "ExplainOpts": {
       "additionalProperties": false,
       "description": "Opt-in configuration for generating explanation traces.\n\nControls whether detailed execution traces are captured during computation.\nWhen disabled, there is zero runtime overhead.",
@@ -2919,18 +2879,44 @@
           "additionalProperties": false,
           "description": "Dividend schedule for an underlier.",
           "properties": {
+            "currency": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Quote currency for cash dividends (optional metadata)."
+            },
+            "events": {
+              "description": "Sorted events by date (ascending).",
+              "items": {
+                "$ref": "#/$defs/DividendEvent"
+              },
+              "type": "array"
+            },
+            "id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Unique identifier of this schedule in the market context."
+            },
             "kind": {
               "const": "dividend_schedule",
               "type": "string"
             },
-            "schedule": {
-              "$ref": "#/$defs/DividendSchedule",
-              "description": "The dividend schedule itself."
+            "underlying": {
+              "description": "Optional display symbol/ticker for convenience.",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
             "kind",
-            "schedule"
+            "id",
+            "events"
           ],
           "type": "object"
         },

@@ -1,12 +1,12 @@
 //! Typed calibration market data: rate, CDS, volatility, inflation,
 //! cross-currency and CDS-tranche quotes plus the FX-spot, price,
-//! dividend-schedule and collateral datums carried by the calibration envelope.
+//! and collateral datums carried by the calibration envelope.
 //!
 //! Quote constructors convert host arguments and delegate to the typed Rust
 //! quote constructors, which own defaults and quote validation. The datum
 //! constructors convert host values into the Rust payload structs.
 
-use super::envelope::{currency_code, from_value};
+use super::envelope::from_value;
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::market_data::scalars::extract_f64;
 use crate::bindings::core::money::{decimal_to_py, money_from_amount};
@@ -15,11 +15,10 @@ use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
 use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::{py_to_json_value, py_to_serde};
 use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
-use finstack_quant_calibration::api::market_datum::{
-    DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum,
-};
+use finstack_quant_calibration::api::market_datum::{FxSpotDatum, MarketDatum, PriceDatum};
 use finstack_quant_calibration::quotes::CdsQuote;
 use finstack_quant_calibration::quotes::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::InflationQuote;
@@ -295,30 +294,7 @@ impl PyCdsQuote {
 
 #[pymethods]
 impl PyCdsQuote {
-    /// Running par-spread CDS quote.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique quote identifier.
-    /// entity : str
-    ///     Reference entity name.
-    /// currency : str | Currency
-    ///     Contract currency of the CDS convention.
-    /// doc_clause : str
-    ///     ISDA documentation clause (``"isda_na"``, ``"isda_eu"``, ``"cr14"``,
-    ///     ``"mr14"``, ``"mm14"``, ``"xr14"``).
-    /// pillar : str | datetime.date | dict
-    ///     Maturity pillar (tenor string, date, or pillar mapping).
-    /// spread_bp : float | Bps
-    ///     Par spread in basis points.
-    /// recovery_rate : float
-    ///     Assumed recovery rate as a decimal in ``[0, 1)``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the convention, pillar or numeric inputs are invalid.
+    #[doc = pydoc!("finstack_quant.calibration", "CdsQuote.par_spread")]
     #[staticmethod]
     #[pyo3(text_signature = "(id, entity, currency, doc_clause, pillar, spread_bp, recovery_rate)")]
     #[allow(clippy::too_many_arguments)]
@@ -335,7 +311,7 @@ impl PyCdsQuote {
         CdsQuote::par_spread(
             id,
             entity,
-            &currency_code(currency)?,
+            extract_currency(currency)?.as_ref(),
             doc_clause,
             extract_pillar(py, pillar)?,
             extract_basis_points(spread_bp, "spread_bp")?,
@@ -345,31 +321,7 @@ impl PyCdsQuote {
         .map_err(core_to_py)
     }
 
-    /// Upfront-plus-running-coupon CDS quote.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique quote identifier.
-    /// entity : str
-    ///     Reference entity name.
-    /// currency : str | Currency
-    ///     Contract currency of the CDS convention.
-    /// doc_clause : str
-    ///     ISDA documentation clause (see ``par_spread``).
-    /// pillar : str | datetime.date | dict
-    ///     Maturity pillar.
-    /// coupon_bp : float | Bps
-    ///     Standard running coupon in basis points (e.g. ``100.0``).
-    /// upfront_pct : float
-    ///     Upfront payment as a percentage of notional (points).
-    /// recovery_rate : float
-    ///     Assumed recovery rate as a decimal in ``[0, 1)``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the convention, pillar or numeric inputs are invalid.
+    #[doc = pydoc!("finstack_quant.calibration", "CdsQuote.upfront")]
     #[staticmethod]
     #[pyo3(
         text_signature = "(id, entity, currency, doc_clause, pillar, coupon_bp, upfront_pct, recovery_rate)"
@@ -389,7 +341,7 @@ impl PyCdsQuote {
         CdsQuote::upfront(
             id,
             entity,
-            &currency_code(currency)?,
+            extract_currency(currency)?.as_ref(),
             doc_clause,
             extract_pillar(py, pillar)?,
             extract_basis_points(coupon_bp, "coupon_bp")?,
@@ -932,38 +884,7 @@ pub struct PyCdsTrancheQuote {
 
 #[pymethods]
 impl PyCdsTrancheQuote {
-    /// Build a validated CDS index tranche quote.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique quote identifier.
-    /// index : str
-    ///     Credit index name (e.g. ``"CDX.NA.IG"``).
-    /// series : int
-    ///     Index series number.
-    /// attachment : float
-    ///     Tranche attachment point as a decimal loss fraction in ``[0, 1]``.
-    /// detachment : float
-    ///     Tranche detachment point as a decimal loss fraction in ``[0, 1]``,
-    ///     above ``attachment``.
-    /// maturity : datetime.date | str
-    ///     Tranche maturity date.
-    /// upfront_pct : float
-    ///     Upfront payment as a decimal fraction of notional
-    ///     (``|upfront_pct| <= 1``).
-    /// coupon_bp : float | Bps
-    ///     Running coupon in basis points (> 0).
-    /// currency : str | Currency
-    ///     Contract currency of the CDS convention.
-    /// doc_clause : str
-    ///     ISDA documentation clause (``"isda_na"``, ``"cr14"``, ...).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the date, convention or numeric inputs are invalid, or
-    ///     ``attachment >= detachment``.
+    #[doc = pydoc!("finstack_quant.calibration", "CdsTrancheQuote.__init__")]
     #[new]
     #[pyo3(
         text_signature = "(id, index, series, attachment, detachment, maturity, upfront_pct, coupon_bp, currency, doc_clause)"
@@ -990,7 +911,7 @@ impl PyCdsTrancheQuote {
             py_to_date(maturity)?,
             upfront_pct,
             extract_basis_points(coupon_bp, "coupon_bp")?,
-            &currency_code(currency)?,
+            extract_currency(currency)?.as_ref(),
             doc_clause,
         )
         .map(|inner| Self { inner })
@@ -1238,73 +1159,6 @@ impl PyPriceDatum {
 
 wire_methods!(PyPriceDatum, PriceDatum, "PriceDatum");
 
-/// Dividend-schedule market datum (``kind == "dividend_schedule"``).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.calibration import DividendScheduleDatum
-/// >>> d = DividendScheduleDatum({"id": "AAPL-DIVS", "underlying": "AAPL", "events": []})
-/// >>> d.id
-/// 'AAPL-DIVS'
-#[pyclass(
-    name = "DividendScheduleDatum",
-    module = "finstack_quant.calibration",
-    frozen,
-    skip_from_py_object
-)]
-#[derive(Clone)]
-pub struct PyDividendScheduleDatum {
-    pub(crate) inner: DividendScheduleDatum,
-}
-
-#[pymethods]
-impl PyDividendScheduleDatum {
-    /// Build a dividend-schedule datum from the Rust ``DividendSchedule`` wire mapping.
-    ///
-    /// Parameters
-    /// ----------
-    /// schedule : dict
-    ///     Dividend schedule in its serde wire form (``id``, ``underlying``,
-    ///     ``events``, ...); see ``schema.get("calibration.schema.json")``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``schedule`` has a missing, unknown or mistyped field.
-    #[new]
-    #[pyo3(text_signature = "(schedule)")]
-    fn new(py: Python<'_>, schedule: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let value = py_to_json_value(py, schedule, "dividend schedule")?;
-        Ok(Self {
-            inner: DividendScheduleDatum {
-                schedule: from_value(value, "dividend schedule")?,
-            },
-        })
-    }
-
-    /// Identifier of the dividend schedule (the datum id).
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.schedule.get_id().as_str().to_string()
-    }
-
-    /// Dividend schedule as its serde wire mapping.
-    #[getter]
-    fn schedule<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.schedule)
-    }
-
-    fn __repr__(&self) -> String {
-        repr_from_serde("DividendScheduleDatum", &self.inner)
-    }
-}
-
-wire_methods!(
-    PyDividendScheduleDatum,
-    DividendScheduleDatum,
-    "DividendScheduleDatum"
-);
-
 /// Convert one market-data entry (typed quote or datum, or dict) into a `MarketDatum`.
 pub(crate) fn extract_market_datum(
     py: Python<'_>,
@@ -1333,9 +1187,6 @@ pub(crate) fn extract_market_datum(
     }
     if let Ok(datum) = obj.cast::<PyPriceDatum>() {
         return Ok(MarketDatum::Price(datum.borrow().inner.clone()));
-    }
-    if let Ok(datum) = obj.cast::<PyDividendScheduleDatum>() {
-        return Ok(MarketDatum::DividendSchedule(datum.borrow().inner.clone()));
     }
     let value = py_to_json_value(py, obj, "market datum")?;
     from_value(value, "market datum (expected {\"kind\": ..., ...})")

@@ -468,11 +468,23 @@ export type MarketDatum =
       scalar: MarketScalar;
     }
   | {
+      /**
+       * Quote currency for cash dividends (optional metadata).
+       */
+      currency?: valuations.Currency | null;
+      /**
+       * Sorted events by date (ascending).
+       */
+      events: DividendEvent[];
+      /**
+       * Unique identifier of this schedule in the market context.
+       */
+      id: valuations.Id;
       kind: "dividend_schedule";
       /**
-       * The dividend schedule itself.
+       * Optional display symbol/ticker for convenience.
        */
-      schedule: DividendSchedule;
+      underlying?: string | null;
     }
   | {
       /**
@@ -5028,38 +5040,6 @@ export interface CdsConventionKey {
   [k: string]: unknown;
 }
 /**
- * Dividend schedule for an equity or ETF underlying.
- *
- * Contains a time-ordered sequence of dividend events used for pricing equity
- * derivatives and calculating total return. The schedule can be referenced by
- * multiple instruments via its [`CurveId`] in the market context.
- *
- * # Usage in Pricing
- *
- * - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
- * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
- * - **Dividend futures**: Sum dividends in contract period
- * - **Total return**: Include dividend reinvestment in performance
- */
-export interface DividendSchedule {
-  /**
-   * Quote currency for cash dividends (optional metadata).
-   */
-  currency?: valuations.Currency | null;
-  /**
-   * Sorted events by date (ascending).
-   */
-  events: DividendEvent[];
-  /**
-   * Unique identifier of this schedule in the market context.
-   */
-  id: valuations.Id;
-  /**
-   * Optional display symbol/ticker for convenience.
-   */
-  underlying?: string | null;
-}
-/**
  * A dated dividend event.
  */
 export interface DividendEvent {
@@ -5802,6 +5782,38 @@ export interface CreditIndexState {
    * Recovery rate
    */
   recovery_rate: number;
+}
+/**
+ * Dividend schedule for an equity or ETF underlying.
+ *
+ * Contains a time-ordered sequence of dividend events used for pricing equity
+ * derivatives and calculating total return. The schedule can be referenced by
+ * multiple instruments via its [`CurveId`] in the market context.
+ *
+ * # Usage in Pricing
+ *
+ * - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
+ * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
+ * - **Dividend futures**: Sum dividends in contract period
+ * - **Total return**: Include dividend reinvestment in performance
+ */
+export interface DividendSchedule {
+  /**
+   * Quote currency for cash dividends (optional metadata).
+   */
+  currency?: valuations.Currency | null;
+  /**
+   * Sorted events by date (ascending).
+   */
+  events: DividendEvent[];
+  /**
+   * Unique identifier of this schedule in the market context.
+   */
+  id: valuations.Id;
+  /**
+   * Optional display symbol/ticker for convenience.
+   */
+  underlying?: string | null;
 }
 /**
  * Serializable state of an FxMatrix.

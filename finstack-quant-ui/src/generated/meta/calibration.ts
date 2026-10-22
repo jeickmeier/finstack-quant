@@ -2623,49 +2623,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_7d8265a72b3debd33f3e",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule",
-    "description": "Dividend schedule for an equity or ETF underlying.\n\nContains a time-ordered sequence of dividend events used for pricing equity\nderivatives and calculating total return. The schedule can be referenced by\nmultiple instruments via its [`CurveId`] in the market context.\n\n# Usage in Pricing\n\n- **Discrete dividends**: Subtract PV of future dividends from spot for option pricing\n- **Ex-dividend adjustments**: Reduce forward price by dividend amount\n- **Dividend futures**: Sum dividends in contract period\n- **Total return**: Include dividend reinvestment in performance\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::dividends::DividendSchedule;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet schedule = DividendSchedule::builder(\"AAPL-DIVS\")\n    .underlying(\"AAPL\")\n    .currency(Currency::USD)\n    .cash(\n        Date::from_calendar_date(2025, Month::March, 15).expect(\"Valid date\"),\n        Money::new(0.24, Currency::USD).expect(\"valid money fixture\")\n    ).build().expect(\"Valid dividends\");\n\nassert_eq!(schedule.get_events().len(), 1);\n```"
-  },
-  {
-    "path": "#/$defs/d_7d8265a72b3debd33f3e/properties/currency",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule/properties/currency",
-    "description": "Quote currency for cash dividends (optional metadata)."
-  },
-  {
-    "path": "#/$defs/d_7d8265a72b3debd33f3e/properties/currency/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule/properties/currency/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_7d8265a72b3debd33f3e/properties/currency/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule/properties/currency/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_7d8265a72b3debd33f3e/properties/events",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule/properties/events",
-    "description": "Sorted events by date (ascending)."
-  },
-  {
-    "path": "#/$defs/d_7d8265a72b3debd33f3e/properties/events/items",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule/properties/events/items",
-    "ref": "#/$defs/DividendEvent",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent"
-  },
-  {
-    "path": "#/$defs/d_7d8265a72b3debd33f3e/properties/id",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule/properties/id",
-    "description": "Unique identifier of this schedule in the market context.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_7d8265a72b3debd33f3e/properties/underlying",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule/properties/underlying",
-    "description": "Optional display symbol/ticker for convenience."
-  },
-  {
     "path": "#/$defs/d_826db27dbb673d9f5f86",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum",
     "description": "A single id-addressable input to the calibrator.\n\nEach variant is tagged via serde as `{\"kind\": \"<snake_case_variant>\", ...}`\nso callers can author flat heterogeneous lists in JSON/YAML."
@@ -3680,16 +3637,47 @@ export default [
     "description": "Dividend schedule for an underlier."
   },
   {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/currency",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/currency",
+    "description": "Quote currency for cash dividends (optional metadata)."
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/currency/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/currency/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/currency/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/currency/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/events",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/events",
+    "description": "Sorted events by date (ascending)."
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/events/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/events/items",
+    "ref": "#/$defs/DividendEvent",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/id",
+    "description": "Unique identifier of this schedule in the market context.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/kind",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/kind",
     "const": "dividend_schedule"
   },
   {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/schedule",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/schedule",
-    "description": "The dividend schedule itself.",
-    "ref": "#/$defs/DividendSchedule",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule"
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/underlying",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/underlying",
+    "description": "Optional display symbol/ticker for convenience."
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/9",

@@ -89,7 +89,22 @@ _INSTRUMENT_MACRO_OWNERS = (
 )
 
 CONVERTED: dict[str, tuple[str, ...] | None] = {
-    "finstack_quant.calibration": ("CalibrationConfig",),
+    "finstack_quant.calibration": (
+        "CalibrationConfig",
+        "CalibrationEnvelope.__init__",
+        "CalibrationStep.discount",
+        "CalibrationStep.forward",
+        "CalibrationStep.hazard",
+        "CalibrationStep.inflation",
+        "CalibrationStep.swaption_vol",
+        "CalibrationStep.base_correlation",
+        "CalibrationStep.hull_white",
+        "CalibrationStep.cap_floor_hull_white",
+        "CalibrationStep.xccy_basis",
+        "CdsQuote.par_spread",
+        "CdsQuote.upfront",
+        "CdsTrancheQuote.__init__",
+    ),
     "finstack_quant.analytics": (
         "AnalyticsError",
         "Performance",
