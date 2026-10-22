@@ -125,10 +125,10 @@ def perf_returns() -> Performance:
 
 class TestConstruction:
     def test_from_prices_dataframe(self, perf_prices: Performance) -> None:
-        assert perf_prices.ticker_names == ["ACME", "BENCH"]
-        assert perf_prices.benchmark_idx == 1
-        assert perf_prices.frequency == "daily"
-        active = perf_prices.dates()
+        assert perf_prices.get_ticker_names() == ["ACME", "BENCH"]
+        assert perf_prices.get_benchmark_idx() == 1
+        assert perf_prices.get_frequency() == "daily"
+        active = perf_prices.get_dates()
         # Returns from N prices yield N-1 active observation dates (first
         # price date is dropped because returns are pct_change).
         assert len(active) == 59
@@ -137,14 +137,14 @@ class TestConstruction:
     def test_from_prices_series(self) -> None:
         prices = _prices_panel()["ACME"]
         perf_named = Performance(prices)
-        assert perf_named.ticker_names == ["ACME"]
+        assert perf_named.get_ticker_names() == ["ACME"]
         perf_unnamed = Performance(prices.rename(None))
-        assert perf_unnamed.ticker_names == ["asset"]
+        assert perf_unnamed.get_ticker_names() == ["asset"]
 
     def test_from_returns_dataframe(self, perf_returns: Performance) -> None:
-        assert perf_returns.ticker_names == ["ACME", "BENCH"]
-        assert perf_returns.benchmark_idx == 1
-        assert len(perf_returns.dates()) == 60
+        assert perf_returns.get_ticker_names() == ["ACME", "BENCH"]
+        assert perf_returns.get_benchmark_idx() == 1
+        assert len(perf_returns.get_dates()) == 60
 
     def test_ragged_price_dataframe_trims_active_spans(self) -> None:
         dates = pd.to_datetime(_daily_dates(6))
@@ -157,14 +157,14 @@ class TestConstruction:
         )
 
         perf = Performance(prices, benchmark_ticker="BENCH")
-        assert perf.active_dates_for_ticker(1) == [date(2024, 1, 4), date(2024, 1, 5)]
+        assert perf.get_active_dates_for_ticker(1) == [date(2024, 1, 4), date(2024, 1, 5)]
         assert perf.cumulative_returns()[1] == pytest.approx([0.10, 0.21])
 
     def test_from_arrays(self) -> None:
         dates = _daily_dates(5)
         prices = [[100.0, 101.0, 102.0, 103.0, 104.0], [50.0, 50.5, 51.0, 51.5, 52.0]]
         perf = Performance.from_arrays(dates, prices, ["A", "B"])
-        assert perf.ticker_names == ["A", "B"]
+        assert perf.get_ticker_names() == ["A", "B"]
         assert list(perf.cagr().index) == ["A", "B"]
 
     def test_from_returns_arrays(self) -> None:
@@ -176,7 +176,7 @@ class TestConstruction:
             ["A", "B"],
             benchmark_ticker="B",
         )
-        assert perf.benchmark_idx == 1
+        assert perf.get_benchmark_idx() == 1
         assert list(perf.cagr().index) == ["A", "B"]
 
     def test_prices_and_returns_paths_agree_on_volatility(self) -> None:
@@ -198,7 +198,7 @@ class TestConstruction:
 
         vol_p = perf_p.volatility(annualize=False)
         vol_r = perf_r.volatility(annualize=False)
-        for ticker in perf_p.ticker_names:
+        for ticker in perf_p.get_ticker_names():
             assert vol_p[ticker] == pytest.approx(vol_r[ticker], rel=1e-12, abs=1e-12)
 
 
@@ -235,9 +235,9 @@ class TestReturnRiskMetrics:
             perf_prices.excess_returns([0.0])
 
     def test_excess_returns_zero_rf_matches_returns(self, perf_prices: Performance) -> None:
-        rf = [0.0] * len(perf_prices.active_dates())
+        rf = [0.0] * len(perf_prices.get_active_dates())
         excess = perf_prices.excess_returns(rf, nperiods=1.0)
-        raw = perf_prices.returns()
+        raw = perf_prices.get_returns()
         assert excess[0] == pytest.approx(raw[0])
 
     def test_correlation_matrix_is_square_psd_identity_diag(self) -> None:
@@ -302,7 +302,7 @@ class TestScalarMetricSeries:
         assert isinstance(perf_prices.max_drawdown_duration(), pd.Series)
 
     def test_metric_index_equals_ticker_names(self, perf_prices: Performance) -> None:
-        assert list(perf_prices.volatility().index) == perf_prices.ticker_names
+        assert list(perf_prices.volatility().index) == perf_prices.get_ticker_names()
 
     def test_metric_series_name_is_metric_name(self, perf_prices: Performance) -> None:
         for metric in ("cagr", "sharpe", "max_drawdown", "tail_ratio", "max_drawdown_duration"):
@@ -335,7 +335,7 @@ class TestPeriodicReturns:
         assert len(lb.qtd) == 2
         assert len(lb.ytd) == 2
         assert len(lb.fytd) == 2
-        assert lb.ticker_names == perf_prices.ticker_names
+        assert lb.ticker_names == perf_prices.get_ticker_names()
         assert list(lb.to_dataframe().columns) == [
             "mtd",
             "qtd",
@@ -473,7 +473,7 @@ class TestBenchmark:
 
     def test_reset_bench_ticker_changes_index(self, perf_prices: Performance) -> None:
         perf_prices.reset_bench_ticker("ACME")
-        assert perf_prices.benchmark_idx == 0
+        assert perf_prices.get_benchmark_idx() == 0
 
 
 # Multi-factor
@@ -481,7 +481,7 @@ class TestBenchmark:
 
 class TestMultiFactor:
     def test_multi_factor_returns_structured_result(self, perf_prices: Performance) -> None:
-        n = len(perf_prices.dates())
+        n = len(perf_prices.get_dates())
         factor1 = [0.001 * (i % 5) for i in range(n)]
         factor2 = [0.002 if i % 3 == 0 else -0.001 for i in range(n)]
         result = perf_prices.multi_factor_greeks(0, [factor1, factor2])
@@ -490,13 +490,13 @@ class TestMultiFactor:
         assert 0.0 <= result.r_squared <= 1.0
 
     def test_multi_factor_rejects_non_finite_inputs(self, perf_prices: Performance) -> None:
-        n = len(perf_prices.dates())
+        n = len(perf_prices.get_dates())
         bad = [float("nan")] + [0.001] * (n - 1)
         with pytest.raises(AnalyticsError):
             perf_prices.multi_factor_greeks(0, [bad])
 
     def test_multi_factor_total_zero_matches_excess(self, perf_prices: Performance) -> None:
-        n = len(perf_prices.dates())
+        n = len(perf_prices.get_dates())
         factor = [0.001 * (i % 5) for i in range(n)]
         excess = perf_prices.multi_factor_greeks(0, [factor], return_kind="excess")
         total = perf_prices.multi_factor_greeks(0, [factor], return_kind="total", risk_free_rate=0.0)
@@ -504,7 +504,7 @@ class TestMultiFactor:
         assert float(excess.betas[0]) == pytest.approx(float(total.betas[0]))
 
     def test_multi_factor_rejects_unknown_kind(self, perf_prices: Performance) -> None:
-        n = len(perf_prices.dates())
+        n = len(perf_prices.get_dates())
         factor = [0.001] * n
         with pytest.raises(ValueError, match="return_kind"):
             perf_prices.multi_factor_greeks(0, [factor], return_kind="jensen")
@@ -520,11 +520,11 @@ class TestMultiFactor:
 class TestDateRange:
     def test_reset_date_range_narrows_active_grid(self, perf_prices: Performance) -> None:
         perf_prices.reset_date_range(date(2024, 1, 10), date(2024, 1, 20))
-        active = perf_prices.active_dates()
+        active = perf_prices.get_active_dates()
         assert active[0] == date(2024, 1, 10)
         assert active[-1] == date(2024, 1, 20)
         # `dates()` keeps Rust semantics: the full constructed grid.
-        assert len(perf_prices.dates()) == 59
+        assert len(perf_prices.get_dates()) == 59
 
 
 # Stubs

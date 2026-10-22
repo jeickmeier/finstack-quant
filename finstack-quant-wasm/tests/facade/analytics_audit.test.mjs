@@ -101,7 +101,9 @@ test('extreme wealth preserves annualized growth and relative drawdowns', () => 
     }
   }
   const perf = panel([1e300, 1e300, -0.5, 0]);
-  Array.from(perf.drawdownSeries()[0]).forEach((value, i) => close(value, [0, 0, -0.5, -0.5][i]));
+  Array.from(perf.getDrawdownSeries()[0]).forEach((value, i) =>
+    close(value, [0, 0, -0.5, -0.5][i])
+  );
   close(perf.maxDrawdown()[0], -0.5);
   close(perf.drawdownDetails(0)[0].max_drawdown, -0.5);
   close(panel([1e-18, 1e-18]).cumulativeReturns()[0][1] / 2e-18, 1);
@@ -181,8 +183,8 @@ test('integer arguments reject truncation, wrapping and non-finite values', () =
   const perf = panel([0.01, -0.02, 0.03]);
   for (const bad of [0.9, -1, NaN, Infinity, 4294967296]) {
     for (const call of [
-      () => perf.returnsForTicker(bad),
-      () => perf.activeDatesForTicker(bad),
+      () => perf.getReturnsForTicker(bad),
+      () => perf.getActiveDatesForTicker(bad),
       () => perf.rollingReturns(0, bad),
       () => perf.rollingSharpe(0, bad),
       () => perf.rollingSortino(0, bad),
@@ -196,7 +198,7 @@ test('integer arguments reject truncation, wrapping and non-finite values', () =
     ])
       assert.throws(call, (error) => error instanceof TypeError && error.kind === 'invalid_type');
   }
-  assert.deepEqual(Array.from(perf.returnsForTicker(0)), [0.01, -0.02, 0.03]);
+  assert.deepEqual(Array.from(perf.getReturnsForTicker(0)), [0.01, -0.02, 0.03]);
   assert.throws(() => perf.rollingReturns(0, 0), /at least 1/);
 });
 

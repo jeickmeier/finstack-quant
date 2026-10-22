@@ -736,7 +736,7 @@ impl Performance {
         columns.push(
             TableColumn::new(
                 "ticker",
-                TableColumnData::String(self.ticker_names().to_vec()),
+                TableColumnData::String(self.get_ticker_names().to_vec()),
             )
             .with_role(TableColumnRole::Dimension),
         );

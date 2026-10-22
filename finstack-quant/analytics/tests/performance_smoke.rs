@@ -73,12 +73,12 @@ fn performance_facade_exercises_broad_api_surface() {
     )
     .expect("perf");
 
-    assert_eq!(perf.benchmark_idx(), 1);
-    assert_eq!(perf.frequency(), PeriodKind::Daily);
-    let ticker_count = perf.ticker_names().len();
+    assert_eq!(perf.get_benchmark_idx(), 1);
+    assert_eq!(perf.get_frequency(), PeriodKind::Daily);
+    let ticker_count = perf.get_ticker_names().len();
     let active_lens: Vec<usize> = (0..ticker_count)
         .map(|idx| {
-            perf.active_dates_for_ticker(idx)
+            perf.get_active_dates_for_ticker(idx)
                 .expect("valid ticker index")
                 .len()
         })
@@ -185,7 +185,7 @@ fn performance_facade_exercises_broad_api_surface() {
     assert!(rolling_sortino.values.iter().all(|value| value.is_finite()));
 
     let bench_series = perf
-        .returns_for_ticker(perf.benchmark_idx())
+        .get_returns_for_ticker(perf.get_benchmark_idx())
         .expect("benchmark returns");
     let multi_factor = perf
         .multi_factor_greeks(
@@ -203,7 +203,7 @@ fn performance_facade_exercises_broad_api_surface() {
 
     let cumulative = perf.cumulative_returns();
     assert_finite_panel("cumulative returns", &cumulative, &active_lens);
-    let drawdowns = perf.drawdown_series();
+    let drawdowns = perf.get_drawdown_series();
     assert_finite_panel("drawdown series", &drawdowns, &active_lens);
     assert!(drawdowns
         .iter()
@@ -247,7 +247,7 @@ fn performance_facade_exercises_broad_api_surface() {
     assert_eq!(rolling_sharpe.dates.len(), rolling_count);
     assert!(rolling_sharpe.values.iter().all(|value| value.is_finite()));
 
-    let ref_date = *perf.active_dates().last().expect("last active date");
+    let ref_date = *perf.get_active_dates().last().expect("last active date");
     let lookbacks = perf.lookback_returns(ref_date, Some(FiscalConfig::us_federal()));
     assert_finite_metric("month-to-date lookback", &lookbacks.mtd, ticker_count);
     assert_finite_metric("quarter-to-date lookback", &lookbacks.qtd, ticker_count);
@@ -283,17 +283,17 @@ fn performance_facade_exercises_broad_api_surface() {
     assert_finite_panel("drawdown difference", &drawdown_difference, &active_lens);
 
     let benchmark_drawdowns = perf
-        .drawdown_details(perf.benchmark_idx(), 2)
+        .drawdown_details(perf.get_benchmark_idx(), 2)
         .expect("benchmark drawdown details");
     assert!(benchmark_drawdowns.len() <= 2);
 
-    let rf = vec![0.0; perf.active_dates().len()];
+    let rf = vec![0.0; perf.get_active_dates().len()];
     let excess = perf
         .excess_returns(&rf, Some(252.0))
         .expect("aligned zero rf");
     assert_finite_panel("excess returns", &excess, &active_lens);
 
-    let d = perf.dates().to_vec();
+    let d = perf.get_dates().to_vec();
     let baseline_cumulative = perf.cumulative_returns();
     perf.reset_date_range(d[15], d[d.len() - 1]);
     let windowed_cumulative = perf.cumulative_returns();
@@ -306,10 +306,10 @@ fn performance_facade_exercises_broad_api_surface() {
 
     let baseline_tracking_error = perf.tracking_error();
     perf.reset_bench_ticker("AAA").expect("bench switch");
-    assert_eq!(perf.benchmark_idx(), 0);
+    assert_eq!(perf.get_benchmark_idx(), 0);
     assert_ne!(perf.tracking_error(), baseline_tracking_error);
     perf.reset_bench_ticker("BBB").expect("restore bench");
-    assert_eq!(perf.benchmark_idx(), 1);
+    assert_eq!(perf.get_benchmark_idx(), 1);
     assert_eq!(perf.tracking_error(), baseline_tracking_error);
 
     assert!(Performance::new(
@@ -377,7 +377,10 @@ fn performance_smoke_asserts_fiscal_lookback_and_zero_variance_invariants() {
     )
     .expect("rising performance");
     let config = FiscalConfig::new(1, 15).expect("valid fiscal config");
-    let ref_date = *rising_perf.active_dates().last().expect("last active date");
+    let ref_date = *rising_perf
+        .get_active_dates()
+        .last()
+        .expect("last active date");
     let lookbacks = rising_perf.lookback_returns(ref_date, Some(config));
     assert!(lookbacks.fytd[0] > 0.0);
 }
@@ -400,17 +403,19 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
     )
     .expect("perf");
 
-    let panel = perf.returns();
-    assert_eq!(panel.len(), perf.ticker_names().len());
+    let panel = perf.get_returns();
+    assert_eq!(panel.len(), perf.get_ticker_names().len());
 
     // The panel accessor and the checked per-ticker accessor agree.
     for (idx, series) in panel.iter().enumerate() {
-        let single = perf.returns_for_ticker(idx).expect("valid ticker index");
+        let single = perf
+            .get_returns_for_ticker(idx)
+            .expect("valid ticker index");
         assert_eq!(&single, series);
         // Span-aware: one return per active date for this ticker.
         assert_eq!(
             series.len(),
-            perf.active_dates_for_ticker(idx)
+            perf.get_active_dates_for_ticker(idx)
                 .expect("valid ticker index")
                 .len()
         );
@@ -432,14 +437,16 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
 
     // The `excess_returns(zeros)` workaround is now unnecessary: it is exactly
     // what `returns()` yields.
-    let rf = vec![0.0; perf.active_dates().len()];
+    let rf = vec![0.0; perf.get_active_dates().len()];
     assert_eq!(
         perf.excess_returns(&rf, None).expect("aligned zero rf"),
         panel
     );
 
     // Out-of-range indices are rejected rather than silently returning empty.
-    assert!(perf.returns_for_ticker(perf.ticker_names().len()).is_err());
+    assert!(perf
+        .get_returns_for_ticker(perf.get_ticker_names().len())
+        .is_err());
 }
 
 #[test]

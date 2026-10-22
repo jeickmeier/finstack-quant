@@ -86,11 +86,11 @@ def _section_stats(row: Any, total_return: float) -> Section:
 
 
 def _section_drawdown(perf: Any, ticker: int, theme: Theme) -> Section:
-    dd_series = [v * 100.0 for v in perf.drawdown_series()[ticker]]
+    dd_series = [v * 100.0 for v in perf.get_drawdown_series()[ticker]]
     return Section(
         "Drawdown",
         charts.line_chart(
-            perf.active_dates_for_ticker(perf.ticker_names[ticker]),
+            perf.get_active_dates_for_ticker(perf.get_ticker_names()[ticker]),
             dd_series,
             theme=theme,
             area=True,
@@ -106,7 +106,7 @@ def _section_drawdown(perf: Any, ticker: int, theme: Theme) -> Section:
 def _section_rolling(perf: Any, ticker: int, theme: Theme) -> Section:
     # One year of observations at the panel's own frequency (Rust
     # ``PeriodKind.periods_per_year``: 252 daily, 52 weekly, 12 monthly, ...).
-    window = PeriodKind.from_name(perf.frequency).periods_per_year
+    window = PeriodKind.from_name(perf.get_frequency()).periods_per_year
     rs = perf.rolling_sharpe(ticker, window=window).to_dataframe()
     rv = perf.rolling_volatility(ticker, window=window).to_dataframe()
     rs_svg = charts.line_chart(fmt._dates_of(rs), rs.iloc[:, 0].tolist(), theme=theme, color=theme.ink, height=170)
@@ -142,7 +142,7 @@ def _section_drawdowns(perf: Any, ticker: int) -> Section:
             "Length": f"{int(ep.duration_days)} days",
             "Recovery": "ongoing" if ep.end is None else fmt.fmt_date(ep.end),
         }
-        for ep in perf.drawdown_details(perf.ticker_names[ticker], n=5)
+        for ep in perf.drawdown_details(perf.get_ticker_names()[ticker], n=5)
     ]
     return Section(
         "Worst Drawdowns",
@@ -210,11 +210,11 @@ def performance_tearsheet(
     wanted = _resolve_sections(sections, ALL_SECTIONS)
 
     summary = perf.to_dataframe()
-    col = perf.ticker_names[ticker]
+    col = perf.get_ticker_names()[ticker]
     row = summary.iloc[ticker]
 
     cum_series = [v * 100.0 for v in perf.cumulative_returns()[ticker]]
-    cum_dates = perf.active_dates_for_ticker(col)
+    cum_dates = perf.get_active_dates_for_ticker(col)
     total_return = cum_series[-1] if cum_series else float("nan")
 
     secs: list[Section] = []

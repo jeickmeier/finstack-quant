@@ -312,14 +312,14 @@ fn ragged_window_round_trip_preserves_alignment_and_initial_dates() {
     perf.reset_date_range(dates(4)[1], dates(4)[2]);
     let restored: Performance =
         serde_json::from_str(&serde_json::to_string(&perf).unwrap()).unwrap();
-    assert_eq!(restored.active_dates(), perf.active_dates());
-    assert_eq!(restored.returns(), perf.returns());
+    assert_eq!(restored.get_active_dates(), perf.get_active_dates());
+    assert_eq!(restored.get_returns(), perf.get_returns());
     assert_eq!(restored.max_drawdown(), perf.max_drawdown());
     assert_eq!(
         restored.drawdown_details(1, 5).unwrap(),
         perf.drawdown_details(1, 5).unwrap()
     );
-    assert_eq!(restored.benchmark_idx(), 1);
+    assert_eq!(restored.get_benchmark_idx(), 1);
 }
 
 #[test]
@@ -446,7 +446,7 @@ fn identical_paths_have_zero_relative_wealth_at_extreme_absolute_wealth() {
 #[test]
 fn drawdowns_remain_finite_when_absolute_wealth_overflows() {
     let perf = panel(vec![1e300, 1e300, -0.5, 0.0], PeriodKind::Daily);
-    let drawdown = &perf.drawdown_series()[0];
+    let drawdown = &perf.get_drawdown_series()[0];
     close(drawdown[0], 0.0);
     close(drawdown[1], 0.0);
     close(drawdown[2], -0.5);

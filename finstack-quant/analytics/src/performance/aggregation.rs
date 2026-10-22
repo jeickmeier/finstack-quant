@@ -23,15 +23,15 @@ impl Performance {
     ///
     /// Series are span-aware and therefore ragged across tickers on
     /// edge-ragged panels: row `i` has the length of
-    /// [`Performance::active_dates_for_ticker`] for ticker `i`, which may be
-    /// shorter than [`Performance::active_dates`]. Use
-    /// [`Performance::returns_for_ticker`] when only one column is needed.
+    /// [`Performance::get_active_dates_for_ticker`] for ticker `i`, which may be
+    /// shorter than [`Performance::get_active_dates`]. Use
+    /// [`Performance::get_returns_for_ticker`] when only one column is needed.
     ///
     /// # Returns
     ///
-    /// One vector per ticker, in [`Performance::ticker_names`] order, holding
+    /// One vector per ticker, in [`Performance::get_ticker_names`] order, holding
     /// simple returns as decimal fractions (`0.01` for `+1%`) in date order.
-    pub fn returns(&self) -> Vec<Vec<f64>> {
+    pub fn get_returns(&self) -> Vec<Vec<f64>> {
         self.map_tickers(|i| self.active_returns(i).to_vec())
     }
 
@@ -43,7 +43,7 @@ impl Performance {
     /// Drawdown series for each ticker.
     ///
     /// Values are non-positive fractions such as `-0.25` for a 25% drawdown.
-    pub fn drawdown_series(&self) -> Vec<Vec<f64>> {
+    pub fn get_drawdown_series(&self) -> Vec<Vec<f64>> {
         self.map_tickers(|i| self.active_drawdown_values(i).to_vec())
     }
 
@@ -86,14 +86,14 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// `(matrix, repaired)`. `matrix` is `n × n` in [`Self::ticker_names`]
+    /// `(matrix, repaired)`. `matrix` is `n × n` in [`Self::get_ticker_names`]
     /// order with a unit diagonal and passes
     /// [`finstack_quant_core::math::linalg::validate_correlation_matrix`]. `repaired` is
     /// `true` when the raw pairwise matrix failed that validation and was
     /// projected to the nearest valid correlation matrix, so a reader can
     /// tell a clean estimate from a repaired one.
     pub fn correlation_matrix(&self) -> finstack_quant_core::Result<(Vec<Vec<f64>>, bool)> {
-        let n = self.ticker_names().len();
+        let n = self.get_ticker_names().len();
         let mut matrix = vec![vec![0.0; n]; n];
 
         let common = self.common_active_span();
@@ -153,7 +153,7 @@ impl Performance {
 
     /// Excess returns (portfolio minus risk-free) for each ticker.
     ///
-    /// `rf` is aligned to [`Self::active_dates`] (the panel grid), not to
+    /// `rf` is aligned to [`Self::get_active_dates`] (the panel grid), not to
     /// each ticker's possibly shorter active span. A ticker that starts
     /// later subtracts `rf[panel_index]` for the dates it actually
     /// observes.
@@ -166,7 +166,7 @@ impl Performance {
     /// # Arguments
     ///
     /// * `rf` - Risk-free rate per panel date. Length must equal
-    ///   [`Self::active_dates`]. Values are annualized decimal rates when
+    ///   [`Self::get_active_dates`]. Values are annualized decimal rates when
     ///   `nperiods` is `None` or greater than `1`; already-periodic simple
     ///   rates when `nperiods` is `Some(1.0)`.
     /// * `nperiods` - Optional compounding periods per year used to
@@ -187,7 +187,7 @@ impl Performance {
         rf: &[f64],
         nperiods: Option<f64>,
     ) -> finstack_quant_core::Result<Vec<Vec<f64>>> {
-        let panel_len = self.active_dates().len();
+        let panel_len = self.get_active_dates().len();
         if rf.len() != panel_len {
             return Err(invalid_return_series(
                 "<rf>",
@@ -249,7 +249,7 @@ impl Performance {
         };
 
         LookbackReturns {
-            ticker_names: self.ticker_names().to_vec(),
+            ticker_names: self.get_ticker_names().to_vec(),
             mtd: compute(lookback::mtd_start_date(ref_date)),
             qtd: compute(lookback::qtd_start_date(ref_date)),
             ytd: compute(lookback::ytd_start_date(ref_date)),
@@ -295,7 +295,7 @@ impl Performance {
     /// period-end date and compounded return of one calendar bucket of `frequency`.
     /// Buckets compound via the shared kernel, so they reconcile exactly with
     /// [`Performance::cumulative_returns`]. Returns are simple decimal fractions
-    /// (`0.01` means 1%), ticker series follow [`Performance::ticker_names`] order,
+    /// (`0.01` means 1%), ticker series follow [`Performance::get_ticker_names`] order,
     /// and points within each series are chronological. Calendar bucketing only.
     ///
     /// # Arguments
@@ -446,7 +446,7 @@ mod tests {
     #[test]
     fn lookback_returns_default_fiscal_year_is_calendar_year() {
         let perf = sample_two_month_daily_performance();
-        let ref_date = *perf.dates().last().unwrap();
+        let ref_date = *perf.get_dates().last().unwrap();
         let omitted = perf.lookback_returns(ref_date, None);
         let explicit = perf.lookback_returns(ref_date, Some(FiscalConfig::calendar_year()));
         assert_eq!(omitted.fytd, explicit.fytd);
@@ -457,7 +457,7 @@ mod tests {
     fn periodic_returns_monthly_has_one_bucket_per_month() {
         let perf = sample_two_month_daily_performance();
         let periodic = perf.periodic_returns(PeriodKind::Monthly);
-        assert_eq!(periodic.len(), perf.ticker_names().len());
+        assert_eq!(periodic.len(), perf.get_ticker_names().len());
         assert_eq!(periodic[0].len(), 2);
         assert_eq!(periodic[0][0].date.month(), Month::January);
         assert_eq!(periodic[0][1].date.month(), Month::February);
@@ -470,9 +470,9 @@ mod tests {
     #[test]
     fn excess_returns_rectangular_identity_with_zero_rf() {
         let perf = rectangular_perf();
-        let rf = vec![0.0; perf.active_dates().len()];
+        let rf = vec![0.0; perf.get_active_dates().len()];
         let excess = perf.excess_returns(&rf, None).expect("aligned rf");
-        assert_eq!(excess, perf.returns());
+        assert_eq!(excess, perf.get_returns());
     }
 
     #[test]

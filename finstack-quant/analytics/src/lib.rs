@@ -69,7 +69,7 @@
 //!     None,
 //!     PeriodKind::Daily,
 //! ).unwrap();
-//! assert_eq!(perf.ticker_names(), &["SPY"]);
+//! assert_eq!(perf.get_ticker_names(), &["SPY"]);
 //! ```
 //!
 //! # References

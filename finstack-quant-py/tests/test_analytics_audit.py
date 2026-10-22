@@ -85,7 +85,7 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
         assert all(value == 0.0 for series in perf.cumulative_returns_outperformance() for value in series)
 
     perf = panel([1e300, 1e300, -0.5, 0.0])
-    assert perf.drawdown_series()[0] == pytest.approx([0.0, 0.0, -0.5, -0.5])
+    assert perf.get_drawdown_series()[0] == pytest.approx([0.0, 0.0, -0.5, -0.5])
     assert perf.max_drawdown().iloc[0] == pytest.approx(-0.5)
     assert perf.drawdown_details(0)[0].max_drawdown == pytest.approx(-0.5)
     assert panel([1e-18, 1e-18]).cumulative_returns()[0][-1] == pytest.approx(2e-18, rel=1e-12, abs=0.0)

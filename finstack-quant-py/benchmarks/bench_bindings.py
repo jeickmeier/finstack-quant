@@ -540,7 +540,7 @@ class TestAnalyticsBenchmarks:
         benchmark(_PERFORMANCE_10K.sharpe)
 
     def test_to_drawdown_series(self, benchmark) -> None:
-        benchmark(_PERFORMANCE_10K.drawdown_series)
+        benchmark(_PERFORMANCE_10K.get_drawdown_series)
 
     def test_rolling_sharpe(self, benchmark) -> None:
         benchmark(_PERFORMANCE_10K.rolling_sharpe, 0, 63)
@@ -549,7 +549,7 @@ class TestAnalyticsBenchmarks:
         benchmark(_PERFORMANCE_10K.volatility)
 
     def test_simple_returns(self, benchmark) -> None:
-        benchmark(_PERFORMANCE_10K.returns)
+        benchmark(_PERFORMANCE_10K.get_returns)
 
     def test_comp_sum(self, benchmark) -> None:
         benchmark(_PERFORMANCE_10K.cumulative_returns)

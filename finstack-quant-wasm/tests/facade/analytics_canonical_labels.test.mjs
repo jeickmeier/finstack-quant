@@ -18,7 +18,7 @@ const panel = (frequency = 'daily') =>
 test('canonical frequencies are accepted by core and analytics', () => {
   for (const label of ['daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual']) {
     assert.equal(core.PeriodKind.fromName(label).toString(), label);
-    assert.equal(panel(label).frequency(), label);
+    assert.equal(panel(label).getFrequency(), label);
     assert.ok(panel().periodicReturns(label).length);
   }
 });
@@ -61,4 +61,35 @@ test('CAGR accepts its canonical spelling and rejects aliases', () => {
   ]) {
     assert.throws(() => panel().cagr(label));
   }
+});
+
+test('Performance publishes only canonical get accessors', () => {
+  const perf = panel();
+  for (const name of [
+    'dates',
+    'activeDates',
+    'activeDatesForTicker',
+    'tickerNames',
+    'tickerIndex',
+    'benchmarkIdx',
+    'frequency',
+    'returns',
+    'returnsForTicker',
+    'drawdownSeries',
+  ]) {
+    assert.equal(name in perf, false, name);
+    const canonical = `get${name[0].toUpperCase()}${name.slice(1)}`;
+    assert.equal(typeof perf[canonical], 'function', canonical);
+  }
+  assert.deepEqual(perf.getTickerNames(), ['FUND']);
+  assert.equal(perf.getTickerIndex('FUND'), 0);
+  assert.equal(perf.getBenchmarkIdx(), 0);
+  assert.equal(perf.getFrequency(), 'daily');
+  assert.deepEqual(perf.getDates(), perf.getActiveDates());
+  assert.deepEqual(perf.getActiveDatesForTicker(0), perf.getDates());
+  assert.deepEqual(Array.from(perf.getReturnsForTicker(0)), Array.from(perf.getReturns()[0]));
+  assert.equal(perf.getDrawdownSeries()[0].length, perf.getDates().length);
+  assert.throws(() => perf.getTickerIndex('fund'));
+  assert.throws(() => perf.getTickerIndex('MISSING'));
+  perf.free();
 });

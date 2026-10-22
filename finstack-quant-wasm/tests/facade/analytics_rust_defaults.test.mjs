@@ -80,7 +80,7 @@ test('omitted arguments equal the Rust defaults', () => {
   assert.deepEqual(p.multiFactorGreeks(0, [BENCH]), p.multiFactorGreeks(0, [BENCH], 'excess', 0));
   sameArray(p.cagr(), p.cagr('act365_25'));
   const fromPrices = new analytics.Performance(dates(3), [[100, 101, 102]], ['A']);
-  assert.equal(fromPrices.frequency(), 'daily');
+  assert.equal(fromPrices.getFrequency(), 'daily');
 });
 
 test('a partial fiscal-year start fills the other half per FiscalConfig::from_parts', () => {
