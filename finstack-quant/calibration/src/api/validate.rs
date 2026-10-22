@@ -423,7 +423,7 @@ fn build_nodes(
         nodes.push(DependencyNode {
             step_index,
             step_id: step.id.clone(),
-            kind: io.kind.to_string(),
+            kind: step.params.kind_str().to_string(),
             reads: io.reads,
             writes: io.writes,
         });
