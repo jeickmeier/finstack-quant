@@ -18,46 +18,48 @@ use finstack_quant_statements_analytics::templates::roll_forward;
 #[test]
 fn test_corkscrew_extension_with_valid_config() {
     // Build a model with balance sheet accounts that roll forward
-    let model = ModelBuilder::new("balance_sheet")
-        .periods("2025Q1..2025Q3", None)
-        .unwrap()
-        // Cash account
-        .value(
-            "cash",
-            &[
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(100_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(110_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                    AmountOrScalar::scalar(115_000.0),
-                ),
-            ],
-        )
-        // Cash changes
-        .value(
-            "cash_inflows",
-            &[
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(15_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                    AmountOrScalar::scalar(10_000.0),
-                ),
-            ],
-        )
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("balance_sheet");
+        model_builder.periods("2025Q1..2025Q3", None).unwrap();
+        model_builder
+            // Cash account
+            .value(
+                "cash",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(110_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                        AmountOrScalar::scalar(115_000.0),
+                    ),
+                ],
+            );
+        model_builder
+            // Cash changes
+            .value(
+                "cash_inflows",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(0.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(15_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                        AmountOrScalar::scalar(10_000.0),
+                    ),
+                ],
+            );
+        model_builder.value(
             "cash_outflows",
             &[
                 (
@@ -73,9 +75,9 @@ fn test_corkscrew_extension_with_valid_config() {
                     AmountOrScalar::scalar(-5_000.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -104,10 +106,10 @@ fn test_corkscrew_extension_with_valid_config() {
 
 #[test]
 fn test_corkscrew_with_multiple_accounts() {
-    let model = ModelBuilder::new("multi_account")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("multi_account");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "cash",
             &[
                 (
@@ -119,8 +121,8 @@ fn test_corkscrew_with_multiple_accounts() {
                     AmountOrScalar::scalar(55_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "debt",
             &[
                 (
@@ -132,9 +134,9 @@ fn test_corkscrew_with_multiple_accounts() {
                     AmountOrScalar::scalar(190_000.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -169,10 +171,10 @@ fn test_corkscrew_with_multiple_accounts() {
 #[test]
 fn roll_forward_inventory_pairs_with_corkscrew_decreases() {
     let model = roll_forward::add_roll_forward(
-        ModelBuilder::new("inventory_roll")
-            .periods("2025Q1..Q2", None)
-            .unwrap()
-            .value(
+        {
+            let mut model_builder = ModelBuilder::new("inventory_roll");
+            model_builder.periods("2025Q1..Q2", None).unwrap();
+            model_builder.value(
                 "additions",
                 &[
                     (
@@ -184,8 +186,8 @@ fn roll_forward_inventory_pairs_with_corkscrew_decreases() {
                         AmountOrScalar::scalar(50.0),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder.value(
                 "disposals",
                 &[
                     (
@@ -197,7 +199,9 @@ fn roll_forward_inventory_pairs_with_corkscrew_decreases() {
                         AmountOrScalar::scalar(20.0),
                     ),
                 ],
-            ),
+            );
+            model_builder
+        },
         "inventory",
         &["additions"],
         &["disposals"],
@@ -273,10 +277,10 @@ fn roll_forward_inventory_pairs_with_corkscrew_decreases() {
 #[test]
 fn test_scorecard_extension_with_valid_config() {
     // Build a model with leverage metrics
-    let model = ModelBuilder::new("credit_model")
-        .periods("2024Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("credit_model");
+        model_builder.periods("2024Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "total_debt",
             &[
                 (
@@ -304,8 +308,8 @@ fn test_scorecard_extension_with_valid_config() {
                     AmountOrScalar::scalar(350_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "ebitda",
             &[
                 (
@@ -333,8 +337,8 @@ fn test_scorecard_extension_with_valid_config() {
                     AmountOrScalar::scalar(30_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "interest_expense",
             &[
                 (
@@ -362,9 +366,9 @@ fn test_scorecard_extension_with_valid_config() {
                     AmountOrScalar::scalar(5_500.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -421,10 +425,10 @@ fn test_scorecard_extension_with_valid_config() {
 
 #[test]
 fn test_scorecard_moodys_rating_scale() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "debt",
             &[
                 (
@@ -444,8 +448,8 @@ fn test_scorecard_moodys_rating_scale() {
                     AmountOrScalar::scalar(100.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "equity",
             &[
                 (
@@ -465,9 +469,9 @@ fn test_scorecard_moodys_rating_scale() {
                     AmountOrScalar::scalar(50.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -510,10 +514,10 @@ fn test_scorecard_rejects_retired_fitch_alias() {
 
 #[test]
 fn test_scorecard_with_minimum_rating_warning() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "debt",
             &[
                 (
@@ -533,8 +537,8 @@ fn test_scorecard_with_minimum_rating_warning() {
                     AmountOrScalar::scalar(600.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "ebitda",
             &[
                 (
@@ -554,9 +558,9 @@ fn test_scorecard_with_minimum_rating_warning() {
                     AmountOrScalar::scalar(100.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -594,10 +598,10 @@ fn test_scorecard_with_minimum_rating_warning() {
 
 #[test]
 fn test_scorecard_multiple_metrics_weighted() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "metric1",
             &[
                 (
@@ -617,8 +621,8 @@ fn test_scorecard_multiple_metrics_weighted() {
                     AmountOrScalar::scalar(1.5),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "metric2",
             &[
                 (
@@ -638,9 +642,9 @@ fn test_scorecard_multiple_metrics_weighted() {
                     AmountOrScalar::scalar(2.5),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -690,18 +694,18 @@ fn test_scorecard_multiple_metrics_weighted() {
 
 #[test]
 fn test_scorecard_metric_evaluation_error_handling() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "value",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -734,10 +738,10 @@ fn two_metric_model() -> (
     finstack_quant_statements::types::FinancialModelSpec,
     finstack_quant_statements::evaluator::StatementResult,
 ) {
-    let model = ModelBuilder::new("nm_test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("nm_test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "debt",
             &[
                 (
@@ -749,8 +753,8 @@ fn two_metric_model() -> (
                     AmountOrScalar::scalar(150.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "ebitda",
             &[
                 (
@@ -763,8 +767,8 @@ fn two_metric_model() -> (
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "coverage",
             &[
                 (
@@ -776,9 +780,9 @@ fn two_metric_model() -> (
                     AmountOrScalar::scalar(5.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
     (model, results)

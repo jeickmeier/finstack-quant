@@ -498,9 +498,13 @@ pub(crate) fn parse_label<T: serde::de::DeserializeOwned>(label: &str) -> PyResu
 
 /// Render `value` as its canonical serde wire label.
 ///
+/// # Arguments
+///
+/// * `value` - Rust value whose canonical serde representation must be a string.
+///
 /// # Errors
 ///
-/// Returns `ValueError` when `value` does not serialize to a string label.
+/// Returns `RuntimeError` when `value` does not serialize to a string label.
 pub(crate) fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
     finstack_quant_core::wire::serde_label(value).map_err(crate::errors::core_to_py)
 }

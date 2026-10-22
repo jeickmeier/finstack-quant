@@ -66,7 +66,6 @@ use crate::error::Result;
 use crate::evaluator::{
     CapitalStructureClaimCategory, CapitalStructureWarning, EvalWarning, EvaluationContext,
 };
-use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
 use std::collections::HashSet;
@@ -90,26 +89,26 @@ const MONEY_TOLERANCE: f64 = 1e-6;
 
 /// Result of executing the waterfall for a single period.
 #[derive(Debug, Clone)]
-pub struct WaterfallPeriodResult {
+pub(crate) struct WaterfallPeriodResult {
     /// Per-instrument cashflow breakdowns after sweep, PIK, and
     /// priority-of-payments allocation have been applied.
-    pub flows: IndexMap<String, CashflowBreakdown>,
+    pub(crate) flows: IndexMap<String, CashflowBreakdown>,
     /// Structured warnings raised during allocation (e.g. cash shortfalls).
-    pub warnings: Vec<EvalWarning>,
+    pub(crate) warnings: Vec<EvalWarning>,
     /// Post-waterfall residual cash distributed to equity.
     ///
     /// The cash remaining after fees, interest, and principal allocations, so
     /// `fees + cash interest + principal + equity == available cash`.
     /// `None` only when the period had no contractual flows at all, in which
     /// case no waterfall ran and there is no currency to denominate it in.
-    pub equity_distribution: Option<Money>,
+    pub(crate) equity_distribution: Option<Money>,
     /// Cash the waterfall allocated from: the `available_cash_node` value
     /// floored at zero, in the waterfall's currency. With the allocations in
     /// `flows` it satisfies
     /// `fees + cash interest + principal + equity == available cash`.
     /// `None` only when the period had no contractual flows, as for
     /// `equity_distribution`.
-    pub available_cash: Option<Money>,
+    pub(crate) available_cash: Option<Money>,
 }
 
 /// Evaluate a node reference or inline DSL expression against the current context.
@@ -230,13 +229,11 @@ fn apply_named_prepay(
 ///
 /// # Arguments
 ///
-/// * `_period_id` - Current model-period identifier; accepted for the
-///   period-level API contract but allocation derives timing from `context`.
 /// * `context` - Evaluation context providing statement values used by sweep,
 ///   PIK, and payment-priority rules.
 /// * `waterfall_spec` - Validated priority-of-payments and allocation policy.
 /// * `state` - Mutable capital-structure state updated with period balances
-///   and cumulative tracking fields.
+///   and carried claims.
 /// * `contractual_flows` - Per-instrument contractual cashflow breakdowns to
 ///   allocate under the waterfall.
 ///
@@ -245,7 +242,7 @@ fn apply_named_prepay(
 /// Returns a [`WaterfallPeriodResult`] with per-instrument cashflow breakdowns
 /// after sweep, PIK, and priority-of-payments allocation have been applied,
 /// plus shortfall warnings and the equity residual. `state` is updated
-/// in-place with opening/closing balances and cumulative tracking fields.
+/// in-place with opening/closing balances and carried claims.
 ///
 /// # Limitations
 ///
@@ -259,12 +256,29 @@ fn apply_named_prepay(
 /// Returns an error if required statement nodes are missing, if the waterfall
 /// references inconsistent currencies, if sweep / PIK calculations fail, or if
 /// computed allocations or balances cannot be represented as monetary values.
+/// On any error, `state` is unchanged; warnings and flows are published only on success.
 ///
 /// # References
 ///
 /// - Fixed-income capital structure context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
-pub fn execute_waterfall(
-    _period_id: &PeriodId,
+pub(crate) fn execute_waterfall(
+    context: &EvaluationContext,
+    waterfall_spec: &WaterfallSpec,
+    state: &mut CapitalStructureState,
+    contractual_flows: &IndexMap<String, CashflowBreakdown>,
+) -> Result<WaterfallPeriodResult> {
+    let mut staged_state = state.clone();
+    let result = execute_waterfall_inner(
+        context,
+        waterfall_spec,
+        &mut staged_state,
+        contractual_flows,
+    )?;
+    *state = staged_state;
+    Ok(result)
+}
+
+fn execute_waterfall_inner(
     context: &EvaluationContext,
     waterfall_spec: &WaterfallSpec,
     state: &mut CapitalStructureState,
@@ -304,7 +318,7 @@ pub fn execute_waterfall(
     if let Some(targets) = waterfall_spec
         .pik_toggle
         .as_ref()
-        .and_then(|p| p.target_instrument_ids.as_ref())
+        .map(|p| &p.target_instrument_ids)
     {
         for target in targets {
             if !contractual_flows.contains_key(target) {
@@ -319,7 +333,7 @@ pub fn execute_waterfall(
 
     let _span = tracing::info_span!(
         "statements.capital_structure.waterfall",
-        period = _period_id.to_string(),
+        period = context.period_id.to_string(),
         instruments = contractual_flows.len(),
         has_sweep = waterfall_spec.ecf_sweep.is_some(),
         has_pik_toggle = waterfall_spec.pik_toggle.is_some()
@@ -335,17 +349,14 @@ pub fn execute_waterfall(
     // Evaluate PIK mode BEFORE ECF so that ECF cash-interest deduction
     // correctly reflects actual cash interest paid (instruments in PIK mode
     // pay zero cash interest that period).
-    let (pik_enable, pik_targets): (Option<bool>, Option<HashSet<String>>) =
+    let (pik_enable, pik_targets): (Option<bool>, HashSet<String>) =
         if let Some(pik_spec) = &waterfall_spec.pik_toggle {
             (
                 Some(evaluate_pik_toggle(context, pik_spec, &mut warnings)?),
-                pik_spec
-                    .target_instrument_ids
-                    .as_ref()
-                    .map(|ids| ids.iter().cloned().collect()),
+                pik_spec.target_instrument_ids.iter().cloned().collect(),
             )
         } else {
-            (None, None)
+            (None, HashSet::new())
         };
 
     // Apply PIK mode transitions to `state` before using it for ECF.
@@ -360,7 +371,7 @@ pub fn execute_waterfall(
             state,
             contractual_flows,
             enable_pik,
-            pik_targets.as_ref(),
+            &pik_targets,
             min_periods_in_pik,
         );
     }
@@ -375,7 +386,7 @@ pub fn execute_waterfall(
         // negative signal disappears.
         if cash < 0.0 {
             warnings.push(EvalWarning::CapitalStructure {
-                period: *_period_id,
+                period: context.period_id,
                 warning: CapitalStructureWarning::NegativeAvailableCashFloored {
                     node_id: available_cash_node.clone(),
                     amount: cash,
@@ -384,7 +395,7 @@ pub fn execute_waterfall(
             tracing::warn!(
                 node = available_cash_node.as_str(),
                 cash,
-                period = _period_id.to_string(),
+                period = context.period_id.to_string(),
                 "Available cash is negative; floored to zero for waterfall allocation. \
                  The operating shortfall is surfaced as a warning."
             );
@@ -414,7 +425,7 @@ pub fn execute_waterfall(
             // mismatch as a hard error rather than dropping the claim.
             if shortfall.amount() > 0.0 {
                 if shortfall.currency() != currency {
-                    return Err(crate::error::Error::currency_mismatch(
+                    return Err(crate::error::Error::CurrencyMismatch(
                         currency,
                         shortfall.currency(),
                     ));
@@ -427,7 +438,7 @@ pub fn execute_waterfall(
         if let Some(shortfall) = state.fee_shortfall.shift_remove(instrument_id.as_str()) {
             if shortfall.amount() > 0.0 {
                 if shortfall.currency() != currency {
-                    return Err(crate::error::Error::currency_mismatch(
+                    return Err(crate::error::Error::CurrencyMismatch(
                         currency,
                         shortfall.currency(),
                     ));
@@ -507,7 +518,7 @@ pub fn execute_waterfall(
                     apply_cash_cap_to_category(
                         &mut staged,
                         &mut remaining_cash,
-                        *_period_id,
+                        context.period_id,
                         CapitalStructureClaimCategory::Fees,
                         &mut warnings,
                         |s| &mut s.breakdown.fees,
@@ -518,7 +529,7 @@ pub fn execute_waterfall(
                     apply_cash_cap_to_category(
                         &mut staged,
                         &mut remaining_cash,
-                        *_period_id,
+                        context.period_id,
                         CapitalStructureClaimCategory::Interest,
                         &mut warnings,
                         |s| &mut s.breakdown.interest_expense_cash,
@@ -535,7 +546,7 @@ pub fn execute_waterfall(
                     for s in &mut staged {
                         s.scheduled_principal = s.principal.get_scheduled_capacity()?;
                     }
-                    let allocations = allocate_by_class(&staged, &mut remaining_cash, |s| {
+                    let allocations = allocate_by_class(&mut staged, &mut remaining_cash, |s| {
                         s.scheduled_principal.amount().max(0.0)
                     })?;
                     for (s, allocated) in staged.iter_mut().zip(allocations) {
@@ -611,7 +622,7 @@ pub fn execute_waterfall(
                     Money::new(unpaid_interest, currency)?,
                 );
                 warnings.push(EvalWarning::CapitalStructure {
-                    period: *_period_id,
+                    period: context.period_id,
                     warning: CapitalStructureWarning::InterestShortfall {
                         instrument_id: s.instrument_id.clone(),
                         amount: unpaid_interest,
@@ -620,7 +631,7 @@ pub fn execute_waterfall(
                 tracing::warn!(
                     instrument = s.instrument_id.as_str(),
                     shortfall = unpaid_interest,
-                    period = _period_id.to_string(),
+                    period = context.period_id.to_string(),
                     "Available cash insufficient for planned interest; \
                      shortfall accrued and carried into the next period's interest claim."
                 );
@@ -631,7 +642,7 @@ pub fn execute_waterfall(
                 let currency = s.breakdown.fees.currency();
                 fee_shortfalls.insert(s.instrument_id.clone(), Money::new(unpaid_fees, currency)?);
                 warnings.push(EvalWarning::CapitalStructure {
-                    period: *_period_id,
+                    period: context.period_id,
                     warning: CapitalStructureWarning::FeeShortfall {
                         instrument_id: s.instrument_id.clone(),
                         amount: unpaid_fees,
@@ -640,7 +651,7 @@ pub fn execute_waterfall(
                 tracing::warn!(
                     instrument = s.instrument_id.as_str(),
                     shortfall = unpaid_fees,
-                    period = _period_id.to_string(),
+                    period = context.period_id.to_string(),
                     "Available cash insufficient for planned fees; \
                      shortfall carried into the next period's fee claim."
                 );
@@ -649,7 +660,7 @@ pub fn execute_waterfall(
             let unpaid_principal = s.principal.get_scheduled_capacity()?.amount();
             if unpaid_principal > MONEY_TOLERANCE {
                 warnings.push(EvalWarning::CapitalStructure {
-                    period: *_period_id,
+                    period: context.period_id,
                     warning: CapitalStructureWarning::PrincipalShortfall {
                         instrument_id: s.instrument_id.clone(),
                         amount: unpaid_principal,
@@ -658,7 +669,7 @@ pub fn execute_waterfall(
                 tracing::warn!(
                     instrument = s.instrument_id.as_str(),
                     shortfall = unpaid_principal,
-                    period = _period_id.to_string(),
+                    period = context.period_id.to_string(),
                     "Available cash insufficient for planned scheduled principal; \
                      shortfall carried into the next period's amortization claim."
                 );
@@ -756,16 +767,6 @@ pub fn execute_waterfall(
             ))
         })?;
 
-        let paid_to_date = state
-            .cumulative_principal
-            .get(instrument_id.as_str())
-            .copied()
-            .unwrap_or_else(|| Money::from((0_i64, currency)));
-        state.cumulative_principal.insert(
-            instrument_id.to_string(),
-            paid_to_date.checked_add(breakdown.principal_payment)?,
-        );
-
         result.insert(instrument_id.to_string(), breakdown);
     }
 
@@ -785,6 +786,7 @@ mod tests {
         PikToggleSpec, WaterfallSpec,
     };
     use finstack_quant_core::currency::Currency;
+    #[cfg(test)]
     use finstack_quant_core::dates::PeriodId;
     use finstack_quant_core::money::Money;
     use indexmap::IndexMap;
@@ -862,14 +864,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         // Corrected ECF convention (per standard LPA / S&P LCD definitions):
         // scheduled amortization ranked ahead of the sweep is deducted from
@@ -885,14 +881,6 @@ mod tests {
                 .expect("closing balance")
                 .amount(),
             10_000_000.0 - 425_000.0
-        );
-        assert_eq!(
-            state
-                .cumulative_principal
-                .get("TL-1")
-                .expect("cumulative principal")
-                .amount(),
-            425_000.0
         );
     }
 
@@ -928,14 +916,8 @@ mod tests {
             ..Default::default()
         };
 
-        let result = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("a negative pool floors to zero and still executes");
+        let result = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("a negative pool floors to zero and still executes");
 
         assert!(
             result.warnings.iter().any(|w| matches!(
@@ -983,14 +965,8 @@ mod tests {
             ..Default::default()
         };
 
-        let result = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let result = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let flows = result.flows.get("TL-1").expect("instrument exists");
         let cash_out = flows.fees.amount()
@@ -1044,14 +1020,8 @@ mod tests {
             ..Default::default()
         };
 
-        let err = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect_err("non-finite available cash must error rather than coerce to zero");
+        let err = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect_err("non-finite available cash must error rather than coerce to zero");
         let msg = err.to_string();
         assert!(
             msg.contains("non-finite") && msg.contains("cash / 0"),
@@ -1092,14 +1062,8 @@ mod tests {
             pik_toggle: None,
             ..Default::default()
         };
-        let err = execute_waterfall(
-            &period,
-            &context,
-            &forbidden,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect_err("deducting cs debt service from available cash must error");
+        let err = execute_waterfall(&context, &forbidden, &mut state, &contractual_flows)
+            .expect_err("deducting cs debt service from available cash must error");
         let msg = err.to_string();
         assert!(
             msg.contains("pre-waterfall") && msg.contains("cs.interest_expense"),
@@ -1113,7 +1077,7 @@ mod tests {
             pik_toggle: None,
             ..Default::default()
         };
-        execute_waterfall(&period, &context, &allowed, &mut state, &contractual_flows)
+        execute_waterfall(&context, &allowed, &mut state, &contractual_flows)
             .expect("a standalone cash_available node must still be accepted");
     }
 
@@ -1148,14 +1112,8 @@ mod tests {
             ..Default::default()
         };
 
-        let err = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect_err("out-of-range available cash must error rather than panic");
+        let err = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect_err("out-of-range available cash must error rather than panic");
         let msg = err.to_string();
         assert!(
             msg.contains("1e30") || msg.contains("Decimal") || msg.contains("representable"),
@@ -1185,14 +1143,8 @@ mod tests {
             ..Default::default()
         };
 
-        let error = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect_err("the sum of representable balances may still overflow Money");
+        let error = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect_err("the sum of representable balances may still overflow Money");
         assert!(
             matches!(
                 error,
@@ -1240,14 +1192,8 @@ mod tests {
             ..Default::default()
         };
 
-        let result = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("a guarded expression still evaluates");
+        let result = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("a guarded expression still evaluates");
 
         assert!(
             result
@@ -1298,19 +1244,13 @@ mod tests {
                 liquidity_metric: "cash".into(),
                 threshold: 1_000_000.0, // always below => PIK on
                 min_periods_in_pik: 0,
-                target_instrument_ids: Some(vec!["TL-1".to_string()]),
+                target_instrument_ids: vec!["TL-1".to_string()],
             }),
             ..Default::default()
         };
 
-        let err = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect_err("an inconsistent breakdown must error rather than panic");
+        let err = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect_err("an inconsistent breakdown must error rather than panic");
         assert!(
             err.to_string().contains("Currency mismatch"),
             "expected a currency-mismatch diagnostic naming the field: {err}"
@@ -1347,19 +1287,13 @@ mod tests {
                 liquidity_metric: "liquidity / 0".into(),
                 threshold: 1.0,
                 min_periods_in_pik: 0,
-                target_instrument_ids: Some(vec!["TL-1".to_string()]),
+                target_instrument_ids: vec!["TL-1".to_string()],
             }),
             ..Default::default()
         };
 
-        let err = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect_err("non-finite PIK metric must error rather than read as 'not triggered'");
+        let err = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect_err("non-finite PIK metric must error rather than read as 'not triggered'");
         assert!(
             err.to_string().contains("non-finite"),
             "error must flag the non-finite metric: {err}"
@@ -1403,14 +1337,8 @@ mod tests {
             ..Default::default()
         };
 
-        let result = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let result = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = result.flows.get("TL-1").expect("TL-1");
         assert_eq!(
@@ -1450,34 +1378,22 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-PIK".into()]),
+                target_instrument_ids: vec!["TL-PIK".into()],
                 min_periods_in_pik: 0,
             }),
             ..Default::default()
         };
 
-        execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         assert_eq!(state.pik_mode.get("TL-PIK"), Some(&true));
 
         context
             .set_value("liquidity", 150.0)
             .expect("should update liquidity for second evaluation");
-        execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         assert_eq!(state.pik_mode.get("TL-PIK"), Some(&false));
     }
@@ -1510,7 +1426,7 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-PIK".into()]),
+                target_instrument_ids: vec!["TL-PIK".into()],
                 min_periods_in_pik: 3,
             }),
             ..Default::default()
@@ -1518,28 +1434,16 @@ mod tests {
 
         // Period 1: liquidity < threshold => PIK activates
         let ctx_low = build_context(period, &[("liquidity", 50.0)]);
-        execute_waterfall(
-            &period,
-            &ctx_low,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        execute_waterfall(&ctx_low, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         assert_eq!(state.pik_mode.get("TL-PIK"), Some(&true));
         assert_eq!(state.pik_periods_active.get("TL-PIK"), Some(&1));
 
         // Period 2: liquidity recovers above threshold, but hysteresis holds PIK
         let ctx_high = build_context(period, &[("liquidity", 150.0)]);
-        execute_waterfall(
-            &period,
-            &ctx_high,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        execute_waterfall(&ctx_high, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         assert_eq!(
             state.pik_mode.get("TL-PIK"),
@@ -1549,14 +1453,8 @@ mod tests {
         assert_eq!(state.pik_periods_active.get("TL-PIK"), Some(&2));
 
         // Period 3: still above threshold, hysteresis still holds (periods_active=2 < 3)
-        execute_waterfall(
-            &period,
-            &ctx_high,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        execute_waterfall(&ctx_high, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         assert_eq!(
             state.pik_mode.get("TL-PIK"),
@@ -1566,14 +1464,8 @@ mod tests {
         assert_eq!(state.pik_periods_active.get("TL-PIK"), Some(&3));
 
         // Period 4: min_periods met (periods_active=3, which is not < 3), PIK releases
-        execute_waterfall(
-            &period,
-            &ctx_high,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        execute_waterfall(&ctx_high, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         assert_eq!(
             state.pik_mode.get("TL-PIK"),
@@ -1641,14 +1533,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let total_principal = results
             .flows
@@ -1700,7 +1586,7 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-1".into()]),
+                target_instrument_ids: vec!["TL-1".into()],
                 min_periods_in_pik: 0,
             }),
             ..Default::default()
@@ -1720,7 +1606,6 @@ mod tests {
         };
 
         let sweep_first_result = execute_waterfall(
-            &period,
             &context,
             &sweep_first,
             &mut sweep_first_state,
@@ -1728,7 +1613,6 @@ mod tests {
         )
         .expect("waterfall should execute");
         let interest_first_result = execute_waterfall(
-            &period,
             &context,
             &interest_first,
             &mut interest_first_state,
@@ -1773,14 +1657,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = results.flows.get("TL-1").expect("TL-1");
         assert_eq!(tl.fees.amount(), 20.0);
@@ -1823,14 +1701,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = results.flows.get("TL-1").expect("TL-1");
         // Principal is clamped to the opening balance (can't repay more than owed).
@@ -1884,21 +1756,17 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let rev = results.flows.get("REVOLVER").expect("REVOLVER");
         // closing = opening(0) + draws(100k) - principal(30k) = 70k.
         assert_eq!(rev.debt_balance.amount(), 70_000.0);
         assert_eq!(
             state
-                .get_closing_balance("REVOLVER", Currency::USD)
+                .closing_balances
+                .get("REVOLVER")
+                .expect("closing balance")
                 .amount(),
             70_000.0
         );
@@ -1941,14 +1809,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = results.flows.get("TL-1").expect("TL-1");
         assert!(
@@ -1998,14 +1860,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = results.flows.get("TL-1").expect("TL-1");
         assert_eq!(tl.principal_payment.amount(), 325.0);
@@ -2051,14 +1907,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         // ECF = 1000 - 100 - 50 - max(0, -200) = 1000 - 100 - 50 - 0 = 850
         // Sweep = 850 * 0.5 = 425
@@ -2094,14 +1944,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = results.flows.get("TL-1").expect("TL-1");
         assert_eq!(
@@ -2149,14 +1993,9 @@ mod tests {
 
         // Period 1: only 60 of cash against a 100 coupon.
         let ctx_short = build_context(period, &[("cash_available", 60.0)]);
-        let result_short = execute_waterfall(
-            &period,
-            &ctx_short,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let result_short =
+            execute_waterfall(&ctx_short, &waterfall, &mut state, &contractual_flows)
+                .expect("waterfall should execute");
 
         let tl = result_short.flows.get("TL-1").expect("TL-1");
         assert_eq!(tl.interest_expense_cash.amount(), 60.0);
@@ -2190,14 +2029,9 @@ mod tests {
         // Period 2: 200 of cash funds the 100 coupon plus the carried 40 claim.
         state.advance_period();
         let ctx_recovered = build_context(period, &[("cash_available", 200.0)]);
-        let result_recovered = execute_waterfall(
-            &period,
-            &ctx_recovered,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let result_recovered =
+            execute_waterfall(&ctx_recovered, &waterfall, &mut state, &contractual_flows)
+                .expect("waterfall should execute");
 
         let tl = result_recovered.flows.get("TL-1").expect("TL-1");
         assert_eq!(
@@ -2248,14 +2082,9 @@ mod tests {
         };
 
         let ctx_short = build_context(period, &[("cash_available", 60.0)]);
-        let result_short = execute_waterfall(
-            &period,
-            &ctx_short,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let result_short =
+            execute_waterfall(&ctx_short, &waterfall, &mut state, &contractual_flows)
+                .expect("waterfall should execute");
 
         let tl = result_short.flows.get("TL-1").expect("TL-1");
         assert_eq!(tl.principal_payment.amount(), 60.0);
@@ -2282,14 +2111,9 @@ mod tests {
 
         state.advance_period();
         let ctx_recovered = build_context(period, &[("cash_available", 200.0)]);
-        let result_recovered = execute_waterfall(
-            &period,
-            &ctx_recovered,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let result_recovered =
+            execute_waterfall(&ctx_recovered, &waterfall, &mut state, &contractual_flows)
+                .expect("waterfall should execute");
 
         let tl = result_recovered.flows.get("TL-1").expect("TL-1");
         assert_eq!(
@@ -2342,14 +2166,8 @@ mod tests {
             ..Default::default()
         };
 
-        let result = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let result = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = result.flows.get("TL-1").expect("TL-1");
         let equity = result
@@ -2401,20 +2219,14 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-PIK".into()]),
+                target_instrument_ids: vec!["TL-PIK".into()],
                 min_periods_in_pik: 0,
             }),
             ..Default::default()
         };
 
-        let result = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let result = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = result.flows.get("TL-PIK").expect("TL-PIK");
         assert_eq!(
@@ -2475,14 +2287,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = results.flows.get("TL-1").expect("TL-1");
         assert_eq!(
@@ -2543,14 +2349,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let first = results.flows.get("1L").expect("1L");
         let second = results.flows.get("2L").expect("2L");
@@ -2627,14 +2427,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = results.flows.get("TL-1").expect("TL-1");
         assert!(
@@ -2699,14 +2493,8 @@ mod tests {
             ..Default::default()
         };
 
-        let results = execute_waterfall(
-            &period,
-            &context,
-            &waterfall,
-            &mut state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
+        let results = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect("waterfall should execute");
 
         let tl = results.flows.get("TL-1").expect("TL-1");
         let amount = |money: Option<Money>| money.expect("recorded by the waterfall").amount();
@@ -2770,5 +2558,68 @@ mod tests {
         let back: CashflowBreakdown = serde_json::from_value(json).expect("deserialize");
         assert!(back.scheduled_principal.is_none());
         assert!(back.opening_balance.is_none());
+    }
+    #[test]
+    fn waterfall_errors_preserve_state_and_retry_matches_a_clean_run() {
+        let period = PeriodId::quarter(2025, 1).unwrap();
+        let mut flow = CashflowBreakdown::with_currency(Currency::USD);
+        flow.interest_expense_cash = Money::from((100_i64, Currency::USD));
+        flow.principal_payment = Money::from((50_i64, Currency::USD));
+        flow.debt_balance = Money::from((950_i64, Currency::USD));
+        let contractual = IndexMap::from([("TL-1".to_string(), flow)]);
+        let mut initial = CapitalStructureState::new();
+        initial
+            .opening_balances
+            .insert("TL-1".into(), Money::from((1000_i64, Currency::USD)));
+        initial
+            .interest_shortfall
+            .insert("TL-1".into(), Money::from((20_i64, Currency::USD)));
+        initial
+            .fee_shortfall
+            .insert("TL-1".into(), Money::from((10_i64, Currency::USD)));
+        let valid_spec = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::MandatoryPrepayment,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: "cash".into(),
+            pik_toggle: Some(PikToggleSpec {
+                liquidity_metric: "liquidity".into(),
+                threshold: 100.0,
+                target_instrument_ids: vec!["TL-1".into()],
+                min_periods_in_pik: 3,
+            }),
+            mandatory_prepay_node: Some("0".into()),
+            ..Default::default()
+        };
+        let valid_context = build_context(period, &[("liquidity", 50.0), ("cash", 1000.0)]);
+        for late in [false, true] {
+            let mut spec = valid_spec.clone();
+            let context = if late {
+                spec.mandatory_prepay_node = Some("1 / 0".into());
+                valid_context.clone()
+            } else {
+                build_context(period, &[("liquidity", 50.0), ("cash", 1e100)])
+            };
+            let mut state = initial.clone();
+            let before = format!("{state:?}");
+            assert!(execute_waterfall(&context, &spec, &mut state, &contractual).is_err());
+            assert_eq!(
+                format!("{state:?}"),
+                before,
+                "failed waterfall changed runtime state"
+            );
+            let retry =
+                execute_waterfall(&valid_context, &valid_spec, &mut state, &contractual).unwrap();
+            let mut clean_state = initial.clone();
+            let clean =
+                execute_waterfall(&valid_context, &valid_spec, &mut clean_state, &contractual)
+                    .unwrap();
+            assert_eq!(format!("{state:?}"), format!("{clean_state:?}"));
+            assert_eq!(format!("{retry:?}"), format!("{clean:?}"));
+        }
     }
 }

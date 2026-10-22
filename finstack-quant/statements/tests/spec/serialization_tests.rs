@@ -114,25 +114,25 @@ fn test_capital_structure_cashflows_serialization() {
     // Verify round-trip
     assert_eq!(
         deserialized
-            .get_interest("BOND-001", &period)
+            .get_component("interest_expense", "BOND-001", &period)
             .expect("interest"),
         5_000.0
     );
     assert_eq!(
         deserialized
-            .get_principal("BOND-001", &period)
+            .get_component("principal_payment", "BOND-001", &period)
             .expect("principal"),
         10_000.0
     );
     assert_eq!(
         deserialized
-            .get_debt_balance("BOND-001", &period)
+            .get_component("debt_balance", "BOND-001", &period)
             .expect("balance"),
         100_000.0
     );
     assert_eq!(
         deserialized
-            .get_total_interest(&period)
+            .get_component("interest_expense", "total", &period)
             .expect("total interest"),
         5_000.0
     );
@@ -141,10 +141,10 @@ fn test_capital_structure_cashflows_serialization() {
 #[test]
 fn test_model_spec_full_serialization() {
     // Create a complete model
-    let model = ModelBuilder::new("test_model")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test_model");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -156,13 +156,13 @@ fn test_model_spec_full_serialization() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     // Serialize to JSON
     let json =
@@ -198,11 +198,11 @@ fn test_model_spec_full_serialization() {
 
 #[test]
 fn financial_model_missing_version_is_rejected_by_all_loaders() {
-    let model = ModelBuilder::new("missing-version")
-        .periods("2025Q1..Q1", None)
-        .expect("periods")
-        .build()
-        .expect("model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("missing-version");
+        model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.build().expect("model")
+    };
     let mut json = serde_json::to_value(model).expect("model serializes");
     json.as_object_mut()
         .expect("model is object")
@@ -222,11 +222,11 @@ fn financial_model_missing_version_is_rejected_by_all_loaders() {
 
 #[test]
 fn financial_model_accepts_explicit_null_optional_capital_structure() {
-    let model = ModelBuilder::new("null-capital-structure")
-        .periods("2025Q1..Q1", None)
-        .expect("periods")
-        .build()
-        .expect("model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("null-capital-structure");
+        model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.build().expect("model")
+    };
     let mut json = serde_json::to_value(model).expect("model serializes");
     json["schema_version"] = serde_json::json!(1);
     json["capital_structure"] = serde_json::Value::Null;
@@ -242,11 +242,11 @@ fn financial_model_accepts_explicit_null_optional_capital_structure() {
 
 #[test]
 fn financial_model_strict_loader_rejects_zero_future_malformed_and_invalid_semantics() {
-    let model = ModelBuilder::new("strict")
-        .periods("2025Q1..Q1", None)
-        .expect("periods")
-        .build()
-        .expect("model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("strict");
+        model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.build().expect("model")
+    };
     let base = serde_json::to_value(model).expect("model serializes");
 
     for version in [0, 3] {
@@ -287,11 +287,13 @@ fn financial_model_strict_loader_rejects_zero_future_malformed_and_invalid_seman
 
 #[test]
 fn financial_model_requires_exact_v1_marker() {
-    let model = ModelBuilder::new("strict-v1")
-        .periods("2025Q1..Q2", None)
-        .expect("valid periods")
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("strict-v1");
+        model_builder
+            .periods("2025Q1..Q2", None)
+            .expect("valid periods");
+        model_builder.build().expect("valid model")
+    };
     let valid = serde_json::to_value(model).expect("serialize model");
     FinancialModelSpec::from_slice_strict(
         &serde_json::to_vec(&valid).expect("serialize fixture"),
@@ -335,10 +337,10 @@ fn financial_model_requires_exact_v1_marker() {
 #[test]
 fn test_model_with_results_serialization() {
     // Create and evaluate a model
-    let model = ModelBuilder::new("profit_model")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("profit_model");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -350,13 +352,13 @@ fn test_model_with_results_serialization() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

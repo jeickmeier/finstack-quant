@@ -98,6 +98,7 @@ impl Evaluator {
             None,
         )?;
 
+        let mut waterfall_replaced_flows = false;
         if let Some(cs_spec) = &model.capital_structure {
             if let Some(waterfall_spec) = &cs_spec.waterfall {
                 if let Some(node) = model.nodes.get(&crate::types::NodeId::new(
@@ -108,7 +109,6 @@ impl Evaluator {
                     }
                 }
                 let waterfall_result = crate::capital_structure::waterfall::execute_waterfall(
-                    &period_id,
                     &context,
                     waterfall_spec,
                     cs_state,
@@ -125,12 +125,13 @@ impl Evaluator {
                 }
                 contractual_warnings.extend(waterfall_result.warnings);
                 context.set_capital_structure_cashflows(cs_cashflows);
+                waterfall_replaced_flows = true;
             }
             let from_date = crate::capital_structure::period_flows::period_snapshot_date(period);
             cs_state.rebuild_residuals(from_date)?;
         }
 
-        if context.capital_structure_cashflows.is_some() && !cs_affected_nodes.is_empty() {
+        if waterfall_replaced_flows && !cs_affected_nodes.is_empty() {
             self.evaluate_nodes_in_order(
                 model,
                 &period_id,

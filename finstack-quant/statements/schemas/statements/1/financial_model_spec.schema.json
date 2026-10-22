@@ -6579,14 +6579,12 @@
           "type": "integer"
         },
         "target_instrument_ids": {
-          "description": "Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.\n\nMust be a non-empty list: instrument-level PIK capability is not\nmodeled, so `None` or an empty list is rejected by\n[`PikToggleSpec::validate`] rather than meaning \"every instrument\".\nSwaps and options cannot be PIK targets.",
+          "description": "Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.\n\nMust be a non-empty list: instrument-level PIK capability is not\nmodeled, so an empty list is rejected by [`PikToggleSpec::validate`]\nrather than meaning \"every instrument\".\nSwaps and options cannot be PIK targets.",
           "items": {
             "type": "string"
           },
-          "type": [
-            "array",
-            "null"
-          ]
+          "minItems": 1,
+          "type": "array"
         },
         "threshold": {
           "description": "Threshold value: if metric < threshold, enable PIK; otherwise use cash",
@@ -6596,7 +6594,8 @@
       },
       "required": [
         "liquidity_metric",
-        "threshold"
+        "threshold",
+        "target_instrument_ids"
       ],
       "type": "object"
     },

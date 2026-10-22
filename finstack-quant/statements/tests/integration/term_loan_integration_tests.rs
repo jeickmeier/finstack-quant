@@ -63,16 +63,22 @@ fn term_loan_capital_structure_evaluates_with_market() {
         .build()
         .expect("valid term loan");
 
-    let model = ModelBuilder::new("term-loan-cs")
-        .periods("2025Q1..2025Q4", None)
-        .expect("valid periods")
-        .add_debt("TL-001", FinancialStatementInstrument::TermLoan(loan))
-        .compute("tl_interest", "cs.interest_expense.TL-001")
-        .expect("valid cs interest formula")
-        .compute("tl_balance", "cs.debt_balance.TL-001")
-        .expect("valid cs debt balance formula")
-        .build()
-        .expect("valid capital structure model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("term-loan-cs");
+        model_builder
+            .periods("2025Q1..2025Q4", None)
+            .expect("valid periods");
+        model_builder.add_debt("TL-001", FinancialStatementInstrument::TermLoan(loan));
+        model_builder
+            .compute("tl_interest", "cs.interest_expense.TL-001")
+            .expect("valid cs interest formula");
+        model_builder
+            .compute("tl_balance", "cs.debt_balance.TL-001")
+            .expect("valid cs debt balance formula");
+        model_builder
+            .build()
+            .expect("valid capital structure model")
+    };
 
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(issue)

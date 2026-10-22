@@ -175,9 +175,13 @@ fn extract_distribution_params(
 /// volatility. `seed` must be integer-like and is required for
 /// deterministic sampling.
 ///
+/// * `stream_id` - Optional independent RNG stream for a Monte Carlo path;
+///   `None` uses the configured seed without selecting a path stream.
+///
 /// # Returns
 ///
-/// Returns one simulated scalar per forecast period forming a path.
+/// Returns the per-period levels and the exact sampled standard-normal shocks.
+/// A zero `std_dev` retains zero shocks while still consuming the same draws.
 ///
 /// # Errors
 ///
@@ -193,15 +197,17 @@ pub(crate) fn normal_forecast_with_stream(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
     stream_id: Option<u64>,
-) -> Result<IndexMap<PeriodId, f64>> {
+) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
     let p = extract_distribution_params(params, "Normal")?;
 
     let mut rng = build_rng(p.seed, stream_id);
     let mut results = IndexMap::new();
+    let mut shocks = IndexMap::new();
     let mut prev = base_value;
 
     for period_id in forecast_periods {
         let z = rng.normal(0.0, 1.0);
+        shocks.insert(*period_id, if p.std_dev == 0.0 { 0.0 } else { z });
         let value = normal_step(prev, &p, z);
         if !value.is_finite() {
             return Err(Error::forecast(format!(
@@ -213,7 +219,7 @@ pub(crate) fn normal_forecast_with_stream(
         prev = value;
     }
 
-    Ok(results)
+    Ok((results, shocks))
 }
 
 fn normal_step(prev: f64, params: &DistributionParams, z: f64) -> f64 {
@@ -278,9 +284,13 @@ fn validate_lognormal_base(base_value: f64, context: &str) -> Result<()> {
 /// log return is `mean - 0.5 * std_dev²`. `std_dev` is log-return volatility.
 /// `seed` must be integer-like and is required for deterministic sampling.
 ///
+/// * `stream_id` - Optional independent RNG stream for a Monte Carlo path;
+///   `None` uses the configured seed without selecting a path stream.
+///
 /// # Returns
 ///
-/// Returns one positive simulated scalar per forecast period.
+/// Returns the per-period positive levels and exact sampled standard-normal shocks.
+/// A zero `std_dev` retains zero shocks while still consuming the same draws.
 ///
 /// # Errors
 ///
@@ -297,7 +307,7 @@ pub(crate) fn lognormal_forecast_with_stream(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
     stream_id: Option<u64>,
-) -> Result<IndexMap<PeriodId, f64>> {
+) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
     let p = extract_distribution_params(params, "LogNormal")?;
 
     if p.std_dev == 0.0 {
@@ -310,10 +320,12 @@ pub(crate) fn lognormal_forecast_with_stream(
 
     let mut rng = build_rng(p.seed, stream_id);
     let mut results = IndexMap::new();
+    let mut shocks = IndexMap::new();
     let mut prev = base_value;
 
     for period_id in forecast_periods {
         let z = rng.normal(0.0, 1.0);
+        shocks.insert(*period_id, if p.std_dev == 0.0 { 0.0 } else { z });
         let value = lognormal_step(prev, &p, z);
         if !value.is_finite() {
             return Err(Error::forecast(format!(
@@ -325,7 +337,7 @@ pub(crate) fn lognormal_forecast_with_stream(
         prev = value;
     }
 
-    Ok(results)
+    Ok((results, shocks))
 }
 
 /// Parameters for the mean-reverting AR(1) forecast.
@@ -421,9 +433,13 @@ fn extract_mean_reverting_params(
 ///   shock volatility, non-negative), and `seed` (integer-like, required for
 ///   deterministic sampling)
 ///
+/// * `stream_id` - Optional independent RNG stream for a Monte Carlo path;
+///   `None` uses the configured seed without selecting a path stream.
+///
 /// # Returns
 ///
-/// Returns one simulated scalar per forecast period forming a path.
+/// Returns the per-period levels and the exact sampled standard-normal shocks.
+/// A zero `std_dev` retains zero shocks while still consuming the same draws.
 ///
 /// # Errors
 ///
@@ -438,7 +454,7 @@ pub(crate) fn mean_reverting_forecast_with_stream(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
     stream_id: Option<u64>,
-) -> Result<IndexMap<PeriodId, f64>> {
+) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
     let p = extract_mean_reverting_params(params)?;
 
     if !base_value.is_finite() {
@@ -449,10 +465,12 @@ pub(crate) fn mean_reverting_forecast_with_stream(
 
     let mut rng = build_rng(p.seed, stream_id);
     let mut results = IndexMap::new();
+    let mut shocks = IndexMap::new();
     let mut prev = base_value;
 
     for period_id in forecast_periods {
         let z = rng.normal(0.0, 1.0);
+        shocks.insert(*period_id, if p.std_dev == 0.0 { 0.0 } else { z });
         let value = mean_reverting_step(prev, &p, z);
         if !value.is_finite() {
             return Err(Error::forecast(format!(
@@ -464,7 +482,7 @@ pub(crate) fn mean_reverting_forecast_with_stream(
         prev = value;
     }
 
-    Ok(results)
+    Ok((results, shocks))
 }
 
 /// Bootstrap resampling mode: what the historical series is resampled as.
@@ -633,115 +651,6 @@ pub(crate) fn bootstrap_forecast_with_stream(
     Ok(results)
 }
 
-/// Store standard-normal Z scores for independent Monte Carlo forecasts so peers can
-/// correlate in a later [`crate::evaluator::forecast_eval::evaluate_forecast`] pass.
-///
-/// Recorded Z values are the **shock** Z that was applied at each period, not a
-/// level normalization. They must match the recurrences in
-/// [`normal_forecast_with_stream`] and [`lognormal_forecast_with_stream`]:
-///
-/// - Normal (random walk): `v_t = v_{t-1} + mean + std_dev * z_t`
-///   ⇒ `z_t = (v_t - v_{t-1} - mean) / std_dev`.
-/// - LogNormal (strictly positive GBM):
-///   `v_t = v_{t-1} * exp((mean - 0.5*std_dev²) + std_dev * z_t)`
-///   ⇒ `z_t = (ln(v_t / v_{t-1}) - (mean - 0.5*std_dev²)) / std_dev`.
-///
-/// These per-period shocks are what [`monte_carlo_correlated_series`] mixes
-/// via `ρ·Z_peer + sqrt(1-ρ²)·Z_indep`, so the correlation is applied in the
-/// same shock space that generated the peer path.
-pub(crate) fn record_independent_z_scores_for_mc(
-    method: ForecastMethod,
-    params: &IndexMap<String, serde_json::Value>,
-    forecast_periods: &[PeriodId],
-    values: &IndexMap<PeriodId, f64>,
-    base_value: f64,
-    node_id: &NodeId,
-    mc_z_cache: &mut IndexMap<NodeId, IndexMap<PeriodId, f64>>,
-) -> Result<()> {
-    match method {
-        ForecastMethod::Normal => {
-            let p = extract_distribution_params(params, "Normal")?;
-            let entry = mc_z_cache.entry(node_id.clone()).or_default();
-            let mut prev = base_value;
-            for pid in forecast_periods {
-                let v = *values.get(pid).ok_or_else(|| {
-                    Error::forecast(format!(
-                        "Monte Carlo forecast missing value for period {:?}",
-                        pid
-                    ))
-                })?;
-                let z = if p.std_dev == 0.0 {
-                    0.0
-                } else {
-                    (v - prev - p.mean) / p.std_dev
-                };
-                entry.insert(*pid, z);
-                prev = v;
-            }
-        }
-        ForecastMethod::LogNormal => {
-            let p = extract_distribution_params(params, "LogNormal")?;
-            // These Z-scores invert the generating recurrence, so they are only
-            // meaningful for a base the generator itself would accept. Apply the
-            // same guard rather than recording shocks that would silently
-            // propagate into every correlated peer.
-            validate_lognormal_base(
-                base_value,
-                &format!("Monte Carlo Z-score recording for '{node_id}'"),
-            )?;
-            let entry = mc_z_cache.entry(node_id.clone()).or_default();
-            // Must match the strictly positive GBM recurrence used by the
-            // generator.
-            let mut prev = base_value;
-            for pid in forecast_periods {
-                let v = *values.get(pid).ok_or_else(|| {
-                    Error::forecast(format!(
-                        "Monte Carlo forecast missing value for period {:?}",
-                        pid
-                    ))
-                })?;
-                let z = if p.std_dev == 0.0 {
-                    0.0
-                } else {
-                    let ln_ratio = (v / prev).ln();
-                    (ln_ratio - (p.mean - 0.5 * p.std_dev * p.std_dev)) / p.std_dev
-                };
-                entry.insert(*pid, z);
-                prev = v;
-            }
-        }
-        ForecastMethod::MeanReverting => {
-            let p = extract_mean_reverting_params(params)?;
-            if !base_value.is_finite() {
-                return Err(Error::forecast(format!(
-                    "Monte Carlo Z-score recording for '{node_id}' requires a finite \
-                     base_value, got {base_value}"
-                )));
-            }
-            let entry = mc_z_cache.entry(node_id.clone()).or_default();
-            let mut prev = base_value;
-            for pid in forecast_periods {
-                let v = *values.get(pid).ok_or_else(|| {
-                    Error::forecast(format!(
-                        "Monte Carlo forecast missing value for period {:?}",
-                        pid
-                    ))
-                })?;
-                // Inverts v_t = v_{t-1} + κ(θ − v_{t-1}) + σ·z_t.
-                let z = if p.std_dev == 0.0 {
-                    0.0
-                } else {
-                    (v - prev - p.reversion_speed * (p.long_run_mean - prev)) / p.std_dev
-                };
-                entry.insert(*pid, z);
-                prev = v;
-            }
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
 /// Inputs for [`monte_carlo_correlated_series`].
 pub(crate) struct CorrelatedMonteCarloSeries<'a> {
     /// Forecast method (Normal, LogNormal, or MeanReverting only).
@@ -774,9 +683,8 @@ pub(crate) struct CorrelatedMonteCarloSeries<'a> {
 /// - MeanReverting: AR(1)
 ///   `v_t = v_{t-1} + reversion_speed·(long_run_mean - v_{t-1}) + std_dev * z_t`.
 ///
-/// Matches the shock convention recorded by
-/// [`record_independent_z_scores_for_mc`] so linear correlation of the
-/// peer path is preserved.
+/// Uses the sampled shocks returned by the independent Gaussian kernels,
+/// preserving correlation even when path values round to a constant.
 pub(crate) fn monte_carlo_correlated_series(
     input: CorrelatedMonteCarloSeries<'_>,
 ) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
@@ -885,7 +793,11 @@ pub(crate) fn monte_carlo_correlated_series(
 
         let z_indep = rng.normal(0.0, 1.0);
         let z = rho * z_peer + indep_weight * z_indep;
-        z_out.insert(*period_id, z);
+        let sigma = match &kernel {
+            Kernel::Normal(p) | Kernel::LogNormal(p) => p.std_dev,
+            Kernel::MeanReverting(p) => p.std_dev,
+        };
+        z_out.insert(*period_id, if sigma == 0.0 { 0.0 } else { z });
 
         let value = match &kernel {
             Kernel::Normal(p) => normal_step(prev, p, z),
@@ -916,7 +828,7 @@ mod tests {
         periods: &[PeriodId],
         params: &IndexMap<String, serde_json::Value>,
     ) -> Result<IndexMap<PeriodId, f64>> {
-        normal_forecast_with_stream(base_value, periods, params, None)
+        normal_forecast_with_stream(base_value, periods, params, None).map(|(values, _)| values)
     }
 
     fn lognormal_forecast(
@@ -924,7 +836,7 @@ mod tests {
         periods: &[PeriodId],
         params: &IndexMap<String, serde_json::Value>,
     ) -> Result<IndexMap<PeriodId, f64>> {
-        lognormal_forecast_with_stream(base_value, periods, params, None)
+        lognormal_forecast_with_stream(base_value, periods, params, None).map(|(values, _)| values)
     }
 
     fn mean_reverting_forecast(
@@ -933,6 +845,7 @@ mod tests {
         params: &IndexMap<String, serde_json::Value>,
     ) -> Result<IndexMap<PeriodId, f64>> {
         mean_reverting_forecast_with_stream(base_value, periods, params, None)
+            .map(|(values, _)| values)
     }
 
     fn bootstrap_forecast(
@@ -965,30 +878,6 @@ mod tests {
         ];
         let error = lognormal_forecast_with_stream(0.0, &periods, &lognormal_params(), Some(11))
             .expect_err("zero cannot anchor a GBM path");
-        assert!(error.to_string().contains("strictly positive"));
-    }
-
-    #[test]
-    fn lognormal_zero_base_z_recording_is_rejected() {
-        let periods = vec![
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-        ];
-        let params = lognormal_params();
-        let node = NodeId::new("node");
-        let values = IndexMap::from([(periods[0], 0.0), (periods[1], 0.0)]);
-        let mut cache: IndexMap<NodeId, IndexMap<PeriodId, f64>> = IndexMap::new();
-
-        let error = record_independent_z_scores_for_mc(
-            ForecastMethod::LogNormal,
-            &params,
-            &periods,
-            &values,
-            0.0,
-            &node,
-            &mut cache,
-        )
-        .expect_err("zero cannot produce GBM return shocks");
         assert!(error.to_string().contains("strictly positive"));
     }
 
@@ -1150,31 +1039,10 @@ mod tests {
         );
     }
 
-    /// Z-score recording must apply the same guard: it inverts the generating
-    /// recurrence, so an invalid base means the recorded shocks are garbage
-    /// that would silently propagate into every correlated peer.
     #[test]
-    fn z_score_recording_rejects_invalid_lognormal_base() {
-        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-        let params = lognormal_params();
-        let mut values = IndexMap::new();
-        values.insert(periods[0], 100.0);
-        let mut cache: IndexMap<NodeId, IndexMap<PeriodId, f64>> = IndexMap::new();
-
-        let err = record_independent_z_scores_for_mc(
-            ForecastMethod::LogNormal,
-            &params,
-            &periods,
-            &values,
-            -5.0,
-            &NodeId::new("node"),
-            &mut cache,
-        )
-        .expect_err("z-score recording must reject a negative LogNormal base");
-        assert!(
-            err.to_string().contains("negative") || err.to_string().contains("non-negative"),
-            "error should flag the negative base: {err}"
-        );
+    fn direct_lognormal_shocks_reject_negative_base() {
+        let periods = vec![PeriodId::quarter(2025, 1).unwrap()];
+        assert!(lognormal_forecast_with_stream(-5.0, &periods, &lognormal_params(), None).is_err());
     }
 
     fn mean_reverting_params() -> IndexMap<String, serde_json::Value> {
@@ -1252,39 +1120,19 @@ mod tests {
         assert!(mean_reverting_forecast(f64::NAN, &periods, &mean_reverting_params()).is_err());
     }
 
-    /// The Z-score recorder must invert the AR(1) recurrence exactly: the
-    /// recorded shocks must reproduce the raw normals the generator drew.
+    /// The returned shocks are exactly the generator draws, without inversion.
     #[test]
-    fn mean_reverting_z_recording_inverts_the_generator() {
+    fn mean_reverting_records_the_sampled_shocks() {
         let periods = vec![
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 1).unwrap(),
+            PeriodId::quarter(2025, 2).unwrap(),
         ];
-        let params = mean_reverting_params();
-        let node = NodeId::new("nim");
-
-        let values = mean_reverting_forecast_with_stream(0.10, &periods, &params, Some(5))
-            .expect("forecast");
-        let mut cache: IndexMap<NodeId, IndexMap<PeriodId, f64>> = IndexMap::new();
-        record_independent_z_scores_for_mc(
-            ForecastMethod::MeanReverting,
-            &params,
-            &periods,
-            &values,
-            0.10,
-            &node,
-            &mut cache,
-        )
-        .expect("record z-scores");
-
+        let (_, shocks) =
+            mean_reverting_forecast_with_stream(0.10, &periods, &mean_reverting_params(), Some(5))
+                .expect("forecast");
         let mut rng = build_rng(42, Some(5));
         for pid in &periods {
-            let expected_z = rng.normal(0.0, 1.0);
-            let recorded_z = cache[&node][pid];
-            assert!(
-                (recorded_z - expected_z).abs() < 1e-12,
-                "recorded z {recorded_z} must invert the generator's draw {expected_z}"
-            );
+            assert_eq!(shocks[pid].to_bits(), rng.normal(0.0, 1.0).to_bits());
         }
     }
 
@@ -1644,5 +1492,90 @@ mod tests {
                 value
             );
         }
+    }
+    #[test]
+    fn gaussian_kernels_retain_exact_draws_when_levels_round_flat() {
+        let periods = [
+            PeriodId::quarter(2025, 1).unwrap(),
+            PeriodId::quarter(2025, 2).unwrap(),
+        ];
+        for method in [
+            ForecastMethod::Normal,
+            ForecastMethod::LogNormal,
+            ForecastMethod::MeanReverting,
+        ] {
+            let mut params = match method {
+                ForecastMethod::Normal | ForecastMethod::LogNormal => lognormal_params(),
+                _ => mean_reverting_params(),
+            };
+            params.insert("std_dev".into(), serde_json::json!(1e-20));
+            params.insert("seed".into(), serde_json::json!(42));
+            if method == ForecastMethod::MeanReverting {
+                params.insert("reversion_speed".into(), serde_json::json!(0.1));
+                params.insert("long_run_mean".into(), serde_json::json!(1e16));
+            } else {
+                params.insert("mean".into(), serde_json::json!(0.0));
+            }
+            let (values, shocks) = match method {
+                ForecastMethod::Normal => {
+                    normal_forecast_with_stream(1e16, &periods, &params, Some(5))
+                }
+                ForecastMethod::LogNormal => {
+                    lognormal_forecast_with_stream(1e16, &periods, &params, Some(5))
+                }
+                _ => mean_reverting_forecast_with_stream(1e16, &periods, &params, Some(5)),
+            }
+            .expect("forecast");
+            let mut rng = build_rng(42, Some(5));
+            for period in &periods {
+                assert_eq!(values[period], 1e16, "{method:?}");
+                assert_eq!(
+                    shocks[period].to_bits(),
+                    rng.normal(0.0, 1.0).to_bits(),
+                    "{method:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn deterministic_correlated_node_cannot_anchor_a_later_node() {
+        let periods = [
+            PeriodId::quarter(2025, 1).unwrap(),
+            PeriodId::quarter(2025, 2).unwrap(),
+        ];
+        let peer = NodeId::new("peer");
+        let peer_shocks = periods.iter().map(|p| (*p, 0.5)).collect();
+        let cache = [(peer, peer_shocks)].into_iter().collect();
+        let mut params = lognormal_params();
+        params.insert("std_dev".into(), serde_json::json!(0.0));
+        let (_, shocks) = monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
+            method: ForecastMethod::Normal,
+            params: &params,
+            base_value: 10.0,
+            forecast_periods: &periods,
+            seed_offset: 7,
+            node_id: "flat",
+            peer_id: "peer",
+            rho: 0.5,
+            mc_z_cache: &cache,
+        })
+        .expect("deterministic child");
+        assert!(shocks.values().all(|z| *z == 0.0));
+        let cache = [(NodeId::new("flat"), shocks)].into_iter().collect();
+        params.insert("std_dev".into(), serde_json::json!(1.0));
+        let err = monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
+            method: ForecastMethod::Normal,
+            params: &params,
+            base_value: 10.0,
+            forecast_periods: &periods,
+            seed_offset: 7,
+            node_id: "child",
+            peer_id: "flat",
+            rho: 0.5,
+            mc_z_cache: &cache,
+        })
+        .expect_err("zero-variance peer");
+        assert!(err.to_string().contains("zero variance"));
     }
 }

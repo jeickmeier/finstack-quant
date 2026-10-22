@@ -16,17 +16,16 @@ fn quarter(number: u8) -> PeriodId {
 }
 
 fn forecast_model() -> FinancialModelSpec {
-    ModelBuilder::new("forecast-identity")
-        .periods("2025Q1..Q2", Some("2025Q1"))
-        .unwrap()
-        .value("revenue", &[(quarter(1), 100.0.into())])
-        .forecast("revenue", ForecastSpec::growth(0.1))
-        .value("cost", &[(quarter(1), 40.0.into())])
-        .forecast("cost", ForecastSpec::growth(0.0))
-        .compute("profit", "revenue - cost")
-        .unwrap()
-        .build()
-        .unwrap()
+    {
+        let mut model_builder = ModelBuilder::new("forecast-identity");
+        model_builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
+        model_builder.value("revenue", &[(quarter(1), 100.0.into())]);
+        model_builder.forecast("revenue", ForecastSpec::growth(0.1));
+        model_builder.value("cost", &[(quarter(1), 40.0.into())]);
+        model_builder.forecast("cost", ForecastSpec::growth(0.0));
+        model_builder.compute("profit", "revenue - cost").unwrap();
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
@@ -71,19 +70,21 @@ fn independent_node_forecasts_keep_distinct_economics() {
 
 #[test]
 fn build_rejects_values_that_evaluation_would_silently_drop() {
-    let error = ModelBuilder::new("outside-timeline")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let error = {
+        let mut model_builder = ModelBuilder::new("outside-timeline");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (quarter(1), 100.0.into()),
                 (quarter(2), 200.0.into()),
                 (quarter(3), 300.0.into()),
             ],
-        )
-        .build()
-        .expect_err("an explicit value outside the timeline cannot reach evaluation");
+        );
+        model_builder
+            .build()
+            .expect_err("an explicit value outside the timeline cannot reach evaluation")
+    };
     assert!(error.to_string().contains("2025Q3"));
     assert!(error
         .to_string()
@@ -92,10 +93,12 @@ fn build_rejects_values_that_evaluation_would_silently_drop() {
 
 #[test]
 fn period_columns_validate_null_only_columns_without_changing_builder_state() {
-    let builder = ModelBuilder::new("period-import")
-        .periods("2025Q1..Q2", Some("2025Q1"))
-        .unwrap()
-        .value("existing", &[(quarter(1), 7.0.into())]);
+    let builder = {
+        let mut model_builder = ModelBuilder::new("period-import");
+        model_builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
+        model_builder.value("existing", &[(quarter(1), 7.0.into())]);
+        model_builder
+    };
     let error = builder
         .resolve_period_columns(&[quarter(1), quarter(3)], None)
         .expect_err("column membership is independent of its cell values");
@@ -123,24 +126,26 @@ fn inferred_import_timeline_includes_gaps_and_checks_interior_columns() {
 
 #[test]
 fn reserved_export_index_cannot_be_used_as_a_node_identifier() {
-    let error = ModelBuilder::new("index-collision")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("period_id", &[(quarter(1), 100.0.into())])
-        .build()
-        .expect_err("wide exports reserve period_id for their timeline column");
+    let error = {
+        let mut model_builder = ModelBuilder::new("index-collision");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("period_id", &[(quarter(1), 100.0.into())]);
+        model_builder
+            .build()
+            .expect_err("wide exports reserve period_id for their timeline column")
+    };
     assert!(error.to_string().contains("period_id"));
     assert!(error.to_string().contains("reserved"));
 }
 
 #[test]
 fn invalid_forecast_parameters_are_rejected_even_when_actual_values_win() {
-    let mut model = ModelBuilder::new("unused-forecast")
-        .periods("2025Q1..Q1", Some("2025Q1"))
-        .unwrap()
-        .value("revenue", &[(quarter(1), 100.0.into())])
-        .build()
-        .unwrap();
+    let mut model = {
+        let mut model_builder = ModelBuilder::new("unused-forecast");
+        model_builder.periods("2025Q1..Q1", Some("2025Q1")).unwrap();
+        model_builder.value("revenue", &[(quarter(1), 100.0.into())]);
+        model_builder.build().unwrap()
+    };
     let mut forecast = ForecastSpec::growth(0.1);
     forecast.params.insert("raet".into(), json!(0.2));
     model.nodes.get_mut("revenue").unwrap().forecast = Some(forecast);
@@ -165,29 +170,32 @@ fn removing_an_explicit_observation_requires_removing_its_availability_date() {
 
 #[test]
 fn named_capital_structure_formulas_keep_native_instrument_currency() {
-    let model = ModelBuilder::new("native-versus-reporting")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .add_bond(
-            "euro",
-            Money::from((1_000_i64, Currency::EUR)),
-            0.05,
-            date!(2025 - 01 - 01),
-            date!(2030 - 01 - 01),
-            "EUR-OIS",
-        )
-        .unwrap()
-        .reporting_currency(Currency::USD)
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("native-versus-reporting");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder
+            .add_bond(
+                "euro",
+                Money::from((1_000_i64, Currency::EUR)),
+                0.05,
+                date!(2025 - 01 - 01),
+                date!(2030 - 01 - 01),
+                "EUR-OIS",
+            )
+            .unwrap();
+        model_builder.reporting_currency(Currency::USD);
+        model_builder.value_money(
             "expected_usd",
             &[(quarter(1), Money::from((25_i64, Currency::USD)))],
-        )
-        .compute("native_interest", "cs.interest_expense.euro")
-        .unwrap()
-        .compute("reporting_interest", "cs.interest_expense.total")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("native_interest", "cs.interest_expense.euro")
+            .unwrap();
+        model_builder
+            .compute("reporting_interest", "cs.interest_expense.total")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
     assert_eq!(
         model.nodes["native_interest"].value_type,
         Some(NodeValueType::Monetary {
@@ -201,15 +209,18 @@ fn named_capital_structure_formulas_keep_native_instrument_currency() {
         })
     );
 
-    let error = ModelBuilder::from_spec(model)
-        .unwrap()
-        .compute(
-            "invalid_comparison",
-            "cs.interest_expense.euro == expected_usd",
-        )
-        .unwrap()
-        .build()
-        .expect_err("native EUR interest cannot be compared as USD just because totals use USD");
+    let error = {
+        let mut model_builder = ModelBuilder::from_spec(model).unwrap();
+        model_builder
+            .compute(
+                "invalid_comparison",
+                "cs.interest_expense.euro == expected_usd",
+            )
+            .unwrap();
+        model_builder
+            .build()
+            .expect_err("native EUR interest cannot be compared as USD just because totals use USD")
+    };
     assert!(error.to_string().contains("Dimensional mismatch"));
 }
 

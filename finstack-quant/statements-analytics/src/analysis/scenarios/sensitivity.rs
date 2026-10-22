@@ -53,15 +53,17 @@ use indexmap::IndexMap;
 /// use finstack_quant_statements_analytics::analysis::{run_sensitivity, SensitivityConfig, SensitivityMode, ParameterSpec};
 ///
 /// # fn main() -> Result<()> {
-/// let model = ModelBuilder::new("sensitivity_test")
-///     .periods("2025Q1..Q2", None)?
-///     .value("revenue", &[
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("sensitivity_test");
+///     model_builder.periods("2025Q1..Q2", None)?;
+///     model_builder.value("revenue", &[
 ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
 ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
-///     ])
-///     .compute("cogs", "revenue * 0.6")?
-///     .compute("gross_profit", "revenue - cogs")?
-///     .build()?;
+///     ]);
+///     model_builder.compute("cogs", "revenue * 0.6")?;
+///     model_builder.compute("gross_profit", "revenue - cogs")?;
+///     model_builder.build()?
+/// };
 ///
 /// let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
 ///
@@ -550,22 +552,26 @@ mod tests {
     fn test_diagonal_sensitivity() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("valid period range")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("valid period range");
+            model_builder_1.value(
                 "revenue",
                 &[
                     (period, AmountOrScalar::scalar(100_000.0)),
                     (period2, AmountOrScalar::scalar(100_000.0)),
                 ],
-            )
-            .compute("cogs", "revenue * 0.4")
-            .expect("valid formula")
-            .compute("gross_profit", "revenue - cogs")
-            .expect("valid formula")
-            .build()
-            .expect("valid model");
+            );
+            model_builder_1
+                .compute("cogs", "revenue * 0.4")
+                .expect("valid formula");
+            model_builder_1
+                .compute("gross_profit", "revenue - cogs")
+                .expect("valid formula");
+            model_builder_1.build().expect("valid model")
+        };
 
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         config.add_parameter(ParameterSpec::with_percentages(
@@ -583,15 +589,18 @@ mod tests {
     #[test]
     fn test_full_grid_sensitivity_builds_cartesian_product() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q1", None)
-            .expect("valid period range")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-            .value("cogs", &[(period, AmountOrScalar::scalar(40_000.0))])
-            .compute("gross_profit", "revenue - cogs")
-            .expect("valid formula")
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid period range");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+            model_builder_1.value("cogs", &[(period, AmountOrScalar::scalar(40_000.0))]);
+            model_builder_1
+                .compute("gross_profit", "revenue - cogs")
+                .expect("valid formula");
+            model_builder_1.build().expect("valid model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::FullGrid);
         config.add_parameter(ParameterSpec::new(
             "revenue",
@@ -618,15 +627,18 @@ mod tests {
     #[test]
     fn test_tornado_orders_scenarios_by_target_metric_impact() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q1", None)
-            .expect("valid period range")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-            .value("cogs", &[(period, AmountOrScalar::scalar(40_000.0))])
-            .compute("gross_profit", "revenue - cogs")
-            .expect("valid formula")
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid period range");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+            model_builder_1.value("cogs", &[(period, AmountOrScalar::scalar(40_000.0))]);
+            model_builder_1
+                .compute("gross_profit", "revenue - cogs")
+                .expect("valid formula");
+            model_builder_1.build().expect("valid model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::Tornado);
         config.add_parameter(ParameterSpec::new(
             "revenue",
@@ -657,12 +669,14 @@ mod tests {
     #[test]
     fn tornado_run_rejects_missing_requested_metric() {
         let period = PeriodId::quarter(2025, 1).expect("period");
-        let model = ModelBuilder::new("missing-target")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("missing-target");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.build().expect("model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::Tornado);
         config.add_parameter(ParameterSpec::new("revenue", period, 100.0, vec![90.0]));
         config.add_target_metric("missing");
@@ -675,12 +689,14 @@ mod tests {
     #[test]
     fn tornado_run_rejects_overflowing_impact_from_finite_values() {
         let period = PeriodId::quarter(2025, 1).expect("period");
-        let model = ModelBuilder::new("overflowing-impact")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(-f64::MAX))])
-            .build()
-            .expect("model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("overflowing-impact");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(-f64::MAX))]);
+            model_builder_1.build().expect("model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::Tornado);
         config.add_parameter(ParameterSpec::new(
             "revenue",
@@ -699,18 +715,20 @@ mod tests {
     fn test_full_grid_scenario_metadata_distinguishes_period_overrides() {
         let period1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("valid period range")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("valid period range");
+            model_builder_1.value(
                 "revenue",
                 &[
                     (period1, AmountOrScalar::scalar(100_000.0)),
                     (period2, AmountOrScalar::scalar(110_000.0)),
                 ],
-            )
-            .build()
-            .expect("valid model");
+            );
+            model_builder_1.build().expect("valid model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::FullGrid);
         config.add_parameter(ParameterSpec::new(
             "revenue",
@@ -789,12 +807,14 @@ mod tests {
     #[test]
     fn override_at_period_outside_model_grid_errors() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q1", None)
-            .expect("valid period range")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid period range");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+            model_builder_1.build().expect("valid model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         // 2026Q1 is not in the model grid: previously a silent no-op scenario.
         config.add_parameter(ParameterSpec::new(
@@ -814,14 +834,17 @@ mod tests {
     #[test]
     fn tornado_entries_anchor_on_true_baseline_when_base_not_in_grid() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q1", None)
-            .expect("valid period range")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-            .compute("gross_profit", "revenue * 0.6")
-            .expect("valid formula")
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid period range");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+            model_builder_1
+                .compute("gross_profit", "revenue * 0.6")
+                .expect("valid formula");
+            model_builder_1.build().expect("valid model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         // The base value (100k) is NOT one of the perturbations.
         config.add_parameter(ParameterSpec::new(
@@ -908,15 +931,17 @@ mod tests {
     #[test]
     fn monetary_sensitivity_preserves_node_currency() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("money-sensitivity")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value_money(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("money-sensitivity");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value_money(
                 "revenue",
                 &[(period, Money::from((100_000_i64, Currency::USD)))],
-            )
-            .build()
-            .expect("model");
+            );
+            model_builder_1.build().expect("model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         config.add_parameter(ParameterSpec::new(
             "revenue",
@@ -938,12 +963,14 @@ mod tests {
     #[test]
     fn diagonal_with_several_missing_nodes_reports_the_first_in_order() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("missing_nodes")
-            .periods("2025Q1..Q1", None)
-            .expect("valid period range")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("missing_nodes");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid period range");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.build().expect("valid model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         config.add_parameter(ParameterSpec::new("revenue", period, 100.0, vec![90.0]));
         for i in 0..8 {
@@ -967,18 +994,20 @@ mod tests {
     fn tornado_parameter_identifiers_distinguish_same_node_in_different_periods() {
         let first = PeriodId::quarter(2025, 1).expect("quarter");
         let second = PeriodId::quarter(2025, 2).expect("quarter");
-        let model = ModelBuilder::new("period-identities")
-            .periods("2025Q1..Q2", None)
-            .expect("periods")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("period-identities");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("periods");
+            model_builder_1.value(
                 "revenue",
                 &[
                     (first, AmountOrScalar::scalar(100.0)),
                     (second, AmountOrScalar::scalar(100.0)),
                 ],
-            )
-            .build()
-            .expect("model");
+            );
+            model_builder_1.build().expect("model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         for period in [first, second] {
             config.add_parameter(ParameterSpec::new(
@@ -1000,12 +1029,14 @@ mod tests {
     #[test]
     fn rejects_oversized_cartesian_grid_before_preparing_model() {
         let period = PeriodId::quarter(2025, 1).expect("period");
-        let model = ModelBuilder::new("limits")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("limits");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.build().expect("model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::FullGrid);
         for index in 0..25 {
             // Missing nodes would fail during evaluation; the grid size must
@@ -1024,12 +1055,14 @@ mod tests {
     #[test]
     fn rejects_oversized_diagonal_and_tornado_sweeps() {
         let period = PeriodId::quarter(2025, 1).expect("period");
-        let model = ModelBuilder::new("limits")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("limits");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.build().expect("model")
+        };
         for mode in [SensitivityMode::Diagonal, SensitivityMode::Tornado] {
             let mut config = SensitivityConfig::new(mode);
             config.add_parameter(ParameterSpec::new(
@@ -1048,11 +1081,15 @@ mod tests {
     #[test]
     fn bounds_work_for_large_models_even_when_scenario_count_is_small() {
         let period = PeriodId::quarter(2025, 1).expect("period");
-        let mut builder = ModelBuilder::new("work-limit")
-            .periods("2025Q1..Q1", None)
-            .expect("periods");
+        let mut builder = {
+            let mut model_builder_1 = ModelBuilder::new("work-limit");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1
+        };
         for index in 0..1001 {
-            builder = builder.value(
+            builder.value(
                 format!("node_{index}"),
                 &[(period, AmountOrScalar::scalar(1.0))],
             );
@@ -1074,12 +1111,14 @@ mod tests {
     #[test]
     fn rejects_non_finite_and_duplicate_parameter_specs() {
         let period = PeriodId::quarter(2025, 1).expect("period");
-        let model = ModelBuilder::new("parameters")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("parameters");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.build().expect("model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
         config.add_parameter(ParameterSpec::new("revenue", period, 100.0, vec![f64::NAN]));
         assert!(run_sensitivity(&model, &config).is_err());
@@ -1091,15 +1130,18 @@ mod tests {
     #[test]
     fn full_grid_preserves_order_and_baseline_but_rejects_tornado_generation() {
         let period = PeriodId::quarter(2025, 1).expect("period");
-        let model = ModelBuilder::new("grid")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .value("cost", &[(period, AmountOrScalar::scalar(20.0))])
-            .compute("profit", "revenue - cost")
-            .expect("formula")
-            .build()
-            .expect("model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("grid");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.value("cost", &[(period, AmountOrScalar::scalar(20.0))]);
+            model_builder_1
+                .compute("profit", "revenue - cost")
+                .expect("formula");
+            model_builder_1.build().expect("model")
+        };
         let mut config = SensitivityConfig::new(SensitivityMode::FullGrid);
         config.add_parameter(ParameterSpec::new(
             "revenue",

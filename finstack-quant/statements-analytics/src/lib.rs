@@ -51,9 +51,10 @@
 //! use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let model = ModelBuilder::new("lbo-demo")
-//!     .periods("2025Q1..Q4", None)?
-//!     .value_money(
+//! let model = {
+//!     let mut model_builder = ModelBuilder::new("lbo-demo");
+//!     model_builder.periods("2025Q1..Q4", None)?;
+//!     model_builder.value_money(
 //!         "revenue",
 //!         &[
 //!             (PeriodId::quarter(2025, 1).expect("valid period fixture"), Money::from((10_000_000_i64, Currency::USD))),
@@ -61,11 +62,12 @@
 //!             (PeriodId::quarter(2025, 3).expect("valid period fixture"), Money::from((11_000_000_i64, Currency::USD))),
 //!             (PeriodId::quarter(2025, 4).expect("valid period fixture"), Money::from((11_500_000_i64, Currency::USD))),
 //!         ],
-//!     )
-//!     .compute("ebitda", "revenue * 0.25")?
-//!     .compute("ufcf", "ebitda * 0.6")?
-//!     .with_meta("currency", serde_json::json!("USD"))
-//!     .build()?;
+//!     );
+//!     model_builder.compute("ebitda", "revenue * 0.25")?;
+//!     model_builder.compute("ufcf", "ebitda * 0.6")?;
+//!     model_builder.with_meta("currency", serde_json::json!("USD"));
+//!     model_builder.build()?
+//! };
 //!
 //! let checks = CheckSuite::builder("corporate")
 //!     .add_check(NonFiniteCheck { nodes: vec![] })

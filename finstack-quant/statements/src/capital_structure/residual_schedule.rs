@@ -42,7 +42,7 @@ pub(crate) fn rebuild_residual_interest(
 ) -> Result<CashFlowSchedule> {
     let currency = schedule.get_notional().initial.currency();
     if new_outstanding.currency() != currency {
-        return Err(Error::currency_mismatch(
+        return Err(Error::CurrencyMismatch(
             currency,
             new_outstanding.currency(),
         ));
@@ -100,7 +100,7 @@ pub(crate) fn rebuild_residual_interest(
     let mut reserved_total = 0.0;
     for claim in preserved_cash_claims {
         if claim.amount.currency() != currency {
-            return Err(Error::currency_mismatch(currency, claim.amount.currency()));
+            return Err(Error::CurrencyMismatch(currency, claim.amount.currency()));
         }
         if claim.amount.amount() < 0.0 {
             return Err(Error::capital_structure(

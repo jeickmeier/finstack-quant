@@ -729,8 +729,8 @@ impl CapitalStructureSpec {
                 for debt in &self.debt_instruments {
                     let selected = pik
                         .target_instrument_ids
-                        .as_ref()
-                        .is_some_and(|targets| targets.iter().any(|target| target == &debt.id));
+                        .iter()
+                        .any(|target| target == &debt.id);
                     if selected
                         && matches!(
                             debt.spec,

@@ -23,18 +23,6 @@ mod valuation;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-/// Render a unit-variant enum's canonical serde discriminant.
-///
-/// Single source for status strings (e.g. `CorkscrewStatus::Success` ->
-/// `"success"`): the serde `rename_all` on the Rust enum is the wire
-/// contract, so the bindings never re-declare the casing by hand.
-pub(crate) fn serde_variant_str<T: serde::Serialize>(value: &T) -> String {
-    match serde_json::to_value(value) {
-        Ok(serde_json::Value::String(s)) => s,
-        _ => String::new(),
-    }
-}
-
 /// Convert between a Python enum wrapper and its Rust twin through their
 /// shared serde representation.
 ///

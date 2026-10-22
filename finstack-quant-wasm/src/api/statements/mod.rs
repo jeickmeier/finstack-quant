@@ -20,27 +20,10 @@ mod specs;
 pub use builder::{JsMixedNodeBuilder, JsModelBuilder};
 pub use handles::{JsEvaluator, JsRegistry};
 
-use crate::utils::input::{js_opt_string, js_string, json_text};
+use crate::utils::input::{js_opt_string, js_string, json_text, validated_json};
 use crate::utils::to_js_err;
 use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
-
-/// Parse `json` (object or JSON text) as `T`, run `validate`, and return the
-/// canonical JSON text of the validated value.
-///
-/// Backs every `validate*Json` export.
-pub(crate) fn validated_json<T, E>(
-    json: &JsValue,
-    validate: impl FnOnce(&T) -> Result<(), E>,
-) -> Result<String, JsValue>
-where
-    T: serde::Serialize + serde::de::DeserializeOwned,
-    E: crate::utils::IntoJsError,
-{
-    let value: T = crate::utils::input::from_js_json(json, "json")?;
-    validate(&value).map_err(to_js_err)?;
-    serde_json::to_string(&value).map_err(to_js_err)
-}
 
 /// Validate a `FinancialModelSpec` JSON string.
 ///

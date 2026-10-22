@@ -58,7 +58,7 @@ class TestEcfSweepSpec:
 
 class TestPikToggleSpec:
     def test_defaults_min_periods_to_zero(self) -> None:
-        pik = statements.PikToggleSpec(liquidity_metric="cash", threshold=1e6)
+        pik = statements.PikToggleSpec(liquidity_metric="cash", threshold=1e6, target_instrument_ids=["TL"])
         assert pik.min_periods_in_pik == 0
 
     def test_json_roundtrip(self) -> None:
@@ -109,7 +109,7 @@ class TestWaterfallSpec:
 
     def test_with_ecf_and_pik(self) -> None:
         ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5)
-        pik = statements.PikToggleSpec(liquidity_metric="cash", threshold=1e6)
+        pik = statements.PikToggleSpec(liquidity_metric="cash", threshold=1e6, target_instrument_ids=["TL"])
         ws = statements.WaterfallSpec(ecf_sweep=ecf, pik_toggle=pik)
         assert ws.has_ecf_sweep
         assert ws.has_pik_toggle
@@ -303,3 +303,21 @@ class TestModelBuilderForecasts:
     def test_financial_model_from_json_runs_semantic_validation(self) -> None:
         with pytest.raises(ValueError, match="Model must have at least one period"):
             statements.FinancialModelSpec.from_json('{"schema_version":1,"id":"bad","periods":[],"nodes":{}}')
+
+
+def test_pik_targets_are_required_and_nonempty() -> None:
+    with pytest.raises(TypeError):
+        statements.PikToggleSpec("cash", 1.0)
+    with pytest.raises(TypeError):
+        statements.PikToggleSpec("cash", 1.0, None)
+    for payload in [
+        '{"liquidity_metric":"cash","threshold":1.0}',
+        '{"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":null}',
+    ]:
+        with pytest.raises(ValueError, match=r"field|sequence"):
+            statements.PikToggleSpec.from_json(payload)
+    with pytest.raises(ValueError, match="target_instrument_ids"):
+        statements.PikToggleSpec("cash", 1.0, []).validate()
+    explicit = statements.PikToggleSpec("cash", 1.0, ["TL"])
+    explicit.validate()
+    assert explicit.target_instrument_ids == ["TL"]

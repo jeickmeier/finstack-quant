@@ -86,10 +86,10 @@ pub fn monthly_values(n: usize, base: f64, step: f64) -> Vec<(PeriodId, AmountOr
 
 /// Small P&L used by prepared-evaluation and check benches.
 pub fn simple_pl_model() -> FinancialModelSpec {
-    ModelBuilder::new("pl")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("pl");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -101,20 +101,15 @@ pub fn simple_pl_model() -> FinancialModelSpec {
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
-        )
-        .forecast("revenue", ForecastSpec::growth(0.05))
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .compute("opex", "revenue * 0.15")
-        .unwrap()
-        .compute("ebitda", "gross_profit - opex")
-        .unwrap()
-        .compute("margin", "ebitda / revenue")
-        .unwrap()
-        .build()
-        .unwrap()
+        );
+        model_builder.forecast("revenue", ForecastSpec::growth(0.05));
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder.compute("gross_profit", "revenue - cogs").unwrap();
+        model_builder.compute("opex", "revenue * 0.15").unwrap();
+        model_builder.compute("ebitda", "gross_profit - opex").unwrap();
+        model_builder.compute("margin", "ebitda / revenue").unwrap();
+        model_builder.build().unwrap()
+    }
 }
 
 /// Articulating statements model for the check-suite hot path.
@@ -129,26 +124,23 @@ pub fn accounting_model() -> FinancialModelSpec {
     let cfi = quarterly_values(4, -5_000.0, 0.0);
     let cff = quarterly_values(4, 0.0, 0.0);
 
-    ModelBuilder::new("accounting")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value("cash", &cash)
-        .value("ar", &ar)
-        .value("debt", &debt)
-        .value("net_income", &ni)
-        .value("dividends", &dividends)
-        .value("retained_earnings", &re)
-        .value("cfo", &cfo)
-        .value("cfi", &cfi)
-        .value("cff", &cff)
-        .compute("assets", "cash + ar")
-        .unwrap()
-        .compute("equity", "assets - debt")
-        .unwrap()
-        .compute("total_cf", "cfo + cfi + cff")
-        .unwrap()
-        .build()
-        .unwrap()
+    {
+        let mut model_builder = ModelBuilder::new("accounting");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value("cash", &cash);
+        model_builder.value("ar", &ar);
+        model_builder.value("debt", &debt);
+        model_builder.value("net_income", &ni);
+        model_builder.value("dividends", &dividends);
+        model_builder.value("retained_earnings", &re);
+        model_builder.value("cfo", &cfo);
+        model_builder.value("cfi", &cfi);
+        model_builder.value("cff", &cff);
+        model_builder.compute("assets", "cash + ar").unwrap();
+        model_builder.compute("equity", "assets - debt").unwrap();
+        model_builder.compute("total_cf", "cfo + cfi + cff").unwrap();
+        model_builder.build().unwrap()
+    }
 }
 
 /// Standard accounting + data-quality suite used by check benches.
@@ -192,17 +184,19 @@ pub fn standard_check_suite() -> CheckSuite {
 pub fn bond_cs_model(n_bonds: usize, n_quarters: usize) -> FinancialModelSpec {
     let issue = issue_date();
     let maturity = maturity_date();
-    let mut builder = ModelBuilder::new("cs-bonds")
-        .periods(&quarter_range(n_quarters), Some("2025Q1"))
-        .unwrap()
-        .value(
+    let mut builder = {
+        let mut model_builder = ModelBuilder::new("cs-bonds");
+        model_builder.periods(&quarter_range(n_quarters), Some("2025Q1")).unwrap();
+        model_builder.value(
             "ebitda",
             &quarterly_values(n_quarters, 5_000_000.0, 50_000.0),
         );
+        model_builder
+    };
 
     for i in 0..n_bonds {
         let id = format!("BOND-{i:03}");
-        builder = builder
+        builder
             .add_bond(
                 &id,
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -265,17 +259,19 @@ pub fn waterfall_model(n_loans: usize, n_quarters: usize) -> FinancialModelSpec 
     let taxes = quarterly_values(n_quarters, 1_600_000.0, 20_000.0);
     let capex = quarterly_values(n_quarters, 800_000.0, 0.0);
 
-    let mut builder = ModelBuilder::new("cs-waterfall")
-        .periods(&quarter_range(n_quarters), None)
-        .unwrap()
-        .value("cash", &cash)
-        .value("ebitda", &ebitda)
-        .value("taxes", &taxes)
-        .value("capex", &capex);
+    let mut builder = {
+        let mut model_builder = ModelBuilder::new("cs-waterfall");
+        model_builder.periods(&quarter_range(n_quarters), None).unwrap();
+        model_builder.value("cash", &cash);
+        model_builder.value("ebitda", &ebitda);
+        model_builder.value("taxes", &taxes);
+        model_builder.value("capex", &capex);
+        model_builder
+    };
 
     for i in 0..n_loans {
         let id = format!("TL-{i:03}");
-        builder = builder.add_debt(&id, term_loan(&id, 10_000_000.0));
+        builder.add_debt(&id, term_loan(&id, 10_000_000.0));
     }
 
     builder
@@ -312,20 +308,18 @@ pub fn waterfall_model(n_loans: usize, n_quarters: usize) -> FinancialModelSpec 
 
 /// Monte Carlo forecast model (small node set, multi-year horizon).
 pub fn mc_forecast_model() -> FinancialModelSpec {
-    ModelBuilder::new("mc-model")
-        .periods("2024Q4..2026Q4", Some("2024Q4"))
-        .unwrap()
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("mc-model");
+        model_builder.periods("2024Q4..2026Q4", Some("2024Q4")).unwrap();
+        model_builder.value(
             "revenue",
             &[(PeriodId::quarter(2024, 4).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
-        )
-        .forecast("revenue", ForecastSpec::normal(0.05, 0.02, 42))
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap()
+        );
+        model_builder.forecast("revenue", ForecastSpec::normal(0.05, 0.02, 42));
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder.compute("gross_profit", "revenue - cogs").unwrap();
+        model_builder.build().unwrap()
+    }
 }
 
 /// Single driver plus `n_rolling` rolling-mean formulas over `n_periods` quarters.
@@ -345,14 +339,16 @@ pub fn rolling_model(n_rolling: usize, n_periods: usize) -> FinancialModelSpec {
         ((n_periods - 1) % 4) + 1
     );
 
-    let mut builder = ModelBuilder::new("rolling")
-        .periods(&period_range, None)
-        .unwrap()
-        .value("revenue", &revenue_values);
+    let mut builder = {
+        let mut model_builder = ModelBuilder::new("rolling");
+        model_builder.periods(&period_range, None).unwrap();
+        model_builder.value("revenue", &revenue_values);
+        model_builder
+    };
 
     for i in 0..n_rolling {
         let window = (i % 6) + 2;
-        builder = builder
+        builder
             .compute(
                 format!("rolling_{i}"),
                 format!("rolling_mean(revenue, {window})"),
@@ -365,16 +361,15 @@ pub fn rolling_model(n_rolling: usize, n_periods: usize) -> FinancialModelSpec {
 
 /// LBO-shaped operating model: a handful of drivers plus many derived nodes.
 pub fn large_lbo_model(n_nodes: usize, n_months: usize) -> FinancialModelSpec {
-    let mut builder = ModelBuilder::new("lbo")
-        .periods(&month_range(n_months), None)
-        .unwrap()
-        .value("revenue", &monthly_values(n_months, 1_000_000.0, 1_000.0))
-        .compute("cogs", "revenue * 0.55")
-        .unwrap()
-        .compute("opex", "revenue * 0.20")
-        .unwrap()
-        .compute("ebitda", "revenue - cogs - opex")
-        .unwrap();
+    let mut builder = {
+        let mut model_builder = ModelBuilder::new("lbo");
+        model_builder.periods(&month_range(n_months), None).unwrap();
+        model_builder.value("revenue", &monthly_values(n_months, 1_000_000.0, 1_000.0));
+        model_builder.compute("cogs", "revenue * 0.55").unwrap();
+        model_builder.compute("opex", "revenue * 0.20").unwrap();
+        model_builder.compute("ebitda", "revenue - cogs - opex").unwrap();
+        model_builder
+    };
 
     for i in 0..n_nodes.saturating_sub(4) {
         let formula = match i % 5 {
@@ -384,7 +379,7 @@ pub fn large_lbo_model(n_nodes: usize, n_months: usize) -> FinancialModelSpec {
             3 => format!("lag(ebitda, 1) * {}", 0.5 + 0.001 * i as f64),
             _ => format!("ebitda - cogs * {}", 0.001 * i as f64),
         };
-        builder = builder.compute(format!("derived_{i}"), formula).unwrap();
+        builder.compute(format!("derived_{i}"), formula).unwrap();
     }
 
     builder.build().unwrap()
@@ -392,28 +387,19 @@ pub fn large_lbo_model(n_nodes: usize, n_months: usize) -> FinancialModelSpec {
 
 /// 24-month series plus the formula families missing from the original suite.
 pub fn formula_family_model() -> FinancialModelSpec {
-    ModelBuilder::new("formula-families")
-        .periods("2024M01..2025M12", None)
-        .unwrap()
-        .value("revenue", &monthly_values(24, 100_000.0, 1_000.0))
-        .compute("ewm", "ewm_mean(revenue, 0.3)")
-        .unwrap()
-        .compute("ewm_vol", "ewm_std(revenue, 0.3)")
-        .unwrap()
-        .compute("rev_rank", "rank(revenue)")
-        .unwrap()
-        .compute("rev_q50", "quantile(revenue, 0.5)")
-        .unwrap()
-        .compute("rev_ytd", "ytd(revenue)")
-        .unwrap()
-        .compute("rev_ttm", "ttm(revenue)")
-        .unwrap()
-        .compute("guarded", "if(revenue > 0, revenue, 0)")
-        .unwrap()
-        .compute("safe_div", "coalesce(revenue / 0, 0)")
-        .unwrap()
-        .compute("lagged_roll", "lag(rolling_mean(revenue, 12), 1)")
-        .unwrap()
-        .build()
-        .unwrap()
+    {
+        let mut model_builder = ModelBuilder::new("formula-families");
+        model_builder.periods("2024M01..2025M12", None).unwrap();
+        model_builder.value("revenue", &monthly_values(24, 100_000.0, 1_000.0));
+        model_builder.compute("ewm", "ewm_mean(revenue, 0.3)").unwrap();
+        model_builder.compute("ewm_vol", "ewm_std(revenue, 0.3)").unwrap();
+        model_builder.compute("rev_rank", "rank(revenue)").unwrap();
+        model_builder.compute("rev_q50", "quantile(revenue, 0.5)").unwrap();
+        model_builder.compute("rev_ytd", "ytd(revenue)").unwrap();
+        model_builder.compute("rev_ttm", "ttm(revenue)").unwrap();
+        model_builder.compute("guarded", "if(revenue > 0, revenue, 0)").unwrap();
+        model_builder.compute("safe_div", "coalesce(revenue / 0, 0)").unwrap();
+        model_builder.compute("lagged_roll", "lag(rolling_mean(revenue, 12), 1)").unwrap();
+        model_builder.build().unwrap()
+    }
 }

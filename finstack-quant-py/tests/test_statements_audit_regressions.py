@@ -3,6 +3,7 @@
 import json
 import math
 import pickle
+from typing import Any
 
 import pytest
 
@@ -66,3 +67,71 @@ def test_ordinary_missing_results_survive_json_and_pickle() -> None:
     for restored in [s.StatementResult.from_json(result.to_json()), pickled]:
         assert math.isnan(restored.get("lagged", "2025Q1"))
         assert restored.get("lagged", "2025Q2") == 1.0
+
+
+def test_residual_scale_warning_reports_the_applied_ratio() -> None:
+    document = json.loads(s.Evaluator().evaluate(money_model()).to_json())
+    warning = {
+        "capital_structure": {
+            "period": "2025Q1",
+            "warning": {"kind": "residual_scale_mismatch", "applied_ratio": 10_000_000.0},
+        }
+    }
+    document["meta"]["warnings"] = [warning]
+    restored = s.StatementResult.from_json(json.dumps(document))
+    assert restored.warnings == [warning]
+    assert json.loads(restored.to_json())["meta"]["warnings"] == [warning]
+    document["meta"]["warnings"][0]["capital_structure"]["warning"] = {
+        "kind": "scale_clamped",
+        "raw_ratio": 10_000_000.0,
+        "clamped_ratio": 1.0,
+    }
+    with pytest.raises(ValueError, match="scale_clamped"):
+        s.StatementResult.from_json(json.dumps(document))
+
+
+@pytest.mark.parametrize("method", ["normal", "log_normal", "mean_reverting"])
+@pytest.mark.parametrize("rho", [-1.0, 0.0, 0.6, 1.0])
+def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, rho: float) -> None:
+    def run(tiny: bool) -> dict[str, Any]:
+        builder = s.ModelBuilder("direct-shocks")
+        builder.periods("2025Q1..Q4", "2025Q1")
+        builder.value("peer", [("2025Q1", 1e16 if tiny else 100.0)])
+        params = {"std_dev": 1e-20 if tiny else 0.1, "seed": 42}
+        if method == "mean_reverting":
+            params.update({"long_run_mean": 1e16 if tiny else 100.0, "reversion_speed": 0.1})
+        else:
+            params["mean"] = 0.0
+        builder.forecast("peer", s.ForecastSpec.from_json(json.dumps({"method": method, "params": params})))
+        for node, peer, correlation, seed in [("follower", "peer", rho, 19), ("child", "follower", 0.6, 23)]:
+            mixed = builder.mixed(node)
+            mixed.values([("2025Q1", 100.0)])
+            mixed.formula(f"{peer} * 0 + 100")
+            mixed.forecast(
+                s.ForecastSpec.from_json(
+                    json.dumps({
+                        "method": "normal",
+                        "params": {
+                            "mean": 0.0,
+                            "std_dev": 1.0,
+                            "seed": seed,
+                            "correlation_with": peer,
+                            "correlation": correlation,
+                        },
+                    })
+                )
+            )
+            builder = mixed.build()
+        result = s.Evaluator().evaluate_monte_carlo(builder.build(), s.MonteCarloConfig(16, 7, [0.5], True))
+        return json.loads(result.to_json())
+
+    def paths(result: dict[str, Any], metric: str) -> list[float]:
+        columns = result["path_data"]["columns"]
+        return [
+            v for m, v in zip(columns[2]["data"]["values"], columns[3]["data"]["values"], strict=True) if m == metric
+        ]
+
+    baseline, rounded = run(False), run(True)
+    assert all(v == 1e16 for v in paths(rounded, "peer"))
+    for metric in ["follower", "child"]:
+        assert paths(rounded, metric) == paths(baseline, metric)

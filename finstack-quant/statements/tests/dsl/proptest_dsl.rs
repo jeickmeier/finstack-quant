@@ -87,7 +87,8 @@ proptest! {
         if let Ok(ast) = result {
             // Verify the structure matches expected precedence
             // Top level should be Add, right side should be Mul
-            use finstack_quant_statements::dsl::{StmtExpr, BinOp};
+            use finstack_quant_statements::dsl::StmtExpr;
+            use finstack_quant_core::expr::BinOp;
 
             match ast {
                 StmtExpr::BinOp { op: BinOp::Add, left: _, right } => {

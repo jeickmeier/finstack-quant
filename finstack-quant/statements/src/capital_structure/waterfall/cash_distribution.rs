@@ -99,28 +99,10 @@ where
             *field(s) = Money::from((0_i64, currency));
         }
     }
-    let mut ranks: Vec<u32> = staged.iter().map(|s| s.class_rank).collect();
-    ranks.sort_unstable();
-    ranks.dedup();
-    for rank in ranks {
-        let planned: Vec<f64> = staged
-            .iter_mut()
-            .map(|s| {
-                if s.class_rank == rank {
-                    field(s).amount().max(0.0)
-                } else {
-                    0.0
-                }
-            })
-            .collect();
-        let allocations = allocate_pro_rata(&planned, remaining_cash)?;
-        for (s, allocated) in staged.iter_mut().zip(allocations) {
-            if s.class_rank != rank {
-                continue;
-            }
-            let currency = field(s).currency();
-            *field(s) = Money::new(allocated, currency)?;
-        }
+    let allocations = allocate_by_class(staged, remaining_cash, |s| field(s).amount())?;
+    for (s, allocated) in staged.iter_mut().zip(allocations) {
+        let currency = field(s).currency();
+        *field(s) = Money::new(allocated, currency)?;
     }
     Ok(())
 }
@@ -165,9 +147,9 @@ pub(super) fn allocate_pro_rata(planned: &[f64], remaining_cash: &mut Money) -> 
 /// Allocate `remaining` across staged rows by class rank, then pro-rata
 /// within each class using `planned`.
 pub(super) fn allocate_by_class(
-    staged: &[StagedInstrumentFlow],
+    staged: &mut [StagedInstrumentFlow],
     remaining: &mut Money,
-    planned: impl Fn(&StagedInstrumentFlow) -> f64,
+    mut planned: impl FnMut(&mut StagedInstrumentFlow) -> f64,
 ) -> Result<Vec<f64>> {
     let mut allocations = vec![0.0; staged.len()];
     let mut ranks: Vec<u32> = staged.iter().map(|s| s.class_rank).collect();
@@ -175,7 +157,7 @@ pub(super) fn allocate_by_class(
     ranks.dedup();
     for rank in ranks {
         let class_planned: Vec<f64> = staged
-            .iter()
+            .iter_mut()
             .map(|s| {
                 if s.class_rank == rank {
                     planned(s).max(0.0)

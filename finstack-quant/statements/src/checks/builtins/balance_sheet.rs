@@ -120,6 +120,35 @@ impl Check for BalanceSheetArticulation {
             let equity = sum_nodes(context.results, &self.equity_nodes, pid);
             let imbalance = assets - (liabilities + equity);
             let tolerance = effective_tolerance(&context.config, self.tolerance, assets);
+            let relative = if assets.abs() > f64::EPSILON {
+                (imbalance / assets).abs() * 100.0
+            } else {
+                0.0
+            };
+            if ![
+                assets,
+                liabilities,
+                equity,
+                liabilities + equity,
+                imbalance,
+                tolerance,
+                relative,
+            ]
+            .iter()
+            .all(|v| v.is_finite())
+            {
+                findings.push(crate::checks::helpers::arithmetic_failure(
+                    self.id(),
+                    *pid,
+                    self.assets_nodes
+                        .iter()
+                        .chain(&self.liabilities_nodes)
+                        .chain(&self.equity_nodes)
+                        .cloned()
+                        .collect(),
+                ));
+                continue;
+            }
             let comparison = CheckComparison {
                 identity: "balance_sheet_articulation".to_string(),
                 period: Some(*pid),
@@ -130,12 +159,6 @@ impl Check for BalanceSheetArticulation {
             comparisons.push(comparison.clone());
 
             if imbalance.abs() > tolerance {
-                let relative = if assets.abs() > f64::EPSILON {
-                    (imbalance / assets).abs() * 100.0
-                } else {
-                    0.0
-                };
-
                 findings.push(CheckFinding {
                     check_id: self.id().to_string(),
                     severity: Severity::Error,

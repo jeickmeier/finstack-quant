@@ -13,22 +13,26 @@ fn build_simple_model() -> FinancialModelSpec {
     let period_q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let period_q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
-    ModelBuilder::new("scenario_demo")
-        .periods("2025Q1..Q2", None)
-        .expect("valid period range")
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("scenario_demo");
+        model_builder
+            .periods("2025Q1..Q2", None)
+            .expect("valid period range");
+        model_builder.value(
             "revenue",
             &[
                 (period_q1, AmountOrScalar::scalar(100_000.0)),
                 (period_q2, AmountOrScalar::scalar(100_000.0)),
             ],
-        )
-        .compute("cogs", "revenue * 0.4")
-        .expect("valid formula")
-        .compute("ebitda", "revenue - cogs")
-        .expect("valid formula")
-        .build()
-        .expect("valid model")
+        );
+        model_builder
+            .compute("cogs", "revenue * 0.4")
+            .expect("valid formula");
+        model_builder
+            .compute("ebitda", "revenue - cogs")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    }
 }
 
 #[test]
@@ -164,10 +168,12 @@ fn diff_uses_variance_analyzer() {
 
 #[test]
 fn evaluate_all_preserves_actual_history_when_applying_overrides() {
-    let model = ModelBuilder::new("scenario_actuals")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .expect("valid period range")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("scenario_actuals");
+        model_builder
+            .periods("2025Q1..Q4", Some("2025Q2"))
+            .expect("valid period range");
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -187,9 +193,9 @@ fn evaluate_all_preserves_actual_history_when_applying_overrides() {
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
-        )
-        .build()
-        .expect("valid model");
+        );
+        model_builder.build().expect("valid model")
+    };
 
     let mut scenarios = IndexMap::new();
     scenarios.insert(
@@ -262,18 +268,20 @@ fn comparison_table_emits_null_frac_on_zero_baseline() {
     let period_q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     // Baseline metric is exactly zero in both periods.
-    let model = ModelBuilder::new("zero_base")
-        .periods("2025Q1..Q2", None)
-        .expect("valid period range")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("zero_base");
+        model_builder
+            .periods("2025Q1..Q2", None)
+            .expect("valid period range");
+        model_builder.value(
             "fcf",
             &[
                 (period_q1, AmountOrScalar::scalar(0.0)),
                 (period_q2, AmountOrScalar::scalar(0.0)),
             ],
-        )
-        .build()
-        .expect("valid model");
+        );
+        model_builder.build().expect("valid model")
+    };
 
     let mut scenarios = IndexMap::new();
     scenarios.insert(
@@ -322,18 +330,18 @@ fn comparison_table_emits_null_frac_on_zero_baseline() {
 #[test]
 fn monetary_scenario_overrides_preserve_and_validate_currency() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let model = ModelBuilder::new("money-scenario")
-        .periods("2025Q1..Q1", None)
-        .expect("periods")
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("money-scenario");
+        model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value_money(
             "revenue",
             &[(
                 period,
                 Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             )],
-        )
-        .build()
-        .expect("model");
+        );
+        model_builder.build().expect("model")
+    };
 
     let valid = ScenarioSet {
         scenarios: IndexMap::from([(
@@ -458,15 +466,18 @@ fn q(quarter: u8) -> PeriodId {
 
 /// Revenue is actual in Q1 and grows 5% a quarter after; COGS is a formula.
 fn forecast_model() -> FinancialModelSpec {
-    ModelBuilder::new("forecast_scenarios")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .expect("valid period range")
-        .value("revenue", &[(q(1), AmountOrScalar::scalar(100.0))])
-        .forecast("revenue", ForecastSpec::growth(0.05))
-        .compute("cogs", "revenue * 0.4")
-        .expect("valid formula")
-        .build()
-        .expect("valid model")
+    {
+        let mut model_builder = ModelBuilder::new("forecast_scenarios");
+        model_builder
+            .periods("2025Q1..Q4", Some("2025Q1"))
+            .expect("valid period range");
+        model_builder.value("revenue", &[(q(1), AmountOrScalar::scalar(100.0))]);
+        model_builder.forecast("revenue", ForecastSpec::growth(0.05));
+        model_builder
+            .compute("cogs", "revenue * 0.4")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    }
 }
 
 fn scenario(parent: Option<&str>, forecasts: &[(&str, ForecastSpec)]) -> ScenarioDefinition {
@@ -621,28 +632,32 @@ fn scenarios_evaluate_the_capital_structure() {
     use time::Month;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let model = ModelBuilder::new("cs_scenarios")
-        .periods("2025Q1..Q4", None)
-        .expect("valid periods")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("cs_scenarios");
+        model_builder
+            .periods("2025Q1..Q4", None)
+            .expect("valid periods");
+        model_builder.value(
             "revenue",
             &(1..=4)
                 .map(|quarter| (q(quarter), AmountOrScalar::scalar(1_000.0)))
                 .collect::<Vec<_>>(),
-        )
-        .add_bond(
-            "BOND",
-            Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
-            0.05,
-            issue,
-            Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
-            "USD-OIS",
-        )
-        .expect("valid bond")
-        .compute("interest", "cs.interest_expense.total")
-        .expect("valid formula")
-        .build()
-        .expect("valid model");
+        );
+        model_builder
+            .add_bond(
+                "BOND",
+                Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
+                0.05,
+                issue,
+                Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
+                "USD-OIS",
+            )
+            .expect("valid bond");
+        model_builder
+            .compute("interest", "cs.interest_expense.total")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    };
     let set = ScenarioSet {
         scenarios: IndexMap::from([
             ("base".to_string(), ScenarioDefinition::default()),

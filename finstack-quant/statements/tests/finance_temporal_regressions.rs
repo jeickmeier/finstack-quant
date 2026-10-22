@@ -26,22 +26,19 @@ fn offset_model(periods: Vec<Period>, observations: &[f64]) -> FinancialModelSpe
         .zip(observations)
         .map(|(period, value)| (period.id, AmountOrScalar::scalar(*value)))
         .collect();
-    ModelBuilder::new("fiscal-offsets")
-        .periods_explicit(periods)
-        .unwrap()
-        .value("x", &values)
-        .compute("prior", "lag(x,1)")
-        .unwrap()
-        .compute("shifted", "shift(x,1)")
-        .unwrap()
-        .compute("difference", "diff(x)")
-        .unwrap()
-        .compute("change", "pct_change(x)")
-        .unwrap()
-        .compute("nested", "lag(rolling_mean(x,2),1)")
-        .unwrap()
-        .build()
-        .unwrap()
+    {
+        let mut model_builder = ModelBuilder::new("fiscal-offsets");
+        model_builder.periods_explicit(periods).unwrap();
+        model_builder.value("x", &values);
+        model_builder.compute("prior", "lag(x,1)").unwrap();
+        model_builder.compute("shifted", "shift(x,1)").unwrap();
+        model_builder.compute("difference", "diff(x)").unwrap();
+        model_builder.compute("change", "pct_change(x)").unwrap();
+        model_builder
+            .compute("nested", "lag(rolling_mean(x,2),1)")
+            .unwrap();
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
@@ -113,18 +110,19 @@ fn growth_rate_annualizes_quarterly_and_monthly_observations() {
                 )
             })
             .collect();
-        let model = ModelBuilder::new("annual-growth")
-            .periods_explicit(periods.clone())
-            .unwrap()
-            .value("x", &values)
-            .compute("default", "growth_rate(x)")
-            .unwrap()
-            .compute("one_period", "growth_rate(x,1)")
-            .unwrap()
-            .compute("expression", "growth_rate(x * 2,2)")
-            .unwrap()
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("annual-growth");
+            model_builder.periods_explicit(periods.clone()).unwrap();
+            model_builder.value("x", &values);
+            model_builder.compute("default", "growth_rate(x)").unwrap();
+            model_builder
+                .compute("one_period", "growth_rate(x,1)")
+                .unwrap();
+            model_builder
+                .compute("expression", "growth_rate(x * 2,2)")
+                .unwrap();
+            model_builder.build().unwrap()
+        };
         let result = Evaluator::new().evaluate(&model).unwrap();
         let final_period = periods.last().unwrap().id;
         for node in ["default", "one_period", "expression"] {
@@ -162,14 +160,13 @@ fn daily_and_weekly_growth_use_elapsed_period_end_dates() {
                 )
             })
             .collect();
-        let model = ModelBuilder::new("dated-growth")
-            .periods_explicit(periods.clone())
-            .unwrap()
-            .value("x", &values)
-            .compute("growth", "growth_rate(x,1)")
-            .unwrap()
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("dated-growth");
+            model_builder.periods_explicit(periods.clone()).unwrap();
+            model_builder.value("x", &values);
+            model_builder.compute("growth", "growth_rate(x,1)").unwrap();
+            model_builder.build().unwrap()
+        };
         let result = Evaluator::new().evaluate(&model).unwrap();
         for period in periods.iter().skip(1) {
             close(result.get("growth", &period.id).unwrap(), 0.2);
@@ -296,14 +293,13 @@ fn ytd_starts_at_the_first_fiscal_period_of_the_fiscal_year() {
         .zip([1.0, 2.0, 4.0, 8.0])
         .map(|(period, value)| (period.id, AmountOrScalar::scalar(value)))
         .collect();
-    let model = ModelBuilder::new("fiscal-ytd")
-        .periods_explicit(periods.clone())
-        .unwrap()
-        .value("x", &values)
-        .compute("to_date", "ytd(x)")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("fiscal-ytd");
+        model_builder.periods_explicit(periods.clone()).unwrap();
+        model_builder.value("x", &values);
+        model_builder.compute("to_date", "ytd(x)").unwrap();
+        model_builder.build().unwrap()
+    };
     let result = Evaluator::new().evaluate(&model).unwrap();
     for (index, expected) in [(0, 1.0), (1, 3.0), (2, 4.0), (3, 12.0)] {
         close(result.get("to_date", &periods[index].id).unwrap(), expected);

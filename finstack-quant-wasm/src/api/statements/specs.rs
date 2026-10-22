@@ -49,13 +49,7 @@ pub fn normalization_config_add_adjustment(
 /// adjustment identifiers.
 #[wasm_bindgen(js_name = validateNormalizationConfigJson)]
 pub fn validate_normalization_config_json(json: JsValue) -> Result<String, JsValue> {
-    crate::api::statements::validated_json(&json, NormalizationConfig::validate)
-}
-
-fn normalized(results: &JsValue, config: &JsValue) -> Result<Vec<NormalizationResult>, JsValue> {
-    let results: StatementResult = from_js_json(results, "results")?;
-    let config: NormalizationConfig = from_js_json(config, "config")?;
-    finstack_quant_statements::adjustments::normalize(&results, &config).map_err(to_js_err)
+    crate::utils::input::validated_json(&json, NormalizationConfig::validate)
 }
 
 /// Normalize a target metric by applying an adjustment catalog period by period.
@@ -72,7 +66,11 @@ fn normalized(results: &JsValue, config: &JsValue) -> Result<Vec<NormalizationRe
 /// invalid, or the target and a reference node have incompatible units.
 #[wasm_bindgen(js_name = normalize)]
 pub fn normalize(results: JsValue, config: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&normalized(&results, &config)?)
+    let results: StatementResult = from_js_json(&results, "results")?;
+    let config: NormalizationConfig = from_js_json(&config, "config")?;
+    to_js_value(
+        &finstack_quant_statements::adjustments::normalize(&results, &config).map_err(to_js_err)?,
+    )
 }
 
 /// Write normalized values back into statement results as a node.

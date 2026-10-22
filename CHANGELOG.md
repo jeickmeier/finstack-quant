@@ -31,9 +31,23 @@
 
 #### Changed
 
+- Gaussian Monte Carlo forecasts retain their sampled shocks directly, preserving correlation when small increments round away at large levels. Zero-volatility nodes remain ineligible as stochastic correlation peers.
+
+- Capital-structure residual scaling warnings use `ResidualScaleMismatch { applied_ratio }` (`residual_scale_mismatch` in JSON), replacing the inaccurate `ScaleClamped` warning and its obsolete fields. Cashflow scaling is unchanged.
+
+- Capital-structure runtime state, dated principal claims, and waterfall execution are crate-private. The evaluator owns their lifecycle; the unused cumulative-principal accumulator and redundant waterfall period argument are removed.
+
+- `PikToggleSpec.target_instrument_ids` is a required list across Rust, Python, and JSON. Missing and null target lists are rejected; validation requires at least one borrowing-debt target.
+
+- Waterfall failures leave capital-structure runtime state unchanged. Successful allocations commit balances, PIK state, and carried claims together.
+
+- Accounting identity checks report period-level error findings when sums, differences, tolerances, or materiality calculations overflow. They publish no non-finite comparison payload for that period and continue checking later periods.
+
+- `CapitalStructureCashflows::get_component(component, instrument_or_total, period_id)` replaces the 16 per-component and total getters in Rust and Python; WASM exposes `capitalStructureCashflowsGetComponent`. Instrument lookups retain native currency and `total` reads the reporting-currency aggregate.
+
 - `Evaluator::evaluate_prepared` evaluates a model's capital structure exactly as `Evaluator::evaluate` does (an empty market as of the first period's start), so prepared evaluation now yields `cs_cashflows` and `cs.*` values. Before, it skipped the capital structure.
 - `ModelBuilder::with_builtin_metrics` no longer overwrites a node the model already defines with the same id.
-- `ModelBuilder` has no `NeedPeriods`/`Ready` type-state. `periods` returns `Result<Self>`, a second `periods` call fails with "Periods already set", and `build` fails when no timeline was set. `FinancialModelSpec::builder` is removed (Python `.builder`, WASM `financialModelBuilder`); `ModelBuilder::new` is the one entry point.
+- `ModelBuilder` has one mutable configuration API: setters return `&mut Self` or `Result<&mut Self>` and rejected setters preserve the accumulated model. `build` and `mixed` consume the builder; `MixedNodeBuilder::build` returns its parent builder. The consuming setter and `try_*` twins are removed. `ModelBuilder::new` is the construction entry point, and `build` rejects a model without a timeline.
 - The statements-analytics entry points take the names the bindings already used: `run_sensitivity`, `run_variance`, `variance_bridge`, `explain_formula`, `render_check_report_text`/`_html`, `evaluate_dcf` (was `evaluate_dcf_with_market`). The engine structs behind them are private.
 - `dcf_sensitivity` takes no market argument (Rust, Python and WASM).
 - Each statements and statements-analytics item has one public path: internal modules (`checks::{suite,traits,types,helpers}`, `dsl::{ast,compiler,parser}`, `capital_structure::waterfall`, `registry::dynamic`, `evaluator::formula`, `adjustments::{engine,types}`, `forecast`, and the analysis submodules) are private, with their public items re-exported at the parent. `NormalizationEngine` is replaced by `adjustments::normalize` and `adjustments::merge_into_results`.

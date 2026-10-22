@@ -130,41 +130,45 @@ fn builtin_pl_metrics_articulate_numerically() {
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let v = |x: f64| AmountOrScalar::scalar(x);
 
-    let model = ModelBuilder::new("articulation")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("revenue", &[(q1, v(1000.0))])
-        .value("cogs", &[(q1, v(400.0))])
-        .value("opex", &[(q1, v(300.0))]) // excludes D&A
-        .value("depreciation", &[(q1, v(50.0))])
-        .value("amortization", &[(q1, v(30.0))])
-        .compute(
-            "ebitda",
-            registry
-                .get("fin.ebitda")
-                .unwrap()
-                .definition
-                .formula
-                .clone(),
-        )
-        .unwrap()
-        .compute(
-            "operating_income",
-            registry
-                .get("fin.operating_income")
-                .unwrap()
-                .definition
-                .formula
-                .clone(),
-        )
-        .unwrap()
-        .compute(
-            "ebit",
-            registry.get("fin.ebit").unwrap().definition.formula.clone(),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("articulation");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("revenue", &[(q1, v(1000.0))]);
+        model_builder.value("cogs", &[(q1, v(400.0))]);
+        model_builder.value("opex", &[(q1, v(300.0))]);
+        model_builder // excludes D&A
+            .value("depreciation", &[(q1, v(50.0))]);
+        model_builder.value("amortization", &[(q1, v(30.0))]);
+        model_builder
+            .compute(
+                "ebitda",
+                registry
+                    .get("fin.ebitda")
+                    .unwrap()
+                    .definition
+                    .formula
+                    .clone(),
+            )
+            .unwrap();
+        model_builder
+            .compute(
+                "operating_income",
+                registry
+                    .get("fin.operating_income")
+                    .unwrap()
+                    .definition
+                    .formula
+                    .clone(),
+            )
+            .unwrap();
+        model_builder
+            .compute(
+                "ebit",
+                registry.get("fin.ebit").unwrap().definition.formula.clone(),
+            )
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -350,10 +354,10 @@ fn test_multiple_namespaces() {
 
 #[test]
 fn test_model_builder_with_builtin_metrics() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -365,8 +369,8 @@ fn test_model_builder_with_builtin_metrics() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -378,11 +382,10 @@ fn test_model_builder_with_builtin_metrics() {
                     AmountOrScalar::scalar(66_000.0),
                 ),
             ],
-        )
-        .with_builtin_metrics()
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.with_builtin_metrics().unwrap();
+        model_builder.build().unwrap()
+    };
 
     // Should have revenue, cogs, and all built-in metrics
     assert!(model.has_node("revenue"));
@@ -397,10 +400,10 @@ fn test_evaluate_model_with_select_metrics() {
     let mut registry = Registry::new();
     registry.load_builtins().unwrap();
 
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -412,8 +415,8 @@ fn test_evaluate_model_with_select_metrics() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -425,13 +428,15 @@ fn test_evaluate_model_with_select_metrics() {
                     AmountOrScalar::scalar(66_000.0),
                 ),
             ],
-        )
-        .add_metric_from_registry("fin.gross_profit", &registry)
-        .unwrap()
-        .add_metric_from_registry("fin.gross_margin", &registry)
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .add_metric_from_registry("fin.gross_profit", &registry)
+            .unwrap();
+        model_builder
+            .add_metric_from_registry("fin.gross_margin", &registry)
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -476,10 +481,10 @@ fn test_add_metric_from_registry() {
     let mut registry = Registry::new();
     registry.load_builtins().unwrap();
 
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -491,8 +496,8 @@ fn test_add_metric_from_registry() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -504,13 +509,15 @@ fn test_add_metric_from_registry() {
                     AmountOrScalar::scalar(66_000.0),
                 ),
             ],
-        )
-        .add_metric_from_registry("fin.gross_profit", &registry)
-        .unwrap()
-        .add_metric_from_registry("fin.gross_margin", &registry)
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .add_metric_from_registry("fin.gross_profit", &registry)
+            .unwrap();
+        model_builder
+            .add_metric_from_registry("fin.gross_margin", &registry)
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     // Should only have revenue, cogs, and the two explicitly added metrics
     assert!(model.has_node("revenue"));
@@ -573,10 +580,10 @@ fn test_complete_pl_model_with_select_registry_metrics() {
     let mut registry = Registry::new();
     registry.load_builtins().unwrap();
 
-    let model = ModelBuilder::new("P&L Model")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("P&L Model");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -588,8 +595,8 @@ fn test_complete_pl_model_with_select_registry_metrics() {
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -601,8 +608,8 @@ fn test_complete_pl_model_with_select_registry_metrics() {
                     AmountOrScalar::scalar(660_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "opex",
             &[
                 (
@@ -614,8 +621,8 @@ fn test_complete_pl_model_with_select_registry_metrics() {
                     AmountOrScalar::scalar(220_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "depreciation",
             &[
                 (
@@ -627,8 +634,8 @@ fn test_complete_pl_model_with_select_registry_metrics() {
                     AmountOrScalar::scalar(50_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "amortization",
             &[
                 (
@@ -640,22 +647,28 @@ fn test_complete_pl_model_with_select_registry_metrics() {
                     AmountOrScalar::scalar(10_000.0),
                 ),
             ],
-        )
-        // Only add the metrics we can calculate with the given inputs
-        .add_metric_from_registry("fin.gross_profit", &registry)
-        .unwrap()
-        .add_metric_from_registry("fin.operating_income", &registry)
-        .unwrap()
-        .add_metric_from_registry("fin.ebitda", &registry)
-        .unwrap()
-        .add_metric_from_registry("fin.gross_margin", &registry)
-        .unwrap()
-        .add_metric_from_registry("fin.operating_margin", &registry)
-        .unwrap()
-        .add_metric_from_registry("fin.ebitda_margin", &registry)
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            // Only add the metrics we can calculate with the given inputs
+            .add_metric_from_registry("fin.gross_profit", &registry)
+            .unwrap();
+        model_builder
+            .add_metric_from_registry("fin.operating_income", &registry)
+            .unwrap();
+        model_builder
+            .add_metric_from_registry("fin.ebitda", &registry)
+            .unwrap();
+        model_builder
+            .add_metric_from_registry("fin.gross_margin", &registry)
+            .unwrap();
+        model_builder
+            .add_metric_from_registry("fin.operating_margin", &registry)
+            .unwrap();
+        model_builder
+            .add_metric_from_registry("fin.ebitda_margin", &registry)
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -718,10 +731,10 @@ fn test_inter_metric_dependencies_in_model() {
 
     // Build a model and add only the top-level metrics
     // Dependencies should be automatically added
-    let model = ModelBuilder::new("Test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("Test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -733,8 +746,8 @@ fn test_inter_metric_dependencies_in_model() {
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -746,8 +759,8 @@ fn test_inter_metric_dependencies_in_model() {
                     AmountOrScalar::scalar(660_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "opex",
             &[
                 (
@@ -759,12 +772,13 @@ fn test_inter_metric_dependencies_in_model() {
                     AmountOrScalar::scalar(220_000.0),
                 ),
             ],
-        )
-        // Only add ebitda_margin - should automatically add gross_profit and ebitda
-        .add_metric_from_registry("custom.ebitda_margin", &registry)
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            // Only add ebitda_margin - should automatically add gross_profit and ebitda
+            .add_metric_from_registry("custom.ebitda_margin", &registry)
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     // Evaluate the model
     let mut evaluator = Evaluator::new();
@@ -815,21 +829,22 @@ fn test_deep_dependency_chain() {
     let mut registry = Registry::new();
     registry.load_from_json_str(json).unwrap();
 
-    let model = ModelBuilder::new("Test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("Test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value(
             "base",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        // Only add level4 - should automatically add all dependencies
-        .add_metric_from_registry("chain.level4", &registry)
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            // Only add level4 - should automatically add all dependencies
+            .add_metric_from_registry("chain.level4", &registry)
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -864,62 +879,64 @@ fn parity_add_metric_matches_with_builtin_metrics_for_same_nodes() {
         ]
     };
     let base_model_fn = || {
-        ModelBuilder::new("base")
-            .periods("2025Q1..Q2", None)
-            .unwrap()
-            .value(
-                "revenue",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(100_000.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(110_000.0),
-                    ),
-                ],
-            )
-            .value(
-                "cogs",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(60_000.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(66_000.0),
-                    ),
-                ],
-            )
-            .value("opex", &zero_periods(0.0))
-            .value("interest_expense", &zero_periods(0.0))
-            .value("tax_expense", &zero_periods(0.0))
-            .value("depreciation", &zero_periods(0.0))
-            .value("amortization", &zero_periods(0.0))
-            .value("principal_payment", &zero_periods(0.0))
-            .value("total_assets", &zero_periods(1.0))
-            .value("total_debt", &zero_periods(0.0))
-            .value("total_equity", &zero_periods(1.0))
-            .value("taxes", &zero_periods(0.0))
-            .value("current_liabilities", &zero_periods(1.0))
+        let mut model_builder = ModelBuilder::new("base");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
+            "revenue",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110_000.0),
+                ),
+            ],
+        );
+        model_builder.value(
+            "cogs",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(60_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(66_000.0),
+                ),
+            ],
+        );
+        model_builder.value("opex", &zero_periods(0.0));
+        model_builder.value("interest_expense", &zero_periods(0.0));
+        model_builder.value("tax_expense", &zero_periods(0.0));
+        model_builder.value("depreciation", &zero_periods(0.0));
+        model_builder.value("amortization", &zero_periods(0.0));
+        model_builder.value("principal_payment", &zero_periods(0.0));
+        model_builder.value("total_assets", &zero_periods(1.0));
+        model_builder.value("total_debt", &zero_periods(0.0));
+        model_builder.value("total_equity", &zero_periods(1.0));
+        model_builder.value("taxes", &zero_periods(0.0));
+        model_builder.value("current_liabilities", &zero_periods(1.0));
+        model_builder
     };
 
     // Path 1: with_builtin_metrics() — adds all registry metrics at once
-    let model_bulk = base_model_fn()
-        .with_builtin_metrics()
-        .unwrap()
-        .build()
-        .unwrap();
+    let model_bulk = {
+        let mut model_builder_1 = base_model_fn();
+        model_builder_1.with_builtin_metrics().unwrap();
+        model_builder_1.build().unwrap()
+    };
 
     // Path 2: add_metric_from_registry("fin.gross_profit") — adds just one specific metric
     let registry = Registry::with_builtins().unwrap();
-    let model_select = base_model_fn()
-        .add_metric_from_registry("fin.gross_profit", &registry)
-        .unwrap()
-        .build()
-        .unwrap();
+    let model_select = {
+        let mut model_builder_1 = base_model_fn();
+        model_builder_1
+            .add_metric_from_registry("fin.gross_profit", &registry)
+            .unwrap();
+        model_builder_1.build().unwrap()
+    };
 
     // Both paths produce a fin.gross_profit node
     assert!(model_bulk.has_node("fin.gross_profit"));
@@ -947,53 +964,57 @@ fn registry_with_builtins_matches_new_then_load() {
     // Parity check between the convenience `Registry::with_builtins` and the
     // explicit two-step `Registry::new(); load_builtins()` pattern.
     let base_model_fn = || {
-        ModelBuilder::new("base")
-            .periods("2025Q1..Q2", None)
-            .unwrap()
-            .value(
-                "revenue",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(100_000.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(110_000.0),
-                    ),
-                ],
-            )
-            .value(
-                "cogs",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(60_000.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(66_000.0),
-                    ),
-                ],
-            )
+        let mut model_builder = ModelBuilder::new("base");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
+            "revenue",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110_000.0),
+                ),
+            ],
+        );
+        model_builder.value(
+            "cogs",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(60_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(66_000.0),
+                ),
+            ],
+        );
+        model_builder
     };
 
     // Path 1: Registry::with_builtins()
     let registry_a = Registry::with_builtins().unwrap();
-    let model_a = base_model_fn()
-        .add_metric_from_registry("fin.gross_profit", &registry_a)
-        .unwrap()
-        .build()
-        .unwrap();
+    let model_a = {
+        let mut model_builder_1 = base_model_fn();
+        model_builder_1
+            .add_metric_from_registry("fin.gross_profit", &registry_a)
+            .unwrap();
+        model_builder_1.build().unwrap()
+    };
 
     // Path 2: explicit registry then load_builtins
     let mut registry_b = Registry::new();
     registry_b.load_builtins().unwrap();
-    let model_b = base_model_fn()
-        .add_metric_from_registry("fin.gross_profit", &registry_b)
-        .unwrap()
-        .build()
-        .unwrap();
+    let model_b = {
+        let mut model_builder_1 = base_model_fn();
+        model_builder_1
+            .add_metric_from_registry("fin.gross_profit", &registry_b)
+            .unwrap();
+        model_builder_1.build().unwrap()
+    };
 
     let mut eval = Evaluator::new();
     let r_a = eval.evaluate(&model_a).unwrap();
@@ -1015,10 +1036,10 @@ fn registry_with_builtins_matches_new_then_load() {
 fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
     // Verify that namespace-qualified refs like fin.gross_profit work in formulas
     // when loaded via with_builtin_metrics
-    let model = ModelBuilder::new("namespace-qual-test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("namespace-qual-test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -1030,8 +1051,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(220_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -1043,8 +1064,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "opex",
             &[
                 (
@@ -1056,8 +1077,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "interest_expense",
             &[
                 (
@@ -1069,8 +1090,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "tax_expense",
             &[
                 (
@@ -1082,8 +1103,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "depreciation",
             &[
                 (
@@ -1095,8 +1116,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "amortization",
             &[
                 (
@@ -1108,8 +1129,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "principal_payment",
             &[
                 (
@@ -1121,8 +1142,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_assets",
             &[
                 (
@@ -1134,8 +1155,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(1.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_debt",
             &[
                 (
@@ -1147,8 +1168,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_equity",
             &[
                 (
@@ -1160,8 +1181,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(1.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "taxes",
             &[
                 (
@@ -1173,8 +1194,8 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "current_liabilities",
             &[
                 (
@@ -1186,11 +1207,10 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                     AmountOrScalar::scalar(1.0),
                 ),
             ],
-        )
-        .with_builtin_metrics()
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.with_builtin_metrics().unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).unwrap();

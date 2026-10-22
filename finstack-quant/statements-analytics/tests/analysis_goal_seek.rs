@@ -10,16 +10,20 @@ use finstack_quant_statements_analytics::analysis::goal_seek;
 #[test]
 fn test_goal_seek_simple_linear() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .expect("valid period")
-        .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-        .compute("profit_margin", "0.15")
-        .expect("valid formula")
-        .compute("net_income", "revenue * profit_margin")
-        .expect("valid formula")
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid period");
+        model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+        model_builder
+            .compute("profit_margin", "0.15")
+            .expect("valid formula");
+        model_builder
+            .compute("net_income", "revenue * profit_margin")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    };
 
     let solved = goal_seek(
         &model,
@@ -43,16 +47,20 @@ fn test_goal_seek_simple_linear() {
 #[test]
 fn test_goal_seek_with_update() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .expect("valid period")
-        .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-        .compute("cogs", "revenue * 0.6")
-        .expect("valid formula")
-        .compute("gross_profit", "revenue - cogs")
-        .expect("valid formula")
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid period");
+        model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+        model_builder
+            .compute("cogs", "revenue * 0.6")
+            .expect("valid formula");
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    };
 
     let solved = goal_seek(
         &model,
@@ -96,19 +104,24 @@ fn test_goal_seek_interest_coverage() {
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
 
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .expect("valid period range")
-        .value("revenue", &[(q1, AmountOrScalar::scalar(100_000.0))])
-        .forecast("revenue", ForecastSpec::growth(0.05))
-        .compute("interest_expense", "10000.0")
-        .expect("valid formula")
-        .compute("ebitda", "revenue * 0.3")
-        .expect("valid formula")
-        .compute("interest_coverage", "ebitda / interest_expense")
-        .expect("valid formula")
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..Q4", None)
+            .expect("valid period range");
+        model_builder.value("revenue", &[(q1, AmountOrScalar::scalar(100_000.0))]);
+        model_builder.forecast("revenue", ForecastSpec::growth(0.05));
+        model_builder
+            .compute("interest_expense", "10000.0")
+            .expect("valid formula");
+        model_builder
+            .compute("ebitda", "revenue * 0.3")
+            .expect("valid formula");
+        model_builder
+            .compute("interest_coverage", "ebitda / interest_expense")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    };
 
     let solved = goal_seek(
         &model,
@@ -138,12 +151,14 @@ fn test_goal_seek_interest_coverage() {
 #[test]
 fn test_goal_seek_invalid_target_node() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .expect("valid period")
-        .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid period");
+        model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+        model_builder.build().expect("valid model")
+    };
 
     let result = goal_seek(
         &model,
@@ -162,12 +177,14 @@ fn test_goal_seek_invalid_target_node() {
 #[test]
 fn test_goal_seek_invalid_driver_node() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .expect("valid period")
-        .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid period");
+        model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+        model_builder.build().expect("valid model")
+    };
 
     let result = goal_seek(
         &model,
@@ -186,14 +203,17 @@ fn test_goal_seek_invalid_driver_node() {
 #[test]
 fn test_goal_seek_with_explicit_bounds() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let model = ModelBuilder::new("bounds")
-        .periods("2025Q1..Q1", None)
-        .expect("valid period")
-        .value("driver", &[(period, AmountOrScalar::scalar(0.0))])
-        .compute("target", "driver")
-        .expect("valid formula")
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("bounds");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid period");
+        model_builder.value("driver", &[(period, AmountOrScalar::scalar(0.0))]);
+        model_builder
+            .compute("target", "driver")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    };
 
     let solution = goal_seek(
         &model,
@@ -220,16 +240,20 @@ fn test_goal_seek_with_explicit_bounds() {
 #[test]
 fn test_goal_seek_reports_residual_and_evaluations() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let model = ModelBuilder::new("diagnostics")
-        .periods("2025Q1..Q1", None)
-        .expect("valid period")
-        .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-        .compute("cogs", "revenue * 0.6")
-        .expect("valid formula")
-        .compute("gross_profit", "revenue - cogs")
-        .expect("valid formula")
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("diagnostics");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid period");
+        model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+        model_builder
+            .compute("cogs", "revenue * 0.6")
+            .expect("valid formula");
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    };
     let target = 50_000.0;
 
     let solved = goal_seek(
@@ -273,14 +297,17 @@ fn test_goal_seek_result_wire_form() {
     use finstack_quant_statements_analytics::analysis::GoalSeekResult;
 
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let model = ModelBuilder::new("wire")
-        .periods("2025Q1..Q1", None)
-        .expect("valid period")
-        .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-        .compute("profit", "revenue * 0.5")
-        .expect("valid formula")
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("wire");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid period");
+        model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+        model_builder
+            .compute("profit", "revenue * 0.5")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    };
 
     let bare = goal_seek(
         &model, "profit", period, 60.0, "revenue", period, false, None,

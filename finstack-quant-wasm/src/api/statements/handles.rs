@@ -262,17 +262,18 @@ impl JsRegistry {
 
     /// Metrics one metric depends on, transitively.
     ///
-    /// Twin of Python `Registry.dependencies` (Rust
-    /// `Registry::get_metric_dependencies`).
+    /// Twin of Python `Registry.get_dependencies` (Rust
+    /// `Registry::get_dependencies`).
     ///
     /// @param qualified_id - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
     /// @returns Qualified identifiers of the metrics to add before `qualifiedId`, in dependency order.
     /// @throws Error with kind `not_found` if the metric or one of its dependencies is not registered, and kind `validation` if the dependencies form a cycle.
-    pub fn dependencies(&self, qualified_id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = getDependencies)]
+    pub fn get_dependencies(&self, qualified_id: JsValue) -> Result<JsValue, JsValue> {
         to_js_value(
             &self
                 .inner
-                .get_metric_dependencies(&js_string(&qualified_id, "qualifiedId")?)
+                .get_dependencies(&js_string(&qualified_id, "qualifiedId")?)
                 .map_err(to_js_err)?,
         )
     }

@@ -547,9 +547,9 @@ class MonteCarloResults:
         float | None
             Fraction of paths in ``[0, 1]`` with at least one breach, or
             ``None`` when the metric was not simulated, there are no forecast
-            periods, the path buffer is incomplete, or the result was
-            reconstructed from JSON / pickle (the per-path buffer is not
-            serialized).
+            periods, or the retained path data is incomplete. Results restored
+            from JSON / pickle support this calculation when they include
+            complete path data (``include_path_data=True``).
 
         Notes
         -----
@@ -637,57 +637,6 @@ class MonteCarloResults:
         Notes
         -----
         This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def metrics(self) -> list[str]:
-        """Return simulated metric identifiers in model order.
-
-        Returns
-        -------
-        list[str]
-            Node identifiers represented by percentile summaries.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
-        """
-        ...
-
-    @property
-    def warnings(self) -> list[str]:
-        """Return warnings encountered during path evaluation.
-
-        Returns
-        -------
-        list[str]
-            Human-readable Rust evaluation warnings; empty when every path evaluated cleanly.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
-        """
-        ...
-
-    def breach_probability(self, metric: str, threshold: float) -> float | None:
-        """Estimate the probability of exceeding a level in any forecast period.
-
-        Parameters
-        ----------
-        metric:
-            Simulated node identifier.
-        threshold:
-            Upper breach level in the metric's own units; breaches use strict value > threshold.
-
-        Returns
-        -------
-        float | None
-            Fraction of paths with at least one upside breach. None means an unknown metric, absent forecast data, incomplete paths, or reconstruction from JSON/pickle: the internal path buffer is not serialized, even with include_path_data=True.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
         """
         ...
 
@@ -1026,16 +975,18 @@ class ForecastMethod:
 
     @property
     def kind(self) -> str:
-        """Return the canonical snake_case forecast discriminant.
+        """
+        Return the canonical snake_case forecast discriminant.
 
         Returns
         -------
         str
             Wire method name, such as "growth_pct" or "log_normal".
 
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -1437,7 +1388,7 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def override(overrides: Mapping[str, float] | Sequence[tuple[str, float]] | pd.Series) -> ForecastSpec:
+    def overrides(overrides: Mapping[str, float] | Sequence[tuple[str, float]] | pd.Series) -> ForecastSpec:
         """Pin selected forecast periods and forward-fill the periods between them.
 
         Parameters
@@ -1460,7 +1411,7 @@ class ForecastSpec:
         Examples
         --------
         >>> from finstack_quant.statements import ForecastSpec
-        >>> ForecastSpec.override({"2025Q2": 120.0}).method.kind
+        >>> ForecastSpec.overrides({"2025Q2": 120.0}).method.kind
         'override'
         """
         ...
@@ -1621,9 +1572,10 @@ class NodeType:
             ``"value"``, ``"calculated"``, or ``"mixed"``, matching the JSON
             schema rename for :class:`NodeType`.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -2094,23 +2046,9 @@ class FinancialModelSpec:
         """
         ...
 
-    def content_hash(self) -> str:
-        """Compute the versioned SHA-256 hash of canonical model JSON.
-
-        Returns
-        -------
-        str
-            Stable model content hash, independent of JSON object key order.
-
-        Raises
-        ------
-        ValueError
-            If a model value cannot be represented by the canonical hash contract.
-        """
-        ...
-
     def to_dataframe(self) -> pd.DataFrame:
-        """Export one descriptive row for each configured model node.
+        """
+        Export one descriptive row for each configured model node.
 
         Returns
         -------
@@ -2123,6 +2061,9 @@ class FinancialModelSpec:
             If pandas is unavailable.
         ValueError
             If a node description cannot be converted to the documented column schema.
+
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -2138,7 +2079,8 @@ class ModelBuilder:
     Configuration methods mutate the builder in place *and* return it, so they
     can be chained or called as separate statements. ``build`` and ``mixed``
     are terminal: they consume the builder, and any later configuration call
-    raises ``ValueError``.
+    raises ``ValueError``. A rejected configuration argument leaves the
+    accumulated model unchanged, so a corrected setter can be retried.
 
     Examples
     --------
@@ -2961,14 +2903,18 @@ class MixedNodeBuilder:
 
     Note
     ----
-    Methods on this class mutate the builder in place and return ``None``.
-    Call them sequentially rather than chaining.
+    Setters mutate this builder and return it for chaining. A rejected
+    formula leaves its values, forecast, name, and parent model unchanged.
+    ``build`` consumes the mixed-node builder and returns its parent model
+    builder; further calls on the consumed mixed-node builder raise ``ValueError``.
 
     Examples
     --------
     >>> from finstack_quant.statements import ModelBuilder
     >>> builder = ModelBuilder("demo")
     >>> _ = builder.periods("2025Q1..Q1")
+    >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+    >>> _ = builder.value("cost", [("2025Q1", 60.0)])
     >>> mixed = builder.mixed("profit")
     >>> _ = mixed.values([("2025Q1", 40.0)])
     >>> _ = mixed.formula("revenue - cost")
@@ -3246,7 +3192,7 @@ class Registry:
         """
         ...
 
-    def dependencies(self, qualified_id: str) -> list[str]:
+    def get_dependencies(self, qualified_id: str) -> list[str]:
         """List transitive registry dependencies in construction order.
 
         Parameters
@@ -5108,9 +5054,9 @@ class CheckReport:
         """
         ...
 
-    def findings_by_severity(self, severity: str) -> list[dict[str, object]]:
+    def findings_by_severity(self, severity: str) -> list[CheckFinding]:
         """
-        Return all retained findings of one severity as serde dicts.
+        Return all retained findings of one severity as CheckFinding objects.
 
         Delegates to the canonical Rust ``CheckReport::findings_by_severity``.
 
@@ -5122,8 +5068,8 @@ class CheckReport:
 
         Returns
         -------
-        list[dict[str, object]]
-            One ``CheckFinding`` serde dict per matching retained finding.
+        list[CheckFinding]
+            One ``CheckFinding`` object per matching retained finding.
 
         Raises
         ------
@@ -5569,7 +5515,7 @@ class PikToggleSpec:
         self,
         liquidity_metric: str,
         threshold: float,
-        target_instrument_ids: list[str] | None = None,
+        target_instrument_ids: list[str],
         min_periods_in_pik: int = 0,
     ) -> None:
         """
@@ -5581,10 +5527,10 @@ class PikToggleSpec:
             Model metric or node identifier compared with the trigger threshold.
         threshold : float
             Liquidity threshold in the metric's units that activates PIK logic.
-        target_instrument_ids : list[str] or None, default None
+        target_instrument_ids : list[str]
             Explicit nonempty borrowing-debt identifiers whose cash coupons may
             capitalize into principal. Instrument-level PIK capability is not
-            modeled, so ``None`` or an empty list is rejected by
+            modeled, so an empty list is rejected by
             :meth:`validate` and :meth:`WaterfallSpec.validate` (it does not
             mean "every instrument"); model validation also rejects hedge or
             option targets. Construction stores the specification unvalidated.
@@ -5593,9 +5539,11 @@ class PikToggleSpec:
             (not months): once triggered, PIK stays on for at least this many
             periods. Default 0 lets PIK toggle every period.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        TypeError
+            If targets are omitted or are not a list of strings. Domain validation
+            is performed by :meth:`validate`.
         """
         ...
     @staticmethod
@@ -5622,7 +5570,7 @@ class PikToggleSpec:
         Examples
         --------
         >>> from finstack_quant.statements import PikToggleSpec
-        >>> toggle = PikToggleSpec("cash", 100.0)
+        >>> toggle = PikToggleSpec("cash", 100.0, ["TL"])
         >>> PikToggleSpec.from_json(toggle.to_json()).threshold
         100.0
 
@@ -5637,7 +5585,7 @@ class PikToggleSpec:
         Raises
         ------
         ValueError
-            If ``target_instrument_ids`` is ``None`` or empty.
+            If ``target_instrument_ids`` is empty.
         """
         ...
 
@@ -5715,14 +5663,13 @@ class PikToggleSpec:
 
     def __repr__(self) -> str: ...
     @property
-    def target_instrument_ids(self) -> list[str] | None:
+    def target_instrument_ids(self) -> list[str]:
         """Return explicit borrowing-debt targets for coupon capitalization.
 
         Returns
         -------
-        list[str] | None
-            Stored identifiers, or None in an incomplete specification. None and
-            empty lists fail waterfall validation; swaps and options fail model
+        list[str]
+            Stored identifiers. Empty lists fail waterfall validation; swaps and options fail model
             validation because they cannot capitalize into borrowing principal.
 
         Notes
@@ -6486,12 +6433,15 @@ class MetricDefinition:
         """
         Result unit (e.g. ``"ratio"``, ``"percent"``), or ``None``.
 
-        This property does not raise.
-
         Returns
         -------
         str | None
             Result unit (e.g. ``"ratio"``, ``"percent"``), or ``None``.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -6658,39 +6608,20 @@ class Adjustment:
         """
         ...
 
-    def with_cap(self, base_node: str | None, value: float) -> Adjustment:
-        """Return a copy capped at ``value``.
+    def with_cap(self, base_node: str | None, value: float, base_mode: str) -> Adjustment:
+        """Return a capped copy using an explicit self-referential base mode.
 
         Parameters
         ----------
         base_node : str or None
-            Node the cap is measured against; ``None`` caps on an absolute
-            amount in the target node's units.
+            Node whose value sets the cap base, or ``None`` for an absolute cap.
         value : float
-            Cap magnitude: an absolute amount when ``base_node`` is ``None``,
-            otherwise a decimal fraction of that node's value.
-
-        Returns
-        -------
-        Adjustment
-            Capped copy; the receiver is unchanged.
-
-        This method rewrites an in-memory field and does not raise.
-
-        """
-        ...
-
-    def with_cap_mode(self, base_node: str | None, value: float, base_mode: str) -> Adjustment:
-        """Return a copy capped at ``value`` under an explicit base mode.
-
-        Parameters
-        ----------
-        base_node : str or None
-            Node the cap is measured against, or ``None`` for an absolute cap.
-        value : float
-            Cap magnitude, interpreted per ``base_mode``.
+            Maximum magnitude: a decimal fraction of the base node (0.20 means
+            20%), or an absolute amount in the target metric's units.
         base_mode : str
-            How the base value is read across periods (e.g. ``"same_period"``).
+            ``"reported"`` uses the pre-adjustment target value;
+            ``"progressive"`` includes earlier adjustments. Only affects a
+            cap whose base node is the normalization target itself.
 
         Returns
         -------
@@ -6700,7 +6631,7 @@ class Adjustment:
         Raises
         ------
         ValueError
-            If ``base_mode`` is not a recognized mode.
+            If ``base_mode`` is neither ``"reported"`` nor ``"progressive"``.
 
         """
         ...
@@ -6826,12 +6757,15 @@ class Adjustment:
         """
         Cap base mode, or ``None`` when uncapped.
 
-        This property does not raise.
-
         Returns
         -------
         str | None
             Cap base mode, or ``None`` when uncapped.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -6978,12 +6912,15 @@ class CheckConfig:
         """
         Lowest severity retained in the report.
 
-        This property does not raise.
-
         Returns
         -------
         str
             Lowest severity retained in the report.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -7169,12 +7106,15 @@ class FormulaCheckSpec:
         """
         Classification bucket.
 
-        This property does not raise.
-
         Returns
         -------
         str
             Classification bucket.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -7183,12 +7123,15 @@ class FormulaCheckSpec:
         """
         Severity assigned to findings from this check.
 
-        This property does not raise.
-
         Returns
         -------
         str
             Severity assigned to findings from this check.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -7285,12 +7228,15 @@ class CheckFinding:
         """
         ``"info"``, ``"warning"`` or ``"error"``.
 
-        This property does not raise.
-
         Returns
         -------
         str
             ``"info"``, ``"warning"`` or ``"error"``.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -7559,390 +7505,38 @@ class CapitalStructureCashflows:
         """
         ...
 
-    def get_interest(self, instrument_id: str, period: str) -> float:
-        """Total interest accrued on one instrument in one period.
+    def get_component(self, component: str, instrument_or_total: str, period_id: str) -> float:
+        """Read a capital-structure component for an instrument or reporting total.
 
         Parameters
         ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period id (e.g. ``"2025Q1"``).
+        component : str
+            One of ``interest_expense`` (cash plus PIK), ``interest_expense_cash``,
+            ``interest_expense_pik``, ``interest_income``, ``principal_payment``,
+            ``debt_balance``, ``fees``, or ``accrued_interest``. Flows are positive
+            payment or receipt magnitudes; debt balance is closing principal.
+            Rate hedges have zero debt balance and debt accrued interest.
+        instrument_or_total : str
+            Instrument identifier for a native-currency amount, or ``"total"``
+            for the reporting-currency aggregate. No FX conversion is performed
+            by this accessor.
+        period_id : str
+            Reporting-period label such as ``"2025Q1"`` present in the result.
 
         Returns
         -------
         float
-            Interest amount in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_interest_cash(self, instrument_id: str, period: str) -> float:
-        """Cash-paid portion of the period's interest.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Cash interest in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_interest_pik(self, instrument_id: str, period: str) -> float:
-        """Payment-in-kind portion of the period's interest.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            PIK interest in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_principal(self, instrument_id: str, period: str) -> float:
-        """Principal repaid on one instrument in one period.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Principal repayment in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_debt_balance(self, instrument_id: str, period: str) -> float:
-        """Return borrowing principal at the inclusive reporting-period end.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Capital-structure identifier of the debt or rate hedge to inspect.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Closing borrowing principal in the instrument's native currency.
-            Rate hedges, including interest-rate swaps, return zero; their trade
-            notional is not borrowing principal.
+            Requested component in major units of the selected currency.
+            Absent optional interest income is zero.
 
         Raises
         ------
         ValueError
-            If period is not a valid reporting-period label.
+            If ``period_id`` is not a valid reporting-period label.
         RuntimeError
-            If the instrument-period breakdown is absent.
-
-        """
-        ...
-
-    def get_fees(self, instrument_id: str, period: str) -> float:
-        """Fees charged on one instrument in one period.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Debt instrument identifier.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Fee amount in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the instrument or period is unknown.
-
-        """
-        ...
-
-    def get_accrued_interest(self, instrument_id: str, period: str) -> float:
-        """Return debt interest accrued but unpaid at the inclusive period end.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Capital-structure identifier of the debt or rate hedge to inspect.
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Unpaid debt coupon accrual in the instrument's native currency.
-            Rate hedges, including interest-rate swaps, return zero; this debt
-            accrual accessor does not report hedge mark-to-market or leg accruals.
-
-        Raises
-        ------
-        ValueError
-            If period is not a valid reporting-period label.
-        RuntimeError
-            If the instrument-period breakdown is absent.
-
-        """
-        ...
-
-    def get_total_interest(self, period: str) -> float:
-        """Interest across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Total interest in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the period is unknown.
-
-        """
-        ...
-
-    def get_total_principal(self, period: str) -> float:
-        """Principal repaid across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Total principal in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the period is unknown.
-
-        """
-        ...
-
-    def get_total_debt_balance(self, period: str) -> float:
-        """Closing debt across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Total closing balance in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the period is unknown.
-
-        """
-        ...
-
-    def get_total_fees(self, period: str) -> float:
-        """Fees across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``, matching the labels of
-            the projection the cashflows were built from.
-
-        Returns
-        -------
-        float
-            Total fees in the reporting currency.
-
-        Raises
-        ------
-        KeyError
-            If the period is unknown.
-
-        """
-        ...
-
-    def get_total_interest_cash(self, period: str) -> float:
-        """Cash interest expense across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            Cash interest expense in the reporting currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the period has no totals or the instruments span several
-            currencies without a reporting currency.
-
-        """
-        ...
-
-    def get_total_interest_income(self, period: str) -> float:
-        """Cash interest received (net hedge receipts and negative-rate coupon receipts) across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            Interest income in the reporting currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the period has no totals or the instruments span several
-            currencies without a reporting currency.
-
-        """
-        ...
-
-    def get_total_interest_pik(self, period: str) -> float:
-        """PIK (non-cash) interest accrued across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            PIK interest in the reporting currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the period has no totals or the instruments span several
-            currencies without a reporting currency.
-
-        """
-        ...
-
-    def get_total_accrued_interest(self, period: str) -> float:
-        """Accrued-but-unpaid debt interest at period end across all instruments in one period.
-
-        Parameters
-        ----------
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            Accrued interest in the reporting currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the period has no totals or the instruments span several
-            currencies without a reporting currency.
-
-        """
-        ...
-
-    def get_interest_income(self, instrument_id: str, period: str) -> float:
-        """Cash interest received for one instrument and period.
-
-        Includes net hedge receipts and receipts from negative-rate debt
-        coupons; zero when nothing was received.
-
-        Parameters
-        ----------
-        instrument_id : str
-            Capital-structure identifier of the instrument to inspect.
-        period : str
-            Period identifier such as ``"2025Q1"``.
-
-        Returns
-        -------
-        float
-            Interest income in the instrument's native currency.
-
-        Raises
-        ------
-        ValueError
-            If ``period`` is not a valid period id.
-        RuntimeError
-            If the instrument-period breakdown is absent.
-
+            If the component, instrument, or period is unknown, reporting totals
+            are unavailable for multiple currencies, or cash and PIK currencies
+            differ when requesting total interest expense.
         """
         ...
 
@@ -7952,7 +7546,7 @@ class CapitalStructureCashflows:
 
         Populated for every evaluation with capital-structure flows, including
         multi-currency structures without a reporting currency, where
-        ``to_totals_dataframe`` and the ``get_total_*`` accessors have nothing
+        ``to_totals_dataframe`` and the ``get_component(..., "total", ...)`` lookups have nothing
         to report.
 
         Returns

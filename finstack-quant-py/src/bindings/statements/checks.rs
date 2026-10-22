@@ -4,6 +4,7 @@ use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{serde_json_to_py, statements_to_py, value_error};
 use finstack_quant_statements::checks::{
     BuiltinCheckSpec, CheckCategory, CheckConfig, CheckFinding, FormulaCheckSpec, Severity,
@@ -200,10 +201,10 @@ impl PyCheckConfig {
         self.inner.materiality_threshold
     }
 
-    /// Lowest retained severity name (``"info"``, ``"warning"``, ``"error"``).
+    #[doc = pydoc!("finstack_quant.statements", "CheckConfig.min_severity")]
     #[getter]
-    fn min_severity(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner.min_severity)
+    fn min_severity(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.min_severity)
     }
 
     /// Identify this value in notebooks and logs.
@@ -316,16 +317,16 @@ impl PyFormulaCheckSpec {
         &self.inner.message_template
     }
 
-    /// Category discriminant (``"internal_consistency"``, ...).
+    #[doc = pydoc!("finstack_quant.statements", "FormulaCheckSpec.category")]
     #[getter]
-    fn category(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner.category)
+    fn category(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.category)
     }
 
-    /// Severity discriminant (``"info"``, ``"warning"``, ``"error"``).
+    #[doc = pydoc!("finstack_quant.statements", "FormulaCheckSpec.severity")]
     #[getter]
-    fn severity(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner.severity)
+    fn severity(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.severity)
     }
 
     /// Optional absolute tolerance, or ``None``.
@@ -569,10 +570,10 @@ impl PyCheckFinding {
         &self.inner.check_id
     }
 
-    /// Severity discriminant (``"info"``, ``"warning"``, ``"error"``).
+    #[doc = pydoc!("finstack_quant.statements", "CheckFinding.severity")]
     #[getter]
-    fn severity(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner.severity)
+    fn severity(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.severity)
     }
 
     /// Human-readable description of the issue.
@@ -655,15 +656,15 @@ impl PyCheckFinding {
     }
 
     /// Return ``CheckFinding(check_id=..., severity=..., period=..., message=...)``.
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "CheckFinding(check_id={:?}, severity={:?}, period={}, message={:?})",
             self.inner.check_id,
-            self.severity(),
+            self.severity()?,
             self.period()
                 .map_or_else(|| "None".to_string(), |p| format!("{p:?}")),
             self.inner.message,
-        )
+        ))
     }
 }
 
@@ -729,25 +730,7 @@ impl PyCheckReport {
         self.inner.has_warnings()
     }
 
-    /// Return all retained findings of one severity.
-    ///
-    /// Delegates to the canonical Rust ``CheckReport::findings_by_severity``.
-    ///
-    /// Parameters
-    /// ----------
-    /// severity : str
-    ///     One of ``"info"``, ``"warning"``, ``"error"`` (the canonical
-    ///     snake_case severity discriminants).
-    ///
-    /// Returns
-    /// -------
-    /// list[CheckFinding]
-    ///     One typed finding per matching retained finding, in check order.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``severity`` is not a canonical severity discriminant.
+    #[doc = pydoc!("finstack_quant.statements", "CheckReport.findings_by_severity")]
     #[pyo3(text_signature = "($self, severity)")]
     fn findings_by_severity(&self, severity: &str) -> PyResult<Vec<PyCheckFinding>> {
         let severity = parse_severity(severity)?;

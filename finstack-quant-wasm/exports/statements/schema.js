@@ -4,7 +4,4 @@ export const schema = {
   index: wasm.statementsSchemaIndex,
   get: wasm.statementsSchemaGet,
   validate: wasm.statementsSchemaValidate,
-  financialModelSpecSchema: wasm.financialModelSpecSchema,
-  normalizationConfigSchema: wasm.normalizationConfigSchema,
-  statementResultSchema: wasm.statementResultSchema,
 };

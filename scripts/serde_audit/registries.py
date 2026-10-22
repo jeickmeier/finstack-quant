@@ -164,11 +164,6 @@ RUNTIME_RESULT_EXCEPTIONS = (
     ),
     *_runtime_exception("core", "src/math/linalg/mod.rs", ("LedoitWolfResult",)),
     *_runtime_exception(
-        "statements",
-        "src/capital_structure/waterfall/mod.rs",
-        ("WaterfallPeriodResult",),
-    ),
-    *_runtime_exception(
         "valuations-fixed-income",
         "src/bond/pricing/ytm_solver.rs",
         ("YtmPricingSpec",),

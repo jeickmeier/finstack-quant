@@ -16,27 +16,28 @@ fn test_model_json() -> String {
 
     let q1 = PeriodId::quarter(2024, 1).expect("valid period fixture");
     let q2 = PeriodId::quarter(2024, 2).expect("valid period fixture");
-    let model = ModelBuilder::new("test_model")
-        .periods("2024Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test_model");
+        model_builder.periods("2024Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (q1, AmountOrScalar::scalar(100_000.0)),
                 (q2, AmountOrScalar::scalar(110_000.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (q1, AmountOrScalar::scalar(40_000.0)),
                 (q2, AmountOrScalar::scalar(44_000.0)),
             ],
-        )
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
     serde_json::to_string(&model).unwrap()
 }
 
@@ -225,20 +226,19 @@ fn monetary_goal_seek_returns_a_valid_updated_model() {
     use finstack_quant_core::{currency::Currency, dates::PeriodId};
     use finstack_quant_statements::{builder::ModelBuilder, types::AmountOrScalar};
     let period = PeriodId::annual(2025);
-    let model = ModelBuilder::new("monetary-goal")
-        .periods("2025..2025", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("monetary-goal");
+        model_builder.periods("2025..2025", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 period,
                 AmountOrScalar::amount(100.0, Currency::USD).unwrap(),
             )],
-        )
-        .compute("profit", "revenue * 0.5")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("profit", "revenue * 0.5").unwrap();
+        model_builder.build().unwrap()
+    };
     let json = serde_json::to_string(&model).unwrap();
     let result = goal_seek(
         JsValue::from(&json),
@@ -252,10 +252,12 @@ fn monetary_goal_seek_returns_a_valid_updated_model() {
     )
     .unwrap();
     let output: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
-    let updated = ModelBuilder::from_spec(serde_json::from_value(output["model"].clone()).unwrap())
-        .unwrap()
-        .build()
-        .unwrap();
+    let updated = {
+        let model_builder =
+            ModelBuilder::from_spec(serde_json::from_value(output["model"].clone()).unwrap())
+                .unwrap();
+        model_builder.build().unwrap()
+    };
     let results = finstack_quant_statements::evaluator::Evaluator::new()
         .evaluate(&updated)
         .unwrap();

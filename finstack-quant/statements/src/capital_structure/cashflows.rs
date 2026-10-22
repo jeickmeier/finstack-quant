@@ -18,9 +18,9 @@ use serde::{Deserialize, Serialize};
 /// that downstream consumers can drill down or report aggregates.
 ///
 /// Monetary fields are stored as [`Money`] to preserve currency identity. The
-/// accessor methods return raw `f64` amounts in the reporting currency for
-/// convenience; callers that need full currency fidelity should inspect the
-/// underlying maps directly.
+/// component accessor returns raw `f64` amounts in the instrument's native
+/// currency or the reporting currency for totals. Callers that need currency
+/// metadata should inspect the underlying maps directly.
 ///
 /// # Example
 ///
@@ -63,7 +63,7 @@ use serde::{Deserialize, Serialize};
 ///     voluntary_prepayment: None,
 /// });
 ///
-/// assert_eq!(cs.get_total_interest(&period).unwrap(), 12_500.0);
+/// assert_eq!(cs.get_component("interest_expense", "total", &period).unwrap(), 12_500.0);
 /// ```
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -614,440 +614,76 @@ impl CapitalStructureCashflows {
         }
     }
 
-    /// Generic accessor for instrument-period cashflow data.
+    /// Read one capital-structure component for an instrument or the reporting total.
     ///
-    /// Extracts a value from the `by_instrument` map using the provided extractor function.
-    fn get_instrument_field<F>(
-        &self,
-        instrument_id: &str,
-        period_id: &PeriodId,
-        field_name: &str,
-        extractor: F,
-    ) -> Result<f64>
-    where
-        F: Fn(&CashflowBreakdown) -> f64,
-    {
-        self.by_instrument
-            .get(instrument_id)
-            .and_then(|m| m.get(period_id))
-            .map(extractor)
-            .ok_or_else(|| {
-                crate::error::Error::capital_structure(format!(
-                    "No {} data for instrument '{}' in period {}",
-                    field_name, instrument_id, period_id
-                ))
-            })
-    }
-
-    /// Resolve a `cs.<component>.<instrument_or_total>` formula reference for
-    /// one period.
-    ///
-    /// This is the lookup the statement evaluator performs for capital-structure
-    /// references, so a value read here matches what a formula saw.
+    /// This is the same lookup used for `cs.<component>.<instrument_or_total>`
+    /// in statement formulas. It reads already-calculated cashflows and does
+    /// not perform FX conversion.
     ///
     /// # Arguments
     ///
-    /// * `component` - One of `interest_expense`, `interest_expense_cash`,
+    /// * `component` - `interest_expense` (cash plus PIK), `interest_expense_cash`,
     ///   `interest_expense_pik`, `interest_income`, `principal_payment`,
-    ///   `debt_balance`, `fees` or `accrued_interest`.
-    /// * `instrument_or_total` - Instrument identifier for that instrument's
-    ///   native-currency amount, or `total` for the reporting-currency
-    ///   aggregate across instruments.
-    /// * `period_id` - Period whose cashflow component is read.
+    ///   `debt_balance`, `fees`, or `accrued_interest`. Flows use positive
+    ///   payment/receipt magnitudes; `debt_balance` is period-end principal.
+    /// * `instrument_or_total` - Instrument identifier for its native-currency
+    ///   value, or `total` for the reporting-currency aggregate.
+    /// * `period_id` - Reporting period whose component is returned, in major
+    ///   currency units. The period must exist in the selected cashflow map.
     ///
     /// # Errors
     ///
-    /// Returns a capital-structure error if `component` is unknown, the
-    /// instrument or its cashflow for `period_id` is absent, or an aggregate
-    /// cannot be formed under the currency invariant.
+    /// Returns a capital-structure error for an unknown component, missing
+    /// instrument or period, unavailable multi-currency reporting totals, or
+    /// incompatible cash/PIK currencies in total interest.
     pub fn get_component(
         &self,
         component: &str,
         instrument_or_total: &str,
         period_id: &PeriodId,
     ) -> Result<f64> {
-        let unknown = || {
-            crate::error::Error::capital_structure(format!(
+        let extract: fn(&CashflowBreakdown) -> Result<f64> = match component {
+            "interest_expense" => |flow| Ok(flow.interest_expense_total()?.amount()),
+            "interest_expense_cash" => |flow| Ok(flow.interest_expense_cash.amount()),
+            "interest_expense_pik" => |flow| Ok(flow.interest_expense_pik.amount()),
+            "interest_income" => |flow| Ok(flow.interest_income_cash_or_zero().amount()),
+            "principal_payment" => |flow| Ok(flow.principal_payment.amount()),
+            "debt_balance" => |flow| Ok(flow.debt_balance.amount()),
+            "fees" => |flow| Ok(flow.fees.amount()),
+            "accrued_interest" => |flow| Ok(flow.accrued_interest.amount()),
+            _ => {
+                return Err(crate::error::Error::capital_structure(format!(
                 "Unknown capital structure component: {component}. Expected: interest_expense, \
                  interest_expense_cash, interest_expense_pik, interest_income, principal_payment, \
                  debt_balance, fees, or accrued_interest"
-            ))
+            )))
+            }
         };
-        if instrument_or_total == "total" {
-            match component {
-                "interest_expense" => self.get_total_interest(period_id),
-                "interest_expense_cash" => self.get_total_interest_cash(period_id),
-                "interest_expense_pik" => self.get_total_interest_pik(period_id),
-                "interest_income" => self.get_total_interest_income(period_id),
-                "principal_payment" => self.get_total_principal(period_id),
-                "debt_balance" => self.get_total_debt_balance(period_id),
-                "fees" => self.get_total_fees(period_id),
-                "accrued_interest" => self.get_total_accrued_interest(period_id),
-                _ => Err(unknown()),
+        let flow = if instrument_or_total == "total" {
+            if self.reporting_currency.is_none()
+                && self.totals.is_empty()
+                && self.totals_by_currency.len() > 1
+            {
+                return Err(crate::error::Error::capital_structure(
+                    "Multiple currencies present in capital structure totals and no FX provided. Supply FX in MarketContext or limit to a single currency.",
+                ));
             }
-        } else {
-            match component {
-                "interest_expense" => self.get_interest(instrument_or_total, period_id),
-                "interest_expense_cash" => self.get_interest_cash(instrument_or_total, period_id),
-                "interest_expense_pik" => self.get_interest_pik(instrument_or_total, period_id),
-                "interest_income" => self.get_interest_income(instrument_or_total, period_id),
-                "principal_payment" => self.get_principal(instrument_or_total, period_id),
-                "debt_balance" => self.get_debt_balance(instrument_or_total, period_id),
-                "fees" => self.get_fees(instrument_or_total, period_id),
-                "accrued_interest" => self.get_accrued_interest(instrument_or_total, period_id),
-                _ => Err(unknown()),
-            }
-        }
-    }
-
-    /// Get total interest expense (cash + PIK) for a specific instrument and period.
-    ///
-    /// # Arguments
-    ///
-    /// * `instrument_id` - Identifier supplied when the instrument was added to the model
-    /// * `period_id` - Period for which the cashflow should be returned
-    ///
-    /// # Returns
-    ///
-    /// Returns the total interest expense in the instrument's native currency as
-    /// a scalar amount.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when no breakdown exists for the
-    /// `(instrument_id, period_id)` pair or when the cash and PIK currencies
-    /// differ.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
-    /// # use finstack_quant_core::dates::PeriodId;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::currency::Currency;
-    /// let mut cashflows = CapitalStructureCashflows::new();
-    /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    /// cashflows.by_instrument.insert(
-    ///     "BOND-1".into(),
-    ///     [(period, CashflowBreakdown { interest_expense_cash: Money::from((5_000_i64, Currency::USD)), ..CashflowBreakdown::with_currency(Currency::USD) })]
-    ///         .into_iter()
-    ///         .collect(),
-    /// );
-    /// assert_eq!(cashflows.get_interest("BOND-1", &period).unwrap(), 5_000.0);
-    /// ```
-    pub fn get_interest(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
-        let cf = self
-            .by_instrument
-            .get(instrument_id)
-            .and_then(|m| m.get(period_id))
-            .ok_or_else(|| {
+            self.totals.get(period_id).ok_or_else(|| {
                 crate::error::Error::capital_structure(format!(
-                    "No interest data for instrument '{}' in period {}",
-                    instrument_id, period_id
+                    "No total cashflow data for period {period_id}"
                 ))
-            })?;
-        Ok(cf.interest_expense_total()?.amount())
-    }
-
-    /// Get cash interest expense for a specific instrument and period.
-    ///
-    /// # Arguments
-    /// * `instrument_id` - Instrument identifier
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// Cash interest as a scalar in the instrument's native currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when the requested instrument-period
-    /// breakdown is absent.
-    pub fn get_interest_cash(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
-        self.get_instrument_field(instrument_id, period_id, "cash interest", |cf| {
-            cf.interest_expense_cash.amount()
-        })
-    }
-
-    /// Get cash interest **received** for a specific instrument and period.
-    ///
-    /// Includes net hedge receipts and receipts from negative-rate debt coupons.
-    ///
-    /// # Arguments
-    /// * `instrument_id` - Instrument identifier
-    /// * `period_id` - Period to inspect
-    pub fn get_interest_income(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
-        self.get_instrument_field(instrument_id, period_id, "interest income", |cf| {
-            cf.interest_income_cash_or_zero().amount()
-        })
-    }
-
-    /// Get PIK interest expense for a specific instrument and period.
-    ///
-    /// # Arguments
-    /// * `instrument_id` - Instrument identifier
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// PIK interest accrued during the period in the instrument's native currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when the requested instrument-period
-    /// breakdown is absent.
-    pub fn get_interest_pik(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
-        self.get_instrument_field(instrument_id, period_id, "PIK interest", |cf| {
-            cf.interest_expense_pik.amount()
-        })
-    }
-
-    /// Get principal payment for a specific instrument and period.
-    ///
-    /// # Arguments
-    /// * `instrument_id` - Instrument identifier
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// Principal paid during the period in the instrument's native currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when the requested instrument-period
-    /// breakdown is absent.
-    pub fn get_principal(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
-        self.get_instrument_field(instrument_id, period_id, "principal", |cf| {
-            cf.principal_payment.amount()
-        })
-    }
-
-    /// Get debt balance for a specific instrument and period.
-    ///
-    /// # Arguments
-    /// * `instrument_id` - Instrument identifier
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// End-of-period debt balance in the instrument's native currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when the requested instrument-period
-    /// breakdown is absent.
-    pub fn get_debt_balance(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
-        self.get_instrument_field(instrument_id, period_id, "debt balance", |cf| {
-            cf.debt_balance.amount()
-        })
-    }
-
-    /// Get fees for a specific instrument and period.
-    ///
-    /// # Arguments
-    /// * `instrument_id` - Instrument identifier
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// Fees charged during the period in the instrument's native currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when the requested instrument-period
-    /// breakdown is absent.
-    pub fn get_fees(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
-        self.get_instrument_field(instrument_id, period_id, "fees", |cf| cf.fees.amount())
-    }
-
-    /// Get accrued interest for a specific instrument and period.
-    ///
-    /// # Arguments
-    /// * `instrument_id` - Instrument identifier
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// Accrued unpaid interest in the instrument's native currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when the requested instrument-period
-    /// breakdown is absent.
-    pub fn get_accrued_interest(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
-        self.get_instrument_field(instrument_id, period_id, "accrued interest", |cf| {
-            cf.accrued_interest.amount()
-        })
-    }
-
-    /// Get total interest expense (cash + PIK) across all instruments for a period.
-    ///
-    /// # Arguments
-    ///
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// Returns total interest in the reporting currency. If reporting totals are
-    /// unavailable because multiple currencies are present and no FX conversion
-    /// was supplied, this function returns an error.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when multi-currency totals lack a
-    /// reporting-currency conversion, no total exists for `period_id`, or the
-    /// cash and PIK total currencies differ.
-    pub fn get_total_interest(&self, period_id: &PeriodId) -> Result<f64> {
-        if self.reporting_currency.is_none()
-            && self.totals.is_empty()
-            && self.totals_by_currency.len() > 1
-        {
-            return Err(crate::error::Error::capital_structure(
-                "Multiple currencies present in capital structure totals and no FX provided. Supply FX in MarketContext or limit to a single currency.",
-            ));
-        }
-        let cf = self.totals.get(period_id).ok_or_else(|| {
-            crate::error::Error::capital_structure(format!(
-                "No total cashflow data for period {}",
-                period_id
-            ))
-        })?;
-        Ok(cf.interest_expense_total()?.amount())
-    }
-
-    /// Get total cash interest expense across all instruments for a period.
-    ///
-    /// # Arguments
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// Cash interest in the reporting currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when multi-currency totals lack a
-    /// reporting-currency conversion or no total exists for `period_id`.
-    pub fn get_total_interest_cash(&self, period_id: &PeriodId) -> Result<f64> {
-        self.reporting_total(period_id, |cf| cf.interest_expense_cash.amount())
-    }
-
-    /// Get total cash interest **received** across all instruments for a period.
-    ///
-    /// Includes net hedge receipts and receipts from negative-rate debt coupons.
-    ///
-    /// # Arguments
-    /// * `period_id` - Period to inspect
-    pub fn get_total_interest_income(&self, period_id: &PeriodId) -> Result<f64> {
-        self.reporting_total(period_id, |cf| cf.interest_income_cash_or_zero().amount())
-    }
-
-    /// Get total PIK interest expense across all instruments for a period.
-    ///
-    /// # Arguments
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// PIK interest in the reporting currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when multi-currency totals lack a
-    /// reporting-currency conversion or no total exists for `period_id`.
-    pub fn get_total_interest_pik(&self, period_id: &PeriodId) -> Result<f64> {
-        self.reporting_total(period_id, |cf| cf.interest_expense_pik.amount())
-    }
-
-    /// Get total principal payments across all instruments for a period.
-    ///
-    /// # Arguments
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// Principal payments in the reporting currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when multi-currency totals lack a
-    /// reporting-currency conversion or no total exists for `period_id`.
-    pub fn get_total_principal(&self, period_id: &PeriodId) -> Result<f64> {
-        self.reporting_total(period_id, |cf| cf.principal_payment.amount())
-    }
-
-    /// Get total debt balance across all instruments for a period.
-    ///
-    /// # Arguments
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// End-of-period debt balance in the reporting currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when multi-currency totals lack a
-    /// reporting-currency conversion or no total exists for `period_id`.
-    pub fn get_total_debt_balance(&self, period_id: &PeriodId) -> Result<f64> {
-        self.reporting_total(period_id, |cf| cf.debt_balance.amount())
-    }
-
-    /// Get total fees across all instruments for a period.
-    ///
-    /// # Arguments
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// Fees in the reporting currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when multi-currency totals lack a
-    /// reporting-currency conversion or no total exists for `period_id`.
-    pub fn get_total_fees(&self, period_id: &PeriodId) -> Result<f64> {
-        self.reporting_total(period_id, |cf| cf.fees.amount())
-    }
-
-    /// Get total accrued interest across all instruments for a period.
-    ///
-    /// # Arguments
-    /// * `period_id` - Period to inspect
-    ///
-    /// # Returns
-    ///
-    /// Accrued interest in the reporting currency.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when multi-currency totals lack a
-    /// reporting-currency conversion or no total exists for `period_id`.
-    pub fn get_total_accrued_interest(&self, period_id: &PeriodId) -> Result<f64> {
-        self.reporting_total(period_id, |cf| cf.accrued_interest.amount())
-    }
-
-    /// Helper to fetch reporting totals with better error messages.
-    fn reporting_total(
-        &self,
-        period_id: &PeriodId,
-        f: impl Fn(&CashflowBreakdown) -> f64,
-    ) -> Result<f64> {
-        if self.reporting_currency.is_none()
-            && self.totals.is_empty()
-            && self.totals_by_currency.len() > 1
-        {
-            return Err(crate::error::Error::capital_structure(
-                "Multiple currencies present in capital structure totals and no FX provided. Supply FX in MarketContext or limit to a single currency.",
-            ));
-        }
-
-        self.totals.get(period_id).map(f).ok_or_else(|| {
-            crate::error::Error::capital_structure(format!(
-                "No total cashflow data for period {}",
-                period_id
-            ))
-        })
+            })?
+        } else {
+            self.by_instrument
+                .get(instrument_or_total)
+                .and_then(|periods| periods.get(period_id))
+                .ok_or_else(|| {
+                    crate::error::Error::capital_structure(format!(
+                        "No {component} data for instrument '{instrument_or_total}' in period {period_id}"
+                    ))
+                })?
+        };
+        extract(flow)
     }
 }
 
@@ -1185,57 +821,94 @@ mod tests {
             .insert("BOND-001".to_string(), period_map);
         cs_cf.totals.insert(period_id, breakdown);
 
+        for scope in ["BOND-001", "total"] {
+            for (component, expected) in [
+                ("interest_expense", 50_000.0),
+                ("interest_expense_cash", 45_000.0),
+                ("interest_expense_pik", 5_000.0),
+                ("interest_income", 0.0),
+                ("principal_payment", 100_000.0),
+                ("debt_balance", 1_000_000.0),
+                ("fees", 0.0),
+                ("accrued_interest", 2_500.0),
+            ] {
+                assert_eq!(
+                    cs_cf
+                        .get_component(component, scope, &period_id)
+                        .expect("component"),
+                    expected
+                );
+            }
+        }
+        assert!(cs_cf
+            .get_component("unknown", "BOND-001", &period_id)
+            .is_err());
+        let missing = PeriodId::quarter(2025, 2).expect("period");
+        assert!(cs_cf.get_component("fees", "total", &missing).is_err());
+        let mut incompatible = CashflowBreakdown::with_currency(Currency::USD);
+        incompatible.interest_expense_pik = Money::from((1_i64, Currency::EUR));
+        cs_cf
+            .by_instrument
+            .entry("BAD".into())
+            .or_default()
+            .insert(period_id, incompatible);
+        assert!(cs_cf
+            .get_component("interest_expense", "BAD", &period_id)
+            .is_err());
+
         assert_eq!(
             cs_cf
-                .get_interest("BOND-001", &period_id)
+                .get_component("interest_expense", "BOND-001", &period_id)
                 .expect("interest"),
             50_000.0
         );
         assert_eq!(
             cs_cf
-                .get_principal("BOND-001", &period_id)
+                .get_component("principal_payment", "BOND-001", &period_id)
                 .expect("principal"),
             100_000.0
         );
         assert_eq!(
             cs_cf
-                .get_debt_balance("BOND-001", &period_id)
+                .get_component("debt_balance", "BOND-001", &period_id)
                 .expect("balance"),
             1_000_000.0
         );
         assert_eq!(
             cs_cf
-                .get_accrued_interest("BOND-001", &period_id)
+                .get_component("accrued_interest", "BOND-001", &period_id)
                 .expect("accrued"),
             2_500.0
         );
 
         assert_eq!(
             cs_cf
-                .get_total_interest(&period_id)
+                .get_component("interest_expense", "total", &period_id)
                 .expect("total interest"),
             50_000.0
         );
         assert_eq!(
             cs_cf
-                .get_total_principal(&period_id)
+                .get_component("principal_payment", "total", &period_id)
                 .expect("total principal"),
             100_000.0
         );
         assert_eq!(
             cs_cf
-                .get_total_debt_balance(&period_id)
+                .get_component("debt_balance", "total", &period_id)
                 .expect("total balance"),
             1_000_000.0
         );
         assert_eq!(
             cs_cf
-                .get_total_accrued_interest(&period_id)
+                .get_component("accrued_interest", "total", &period_id)
                 .expect("total accrued"),
             2_500.0
         );
 
-        assert!(cs_cf.get_interest("NONEXISTENT", &period_id).is_err());
+        assert!(cs_cf
+            .get_component("interest_expense", "NONEXISTENT", &period_id)
+            .is_err());
     }
 
     #[test]
@@ -1295,7 +968,7 @@ mod tests {
         cs.totals_by_currency.insert(Currency::EUR, IndexMap::new());
 
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let err = cs.get_total_interest(&period);
+        let err = cs.get_component("interest_expense", "total", &period);
         assert!(err.is_err());
     }
 }

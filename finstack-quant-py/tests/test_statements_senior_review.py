@@ -13,6 +13,18 @@ from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics import run_checks
 
 
+def test_canonical_forecast_and_registry_names() -> None:
+    assert not hasattr(s.ForecastSpec, "override")
+    assert s.ForecastSpec.overrides({"2025Q2": 120.0}).method.kind == "override"
+    registry = s.Registry.with_builtins()
+    assert not hasattr(registry, "dependencies")
+    assert "fin.gross_profit" in registry.get_dependencies("fin.gross_margin")
+    assert s.parse_formula("ltm(revenue)") == "ltm(revenue)"
+    with pytest.raises(ValueError, match="Function 'ltm' is not supported"):
+        s.parse_and_compile("ltm(revenue)")
+    assert s.parse_and_compile("ttm(revenue)") is None
+
+
 @pytest.mark.parametrize("ready", [False, True])
 @pytest.mark.parametrize(
     "method",
@@ -126,22 +138,22 @@ def test_swap_with_two_receiving_legs_reports_interest_income(
     assert float(flow["interest_expense_cash"]["amount"]) == 0.0
     income = float(flow["interest_income_cash"]["amount"])
     assert income > 0.0
-    assert results.cs_cashflows.get_interest_cash("IRS", "2025") == 0.0
-    assert results.cs_cashflows.get_debt_balance("IRS", "2025") == 0.0
-    assert results.cs_cashflows.get_accrued_interest("IRS", "2025") == 0.0
+    assert results.cs_cashflows.get_component("interest_expense_cash", "IRS", "2025") == 0.0
+    assert results.cs_cashflows.get_component("debt_balance", "IRS", "2025") == 0.0
+    assert results.cs_cashflows.get_component("accrued_interest", "IRS", "2025") == 0.0
     assert float(flow["principal_payment"]["amount"]) == 0.0
     assert results.get("income", "2025") == pytest.approx(income)
     # STMT-007: interest-income and per-currency totals are reachable typed.
     cs = results.cs_cashflows
-    assert cs.get_interest_income("IRS", "2025") == pytest.approx(income)
+    assert cs.get_component("interest_income", "IRS", "2025") == pytest.approx(income)
     usd_totals = cs.totals_by_currency["USD"]["2025"]
     assert usd_totals["interest_income_cash"].amount == pytest.approx(income)
     assert usd_totals["interest_expense_cash"].amount == 0.0
     if cs.reporting_currency is not None:
-        assert cs.get_total_interest_income("2025") == pytest.approx(income)
-        assert cs.get_total_interest_cash("2025") == 0.0
-        assert cs.get_total_interest_pik("2025") == 0.0
-        assert cs.get_total_accrued_interest("2025") == 0.0
+        assert cs.get_component("interest_income", "total", "2025") == pytest.approx(income)
+        assert cs.get_component("interest_expense_cash", "total", "2025") == 0.0
+        assert cs.get_component("interest_expense_pik", "total", "2025") == 0.0
+        assert cs.get_component("accrued_interest", "total", "2025") == 0.0
 
 
 def test_merge_into_results_writes_normalized_node() -> None:
@@ -173,3 +185,78 @@ def test_model_rejects_rate_hedge_as_pik_target() -> None:
     builder.waterfall(s.WaterfallSpec(pik_toggle=s.PikToggleSpec("cash", 20.0, ["IRS"])))
     with pytest.raises(ValueError, match="only borrowing debt coupons can capitalize into principal"):
         builder.build()
+
+
+def test_adjustment_cap_requires_an_explicit_supported_base_mode() -> None:
+    adjustment = s.Adjustment.percentage("synergies", "Synergies", "revenue", 0.05)
+    for mode in ("reported", "progressive"):
+        capped = adjustment.with_cap("ebitda", 0.20, mode)
+        assert capped.cap_base_mode == mode
+    assert json.loads(adjustment.to_json()).get("cap") is None
+    assert not hasattr(adjustment, "with_cap_mode")
+    with pytest.raises(TypeError):
+        adjustment.with_cap("ebitda", 0.20)  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="reported or progressive"):
+        adjustment.with_cap("ebitda", 0.20, "same_period")
+
+
+def test_empty_explicit_periods_preserve_model_builder_for_retry() -> None:
+    builder = s.ModelBuilder("recoverable")
+    builder.value_scalar("revenue", {"2025Q1": 100.0})
+    builder.with_meta("marker", {"retained": True})
+    with pytest.raises(ValueError, match="at least one period"):
+        builder.periods_explicit([])
+    builder.periods("2025Q1..Q2", "2025Q1")
+    builder.forecast("revenue", s.ForecastSpec.forward_fill())
+    model = json.loads(builder.build().to_json())
+    assert model["nodes"]["revenue"]["values"]["2025Q1"] == 100.0
+    assert model["meta"]["marker"] == {"retained": True}
+
+
+def test_failed_mixed_formula_preserves_configuration_and_parent() -> None:
+    parent = s.ModelBuilder("mixed-recovery").periods("2025Q1..Q2", "2025Q1")
+    parent.value_scalar("base", {"2025Q1": 100.0})
+    parent.with_meta("marker", "retained")
+    mixed = parent.mixed("mixed")
+    assert mixed.values([("2025Q1", 40.0)]) is mixed
+    assert mixed.forecast(s.ForecastSpec.forward_fill()) is mixed
+    assert mixed.name("Retained name") is mixed
+    with pytest.raises(ValueError, match="parse"):
+        mixed.formula("(")
+    mixed.formula("base * 0.5")
+    model = json.loads(mixed.build().build().to_json())
+    assert model["nodes"]["mixed"]["values"]["2025Q1"] == 40.0
+    assert model["nodes"]["mixed"]["name"] == "Retained name"
+    assert model["nodes"]["mixed"]["formula_text"] == "base * 0.5"
+    assert model["meta"]["marker"] == "retained"
+    assert "base" in model["nodes"]
+
+
+def test_accounting_overflow_is_an_error_without_invalid_numbers() -> None:
+    builder = s.ModelBuilder("overflow")
+    builder.periods("2025Q1..Q2", None)
+    for name, bad, good in [("a1", 1e308, 40.0), ("a2", 1e308, 60.0), ("l", 1e308, 70.0), ("e", 1e308, 30.0)]:
+        builder.value_scalar(name, {"2025Q1": bad, "2025Q2": good})
+    model = builder.build()
+    suite = s.CheckSuiteSpec(
+        "overflow",
+        builtin_checks=[
+            {
+                "type": "balance_sheet_articulation",
+                "assets_nodes": ["a1", "a2"],
+                "liabilities_nodes": ["l"],
+                "equity_nodes": ["e"],
+            }
+        ],
+        config=s.CheckConfig(materiality_threshold=1e300),
+    )
+    report = json.loads(run_checks(model, suite).to_json())
+    assert report["summary"]["failed"] == 1
+    result = report["results"][0]
+    assert not result["passed"]
+    assert len(result["comparisons"]) == 1
+    assert result["comparisons"][0]["period"] == "2025Q2"
+    finding = result["findings"][0]
+    assert finding["severity"] == "error"
+    assert finding.get("comparison") is None
+    assert finding.get("materiality") is None

@@ -7,6 +7,22 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
+test('canonical registry name and compiled trailing-period function', () => {
+  const registry = statements.Registry.withBuiltins();
+  try {
+    assert.equal(registry.dependencies, undefined);
+    assert.ok(registry.getDependencies('fin.gross_margin').includes('fin.gross_profit'));
+  } finally {
+    registry.free();
+  }
+  assert.doesNotThrow(() => statements.parseFormula('ltm(revenue)'));
+  assert.throws(
+    () => statements.parseAndCompile('ltm(revenue)'),
+    /Function 'ltm' is not supported/
+  );
+  assert.equal(statements.parseAndCompile('ttm(revenue)'), undefined);
+});
+
 /** One-shot `Evaluator.evaluate`, the branch twin of the retired `evaluateModel`. */
 function evaluateModel(input) {
   const evaluator = new statements.Evaluator();
@@ -228,4 +244,77 @@ test('checkConfigValidate is the Rust CheckConfig::validate', () => {
     (error) => error.kind === 'validation'
   );
   assert.throws(() => statements.checkConfigValidate(1), TypeError);
+});
+
+test('empty explicit periods preserve the model builder for retry', () => {
+  const builder = new statements.ModelBuilder('recoverable');
+  try {
+    builder.valueScalar('revenue', { '2025Q1': 100 });
+    builder.withMeta('marker', { retained: true });
+    assert.throws(() => builder.periodsExplicit([]), /at least one period/);
+    builder.periods('2025Q1..Q2', '2025Q1');
+    builder.forecast('revenue', { method: 'forward_fill', params: {} });
+    const model = builder.build();
+    assert.equal(model.nodes.revenue.values['2025Q1'], 100);
+    assert.deepEqual(model.meta.marker, { retained: true });
+  } finally {
+    builder.free();
+  }
+});
+
+test('failed mixed formula preserves values, forecast, name and parent', () => {
+  const parent = new statements.ModelBuilder('mixed-recovery');
+  let mixed;
+  let ready;
+  try {
+    parent.periods('2025Q1..Q2', '2025Q1');
+    parent.valueScalar('base', { '2025Q1': 100 });
+    parent.withMeta('marker', 'retained');
+    mixed = parent.mixed('mixed');
+    mixed.values({ '2025Q1': 40 });
+    mixed.forecast({ method: 'forward_fill', params: {} });
+    mixed.name('Retained name');
+    assert.throws(() => mixed.formula('('));
+    mixed.formula('base * 0.5');
+    ready = mixed.build();
+    const model = ready.build();
+    assert.equal(model.nodes.mixed.values['2025Q1'], 40);
+    assert.equal(model.nodes.mixed.name, 'Retained name');
+    assert.equal(model.nodes.mixed.formula_text, 'base * 0.5');
+    assert.equal(model.meta.marker, 'retained');
+    assert.ok(model.nodes.base);
+  } finally {
+    ready?.free();
+    mixed?.free();
+    parent.free();
+  }
+});
+
+test('accounting overflow fails without publishing invalid numbers', () => {
+  const input = model({
+    a1: values('a1', [1e308, 40, 40]),
+    a2: values('a2', [1e308, 60, 60]),
+    l: values('l', [1e308, 70, 70]),
+    e: values('e', [1e308, 30, 30]),
+  });
+  const suite = {
+    name: 'overflow',
+    config: { materiality_threshold: 1e300 },
+    builtin_checks: [
+      {
+        type: 'balance_sheet_articulation',
+        assets_nodes: ['a1', 'a2'],
+        liabilities_nodes: ['l'],
+        equity_nodes: ['e'],
+      },
+    ],
+  };
+  const report = statements_analytics.runChecks(input, suite);
+  assert.equal(report.summary.failed, 1);
+  const result = report.results[0];
+  assert.equal(result.passed, false);
+  assert.equal(result.comparisons.length, 2);
+  assert.equal(result.findings[0].severity, 'error');
+  assert.equal(result.findings[0].comparison ?? null, null);
+  assert.equal(result.findings[0].materiality ?? null, null);
 });

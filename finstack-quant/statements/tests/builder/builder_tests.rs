@@ -13,7 +13,13 @@ use finstack_quant_statements::Error;
 
 #[test]
 fn test_periods_parsing() {
-    let result = ModelBuilder::new("test").periods("2025Q1..Q4", None);
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        match model_builder.periods("2025Q1..Q4", None) {
+            Ok(_) => Ok(model_builder),
+            Err(error) => Err(error),
+        }
+    };
     assert!(result.is_ok());
 
     let builder = result.unwrap();
@@ -32,11 +38,11 @@ fn test_periods_parsing() {
 
 #[test]
 fn test_periods_with_actuals_cutoff() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(model.periods.len(), 4);
 
@@ -52,28 +58,34 @@ fn test_periods_with_actuals_cutoff() {
 #[test]
 fn test_periods_explicit() {
     let periods = build_periods("2025Q1..Q2", None).unwrap().periods;
-    let model = ModelBuilder::new("test")
-        .periods_explicit(periods)
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods_explicit(periods).unwrap();
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(model.periods.len(), 2);
 }
 
 #[test]
 fn test_empty_periods_error() {
-    let result = ModelBuilder::new("test").periods_explicit(vec![]);
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        match model_builder.periods_explicit(vec![]) {
+            Ok(_) => Ok(model_builder),
+            Err(error) => Err(error),
+        }
+    };
     assert!(result.is_err());
 }
 
 #[test]
 fn test_model_serialization() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.build().unwrap()
+    };
 
     // Test JSON serialization roundtrip
     let json = serde_json::to_string(&model).unwrap();
@@ -87,18 +99,18 @@ fn test_model_serialization() {
 
 #[test]
 fn test_value_node_single_period() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(model.nodes.len(), 1);
     assert!(model.has_node("revenue"));
@@ -117,10 +129,10 @@ fn test_value_node_single_period() {
 
 #[test]
 fn test_value_node_multiple_periods() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -136,9 +148,9 @@ fn test_value_node_multiple_periods() {
                     AmountOrScalar::scalar(121_000.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let node = model.get_node("revenue").unwrap();
     let values = node.values.as_ref().unwrap();
@@ -160,18 +172,18 @@ fn test_value_node_multiple_periods() {
 
 #[test]
 fn test_value_node_with_currency() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::amount(1_000_000.0, Currency::USD).expect("valid amount fixture"),
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let node = model.get_node("revenue").unwrap();
     let values = node.values.as_ref().unwrap();
@@ -184,10 +196,10 @@ fn test_value_node_with_currency() {
 
 #[test]
 fn test_value_node_rejects_mixed_currencies_within_one_node() {
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -199,8 +211,9 @@ fn test_value_node_rejects_mixed_currencies_within_one_node() {
                     AmountOrScalar::amount(90_000.0, Currency::EUR).expect("valid amount fixture"),
                 ),
             ],
-        )
-        .build();
+        );
+        model_builder.build()
+    };
 
     let message = result.unwrap_err().to_string();
     assert!(
@@ -211,13 +224,14 @@ fn test_value_node_rejects_mixed_currencies_within_one_node() {
 
 #[test]
 fn test_calculated_node() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(model.nodes.len(), 1);
     let node = model.get_node("gross_profit").unwrap();
@@ -229,10 +243,14 @@ fn test_calculated_node() {
 
 #[test]
 fn test_empty_formula_error() {
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .compute("invalid", "");
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        match model_builder.compute("invalid", "") {
+            Ok(_) => Ok(model_builder),
+            Err(error) => Err(error),
+        }
+    };
 
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), Error::FormulaParse(_)));
@@ -240,20 +258,24 @@ fn test_empty_formula_error() {
 
 #[test]
 fn test_whitespace_only_formula_error() {
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .compute("invalid", "   ");
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        match model_builder.compute("invalid", "   ") {
+            Ok(_) => Ok(model_builder),
+            Err(error) => Err(error),
+        }
+    };
 
     assert!(result.is_err());
 }
 
 #[test]
 fn test_multiple_nodes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -265,13 +287,13 @@ fn test_multiple_nodes() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(model.nodes.len(), 3);
     assert!(model.has_node("revenue"));
@@ -281,13 +303,13 @@ fn test_multiple_nodes() {
 
 #[test]
 fn test_metadata() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .with_meta("author", serde_json::json!("Test User"))
-        .with_meta("version", serde_json::json!("1.0.0"))
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.with_meta("author", serde_json::json!("Test User"));
+        model_builder.with_meta("version", serde_json::json!("1.0.0"));
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(model.meta.len(), 2);
     assert_eq!(model.meta["author"], "Test User");
@@ -296,11 +318,11 @@ fn test_metadata() {
 
 #[test]
 fn test_schema_version() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(u32::from(model.schema_version), 1);
 }
@@ -309,49 +331,57 @@ fn test_schema_version() {
 
 #[test]
 fn test_basic_pl_model() {
-    let model = ModelBuilder::new("Simple P&L")
-        .periods("2025Q1..2025Q4", Some("2025Q2"))
-        .unwrap()
-        // Revenue
-        .value(
-            "revenue",
-            &[
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(10_000_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(11_000_000.0),
-                ),
-            ],
-        )
-        // COGS as 60% of revenue
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        // Operating expenses
-        .value(
-            "opex",
-            &[
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(2_000_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(2_100_000.0),
-                ),
-            ],
-        )
-        // Derived metrics
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .compute("operating_income", "gross_profit - opex")
-        .unwrap()
-        .compute("gross_margin", "gross_profit / revenue")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("Simple P&L");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q2"))
+            .unwrap();
+        model_builder
+            // Revenue
+            .value(
+                "revenue",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(10_000_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(11_000_000.0),
+                    ),
+                ],
+            );
+        model_builder
+            // COGS as 60% of revenue
+            .compute("cogs", "revenue * 0.6")
+            .unwrap();
+        model_builder
+            // Operating expenses
+            .value(
+                "opex",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(2_000_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(2_100_000.0),
+                    ),
+                ],
+            );
+        model_builder
+            // Derived metrics
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder
+            .compute("operating_income", "gross_profit - opex")
+            .unwrap();
+        model_builder
+            .compute("gross_margin", "gross_profit / revenue")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(model.id, "Simple P&L");
     assert_eq!(model.periods.len(), 4);
@@ -380,25 +410,25 @@ fn test_basic_pl_model() {
 
 #[test]
 fn test_model_with_multiple_currencies() {
-    let model = ModelBuilder::new("Multi-currency")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("Multi-currency");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "usd_revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::amount(1_000_000.0, Currency::USD).expect("valid amount fixture"),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "eur_revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::amount(900_000.0, Currency::EUR).expect("valid amount fixture"),
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let usd_node = model.get_node("usd_revenue").unwrap();
     let eur_node = model.get_node("eur_revenue").unwrap();
@@ -555,17 +585,18 @@ fn test_amount_or_scalar_from_conversions() {
 /// This prefix is used internally for capital structure references.
 #[test]
 fn test_reserved_cs_prefix_rejected_in_value() {
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "__cs__bad_node",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .build();
+        );
+        model_builder.build()
+    };
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
@@ -579,17 +610,18 @@ fn test_reserved_cs_prefix_rejected_in_value() {
 /// Test that node IDs containing __cs__ anywhere are rejected.
 #[test]
 fn test_reserved_cs_prefix_in_middle_rejected() {
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue__cs__hidden",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .build();
+        );
+        model_builder.build()
+    };
 
     assert!(result.is_err());
 }
@@ -598,10 +630,14 @@ fn test_reserved_cs_prefix_in_middle_rejected() {
 /// This prefix is reserved for internal use.
 #[test]
 fn test_double_underscore_prefix_rejected_in_compute() {
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .compute("__internal_node", "100");
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        match model_builder.compute("__internal_node", "100") {
+            Ok(_) => Ok(model_builder),
+            Err(error) => Err(error),
+        }
+    };
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
@@ -615,33 +651,35 @@ fn test_double_underscore_prefix_rejected_in_compute() {
 /// Test that normal node IDs without reserved prefixes are accepted.
 #[test]
 fn test_normal_node_ids_accepted() {
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "_single_underscore",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(50.0),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "node_with__double_inside",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(25.0),
             )],
-        )
-        .compute("gross_profit", "revenue * 0.4")
-        .unwrap()
-        .build();
+        );
+        model_builder
+            .compute("gross_profit", "revenue * 0.4")
+            .unwrap();
+        model_builder.build()
+    };
 
     assert!(result.is_ok());
 }
@@ -649,15 +687,16 @@ fn test_normal_node_ids_accepted() {
 /// Test that mixed node builder also validates node IDs.
 #[test]
 fn test_reserved_prefix_rejected_in_mixed_node() {
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .mixed("__bad_mixed")
-        .values(&[(
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        let mut model_builder = model_builder.mixed("__bad_mixed");
+        model_builder.values(&[(
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
             AmountOrScalar::scalar(100.0),
-        )])
-        .build();
+        )]);
+        model_builder.build()
+    };
 
     assert!(result.is_err());
 }
@@ -667,19 +706,19 @@ fn from_spec_roundtrip_preserves_complete_model_state() {
     use finstack_quant_statements::types::CapitalStructureSpec;
     use indexmap::indexmap;
 
-    let mut spec = ModelBuilder::new("roundtrip")
-        .periods("2025Q1..Q2", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let mut spec = {
+        let mut model_builder = ModelBuilder::new("roundtrip");
+        model_builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .with_meta("source", serde_json::json!({"system": "test"}))
-        .build()
-        .unwrap();
+        );
+        model_builder.with_meta("source", serde_json::json!({"system": "test"}));
+        model_builder.build().unwrap()
+    };
     spec.capital_structure = Some(CapitalStructureSpec {
         debt_instruments: Vec::new(),
         meta: indexmap! { "desk".into() => serde_json::json!("credit") },
@@ -689,7 +728,10 @@ fn from_spec_roundtrip_preserves_complete_model_state() {
     });
     let expected = serde_json::to_value(&spec).unwrap();
 
-    let rebuilt = ModelBuilder::from_spec(spec).unwrap().build().unwrap();
+    let rebuilt = {
+        let model_builder = ModelBuilder::from_spec(spec).unwrap();
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(serde_json::to_value(rebuilt).unwrap(), expected);
 }

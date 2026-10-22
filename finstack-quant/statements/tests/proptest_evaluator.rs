@@ -16,19 +16,17 @@ proptest! {
         revenue_q2 in 100_000.0..1_000_000.0,
         cogs_multiplier in 0.4..0.8,
     ) {
-        let model = ModelBuilder::new("proptest")
-            .periods("2025Q1..Q2", None)
-            .unwrap()
-            .value("revenue", &[
+        let model = {
+            let mut model_builder = ModelBuilder::new("proptest");
+            model_builder.periods("2025Q1..Q2", None).unwrap();
+            model_builder.value("revenue", &[
                 (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(revenue_q1)),
                 (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(revenue_q2)),
-            ])
-            .compute("cogs", format!("revenue * {}", cogs_multiplier))
-            .unwrap()
-            .compute("gross_profit", "revenue - cogs")
-            .unwrap()
-            .build()
-            .unwrap();
+            ]);
+            model_builder.compute("cogs", format!("revenue * {}", cogs_multiplier)).unwrap();
+            model_builder.compute("gross_profit", "revenue - cogs").unwrap();
+            model_builder.build().unwrap()
+        };
 
         // Evaluate 10 times
         let mut results_vec = Vec::new();
@@ -69,14 +67,16 @@ proptest! {
         num_nodes in 3usize..10usize,
     ) {
         // Build a model with a chain of dependent nodes
-        let mut builder = ModelBuilder::new("dag_test")
-            .periods("2025Q1..Q1", None)
-            .unwrap()
-            .value("base", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))]);
+        let mut builder = {
+            let mut model_builder = ModelBuilder::new("dag_test");
+            model_builder.periods("2025Q1..Q1", None).unwrap();
+            model_builder.value("base", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))]);
+            model_builder
+        };
 
         for i in 1..num_nodes {
             let prev = if i == 1 { "base".to_string() } else { format!("node_{}", i - 1) };
-            builder = builder.compute(format!("node_{}", i), format!("{} * 1.1", prev)).unwrap();
+            builder.compute(format!("node_{}", i), format!("{} * 1.1", prev)).unwrap();
         }
 
         let model = builder.build().unwrap();
@@ -101,13 +101,13 @@ proptest! {
         mean in 0.01..0.10,
         std_dev in 0.01..0.05,
     ) {
-        let model = ModelBuilder::new("forecast_test")
-            .periods("2025Q1..Q4", Some("2025Q1"))
-            .unwrap()
-            .value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0))])
-            .forecast("revenue", ForecastSpec::log_normal(mean, std_dev, seed))
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("forecast_test");
+            model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+            model_builder.value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0))]);
+            model_builder.forecast("revenue", ForecastSpec::log_normal(mean, std_dev, seed));
+            model_builder.build().unwrap()
+        };
 
         // Evaluate twice with same seed
         let mut eval1 = Evaluator::new();
@@ -133,13 +133,13 @@ proptest! {
         base_value in 50_000.0..200_000.0,
         growth_rate in 0.01..0.20,
     ) {
-        let model = ModelBuilder::new("growth_test")
-            .periods("2025Q1..Q4", Some("2025Q1"))
-            .unwrap()
-            .value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(base_value))])
-            .forecast("revenue", ForecastSpec::growth(growth_rate))
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("growth_test");
+            model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+            model_builder.value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(base_value))]);
+            model_builder.forecast("revenue", ForecastSpec::growth(growth_rate));
+            model_builder.build().unwrap()
+        };
 
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).unwrap();

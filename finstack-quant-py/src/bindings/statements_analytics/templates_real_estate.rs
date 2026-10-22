@@ -12,6 +12,7 @@ use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe, serde_object_to_single_row_dataframe_with_schema,
 };
+use crate::bindings::pydoc::pydoc;
 use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use finstack_quant_statements_analytics::templates::real_estate as rust_re;
@@ -403,18 +404,7 @@ impl PyLeaseSpec {
             .map_err(crate::errors::statements_to_py)
     }
 
-    /// Export the lease spec as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``node_id``, ``start``, ``end``, ``base_rent``,
-    /// ``growth_rate``, ``growth_convention``, ``free_rent_periods``,
-    /// ``occupancy``, ``rent_step_count``, ``free_rent_window_count``,
-    /// ``has_renewal``.
-    ///
-    /// ``start`` and ``end`` are period-id strings, ``base_rent`` is per
-    /// model period, ``growth_rate`` and ``occupancy`` are decimal fractions,
-    /// and ``free_rent_periods`` is a count of model periods. The nested
-    /// collections are summarised as counts here — read ``renewal`` (and its
-    /// own ``to_dataframe``) for the renewal terms.
+    #[doc = pydoc!("finstack_quant.statements_analytics", "LeaseSpec.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let row = serde_json::json!({
             "node_id": self.inner.node_id,
@@ -422,7 +412,7 @@ impl PyLeaseSpec {
             "end": self.inner.end.map(|p| p.to_string()),
             "base_rent": self.inner.base_rent,
             "growth_rate": self.inner.growth_rate,
-            "growth_convention": crate::bindings::statements_analytics::serde_variant_str(&self.inner.growth_convention),
+            "growth_convention": crate::bindings::extract::label(&self.inner.growth_convention)?,
             "free_rent_periods": self.inner.free_rent_periods,
             "occupancy": self.inner.occupancy,
             "rent_step_count": self.inner.rent_steps.len(),

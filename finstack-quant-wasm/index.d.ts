@@ -7495,12 +7495,12 @@ export interface FactorSchemaNamespace {
 }
 
 /**
- * Registry and named accessors of the statements JSON Schemas.
+ * Registry of the canonical statements JSON Schemas.
  * @example
  * ```typescript
  * import init, { statements } from "finstack-quant-wasm";
  * await init();
- * const document = statements.schema.financialModelSpecSchema();
+ * const document = statements.schema.get("financial_model_spec.schema.json");
  * console.log(document.title);
  * ```
  */
@@ -7530,24 +7530,6 @@ export interface StatementsSchemaNamespace {
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and a `TypeError` (kind `invalid_type`) if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
   validate(selector: string, payload: string | object): SchemaValidationFailure[];
-  /**
-   * JSON Schema of a serialized `FinancialModelSpec`.
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
-   */
-  financialModelSpecSchema(): Record<string, unknown>;
-  /**
-   * JSON Schema of a serialized `NormalizationConfig`.
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
-   */
-  normalizationConfigSchema(): Record<string, unknown>;
-  /**
-   * JSON Schema of a serialized `StatementResult`.
-   * @returns JSON Schema document.
-   * @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
-   */
-  statementResultSchema(): Record<string, unknown>;
 }
 
 /**
@@ -31155,13 +31137,13 @@ export interface Registry extends WasmOwned {
   /**
    * Metrics one metric depends on, transitively.
    *
-   * Twin of Python `Registry.dependencies` (Rust
-   * `Registry::get_metric_dependencies`).
+   * Twin of Python `Registry.get_dependencies` (Rust
+   * `Registry::get_dependencies`).
    * @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
    * @returns Qualified identifiers of the metrics to add before `qualifiedId`, in dependency order.
    * @throws Error with kind `not_found` if the metric or one of its dependencies is not registered, and kind `validation` if the dependencies form a cycle.
    */
-  dependencies(qualifiedId: string): string[];
+  getDependencies(qualifiedId: string): string[];
 }
 
 /**
@@ -31221,7 +31203,7 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Define the model periods from a range expression.
    *
-   * Twin of Python `ModelBuilder.periods` (Rust `ModelBuilder::try_periods`).
+   * Twin of Python `ModelBuilder.periods` (Rust `ModelBuilder::periods`).
    * A failed call leaves the builder usable.
    * @param range - Period range `<start>..<end>` in one period kind, e.g. `"2025Q1..Q4"`, `"2024M10..2025M03"` or `"2025..2030"`.
    * @param actualsUntil - Last actual period (inclusive), e.g. `"2025Q2"`; later periods are forecast. Omit to treat every period as forecast.
@@ -31234,7 +31216,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.periods_explicit` (Rust
    * `ModelBuilder::periods_explicit`).
    * @param periods - Array of `Period` objects (`id`, ISO `start`, exclusive ISO `end`, `is_actual`) in timeline order (array or JSON).
-   * @throws Error with kind `validation` if `periods` is malformed, empty, unordered or overlapping, periods were already set, or the builder was consumed.
+   * @throws Error with kind `validation` if `periods` is malformed or empty, periods were already set, or the builder was consumed.
    */
   periodsExplicit(periods: generated.statements.Period[] | string): void;
   /**
@@ -31271,7 +31253,7 @@ export interface ModelBuilder extends WasmOwned {
    * Record the dates on which a node's period values became available.
    *
    * Twin of Python `ModelBuilder.availability_dates` (Rust
-   * `ModelBuilder::try_availability_dates`). A failed call leaves the
+   * `ModelBuilder::availability_dates`). A failed call leaves the
    * builder usable.
    * @param nodeId - Existing node whose values the dates describe.
    * @param availabilityDates - Object mapping period id (e.g. `"2025Q1"`) to the ISO 8601 date its value was published.
@@ -31281,7 +31263,7 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Add a calculated node defined by a DSL formula.
    *
-   * Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::try_compute`).
+   * Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::compute`).
    * A failed call leaves the builder usable.
    * @param nodeId - Node identifier, unique within the model.
    * @param formula - Statements DSL expression, e.g. `"revenue - cogs"`.
@@ -31339,7 +31321,7 @@ export interface ModelBuilder extends WasmOwned {
    * Add every built-in statement metric (`fin.*` namespace).
    *
    * Twin of Python `ModelBuilder.with_builtin_metrics` (Rust
-   * `ModelBuilder::try_with_builtin_metrics`). A failed call leaves the
+   * `ModelBuilder::with_builtin_metrics`). A failed call leaves the
    * builder usable.
    * @throws Error with kind `validation` if the built-in catalog cannot be loaded or the builder was consumed.
    */
@@ -31348,7 +31330,7 @@ export interface ModelBuilder extends WasmOwned {
    * Add one metric and its dependencies from a registry.
    *
    * Twin of Python `ModelBuilder.add_metric_from_registry` (Rust
-   * `ModelBuilder::try_add_metric_from_registry`). A failed call leaves the
+   * `ModelBuilder::add_metric_from_registry`). A failed call leaves the
    * builder usable.
    * @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
    * @param registry - `Registry` holding the metric and its dependencies.
@@ -31358,7 +31340,7 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Add a fixed-rate bond to the capital structure (US conventions: 30/360, semi-annual).
    *
-   * Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::try_add_bond`).
+   * Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::add_bond`).
    * A failed call leaves the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Principal as a `Money` wire object (`{amount, currency}`).
@@ -31380,7 +31362,7 @@ export interface ModelBuilder extends WasmOwned {
    * Add a fixed-rate bond with a market convention preset.
    *
    * Twin of Python `ModelBuilder.add_bond_with_convention` (Rust
-   * `ModelBuilder::try_add_bond_with_convention`). A failed call leaves
+   * `ModelBuilder::add_bond_with_convention`). A failed call leaves
    * the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Principal as a `Money` wire object (`{amount, currency}`).
@@ -31403,7 +31385,7 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Add a pay-fixed interest rate swap to the capital structure (US conventions).
    *
-   * Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::try_add_swap`).
+   * Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::add_swap`).
    * A failed call leaves the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
@@ -31427,7 +31409,7 @@ export interface ModelBuilder extends WasmOwned {
    * Add a pay-fixed interest rate swap with explicit leg conventions.
    *
    * Twin of Python `ModelBuilder.add_swap_with_conventions` (Rust
-   * `ModelBuilder::try_add_swap_with_conventions`). A failed call leaves
+   * `ModelBuilder::add_swap_with_conventions`). A failed call leaves
    * the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
@@ -31596,7 +31578,7 @@ export interface MixedNodeBuilder extends WasmOwned {
    * Set the fallback formula used when no value or forecast applies.
    *
    * Twin of Python `MixedNodeBuilder.formula` (Rust
-   * `MixedNodeBuilder::try_formula`). A failed call leaves the builder
+   * `MixedNodeBuilder::formula`). A failed call leaves the builder
    * usable.
    * @param formula - Statements DSL expression, e.g. `"lag(revenue, 1) * 1.05"`.
    * @throws Error with kind `validation` if the formula is blank or does not parse and compile, or the builder was consumed.
@@ -31659,7 +31641,7 @@ export interface MixedNodeBuilderConstructor {
  */
 export interface StatementsNamespace {
   /**
-   * Registry and named accessors of the statements JSON Schemas.
+   * Registry of the canonical statements JSON Schemas.
    */
   schema: StatementsSchemaNamespace;
   /**
@@ -32011,247 +31993,21 @@ export interface StatementsNamespace {
     severity: CheckSeverity
   ): CheckFinding[];
   /**
-   * Total interest expense (cash plus PIK) of one instrument in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_interest` (Rust
-   * `CapitalStructureCashflows::get_interest`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param instrumentId - Capital-structure instrument identifier.
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Interest expense in the instrument's currency.
-   * @throws Error - Throws with kind `computation` if the instrument or period has no cashflows, and kind `validation` if an input is malformed.
+   * Read a capital-structure component for an instrument or reporting total.
+   * @param cashflowsJson - Capital-structure cashflows object or its serialized JSON.
+   * @param component - One of `interest_expense` (cash plus PIK), `interest_expense_cash`, `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`, `fees`, or `accrued_interest`. Flows are positive payment/receipt magnitudes; debt balance is closing principal. Rate hedges have zero debt balance and debt accrued interest.
+   * @param instrumentOrTotal - Instrument identifier for native-currency amounts, or `total` for reporting-currency aggregates. This lookup performs no FX.
+   * @param periodId - Reporting-period label such as `2025Q1` present in the result.
+   * @returns Requested amount in major currency units; absent optional interest income is zero.
+   * @throws Error - Throws with kind `validation` for malformed inputs or period labels, and kind `computation` for unknown components, missing instrument/period data, unavailable multi-currency totals, or incompatible cash/PIK currencies.
    */
-  capitalStructureCashflowsGetInterest(
+  capitalStructureCashflowsGetComponent(
     cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    instrumentId: string,
-    period: string
+    component: string,
+    instrumentOrTotal: string,
+    periodId: string
   ): number;
-  /**
-   * Cash interest expense of one instrument in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_interest_cash` (Rust
-   * `CapitalStructureCashflows::get_interest_cash`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param instrumentId - Capital-structure instrument identifier.
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Cash interest in the instrument's currency.
-   * @throws Error - Throws with kind `computation` if the instrument or period has no cashflows, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetInterestCash(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    instrumentId: string,
-    period: string
-  ): number;
-  /**
-   * Payment-in-kind interest of one instrument in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_interest_pik` (Rust
-   * `CapitalStructureCashflows::get_interest_pik`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param instrumentId - Capital-structure instrument identifier.
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns PIK interest in the instrument's currency.
-   * @throws Error - Throws with kind `computation` if the instrument or period has no cashflows, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetInterestPik(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    instrumentId: string,
-    period: string
-  ): number;
-  /**
-   * Principal payment of one instrument in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_principal` (Rust
-   * `CapitalStructureCashflows::get_principal`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param instrumentId - Capital-structure instrument identifier.
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Principal paid in the instrument's currency.
-   * @throws Error - Throws with kind `computation` if the instrument or period has no cashflows, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetPrincipal(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    instrumentId: string,
-    period: string
-  ): number;
-  /**
-   * Closing debt balance of one instrument in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_debt_balance` (Rust
-   * `CapitalStructureCashflows::get_debt_balance`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param instrumentId - Capital-structure instrument identifier.
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Outstanding balance in the instrument's currency.
-   * @throws Error - Throws with kind `computation` if the instrument or period has no cashflows, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetDebtBalance(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    instrumentId: string,
-    period: string
-  ): number;
-  /**
-   * Fees of one instrument in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_fees` (Rust
-   * `CapitalStructureCashflows::get_fees`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param instrumentId - Capital-structure instrument identifier.
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Fees in the instrument's currency.
-   * @throws Error - Throws with kind `computation` if the instrument or period has no cashflows, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetFees(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    instrumentId: string,
-    period: string
-  ): number;
-  /**
-   * Accrued interest liability of one instrument at the end of one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_accrued_interest` (Rust
-   * `CapitalStructureCashflows::get_accrued_interest`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param instrumentId - Capital-structure instrument identifier.
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Accrued interest in the instrument's currency.
-   * @throws Error - Throws with kind `computation` if the instrument or period has no cashflows, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetAccruedInterest(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    instrumentId: string,
-    period: string
-  ): number;
-  /**
-   * Total interest expense (cash plus PIK) across all instruments in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_total_interest` (Rust
-   * `CapitalStructureCashflows::get_total_interest`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Total interest expense in the reporting currency.
-   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetTotalInterest(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    period: string
-  ): number;
-  /**
-   * Total principal payments across all instruments in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_total_principal` (Rust
-   * `CapitalStructureCashflows::get_total_principal`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Total principal paid in the reporting currency.
-   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetTotalPrincipal(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    period: string
-  ): number;
-  /**
-   * Total closing debt balance across all instruments in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_total_debt_balance` (Rust
-   * `CapitalStructureCashflows::get_total_debt_balance`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Total outstanding balance in the reporting currency.
-   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetTotalDebtBalance(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    period: string
-  ): number;
-  /**
-   * Total fees across all instruments in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_total_fees` (Rust
-   * `CapitalStructureCashflows::get_total_fees`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Total fees in the reporting currency.
-   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetTotalFees(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    period: string
-  ): number;
-  /**
-   * Total cash interest expense across all instruments in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_total_interest_cash` (Rust
-   * `CapitalStructureCashflows::get_total_interest_cash`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Cash interest expense in the reporting currency.
-   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetTotalInterestCash(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    period: string
-  ): number;
-  /**
-   * Total cash interest received (net hedge receipts and negative-rate coupon receipts) across all instruments in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_total_interest_income` (Rust
-   * `CapitalStructureCashflows::get_total_interest_income`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Interest income in the reporting currency.
-   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetTotalInterestIncome(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    period: string
-  ): number;
-  /**
-   * Total PIK (non-cash) interest accrued across all instruments in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_total_interest_pik` (Rust
-   * `CapitalStructureCashflows::get_total_interest_pik`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns PIK interest in the reporting currency.
-   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetTotalInterestPik(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    period: string
-  ): number;
-  /**
-   * Total accrued-but-unpaid debt interest at period end across all instruments in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_total_accrued_interest` (Rust
-   * `CapitalStructureCashflows::get_total_accrued_interest`).
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Accrued interest in the reporting currency.
-   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetTotalAccruedInterest(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    period: string
-  ): number;
-  /**
-   * Cash interest received by one instrument in one period.
-   *
-   * Free-function twin of Python `CapitalStructureCashflows.get_interest_income`
-   * (Rust `CapitalStructureCashflows::get_interest_income`). Includes net hedge
-   * receipts and receipts from negative-rate debt coupons; zero when nothing
-   * was received.
-   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
-   * @param instrumentId - Capital-structure instrument identifier.
-   * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @returns Interest income in the instrument's currency.
-   * @throws Error - Throws with kind `computation` if the instrument or period has no cashflows, and kind `validation` if an input is malformed.
-   */
-  capitalStructureCashflowsGetInterestIncome(
-    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
-    instrumentId: string,
-    period: string
-  ): number;
+
   /**
    * Copy of a normalization configuration with one more adjustment.
    *

@@ -343,10 +343,6 @@ pub(crate) struct MonteCarloAccumulator {
     path_values: IndexMap<String, IndexMap<PeriodId, Vec<(u32, f64)>>>,
     include_path_data: bool,
     warnings: Vec<EvalWarning>,
-    path_ids: Vec<u32>,
-    periods: Vec<String>,
-    metrics: Vec<String>,
-    values: Vec<f64>,
 }
 
 impl MonteCarloAccumulator {
@@ -374,10 +370,6 @@ impl MonteCarloAccumulator {
             path_values: IndexMap::new(),
             include_path_data: config.include_path_data,
             warnings: Vec::new(),
-            path_ids: Vec::new(),
-            periods: Vec::new(),
-            metrics: Vec::new(),
-            values: Vec::new(),
         })
     }
 
@@ -406,12 +398,6 @@ impl MonteCarloAccumulator {
                     .entry(period_id)
                     .or_default()
                     .push((path_idx as u32, value));
-                if self.include_path_data {
-                    self.path_ids.push(path_idx as u32);
-                    self.periods.push(period_id.to_string());
-                    self.metrics.push(metric.clone());
-                    self.values.push(value);
-                }
             }
         }
 
@@ -463,33 +449,45 @@ impl MonteCarloAccumulator {
         self.warnings
             .sort_by_cached_key(|warning| format!("{warning:?}"));
 
-        let path_data = if !self.include_path_data || self.path_ids.is_empty() {
+        let path_data = if !self.include_path_data
+            || self
+                .path_values
+                .values()
+                .all(|periods| periods.values().all(Vec::is_empty))
+        {
             None
         } else {
-            let mut order: Vec<usize> = (0..self.path_ids.len()).collect();
-            order.sort_by(|&a, &b| {
-                (self.path_ids[a], &self.metrics[a], &self.periods[a]).cmp(&(
-                    self.path_ids[b],
-                    &self.metrics[b],
-                    &self.periods[b],
-                ))
-            });
-            self.path_ids = order.iter().map(|&i| self.path_ids[i]).collect();
-            self.periods = order.iter().map(|&i| self.periods[i].clone()).collect();
-            self.metrics = order.iter().map(|&i| self.metrics[i].clone()).collect();
-            self.values = order.iter().map(|&i| self.values[i]).collect();
+            let mut rows = Vec::new();
+            for (metric, period_values) in &self.path_values {
+                for (period, values) in period_values {
+                    for &(path, value) in values {
+                        rows.push((path, metric.as_str(), period.to_string(), value));
+                    }
+                }
+            }
+            rows.sort_by(|a, b| (a.0, a.1, &a.2).cmp(&(b.0, b.1, &b.2)));
+            let mut path_ids = Vec::with_capacity(rows.len());
+            let mut periods = Vec::with_capacity(rows.len());
+            let mut metrics = Vec::with_capacity(rows.len());
+            let mut values = Vec::with_capacity(rows.len());
+            for (path, metric, period, value) in rows {
+                path_ids.push(path);
+                periods.push(period);
+                metrics.push(metric.to_string());
+                values.push(value);
+            }
             let mut metadata = IndexMap::new();
             metadata.insert("layout".to_string(), json!("long"));
             metadata.insert("source".to_string(), json!("statement_monte_carlo_paths"));
             Some(TableEnvelope::new(
                 vec![
-                    TableColumn::new("path_id", TableColumnData::UInt32(self.path_ids))
+                    TableColumn::new("path_id", TableColumnData::UInt32(path_ids))
                         .with_role(TableColumnRole::Dimension),
-                    TableColumn::new("period", TableColumnData::String(self.periods))
+                    TableColumn::new("period", TableColumnData::String(periods))
                         .with_role(TableColumnRole::Index),
-                    TableColumn::new("metric", TableColumnData::String(self.metrics))
+                    TableColumn::new("metric", TableColumnData::String(metrics))
                         .with_role(TableColumnRole::Dimension),
-                    TableColumn::new("value", TableColumnData::Float64(self.values))
+                    TableColumn::new("value", TableColumnData::Float64(values))
                         .with_role(TableColumnRole::Measure),
                 ],
                 metadata,
@@ -531,11 +529,6 @@ impl MonteCarloAccumulator {
             }
         }
 
-        self.path_ids.extend(other.path_ids);
-        self.periods.extend(other.periods);
-        self.metrics.extend(other.metrics);
-        self.values.extend(other.values);
-
         Ok(self)
     }
 
@@ -549,10 +542,6 @@ impl MonteCarloAccumulator {
             path_values: IndexMap::new(),
             include_path_data: self.include_path_data,
             warnings: Vec::new(),
-            path_ids: Vec::new(),
-            periods: Vec::new(),
-            metrics: Vec::new(),
-            values: Vec::new(),
         }
     }
 }
@@ -612,12 +601,14 @@ mod tests {
     #[test]
     fn aggregate_rejects_non_finite_path_values() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("mc-agg")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder = ModelBuilder::new("mc-agg");
+            model_builder
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder.build().expect("valid model")
+        };
         let config = MonteCarloConfig::new(1, 7);
 
         let mut path = IndexMap::new();
@@ -636,12 +627,14 @@ mod tests {
         // Two paths; path 0 breaches in period 1, path 1 never breaches.
         // Expected probability: exactly 0.5 regardless of rayon-reduce order.
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("mc-breach")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder = ModelBuilder::new("mc-breach");
+            model_builder
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder.build().expect("valid model")
+        };
         let config = MonteCarloConfig::new(2, 7);
 
         for insertion_order in [[0usize, 1], [1, 0]] {
@@ -670,12 +663,14 @@ mod tests {
     #[test]
     fn breach_probability_survives_a_json_round_trip_with_path_data() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("mc-breach-json")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder = ModelBuilder::new("mc-breach-json");
+            model_builder
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder.build().expect("valid model")
+        };
         let paths: Vec<PathResult> = [200.0, 50.0, 150.0, 80.0]
             .into_iter()
             .map(|value| {
@@ -709,12 +704,14 @@ mod tests {
     #[test]
     fn accumulator_preserves_warnings_for_valid_paths() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("mc-agg")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder = ModelBuilder::new("mc-agg");
+            model_builder
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder.build().expect("valid model")
+        };
         let config = MonteCarloConfig::new(1, 7);
         let mut accumulator = MonteCarloAccumulator::new(&model, &config).expect("accumulator");
 
@@ -758,12 +755,14 @@ mod tests {
         // Rayon merge order is nondeterministic; finish() must emit a
         // canonical (path_id, metric, period) row order either way.
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("mc-sort")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder = ModelBuilder::new("mc-sort");
+            model_builder
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder.build().expect("valid model")
+        };
         let config = MonteCarloConfig::new(2, 7).with_path_data(true);
 
         let mut acc = MonteCarloAccumulator::new(&model, &config).expect("acc");
@@ -791,14 +790,84 @@ mod tests {
     }
 
     #[test]
+    fn path_data_orders_all_columns_and_matches_partition_merges() {
+        use finstack_quant_core::table::TableColumnData;
+        let mut builder = ModelBuilder::new("mc-row-order");
+        builder.periods("2025Q1..Q3", None).expect("periods");
+        builder.value("a", &[(PeriodId::quarter(2025, 1).unwrap(), 1.0.into())]);
+        let model = builder.build().expect("model");
+        let config = MonteCarloConfig::new(3, 7).with_path_data(true);
+        let mut serial = MonteCarloAccumulator::new(&model, &config).expect("accumulator");
+        let mut merged = serial.empty_like();
+        for path_idx in [2usize, 0, 1] {
+            let mut path = IndexMap::new();
+            for metric in ["z", "a"] {
+                let mut periods = IndexMap::new();
+                for quarter in [3, 1, 2] {
+                    let period = PeriodId::quarter(2025, quarter).expect("period");
+                    periods.insert(period, 100.0 * path_idx as f64 + f64::from(quarter));
+                }
+                path.insert(metric.to_string(), periods);
+            }
+            serial
+                .push_path(path_idx, path.clone(), Vec::new())
+                .expect("serial push");
+            let mut partition = merged.empty_like();
+            partition
+                .push_path(path_idx, path, Vec::new())
+                .expect("partition push");
+            merged = partition.merge(merged).expect("merge");
+        }
+        let serial = serial.finish().expect("serial finish");
+        let merged = merged.finish().expect("merged finish");
+        let table = serial.path_data.as_ref().expect("path data");
+        assert_eq!(
+            serde_json::to_value(table).unwrap(),
+            serde_json::to_value(merged.path_data.as_ref().unwrap()).unwrap()
+        );
+        let mut expected_ids = Vec::new();
+        let mut expected_periods = Vec::new();
+        let mut expected_metrics = Vec::new();
+        let mut expected_values = Vec::new();
+        for path in 0..3u32 {
+            for metric in ["a", "z"] {
+                for quarter in 1..=3 {
+                    expected_ids.push(path);
+                    expected_metrics.push(metric.to_string());
+                    expected_periods.push(format!("2025Q{quarter}"));
+                    expected_values.push(100.0 * f64::from(path) + f64::from(quarter));
+                }
+            }
+        }
+        assert_eq!(table.columns[0].data, TableColumnData::UInt32(expected_ids));
+        assert_eq!(
+            table.columns[1].data,
+            TableColumnData::String(expected_periods)
+        );
+        assert_eq!(
+            table.columns[2].data,
+            TableColumnData::String(expected_metrics)
+        );
+        assert_eq!(
+            table.columns[3].data,
+            TableColumnData::Float64(expected_values)
+        );
+        for result in [&serial, &merged] {
+            assert_eq!(result.breach_probability("a", 150.0), Some(1.0 / 3.0));
+        }
+    }
+
+    #[test]
     fn path_data_is_opt_in() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("mc-path-data")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder = ModelBuilder::new("mc-path-data");
+            model_builder
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder.build().expect("valid model")
+        };
 
         let mut path = IndexMap::new();
         path.insert(
@@ -831,21 +900,23 @@ mod tests {
         use crate::evaluator::Evaluator;
         use crate::types::ForecastSpec;
 
-        let model = ModelBuilder::new("mc-first-error")
-            .periods("2025Q1..2026Q4", Some("2025Q1"))
-            .expect("valid periods")
-            .mixed("x")
-            .values(&[(
+        let model = {
+            let mut model_builder = ModelBuilder::new("mc-first-error");
+            model_builder
+                .periods("2025Q1..2026Q4", Some("2025Q1"))
+                .expect("valid periods");
+            let mut model_builder = model_builder.mixed("x");
+            model_builder.values(&[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(1.0),
-            )])
-            .forecast(ForecastSpec::normal(0.5, 1.0, 7))
-            .build()
-            .expect("valid mixed node")
-            .compute("y", "sqrt(x)")
-            .expect("valid formula")
-            .build()
-            .expect("valid model");
+            )]);
+            model_builder.forecast(ForecastSpec::normal(0.5, 1.0, 7));
+            let mut model_builder = model_builder.build().expect("valid mixed node");
+            model_builder
+                .compute("y", "sqrt(x)")
+                .expect("valid formula");
+            model_builder.build().expect("valid model")
+        };
 
         // Serial reference: path results do not depend on `n_paths`, so the
         // smallest `n` that fails isolates the lowest failing path, whose error

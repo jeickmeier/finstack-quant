@@ -245,10 +245,10 @@ fn test_context_get_cs_value_invalid_component() {
 #[test]
 fn test_evaluate_model_with_cs_mock() {
     // Create a simple model that references capital structure
-    let model_result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model_result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -260,8 +260,8 @@ fn test_evaluate_model_with_cs_mock() {
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -273,8 +273,9 @@ fn test_evaluate_model_with_cs_mock() {
                     AmountOrScalar::scalar(650_000.0),
                 ),
             ],
-        )
-        .build();
+        );
+        model_builder.build()
+    };
 
     assert!(model_result.is_ok());
     let model = model_result.unwrap();
@@ -291,26 +292,28 @@ fn test_model_with_bond_builder() {
     let issue_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity_date = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let model_result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model_result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(1_000_000.0),
             )],
-        )
-        .add_bond(
-            "BOND-001",
-            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-            0.05,
-            issue_date,
-            maturity_date,
-            "USD-OIS",
-        )
-        .unwrap()
-        .build();
+        );
+        model_builder
+            .add_bond(
+                "BOND-001",
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                0.05,
+                issue_date,
+                maturity_date,
+                "USD-OIS",
+            )
+            .unwrap();
+        model_builder.build()
+    };
 
     assert!(model_result.is_ok());
     let model = model_result.unwrap();
@@ -433,7 +436,7 @@ fn test_aggregate_period_flows() {
     let market_ctx = MarketContext::new();
 
     let cashflows =
-        super::support::aggregate_period_flows(&instruments, &periods, &market_ctx, as_of);
+        crate::support::aggregate_period_flows(&instruments, &periods, &market_ctx, as_of);
 
     assert!(cashflows.is_ok());
     let cf = cashflows.unwrap();
@@ -484,7 +487,7 @@ fn test_build_instrument_from_spec_swap_variant() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let swap = super::rates_support::usd_irs_swap(
+    let swap = crate::rates_support::usd_irs_swap(
         InstrumentId::new("SWAP-002"),
         Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"),
         0.045,
@@ -574,32 +577,44 @@ fn test_capital_structure_cashflows_accessors() {
 
     // Test accessors
     assert_eq!(
-        cs.get_interest("INST-001", &period).expect("interest"),
+        cs.get_component("interest_expense", "INST-001", &period)
+            .expect("interest"),
         10_000.0
     );
     assert_eq!(
-        cs.get_principal("INST-001", &period).expect("principal"),
+        cs.get_component("principal_payment", "INST-001", &period)
+            .expect("principal"),
         25_000.0
     );
     assert_eq!(
-        cs.get_debt_balance("INST-001", &period).expect("balance"),
+        cs.get_component("debt_balance", "INST-001", &period)
+            .expect("balance"),
         500_000.0
     );
     assert_eq!(
-        cs.get_total_interest(&period).expect("total interest"),
+        cs.get_component("interest_expense", "total", &period)
+            .expect("total interest"),
         10_000.0
     );
     assert_eq!(
-        cs.get_total_principal(&period).expect("total principal"),
+        cs.get_component("principal_payment", "total", &period)
+            .expect("total principal"),
         25_000.0
     );
     assert_eq!(
-        cs.get_total_debt_balance(&period).expect("total balance"),
+        cs.get_component("debt_balance", "total", &period)
+            .expect("total balance"),
         500_000.0
     );
 
     // Test missing instrument
-    assert!(cs.get_interest("NONEXISTENT", &period).is_err());
-    assert!(cs.get_principal("NONEXISTENT", &period).is_err());
-    assert!(cs.get_debt_balance("NONEXISTENT", &period).is_err());
+    assert!(cs
+        .get_component("interest_expense", "NONEXISTENT", &period)
+        .is_err());
+    assert!(cs
+        .get_component("principal_payment", "NONEXISTENT", &period)
+        .is_err());
+    assert!(cs
+        .get_component("debt_balance", "NONEXISTENT", &period)
+        .is_err());
 }

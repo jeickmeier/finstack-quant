@@ -40,14 +40,11 @@ pub(super) fn apply_pik_transitions(
     state: &mut CapitalStructureState,
     contractual_flows: &IndexMap<String, CashflowBreakdown>,
     enable_pik: bool,
-    pik_targets: Option<&HashSet<String>>,
+    pik_targets: &HashSet<String>,
     min_periods_in_pik: usize,
 ) {
     for instrument_id in contractual_flows.keys() {
-        let should_apply = pik_targets
-            .map(|set| set.contains(instrument_id))
-            .unwrap_or(true);
-        if !should_apply {
+        if !pik_targets.contains(instrument_id) {
             continue;
         }
         let periods_active = state

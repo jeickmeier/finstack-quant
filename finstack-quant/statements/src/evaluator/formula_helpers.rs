@@ -30,14 +30,14 @@ pub(crate) fn is_truthy(value: f64) -> bool {
 pub(crate) fn collect_historical_values_sorted(
     node_name: &str,
     context: &EvaluationContext,
-) -> Result<Rc<BTreeMap<PeriodId, f64>>> {
+) -> Rc<BTreeMap<PeriodId, f64>> {
     if let Some(cached) = context
         .sorted_history_cache
         .borrow()
         .get(node_name)
         .cloned()
     {
-        return Ok(cached);
+        return cached;
     }
 
     // Only periods at or before the context's evaluation period are visible.
@@ -65,7 +65,7 @@ pub(crate) fn collect_historical_values_sorted(
         .sorted_history_cache
         .borrow_mut()
         .insert(node_name.to_string(), Rc::clone(&result));
-    Ok(result)
+    result
 }
 
 /// Collect the dedicated capital-structure reference's visible snapshots.
@@ -101,26 +101,17 @@ pub(crate) fn collect_rolling_window_values(
     node_name: &str,
     context: &EvaluationContext,
     window_size: usize,
-) -> Result<Vec<f64>> {
+) -> Vec<f64> {
     if window_size == 0 {
-        return Ok(Vec::new());
+        return Vec::new();
     }
 
-    let sorted = collect_historical_values_sorted(node_name, context)?;
+    let sorted = collect_historical_values_sorted(node_name, context);
 
     // Take the last `window_size` values directly in chronological order — avoids
     // the rev/take/reverse round-trip the previous implementation incurred per call.
     let skip_count = sorted.len().saturating_sub(window_size);
-    Ok(sorted.values().skip(skip_count).copied().collect())
-}
-
-/// Collect all historical values for a node including current.
-pub(crate) fn collect_all_historical_values(
-    node_name: &str,
-    context: &EvaluationContext,
-) -> Result<Vec<f64>> {
-    let sorted = collect_historical_values_sorted(node_name, context)?;
-    Ok(sorted.values().copied().collect())
+    sorted.values().skip(skip_count).copied().collect()
 }
 
 #[cfg(test)]
@@ -165,13 +156,13 @@ mod tests {
         ctx.set_value("revenue", 110.0).expect("set initial");
 
         // Populate cache.
-        let first = collect_historical_values_sorted("revenue", &ctx).expect("first lookup");
+        let first = collect_historical_values_sorted("revenue", &ctx);
         assert_eq!(first.get(&current), Some(&110.0));
 
         // Mutate; cache must be invalidated.
         ctx.set_value("revenue", 125.0).expect("set updated");
 
-        let second = collect_historical_values_sorted("revenue", &ctx).expect("second lookup");
+        let second = collect_historical_values_sorted("revenue", &ctx);
         assert_eq!(
             second.get(&current),
             Some(&125.0),
@@ -193,8 +184,7 @@ mod tests {
         original.set_value("revenue", 110.0).expect("set original");
 
         // Populate the original's cache.
-        let from_original =
-            collect_historical_values_sorted("revenue", &original).expect("original lookup");
+        let from_original = collect_historical_values_sorted("revenue", &original);
         assert_eq!(from_original.get(&current), Some(&110.0));
 
         // Clone the context — should deep-clone the IndexMap shell while
@@ -203,16 +193,14 @@ mod tests {
         let mut cloned = original.clone();
         cloned.set_value("revenue", 999.0).expect("set clone");
 
-        let from_original_after =
-            collect_historical_values_sorted("revenue", &original).expect("re-read original");
+        let from_original_after = collect_historical_values_sorted("revenue", &original);
         assert_eq!(
             from_original_after.get(&current),
             Some(&110.0),
             "original cache was corrupted by clone mutation"
         );
 
-        let from_clone =
-            collect_historical_values_sorted("revenue", &cloned).expect("clone lookup");
+        let from_clone = collect_historical_values_sorted("revenue", &cloned);
         assert_eq!(
             from_clone.get(&current),
             Some(&999.0),

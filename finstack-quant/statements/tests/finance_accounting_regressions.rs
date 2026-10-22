@@ -36,20 +36,20 @@ fn formula_check(formula: &str, tolerance: Option<f64>) -> FormulaCheckSpec {
 }
 
 fn currency_model() -> FinancialModelSpec {
-    ModelBuilder::new("check units")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("check units");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value(
             "usd",
             &[(q1(), AmountOrScalar::amount(100.0, Currency::USD).unwrap())],
-        )
-        .value(
+        );
+        model_builder.value(
             "eur",
             &[(q1(), AmountOrScalar::amount(100.0, Currency::EUR).unwrap())],
-        )
-        .value("count", &[(q1(), 100.0.into())])
-        .build()
-        .unwrap()
+        );
+        model_builder.value("count", &[(q1(), 100.0.into())]);
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
@@ -156,13 +156,13 @@ fn formula_checks_keep_native_instrument_units_distinct_from_reporting_totals() 
         CurveId::new("EUR-OIS"),
     )
     .unwrap();
-    model.capital_structure = ModelBuilder::new("native currency declaration")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .add_debt("EUR_BOND", FinancialStatementInstrument::Bond(bond))
-        .build()
-        .unwrap()
-        .capital_structure;
+    model.capital_structure = {
+        let mut model_builder = ModelBuilder::new("native currency declaration");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.add_debt("EUR_BOND", FinancialStatementInstrument::Bond(bond));
+        model_builder.build().unwrap()
+    }
+    .capital_structure;
     model.capital_structure.as_mut().unwrap().reporting_currency = Some(Currency::USD);
 
     let mut native = CashflowBreakdown::with_currency(Currency::EUR);
@@ -217,14 +217,14 @@ fn formula_checks_keep_native_instrument_units_distinct_from_reporting_totals() 
 }
 
 fn checked_balance_sheet() -> (FinancialModelSpec, StatementResult, CheckSuite) {
-    let model = ModelBuilder::new("balance sheet")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("assets", &[(q1(), 100.0.into())])
-        .value("liabilities", &[(q1(), 60.0.into())])
-        .value("equity", &[(q1(), 40.0.into())])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("balance sheet");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("assets", &[(q1(), 100.0.into())]);
+        model_builder.value("liabilities", &[(q1(), 60.0.into())]);
+        model_builder.value("equity", &[(q1(), 40.0.into())]);
+        model_builder.build().unwrap()
+    };
     let suite = CheckSuite::builder("balance sheet")
         .add_check(BalanceSheetArticulation {
             assets_nodes: vec![NodeId::new("assets")],
@@ -278,4 +278,127 @@ fn failed_and_empty_normalization_merges_preserve_the_original_report_and_values
     .is_err());
     assert_eq!(results.nodes, original_values);
     assert_eq!(results.check_report, original_report);
+}
+
+fn assert_arithmetic_failure(result: &finstack_quant_statements::checks::CheckResult) {
+    assert!(!result.passed);
+    assert!(result.findings.iter().any(|finding| {
+        finding.severity == Severity::Error
+            && finding.message.contains("Arithmetic overflow")
+            && finding.materiality.is_none()
+            && finding.comparison.is_none()
+    }));
+    assert!(result
+        .comparisons
+        .iter()
+        .all(|c| c.actual.is_finite() && c.expected.is_finite() && c.tolerance.is_finite()));
+    serde_json::to_string(result).expect("all published numbers are finite");
+}
+
+#[test]
+fn balance_sheet_arithmetic_overflow_fails_without_publishing_nonfinite_numbers() {
+    for (assets, liabilities, equity, relative_tolerance) in [
+        ([1e308, 1e308], 1e308, 1e308, 1e-9),
+        ([1e308, 0.0], -1e308, -1.0, 1e-9),
+        ([1e308, 0.0], 5e307, 5e307, 10.0),
+    ] {
+        let p2 = PeriodId::quarter(2025, 2).unwrap();
+        let mut builder = ModelBuilder::new("overflow");
+        builder.periods("2025Q1..Q2", None).unwrap();
+        for (name, first, second) in [
+            ("a1", assets[0], 40.0),
+            ("a2", assets[1], 60.0),
+            ("l", liabilities, 70.0),
+            ("e", equity, 30.0),
+        ] {
+            builder.value_scalar(name, &[(q1(), first), (p2, second)]);
+        }
+        let model = builder.build().unwrap();
+        let results = Evaluator::new().evaluate(&model).unwrap();
+        let mut context = CheckContext::new(&model, &results);
+        context.config.default_relative_tolerance = relative_tolerance;
+        context.config.materiality_threshold = f64::MAX;
+        let check = BalanceSheetArticulation {
+            assets_nodes: vec!["a1".into(), "a2".into()],
+            liabilities_nodes: vec!["l".into()],
+            equity_nodes: vec!["e".into()],
+            tolerance: None,
+        };
+        let result = check.execute(&context).unwrap();
+        assert_arithmetic_failure(&result);
+        assert_eq!(result.comparisons.len(), 1);
+        assert_eq!(result.comparisons[0].period, Some(p2));
+        let suite = CheckSuite::builder("overflow")
+            .config(context.config.clone())
+            .add_check(check)
+            .build();
+        let report = suite.run(&model, &results).unwrap();
+        assert!(report.has_errors());
+        assert_eq!(report.summary.failed, 1);
+    }
+}
+
+#[test]
+fn cash_identities_reject_intermediate_overflow() {
+    use finstack_quant_statements::checks::builtins::CashReconciliation;
+    let p2 = PeriodId::quarter(2025, 2).unwrap();
+    let mut builder = ModelBuilder::new("cash overflow");
+    builder.periods("2025Q1..Q2", None).unwrap();
+    for (name, values) in [
+        ("cash", [1e308, 1e308]),
+        ("flow", [0.0, 1e308]),
+        ("cfo", [0.0, 1e308]),
+        ("cfi", [0.0, 1e308]),
+        ("cff", [0.0, -1e308]),
+    ] {
+        builder.value_scalar(name, &[(q1(), values[0]), (p2, values[1])]);
+    }
+    let model = builder.build().unwrap();
+    let results = Evaluator::new().evaluate(&model).unwrap();
+    let check = CashReconciliation {
+        cash_balance_node: "cash".into(),
+        total_cash_flow_node: "flow".into(),
+        cfo_node: Some("cfo".into()),
+        cfi_node: Some("cfi".into()),
+        cff_node: Some("cff".into()),
+        tolerance: None,
+    };
+    let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
+    assert_arithmetic_failure(&result);
+    assert_eq!(
+        result
+            .findings
+            .iter()
+            .filter(|f| f.severity == Severity::Error)
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn retained_earnings_rejects_intermediate_overflow() {
+    use finstack_quant_statements::checks::builtins::RetainedEarningsReconciliation;
+    let p2 = PeriodId::quarter(2025, 2).unwrap();
+    let mut builder = ModelBuilder::new("retained earnings overflow");
+    builder.periods("2025Q1..Q2", None).unwrap();
+    for (name, values) in [
+        ("re", [1e308, 1e308]),
+        ("ni", [0.0, 1e308]),
+        ("div", [0.0, 1e308]),
+    ] {
+        builder.value_scalar(name, &[(q1(), values[0]), (p2, values[1])]);
+    }
+    let model = builder.build().unwrap();
+    let results = Evaluator::new().evaluate(&model).unwrap();
+    let check = RetainedEarningsReconciliation {
+        retained_earnings_node: "re".into(),
+        net_income_node: "ni".into(),
+        dividends_node: Some("div".into()),
+        other_adjustments: Vec::new(),
+        tolerance: None,
+        dividends_sign_convention: Default::default(),
+    };
+    let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
+    assert_arithmetic_failure(&result);
+    assert!(result.comparisons.is_empty());
 }

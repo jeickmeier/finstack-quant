@@ -23,10 +23,12 @@ fn test_ecf_sweep_basic() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
 
-    let model = ModelBuilder::new("ecf_test")
-        .periods("2025Q1..2025Q2", None)
-        .expect("valid periods")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("ecf_test");
+        model_builder
+            .periods("2025Q1..2025Q2", None)
+            .expect("valid periods");
+        model_builder.value(
             "cash",
             &[
                 (
@@ -38,8 +40,8 @@ fn test_ecf_sweep_basic() {
                     AmountOrScalar::scalar(1_000_000_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "ebitda",
             &[
                 (
@@ -51,8 +53,8 @@ fn test_ecf_sweep_basic() {
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "taxes",
             &[
                 (
@@ -64,8 +66,8 @@ fn test_ecf_sweep_basic() {
                     AmountOrScalar::scalar(220_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "capex",
             &[
                 (
@@ -77,8 +79,8 @@ fn test_ecf_sweep_basic() {
                     AmountOrScalar::scalar(100_000.0),
                 ),
             ],
-        )
-        .add_debt(
+        );
+        model_builder.add_debt(
             "TL-001",
             FinancialStatementInstrument::TermLoan(
                 TermLoan::builder()
@@ -106,8 +108,8 @@ fn test_ecf_sweep_basic() {
                     .build()
                     .expect("valid term loan"),
             ),
-        )
-        .waterfall(WaterfallSpec {
+        );
+        model_builder.waterfall(WaterfallSpec {
             ecf_sweep: Some(EcfSweepSpec {
                 ebitda_node: "ebitda".to_string(),
                 taxes_node: Some("taxes".to_string()),
@@ -127,9 +129,9 @@ fn test_ecf_sweep_basic() {
             available_cash_node: "cash".into(),
             pik_toggle: None,
             ..Default::default()
-        })
-        .build()
-        .expect("model should build");
+        });
+        model_builder.build().expect("model should build")
+    };
 
     // Create market context
     let disc_curve = DiscountCurve::builder("USD-OIS")
@@ -168,6 +170,7 @@ fn test_ecf_sweep_basic() {
 // pipeline (contractual flow extraction → waterfall → state advance).
 
 mod period_flow_waterfall_integration {
+    use crate::capital_structure::waterfall::execute_waterfall;
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::cashflow::CashFlow;
@@ -176,8 +179,7 @@ mod period_flow_waterfall_integration {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;
     use finstack_quant_statements::capital_structure::{
-        calculate_period_flows, execute_waterfall, CapitalStructureState, EcfSweepSpec,
-        PikToggleSpec, WaterfallSpec,
+        calculate_period_flows, CapitalStructureState, EcfSweepSpec, PikToggleSpec, WaterfallSpec,
     };
     use finstack_quant_statements::evaluator::EvaluationContext;
     use finstack_quant_statements::types::NodeId;
@@ -186,7 +188,7 @@ mod period_flow_waterfall_integration {
     use std::sync::Arc;
     use time::Month;
 
-    use crate::dsl_all::support::ScheduleInstrument;
+    use crate::support::ScheduleInstrument;
 
     fn quarter_period(year: i32, q: u8) -> Period {
         let month = |q: u8| match q {
@@ -289,7 +291,7 @@ mod period_flow_waterfall_integration {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-PIK".into()]),
+                target_instrument_ids: vec!["TL-PIK".into()],
                 min_periods_in_pik: 0,
             }),
             ..Default::default()
@@ -336,8 +338,8 @@ mod period_flow_waterfall_integration {
 
             // Liquidity below the threshold keeps PIK active every period.
             let ctx = context_with(period.id, &[("liquidity", 10.0)]);
-            let result = execute_waterfall(&period.id, &ctx, &waterfall, &mut state, &contractual)
-                .expect("waterfall");
+            let result =
+                execute_waterfall(&ctx, &waterfall, &mut state, &contractual).expect("waterfall");
             last_pik = result.flows["TL-PIK"].interest_expense_pik.amount();
             let coupon = &instrument.schedule.get_flows()[i as usize];
             let start = if i == 0 {
@@ -469,8 +471,7 @@ mod period_flow_waterfall_integration {
         contractual.insert("TL-1".to_string(), breakdown);
         // ECF = 500k, sweep 100% → 500k extra principal after 20k cash interest.
         let ctx = context_with(q1.id, &[("sweep_cash", 520_000.0)]);
-        execute_waterfall(&q1.id, &ctx, &waterfall, &mut state, &contractual)
-            .expect("q1 waterfall");
+        execute_waterfall(&ctx, &waterfall, &mut state, &contractual).expect("q1 waterfall");
         state
             .rebuild_residuals(q1.end - time::Duration::days(1))
             .expect("rebuild after sweep");
@@ -572,8 +573,8 @@ mod period_flow_waterfall_integration {
 
         let available = 100_000.0;
         let ctx = context_with(period.id, &[("cash_available", available)]);
-        let result = execute_waterfall(&period.id, &ctx, &waterfall, &mut state, &contractual)
-            .expect("waterfall");
+        let result =
+            execute_waterfall(&ctx, &waterfall, &mut state, &contractual).expect("waterfall");
 
         let tl = &result.flows["TL-1"];
         let equity = result
@@ -630,7 +631,7 @@ mod period_flow_waterfall_integration {
         instruments.insert("DDTL-1".to_string(), instrument);
 
         let periods: Vec<Period> = (1..=4).map(|q| quarter_period(2025, q)).collect();
-        let cashflows = crate::integration_all::support::aggregate_period_flows(
+        let cashflows = crate::support::aggregate_period_flows(
             &instruments,
             &periods,
             &MarketContext::new(),
@@ -644,7 +645,7 @@ mod period_flow_waterfall_integration {
         for pre in [q1, q2] {
             assert_eq!(
                 cashflows
-                    .get_debt_balance("DDTL-1", &pre)
+                    .get_component("debt_balance", "DDTL-1", &pre)
                     .expect("balance present"),
                 0.0,
                 "pre-issuance period {pre} must report zero debt balance"
@@ -652,7 +653,7 @@ mod period_flow_waterfall_integration {
         }
         assert_eq!(
             cashflows
-                .get_debt_balance("DDTL-1", &q3)
+                .get_component("debt_balance", "DDTL-1", &q3)
                 .expect("balance present"),
             1_000_000.0,
             "post-issuance balance must equal the funded notional"

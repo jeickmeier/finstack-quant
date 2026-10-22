@@ -352,10 +352,12 @@ mod tests {
     /// Mirrors the notebook deal: 8.5x entry on 22.0 EBITDA, 3.0 of fees,
     /// 115.0 of funded debt, 9.5x exit on 26.4 EBITDA with 35.0 of net debt.
     fn demo_model() -> FinancialModelSpec {
-        ModelBuilder::new("lbo-demo")
-            .periods("2025..2026", Some("2025"))
-            .expect("valid periods")
-            .value(
+        {
+            let mut model_builder = ModelBuilder::new("lbo-demo");
+            model_builder
+                .periods("2025..2026", Some("2025"))
+                .expect("valid periods");
+            model_builder.value(
                 "ebitda",
                 &[
                     (
@@ -369,8 +371,8 @@ mod tests {
                             .unwrap(),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder.value(
                 "total_debt",
                 &[
                     (
@@ -384,10 +386,10 @@ mod tests {
                             .unwrap(),
                     ),
                 ],
-            )
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("valid model")
+            );
+            model_builder.with_meta("currency", serde_json::json!("USD"));
+            model_builder.build().expect("valid model")
+        }
     }
 
     fn demo_config() -> LboConfig {
@@ -468,15 +470,17 @@ mod tests {
 
     #[test]
     fn evaluate_lbo_requires_currency_metadata() {
-        let model = ModelBuilder::new("lbo-no-currency")
-            .periods("2025..2026", Some("2025"))
-            .expect("valid periods")
-            .value(
+        let model = {
+            let mut model_builder = ModelBuilder::new("lbo-no-currency");
+            model_builder
+                .periods("2025..2026", Some("2025"))
+                .expect("valid periods");
+            model_builder.value(
                 "ebitda",
                 &[(PeriodId::annual(2025), AmountOrScalar::scalar(22.0))],
-            )
-            .build()
-            .expect("valid model");
+            );
+            model_builder.build().expect("valid model")
+        };
 
         assert!(evaluate_lbo(&model, &demo_config()).is_err());
     }

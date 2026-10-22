@@ -233,14 +233,14 @@ fn resolved_suite_runs_against_model() {
 
     let suite = spec.resolve().unwrap();
 
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("total_assets", &[(q(1), s(1000.0)), (q(2), s(1100.0))])
-        .value("total_liabilities", &[(q(1), s(600.0)), (q(2), s(700.0))])
-        .value("total_equity", &[(q(1), s(400.0)), (q(2), s(400.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("total_assets", &[(q(1), s(1000.0)), (q(2), s(1100.0))]);
+        model_builder.value("total_liabilities", &[(q(1), s(600.0)), (q(2), s(700.0))]);
+        model_builder.value("total_equity", &[(q(1), s(400.0)), (q(2), s(400.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -252,21 +252,19 @@ fn resolved_suite_runs_against_model() {
 
 #[test]
 fn run_model_evaluates_with_value_forecast_formula_precedence() {
-    let model = ModelBuilder::new("precedence")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .mixed("revenue")
-        .values(&[(q(1), s(100.0)), (q(2), s(110.0))])
-        .forecast(ForecastSpec {
+    let model = {
+        let mut model_builder = ModelBuilder::new("precedence");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        let mut model_builder = model_builder.mixed("revenue");
+        model_builder.values(&[(q(1), s(100.0)), (q(2), s(110.0))]);
+        model_builder.forecast(ForecastSpec {
             method: ForecastMethod::GrowthPct,
             params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-        })
-        .formula("0")
-        .unwrap()
-        .build()
-        .unwrap()
-        .build()
-        .unwrap();
+        });
+        model_builder.formula("0").unwrap();
+        let model_builder = model_builder.build().unwrap();
+        model_builder.build().unwrap()
+    };
 
     let report = positive_revenue_suite().run_model(&model, None).unwrap();
 
@@ -275,12 +273,12 @@ fn run_model_evaluates_with_value_forecast_formula_precedence() {
 
 #[test]
 fn run_model_uses_supplied_results_without_recomputation() {
-    let model = ModelBuilder::new("supplied")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("supplied");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
     let mut supplied = Evaluator::new().evaluate(&model).unwrap();
     supplied
         .nodes
@@ -299,12 +297,12 @@ fn run_model_uses_supplied_results_without_recomputation() {
 /// summary's severity counts for a run and survives a JSON round trip.
 #[test]
 fn total_findings_counts_retained_findings() {
-    let model = ModelBuilder::new("findings")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(-1.0)), (q(2), s(-2.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("findings");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(-1.0)), (q(2), s(-2.0))]);
+        model_builder.build().unwrap()
+    };
     let report = positive_revenue_suite().run_model(&model, None).unwrap();
 
     assert_eq!(report.total_findings(), 2);
@@ -327,14 +325,14 @@ fn materiality_threshold_does_not_flip_error_verdict() {
     use finstack_quant_statements::checks::{CheckConfig, CheckSuite};
 
     // Imbalance of 100 on a 1000 sheet: an unambiguous Error.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("total_assets", &[(q(1), s(1000.0))])
-        .value("total_liabilities", &[(q(1), s(600.0))])
-        .value("total_equity", &[(q(1), s(300.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("total_assets", &[(q(1), s(1000.0))]);
+        model_builder.value("total_liabilities", &[(q(1), s(600.0))]);
+        model_builder.value("total_equity", &[(q(1), s(300.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

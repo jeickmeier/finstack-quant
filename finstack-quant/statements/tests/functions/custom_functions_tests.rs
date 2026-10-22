@@ -7,10 +7,10 @@ use finstack_quant_statements::types::AmountOrScalar;
 
 #[test]
 fn test_sum_function() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "a",
             &[
                 (
@@ -22,8 +22,8 @@ fn test_sum_function() {
                     AmountOrScalar::scalar(15.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "b",
             &[
                 (
@@ -35,8 +35,8 @@ fn test_sum_function() {
                     AmountOrScalar::scalar(25.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "c",
             &[
                 (
@@ -48,11 +48,10 @@ fn test_sum_function() {
                     AmountOrScalar::scalar(35.0),
                 ),
             ],
-        )
-        .compute("total", "sum(a, b, c)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("total", "sum(a, b, c)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -82,10 +81,10 @@ fn test_sum_function() {
 
 #[test]
 fn test_mean_function() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "a",
             &[
                 (
@@ -97,8 +96,8 @@ fn test_mean_function() {
                     AmountOrScalar::scalar(20.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "b",
             &[
                 (
@@ -110,8 +109,8 @@ fn test_mean_function() {
                     AmountOrScalar::scalar(30.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "c",
             &[
                 (
@@ -123,11 +122,10 @@ fn test_mean_function() {
                     AmountOrScalar::scalar(40.0),
                 ),
             ],
-        )
-        .compute("average", "mean(a, b, c)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("average", "mean(a, b, c)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -157,10 +155,10 @@ fn test_mean_function() {
 
 #[test]
 fn test_annualize_function() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "quarterly_revenue",
             &[
                 (
@@ -172,11 +170,12 @@ fn test_annualize_function() {
                     AmountOrScalar::scalar(1100.0),
                 ),
             ],
-        )
-        .compute("annual_revenue", "annualize(quarterly_revenue, 4)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("annual_revenue", "annualize(quarterly_revenue, 4)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -206,10 +205,10 @@ fn test_annualize_function() {
 
 #[test]
 fn test_coalesce_function() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q3", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q3", None).unwrap();
+        model_builder.value(
             "value1",
             &[
                 (
@@ -225,8 +224,8 @@ fn test_coalesce_function() {
                     AmountOrScalar::scalar(300.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "value2",
             &[
                 (
@@ -242,11 +241,12 @@ fn test_coalesce_function() {
                     AmountOrScalar::scalar(350.0),
                 ),
             ],
-        )
-        .compute("result", "coalesce(value1, value2)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("result", "coalesce(value1, value2)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -287,10 +287,10 @@ fn test_coalesce_function() {
 
 #[test]
 fn test_ttm_function() {
-    let model = ModelBuilder::new("test")
-        .periods("2024Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2024Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "quarterly_revenue",
             &[
                 (
@@ -314,11 +314,12 @@ fn test_ttm_function() {
                     AmountOrScalar::scalar(1400.0),
                 ),
             ],
-        )
-        .compute("ttm_revenue", "ttm(quarterly_revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("ttm_revenue", "ttm(quarterly_revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -359,10 +360,10 @@ fn test_ttm_function() {
 
 #[test]
 fn test_complex_custom_functions() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -374,8 +375,8 @@ fn test_complex_custom_functions() {
                     AmountOrScalar::scalar(1200.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -387,8 +388,8 @@ fn test_complex_custom_functions() {
                     AmountOrScalar::scalar(700.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "opex",
             &[
                 (
@@ -400,18 +401,22 @@ fn test_complex_custom_functions() {
                     AmountOrScalar::scalar(250.0),
                 ),
             ],
-        )
-        // Complex calculation using custom functions
-        .compute("total_costs", "sum(cogs, opex)")
-        .unwrap()
-        .compute("avg_unit_cost", "mean(cogs, opex)")
-        .unwrap()
-        .compute("profit", "revenue - total_costs")
-        .unwrap()
-        .compute("annualized_profit", "annualize(profit, 4)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            // Complex calculation using custom functions
+            .compute("total_costs", "sum(cogs, opex)")
+            .unwrap();
+        model_builder
+            .compute("avg_unit_cost", "mean(cogs, opex)")
+            .unwrap();
+        model_builder
+            .compute("profit", "revenue - total_costs")
+            .unwrap();
+        model_builder
+            .compute("annualized_profit", "annualize(profit, 4)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

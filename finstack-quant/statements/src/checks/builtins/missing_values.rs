@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::checks::helpers::get_node_value;
 use crate::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, PeriodScope, Severity,
 };
@@ -55,7 +54,7 @@ impl Check for MissingValueCheck {
             };
 
             for node in &self.required_nodes {
-                if get_node_value(context.results, node, &period.id).is_none() {
+                if context.results.get(node.as_str(), &period.id).is_none() {
                     findings.push(CheckFinding {
                         check_id: self.id().to_string(),
                         severity,
