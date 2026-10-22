@@ -224,7 +224,7 @@ fn market_context_state_has_golden_canonical_bytes_hash_and_order_invariance() {
     let fixture = fixture.strip_suffix(b"\n").unwrap_or(fixture);
     assert_eq!(canonical, fixture);
     assert_eq!(
-        first.content_hash().expect("market state hashes"),
+        content_hash(&first).expect("market state hashes"),
         include_str!("../data/canonical/market_context_state.sha256").trim()
     );
     assert_eq!(

@@ -206,18 +206,6 @@ pub struct MarketContextState {
     pub hierarchy: Option<MarketDataHierarchy>,
 }
 
-impl MarketContextState {
-    /// Compute the versioned SHA-256 hash of this state's canonical JSON.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the state contains a non-finite number or cannot be
-    /// serialized to the core canonical JSON representation.
-    pub fn content_hash(&self) -> crate::Result<String> {
-        crate::canonical::content_hash(self)
-    }
-}
-
 fn duplicate_id_diagnostics(
     report: &mut ValidationReport,
     limits: &LoadLimits,
