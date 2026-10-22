@@ -24,11 +24,6 @@ permissions:
 
 env:
   UV_PYTHON_DOWNLOADS: never
-  # rustup's shared download cache is not concurrency-safe. mise installs
-  # multiple `cargo:*` tools in parallel by default, and concurrent component
-  # fetches race on ~/.rustup/downloads/*.partial; on a mise cache miss every
-  # job installs.
-  MISE_JOBS: "1"
 
 jobs:
   # ============================================
@@ -53,6 +48,13 @@ jobs:
           # Pull requests restore master's toolchain cache; a per-PR save is
           # ~310 MB and evicts master's Rust caches.
           cache_save: ${{ github.ref == 'refs/heads/master' }}
+        env:
+          # rustup's shared download cache is not concurrency-safe. mise
+          # installs multiple `cargo:*` tools in parallel by default, and
+          # concurrent component fetches race on ~/.rustup/downloads/*.partial.
+          # Every mise step sets this: on a cache miss off master, every job
+          # installs. Step-scoped so `mise run` task parallelism is unaffected.
+          MISE_JOBS: "1"
 
   # ============================================
   # Supply-chain security: cargo-deny (advisories, licenses, bans), then
@@ -74,6 +76,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       - name: Audit dependencies
         run: mise run all-audit
@@ -110,6 +114,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # rust-cache hashes `rustc -vV` of every toolchain `rustup toolchain list`
       # shows into its restore key. mise installs into the image's rustup
@@ -191,6 +197,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint).
       - name: Remove the runner image's Rust toolchain
@@ -255,6 +263,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint).
       - name: Remove the runner image's Rust toolchain
@@ -302,6 +312,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint).
       - name: Remove the runner image's Rust toolchain
@@ -365,6 +377,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint).
       - name: Remove the runner image's Rust toolchain

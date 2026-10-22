@@ -18,11 +18,6 @@ permissions:
 
 env:
   UV_PYTHON_DOWNLOADS: never
-  # rustup's shared download cache is not concurrency-safe. mise installs
-  # multiple `cargo:*` tools in parallel by default, and concurrent component
-  # fetches race on ~/.rustup/downloads/*.partial; on a mise cache miss every
-  # job installs.
-  MISE_JOBS: "1"
 
 jobs:
   # ============================================
@@ -43,6 +38,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
   # ============================================
   # Rust coverage — cargo llvm-cov nextest, LCOV for SonarQube
@@ -74,6 +71,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
       - name: Remove the runner image's Rust toolchain
@@ -129,6 +128,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
       - name: Remove the runner image's Rust toolchain
@@ -250,6 +251,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
       - name: Remove the runner image's Rust toolchain
@@ -328,6 +331,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
       - name: Remove the runner image's Rust toolchain
@@ -373,6 +378,8 @@ jobs:
         with:
           cache: true
           cache_save: false
+        env:
+          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
       - name: Remove the runner image's Rust toolchain
