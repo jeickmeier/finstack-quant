@@ -807,8 +807,12 @@ impl CompiledCashFlowPlan {
             state.projected_fixings,
         );
         debug!(flows = flows.len(), "cashflow schedule: project complete");
-        let schedule =
-            CashFlowSchedule::from_parts(flows, self.notional.clone(), out_day_count, meta);
+        let schedule = CashFlowSchedule::from_flows_unchecked(
+            flows,
+            self.notional.clone(),
+            out_day_count,
+            meta,
+        );
         schedule.validate()?;
         Ok(schedule)
     }

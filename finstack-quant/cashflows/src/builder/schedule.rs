@@ -327,7 +327,7 @@ impl CashFlowSchedule {
     /// * `day_count` - Day-count convention converting date pairs into year fractions
     /// * `meta` - Schedule-level calendars, facility limit, issue/maturity
     ///   dates, and representation tag stamped on the result
-    pub fn from_parts(
+    pub(crate) fn from_flows_unchecked(
         flows: Vec<CashFlow>,
         notional: Notional,
         day_count: DayCount,
@@ -348,9 +348,9 @@ impl CashFlowSchedule {
     ///
     /// Each row must pass [`CashFlow::validate`] (finite amounts, a finite
     /// non-negative `accrual_factor`, a reset date not after the payment date,
-    /// consistent accrual metadata); the rows are then sorted exactly as
-    /// [`Self::from_parts`] does. Cross-flow economic invariants (principal
-    /// reconciliation, metadata dates) are not checked here; call
+    /// consistent accrual metadata and principal-delta currency); the rows are
+    /// then sorted into canonical schedule order. Cross-flow economic invariants
+    /// (principal reconciliation, metadata dates) are not checked here; call
     /// [`Self::validate`] for those.
     ///
     /// # Arguments
@@ -364,8 +364,8 @@ impl CashFlowSchedule {
     ///
     /// # Errors
     ///
-    /// Returns the first row's validation error (`Error::Validation` or
-    /// `Error::Input`) when any row is invalid.
+    /// Returns the first row's validation error (`Error::Validation`,
+    /// `Error::Input`, or `Error::CurrencyMismatch`) when any row is invalid.
     ///
     /// # Examples
     ///
@@ -407,7 +407,7 @@ impl CashFlowSchedule {
         for flow in &flows {
             flow.validate()?;
         }
-        Ok(Self::from_parts(flows, notional, day_count, meta))
+        Ok(Self::from_flows_unchecked(flows, notional, day_count, meta))
     }
 
     /// Return the canonical ordered cashflows.
@@ -760,12 +760,12 @@ impl CashFlowSchedule {
     ///     CashFlow::new(date, None, Money::from((50_000_i64, Currency::USD)), CFKind::Fixed, 0.5, Some(0.05)),
     ///     CashFlow::new(date, None, Money::from((100_000_i64, Currency::USD)), CFKind::Amortization, 0.0, None),
     /// ];
-    /// let schedule = CashFlowSchedule::from_parts(
+    /// let schedule = CashFlowSchedule::from_flows(
     ///     flows,
     ///     Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
     ///     DayCount::Act365F,
     ///     CashFlowMeta::default(),
-    /// );
+    /// ).expect("valid cashflow rows");
     ///
     /// let coupons: Vec<_> = schedule.coupons().collect();
     /// assert_eq!(coupons.len(), 1);
@@ -1103,7 +1103,7 @@ where
     calendar_ids.dedup();
     crate::fixings::normalize_projected_fixings(&mut projected_fixings);
 
-    CashFlowSchedule::from_parts(
+    CashFlowSchedule::from_flows_unchecked(
         flows,
         notional,
         day_count,
@@ -1358,7 +1358,7 @@ mod tests {
     }
 
     #[test]
-    fn from_flows_validates_every_row_and_from_parts_does_not() {
+    fn from_flows_validates_every_row_and_from_flows_unchecked_does_not() {
         let date = Date::from_calendar_date(2025, Month::June, 15).expect("date");
         let negative_accrual = CashFlow {
             accrual_factor: -1.0,
@@ -1369,7 +1369,9 @@ mod tests {
             ..flow(date, 10.0, CFKind::Fixed)
         };
         let notional = Notional::par(1_000.0, Currency::USD).expect("notional");
-        for bad in [negative_accrual, late_reset] {
+        let mismatched_currency = flow(date, -98.0, CFKind::Notional)
+            .with_principal_delta(Money::from((100_i64, Currency::EUR)));
+        for bad in [negative_accrual, late_reset, mismatched_currency] {
             assert!(CashFlowSchedule::from_flows(
                 vec![flow(date, 1.0, CFKind::Fixed), bad.clone()],
                 notional.clone(),
@@ -1377,7 +1379,7 @@ mod tests {
                 CashFlowMeta::default(),
             )
             .is_err());
-            let raw = CashFlowSchedule::from_parts(
+            let raw = CashFlowSchedule::from_flows_unchecked(
                 vec![bad],
                 notional.clone(),
                 DayCount::Act360,
@@ -1400,7 +1402,7 @@ mod tests {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("issue");
         let pik = issue.add_months(3).expect("valid date shift");
         let maturity = issue.add_months(6).expect("valid date shift");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(issue, -98.0, CFKind::Notional)
                     .with_principal_delta(Money::from((100_i64, Currency::USD))),
@@ -1447,7 +1449,7 @@ mod tests {
             coupon_period: None,
             end_is_termination_date: true,
         });
-        let raw = CashFlowSchedule::from_parts(
+        let raw = CashFlowSchedule::from_flows_unchecked(
             vec![pik, flow(maturity, 106.0, CFKind::Notional)],
             Notional::par(100.0, Currency::USD).expect("notional"),
             DayCount::Thirty360,
@@ -1543,7 +1545,7 @@ mod tests {
     #[test]
     fn scale_amounts_restores_canonical_order_under_sign_flip() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(date, 100.0, CFKind::Amortization),
                 flow(date, 200.0, CFKind::Amortization),
@@ -1569,9 +1571,9 @@ mod tests {
     }
 
     #[test]
-    fn from_parts_sorts_by_date_then_kind_rank() {
+    fn from_flows_unchecked_sorts_by_date_then_kind_rank() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(date, 10.0, CFKind::Recovery),
                 flow(date, 12.0, CFKind::Amortization),
@@ -1593,7 +1595,7 @@ mod tests {
     fn validate_rejects_over_amortization() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
 
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 150.0, CFKind::Amortization)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -1609,7 +1611,7 @@ mod tests {
     #[test]
     fn serde_is_structural_and_requires_explicit_economic_validation() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let unvalidated = CashFlowSchedule::from_parts(
+        let unvalidated = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 150.0, CFKind::Amortization)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -1630,7 +1632,7 @@ mod tests {
     fn merge_cashflow_schedules_merges_meta_and_resorts() {
         let d1 = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let d2 = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
-        let left = CashFlowSchedule::from_parts(
+        let left = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d2, 4.0, CFKind::Recovery).with_accrual(CashFlowAccrual {
                     coupon_period: None,
@@ -1653,7 +1655,7 @@ mod tests {
                 maturity: None,
             },
         );
-        let right = CashFlowSchedule::from_parts(
+        let right = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d1, 10.0, CFKind::Amortization).with_accrual(CashFlowAccrual {
                     coupon_period: None,
@@ -1713,13 +1715,13 @@ mod tests {
     #[test]
     fn merge_cashflow_schedules_preserves_mixed_currency_rows() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let usd = CashFlowSchedule::from_parts(
+        let usd = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 100.0, CFKind::Notional)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
-        let eur = CashFlowSchedule::from_parts(
+        let eur = CashFlowSchedule::from_flows_unchecked(
             vec![CashFlow::new(
                 date,
                 None,
@@ -1753,13 +1755,13 @@ mod tests {
     #[test]
     fn merge_cashflow_schedules_marks_mixed_projection_as_projected() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let contractual = CashFlowSchedule::from_parts(
+        let contractual = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 100.0, CFKind::Fixed)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
-        let projected = CashFlowSchedule::from_parts(
+        let projected = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 1.0, CFKind::FloatReset)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -1785,7 +1787,7 @@ mod tests {
     fn validation_counts_delayed_funding_before_amortization() {
         let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let repayment = Date::from_calendar_date(2025, Month::July, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(issue, -100.0, CFKind::Notional),
                 flow(repayment, 30.0, CFKind::Amortization),
@@ -1806,7 +1808,7 @@ mod tests {
     #[test]
     fn retired_accrual_sidecars_are_rejected() {
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![flow(end, 12.5, CFKind::Fixed)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -1828,7 +1830,7 @@ mod tests {
     fn deserialization_routes_unsorted_flows_through_canonical_constructor() {
         let early = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let late = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(early, 1.0, CFKind::Fixed),
                 flow(late, 2.0, CFKind::Fixed),
@@ -1857,7 +1859,7 @@ mod tests {
             day_count: DayCount::Act360,
             projected_index_rate: Some(0.031),
         };
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d2, 12.5, CFKind::Fixed).with_accrual(accrual.clone()),
                 flow(d1, 100.0, CFKind::Notional),
@@ -1879,7 +1881,7 @@ mod tests {
         let d1 = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
         let d2 = Date::from_calendar_date(2027, Month::January, 1).expect("valid date");
 
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d1, 500_000.0, CFKind::Amortization),
                 flow(d2, 500_000.0, CFKind::Amortization),
@@ -1994,7 +1996,7 @@ mod tests {
             let mut row = flow(date, amount, CFKind::Fixed);
             row.principal_delta =
                 delta.map(|value| Money::new(value, Currency::USD).expect("money"));
-            let schedule = CashFlowSchedule::from_parts(
+            let schedule = CashFlowSchedule::from_flows_unchecked(
                 vec![row],
                 Notional::par(0.0, Currency::USD).expect("notional"),
                 DayCount::Act365F,
@@ -2007,7 +2009,7 @@ mod tests {
     fn shifted_principal_schedule(payment: Date, economic: Date) -> CashFlowSchedule {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        CashFlowSchedule::from_parts(
+        CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(issue, -100.0, CFKind::Notional),
                 flow(payment, 50.0, CFKind::Amortization).with_principal_date(economic),
@@ -2143,7 +2145,7 @@ mod tests {
     fn wal_counts_revolving_repayments() {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![flow(maturity, 100.0, CFKind::RevolvingRepayment)],
             Notional::par(100.0, Currency::USD).expect("notional"),
             DayCount::Thirty360,
@@ -2162,7 +2164,7 @@ mod tests {
         let usd = flow(date, 100.0, CFKind::Fixed);
         let mut eur = usd.clone();
         eur.amount = Money::from((100_i64, Currency::EUR));
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![usd, eur],
             Notional::par(100.0, Currency::USD).expect("notional"),
             DayCount::Act365F,

@@ -287,7 +287,7 @@ mod tests {
             total_deferred: zero,
             total_writedown: zero,
         };
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows(
             principal_flows
                 .iter()
                 .map(|(date, amount)| {
@@ -297,7 +297,8 @@ mod tests {
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Thirty360,
             CashFlowMeta::default(),
-        );
+        )
+        .expect("valid cashflow rows");
 
         let tranche_wal = calculate_tranche_wal(&tranche, as_of).expect("tranche WAL");
         let schedule_wal = schedule.wal(as_of).expect("schedule WAL");
