@@ -1,4 +1,4 @@
-//! Private markets fund metrics: IRR, MOIC, DPI, TVPI, carry calculations, and theta.
+//! Private markets fund metrics: IRR, DPI, TVPI, carry calculations, and theta.
 
 use crate::pe_fund::waterfall::{FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche};
 use crate::pe_fund::PrivateMarketsFund;
@@ -86,44 +86,6 @@ impl MetricCalculator for GpCarryTotalCalculator {
     }
 }
 
-/// Total value multiple on paid-in capital:
-/// `(realized LP distributions to date + residual value) / paid-in capital`.
-///
-/// Shared implementation for the LP MOIC and TVPI metrics, which are the
-/// same quantity by definition on a net LP basis.
-fn total_value_to_paid_in(context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-    let pe: &PrivateMarketsFund = context.instrument_as()?;
-    let ledger = pe.run_waterfall()?;
-
-    let total_contributions = paid_in_to_date(pe, context.as_of);
-    let realized_lp_distributions = realized_lp_to_date(&ledger, context.as_of);
-
-    // Use the base_value (pricing result) as the NAV / Residual Value.
-    // This correctly captures the NPV of future flows or the explicit valuation.
-    let residual_nav = context.base_value.amount();
-
-    if total_contributions <= 1e-6 {
-        return Ok(0.0);
-    }
-
-    Ok((realized_lp_distributions + residual_nav) / total_contributions)
-}
-
-/// Multiple on Invested Capital (MOIC) for LP calculator.
-///
-/// Net LP MOIC: `(realized LP distributions + residual value) / paid-in
-/// capital`, where realized distributions are the ledger's `to_lp` amounts
-/// (net of GP carry) and the residual value is the pricing `base_value`. On
-/// this net LP basis MOIC equals TVPI by definition; the metric is kept as a
-/// separate id because desks quote both names.
-struct MoicLpCalculator;
-
-impl MetricCalculator for MoicLpCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        total_value_to_paid_in(context)
-    }
-}
-
 /// Distributions to Paid-In Capital (DPI) calculator.
 ///
 /// Realized-only multiple: ledger `to_lp` distributions over contributions,
@@ -155,7 +117,21 @@ struct TvpiLpCalculator;
 
 impl MetricCalculator for TvpiLpCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        total_value_to_paid_in(context)
+        let pe: &PrivateMarketsFund = context.instrument_as()?;
+        let ledger = pe.run_waterfall()?;
+
+        let total_contributions = paid_in_to_date(pe, context.as_of);
+        let realized_lp_distributions = realized_lp_to_date(&ledger, context.as_of);
+
+        // Use the base_value (pricing result) as the NAV / Residual Value.
+        // This correctly captures the NPV of future flows or the explicit valuation.
+        let residual_nav = context.base_value.amount();
+
+        if total_contributions <= 1e-6 {
+            return Ok(0.0);
+        }
+
+        Ok((realized_lp_distributions + residual_nav) / total_contributions)
     }
 }
 
@@ -226,7 +202,6 @@ pub(crate) fn register_private_markets_fund_metrics(
         metrics: [
             (LpIrr, LpIrrCalculator),
             (GpCarryTotal, GpCarryTotalCalculator),
-            (MoicLp, MoicLpCalculator),
             (DpiLp, DpiLpCalculator),
             (TvpiLp, TvpiLpCalculator),
             (CarryAccrued, CarryAccruedCalculator),
@@ -566,9 +541,9 @@ mod tests {
     }
 
     #[test]
-    fn test_moic_calculation() {
+    fn test_tvpi_calculation() {
         // 100% LP promote tier so the full distribution reaches the LP and
-        // the ledger-basis MOIC  equals the naive 2x.
+        // the ledger-basis TVPI  equals the naive 2x.
         let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 1.0, 0.0)
@@ -591,7 +566,7 @@ mod tests {
 
         let curves = finstack_quant_core::market_data::context::MarketContext::new();
         // Fully realized fund: holder-view residual value is ~0, so the net
-        // LP MOIC is realized distributions / paid-in = 2x.
+        // LP TVPI is realized distributions / paid-in = 2x.
         let base_value = Money::from((0_i64, test_currency()));
         let mut context = MetricContext::new(
             std::sync::Arc::new(pe),
@@ -601,22 +576,18 @@ mod tests {
             MetricContext::default_config(),
         );
 
-        let moic = MoicLpCalculator
-            .calculate(&mut context)
-            .expect("should succeed");
-        assert!((moic - 2.0).abs() < 1e-6); // 2x multiple
-
-        // With residual value, MOIC includes it (net LP MOIC == TVPI):
-        // (2.0M realized + 0.5M residual) / 1.0M paid-in = 2.5x.
-        context.set_base_value(Money::from((500_000_i64, test_currency())));
-        let moic_with_residual = MoicLpCalculator
-            .calculate(&mut context)
-            .expect("should succeed");
-        assert!((moic_with_residual - 2.5).abs() < 1e-6);
         let tvpi = TvpiLpCalculator
             .calculate(&mut context)
             .expect("should succeed");
-        assert!((moic_with_residual - tvpi).abs() < 1e-12);
+        assert!((tvpi - 2.0).abs() < 1e-6); // 2x multiple
+
+        // TVPI also includes residual value:
+        // (2.0M realized + 0.5M residual) / 1.0M paid-in = 2.5x.
+        context.set_base_value(Money::from((500_000_i64, test_currency())));
+        let tvpi_with_residual = TvpiLpCalculator
+            .calculate(&mut context)
+            .expect("should succeed");
+        assert!((tvpi_with_residual - 2.5).abs() < 1e-6);
     }
 
     /// Holder-view PV : a fully realized fund has

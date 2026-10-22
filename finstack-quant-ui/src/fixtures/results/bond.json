@@ -83,7 +83,6 @@
       "implied_collateral_return",
       "index_ratio",
       "lp_irr",
-      "moic_lp",
       "nav01",
       "real_yield",
       "repo_interest",
