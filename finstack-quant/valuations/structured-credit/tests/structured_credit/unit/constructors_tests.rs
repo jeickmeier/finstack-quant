@@ -1,7 +1,7 @@
 //! Tests for structured credit constructors and behavioral overrides.
 
+use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 use finstack_quant_cashflows::builder::RateSpec;
-use finstack_quant_cashflows::builder::{clamped_cdr_to_mdr, clamped_cpr_to_smm};
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
@@ -93,7 +93,7 @@ fn per_type_constructors_set_expected_assumptions() {
         assert_eq!(sc.frequency, expected_frequency);
         assert!(
             (sc.credit_model.default_spec.mdr(1).unwrap()
-                - finstack_quant_cashflows::builder::cdr_to_mdr(expected_cdr).unwrap())
+                - finstack_quant_cashflows::builder::annual_to_monthly(expected_cdr).unwrap())
             .abs()
                 < 1e-12
         );
@@ -173,13 +173,13 @@ fn test_prepayment_spec_shapes_drive_monthly_rates() {
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.12);
     let cpr_rate = sc.credit_model.prepayment_spec.smm(1).unwrap();
-    assert!((cpr_rate - clamped_cpr_to_smm(0.12)).abs() < 1e-12);
+    assert!((cpr_rate - annual_to_monthly_clamped(0.12)).abs() < 1e-12);
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(2.0);
     // PSA standard: CPR ramps linearly to 6% over the first 30 months.
     let seasoning = 3;
     let base_cpr = (seasoning as f64 / 30.0) * 0.06;
-    let expected = clamped_cpr_to_smm(base_cpr * 2.0);
+    let expected = annual_to_monthly_clamped(base_cpr * 2.0);
     let psa_rate = sc.credit_model.prepayment_spec.smm(seasoning).unwrap();
     assert!((psa_rate - expected).abs() < 1e-12);
 }
@@ -200,7 +200,7 @@ fn test_default_spec_shapes_drive_monthly_rates() {
 
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.12);
     let cdr_rate = sc.credit_model.default_spec.mdr(1).unwrap();
-    assert!((cdr_rate - clamped_cdr_to_mdr(0.12)).abs() < 1e-12);
+    assert!((cdr_rate - annual_to_monthly_clamped(0.12)).abs() < 1e-12);
 
     sc.credit_model.default_spec = DefaultModelSpec::sda(1.5);
 

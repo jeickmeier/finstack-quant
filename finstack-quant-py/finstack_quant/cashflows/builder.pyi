@@ -61,11 +61,9 @@ __all__ = [
     "ScheduleParams",
     "StepUpCouponSpec",
     "abs_to_smm",
-    "cdr_to_mdr",
-    "cpr_to_smm",
-    "mdr_to_cdr",
+    "annual_to_monthly",
+    "monthly_to_annual",
     "merge_cashflow_schedules",
-    "smm_to_cpr",
 ]
 
 class AmortizationSpec:
@@ -5419,120 +5417,60 @@ def abs_to_smm(speed: float, month: int) -> float:
     """
     ...
 
-def cpr_to_smm(cpr: float) -> float:
-    """
-    Convert an annual CPR (constant prepayment rate) to a monthly SMM.
+def annual_to_monthly(annual: float) -> float:
+    """Convert annual conditional prepayment or default mortality to monthly mortality.
 
-    Uses the standard relationship ``SMM = 1 - (1 - CPR)^(1/12)`` (Fabozzi's
-    MBS handbook).
+    Uses ``monthly = 1 - (1 - annual) ** (1 / 12)`` for both CPR/SMM and CDR/MDR.
 
     Parameters
     ----------
-    cpr : float
-        Annualized CPR as a decimal in ``[0, 1]`` (``0.06`` means 6%).
+    annual : float
+        Finite annual conditional mortality as a decimal in ``[0, 1]``;
+        ``0.06`` represents 6% CPR or CDR. No calendar day-count adjustment applies.
 
     Returns
     -------
     float
-        Monthly SMM as a decimal fraction.
+        Monthly conditional mortality as a decimal. Zero and one map to themselves.
 
     Raises
     ------
     ValueError
-        If ``cpr`` is negative, non-finite, or above ``1.0``.
+        If ``annual`` is non-finite or outside ``[0, 1]``.
 
     Examples
     --------
-    >>> from finstack_quant.cashflows.builder import cpr_to_smm
-    >>> round(cpr_to_smm(0.06), 6)
+    >>> from finstack_quant.cashflows.builder import annual_to_monthly
+    >>> round(annual_to_monthly(annual=0.06), 6)
     0.005143
     """
     ...
 
-def smm_to_cpr(smm: float) -> float:
-    """
-    Convert a monthly SMM (single monthly mortality) to an annual CPR.
+def monthly_to_annual(monthly: float) -> float:
+    """Convert monthly conditional prepayment or default mortality to annual mortality.
 
-    Uses ``CPR = 1 - (1 - SMM)^12``.
+    Uses ``annual = 1 - (1 - monthly) ** 12`` for both SMM/CPR and MDR/CDR.
 
     Parameters
     ----------
-    smm : float
-        Monthly SMM as a decimal in ``[0, 1]``.
+    monthly : float
+        Finite monthly conditional mortality as a decimal in ``[0, 1]``;
+        ``0.01`` represents 1% SMM or MDR. Annualization uses twelve monthly periods.
 
     Returns
     -------
     float
-        Annualized CPR as a decimal fraction.
+        Annual conditional mortality as a decimal. Zero and one map to themselves.
 
     Raises
     ------
     ValueError
-        If ``smm`` is negative, non-finite, or above ``1.0``.
+        If ``monthly`` is non-finite or outside ``[0, 1]``.
 
     Examples
     --------
-    >>> from finstack_quant.cashflows.builder import cpr_to_smm, smm_to_cpr
-    >>> round(smm_to_cpr(cpr_to_smm(0.06)), 10)
+    >>> from finstack_quant.cashflows.builder import annual_to_monthly, monthly_to_annual
+    >>> round(monthly_to_annual(monthly=annual_to_monthly(0.06)), 10)
     0.06
-    """
-    ...
-
-def cdr_to_mdr(cdr: float) -> float:
-    """
-    Convert an annual CDR (constant default rate) to a monthly MDR.
-
-    Default and prepayment mortality rates share the same annual-to-monthly
-    conversion kernel: ``MDR = 1 - (1 - CDR)^(1/12)``.
-
-    Parameters
-    ----------
-    cdr : float
-        Constant annual default rate as a decimal in ``[0, 1]``.
-
-    Returns
-    -------
-    float
-        Monthly MDR as a decimal fraction.
-
-    Raises
-    ------
-    ValueError
-        If ``cdr`` is negative, non-finite, or above ``1.0``.
-
-    Examples
-    --------
-    >>> from finstack_quant.cashflows.builder import cdr_to_mdr
-    >>> round(cdr_to_mdr(0.02), 6)
-    0.001682
-    """
-    ...
-
-def mdr_to_cdr(mdr: float) -> float:
-    """
-    Convert a monthly MDR (monthly default rate) to an annual CDR.
-
-    Uses ``CDR = 1 - (1 - MDR)^12``.
-
-    Parameters
-    ----------
-    mdr : float
-        Monthly default rate as a decimal in ``[0, 1]``.
-
-    Returns
-    -------
-    float
-        Annualized CDR as a decimal fraction.
-
-    Raises
-    ------
-    ValueError
-        If ``mdr`` is negative, non-finite, or above ``1.0``.
-
-    Examples
-    --------
-    >>> from finstack_quant.cashflows.builder import cdr_to_mdr, mdr_to_cdr
-    >>> round(mdr_to_cdr(cdr_to_mdr(0.02)), 10)
-    0.02
     """
     ...

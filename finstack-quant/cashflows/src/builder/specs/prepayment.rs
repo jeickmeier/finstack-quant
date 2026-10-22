@@ -130,8 +130,8 @@ impl PrepaymentModelSpec {
             )));
         }
 
-        use crate::builder::credit_rates::cpr_to_smm;
-        cpr_to_smm(cpr)
+        use crate::builder::credit_rates::annual_to_monthly;
+        annual_to_monthly(cpr)
     }
 
     /// Validate the curve parameters without evaluating a particular month.
@@ -149,7 +149,7 @@ impl PrepaymentModelSpec {
             ..
         } = self
         {
-            crate::builder::credit_rates::cpr_to_smm(*cpr)?;
+            crate::builder::credit_rates::annual_to_monthly(*cpr)?;
         }
         if let PrepaymentModelSpec::Vector { monthly_cpr } = self {
             super::check_unit_vector(monthly_cpr, "monthly_cpr")?;

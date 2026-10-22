@@ -524,8 +524,9 @@ fn test_prepayment_model_psa_100() {
 
     // At month 30 the PSA ramp reaches its 6% terminal CPR.
     assert!(
-        (spec.smm(30).unwrap() - finstack_quant_cashflows::builder::cpr_to_smm(0.06).unwrap())
-            .abs()
+        (spec.smm(30).unwrap()
+            - finstack_quant_cashflows::builder::annual_to_monthly(0.06).unwrap())
+        .abs()
             < 1e-10
     );
 

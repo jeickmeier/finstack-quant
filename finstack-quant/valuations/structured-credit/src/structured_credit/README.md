@@ -51,7 +51,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `tranche_metrics`, `TrancheMetrics`, `tranche_scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | The one per-tranche API (clean/dirty price, accrued, WAL, yield, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters, plus requested registry metrics valued on the note) and scenario grids (one projection per cell, clean settlement price per current face). |
 | `tranche_discount_margin`, `tranche_oas` (+ `OasConfig`, `OasResult`), `tranche_breakeven_cdr` | Individual tranche analytics, bound under the same names in Python and (camelCase) in WASM. |
 | `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_cs01` | Individual tranche analytics used by `tranche_metrics` (Rust-only). |
-| `clamped_cpr_to_smm`, `clamped_smm_to_cpr`, `clamped_cdr_to_mdr`, `clamped_mdr_to_cdr`, `psa_to_cpr` | Rate conversions. |
+| Cashflow rate helpers | Import `annual_to_monthly`, `monthly_to_annual`, `annual_to_monthly_clamped`, and `psa_cpr` from `finstack_quant_cashflows::builder`. |
 | `validate_tiers`, `ValidationError` | Waterfall validation. |
 | Constants | Solver tolerances stay crate-internal (basis-point conversion is `finstack_quant_core::math::units`). The pool-balance cleanup threshold is read from the embedded assumptions registry. |
 
@@ -735,17 +735,16 @@ needs a loss distribution.
 ### Rate conversions
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    clamped_cdr_to_mdr, clamped_cpr_to_smm, psa_to_cpr,
-};
+use finstack_quant_cashflows::builder::{annual_to_monthly_clamped, psa_cpr};
 
-let smm = clamped_cpr_to_smm(0.06);  // 6% annual CPR -> monthly SMM
-let mdr = clamped_cdr_to_mdr(0.02);  // 2% annual CDR -> monthly MDR
-let cpr = psa_to_cpr(1.5, 30);       // 150% PSA at month 30
+let smm = annual_to_monthly_clamped(0.06);  // 6% annual CPR -> monthly SMM
+let mdr = annual_to_monthly_clamped(0.02);  // 2% annual CDR -> monthly MDR
+let cpr = psa_cpr(1.5, 30);       // 150% PSA at month 30
 ```
 
-The `clamped_*` forms clamp their input to a valid rate range before
-converting; the unclamped `cpr_to_smm` / `cdr_to_mdr` primitives are internal.
+`annual_to_monthly_clamped` clamps inputs into `[0, 1]` before converting.
+Use the checked `annual_to_monthly` and `monthly_to_annual` functions when invalid
+rates should produce an error.
 
 ## Metrics
 

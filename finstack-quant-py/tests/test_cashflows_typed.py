@@ -1489,10 +1489,10 @@ class TestTypedTwinsAndWire:
         assert str(FixedCouponSpec("0.05", params).rate) == "0.05"
 
     def test_credit_rate_error_text(self) -> None:
-        from finstack_quant.cashflows.builder import cpr_to_smm
+        from finstack_quant.cashflows.builder import annual_to_monthly
 
         with pytest.raises(ValueError, match=r"must be a decimal in \[0,1\]"):
-            cpr_to_smm(-0.05)
+            annual_to_monthly(-0.05)
 
     def test_period_aggregation_wire(self) -> None:
         import pickle
@@ -1612,3 +1612,23 @@ def test_build_as_of_uses_fixings_after_curve_anchor() -> None:
     coupon = next(flow for flow in schedule.get_flows() if flow.kind == CFKind.FLOAT_RESET)
     assert coupon.rate == pytest.approx(0.06, abs=1e-12)
     assert coupon.amount.amount == pytest.approx(15_000.0, abs=1e-8)
+
+
+@pytest.mark.parametrize("rate", [0.0, 0.02, 0.06, 0.5, 1.0])
+def test_credit_rate_conversions_roundtrip(rate: float) -> None:
+    from finstack_quant.cashflows.builder import annual_to_monthly, monthly_to_annual
+
+    monthly = annual_to_monthly(annual=rate)
+    assert monthly_to_annual(monthly=monthly) == pytest.approx(rate, abs=1e-14)
+
+
+def test_credit_rate_conversion_boundaries_and_errors() -> None:
+    import math
+
+    from finstack_quant.cashflows.builder import annual_to_monthly, monthly_to_annual
+
+    for convert, name in [(annual_to_monthly, "annual"), (monthly_to_annual, "monthly")]:
+        assert math.copysign(1.0, convert(-0.0)) == 1.0
+        for invalid in [-0.01, 1.01, float("nan"), float("inf"), -float("inf")]:
+            with pytest.raises(ValueError, match=rf"{name} must be a decimal in \[0,1\]"):
+                convert(invalid)

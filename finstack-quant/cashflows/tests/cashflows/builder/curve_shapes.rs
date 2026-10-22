@@ -3,7 +3,7 @@
 //! vectors by month of default.
 
 use finstack_quant_cashflows::builder::{
-    abs_to_smm, cpr_to_smm, DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    abs_to_smm, annual_to_monthly, DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
 };
 
 const TOL: f64 = 1e-12;
@@ -55,13 +55,13 @@ fn abs_speed_prepays_the_original_balance_evenly() {
 #[test]
 fn vector_curves_hold_the_last_value() {
     let prepay = PrepaymentModelSpec::vector(vec![0.02, 0.04]);
-    assert_eq!(prepay.smm(0).unwrap(), cpr_to_smm(0.02).unwrap());
-    assert_eq!(prepay.smm(1).unwrap(), cpr_to_smm(0.02).unwrap());
-    assert_eq!(prepay.smm(2).unwrap(), cpr_to_smm(0.04).unwrap());
-    assert_eq!(prepay.smm(120).unwrap(), cpr_to_smm(0.04).unwrap());
+    assert_eq!(prepay.smm(0).unwrap(), annual_to_monthly(0.02).unwrap());
+    assert_eq!(prepay.smm(1).unwrap(), annual_to_monthly(0.02).unwrap());
+    assert_eq!(prepay.smm(2).unwrap(), annual_to_monthly(0.04).unwrap());
+    assert_eq!(prepay.smm(120).unwrap(), annual_to_monthly(0.04).unwrap());
 
     let default = DefaultModelSpec::vector(vec![0.01, 0.03]);
-    assert_eq!(default.mdr(1).unwrap(), cpr_to_smm(0.01).unwrap());
+    assert_eq!(default.mdr(1).unwrap(), annual_to_monthly(0.01).unwrap());
     assert_eq!(default.mdr(2).unwrap(), default.mdr(240).unwrap());
 
     assert!(PrepaymentModelSpec::vector(Vec::new()).smm(1).is_err());

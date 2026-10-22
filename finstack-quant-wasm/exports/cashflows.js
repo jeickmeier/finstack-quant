@@ -30,14 +30,13 @@ export const cashflows = {
   accruedInterestAmount: wasm.accruedInterestAmount,
   aggregateByPeriod: wasm.aggregateByPeriod,
   aggregateCashflowsChecked: wasm.aggregateCashflowsChecked,
+  annualToMonthly: wasm.annualToMonthly,
   buildCashflowSchedule: (spec, market = undefined) =>
     market === undefined || market === null
       ? wasm.buildCashflowSchedule(spec)
       : wasm.buildCashflowScheduleWithMarket(spec, market),
   buildCashflowScheduleJson: wasm.buildCashflowScheduleJson,
   calendarYearLadder: wasm.calendarYearLadder,
-  cdrToMdr: wasm.cdrToMdr,
-  cprToSmm: wasm.cprToSmm,
   datedFlows: wasm.datedFlows,
   datedFlowsJson: wasm.datedFlowsJson,
   defaultModelSpecCumulativeDefaultFraction: wasm.defaultModelSpecCumulativeDefaultFraction,
@@ -56,9 +55,9 @@ export const cashflows = {
   floatingRateSpecValidate: wasm.floatingRateSpecValidate,
   materializeFixings: (market, schedules, oldDate, newDate) =>
     wasm.materializeFixings(market, scheduleJsonList(schedules), oldDate, newDate),
-  mdrToCdr: wasm.mdrToCdr,
   mergeCashflowSchedules: (schedules, notional, dayCount) =>
     wasm.mergeCashflowSchedules(scheduleJsonList(schedules), notional, dayCount),
+  monthlyToAnnual: wasm.monthlyToAnnual,
   notionalPar: wasm.notionalPar,
   notionalValidate: wasm.notionalValidate,
   prepaymentModelSpecSmm: wasm.prepaymentModelSpecSmm,
@@ -78,7 +77,6 @@ export const cashflows = {
   scheduleParamsUsdSofrSwap: wasm.scheduleParamsUsdSofrSwap,
   scheduleParamsUsdTreasury: wasm.scheduleParamsUsdTreasury,
   scheduleParamsValidate: wasm.scheduleParamsValidate,
-  smmToCpr: wasm.smmToCpr,
   validateCashflowScheduleJson: wasm.validateCashflowScheduleJson,
   schema,
 };
