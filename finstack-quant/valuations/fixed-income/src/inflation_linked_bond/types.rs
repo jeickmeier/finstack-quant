@@ -1,6 +1,5 @@
 //! Inflation-Linked Bond (ILB) types and implementation.
 
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -500,7 +499,7 @@ impl InflationLinkedBond {
     fn real_flows_from(
         schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         as_of: Date,
-    ) -> DatedFlows {
+    ) -> Vec<(Date, Money)> {
         schedule
             .get_flows()
             .iter()

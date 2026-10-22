@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use super::compiler::{
     build_fee_schedules, compute_coupon_schedules, CompiledSchedules, CouponProgramPiece,
-    FixedSchedule, FloatSchedule, PaymentProgramPiece, PeriodicFee,
+    FeeSchedules, FixedSchedule, FloatSchedule, PaymentProgramPiece, PeriodicFee,
 };
 use super::emission::ResolvedFloatMarket;
 use super::specs::FeeSpec;
@@ -458,7 +458,7 @@ pub(super) struct CompiledCashFlowPlan {
     pub(super) fixed_schedules: Vec<FixedSchedule>,
     pub(super) float_schedules: Vec<FloatSchedule>,
     pub(super) periodic_fees: Vec<PeriodicFee>,
-    pub(super) fixed_fees: crate::DatedFlows,
+    pub(super) fixed_fees: Vec<(Date, Money)>,
     pub(super) principal_events: Vec<PrincipalEventSpec>,
     pub(super) dates: Vec<Date>,
     pub(super) amort_setup: AmortizationSetup,
@@ -557,7 +557,10 @@ impl CashFlowBuilder {
             fixed_fees,
         ) = {
             let compiled = compute_coupon_schedules(self, issue, maturity)?;
-            let (periodic_fees, fixed_fees) = build_fee_schedules(issue, maturity, &self.fees)?;
+            let FeeSchedules {
+                periodic_fees,
+                fixed_fees,
+            } = build_fee_schedules(issue, maturity, &self.fees)?;
             (compiled, periodic_fees, fixed_fees)
         };
 

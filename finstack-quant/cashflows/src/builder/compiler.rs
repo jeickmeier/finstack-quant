@@ -24,6 +24,7 @@
 //! least two dates.
 
 use finstack_quant_core::dates::{Date, DayCount, HolidayCalendar, Tenor};
+use finstack_quant_core::money::Money;
 use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
@@ -36,7 +37,6 @@ use super::specs::{
     CouponType, FeeAccrualBasis, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec,
     ScheduleParams, StepUpCouponSpec,
 };
-use crate::DatedFlows;
 use finstack_quant_core::dates::calendar_by_id_strict;
 
 #[derive(Debug, Clone, Copy)]
@@ -210,13 +210,19 @@ pub(super) struct PeriodicFee {
     pub(super) terminal_accrual_end: Option<Date>,
 }
 
+/// Compiled fee legs, retaining periodic accrual rules separately from dated payments.
+pub(super) struct FeeSchedules {
+    pub(super) periodic_fees: Vec<PeriodicFee>,
+    pub(super) fixed_fees: Vec<(Date, Money)>,
+}
+
 pub(super) fn build_fee_schedules(
     issue: Date,
     maturity: Date,
     fees: &[FeeSpec],
-) -> finstack_quant_core::Result<(Vec<PeriodicFee>, DatedFlows)> {
+) -> finstack_quant_core::Result<FeeSchedules> {
     let mut periodic_fees = Vec::new();
-    let mut fixed_fees = DatedFlows::new();
+    let mut fixed_fees = Vec::new();
     for fee in fees {
         match fee {
             FeeSpec::Fixed { date, amount } => {
@@ -277,7 +283,10 @@ pub(super) fn build_fee_schedules(
             }
         }
     }
-    Ok((periodic_fees, fixed_fees))
+    Ok(FeeSchedules {
+        periodic_fees,
+        fixed_fees,
+    })
 }
 
 /// The public coupon spec a program piece was added with.

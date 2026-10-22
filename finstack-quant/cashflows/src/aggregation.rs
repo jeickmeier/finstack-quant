@@ -162,7 +162,7 @@ trait HasDate {
     fn flow_date(&self) -> Date;
 }
 
-impl HasDate for crate::DatedFlow {
+impl HasDate for (Date, Money) {
     fn flow_date(&self) -> Date {
         self.0
     }
@@ -320,14 +320,14 @@ fn validate_periods(periods: &[Period]) -> finstack_quant_core::Result<()> {
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn aggregate_by_period(
-    flows: &[crate::DatedFlow],
+    flows: &[(Date, Money)],
     periods: &[Period],
 ) -> finstack_quant_core::Result<PeriodAggregation> {
     validate_periods(periods)?;
     if flows.is_empty() || periods.is_empty() {
         return Ok(PeriodAggregation::default());
     }
-    let sorted: std::borrow::Cow<'_, [crate::DatedFlow]> =
+    let sorted: std::borrow::Cow<'_, [(Date, Money)]> =
         if flows.windows(2).all(|w| w[0].0 <= w[1].0) {
             std::borrow::Cow::Borrowed(flows)
         } else {
@@ -382,7 +382,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 /// assert_eq!(total.currency(), Currency::USD);
 /// ```
 pub fn aggregate_cashflows_checked(
-    flows: &[crate::DatedFlow],
+    flows: &[(Date, Money)],
     target: Currency,
 ) -> finstack_quant_core::Result<Money> {
     let mut acc = NeumaierAccumulator::default();
@@ -1287,7 +1287,7 @@ mod period_contract_tests {
         assert!((pv - 200.0).abs() < 1e-12, "expected 200, got {pv}");
 
         // Nominal aggregation still includes the historical flows.
-        let dated: Vec<crate::DatedFlow> = flows.iter().map(|cf| (cf.date, cf.amount)).collect();
+        let dated: Vec<(Date, Money)> = flows.iter().map(|cf| (cf.date, cf.amount)).collect();
         let nominal = aggregate_by_period(&dated, &periods).expect("nominal aggregation");
         let total = nominal[&PeriodId::annual(2025)][&Currency::USD].amount();
         assert!((total - 350.0).abs() < 1e-12, "expected 350, got {total}");
@@ -1657,7 +1657,7 @@ mod credit_pv_tests {
         // when materialized as Money; that must surface as Err, not a panic.
         let base = d(2025, 1, 1);
         let periods = vec![make_period(base, d(2026, 1, 1))];
-        let flows: Vec<crate::DatedFlow> = vec![
+        let flows: Vec<(Date, Money)> = vec![
             (
                 d(2025, 3, 1),
                 Money::new(7.0e28, Currency::USD).expect("valid money fixture"),

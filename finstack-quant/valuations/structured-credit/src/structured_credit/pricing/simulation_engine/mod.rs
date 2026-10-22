@@ -13,7 +13,6 @@ use crate::structured_credit::types::{
     Waterfall, WaterfallDistribution,
 };
 use crate::structured_credit::utils::simulation::RecoveryQueue;
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::HolidayCalendar;

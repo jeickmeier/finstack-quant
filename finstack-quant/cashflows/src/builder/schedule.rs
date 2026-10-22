@@ -842,7 +842,7 @@ impl CashFlowSchedule {
     /// Returns error if:
     /// - `meta.issue_date` is unset
     /// - Currency mismatch between flows and notional
-    pub fn outstanding_by_date(&self) -> finstack_quant_core::Result<crate::DatedFlows> {
+    pub fn outstanding_by_date(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let issue = self.meta.issue_date.ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "outstanding_by_date: schedule.meta.issue_date is required to identify the initial funding flow"
@@ -871,7 +871,7 @@ impl CashFlowSchedule {
     ///
     /// # Returns
     ///
-    /// Validated [`crate::DatedFlows`] in schedule order.
+    /// Validated `Vec<(Date, Money)>` in schedule order.
     ///
     /// # Errors
     ///
@@ -896,12 +896,12 @@ impl CashFlowSchedule {
     /// assert_eq!(schedule.dated_flows()?[0].1.currency(), Currency::USD);
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
-    pub fn dated_flows(&self) -> finstack_quant_core::Result<crate::DatedFlows> {
+    pub fn dated_flows(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         self.validate_native_cash()?;
         Ok(self.settlement_rows())
     }
 
-    pub(crate) fn settlement_rows(&self) -> crate::DatedFlows {
+    pub(crate) fn settlement_rows(&self) -> Vec<(Date, Money)> {
         self.flows
             .iter()
             .filter(|flow| flow.kind.is_cash_settlement())

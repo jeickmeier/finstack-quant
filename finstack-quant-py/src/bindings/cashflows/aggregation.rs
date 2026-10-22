@@ -4,7 +4,7 @@ use finstack_quant_cashflows::aggregation::{
     aggregate_by_period, aggregate_cashflows_checked as rust_aggregate_cashflows_checked,
     calendar_year_ladder as rust_calendar_year_ladder, PeriodAggregation,
 };
-use finstack_quant_cashflows::DatedFlow;
+use finstack_quant_core::{dates::Date, money::Money};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
@@ -18,7 +18,7 @@ use crate::errors::core_to_py;
 /// Convert Python ``[(date, Money), ...]`` into Rust dated flows.
 pub(crate) fn extract_dated_flows(
     flows: Vec<(Bound<'_, PyAny>, PyMoney)>,
-) -> PyResult<Vec<DatedFlow>> {
+) -> PyResult<Vec<(Date, Money)>> {
     flows
         .iter()
         .map(|(d, m)| Ok((py_to_date(d)?, m.inner)))
