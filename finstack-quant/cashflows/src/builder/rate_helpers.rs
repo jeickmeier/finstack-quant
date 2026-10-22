@@ -398,7 +398,7 @@ pub fn project_overnight_rate(
                 .into(),
         ));
     }
-    let rate = fwd.rate_period(t, t_end) * (curve_year_fraction / index_year_fraction);
+    let rate = fwd.rate_period(t, t_end)? * (curve_year_fraction / index_year_fraction);
     if !rate.is_finite() {
         return Err(finstack_quant_core::Error::Validation(
             "overnight projection produced a non-finite index rate".into(),
@@ -730,7 +730,9 @@ mod tests {
             .year_fraction(base, period_end, DayCountContext::default())
             .expect("valid period-end year fraction");
         let reset_fixing = fwd_curve.rate(reset_t);
-        let integrated_average = fwd_curve.rate_period(reset_t, period_end_t);
+        let integrated_average = fwd_curve
+            .rate_period(reset_t, period_end_t)
+            .expect("finite ordered period");
 
         let accrual = (period_end - reset).whole_days() as f64 / 360.0;
         let projected =

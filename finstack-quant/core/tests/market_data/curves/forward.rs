@@ -240,7 +240,7 @@ fn rate_period_matches_linear_curve_integral_average() {
         .build()
         .unwrap();
 
-    let avg = curve.rate_period(2.0, 8.0);
+    let avg = curve.rate_period(2.0, 8.0).expect("finite ordered period");
     let expected = 0.02 + 0.01 * ((2.0 + 8.0) / 2.0);
     assert!((avg - expected).abs() < 1e-14);
 }
@@ -254,8 +254,11 @@ fn rate_period_handles_zero_width_and_long_flat_intervals() {
         .build()
         .unwrap();
 
-    assert_eq!(curve.rate_period(3.0, 3.0), curve.rate(3.0));
-    assert!((curve.rate_period(0.0, 25.0) - 0.04).abs() < 1e-14);
+    assert_eq!(
+        curve.rate_period(3.0, 3.0).expect("equal endpoints"),
+        curve.rate(3.0)
+    );
+    assert!((curve.rate_period(0.0, 25.0).expect("finite ordered period") - 0.04).abs() < 1e-14);
 }
 
 // Serialization Tests

@@ -873,11 +873,14 @@ class ForwardCurve:
         Returns
         -------
         float
-            Period-average forward rate as a decimal.
-        Notes
-        -----
-        This method does not raise.
+            Finite period-average rate as a decimal. Equal endpoints and intervals
+            no longer than 1e-12 years return the start rate. Negative finite times
+            retain the curve's extrapolation policy.
 
+        Raises
+        ------
+        ValueError
+            If endpoints are non-finite or reversed, or the interval length or result is non-finite.
         """
         ...
 

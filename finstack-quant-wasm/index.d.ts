@@ -3550,11 +3550,15 @@ export interface ForwardCurve extends WasmOwned {
    */
   toJson(): string;
   /**
-   * Simple forward rate over `[t1, t2]` implied by the curve (Rust `rate_period`).
+   * Integral-average forward rate over `[t1, t2]` on the curve day-count basis.
+   *
+   * Equal endpoints and intervals no longer than `1e-12` years return the
+   * start rate. Negative finite times retain the curve's extrapolation policy.
    *
    * @param t1 - Start of the accrual period in years from `baseDate`.
    * @param t2 - End of the accrual period in years from `baseDate`.
-   * @returns The average forward over the period as a decimal.
+   * @returns The finite period-average rate as a decimal; equal or very short intervals return the start rate.
+   * @throws If endpoints are non-finite or reversed, or the interval or result is non-finite.
    */
   ratePeriod(t1: number, t2: number): number;
   /**
