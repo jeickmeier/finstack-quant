@@ -26,7 +26,6 @@ CalibrationStep = _calibration.CalibrationStep
 CalibrationValidationReport = _calibration.CalibrationValidationReport
 CdsQuote = _calibration.CdsQuote
 CdsTrancheQuote = _calibration.CdsTrancheQuote
-DividendScheduleDatum = _calibration.DividendScheduleDatum
 FxSpotDatum = _calibration.FxSpotDatum
 InflationQuote = _calibration.InflationQuote
 PriceDatum = _calibration.PriceDatum
@@ -65,7 +64,6 @@ __all__ = [
     "CalibrationValidationReport",
     "CdsQuote",
     "CdsTrancheQuote",
-    "DividendScheduleDatum",
     "FxSpotDatum",
     "InflationQuote",
     "PriceDatum",

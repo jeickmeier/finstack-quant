@@ -453,11 +453,11 @@ fn add_equity_carry_reads(
         .iter()
         .filter_map(|datum| match datum {
             MarketDatum::DividendSchedule(datum)
-                if datum.schedule.get_underlying() == Some(ticker)
-                    || datum.schedule.get_id().as_str() == ticker
-                    || datum.schedule.get_id().as_str() == fallback_id =>
+                if datum.get_underlying() == Some(ticker)
+                    || datum.get_id().as_str() == ticker
+                    || datum.get_id().as_str() == fallback_id =>
             {
-                Some(datum.schedule.get_id().to_string())
+                Some(datum.get_id().to_string())
             }
             _ => None,
         })

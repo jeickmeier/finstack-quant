@@ -297,49 +297,47 @@
         },
         {
           "kind": "dividend_schedule",
-          "schedule": {
-            "id": "AAPL-DIVS",
-            "underlying": "AAPL",
-            "currency": "USD",
-            "events": [
-              {
-                "date": "2026-08-15",
-                "kind": {
-                  "cash": {
-                    "amount": "0.25",
-                    "currency": "USD"
-                  }
-                }
-              },
-              {
-                "date": "2026-11-15",
-                "kind": {
-                  "cash": {
-                    "amount": "0.25",
-                    "currency": "USD"
-                  }
-                }
-              },
-              {
-                "date": "2027-02-15",
-                "kind": {
-                  "cash": {
-                    "amount": "0.25",
-                    "currency": "USD"
-                  }
-                }
-              },
-              {
-                "date": "2027-05-15",
-                "kind": {
-                  "cash": {
-                    "amount": "0.25",
-                    "currency": "USD"
-                  }
+          "id": "AAPL-DIVS",
+          "underlying": "AAPL",
+          "currency": "USD",
+          "events": [
+            {
+              "date": "2026-08-15",
+              "kind": {
+                "cash": {
+                  "amount": "0.25",
+                  "currency": "USD"
                 }
               }
-            ]
-          }
+            },
+            {
+              "date": "2026-11-15",
+              "kind": {
+                "cash": {
+                  "amount": "0.25",
+                  "currency": "USD"
+                }
+              }
+            },
+            {
+              "date": "2027-02-15",
+              "kind": {
+                "cash": {
+                  "amount": "0.25",
+                  "currency": "USD"
+                }
+              }
+            },
+            {
+              "date": "2027-05-15",
+              "kind": {
+                "cash": {
+                  "amount": "0.25",
+                  "currency": "USD"
+                }
+              }
+            }
+          ]
         }
       ],
       "prior_market": []

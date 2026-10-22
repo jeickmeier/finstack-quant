@@ -44,7 +44,7 @@ pub enum MarketDatum {
     /// Spot price for a single asset.
     Price(PriceDatum),
     /// Dividend schedule for an underlier.
-    DividendSchedule(DividendScheduleDatum),
+    DividendSchedule(DividendSchedule),
     /// Generic scalar time series (CPI, historical fixings, ...).
     FixingSeries(ScalarTimeSeries),
     /// Inflation index fixings.
@@ -86,15 +86,6 @@ pub struct PriceDatum {
     pub scalar: MarketScalar,
 }
 
-/// Dividend-schedule payload for [`MarketDatum::DividendSchedule`].
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct DividendScheduleDatum {
-    /// The dividend schedule itself.
-    pub schedule: DividendSchedule,
-}
-
 impl MarketDatum {
     /// Stable identifier for this datum, borrowed as a string slice.
     ///
@@ -110,7 +101,7 @@ impl MarketDatum {
             MarketDatum::XccyQuote(q) => q.id().as_str(),
             MarketDatum::FxSpot(d) => &d.id,
             MarketDatum::Price(d) => &d.id,
-            MarketDatum::DividendSchedule(d) => d.schedule.get_id().as_str(),
+            MarketDatum::DividendSchedule(d) => d.get_id().as_str(),
             MarketDatum::FixingSeries(s) => s.id().as_str(),
             MarketDatum::InflationFixings(i) => i.id(),
             MarketDatum::CreditIndex(c) => c.id.as_str(),
@@ -247,5 +238,41 @@ mod tests {
         assert_eq!(datum.id(), "EUR/USD");
         assert_eq!(datum.kind_name(), "fx_spot");
         assert!(datum.as_quote().is_none());
+    }
+    #[test]
+    fn dividend_schedule_uses_direct_fields_and_materializes_unchanged() {
+        let wire = serde_json::json!({
+            "kind": "dividend_schedule",
+            "id": "AAPL-DIVS",
+            "underlying": "AAPL",
+            "currency": "USD",
+            "events": [{"date": "2026-08-15", "kind": {"cash": {"amount": "0.25", "currency": "USD"}}}]
+        });
+        let datum: MarketDatum =
+            serde_json::from_value(wire.clone()).expect("valid direct schedule");
+        assert_eq!(datum.id(), "AAPL-DIVS");
+        assert_eq!(
+            serde_json::to_value(&datum).expect("serialize schedule"),
+            wire
+        );
+        let context = crate::api::context_builder::build_initial_context(
+            &[],
+            std::slice::from_ref(&datum),
+            &crate::CalibrationConfig::default(),
+        )
+        .expect("materialize schedule");
+        let (stored_id, stored) = context.dividends_iter().next().expect("stored schedule");
+        assert_eq!(stored_id.as_str(), "AAPL-DIVS");
+        let mut old_payload = wire.as_object().expect("object").clone();
+        old_payload.remove("kind");
+        assert_eq!(
+            serde_json::to_value(stored).expect("stored wire"),
+            serde_json::Value::Object(old_payload.clone())
+        );
+        let error = serde_json::from_value::<MarketDatum>(serde_json::json!({
+            "kind": "dividend_schedule", "schedule": old_payload
+        }))
+        .expect_err("removed nested shape");
+        assert!(error.to_string().contains("schedule"));
     }
 }

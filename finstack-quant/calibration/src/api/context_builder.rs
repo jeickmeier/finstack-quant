@@ -120,7 +120,7 @@ pub(crate) fn build_initial_context(
                 ctx.insert_price_mut(CurveId::from(p.id.clone()), p.scalar.clone());
             }
             MarketDatum::DividendSchedule(d) => {
-                ctx.insert_dividends_mut(d.schedule.clone());
+                ctx.insert_dividends_mut(d.clone());
             }
             MarketDatum::FixingSeries(s) => {
                 ctx.insert_series_mut(s.clone());

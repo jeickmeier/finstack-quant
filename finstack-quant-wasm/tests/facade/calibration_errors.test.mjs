@@ -446,3 +446,27 @@ test('calibration configuration accepts nested solver settings and rejects flat 
     assert.match(error.message, new RegExp(field));
   }
 });
+
+test('dividend schedules use direct market-datum fields', () => {
+  const datum = {
+    kind: 'dividend_schedule',
+    id: 'AAPL-DIVS',
+    underlying: 'AAPL',
+    currency: 'USD',
+    events: [{ date: '2026-08-15', kind: { cash: { amount: '0.25', currency: 'USD' } } }],
+  };
+  const envelope = {
+    schema: 'finstack_quant.calibration/1',
+    plan: { id: 'dividends', quote_sets: {}, steps: [] },
+    market_data: [datum],
+    prior_market: [],
+  };
+  const validated = calibration.validateCalibration(envelope);
+  assert.deepEqual(validated.market_data, [datum]);
+  assert.equal(calibration.calibrate(envelope).result.report.success, true);
+  const { kind, ...schedule } = datum;
+  envelope.market_data = [{ kind, schedule }];
+  const error = captureError(() => calibration.validateCalibration(envelope));
+  assertStructuredError(error);
+  assert.match(error.message, /schedule/);
+});

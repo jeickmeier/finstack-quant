@@ -487,7 +487,6 @@ class TestCalibrationNamespace:
             "CalibrationValidationReport",
             "CdsQuote",
             "CdsTrancheQuote",
-            "DividendScheduleDatum",
             "FxSpotDatum",
             "InflationQuote",
             "PriceDatum",

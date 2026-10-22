@@ -24,6 +24,7 @@ import pandas as pd
 
 from finstack_quant.calibration import hull_white as hull_white
 from finstack_quant.calibration import schema as schema
+from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext, VolSurface
 
 __all__ = [
@@ -38,7 +39,6 @@ __all__ = [
     "CalibrationValidationReport",
     "CdsQuote",
     "CdsTrancheQuote",
-    "DividendScheduleDatum",
     "FxSpotDatum",
     "InflationQuote",
     "PriceDatum",
@@ -885,7 +885,7 @@ class CdsQuote:
     def par_spread(
         id: str,
         entity: str,
-        currency: str,
+        currency: str | Currency,
         doc_clause: str,
         pillar: str,
         spread_bp: float,
@@ -899,7 +899,7 @@ class CdsQuote:
             Unique quote identifier.
         entity : str
             Reference entity identifier.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the contract currency.
         doc_clause : str
             ISDA documentation clause, for example ``"xr14"``.
@@ -920,6 +920,8 @@ class CdsQuote:
         ValueError
             If a field is empty, ``currency`` is invalid, or ``recovery_rate``
             lies outside [0, 1).
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -933,7 +935,7 @@ class CdsQuote:
     def upfront(
         id: str,
         entity: str,
-        currency: str,
+        currency: str | Currency,
         doc_clause: str,
         pillar: str,
         coupon_bp: float,
@@ -948,7 +950,7 @@ class CdsQuote:
             Unique quote identifier.
         entity : str
             Reference entity identifier.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the contract currency.
         doc_clause : str
             ISDA documentation clause, for example ``"xr14"``.
@@ -973,6 +975,8 @@ class CdsQuote:
         ValueError
             If a field is empty, ``currency`` is invalid, or ``recovery_rate``
             lies outside [0, 1).
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -1760,7 +1764,7 @@ class CdsTrancheQuote:
         maturity: str,
         upfront_pct: float,
         coupon_bp: float,
-        currency: str,
+        currency: str | Currency,
         doc_clause: str,
     ) -> None:
         """Build a CDS index tranche quote.
@@ -1784,7 +1788,7 @@ class CdsTrancheQuote:
             Upfront payment as a decimal fraction of notional, ``|upfront_pct| <= 1``.
         coupon_bp : float
             Running coupon in basis points per annum (positive).
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the contract currency.
         doc_clause : str
             ISDA documentation clause, for example ``"isda_na"``.
@@ -1794,6 +1798,8 @@ class CdsTrancheQuote:
         ValueError
             If a date, convention or numeric input is invalid, or
             ``attachment >= detachment``.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         """
 
@@ -2208,107 +2214,6 @@ class PriceDatum:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
-class DividendScheduleDatum:
-    """A dividend-schedule market datum (``kind == "dividend_schedule"``).
-
-    Examples:
-    --------
-    >>> from finstack_quant.calibration import DividendScheduleDatum
-    >>> DividendScheduleDatum({"id": "AAPL-DIVS", "underlying": "AAPL", "events": []}).id
-    'AAPL-DIVS'
-
-    """
-
-    def __init__(self, schedule: dict[str, Any]) -> None:
-        """Build a dividend-schedule datum from the Rust ``DividendSchedule`` wire mapping.
-
-        Parameters
-        ----------
-        schedule : dict
-            Dividend schedule in its serde wire form (``id``, ``underlying``,
-            ``events``, optional ``currency``).
-
-        Raises
-        ------
-        ValueError
-            If ``schedule`` has a missing, unknown or mistyped field.
-
-        """
-
-    @property
-    def id(self) -> str:
-        """
-        Identifier of the dividend schedule (the datum id).
-
-        This property does not raise.
-
-        Returns
-        -------
-        str
-            Identifier of the dividend schedule (the datum id).
-        """
-
-    @property
-    def schedule(self) -> dict[str, Any]:
-        """
-        Dividend schedule as its serde wire mapping.
-
-        This property does not raise.
-
-        Returns
-        -------
-        dict[str, Any]
-            Dividend schedule as its serde wire mapping.
-        """
-
-    def to_json(self) -> str:
-        """
-        Serialize to compact JSON.
-
-        Returns
-        -------
-        str
-            Compact JSON encoding of this value.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized to JSON.
-        """
-
-    @staticmethod
-    def from_json(json: str) -> DividendScheduleDatum:
-        """
-        Rebuild from JSON produced by :meth:`to_json`.
-
-        Parameters
-        ----------
-        json : str
-            JSON produced by :meth:`to_json`.
-
-        Returns
-        -------
-        DividendScheduleDatum
-            The decoded value.
-
-        Raises
-        ------
-        ValueError
-            If ``json`` is malformed or carries unknown fields.
-
-        Examples
-        --------
-        >>> from finstack_quant.calibration import DividendScheduleDatum
-        >>> DividendScheduleDatum.from_json(DividendScheduleDatum({"id": "D", "events": []}).to_json()).id
-        'D'
-        """
-
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
-    def __repr__(self) -> str: ...
-
-type Quote = RateQuote | CdsQuote | VolQuote | InflationQuote | XccyQuote | CdsTrancheQuote
-type MarketDatum = Quote | FxSpotDatum | PriceDatum | DividendScheduleDatum
-
 class CalibrationStep:
     """One calibration step: a target kind, parameters, and a named quote set.
 
@@ -2331,7 +2236,7 @@ class CalibrationStep:
     @staticmethod
     def discount(
         id: str,
-        currency: str,
+        currency: str | Currency,
         base_date: str,
         quote_set: str | None = None,
         curve_id: str | None = None,
@@ -2343,7 +2248,7 @@ class CalibrationStep:
         ----------
         id : str
             Unique step identifier; also the residual key in the result.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the curve currency.
         base_date : str
             Curve base (spot) date as an ISO date string.
@@ -2364,6 +2269,8 @@ class CalibrationStep:
         ------
         ValueError
             If a parameter is unknown to the Rust step schema or has the wrong shape.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -2380,7 +2287,7 @@ class CalibrationStep:
     @staticmethod
     def forward(
         id: str,
-        currency: str,
+        currency: str | Currency,
         base_date: str,
         tenor_years: float,
         discount_curve_id: str,
@@ -2394,7 +2301,7 @@ class CalibrationStep:
         ----------
         id : str
             Unique step identifier.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the curve currency.
         base_date : str
             Curve base date as an ISO date string.
@@ -2420,6 +2327,8 @@ class CalibrationStep:
         ------
         ValueError
             If quote wiring is ambiguous or a parameter is unknown.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -2439,7 +2348,7 @@ class CalibrationStep:
     def hazard(
         id: str,
         entity: str,
-        currency: str,
+        currency: str | Currency,
         base_date: str,
         discount_curve_id: str,
         recovery_rate: float,
@@ -2456,7 +2365,7 @@ class CalibrationStep:
             Unique step identifier.
         entity : str
             Reference entity identifier.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the contract currency.
         base_date : str
             Curve base date as an ISO date string.
@@ -2485,6 +2394,8 @@ class CalibrationStep:
         ValueError
             If quote wiring is ambiguous, ``recovery_rate`` is outside [0, 1),
             or a parameter is unknown.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -2504,7 +2415,7 @@ class CalibrationStep:
     @staticmethod
     def inflation(
         id: str,
-        currency: str,
+        currency: str | Currency,
         base_date: str,
         discount_curve_id: str,
         index: str,
@@ -2520,7 +2431,7 @@ class CalibrationStep:
         ----------
         id : str
             Unique step identifier.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the curve currency.
         base_date : str
             Valuation and calibration-instrument start date as an ISO date string.
@@ -2553,6 +2464,8 @@ class CalibrationStep:
         ------
         ValueError
             If quote wiring is ambiguous or a parameter is unknown.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -2623,7 +2536,7 @@ class CalibrationStep:
         id: str,
         base_date: str,
         discount_curve_id: str,
-        currency: str,
+        currency: str | Currency,
         quote_set: str | None = None,
         vol_surface_id: str | None = None,
         **params: Any,
@@ -2638,7 +2551,7 @@ class CalibrationStep:
             Surface base date as an ISO date string.
         discount_curve_id : str
             Identifier of the discount curve solved in an earlier step.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the swaption currency.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
@@ -2656,6 +2569,8 @@ class CalibrationStep:
         ------
         ValueError
             If quote wiring is ambiguous or a parameter is unknown.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -2678,7 +2593,7 @@ class CalibrationStep:
         maturity_years: float,
         base_date: str,
         discount_curve_id: str,
-        currency: str,
+        currency: str | Currency,
         quote_set: str | None = None,
         **params: Any,
     ) -> CalibrationStep:
@@ -2698,7 +2613,7 @@ class CalibrationStep:
             Curve base date as an ISO date string.
         discount_curve_id : str
             Identifier of the discount curve solved in an earlier step.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the tranche currency.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
@@ -2714,6 +2629,8 @@ class CalibrationStep:
         ------
         ValueError
             If quote wiring is ambiguous or a parameter is unknown.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -2777,7 +2694,7 @@ class CalibrationStep:
     def hull_white(
         id: str,
         curve_id: str,
-        currency: str,
+        currency: str | Currency,
         base_date: str,
         quote_set: str | None = None,
         **params: Any,
@@ -2790,7 +2707,7 @@ class CalibrationStep:
             Unique step identifier.
         curve_id : str
             Identifier of the discount curve the model is fitted against.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the model currency.
         base_date : str
             Model base date as an ISO date string.
@@ -2811,6 +2728,8 @@ class CalibrationStep:
         ValueError
             If quote wiring is ambiguous, a parameter is unknown, or the required
             ``fit_tolerance`` is missing, non-finite or non-positive.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -2828,7 +2747,7 @@ class CalibrationStep:
         discount_curve_id: str,
         forward_curve_id: str,
         index_id: str,
-        currency: str,
+        currency: str | Currency,
         base_date: str,
         quote_set: str | None = None,
         **params: Any,
@@ -2851,7 +2770,7 @@ class CalibrationStep:
             Term-rate index identifier, for example ``"EUR-EURIBOR-3M"``. Its
             conventions determine settlement, fixing and payment dates, calendars,
             and accrual fractions. Calibration rejects overnight indices.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the model currency; must match the index conventions.
         base_date : str
             Model base date as an ISO date string.
@@ -2872,6 +2791,8 @@ class CalibrationStep:
         ValueError
             If quote wiring is ambiguous, a parameter is unknown, or the required
             ``fit_tolerance`` is missing, non-finite or non-positive.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -2941,7 +2862,7 @@ class CalibrationStep:
     @staticmethod
     def xccy_basis(
         id: str,
-        currency: str,
+        currency: str | Currency,
         base_date: str,
         fx_spot: float,
         domestic_discount_id: str,
@@ -2955,7 +2876,7 @@ class CalibrationStep:
         ----------
         id : str
             Unique step identifier.
-        currency : str
+        currency : str | Currency
             ISO 4217 code of the foreign (solved) currency.
         base_date : str
             Curve base date as an ISO date string.
@@ -2979,6 +2900,8 @@ class CalibrationStep:
         ------
         ValueError
             If quote wiring is ambiguous or a parameter is unknown.
+        TypeError
+            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
 
         Examples:
         --------
@@ -3342,7 +3265,18 @@ class CalibrationEnvelope:
     def __init__(
         self,
         plan: CalibrationPlan,
-        market_data: list[MarketDatum | dict[str, Any]] | None = None,
+        market_data: list[
+            RateQuote
+            | CdsQuote
+            | VolQuote
+            | InflationQuote
+            | XccyQuote
+            | CdsTrancheQuote
+            | FxSpotDatum
+            | PriceDatum
+            | dict[str, Any]
+        ]
+        | None = None,
         prior_market: list[dict[str, Any]] | None = None,
     ) -> None:
         """Build a calibration envelope.
@@ -3351,9 +3285,14 @@ class CalibrationEnvelope:
         ----------
         plan : CalibrationPlan
             Plain plan whose quote IDs resolve in ``market_data``.
-        market_data : list[MarketDatum | dict] | None, default None
+        market_data : list[RateQuote | CdsQuote | VolQuote | InflationQuote | XccyQuote | CdsTrancheQuote | FxSpotDatum | PriceDatum | dict[str, Any]] | None, default None
             Flat market data: typed quotes and datums or ``{"kind": ...}`` dicts.
-            Duplicate kind-and-ID inputs are rejected during validation.
+            Dividend schedules use ``{"kind": "dividend_schedule", "id": ...,
+            "underlying": ..., "events": [...], "currency": ...}`` directly,
+            with ISO dates and cash amounts in the stated currency. Optional
+            underlying/currency metadata may be omitted. The former nested
+            ``schedule`` field is rejected. Duplicate kind-and-ID inputs are
+            rejected during validation.
         prior_market : list[dict] | None, default None
             Pre-built calibrated objects as ``{"kind": ..., ...}`` dicts.
 
