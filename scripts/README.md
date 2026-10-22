@@ -144,7 +144,7 @@ without a QuantLib install.
 | --- | --- | --- |
 | `check_loc.py` | Lists source files above a line limit (default 1000; positional override). Rust files are counted after stripping `#[test]` functions and `#[cfg(test)]` modules. `--ci` exits 1 on violations. | `uv run --no-sync python scripts/check_loc.py` |
 | `audit_hardcoded_assumptions.py` | Flags source lines carrying market-convention, rating-agency, regulatory, accounting, or product assumptions that belong in a data registry. Reviewed matches live in `hardcoded_assumptions_allowlist.json`. `--format {text,markdown,json}`, `--include-allowed`, `--fail-on-candidates`. | `python3 scripts/audit_hardcoded_assumptions.py` |
-| `ci_report.py` | Formats Rust (`nextest` JUnit + LCOV), Python (`pytest` JUnit + Cobertura), WASM (`wasm-test` log), and SonarQube (`.scannerwork/report-task.txt` + SonarQube Cloud API) results into GitHub Actions `$GITHUB_STEP_SUMMARY` Markdown tables and workflow annotations. | `.github/workflows/checks.yml` |
+| `ci_report.py` | Formats Rust (`nextest` JUnit + LCOV), Python (`pytest` JUnit + Cobertura), WASM (`wasm-test` log), and SonarQube (`.scannerwork/report-task.txt` + SonarQube Cloud API) results into GitHub Actions `$GITHUB_STEP_SUMMARY` Markdown tables and workflow annotations. | `.github/workflows/checks.yml`, `.github/workflows/full-checks.yml` |
 | `clean_workspace.py` | Removes build artifacts, virtualenvs, and caches. `--incremental` drops only Cargo incremental caches; `--wasm` drops only wasm-pack output and wasm32 target artifacts. | `mise run all-clean` |
 
 ## Tests

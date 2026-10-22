@@ -91,11 +91,16 @@ blocks direct pushes, force-pushes, and deletion of `master`.
 2. Keep the branch short-lived: days, not weeks. Split large work into a series
    of pull requests that each leave `master` working.
 3. Open a pull request into `master`. The PR workflow
-   ([`.github/workflows/pr.yml`](.github/workflows/pr.yml)) runs the nightly
-   check set: lint, generated-artifact drift, the fast Rust, Python, and WASM
-   tests, and the supply-chain audit. It reports one status check, `PR gate`,
-   which must pass before the pull request can merge. `mise run all-ci` runs
-   the same checks locally.
+   ([`.github/workflows/pr.yml`](.github/workflows/pr.yml)) runs the fast
+   check tier: lint, generated-artifact drift, the fast Rust, Python, and WASM
+   tests, and the supply-chain audit, in under 15 minutes. It reports one
+   status check, `PR gate`, which must pass before the pull request can merge.
+   `mise run all-ci` runs the same checks locally. The full tier (coverage,
+   docs and doctests, the slow suites) runs nightly on `master`; for a change
+   that needs it before merging, run
+   `gh workflow run full-checks.yml --ref <branch>`, or
+   `mise run all-ci --full` locally (without coverage). A test that needs more
+   than 60 s belongs in the slow suite: mark it `#[ignore = "slow: <reason>"]`.
 4. Title the pull request as a conventional commit, such as
    `fix(credit): accrue premium on default`. Pull requests are squash-merged,
    so the title becomes the commit subject on `master`.
@@ -111,7 +116,8 @@ WASM contract types, the UI registry, and the pinned UI fixtures. Resolve such a
 conflict by taking `master`'s version and regenerating, not by editing the
 file. `mise run gen-write` regenerates the schemas, contract types, and UI
 registry; [`AGENTS.md`](AGENTS.md) lists the commands for the UI fixtures. The
-Lint job's `gen-check` step fails on any generated file left stale.
+Generated artifacts job (`mise run gen-check`) fails on any generated file left
+stale.
 
 ### Pull Request Descriptions
 
@@ -175,8 +181,8 @@ both enforce this (`mise run release-check-upstream` runs the check locally).
    `X.Y.Z-rc.N` into the manifests before building, so a patch release or
    candidate needs no version commit. Its Version metadata gate checks that the
    committed version is on the tag's `X.Y` line, and, for the final tag, the
-   changelog section and notes file. `mise run all-ci --release` runs the
-   release gates locally.
+   changelog section and notes file. `mise run all-ci --release` runs both
+   check tiers (without coverage) and the release gates locally.
 3. **Choose the pull requests.** Label each pull request into `master` that
    should ship on this line `backport release/X.Y`, before or after it merges.
    Once it is merged, the backport bot opens a pull request into
