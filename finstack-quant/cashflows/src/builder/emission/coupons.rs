@@ -69,27 +69,6 @@ fn add_pik_flow_if_nonzero(
     }
 }
 
-/// Error for an overnight observation date strictly before the curve base
-/// when no historical fixing series is available.
-///
-/// Historical fixings are supported via a [`ScalarTimeSeries`] stored in the
-/// `MarketContext` under the canonical id `FIXING:{forward_curve_id}` (see
-/// [`finstack_quant_core::market_data::fixings`]). This error is raised only when
-/// no such series was provided; the emission layer routes it through the
-/// spec's [`crate::builder::FloatingRateFallback`] policy.
-fn pre_base_observation_error(obs_date: Date, fwd: &ForwardCurve) -> finstack_quant_core::Error {
-    finstack_quant_core::Error::Validation(format!(
-        "overnight observation date {} is before the '{}' curve base date {}; the realized \
-         historical fixings are missing — provide a MarketContext ScalarTimeSeries with id \
-         '{}', supply a curve based on/before the observation date, or configure a \
-         FloatingRateFallback",
-        obs_date,
-        fwd.id(),
-        fwd.base_date(),
-        fixing_series_id(fwd.id().as_str()),
-    ))
-}
-
 /// Resolve the overnight rate for a single observation date, seamlessly mixing
 /// realized historical fixings with curve-projected forwards.
 ///
@@ -98,16 +77,16 @@ fn pre_base_observation_error(obs_date: Date, fwd: &ForwardCurve) -> finstack_qu
 /// date: realized fixings before it and projected forwards after it. Both
 /// carry the same `(rate, days)` weighting in the compounding product.
 ///
-/// - `obs_date < curve base`: realized fixing, resolved exactly from the
+/// - `obs_date < as_of`: realized fixing, resolved exactly from the
 ///   `FIXING:{forward_curve_id}` series. Weekend/holiday carry is represented by the
 ///   observation day weight, so a missing business-day publication is an
-///   error rather than permission to reuse an arbitrarily old rate. Errors via
-///   [`pre_base_observation_error`] when no series is provided. An incomplete
+///   error rather than permission to reuse an arbitrarily old rate. Missing
+///   history diagnostics identify the observation and valuation dates. An incomplete
 ///   supplied series remains an error even when a fallback is configured.
-/// - `obs_date == curve base`: a published same-day fixing (exact-date match)
+/// - `obs_date == as_of`: a published same-day fixing (exact-date match)
 ///   is preferred when present — today's fixing may or may not be published
-///   yet; otherwise the rate is projected from `t = 0`.
-/// - `obs_date > curve base`: the overnight forward is projected from the
+///   yet; otherwise the rate is projected on the curve's clock.
+/// - `obs_date > as_of`: the overnight forward is projected from the
 ///   calendar observation interval, with both endpoints on the curve's clock.
 fn observed_overnight_rate(
     obs_date: Date,
@@ -118,12 +97,7 @@ fn observed_overnight_rate(
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
     if obs_date < as_of {
-        return match fixings {
-            Some(series) => {
-                require_fixing_value_exact(Some(series), forward_curve_id, obs_date, as_of)
-            }
-            None => Err(pre_base_observation_error(obs_date, fwd)),
-        };
+        return require_fixing_value_exact(fixings, forward_curve_id, obs_date, as_of);
     }
     if obs_date == as_of {
         if let Some(fixing) = fixings.and_then(|series| series.value_on_exact(obs_date).ok()) {
@@ -797,6 +771,36 @@ mod tests {
     use crate::builder::FloatingLegCompounding;
     use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
     use time::Month;
+
+    #[test]
+    fn overnight_history_diagnostics_use_valuation_date_after_curve_base() {
+        let base = Date::from_calendar_date(2025, Month::January, 2).expect("base");
+        let observation = Date::from_calendar_date(2025, Month::January, 3).expect("observation");
+        let as_of = Date::from_calendar_date(2025, Month::January, 6).expect("valuation");
+        let curve = ForwardCurve::builder("TEST-ON", 1.0 / 360.0)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.04), (1.0, 0.04)])
+            .build()
+            .expect("curve");
+        let incomplete = ScalarTimeSeries::new("FIXING:TEST-ON", vec![(base, 0.04)], None)
+            .expect("incomplete history");
+        for history in [None, Some(&incomplete)] {
+            let error =
+                observed_overnight_rate(observation, 360.0, &curve, history, "TEST-ON", as_of)
+                    .expect_err("past observations require exact history");
+            assert!(matches!(error, finstack_quant_core::Error::Validation(_)));
+            let message = error.to_string();
+            assert!(message.contains("TEST-ON") && message.contains("2025-01-03"));
+            assert!(message.contains("valuation date: 2025-01-06"));
+            assert!(!message.contains("curve base"));
+            if history.is_none() {
+                assert!(message.contains("FIXING:TEST-ON"));
+            } else {
+                assert!(message.contains("no exact observation"));
+            }
+        }
+    }
 
     #[test]
     fn overnight_projection_converts_curve_basis_but_preserves_observed_fixings() {
