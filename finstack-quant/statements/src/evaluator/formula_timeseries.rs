@@ -74,7 +74,7 @@ fn historical_expression_value(
             {
                 return Ok(f64::NAN);
             }
-            let mut historical = build_context_for_period(target_period, context)?;
+            let mut historical = build_context_for_period(target_period, context);
             evaluate_formula(expr, &mut historical, node_id)
         }
     }

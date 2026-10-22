@@ -16,37 +16,6 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
 use finstack_quant_core::math::ZERO_TOLERANCE;
 
-/// Collect chronologically-sorted (period, value) pairs for a column reference,
-/// including the current period's value if set. Returns `None` if `args[0]` is
-/// not a column reference.
-///
-/// Only periods at or before the context's evaluation period are included so
-/// lagged evaluation cannot look ahead. Non-finite values are **kept** as NaN
-/// slots: the EWM weighting is positional (pandas `ignore_na=False`), so a gap
-/// must still advance the decay. Trailing non-finite slots are trimmed — they
-/// scale every weight uniformly and cancel out of the normalized moments.
-fn collect_column_series(column_name: &str, context: &EvaluationContext) -> Vec<(PeriodId, f64)> {
-    let mut values = Vec::with_capacity(context.history.len() + 1);
-    if let Some(&column) = context.node_to_column.get(column_name) {
-        for (period_id, row) in context.history.iter() {
-            if period_id >= context.period_id {
-                continue;
-            }
-            if let Some(value) = row.get(column).copied().flatten() {
-                values.push((period_id, value));
-            }
-        }
-    }
-    if let Ok(current) = context.get_value(column_name) {
-        values.push((context.period_id, current));
-    }
-    values.sort_by_key(|(period, _)| *period);
-    while values.last().is_some_and(|(_, v)| !v.is_finite()) {
-        values.pop();
-    }
-    values
-}
-
 /// Recursive `adjust=False, ignore_na=False` moments. Missing slots decay the
 /// old weight; each observation normalizes the old distribution and new weight
 /// before the next update. Squared weights track the unbiased correction.
@@ -95,23 +64,25 @@ fn validate_alpha(alpha: f64, func_name: &str, node_id: Option<&str>) -> Result<
 
 /// Collect the chronological series for an EWM function's first argument.
 ///
-/// A bare column reference takes the fast path (`collect_column_series`,
-/// which reads historical results directly). Any other expression is
-/// re-evaluated once per period at or before the current one via
-/// [`collect_expression_values_sorted`]. Both paths keep NaN slots so the
-/// positional decay (pandas `ignore_na=False`) still advances across gaps,
-/// and both trim trailing non-finite slots, which scale every weight
-/// uniformly and cancel out of the normalized moments.
+/// Reuses the shared expression collector, keeping non-finite slots for
+/// positional decay and trimming only trailing non-finite observations.
 fn collect_series(
     expr: &Expr,
     context: &EvaluationContext,
     node_id: Option<&str>,
 ) -> Result<Vec<(PeriodId, f64)>> {
-    if let ExprNode::Column(name) = &expr.node {
-        return Ok(collect_column_series(name.as_str(), context));
-    }
     let sorted = collect_expression_values_sorted(expr, context, node_id)?;
-    let mut values: Vec<(PeriodId, f64)> = sorted.iter().map(|(p, v)| (*p, *v)).collect();
+    // A bare column uses only the evaluated current value. A same-period
+    // history row must not stand in for a node that is not evaluated yet.
+    let include_current = match &expr.node {
+        ExprNode::Column(name) => context.get_value(name).is_ok(),
+        _ => true,
+    };
+    let mut values: Vec<(PeriodId, f64)> = sorted
+        .iter()
+        .filter(|(period, _)| include_current || **period != context.period_id)
+        .map(|(period, value)| (*period, *value))
+        .collect();
     while values.last().is_some_and(|(_, v)| !v.is_finite()) {
         values.pop();
     }

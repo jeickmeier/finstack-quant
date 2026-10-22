@@ -1,16 +1,15 @@
 //! Formula-evaluation helpers for statement expressions.
 //!
 use super::formula::{
-    collect_all_historical_values, collect_expression_range_values,
-    collect_expression_values_sorted, collect_expression_window_values,
-    collect_rolling_window_values, eval_error, evaluate_non_negative_integer_arg, require_args,
+    collect_expression_range_values, collect_expression_values_sorted,
+    collect_expression_window_values, eval_error, evaluate_non_negative_integer_arg, require_args,
     require_min_args,
 };
 use super::results::EvalWarning;
 use super::EvaluationContext;
 use crate::error::Result;
 use finstack_quant_core::dates::{PeriodId, PeriodKind};
-use finstack_quant_core::expr::{Expr, ExprNode, Function};
+use finstack_quant_core::expr::{Expr, Function};
 use finstack_quant_core::math::stats::{
     mean_or_nan, median_or_nan, sample_std_or_nan, sample_variance_or_nan,
 };
@@ -33,32 +32,15 @@ fn retain_finite(values: &[f64]) -> Vec<f64> {
     values.iter().copied().filter(|v| v.is_finite()).collect()
 }
 
-fn collect_window_values(
-    arg: &Expr,
-    context: &EvaluationContext,
-    window: usize,
-    node_id: Option<&str>,
-) -> Result<Vec<f64>> {
-    if let ExprNode::Column(node_name) = &arg.node {
-        collect_rolling_window_values(node_name, context, window)
-    } else {
-        collect_expression_window_values(arg, context, window, node_id)
-    }
-}
-
 fn collect_all_values(
     arg: &Expr,
     context: &EvaluationContext,
     node_id: Option<&str>,
 ) -> Result<Vec<f64>> {
-    if let ExprNode::Column(node_name) = &arg.node {
-        collect_all_historical_values(node_name, context)
-    } else {
-        Ok(collect_expression_values_sorted(arg, context, node_id)?
-            .values()
-            .copied()
-            .collect())
-    }
+    Ok(collect_expression_values_sorted(arg, context, node_id)?
+        .values()
+        .copied()
+        .collect())
 }
 
 /// Sum finite values, returning `NaN` when none are present.
@@ -89,38 +71,7 @@ fn sum_expression_range(
     Ok(sum_finite_or_nan(&values))
 }
 
-pub(crate) fn evaluate_historical_function(
-    func: &Function,
-    args: &[Expr],
-    context: &mut EvaluationContext,
-    node_id: Option<&str>,
-) -> Result<f64> {
-    match func {
-        Function::RollingMean
-        | Function::RollingSum
-        | Function::RollingStd
-        | Function::RollingVar
-        | Function::RollingMedian
-        | Function::RollingMin
-        | Function::RollingMax
-        | Function::RollingCount => evaluate_rolling_function(func, args, context, node_id),
-        Function::Std | Function::Var | Function::Median => {
-            evaluate_statistical_function(func, args, context, node_id)
-        }
-        Function::CumSum | Function::CumProd | Function::CumMin | Function::CumMax => {
-            evaluate_cumulative_function(func, args, context, node_id)
-        }
-        Function::Ytd | Function::Qtd | Function::FiscalYtd | Function::Ttm => {
-            evaluate_period_aggregate_function(func, args, context, node_id)
-        }
-        _ => Err(eval_error(
-            node_id,
-            format!("Function {:?} is not a historical aggregate", func),
-        )),
-    }
-}
-
-fn evaluate_rolling_function(
+pub(crate) fn evaluate_rolling_function(
     func: &Function,
     args: &[Expr],
     context: &mut EvaluationContext,
@@ -158,7 +109,7 @@ fn evaluate_rolling_function(
         window
     };
 
-    let raw_values = collect_window_values(&args[0], context, window, node_id)?;
+    let raw_values = collect_expression_window_values(&args[0], context, window, node_id)?;
 
     // Skip non-finite values (see `retain_finite` doc). Note: `RollingCount`
     // counts finite observations, matching pandas `rolling().count()`.
@@ -184,7 +135,7 @@ fn evaluate_rolling_function(
     }
 }
 
-fn evaluate_statistical_function(
+pub(crate) fn evaluate_statistical_function(
     func: &Function,
     args: &[Expr],
     context: &mut EvaluationContext,
@@ -206,7 +157,7 @@ fn evaluate_statistical_function(
     }
 }
 
-fn evaluate_cumulative_function(
+pub(crate) fn evaluate_cumulative_function(
     func: &Function,
     args: &[Expr],
     context: &mut EvaluationContext,
@@ -253,7 +204,7 @@ fn evaluate_cumulative_function(
     }
 }
 
-fn evaluate_period_aggregate_function(
+pub(crate) fn evaluate_period_aggregate_function(
     func: &Function,
     args: &[Expr],
     context: &mut EvaluationContext,
@@ -340,7 +291,7 @@ fn evaluate_period_aggregate_function(
                     {
                         return Ok(f64::NAN);
                     }
-                    let mut historical = super::formula::build_context_for_period(period, context)?;
+                    let mut historical = super::formula::build_context_for_period(period, context);
                     super::formula::evaluate_formula(&args[0], &mut historical, node_id)?
                 };
                 if !value.is_finite() {

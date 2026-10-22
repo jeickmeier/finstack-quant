@@ -146,12 +146,6 @@ impl PeriodHistory {
         }
     }
 
-    /// Number of stored periods.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.rows.len()
-    }
-
     /// Whether a row exists for `period`.
     ///
     /// # Arguments
@@ -235,7 +229,7 @@ mod tests {
         let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         history.push_row(q1, vec![Some(100.0), Some(40.0)]);
 
-        assert_eq!(history.len(), 1);
+        assert_eq!(history.keys().copied().collect::<Vec<_>>(), vec![q1]);
         assert!(history.contains_key(&q1));
         assert_eq!(history.get_value("revenue", &q1), Some(100.0));
         assert_eq!(history.get_value("cogs", &q1), Some(40.0));
