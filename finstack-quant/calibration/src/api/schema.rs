@@ -572,8 +572,6 @@ pub enum StepParams {
 /// Static input/output metadata for a calibration step.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StepIo {
-    /// Step kind as serialized in envelope JSON.
-    pub(crate) kind: &'static str,
     /// Curve / surface / scalar IDs the step reads.
     pub(crate) reads: Vec<String>,
     /// Curve / surface / scalar IDs the step writes.
@@ -605,7 +603,6 @@ impl StepParams {
     pub(crate) fn io(&self) -> StepIo {
         match self {
             StepParams::Discount(p) => StepIo {
-                kind: "discount",
                 reads: [
                     p.pricing_discount_id.as_ref(),
                     p.pricing_forward_id.as_ref(),
@@ -618,22 +615,18 @@ impl StepParams {
                 writes: vec![p.curve_id.to_string()],
             },
             StepParams::Forward(p) => StepIo {
-                kind: "forward",
                 reads: vec![p.discount_curve_id.to_string()],
                 writes: vec![p.curve_id.to_string()],
             },
             StepParams::Hazard(p) => StepIo {
-                kind: "hazard",
                 reads: vec![p.discount_curve_id.to_string()],
                 writes: vec![p.curve_id.to_string()],
             },
             StepParams::Inflation(p) => StepIo {
-                kind: "inflation",
                 reads: vec![p.discount_curve_id.to_string()],
                 writes: vec![p.curve_id.to_string()],
             },
             StepParams::VolSurface(p) => StepIo {
-                kind: "vol_surface",
                 reads: p
                     .discount_curve_id
                     .as_ref()
@@ -648,7 +641,6 @@ impl StepParams {
                 writes: vec![p.vol_surface_id.clone()],
             },
             StepParams::SwaptionVol(p) => StepIo {
-                kind: "swaption_vol",
                 reads: std::iter::once(p.discount_curve_id.to_string())
                     .chain(p.forward_id.clone())
                     .collect(),
@@ -657,7 +649,6 @@ impl StepParams {
             StepParams::BaseCorrelation(p) => {
                 let curve_id = CurveId::from(format!("{}_CORR", p.index_id));
                 StepIo {
-                    kind: "base_correlation",
                     reads: vec![p.discount_curve_id.to_string(), p.index_id.clone()],
                     writes: vec![curve_id.to_string(), p.index_id.clone()],
                 }
@@ -669,7 +660,6 @@ impl StepParams {
                 }
                 let scalar_key = format!("{}_STUDENT_T_DF", p.tranche_instrument_id);
                 StepIo {
-                    kind: "student_t",
                     reads,
                     writes: vec![scalar_key],
                 }
@@ -678,7 +668,6 @@ impl StepParams {
                 let (kappa_key, sigma_key) =
                     finstack_quant_models::rates::hull_white::hw1f_scalar_keys(p.curve_id.as_str());
                 StepIo {
-                    kind: "hull_white",
                     reads: vec![p.curve_id.to_string()],
                     writes: vec![kappa_key, sigma_key],
                 }
@@ -701,13 +690,11 @@ impl StepParams {
                     }
                 };
                 StepIo {
-                    kind: "cap_floor_hull_white",
                     reads,
                     writes: vec![kappa_key, volatility_key],
                 }
             }
             StepParams::SviSurface(p) => StepIo {
-                kind: "svi_surface",
                 reads: p
                     .discount_curve_id
                     .as_ref()
@@ -727,13 +714,11 @@ impl StepParams {
                     writes.push(basis_id.to_string());
                 }
                 StepIo {
-                    kind: "xccy_basis",
                     reads: vec![p.domestic_discount_id.to_string()],
                     writes,
                 }
             }
             StepParams::Parametric(p) => StepIo {
-                kind: "parametric",
                 reads: Vec::new(),
                 writes: vec![p.curve_id.to_string()],
             },
