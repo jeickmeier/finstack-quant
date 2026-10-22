@@ -16,9 +16,9 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, AssetType, BalloonSpec, CmbsDscrCalculator,
-    DealFees, DealType, PenaltyStep, PeriodDiagnostics, PoolAsset, PrepaymentPenalty,
-    SpecialServicingSpec, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, AssetType, BalloonSpec, CmbsDscrCalculator, DealFees, DealType, PenaltyStep,
+    PeriodDiagnostics, PoolAsset, PrepaymentPenalty, SpecialServicingSpec, StructuredCredit,
+    Tranche, TrancheStructure,
 };
 use std::sync::Arc;
 use time::Month;
@@ -121,14 +121,14 @@ fn cmbs(loans: Vec<PoolAsset>) -> StructuredCredit {
 }
 
 fn periods(deal: &StructuredCredit) -> Vec<PeriodDiagnostics> {
-    run_simulation_with_diagnostics(deal, &market(), close())
+    deal.run_simulation(&market(), close())
         .expect("run")
         .diagnostics
         .periods
 }
 
 fn first_interest(deal: &StructuredCredit, tranche: &str) -> f64 {
-    run_simulation_with_diagnostics(deal, &market(), close())
+    deal.run_simulation(&market(), close())
         .expect("run")
         .tranches[tranche]
         .interest_flows[0]
@@ -271,7 +271,7 @@ fn appraisal_reduction_shortfall_hits_the_junior_classes_first() {
         impaired_interest - a_impaired
     );
 
-    let run = run_simulation_with_diagnostics(&impaired, &market(), close()).expect("run");
+    let run = impaired.run_simulation(&market(), close()).expect("run");
     let e_first = run.tranches["E"]
         .cashflows
         .iter()
@@ -471,8 +471,9 @@ fn a_fixed_extension_rate_replaces_the_index_and_spread() {
     floating.io_months = Some(close().months_until(loan_maturity));
     floating.balloon = Some(balloon(0.3, Some(0.09)));
     let deal = cmbs(vec![floating]);
-    let run =
-        run_simulation_with_diagnostics(&deal, &market_with_curves(close()), close()).expect("run");
+    let run = deal
+        .run_simulation(&market_with_curves(close()), close())
+        .expect("run");
     let periods = &run.diagnostics.periods;
     let months = deal.frequency.months().expect("month frequency") as i32;
     let k = periods

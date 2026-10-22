@@ -81,7 +81,8 @@ impl StructuredCredit {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<super::TrancheCashflows> {
-        crate::structured_credit::pricing::run_simulation(self, market, as_of)?
+        self.run_simulation(market, as_of)?
+            .tranches
             .remove(tranche_id)
             .ok_or_else(|| {
                 finstack_quant_core::InputError::NotFound {

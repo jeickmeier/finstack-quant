@@ -244,7 +244,7 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
         ),
     )
     assert deal.pool.assets[0].liquidation["modified_rate"] == 0.04
-    periods = deal.run_simulation_with_diagnostics(_market(), CLOSE).periods
+    periods = deal.run_simulation(_market(), CLOSE).diagnostics.periods
     resolved = next(period for period in periods if period["payment_date"] >= "2026-01-01")
     assert float(resolved["defaults"]["amount"]) == pytest.approx(80_000_000.0)
 
@@ -368,7 +368,7 @@ def test_credit_model_can_be_replaced_whole_and_then_refined() -> None:
 
 def test_diagnostics_carry_the_period_record_and_coverage_tests() -> None:
     deal = _clo()
-    diagnostics = deal.run_simulation_with_diagnostics(_market(), CLOSE)
+    diagnostics = deal.run_simulation(_market(), CLOSE).diagnostics
     periods = diagnostics.periods
     assert periods
     assert periods[0]["coverage_tests"][0]["test_id"] == "OC_A"

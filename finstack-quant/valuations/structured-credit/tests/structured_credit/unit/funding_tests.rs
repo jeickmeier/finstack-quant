@@ -14,9 +14,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, FundingSource,
-    PaymentType, PoolAsset, Recipient, StructuredCredit, Tranche, TrancheCashflows,
-    TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
+    execute_waterfall, AssetPool, CoverageTestSpec, DealType, FundingSource, PaymentType,
+    PoolAsset, Recipient, StructuredCredit, Tranche, TrancheCashflows, TrancheStructure, Waterfall,
+    WaterfallContext, WaterfallTier,
 };
 use time::Month;
 
@@ -132,7 +132,9 @@ fn clo(pool_rate: f64, a_coupon: f64, covers: Option<bool>) -> (StructuredCredit
 }
 
 fn simulate(deal: &StructuredCredit, as_of: Date) -> FxHashMap<String, TrancheCashflows> {
-    run_simulation(deal, &market(as_of), as_of).expect("simulation")
+    deal.run_simulation(&market(as_of), as_of)
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 fn flow_on(flows: &[(Date, Money)], date: Date) -> f64 {

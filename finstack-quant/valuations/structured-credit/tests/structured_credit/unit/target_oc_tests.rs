@@ -11,8 +11,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, AssetType, DealType, PoolAsset, SimulationRun,
-    StructuredCredit, TargetOcSpec, Tranche, TrancheStructure, WaterfallRules,
+    AssetPool, AssetType, DealType, PoolAsset, SimulationRun, StructuredCredit, TargetOcSpec,
+    Tranche, TrancheStructure, WaterfallRules,
 };
 use time::Month;
 
@@ -111,7 +111,7 @@ fn auto_abs(senior: f64) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit) -> SimulationRun {
-    run_simulation_with_diagnostics(deal, &market(), close()).expect("simulation")
+    deal.run_simulation(&market(), close()).expect("simulation")
 }
 
 fn on(run: &SimulationRun, id: &str, date: Date) -> (f64, f64) {

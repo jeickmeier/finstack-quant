@@ -14,7 +14,7 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -290,10 +290,14 @@ fn derived_structure_prices_like_the_declared_one() {
 
     let as_of = d(2024, 1, 1);
     let market = market();
-    let declared_flows =
-        run_simulation(&deal(declared_structure.clone()), &market, as_of).expect("run");
-    let derived_flows =
-        run_simulation(&deal(derived_structure.clone()), &market, as_of).expect("run");
+    let declared_flows = (deal(declared_structure.clone()))
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("run");
+    let derived_flows = (deal(derived_structure.clone()))
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("run");
     for id in ["A", "B", "E"] {
         assert_eq!(
             declared_flows[id].cashflows, derived_flows[id].cashflows,

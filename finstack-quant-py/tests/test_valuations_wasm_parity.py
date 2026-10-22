@@ -228,7 +228,7 @@ def build_cases() -> dict[str, Any]:
         "to_dict": deal.to_dict(),
         "tranche_cashflows": _json(deal.tranche_cashflows("A", sc_market, close)),
         "equity_metrics": _json(equity),
-        "diagnostics": _json(deal.run_simulation_with_diagnostics(sc_market, close)),
+        "diagnostics": _json(deal.run_simulation(sc_market, close).diagnostics),
         "create_waterfall": _json(deal.create_waterfall()),
         "with_standard_fees": deal.with_standard_fees().to_json(),
         "enable_stochastic": stochastic.to_json(),

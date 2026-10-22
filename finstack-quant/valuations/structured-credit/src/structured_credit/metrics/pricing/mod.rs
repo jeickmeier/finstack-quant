@@ -42,11 +42,9 @@ pub(crate) fn accrued_at(
     }
     if context.ext::<DealAccruals>().is_none() {
         let deal = context.instrument_as::<StructuredCredit>()?;
-        let results = crate::structured_credit::pricing::run_simulation(
-            deal,
-            &context.curves,
-            context.as_of,
-        )?;
+        let results = deal
+            .run_simulation(&context.curves, context.as_of)?
+            .tranches;
         context.set_ext(DealAccruals(
             results
                 .into_values()

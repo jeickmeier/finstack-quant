@@ -15,9 +15,9 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, tranche_metrics, AssetPool, CallAssumption, DealType, PoolAsset,
-    ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows,
-    TrancheMetrics, TrancheStructure,
+    tranche_metrics, AssetPool, CallAssumption, DealType, PoolAsset, ReinvestmentCriteria,
+    ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows, TrancheMetrics,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -138,7 +138,9 @@ fn clo(cpr: f64) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
-    run_simulation(deal, &market_with_curves(close()), close()).expect("simulation")
+    deal.run_simulation(&market_with_curves(close()), close())
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 fn metrics(deal: &StructuredCredit, id: &str) -> TrancheMetrics {

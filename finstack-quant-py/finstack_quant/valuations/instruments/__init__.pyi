@@ -103,6 +103,7 @@ __all__ = [
     "ProtectionLegSpec",
     "RepLine",
     "ScenarioTable",
+    "SimulationRun",
     "StandardDealParams",
     "StructuredCredit",
     "StructuredCreditBuilder",
@@ -26227,13 +26228,13 @@ class StructuredCredit:
             If the simulation fails.
         """
         ...
-    def run_simulation_with_diagnostics(
+    def run_simulation(
         self,
         market: MarketContext | str,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-    ) -> SimulationDiagnostics:
+    ) -> SimulationRun:
         """
-        Run the deterministic simulation and return the deal-level accounting.
+        Run deterministic simulation and return all tranche flows and deal accounting.
 
         Parameters
         ----------
@@ -26245,9 +26246,9 @@ class StructuredCredit:
 
         Returns
         -------
-        SimulationDiagnostics
-            Reserve balance and interest per period, draw funding by source
-            and unfunded draws.
+        SimulationRun
+            Tranche cashflows keyed by identifier and complete reserve, draw,
+            pool, coverage-test and cash-account diagnostics.
 
         Raises
         ------
@@ -32336,10 +32337,112 @@ class StochasticPricingResult:
         """
         ...
 
+class SimulationRun:
+    """Complete result of one deterministic structured-credit simulation.
+
+    Contains tranche flows and accounting from the same validated run.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.valuations.instruments import StructuredCredit
+    >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    >>> as_of = datetime.date(2024, 1, 1)
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
+    >>> run = StructuredCredit.example().run_simulation(market, as_of)
+    >>> bool(run.tranches)
+    True
+    """
+    @property
+    def tranches(self) -> dict[str, TrancheCashflows]:
+        """Detailed flows indexed by stable tranche identifier.
+
+        Returns
+        -------
+        dict[str, TrancheCashflows]
+            Owned wrappers for interest, principal and other flow components.
+
+        Notes
+        -----
+        This accessor does not raise; it returns an owned view of the simulation result.
+        """
+        ...
+    @property
+    def diagnostics(self) -> SimulationDiagnostics:
+        """Complete deal accounting produced by the same simulation.
+
+        Returns
+        -------
+        SimulationDiagnostics
+            Period, reserve, draw-funding and coverage-test records.
+
+        Notes
+        -----
+        This accessor does not raise; it returns an owned view of the simulation result.
+        """
+        ...
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize tranche flows and diagnostics to their canonical mapping.
+
+        Returns
+        -------
+        dict[str, Any]
+            Rust wire fields ``tranches`` and ``diagnostics``.
+
+        Raises
+        ------
+        ValueError
+            If the simulation result cannot be serialized to a Python mapping.
+        """
+        ...
+    def to_json(self) -> str:
+        """Serialize the complete run to canonical JSON.
+
+        Returns
+        -------
+        str
+            Rust wire record containing all result components.
+
+        Raises
+        ------
+        ValueError
+            If the simulation result cannot be serialized to JSON.
+        """
+        ...
+    @staticmethod
+    def from_json(json: str) -> SimulationRun:
+        """Deserialize a complete run without executing simulation.
+
+        Parameters
+        ----------
+        json : str
+            Canonical JSON with tranche results and diagnostics.
+
+        Returns
+        -------
+        SimulationRun
+            Restored complete simulation result.
+
+        Raises
+        ------
+        ValueError
+            If the JSON cannot be decoded as a complete run.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import SimulationRun
+        >>> try:
+        ...     SimulationRun.from_json("{}")
+        ... except ValueError:
+        ...     print("invalid run")
+        invalid run
+        """
+        ...
+
 class SimulationDiagnostics:
     """
     Deal-level accounting of one deterministic simulation
-    (:meth:`StructuredCredit.run_simulation_with_diagnostics`'s return value):
+    (the diagnostics member of :meth:`StructuredCredit.run_simulation`'s result):
     the per-period pool, collections, cash-account and coverage-test record
     plus the reserve-account and draw-funding totals.
 
@@ -32390,7 +32493,7 @@ class SimulationDiagnostics:
     >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
     >>> deal = StructuredCredit.from_json(json.dumps(envelope))
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
-    >>> diagnostics = deal.run_simulation_with_diagnostics(market, as_of)
+    >>> diagnostics = deal.run_simulation(market, as_of).diagnostics
     >>> diagnostics.unfunded_draws.amount
     0.0
     >>> list(diagnostics.to_dataframe().columns)[:3]

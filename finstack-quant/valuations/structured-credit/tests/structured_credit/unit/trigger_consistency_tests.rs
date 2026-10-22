@@ -16,11 +16,10 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    execute_waterfall, run_simulation_with_diagnostics, AssetPool, CoverageTestDiagnostic,
-    CoverageTestSpec, DealType, HedgeSwap, PaymentCalculation, PaymentType, PeriodDiagnostics,
-    PoolAsset, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, SwapNotional, Tranche, TrancheStructure, Waterfall, WaterfallContext,
-    WaterfallTier,
+    execute_waterfall, AssetPool, CoverageTestDiagnostic, CoverageTestSpec, DealType, HedgeSwap,
+    PaymentCalculation, PaymentType, PeriodDiagnostics, PoolAsset, Recipient, RecipientType,
+    ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, SwapNotional, Tranche,
+    TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
 };
 use time::macros::date;
 
@@ -138,7 +137,7 @@ fn hedged(mut deal: StructuredCredit) -> StructuredCredit {
 }
 
 fn periods(deal: &StructuredCredit) -> Vec<PeriodDiagnostics> {
-    run_simulation_with_diagnostics(deal, &market(0.02), CLOSE)
+    deal.run_simulation(&market(0.02), CLOSE)
         .expect("simulation")
         .diagnostics
         .periods

@@ -389,12 +389,9 @@ test('structured-credit deal analytics match Python', () => {
     LOOSE
   );
   same(plain(deal.equityMetrics(sc.market, sc.as_of)), sc.equity_metrics, 'equity', LOOSE);
-  same(
-    plain(deal.runSimulationWithDiagnostics(sc.market, sc.as_of)),
-    sc.diagnostics,
-    'diag',
-    LOOSE
-  );
+  const simulation = deal.runSimulation(sc.market, sc.as_of);
+  same(plain(simulation.tranches.A), sc.tranche_cashflows, 'simulation flows', LOOSE);
+  same(plain(simulation.diagnostics), sc.diagnostics, 'diag', LOOSE);
   const waterfall = deal.createWaterfall();
   same(plain(waterfall), sc.create_waterfall, 'waterfall');
   same(plain(instruments.waterfallCoverageTests(waterfall)), sc.coverage_tests, 'coverage tests');

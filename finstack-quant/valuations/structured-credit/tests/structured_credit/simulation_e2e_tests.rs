@@ -18,8 +18,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
-    TrancheStructure,
+    AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -200,7 +199,10 @@ fn e2e_bullet_no_defaults_all_principal_returns() {
         0,
     );
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     let sr = results.get("SR").unwrap();
     let mz = results.get("MZ").unwrap();
@@ -318,7 +320,10 @@ fn e2e_cash_conservation_total_distributed_equals_pool_cash() {
             lag,
         );
 
-        let results = run_simulation(&clo, &market, as_of()).unwrap();
+        let results = clo
+            .run_simulation(&market, as_of())
+            .map(|run| run.tranches)
+            .unwrap();
 
         // Sum all tranche distributions
         let mut total_interest = 0.0_f64;
@@ -425,7 +430,10 @@ fn e2e_defaults_erode_pool_reducing_interest_over_time() {
         6,    // 6 month lag
     );
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
     let sr = results.get("SR").unwrap();
 
     // Senior should have multiple interest flows
@@ -479,7 +487,10 @@ fn e2e_pik_accretes_when_cash_insufficient() {
         0,
     );
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     // Senior should be fully paid (first in waterfall)
     let sr = results.get("SR").unwrap();
@@ -574,8 +585,14 @@ fn e2e_recovery_cash_reaches_tranches() {
         0,    // immediate (no lag)
     );
 
-    let res_no = run_simulation(&clo_no_rec, &market, as_of()).unwrap();
-    let res_yes = run_simulation(&clo_with_rec, &market, as_of()).unwrap();
+    let res_no = clo_no_rec
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
+    let res_yes = clo_with_rec
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     let total_no: f64 = res_no
         .values()
@@ -623,7 +640,10 @@ fn e2e_seniority_protects_senior_under_moderate_stress() {
         6,
     );
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
     let sr = results.get("SR").unwrap();
     let _mz = results.get("MZ").unwrap();
     let eq = results.get("EQ").unwrap();
@@ -682,7 +702,10 @@ fn e2e_cashflows_are_chronologically_ordered() {
         6,
     );
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     for (tranche_id, tc) in &results {
         // Cashflows should be ordered
@@ -731,7 +754,10 @@ fn e2e_waterfall_pays_senior_before_mezz() {
         0,
     );
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
     let sr = results.get("SR").unwrap();
     let mz = results.get("MZ").unwrap();
 
@@ -772,7 +798,10 @@ fn e2e_loss_allocation_equity_first_then_mezz() {
         6,
     );
 
-    let results = run_simulation(&clo_severe, &market, as_of()).unwrap();
+    let results = clo_severe
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     let sr = results.get("SR").unwrap();
     let mz = results.get("MZ").unwrap();
@@ -845,7 +874,10 @@ fn e2e_loss_severity_spectrum() {
             6,
         );
 
-        let results = run_simulation(&clo, &market, as_of()).unwrap();
+        let results = clo
+            .run_simulation(&market, as_of())
+            .map(|run| run.tranches)
+            .unwrap();
 
         let sr = results.get("SR").unwrap();
         let eq = results.get("EQ").unwrap();
@@ -897,7 +929,10 @@ fn e2e_no_loss_full_recovery_all_tranches() {
         6,
     );
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     // All tranches should get at least their face value (principal)
     let total_principal: f64 = results.values().map(|tc| tc.total_principal.amount()).sum();
@@ -986,7 +1021,10 @@ fn e2e_multi_asset_pool_aggregates_correctly() {
     clo.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     clo.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     // Weighted average rate: (6+7+8+9+10)/5 = 8%
     // Total pool cash ≈ $100M * 8% * ~5yr (interest) + $100M (principal) ≈ $140M

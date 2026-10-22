@@ -12,7 +12,7 @@ use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_fixed_income::revolving_credit::CreditSpreadProcessSpec;
 use finstack_quant_valuations_fixed_income::revolving_credit::RevolvingCreditPricer;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, CoverageTestSpec, InstrumentCollateral, StructuredCredit,
+    CoverageTestSpec, InstrumentCollateral, StructuredCredit,
 };
 use time::macros::date;
 
@@ -290,10 +290,12 @@ fn senior_coverage_position_diverts_to_the_senior_note_only() {
     let control = build(Vec::new());
     let market = market().insert(widening_hazard_curve());
 
-    let run = run_simulation_with_diagnostics(&breached, &market, CLOSING)
+    let run = breached
+        .run_simulation(&market, CLOSING)
         .expect("simulation")
         .tranches;
-    let base = run_simulation_with_diagnostics(&control, &market, CLOSING)
+    let base = control
+        .run_simulation(&market, CLOSING)
         .expect("simulation")
         .tranches;
     let on = |flows: &[(Date, finstack_quant_core::money::Money)], date: Date| -> f64 {

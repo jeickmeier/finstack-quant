@@ -18,9 +18,9 @@ use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, HedgeSwap,
-    PaymentType, PoolAsset, Recipient, StructuredCredit, SwapNotional, SwapPriority, Tranche,
-    TrancheCashflows, TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
+    execute_waterfall, AssetPool, CoverageTestSpec, DealType, HedgeSwap, PaymentType, PoolAsset,
+    Recipient, StructuredCredit, SwapNotional, SwapPriority, Tranche, TrancheCashflows,
+    TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
 };
 use time::macros::date;
 
@@ -148,7 +148,9 @@ fn abs(hedged: bool) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit, forward: f64) -> FxHashMap<String, TrancheCashflows> {
-    run_simulation(deal, &market(forward), CLOSE).expect("simulation")
+    deal.run_simulation(&market(forward), CLOSE)
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 #[test]

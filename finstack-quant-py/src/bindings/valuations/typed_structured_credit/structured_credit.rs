@@ -15,9 +15,9 @@ use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, R
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_equity_metrics, run_simulation_with_diagnostics, CreditModelConfig, DealFees,
-    DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata, StructuredCredit,
-    TrancheDraw, TrancheReadvance, WaterfallRules,
+    calculate_equity_metrics, CreditModelConfig, DealFees, DealType, LossAllocationPolicy,
+    LossRecognition, MarketConditions, Metadata, StructuredCredit, TrancheDraw, TrancheReadvance,
+    WaterfallRules,
 };
 
 use super::super::convert::{enum_from_str, instrument_expiry};
@@ -25,9 +25,8 @@ use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 use super::{
-    PyAssetPool, PyCallAssumption, PyCoverageRules, PyEquityMetrics, PyHedgeSwap,
-    PySimulationDiagnostics, PyStochasticPricingResult, PyTrancheCashflows, PyTrancheStructure,
-    PyWaterfall,
+    PyAssetPool, PyCallAssumption, PyCoverageRules, PyEquityMetrics, PyHedgeSwap, PySimulationRun,
+    PyStochasticPricingResult, PyTrancheCashflows, PyTrancheStructure, PyWaterfall,
 };
 
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditBuilder;
@@ -127,47 +126,21 @@ impl PyStructuredCredit {
         Ok(PyStochasticPricingResult { inner })
     }
 
-    /// Run the deterministic simulation and return the deal-level accounting.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context with the deal's discount curve and every curve
-    ///     the collateral references.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// SimulationDiagnostics
-    ///     Reserve balance and interest per period, draw funding by source
-    ///     and unfunded draws.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the deal fails validation or (for instrument collateral) the
-    ///     contractual draw calendar cannot be funded.
-    /// KeyError
-    ///     If a required curve is missing from ``market``.
-    /// RuntimeError
-    ///     If the simulation fails.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.run_simulation")]
     #[pyo3(text_signature = "($self, market, as_of)")]
-    fn run_simulation_with_diagnostics(
+    fn run_simulation(
         &self,
         py: Python<'_>,
         market: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
-    ) -> PyResult<PySimulationDiagnostics> {
+    ) -> PyResult<PySimulationRun> {
         let market = extract_market(py, market)?;
         let as_of = py_to_date(as_of)?;
         let deal = self.inner.clone();
-        let run = py
-            .detach(move || run_simulation_with_diagnostics(&deal, &market, as_of))
+        let inner = py
+            .detach(move || deal.run_simulation(&market, as_of))
             .map_err(core_to_py)?;
-        Ok(PySimulationDiagnostics {
-            inner: run.diagnostics,
-        })
+        Ok(PySimulationRun { inner })
     }
 
     /// Deal closing date as ``datetime.date``.

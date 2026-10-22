@@ -126,12 +126,10 @@ fn run_sim(
     String,
     finstack_quant_valuations_structured_credit::structured_credit::TrancheCashflows,
 > {
-    finstack_quant_valuations_structured_credit::structured_credit::run_simulation(
-        instrument,
-        market,
-        test_date(),
-    )
-    .expect("simulation should succeed")
+    instrument
+        .run_simulation(market, test_date())
+        .map(|run| run.tranches)
+        .expect("simulation should succeed")
 }
 
 // Test 1: Mid-period maturity interest cap (m-FINAL-1)

@@ -14,8 +14,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AssetPool, DealFees, DealType, FundingSource, IncentiveFeeSpec, PoolAsset,
-    StructuredCredit, Tranche, TrancheCashflows, TrancheStructure,
+    AssetPool, DealFees, DealType, FundingSource, IncentiveFeeSpec, PoolAsset, StructuredCredit,
+    Tranche, TrancheCashflows, TrancheStructure,
 };
 use time::Month;
 
@@ -130,7 +130,9 @@ fn clo(adjust: impl FnOnce(&mut DealFees)) -> StructuredCredit {
 
 fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
     let close = d(CLOSE.0, CLOSE.1, CLOSE.2);
-    run_simulation(deal, &market(close), close).expect("simulation")
+    deal.run_simulation(&market(close), close)
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 /// Equity residual per payment date.
@@ -338,12 +340,12 @@ fn incentive_fee_shares_principal_proceeds_above_the_hurdle() {
             share: 0.20,
         });
     });
-    let run = finstack_quant_valuations_structured_credit::structured_credit::run_simulation_with_diagnostics(
-        &deal,
-        &market(d(CLOSE.0, CLOSE.1, CLOSE.2)),
-        d(CLOSE.0, CLOSE.1, CLOSE.2),
-    )
-    .expect("simulation");
+    let run = deal
+        .run_simulation(
+            &market(d(CLOSE.0, CLOSE.1, CLOSE.2)),
+            d(CLOSE.0, CLOSE.1, CLOSE.2),
+        )
+        .expect("simulation");
     let equity_principal = run.tranches["E"].total_principal.amount();
     assert!(
         (equity_principal - 8_000_000.0).abs() < 1.0,
@@ -379,12 +381,12 @@ fn incentive_fee_shares_principal_proceeds_above_the_hurdle() {
             assumptions: None,
         },
     );
-    let run = finstack_quant_valuations_structured_credit::structured_credit::run_simulation_with_diagnostics(
-        &revolving,
-        &market(d(CLOSE.0, CLOSE.1, CLOSE.2)),
-        d(CLOSE.0, CLOSE.1, CLOSE.2),
-    )
-    .expect("simulation");
+    let run = revolving
+        .run_simulation(
+            &market(d(CLOSE.0, CLOSE.1, CLOSE.2)),
+            d(CLOSE.0, CLOSE.1, CLOSE.2),
+        )
+        .expect("simulation");
     for period in run
         .diagnostics
         .periods

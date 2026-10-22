@@ -156,7 +156,7 @@ def test_deterministic_pool_prices_and_reports_the_reserve_path() -> None:
     valuation = price_instrument(deal, ctx, AS_OF, "default")
     assert valuation.value.amount > 0.0
 
-    diagnostics = deal.run_simulation_with_diagnostics(ctx, AS_OF)
+    diagnostics = deal.run_simulation(ctx, AS_OF).diagnostics
     assert isinstance(diagnostics, SimulationDiagnostics)
     # The revolver draws 5M and the delayed-draw loan 15M, all from the reserve.
     assert diagnostics.draws_from_reserve == Money(20_000_000.0, Currency("USD"))
@@ -183,7 +183,7 @@ def test_deterministic_pool_prices_and_reports_the_reserve_path() -> None:
 def test_unfundable_draw_calendar_is_reported_as_a_value_error() -> None:
     deal = pool_deal(RevolvingCredit.example(), reserve=1_000_000.0)
     with pytest.raises(ValueError, match="exceed the reserve"):
-        deal.run_simulation_with_diagnostics(market(), AS_OF)
+        deal.run_simulation(market(), AS_OF)
 
 
 def test_stochastic_pool_reports_draws_and_the_option_cost_by_tranche() -> None:

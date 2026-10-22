@@ -14,9 +14,9 @@ use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AssetPool, CoverageTestAction, CoverageTestSpec, DealType,
-    InstrumentCollateral, PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria,
-    ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows, TrancheStructure,
+    AssetPool, CoverageTestAction, CoverageTestSpec, DealType, InstrumentCollateral, PoolAsset,
+    ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche,
+    TrancheCashflows, TrancheStructure,
 };
 use time::Month;
 
@@ -153,7 +153,9 @@ fn simulate(
 ) -> FxHashMap<String, TrancheCashflows> {
     let (deal, as_of) = clo(period, cdr, tests);
     let market = market(as_of);
-    run_simulation(&deal, &market, as_of).expect("simulation")
+    deal.run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 fn principal_through(results: &FxHashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
@@ -442,7 +444,8 @@ fn instrument_collateral_pools_cannot_reinvest() {
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
     deal.pool.reinvestment_period = Some(window(&[], None));
-    let err = run_simulation(&deal, &market(close), close)
+    let err = deal
+        .run_simulation(&market(close), close)
         .expect_err("instrument pools reject reinvestment periods");
     assert!(
         err.to_string()
@@ -459,7 +462,8 @@ fn amortizing_tranches_must_name_debt_classes_of_the_deal() {
     ] {
         let (mut deal, as_of) = clo(None, 0.0, Vec::new());
         deal.pool.reinvestment_period = Some(window(ids, None));
-        let err = run_simulation(&deal, &market(as_of), as_of)
+        let err = deal
+            .run_simulation(&market(as_of), as_of)
             .expect_err("invalid amortizing tranche is rejected");
         assert!(
             err.to_string().contains(expected),

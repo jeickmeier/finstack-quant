@@ -13,8 +13,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, DealType, LiquidationSpec, LossAllocationPolicy,
-    PeriodDiagnostics, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, DealType, LiquidationSpec, LossAllocationPolicy, PeriodDiagnostics, PoolAsset,
+    StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -117,7 +117,7 @@ fn npl_deal(spec: LiquidationSpec) -> StructuredCredit {
 }
 
 fn periods(deal: &StructuredCredit) -> Vec<PeriodDiagnostics> {
-    run_simulation_with_diagnostics(deal, &market(), close())
+    deal.run_simulation(&market(), close())
         .expect("run")
         .diagnostics
         .periods
@@ -274,7 +274,7 @@ fn resolution_proceeds_are_released_on_the_resolution_date_from_origination() {
         deal.credit_model.recovery_spec.recovery_lag >= 12,
         "the fixture keeps the registry recovery lag"
     );
-    let run = run_simulation_with_diagnostics(&deal, &market(), close()).expect("run");
+    let run = deal.run_simulation(&market(), close()).expect("run");
     let first_principal = run.tranches["A"]
         .principal_flows
         .iter()
@@ -290,7 +290,7 @@ fn resolution_proceeds_are_released_on_the_resolution_date_from_origination() {
     // months earlier.
     let mut seasoned = npl_deal(workout());
     seasoned.pool.assets[0].acquisition_date = Some(d(2023, 1, 1));
-    let run = run_simulation_with_diagnostics(&seasoned, &market(), close()).expect("run");
+    let run = seasoned.run_simulation(&market(), close()).expect("run");
     let resolution = run
         .diagnostics
         .periods
