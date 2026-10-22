@@ -614,7 +614,7 @@ pub fn barrier_rebate(
 ///
 /// ```rust
 /// use finstack_quant_core::types::{BarrierType, PayoutTiming};
-/// use finstack_quant_models::closed_form::barrier::expired_barrier_payoff;
+/// use finstack_quant_models::closed_form::expired_barrier_payoff;
 ///
 /// let knocked_out =
 ///     expired_barrier_payoff(BarrierType::UpAndOut, true, PayoutTiming::AtExpiry, 5.0, 1.0);

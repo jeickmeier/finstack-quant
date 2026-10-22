@@ -400,7 +400,7 @@ impl BrentSolver {
     ///
     /// // Bounded to the pricer's domain, the solve finds ln(x) = 1.
     /// let root = BrentSolver::new()
-    ///     .bracket_bounds(0.5, 10.0)
+    ///     .with_bracket_bounds(0.5, 10.0)
     ///     .solve_fallible(|x| Ok(price(x)? - 1.0), 2.0)?;
     /// assert!((root - std::f64::consts::E).abs() < 1e-10);
     ///
