@@ -209,7 +209,7 @@ impl JsDiscountCurve {
     /// * `points` - Flat `[t0, z0, t1, z1, …]` array: times in years and
     ///   zero rates as decimals (`0.05` is 5%), with strictly increasing times.
     /// * `compounding` - Compounding of the zero rates: `"continuous"`,
-    ///   `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`;
+    ///   `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`;
     ///   omitted means `"continuous"`.
     ///
     /// @returns Curve whose discount factors reproduce every zero rate.
@@ -302,7 +302,7 @@ impl JsDiscountCurve {
     ///
     /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
     ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
-    /// * `compounding` - `"continuous"`, `"simple"`, `"annual"`,
+    /// * `compounding` - `"continuous"`, `"simple"`, `"periodic(1)"`,
     ///   `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means
     ///   `"continuous"`.
     ///

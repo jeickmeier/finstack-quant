@@ -289,7 +289,7 @@ def _scorecard_report(metric_scores: list[dict[str, object]]) -> ScorecardReport
                 "rating": "BBB",
                 "total_score": 3.5,
                 "metric_scores": metric_scores,
-                "rating_scale": "S&P",
+                "rating_scale": "sp",
                 "period": "2025Q4",
                 "partial": False,
                 "weight_coverage": 1.0,

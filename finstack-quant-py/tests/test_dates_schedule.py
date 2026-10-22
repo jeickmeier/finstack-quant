@@ -185,13 +185,13 @@ def test_schedule_builder_accepts_strings_and_calendar_objects() -> None:
         .builder("2025-01-15", "2026-01-15")
         .frequency("6M")
         .stub_rule("short_front")
-        .adjust_with("MF", HolidayCalendar("nyse+gblo"))
+        .adjust_with("modified_following", HolidayCalendar("nyse+gblo"))
         .error_policy("strict")
         .build()
     )
     assert len(schedule) == 3
     with pytest.raises(KeyError):
-        Schedule.builder("2025-01-15", "2026-01-15").adjust_with("MF", "no_such_calendar").build()
+        Schedule.builder("2025-01-15", "2026-01-15").adjust_with("modified_following", "no_such_calendar").build()
     with pytest.raises(ValueError, match=r"start must be before end"):
         Schedule.builder("2026-01-15", "2025-01-15")
 
@@ -267,19 +267,19 @@ def test_tenor_constructor_forms_and_context_helpers() -> None:
     from finstack_quant.core.dates import DayCount, HolidayCalendar, Tenor, TenorUnit
 
     assert Tenor.parse("3M") == Tenor(3, "M") == Tenor(3, TenorUnit.MONTHS)
-    assert Tenor.parse("ON") == Tenor.daily()
+    assert Tenor.parse(" 1d ") == Tenor.daily()
     assert Tenor.parse("3M").payments_per_year() == 4.0
     assert str(Tenor.from_years(0.5, "act_365f")) == "6M"
     assert Tenor.parse("1M").add_to_date("2025-01-31") == date(2025, 2, 28)
-    assert Tenor.parse("1M").add_to_date("2025-01-31", calendar="usny", business_day_convention="F") == date(
+    assert Tenor.parse("1M").add_to_date("2025-01-31", calendar="usny", business_day_convention="following") == date(
         2025, 2, 28
     )
     assert Tenor.parse("1Y").to_years_with_context("2025-01-15", day_count=DayCount.ACT_ACT) == pytest.approx(1.0)
     with pytest.raises(TypeError):
         Tenor(3)
 
-    assert DayCount.from_name("ACT/ACT ICMA") == DayCount.ACT_ACT_ISMA
-    assert DayCount.from_name("ACT/360") == DayCount.ACT_360
+    assert DayCount.from_name(" ACT_ACT_ISMA ") == DayCount.ACT_ACT_ISMA
+    assert DayCount.from_name(" ACT_360 ") == DayCount.ACT_360
     assert DayCount.ACT_ACT_ISMA.year_fraction(
         "2025-01-15", "2025-07-15", DayCountContext(frequency="6M")
     ) == pytest.approx(0.5)
@@ -290,7 +290,7 @@ def test_tenor_constructor_forms_and_context_helpers() -> None:
     assert not joint.is_business_day(date(2025, 7, 4))
     assert str(HolidayCalendar("USNY")) == "usny"
     assert HolidayCalendar("usny").count_business_days("2025-01-01", "2025-01-08") == 4
-    assert str(BusinessDayConvention.from_name("MF")) == "modified_following"
+    assert str(BusinessDayConvention.from_name(" MODIFIED_FOLLOWING ")) == "modified_following"
     assert "weekends_only" in available_calendars()
 
 

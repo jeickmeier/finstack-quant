@@ -219,11 +219,11 @@ test('Hull-White exercise retains partial coupons and floating spread', () => {
 
 test('FX global source precedes the pinned quote in both orientations', () => {
   const fx = new core.FxMatrix();
-  fx.setQuote('USD', 'EUR', 0.8);
+  fx.setQuotes([['USD', 'EUR', 0.8]]);
   fx.setQuoteOn('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate(), 1.3);
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02').rate, 1.25);
   assert.equal(fx.rate('USD', 'EUR', '2025-01-02').rate, 0.8);
-  fx.setQuote('USD', 'GBP', 0.8);
+  fx.setQuotes([['USD', 'GBP', 0.8]]);
   assert.equal(fx.rate('EUR', 'GBP', '2025-01-02').rate, 1);
 });
 

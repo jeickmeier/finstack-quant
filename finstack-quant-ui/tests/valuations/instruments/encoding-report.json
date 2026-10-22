@@ -384,7 +384,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/d_91fef53f78d7c50653a0/properties/stated_delay_days",
@@ -775,7 +775,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/d_24b4bd8fabf71247af0b/properties/stated_delay_days",
@@ -1188,7 +1188,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/d_038bf279beea6aa9cf48/properties/stated_delay_days",
@@ -1566,7 +1566,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -2830,7 +2830,7 @@
           "#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
           "#/$defs/Bond/properties/ex_coupon_days",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/Bond/properties/settlement_days",
           "#/$defs/RevolvingCredit/properties/payment_lag_days",
@@ -3250,7 +3250,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -3795,7 +3795,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -4199,7 +4199,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_bc70851d62fecbbe51c0/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_bc70851d62fecbbe51c0/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
@@ -6950,7 +6950,7 @@
           "#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
           "#/$defs/Bond/properties/ex_coupon_days",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/Bond/properties/settlement_days",
           "#/$defs/PriceTrigger/properties/observation_days",
@@ -7514,7 +7514,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
           "#/$defs/d_c2e67bb3fe26d39944ea/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
@@ -8067,7 +8067,7 @@
           "#/$defs/d_21bc542d2146358a7021/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/d_21bc542d2146358a7021/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
           "#/$defs/d_67c3f0fee95f47938ab4/properties/ex_coupon_days",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_67c3f0fee95f47938ab4/properties/settlement_days"
         ],
@@ -8820,7 +8820,7 @@
           "#/$defs/d_74e12b9de60a5731f116/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/d_74e12b9de60a5731f116/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
           "#/$defs/d_0e4f6595f5e014bbb86a/properties/ex_coupon_days",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_0e4f6595f5e014bbb86a/properties/settlement_days"
         ],
@@ -9404,7 +9404,7 @@
           "#/$defs/d_de9dcde9d5fad54ea251/properties/total_past_observations"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count"
         ],
@@ -9818,7 +9818,7 @@
         ],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_d5a07a5b3af3f2e84a38/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
@@ -10434,7 +10434,7 @@
           "#/$defs/d_765a4643a287f5eb4b9d/properties/version"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_d753b8f92c808b4fcb8e/properties/mpor_days",
           "#/$defs/d_f0ed2e93baffede20ff4/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
@@ -10825,7 +10825,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -11226,7 +11226,7 @@
         "uint16": ["#/$defs/d_acd6c3d775d926e416ed/properties/series"],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -11608,7 +11608,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -12008,7 +12008,7 @@
         ],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -12405,7 +12405,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
@@ -12823,7 +12823,7 @@
         ],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -13190,7 +13190,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -13570,7 +13570,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_d34fe8d294aafaa3e650/properties/settlement_days"
         ],
@@ -13944,7 +13944,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -14324,7 +14324,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -14703,7 +14703,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -15067,7 +15067,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -15445,7 +15445,7 @@
         ],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -15831,7 +15831,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count"
         ],
@@ -18574,7 +18574,7 @@
           "#/$defs/CdsTranche/properties/series"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
           "#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
@@ -19233,7 +19233,7 @@
           "#/$defs/d_3d3908223688cf141275/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
           "#/$defs/d_51885e17c080d760db74/properties/observation_days",
           "#/$defs/d_51885e17c080d760db74/properties/required_days_above",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_5d5c46a56f1a2114a2ed/properties/settlement_days"
         ],
@@ -19847,7 +19847,7 @@
           "#/$defs/d_80d76e0f51c533a80ab8/properties/settlement_delay"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_689f3cd8deb433e8f1b4/properties/mpor_days",
           "#/$defs/d_346928387a11c641c3eb/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
@@ -20254,7 +20254,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -20645,7 +20645,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -21033,7 +21033,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months"
         ],
@@ -21399,7 +21399,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -21773,7 +21773,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -22153,7 +22153,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -22536,7 +22536,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -22912,7 +22912,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -23305,7 +23305,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -23853,7 +23853,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -24381,7 +24381,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -24907,7 +24907,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -25266,7 +25266,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -25646,7 +25646,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -26175,7 +26175,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -26717,7 +26717,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_81828a2fc42ad3c4ad70/properties/settlement_days"
         ],
@@ -27242,7 +27242,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -27771,7 +27771,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -28330,7 +28330,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count"
         ],
@@ -28737,7 +28737,7 @@
         "uint16": ["#/$defs/d_c8d5a8dc925586cc9b9d/oneOf/1/properties/days"],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "uint8": ["#/$defs/d_c8d5a8dc925586cc9b9d/oneOf/0/properties/months"],
@@ -29142,7 +29142,7 @@
         "uint16": ["#/$defs/d_647da623d36ff2b229f7/oneOf/1/properties/days"],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "uint8": ["#/$defs/d_647da623d36ff2b229f7/oneOf/0/properties/months"],
@@ -29541,7 +29541,7 @@
         ],
         "uint16": ["#/$defs/d_44e203fc4369b4a47168/oneOf/1/properties/days"],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "uint8": ["#/$defs/d_44e203fc4369b4a47168/oneOf/0/properties/months"],
@@ -29953,7 +29953,7 @@
           "#/$defs/d_d7c5e0df6d1ecf0eba3d/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_d7c5e0df6d1ecf0eba3d/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/d_d7c5e0df6d1ecf0eba3d/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "uint8": ["#/$defs/d_546d6c19e94fe5cda260/properties/delivery_months"],
@@ -30335,7 +30335,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -30950,7 +30950,7 @@
           "#/$defs/d_1fea90e06b9931379b0f/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_1fea90e06b9931379b0f/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/d_1fea90e06b9931379b0f/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_71c7dfd12d3c79d088e8/properties/mpor_days",
           "#/$defs/d_3b6c8eaba5e197393c0d/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
@@ -31876,7 +31876,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
           "#/$defs/d_681b85f6e74d81aae8d2/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
@@ -32283,7 +32283,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -32820,7 +32820,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -33369,7 +33369,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -33914,7 +33914,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -34482,7 +34482,7 @@
         ],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -35055,7 +35055,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -35474,7 +35474,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_deef56e3a9e2f83fbb27/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
@@ -35985,7 +35985,7 @@
         ],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_2d9b65cc4d957fd6344e/properties/payment_lag_days",
           "#/$defs/d_553b276d4726518cb3ad/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
@@ -36389,7 +36389,7 @@
         ],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -37927,7 +37927,7 @@
           "#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/ImParameters/properties/mpor_days",
           "#/$defs/VmParameters/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
@@ -38407,7 +38407,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
           "#/$defs/d_4f13078034fe1c1b7353/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
@@ -38800,7 +38800,7 @@
         ],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -39448,7 +39448,7 @@
         ],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_7ce89bf77e1734d78fe6/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_7ce89bf77e1734d78fe6/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
@@ -40063,7 +40063,7 @@
           "#/$defs/d_114e9cce0334b4ed200f/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_114e9cce0334b4ed200f/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/d_114e9cce0334b4ed200f/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_bcbfd40d0be718fa0b1b/properties/mpor_days",
           "#/$defs/d_5b15bcb648e98c9285ec/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
@@ -40684,7 +40684,7 @@
           "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/d_fe5ed9f19e4d56cdef5d/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_16219cd83aea7d546c03/properties/mpor_days",
           "#/$defs/d_b3867d24415e3fb4e481/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
@@ -41096,7 +41096,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count"
         ],
@@ -41459,7 +41459,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -41839,7 +41839,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
@@ -42407,7 +42407,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_245867acdd20ef6e60fd/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_245867acdd20ef6e60fd/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/d_245867acdd20ef6e60fd/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
@@ -42820,7 +42820,7 @@
         "uint16": ["#/$defs/d_af2460f03219a318a4c9/oneOf/1/properties/days"],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
-          "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
+          "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "uint8": ["#/$defs/d_af2460f03219a318a4c9/oneOf/0/properties/months"],

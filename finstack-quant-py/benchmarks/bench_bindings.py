@@ -496,7 +496,7 @@ class TestCoreBenchmarks:
 
     def test_fx_matrix_rate(self, benchmark) -> None:
         fx = FxMatrix()
-        fx.set_quote("USD", "EUR", 0.92)
+        fx.set_quotes([("USD", "EUR", 0.92)])
         ref_date = date(2024, 6, 15)
         benchmark(fx.rate, "USD", "EUR", ref_date)
 

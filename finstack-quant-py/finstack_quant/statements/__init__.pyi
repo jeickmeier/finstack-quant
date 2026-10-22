@@ -280,7 +280,7 @@ class RollupSpec:
         ----------
         frequency : str
             Target frequency label (``"quarterly"``, ``"semi_annual"``,
-            ``"annual"`` or a pandas alias).
+            ``"annual"``; surrounding whitespace and ASCII case are ignored).
         methods : dict[str, str] or None, default None
             Node id to ``"sum"``, ``"period_end"`` or ``"formula"``; nodes not
             listed are summed.

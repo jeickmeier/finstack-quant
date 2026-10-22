@@ -139,7 +139,7 @@ fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
     let swap = FxSwap::example().expect("example");
     let provider = Arc::new(SimpleFxProvider::new());
     provider
-        .set_quote(Currency::EUR, Currency::USD, 1.10)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .expect("fx quote");
     let market = MarketContext::new()
         .insert(

@@ -14,15 +14,14 @@ use pyo3::types::PyModule;
 ///
 /// Immutable, hashable enum-style type. ``str()`` gives the snake_case wire
 /// name (``"modified_following"``), which ``from_name`` parses back; the
-/// parser also accepts the short codes ``MF``, ``F``, ``P``, ``MP`` and
-/// ``NONE`` case-insensitively.
+/// parser ignores surrounding whitespace and ASCII case. Short codes are rejected.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.dates import BusinessDayConvention
 /// >>> str(BusinessDayConvention.MODIFIED_FOLLOWING)
 /// 'modified_following'
-/// >>> BusinessDayConvention.from_name("MF") == BusinessDayConvention.MODIFIED_FOLLOWING
+/// >>> BusinessDayConvention.from_name(" MODIFIED_FOLLOWING ") == BusinessDayConvention.MODIFIED_FOLLOWING
 /// True
 #[pyclass(
     name = "BusinessDayConvention",
@@ -303,7 +302,7 @@ impl PyHolidayCalendar {
 ///     ``YYYY-MM-DD`` string).
 /// convention : BusinessDayConvention | str
 ///     Roll rule: a ``BusinessDayConvention`` or its name
-///     (``"modified_following"``, short codes ``MF``/``F``/``P``/``MP``/``NONE``).
+///     (for example ``"modified_following"``), ignoring outer whitespace and ASCII case.
 /// calendar : HolidayCalendar | str
 ///     Holiday calendar object or registry id (``"usny"``; ``"nyse+gblo"``
 ///     joins calendars).

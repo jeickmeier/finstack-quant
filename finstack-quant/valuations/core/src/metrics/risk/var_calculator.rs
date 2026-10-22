@@ -525,7 +525,7 @@ fn convert_money_to_reporting(
         ))
     })?;
     let rate = fx
-        .rate(FxQuery::with_policy(
+        .rate(FxQuery::new(
             value.currency(),
             reporting_currency,
             on,
@@ -1085,7 +1085,7 @@ mod tests {
 
         let provider = finstack_quant_core::money::fx::SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 2.0)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 2.0)])
             .expect("valid rate");
         let fx = finstack_quant_core::money::fx::FxMatrix::new(Arc::new(provider));
 
@@ -1149,7 +1149,7 @@ mod tests {
         let provider = finstack_quant_core::money::fx::SimpleFxProvider::new();
         // Base FX: EUR/USD = 2.0.
         provider
-            .set_quote(Currency::EUR, Currency::USD, 2.0)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 2.0)])
             .expect("valid base rate");
         let fx = finstack_quant_core::money::fx::FxMatrix::new(Arc::new(provider));
         let base_market = MarketContext::new().insert_fx(fx);

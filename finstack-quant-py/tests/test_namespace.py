@@ -215,7 +215,6 @@ class TestCorrelationNamespace:
             RecoverySpec,
             cholesky_correlation,
             correlation_bounds,
-            joint_probabilities,
             validate_correlation_matrix,
         )
 

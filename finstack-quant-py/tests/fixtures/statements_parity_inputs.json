@@ -83,7 +83,7 @@
     "fail_on_error": false
   },
   "scorecard_config": {
-    "rating_scale": "S&P",
+    "rating_scale": "sp",
     "metrics": [
       {
         "name": "margin",

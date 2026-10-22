@@ -88,7 +88,12 @@ def test_enum_classmethods_match_the_shared_wire_values() -> None:
     for type_name, variants in GOLDEN["enums"].items():
         for variant, expected in variants.items():
             if type_name == "Compounding":
-                binding = RateBindingSpec("n", "c", "1Y", compounding=getattr(Compounding, variant)())
+                binding = RateBindingSpec(
+                    "n",
+                    "c",
+                    "1Y",
+                    compounding=Compounding(variant) if variant == "periodic(1)" else getattr(Compounding, variant)(),
+                )
                 assert json.loads(binding.to_json())["compounding"] == expected
             else:
                 assert getattr(ENUMS[type_name], variant)().value == expected

@@ -335,7 +335,7 @@ fn rows_to_table(rows: Vec<SensitivityRow>, layout: Layout) -> Result<TableEnvel
             ));
         }
     }
-    TableEnvelope::new(columns)
+    TableEnvelope::new(columns, Default::default())
 }
 
 impl FrtbSensitivities {

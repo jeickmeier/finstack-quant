@@ -20,17 +20,17 @@ fn query_date() -> Date {
 fn seeded_matrix() -> FxMatrix {
     let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
     matrix
-        .set_quote(Currency::EUR, Currency::USD, 1.10)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .expect("valid quote");
     matrix
-        .set_quote(Currency::GBP, Currency::USD, 1.27)
+        .set_quotes(&[(Currency::GBP, Currency::USD, 1.27)])
         .expect("valid quote");
     matrix
 }
 
 fn rate(matrix: &FxMatrix, from: Currency, to: Currency) -> f64 {
     matrix
-        .rate(FxQuery::new(from, to, query_date()))
+        .rate(FxQuery::new(from, to, query_date(), Default::default()))
         .expect("lookup should succeed")
         .rate
 }
@@ -68,7 +68,7 @@ fn bench_fx_matrix_rate(c: &mut Criterion) {
     group.bench_with_input(BenchmarkId::new("pinned", "eur_usd"), &(), |b, _| {
         b.iter(|| {
             matrix
-                .rate(FxQuery::with_policy(
+                .rate(FxQuery::new(
                     black_box(Currency::EUR),
                     black_box(Currency::USD),
                     on,

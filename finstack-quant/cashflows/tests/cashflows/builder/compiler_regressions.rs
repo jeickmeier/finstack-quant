@@ -612,7 +612,8 @@ fn weekend_balance_splits_record_one_raw_fixing_and_materialize_without_conflict
     let expected = market
         .get_forward("RFR")
         .expect("curve")
-        .rate_period(0.0, 1.0 / 360.0);
+        .rate_period(0.0, 1.0 / 360.0)
+        .expect("finite ordered period");
     close(known[0].value.expect("raw fixing"), expected);
     let realized = finstack_quant_cashflows::fixings::materialize_fixings(
         &market,

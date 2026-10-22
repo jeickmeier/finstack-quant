@@ -121,7 +121,7 @@ impl_repr_html_via_dataframe!(PyFxRateResult);
 /// Foreign-exchange rate matrix for currency conversion.
 ///
 /// Wraps [`FxMatrix`] from `finstack-quant-core`. Quote mutations go through
-/// `FxMatrix::set_quote` (interior mutability) so that matrices obtained
+/// `FxMatrix::set_quotes` (interior mutability) so that matrices obtained
 /// from a `MarketContext` share state with the underlying context.
 #[pyclass(
     name = "FxMatrix",
@@ -141,31 +141,6 @@ impl PyFxMatrix {
         Self {
             inner: Arc::new(FxMatrix::default()),
         }
-    }
-
-    /// Set an explicit FX quote.
-    ///
-    /// Parameters
-    /// ----------
-    /// base : Currency | str
-    ///     Base (from) currency.
-    /// quote : Currency | str
-    ///     Quote (to) currency.
-    /// rate : float
-    ///     The conversion rate ``1 base = rate quote``.
-    #[pyo3(text_signature = "(self, base, quote, rate)")]
-    fn set_quote(
-        &self,
-        base: &Bound<'_, PyAny>,
-        quote: &Bound<'_, PyAny>,
-        rate: f64,
-    ) -> PyResult<()> {
-        let base_currency = extract_currency(base)?;
-        let quote_currency = extract_currency(quote)?;
-        self.inner
-            .set_quote(base_currency, quote_currency, rate)
-            .map_err(core_to_py)?;
-        Ok(())
     }
 
     /// Set an authoritative FX quote scoped to one date and policy.
@@ -203,7 +178,7 @@ impl PyFxMatrix {
     ///     Applicable date for the rate.
     /// policy : FxConversionPolicy | str, optional
     ///     Conversion policy; ``None`` selects the Rust default query
-    ///     (``FxQuery::new``, ``"cashflow_date"``).
+    ///     (``FxConversionPolicy::default()``, ``"cashflow_date"``).
     ///
     /// Returns
     /// -------
@@ -221,10 +196,8 @@ impl PyFxMatrix {
         let quote_currency = extract_currency(quote)?;
         let d = py_to_date(date)?;
         let query = match policy {
-            Some(p) => {
-                FxQuery::with_policy(base_currency, quote_currency, d, extract_fx_policy(p)?)
-            }
-            None => FxQuery::new(base_currency, quote_currency, d),
+            Some(p) => FxQuery::new(base_currency, quote_currency, d, extract_fx_policy(p)?),
+            None => FxQuery::new(base_currency, quote_currency, d, Default::default()),
         };
 
         let result = self.inner.rate(query).map_err(core_to_py)?;

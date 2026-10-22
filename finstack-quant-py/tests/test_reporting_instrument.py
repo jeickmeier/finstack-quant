@@ -241,7 +241,7 @@ def test_instrument_tearsheet_bond_with_definition_and_cashflows() -> None:
     }
     cf = pd.DataFrame({
         "date": [dt.date(2027, 3, 15), dt.date(2034, 3, 15)],
-        "kind": ["coupon", "principal"],
+        "kind": ["fixed", "notional"],
         "amount": [212500.0, 10000000.0],
         "currency": ["USD", "USD"],
         "rate": [0.0425, None],
@@ -412,7 +412,7 @@ def test_cashflow_blocks_from_dataframe() -> None:
 
     df = pd.DataFrame({
         "date": [dt.date(2027, 3, 15), dt.date(2027, 9, 15), dt.date(2034, 3, 15)],
-        "kind": ["coupon", "coupon", "principal"],
+        "kind": ["fixed", "fixed", "notional"],
         "amount": [212500.0, 212500.0, 10000000.0],
         "currency": ["USD", "USD", "USD"],
         "rate": [0.0425, 0.0425, None],

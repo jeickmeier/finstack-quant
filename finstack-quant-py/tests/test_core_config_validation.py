@@ -88,4 +88,6 @@ def test_tiny_annual_zero_rate_avoids_subtractive_cancellation() -> None:
 
     df = 1.0 - 1e-8
     curve = DiscountCurve("TINY", "2025-01-01", [(0, 1), (1, df)], interp="log_linear")
-    assert abs(curve.zero_rate(1, "annual") - (1 - df) / df) < 1e-23
+    assert abs(curve.zero_rate(1, "periodic(1)") - (1 - df) / df) < 1e-23
+    with pytest.raises(ValueError, match="unknown compounding"):
+        curve.zero_rate(1, "annual")

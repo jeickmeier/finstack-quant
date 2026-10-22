@@ -155,8 +155,7 @@ impl PyCurrency {
         Ok(Self { inner })
     }
 
-    #[getter]
-    fn code(&self) -> String { self.inner.code().to_string() }
+    fn __str__(&self) -> String { self.inner.to_string() }
 }
 ```
 

@@ -390,7 +390,7 @@ mod tests {
             if let Some((base, quote)) = self.fx_pair {
                 return Ok(market
                     .fx_required()?
-                    .rate(FxQuery::new(base, quote, as_of))?
+                    .rate(FxQuery::new(base, quote, as_of, Default::default()))?
                     .rate
                     * self.scale);
             }

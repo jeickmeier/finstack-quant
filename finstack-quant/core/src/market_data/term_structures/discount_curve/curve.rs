@@ -380,7 +380,7 @@ impl DiscountCurve {
     /// let r_cont = curve.zero_rate_on_date(target, Compounding::Continuous)?;
     ///
     /// // Annual rate (for European bonds)
-    /// let r_ann = curve.zero_rate_on_date(target, Compounding::Annual)?;
+    /// let r_ann = curve.zero_rate_on_date(target, Compounding::Periodic(std::num::NonZeroU32::MIN))?;
     ///
     /// // Semi-annual rate (for US Treasuries)
     /// let r_semi = curve.zero_rate_on_date(target, Compounding::SEMI_ANNUAL)?;
@@ -443,12 +443,12 @@ impl DiscountCurve {
     ///     .expect("DiscountCurve should build");
     ///
     /// // At 1Y, DF = 0.95, so the annual rate = 0.95^(-1) - 1 ≈ 5.26%
-    /// assert!((curve.zero_rate(1.0, Compounding::Annual) - 0.0526).abs() < 0.001);
+    /// assert!((curve.zero_rate(1.0, Compounding::Periodic(std::num::NonZeroU32::MIN)) - 0.0526).abs() < 0.001);
     /// // At 3M, DF = 0.99, so the simple rate = (1/0.99 - 1) / 0.25 ≈ 4.04%
     /// assert!((curve.zero_rate(0.25, Compounding::Simple) - 0.0404).abs() < 0.001);
     /// // Periodic(1) is the annual convention
     /// let annual = curve.zero_rate(1.0, Compounding::Periodic(1.try_into().unwrap()));
-    /// assert!((curve.zero_rate(1.0, Compounding::Annual) - annual).abs() < 1e-12);
+    /// assert!((curve.zero_rate(1.0, Compounding::Periodic(std::num::NonZeroU32::MIN)) - annual).abs() < 1e-12);
     /// ```
     #[inline]
     #[must_use]

@@ -534,8 +534,8 @@ def test_hierarchy_target_pyclass_roundtrip() -> None:
 
 
 def test_rate_binding_spec_equality_and_validation() -> None:
-    binding = RateBindingSpec("rate", "USD-OIS", "1Y", compounding="annual")
-    assert binding == RateBindingSpec("rate", "USD-OIS", "1Y", compounding=Compounding.annual())
+    binding = RateBindingSpec("rate", "USD-OIS", "1Y", compounding="periodic(1)")
+    assert binding == RateBindingSpec("rate", "USD-OIS", "1Y", compounding=Compounding("periodic(1)"))
     assert binding == RateBindingSpec.from_json(binding.to_json())
     binding.validate()
     with pytest.raises(ValueError, match=r"Invalid tenor string"):
@@ -591,3 +591,13 @@ def test_empty_inventory_is_distinct_from_absent_inventory() -> None:
     result = apply_scenario(spec, _market(), AS_OF, instruments=[])
     assert result.instruments == []
     assert ApplicationResult.from_json(result.to_json()).instruments == []
+
+
+def test_annual_compounding_requires_periodic_one() -> None:
+    assert not hasattr(Compounding, "annual")
+    with pytest.raises(ValueError, match="unknown compounding"):
+        Compounding("annual")
+    with pytest.raises(ValueError, match="unknown variant"):
+        RateBindingSpec.from_json('{"node_id":"rate","curve_id":"USD-OIS","tenor":"1Y","compounding":"annual"}')
+    binding = RateBindingSpec("rate", "USD-OIS", "1Y", compounding=Compounding("periodic(1)"))
+    assert json.loads(binding.to_json())["compounding"] == {"periodic": 1}

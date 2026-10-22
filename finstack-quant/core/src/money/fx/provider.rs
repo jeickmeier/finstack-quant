@@ -5,6 +5,31 @@ use crate::dates::Date;
 
 use super::types::FxConversionPolicy;
 
+/// Failure stage of the pair-independent reciprocal calculation.
+#[derive(Debug)]
+pub(super) enum ReciprocalError {
+    NonFiniteInput(crate::NonFiniteKind),
+    NonPositiveInput,
+    InvalidReciprocal(f64),
+}
+
+/// Compute a positive finite reciprocal, retaining the failed stage for error adapters.
+pub(super) fn checked_reciprocal(rate: f64) -> Result<f64, ReciprocalError> {
+    if !rate.is_finite() {
+        return Err(ReciprocalError::NonFiniteInput(
+            crate::NonFiniteKind::classify(rate),
+        ));
+    }
+    if rate <= 0.0 {
+        return Err(ReciprocalError::NonPositiveInput);
+    }
+    let reciprocal = 1.0 / rate;
+    if !reciprocal.is_finite() || reciprocal <= 0.0 {
+        return Err(ReciprocalError::InvalidReciprocal(reciprocal));
+    }
+    Ok(reciprocal)
+}
+
 /// Helper to compute reciprocal rate safely, validating the output.
 ///
 /// Returns `1.0 / rate` if the reciprocal is a valid FX rate (finite and
@@ -19,16 +44,18 @@ pub(crate) fn reciprocal_rate_or_err(
     from: Currency,
     to: Currency,
 ) -> crate::Result<f64> {
-    if !rate.is_finite() {
-        return Err(crate::InputError::NonFiniteValue {
-            kind: crate::NonFiniteKind::classify(rate),
+    checked_reciprocal(rate).map_err(|failure| match failure {
+        ReciprocalError::NonFiniteInput(kind) => crate::InputError::NonFiniteValue { kind }.into(),
+        ReciprocalError::NonPositiveInput => {
+            crate::InputError::InvalidFxRate { from, to, rate }.into()
         }
-        .into());
-    }
-    validate_fx_rate(from, to, rate)?;
-    // Validate the OUTPUT: tiny (subnormal) inputs produce a reciprocal
-    // that overflows to +inf — never a valid FX rate.
-    validate_fx_rate(to, from, 1.0 / rate)
+        ReciprocalError::InvalidReciprocal(reciprocal) => crate::InputError::InvalidFxRate {
+            from: to,
+            to: from,
+            rate: reciprocal,
+        }
+        .into(),
+    })
 }
 
 /// Resolve `from → to` from one quote store: the direct quote, otherwise the
@@ -201,5 +228,42 @@ pub trait FxProvider: Send + Sync {
     /// so matrices can detect updates between snapshot hooks.
     fn snapshot_pinned_quotes(&self) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
         Vec::new()
+    }
+}
+
+#[cfg(test)]
+mod reciprocal_tests {
+    use super::*;
+
+    #[test]
+    fn reciprocal_errors_keep_input_classification_and_pair_direction() {
+        for rate in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                reciprocal_rate_or_err(rate, Currency::EUR, Currency::USD),
+                Err(crate::Error::Input(
+                    crate::InputError::NonFiniteValue { .. }
+                ))
+            ));
+        }
+        for rate in [0.0, -0.0, -1.0] {
+            assert!(matches!(
+                reciprocal_rate_or_err(rate, Currency::EUR, Currency::USD),
+                Err(crate::Error::Input(crate::InputError::InvalidFxRate {
+                    from: Currency::EUR,
+                    to: Currency::USD,
+                    ..
+                }))
+            ));
+        }
+        assert!(
+            matches!(reciprocal_rate_or_err(1e-320, Currency::EUR, Currency::USD),
+            Err(crate::Error::Input(crate::InputError::InvalidFxRate {
+                from: Currency::USD, to: Currency::EUR, rate
+            })) if rate == f64::INFINITY)
+        );
+        assert_eq!(
+            reciprocal_rate_or_err(2.0, Currency::EUR, Currency::USD).expect("valid rate"),
+            0.5
+        );
     }
 }

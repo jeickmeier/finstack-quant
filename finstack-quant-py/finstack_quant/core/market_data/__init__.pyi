@@ -228,7 +228,7 @@ class DiscountCurve:
             ``(0, 1.0)`` discount-factor anchor is added when no ``t = 0``
             pillar is given.
         compounding : str, optional
-            ``"continuous"`` (default), ``"simple"``, ``"annual"``,
+            ``"continuous"`` (default), ``"simple"``, ``"periodic(1)"``,
             ``"semi_annual"``, ``"quarterly"`` or ``"monthly"``.
 
         Returns
@@ -247,7 +247,7 @@ class DiscountCurve:
         --------
         >>> from finstack_quant.core.market_data import DiscountCurve
         >>> curve = DiscountCurve.from_zero_rates(
-        ...     "USD-OIS", "2025-01-01", [(1.0, 0.05), (2.0, 0.05)], compounding="annual"
+        ...     "USD-OIS", "2025-01-01", [(1.0, 0.05), (2.0, 0.05)], compounding="periodic(1)"
         ... )
         >>> round(curve.df(2.0), 6)
         0.907029
@@ -377,7 +377,7 @@ class DiscountCurve:
             Year fraction from ``base_date``, or a date converted with the
             curve day count.
         compounding : str, optional
-            ``"continuous"`` (default), ``"simple"``, ``"annual"``,
+            ``"continuous"`` (default), ``"simple"``, ``"periodic(1)"``,
             ``"semi_annual"``, ``"quarterly"`` or ``"monthly"``.
 
         Returns
@@ -873,11 +873,14 @@ class ForwardCurve:
         Returns
         -------
         float
-            Period-average forward rate as a decimal.
-        Notes
-        -----
-        This method does not raise.
+            Finite period-average rate as a decimal. Equal endpoints and intervals
+            no longer than 1e-12 years return the start rate. Negative finite times
+            retain the curve's extrapolation policy.
 
+        Raises
+        ------
+        ValueError
+            If endpoints are non-finite or reversed, or the interval length or result is non-finite.
         """
         ...
 
@@ -4219,7 +4222,7 @@ class FxRateResult:
     >>> import datetime
     >>> from finstack_quant.core.market_data import FxMatrix
     >>> matrix = FxMatrix()
-    >>> matrix.set_quote("EUR", "USD", 1.1)
+    >>> matrix.set_quotes([("EUR", "USD", 1.1)])
     >>> result = matrix.rate("EUR", "USD", datetime.date(2025, 1, 1))
     >>> (result.rate, result.triangulated, float(result))
     (1.1, False, 1.1)
@@ -4339,9 +4342,9 @@ class ConvertedMoney:
     >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
     >>> from finstack_quant.core.money import Money
     >>> fx = FxMatrix()
-    >>> fx.set_quote("EUR", "USD", 1.1)
+    >>> fx.set_quotes([("EUR", "USD", 1.1)])
     >>> converted = MarketContext().insert_fx(fx).convert_money(Money(10.0, "EUR"), "USD", "2025-01-02")
-    >>> (converted.amount.currency.code, converted.rate.rate)
+    >>> (str(converted.amount.currency), converted.rate.rate)
     ('USD', 1.1)
 
     """
@@ -4513,7 +4516,7 @@ class FxPairConvention:
     --------
     >>> from finstack_quant.core.market_data import fx_pair_convention
     >>> conv = fx_pair_convention("USD", "EUR")
-    >>> (conv.base.code, conv.quote.code, str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
+    >>> (str(conv.base), str(conv.quote), str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
     ('EUR', 'USD', 'direct', 0.0001, 2)
 
     """
@@ -4633,7 +4636,7 @@ def fx_market_pair(
     Examples
     --------
     >>> from finstack_quant.core.market_data import fx_market_pair
-    >>> [c.code for c in fx_market_pair("USD", "EUR")]
+    >>> [str(c) for c in fx_market_pair("USD", "EUR")]
     ['EUR', 'USD']
 
     """
@@ -4672,7 +4675,7 @@ def fx_pair_convention(
     --------
     >>> from finstack_quant.core.market_data import fx_pair_convention
     >>> conv = fx_pair_convention("USD", "JPY")
-    >>> (conv.base.code, conv.quote.code, str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
+    >>> (str(conv.base), str(conv.quote), str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
     ('USD', 'JPY', 'indirect', 0.01, 2)
 
     """
@@ -4817,31 +4820,6 @@ class FxMatrix:
         >>> FxMatrix.from_dict({"EURUSD": 1.1}).rate("EUR", "USD", datetime.date(2025, 1, 1)).rate
         1.1
 
-        """
-        ...
-
-    def set_quote(
-        self,
-        base: Union[Currency, str],
-        quote: Union[Currency, str],
-        rate: float,
-    ) -> None:
-        """
-        Set an explicit pair-global FX quote.
-
-        Parameters
-        ----------
-        base : Currency or str
-            Base (from) currency.
-        quote : Currency or str
-            Quote (to) currency.
-        rate : float
-            Conversion rate ``1 base = rate quote``; finite and positive.
-
-        Raises
-        ------
-        ValueError
-            If ``rate`` is non-finite or non-positive, or a code is unknown.
         """
         ...
 
@@ -5009,7 +4987,7 @@ class ScalarTimeSeries:
         Examples
         --------
         >>> from finstack_quant.core.market_data import ScalarTimeSeries
-        >>> ScalarTimeSeries("PX", [("2025-01-01", 100.0)], currency="USD").currency.code
+        >>> str(ScalarTimeSeries("PX", [("2025-01-01", 100.0)], currency="USD").currency)
         'USD'
 
         """
@@ -6243,7 +6221,7 @@ class MarketContext:
         >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
         >>> from finstack_quant.core.money import Money
         >>> fx = FxMatrix()
-        >>> fx.set_quote("EUR", "USD", 1.1)
+        >>> fx.set_quotes([("EUR", "USD", 1.1)])
         >>> ctx = MarketContext().insert_fx(fx)
         >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
         >>> (round(converted.amount.amount, 6), converted.rate.triangulated)

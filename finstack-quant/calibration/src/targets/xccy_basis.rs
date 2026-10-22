@@ -417,7 +417,7 @@ mod xccy_quote_calibration_tests {
 
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("set fx");
         let fx = FxMatrix::new(provider);
 

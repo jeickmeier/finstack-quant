@@ -17,7 +17,7 @@ use wasm_bindgen::prelude::*;
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// const usd = new core.Currency("USD");
-/// usd.code;     // "USD"
+/// usd.toString();     // "USD"
 /// usd.numeric;  // 840
 /// usd.decimals; // 2
 /// ```
@@ -40,7 +40,7 @@ impl JsCurrency {
     /// @example
     /// ```javascript
     /// const eur = new core.Currency("eur"); // case-insensitive
-    /// eur.code; // "EUR"
+    /// eur.toString(); // "EUR"
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(code: JsValue) -> Result<JsCurrency, JsValue> {
@@ -68,14 +68,6 @@ impl JsCurrency {
             .map_err(to_js_err)
     }
 
-    /// Three-letter ISO-4217 alphabetic code.
-    ///
-    /// @returns The uppercase alphabetic code (e.g. `"USD"`).
-    #[wasm_bindgen(getter, js_name = code)]
-    pub fn code(&self) -> String {
-        self.inner.to_string()
-    }
-
     /// ISO-4217 numeric code.
     ///
     /// @returns Numeric code (e.g. `840` for USD, `978` for EUR).
@@ -92,7 +84,7 @@ impl JsCurrency {
         self.inner.decimals()
     }
 
-    /// Human-readable code (same as `code`).
+    /// Uppercase ISO-4217 alphabetic code.
     ///
     /// @returns The uppercase alphabetic ISO-4217 code.
     #[wasm_bindgen(js_name = toString)]
@@ -136,7 +128,6 @@ mod tests {
     #[test]
     fn construct_usd() {
         let c = currency("USD");
-        assert_eq!(c.code(), "USD");
         assert_eq!(c.to_string(), "USD");
         assert_eq!(c.decimals(), 2);
     }
@@ -150,14 +141,13 @@ mod tests {
     #[test]
     fn case_insensitive() {
         let c = currency("usd");
-        assert_eq!(c.code(), "USD");
+        assert_eq!(c.to_string(), "USD");
     }
 
     #[test]
     fn multiple_currencies() {
         for code in &["USD", "EUR", "GBP", "JPY", "CHF"] {
             let c = currency(code);
-            assert_eq!(c.code(), *code);
             assert_eq!(c.to_string(), *code);
         }
     }

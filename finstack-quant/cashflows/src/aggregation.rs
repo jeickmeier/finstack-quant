@@ -416,8 +416,8 @@ pub struct CalendarYearLadderRow {
 
 /// Group dated cashflows into a calendar-year non-principal / principal / PV ladder.
 ///
-/// Kind labels parse with `CFKind`'s `FromStr` (aliases `"coupon"` and `"principal"` included). Unknown labels are rejected rather
-/// than silently treated as interest. The `non_principal` column is every
+/// Kind labels use canonical `CFKind` names after trimming whitespace and
+/// ignoring ASCII case. Unknown labels are rejected rather than silently treated as interest. The `non_principal` column is every
 /// classified kind that is not [`CFKind::is_principal_like`] (interest, fees,
 /// recovery, accrued-on-default, …).
 ///
@@ -430,8 +430,8 @@ pub struct CalendarYearLadderRow {
 /// # Arguments
 ///
 /// * `dates` - Payment dates; the Gregorian year of each date is the bucket.
-/// * `kind_labels` - Cashflow kind labels (`"fixed"`, `"notional"`, `"coupon"`,
-///   `"principal"`, …). ASCII case is ignored; unknown labels error.
+/// * `kind_labels` - Canonical cashflow kind labels such as `"fixed"`, `"notional"`,
+///   or `"pre_payment"`. Surrounding whitespace and ASCII case are ignored; unknown labels error.
 /// * `amounts` - Signed finite cashflow amounts, one per date, in native currency units.
 /// * `pvs` - Finite present values, one per date, in the same units as `amounts`.
 ///
@@ -446,7 +446,7 @@ pub struct CalendarYearLadderRow {
 ///     Date::from_calendar_date(2027, Month::March, 15).expect("valid"),
 ///     Date::from_calendar_date(2034, Month::March, 15).expect("valid"),
 /// ];
-/// let rows = calendar_year_ladder(&dates, &["coupon", "principal"], &[100.0, 1000.0], &[90.0, 700.0])
+/// let rows = calendar_year_ladder(&dates, &["fixed", "notional"], &[100.0, 1000.0], &[90.0, 700.0])
 ///     .expect("ladder");
 /// assert_eq!(rows.first().map(|row| row.year), Some(2027));
 /// assert!((rows.last().expect("row").principal - 1000.0).abs() < 1e-12);
@@ -1790,9 +1790,9 @@ mod calendar_year_ladder_tests {
     }
 
     #[test]
-    fn calendar_year_ladder_splits_coupon_and_principal_by_year() {
+    fn calendar_year_ladder_splits_non_principal_and_principal_by_year() {
         let dates = [d(2027, 3, 15), d(2027, 9, 15), d(2034, 3, 15)];
-        let kinds = ["coupon", "fixed", "Notional"];
+        let kinds = [" fixed ", "FiXeD", "Notional"];
         let amounts = [212_500.0, 212_500.0, 10_000_000.0];
         let pvs = [208_000.0, 206_000.0, 7_100_000.0];
         let rows = calendar_year_ladder(&dates, &kinds, &amounts, &pvs).expect("ladder");
@@ -1814,12 +1814,14 @@ mod calendar_year_ladder_tests {
 
     #[test]
     fn calendar_year_ladder_rejects_unknown_kind() {
-        let err = calendar_year_ladder(&[d(2027, 1, 1)], &["redemption"], &[1.0], &[0.9])
-            .expect_err("unknown kind");
-        assert!(
-            err.to_string().contains("unknown cashflow kind"),
-            "unexpected error: {err}"
-        );
+        for label in ["redemption", "coupon", "principal"] {
+            let err = calendar_year_ladder(&[d(2027, 1, 1)], &[label], &[1.0], &[0.9])
+                .expect_err("unknown kind");
+            assert!(
+                err.to_string().contains("unknown cashflow kind"),
+                "unexpected error: {err}"
+            );
+        }
     }
 
     #[test]

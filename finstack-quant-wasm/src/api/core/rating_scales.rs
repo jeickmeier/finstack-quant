@@ -5,13 +5,87 @@
 //! as plain objects typed by the schema-generated types of the same names.
 
 use crate::api::core::config::JsFinstackConfig;
-use crate::utils::input::{from_js_json, js_string, json_text};
+use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::rating_scales::{
     embedded_registry as rust_embedded_registry, registry_from_config as rust_registry_from_config,
-    RatingScaleRegistry, UnknownScalePolicy, RATING_SCALES_EXTENSION_KEY,
+    RatingLevel, RatingScaleRegistry, ScorecardScale, UnknownScalePolicy,
+    RATING_SCALES_EXTENSION_KEY,
 };
 use wasm_bindgen::prelude::*;
+
+/// Construct a validated rating threshold row on the 0–100 scorecard scale.
+///
+/// # Arguments
+///
+/// * `name` - Nonblank rating label, retained verbatim (for example `"AAA"`).
+/// * `score` - Finite representative score in the inclusive range `[0, 100]`.
+/// * `min_score` - Finite minimum qualifying score in `[0, 100]`.
+///
+/// @returns A `RatingLevel` plain object with `name`, `score` and `min_score`.
+/// @throws `TypeError` (kind `invalid_type`) for a non-string name or non-number
+/// score; `FinstackError` (kind `validation`) for a blank name or invalid score.
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const level = core.ratingLevelTryNew("AAA", 95, 90);
+/// console.log(level.min_score); // 90
+/// ```
+#[wasm_bindgen(js_name = ratingLevelTryNew)]
+pub fn rating_level_try_new(
+    name: JsValue,
+    score: JsValue,
+    min_score: JsValue,
+) -> Result<JsValue, JsValue> {
+    to_js_value(
+        &RatingLevel::try_new(
+            js_string(&name, "name")?,
+            js_f64(&score, "score")?,
+            js_f64(&min_score, "minScore")?,
+        )
+        .map_err(to_js_err)?,
+    )
+}
+
+/// Construct a validated best-to-worst scorecard scale.
+///
+/// # Arguments
+///
+/// * `scale_name` - Display name stored verbatim and used in validation messages.
+/// * `description` - Optional description; pass `null` or `undefined` for none.
+/// * `ratings` - Nonempty array (or its JSON text) of `RatingLevel` objects;
+///   names must be unique and both score and minimum score must strictly descend.
+///
+/// @returns A `ScorecardScale` plain object preserving the supplied rating order.
+/// @throws `TypeError` (kind `invalid_type`) for mistyped string arguments;
+/// `FinstackError` (kind `validation`) for malformed, empty, duplicated, out-of-range
+/// or incorrectly ordered rating data. Description precedes ratings as in Rust.
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const scale = core.scorecardScaleTryNew("custom", undefined, [
+///   core.ratingLevelTryNew("A", 90, 85),
+///   core.ratingLevelTryNew("B", 70, 65),
+/// ]);
+/// console.log(scale.ratings.length); // 2
+/// ```
+#[wasm_bindgen(js_name = scorecardScaleTryNew)]
+pub fn scorecard_scale_try_new(
+    scale_name: JsValue,
+    description: JsValue,
+    ratings: JsValue,
+) -> Result<JsValue, JsValue> {
+    to_js_value(
+        &ScorecardScale::try_new(
+            js_string(&scale_name, "scaleName")?,
+            js_opt_string(Some(&description), "description")?,
+            from_js_json::<Vec<RatingLevel>>(&ratings, "ratings")?,
+        )
+        .map_err(to_js_err)?,
+    )
+}
 
 /// What a registry does when asked for a rating scale it does not know.
 ///
@@ -112,7 +186,7 @@ impl JsUnknownScalePolicy {
     }
 }
 
-/// Versioned registry of scorecard rating scales (S&P, Moody's, Fitch, …).
+/// Versioned registry of scorecard rating scales (canonical ids `sp` and `moodys`).
 ///
 /// Get one from `embeddedRegistry()`, `registryFromConfig(config)` or
 /// `RatingScaleRegistry.fromJson(json)`.
@@ -150,9 +224,9 @@ impl JsRatingScaleRegistry {
         self.inner.default_scale_id().to_string()
     }
 
-    /// Primary id of every registered scale, in registry order.
+    /// Canonical normalized id of every registered scale, in registry order.
     ///
-    /// @returns Scale ids; aliases are not listed.
+    /// @returns Canonical trimmed, ASCII-lowercase scale ids.
     #[wasm_bindgen(js_name = scaleIds)]
     pub fn scale_ids(&self) -> Vec<String> {
         self.inner
@@ -170,11 +244,11 @@ impl JsRatingScaleRegistry {
         JsUnknownScalePolicy::from_inner(self.inner.unknown_scale_policy())
     }
 
-    /// Whether a name is a registered scale id or alias.
+    /// Whether a name is a registered canonical id after trimming and ASCII case folding.
     ///
     /// # Arguments
     ///
-    /// * `name` - Scale id or alias to look up.
+    /// * `name` - Canonical id (`sp` or `moodys`); surrounding whitespace and ASCII case are ignored.
     ///
     /// @returns `true` when the registry knows the name.
     /// @throws `TypeError` if `name` is not a string.
@@ -183,12 +257,12 @@ impl JsRatingScaleRegistry {
         Ok(self.inner.is_known_rating_scale(&js_string(&name, "name")?))
     }
 
-    /// Resolve a scale by id or alias under the unknown-scale policy (Rust
+    /// Resolve a canonical scale id under the unknown-scale policy (Rust
     /// `RatingScaleRegistry::rating_scale`).
     ///
     /// # Arguments
     ///
-    /// * `name` - Scale id or alias; an unknown name returns the default
+    /// * `name` - Canonical id, ignoring surrounding whitespace and ASCII case; an unknown name returns the default
     ///   scale under a fallback policy.
     ///
     /// @returns A plain `ScorecardScale` object: `scale_name`, optional
@@ -219,8 +293,7 @@ impl JsRatingScaleRegistry {
     /// # Arguments
     ///
     /// * `json` - Registry JSON text or plain object, such as `toJson()`
-    ///   output. Validation enforces the schema version, unique scale ids and
-    ///   aliases, an existing default scale and in-range scores.
+    ///   output. Validation enforces the schema version, unique normalized scale ids, an existing default scale and in-range scores.
     ///
     /// @returns The validated `RatingScaleRegistry`.
     /// @throws `TypeError` if `json` is not a JSON string or plain object;

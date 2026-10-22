@@ -728,7 +728,7 @@ impl PyMarketContext {
 /// >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
 /// >>> from finstack_quant.core.money import Money
 /// >>> fx = FxMatrix()
-/// >>> fx.set_quote("EUR", "USD", 1.1)
+/// >>> fx.set_quotes([("EUR", "USD", 1.1)])
 /// >>> ctx = MarketContext().insert_fx(fx)
 /// >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
 /// >>> (round(converted.amount.amount, 6), converted.rate.triangulated)

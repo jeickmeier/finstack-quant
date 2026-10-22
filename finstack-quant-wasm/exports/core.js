@@ -111,6 +111,10 @@ function sifmaSettlementDate(month, year, settlementClass = undefined) {
 }
 
 export const core = {
+  toleranceConfigNew: wasm.toleranceConfigNew,
+  ratingLevelTryNew: wasm.ratingLevelTryNew,
+  scorecardScaleTryNew: wasm.scorecardScaleTryNew,
+  sabrParameterDataNew: wasm.sabrParameterDataNew,
   Currency: wasm.Currency,
   Money: wasm.Money,
   Rate: wasm.Rate,

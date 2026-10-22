@@ -108,7 +108,9 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
         .year_fraction(base, first_float.date, DayCountContext::default())
         .expect("valid payment year fraction");
     let reset_fixing = fwd.rate(reset_t);
-    let integrated_average = fwd.rate_period(reset_t, payment_t);
+    let integrated_average = fwd
+        .rate_period(reset_t, payment_t)
+        .expect("finite ordered period");
     let built_rate = first_float
         .rate
         .expect("floating coupon should store its rate");

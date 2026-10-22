@@ -36,7 +36,9 @@ fn build_discount_curve(id: &str, rate: f64) -> DiscountCurve {
 
 fn build_fx_matrix(base: Currency, quote: Currency, rate: f64) -> FxMatrix {
     let provider = Arc::new(SimpleFxProvider::new());
-    provider.set_quote(base, quote, rate).expect("valid rate");
+    provider
+        .set_quotes(&[(base, quote, rate)])
+        .expect("valid rate");
     FxMatrix::new(provider)
 }
 

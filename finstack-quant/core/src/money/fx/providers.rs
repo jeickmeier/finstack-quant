@@ -29,7 +29,7 @@ use std::sync::{Arc, RwLock};
 /// use time::Month;
 ///
 /// let provider = SimpleFxProvider::new();
-/// provider.set_quote(Currency::EUR, Currency::USD, 1.1).expect("valid rate");
+/// provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.1)]).expect("valid rate");
 ///
 /// let date = Date::from_calendar_date(2024, Month::January, 2).expect("Valid date");
 /// let rate = provider.rate(Currency::EUR, Currency::USD, date, FxConversionPolicy::CashflowDate).expect("FX rate lookup should succeed");
@@ -59,47 +59,21 @@ impl SimpleFxProvider {
         Self::default()
     }
 
-    /// Insert or update a single FX quote.
-    ///
-    /// # Parameters
-    /// - `from`: Base currency.
-    /// - `to`: Quote currency.
-    /// - `rate`: Units of `to` per one unit of `from` (for example, `1.25`
-    ///   for GBP/USD when `from` is GBP and `to` is USD).
-    ///
-    /// Replaces any existing direct quote for the same ordered pair. It does
-    /// not insert the reciprocal pair; reciprocal lookup is performed by the
-    /// [`FxProvider`] implementation at read time. Successful updates advance
-    /// the provider revision, invalidating observations in attached matrices
-    /// without removing their explicit quotes or pinned fixings.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `rate` is non-finite or not strictly positive. On
-    /// error the provider is unchanged.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::money::fx::SimpleFxProvider;
-    /// use finstack_quant_core::currency::Currency;
-    ///
-    /// let provider = SimpleFxProvider::new();
-    /// provider.set_quote(Currency::GBP, Currency::USD, 1.25);
-    /// ```
-    pub fn set_quote(&self, from: Currency, to: Currency, rate: f64) -> crate::Result<()> {
-        self.set_quotes(&[(from, to, rate)])
-    }
-
     /// Bulk insert or update FX quotes.
     ///
-    /// # Parameters
-    /// - `quotes`: Slice of `(from, to, rate)` tuples
+    /// # Arguments
+    ///
+    /// * `quotes` - Ordered `(from, to, rate)` tuples with the rate expressed
+    ///   as finite, positive units of `to` per unit of `from`.
     ///
     /// Each rate is units of `to` per unit of `from`. All inputs are validated
     /// before the provider acquires its write lock, so the operation is atomic
     /// with respect to the quote map: if any tuple is invalid, no tuple is
     /// written; otherwise readers observe the full batch together. Later
     /// duplicate pairs in the slice replace earlier entries in that batch.
+    /// Successful updates advance the provider revision, invalidating cached
+    /// observations in attached matrices without removing their explicit
+    /// quotes or pinned fixings.
     ///
     /// # Errors
     ///
@@ -115,7 +89,7 @@ impl SimpleFxProvider {
     /// provider.set_quotes(&[
     ///     (Currency::EUR, Currency::USD, 1.1),
     ///     (Currency::GBP, Currency::USD, 1.25),
-    /// ]);
+    /// ]).expect("valid quotes");
     /// ```
     pub fn set_quotes(&self, quotes: &[(Currency, Currency, f64)]) -> crate::Result<()> {
         let validated = quotes
@@ -179,7 +153,7 @@ impl FxProvider for SimpleFxProvider {
     ///
     /// # Snapshot Date and Policy
     ///
-    /// Quotes inserted through `set_quote` and `set_quotes` are constant across
+    /// Quotes inserted through `set_quotes` are constant across
     /// observation dates and policies. A restored market-context snapshot can
     /// also contain scoped provider quotes; those are checked first for their
     /// exact `on` date and `policy`. The store does not fetch or interpolate
@@ -206,7 +180,7 @@ impl FxProvider for SimpleFxProvider {
     /// use time::Month;
     ///
     /// let provider = SimpleFxProvider::new();
-    /// provider.set_quote(Currency::EUR, Currency::USD, 1.1).expect("valid rate");
+    /// provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.1)]).expect("valid rate");
     ///
     /// let date = Date::from_calendar_date(2024, Month::January, 2).expect("Valid date");
     /// let rate = provider.rate(Currency::EUR, Currency::USD, date, FxConversionPolicy::CashflowDate).expect("FX rate lookup should succeed");
@@ -504,10 +478,10 @@ mod tests {
     fn bumped_provider_applies_relative_bump() {
         let original = Arc::new(SimpleFxProvider::new());
         original
-            .set_quote(Currency::EUR, Currency::USD, 1.1)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .expect("valid test quote");
         original
-            .set_quote(Currency::GBP, Currency::USD, 1.25)
+            .set_quotes(&[(Currency::GBP, Currency::USD, 1.25)])
             .expect("valid test quote");
 
         // Create bumped provider that bumps EUR/USD by 1% (relative).

@@ -106,15 +106,18 @@ fn market_context_state_examples() -> Result<Vec<Value>> {
 /// A two-row table: one string dimension and one float measure.
 fn table_envelope_examples() -> Result<Vec<Value>> {
     use crate::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
-    let table = TableEnvelope::new(vec![
-        TableColumn::new(
-            "ticker",
-            TableColumnData::String(vec!["AAPL".to_string(), "MSFT".to_string()]),
-        )
-        .with_role(TableColumnRole::Dimension),
-        TableColumn::new("weight", TableColumnData::Float64(vec![0.6, 0.4]))
-            .with_role(TableColumnRole::Measure),
-    ])?;
+    let table = TableEnvelope::new(
+        vec![
+            TableColumn::new(
+                "ticker",
+                TableColumnData::String(vec!["AAPL".to_string(), "MSFT".to_string()]),
+            )
+            .with_role(TableColumnRole::Dimension),
+            TableColumn::new("weight", TableColumnData::Float64(vec![0.6, 0.4]))
+                .with_role(TableColumnRole::Measure),
+        ],
+        Default::default(),
+    )?;
     example(&table)
 }
 

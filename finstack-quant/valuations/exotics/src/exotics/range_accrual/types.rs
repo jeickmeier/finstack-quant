@@ -369,7 +369,6 @@ impl RangeAccrualTerms {
         validation::validate_f64_finite(self.lower_bound, "RangeAccrual lower_bound")?;
         validation::validate_f64_finite(self.upper_bound, "RangeAccrual upper_bound")?;
         validation::validate_f64_finite(self.coupon_rate, "RangeAccrual coupon_rate")?;
-        validation::validate_money_finite(self.notional, "RangeAccrual notional")?;
         validation::require_with(self.notional.amount() > 0.0, || {
             format!(
                 "RangeAccrual notional must be positive, got {}",

@@ -2,7 +2,6 @@
 
 use finstack_quant_core::types::{Bps, Rate};
 use proptest::prelude::*;
-use std::panic::catch_unwind;
 
 #[test]
 fn rate_conversions_roundtrip() {
@@ -24,18 +23,18 @@ fn rate_arithmetic_operations() {
     let r2 = Rate::from_percent(1.5).expect("valid rate fixture");
 
     // Addition
-    let sum = r1 + r2;
+    let sum = r1.checked_add(r2).expect("finite sum");
     assert!((sum.as_percent() - 4.5).abs() < 1e-10);
 
     // Subtraction
-    let diff = r1 - r2;
+    let diff = r1.checked_sub(r2).expect("finite difference");
     assert!((diff.as_percent() - 1.5).abs() < 1e-10);
 
     // Multiplication
-    let doubled = r1 * 2.0;
+    let doubled = r1.checked_mul(2.0).expect("finite product");
     assert!((doubled.as_percent() - 6.0).abs() < 1e-10);
 
-    let halved = r1 / 2.0;
+    let halved = r1.checked_div(2.0).expect("finite quotient");
     assert!((halved.as_percent() - 1.5).abs() < 1e-10);
 
     // Negation
@@ -106,11 +105,14 @@ fn bp_arithmetic_operations() {
     let b1 = Bps::new(100);
     let b2 = Bps::new(50);
 
-    assert_eq!(b1 + b2, Bps::new(150));
-    assert_eq!(b1 - b2, Bps::new(50));
-    assert_eq!(b1 * 3, Bps::new(300));
-    assert_eq!(b1 / 2, Bps::new(50));
-    assert_eq!(-b1, Bps::new(-100));
+    assert_eq!(b1.checked_add(b2).expect("integer sum"), Bps::new(150));
+    assert_eq!(
+        b1.checked_sub(b2).expect("integer difference"),
+        Bps::new(50)
+    );
+    assert_eq!(b1.checked_mul(3).expect("integer product"), Bps::new(300));
+    assert_eq!(b1.checked_div(2).expect("integer quotient"), Bps::new(50));
+    assert_eq!(b1.checked_neg().expect("integer negation"), Bps::new(-100));
 }
 
 #[test]
@@ -169,30 +171,15 @@ fn non_finite_constructors_reject_input() {
 }
 
 #[test]
-fn non_finite_rate_arithmetic_panics() {
-    let rate = Rate::from_percent(3.0).expect("valid rate fixture");
-
-    assert!(catch_unwind(|| {
-        let _ = rate * f64::NAN;
-    })
-    .is_err());
-    assert!(catch_unwind(|| {
-        let large = Rate::from_decimal(f64::MAX).expect("finite rate");
-        let _ = large + large;
-    })
-    .is_err());
-    assert!(catch_unwind(|| {
-        let _ = rate / 0.0;
-    })
-    .is_err());
-}
-
-#[test]
 fn checked_rate_arithmetic_rejects_non_finite_results() {
     let rate = Rate::from_percent(3.0).expect("valid rate fixture");
 
     assert!(rate.checked_mul(f64::NAN).is_err());
     assert!(rate.checked_div(0.0).is_err());
+    let largest = Rate::from_decimal(f64::MAX).expect("finite rate");
+    assert!(largest.checked_add(largest).is_err());
+    assert!(largest.checked_mul(2.0).is_err());
+    assert!(largest.checked_sub(-largest).is_err());
     assert_eq!(
         rate.checked_add(Rate::from_percent(2.0).expect("valid rate fixture"))
             .unwrap()
@@ -216,19 +203,10 @@ fn checked_bps_arithmetic_rejects_integer_overflow_and_zero_division() {
     assert!(Bps::new(i32::MAX).checked_add(Bps::new(1)).is_err());
     assert!(Bps::new(i32::MIN).checked_neg().is_err());
     assert!(Bps::new(10).checked_div(0).is_err());
+    assert!(Bps::new(i32::MIN).checked_div(-1).is_err());
+    assert!(Bps::new(i32::MIN).checked_sub(Bps::new(1)).is_err());
+    assert!(Bps::new(i32::MAX).checked_mul(2).is_err());
     assert_eq!(Bps::new(10).checked_mul(3).unwrap(), Bps::new(30));
-    assert!(catch_unwind(|| {
-        let _ = Bps::new(i32::MAX) + Bps::new(1);
-    })
-    .is_err());
-    assert!(catch_unwind(|| {
-        let _ = -Bps::new(i32::MIN);
-    })
-    .is_err());
-    assert!(catch_unwind(|| {
-        let _ = Bps::new(10) / 0;
-    })
-    .is_err());
 }
 
 #[test]

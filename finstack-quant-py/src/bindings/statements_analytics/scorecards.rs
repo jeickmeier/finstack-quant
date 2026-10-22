@@ -149,8 +149,8 @@ wire_methods!(
 ///
 /// Parameters
 /// ----------
-/// rating_scale : str
-///     Rating scale identifier (e.g. ``"S&P"``, ``"Moody's"``, ``"Fitch"``).
+/// rating_scale : str | None
+///     Canonical id (``"sp"`` or ``"moodys"``); None uses the Rust default (``"sp"``).
 /// metrics : list[ScorecardMetric]
 ///     Scorecard metrics to evaluate.
 /// min_rating : str | None
@@ -172,16 +172,19 @@ pub struct PyScorecardConfig {
 #[pymethods]
 impl PyScorecardConfig {
     #[new]
-    #[pyo3(signature = (rating_scale="S&P", metrics=Vec::new(), min_rating=None, period=None))]
+    #[pyo3(signature = (rating_scale=None, metrics=Vec::new(), min_rating=None, period=None))]
     fn new(
-        rating_scale: &str,
+        rating_scale: Option<&str>,
         metrics: Vec<PyScorecardMetric>,
         min_rating: Option<&str>,
         period: Option<&str>,
     ) -> Self {
         Self {
             inner: rust_scorecards::ScorecardConfig {
-                rating_scale: rating_scale.to_string(),
+                rating_scale: rating_scale.map_or_else(
+                    || rust_scorecards::ScorecardConfig::default().rating_scale,
+                    str::to_string,
+                ),
                 metrics: metrics.into_iter().map(|m| m.inner).collect(),
                 min_rating: min_rating.map(str::to_string),
                 period: period.map(str::to_string),
@@ -189,7 +192,7 @@ impl PyScorecardConfig {
         }
     }
 
-    /// Rating scale identifier (e.g. ``"S&P"``, ``"Moody's"``, ``"Fitch"``).
+    /// Canonical rating-scale identifier (``"sp"`` or ``"moodys"``).
     #[getter]
     fn rating_scale(&self) -> &str {
         &self.inner.rating_scale

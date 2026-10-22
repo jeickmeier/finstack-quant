@@ -117,7 +117,7 @@ pub fn build_flat_vol_surface(vol: f64, vol_surface_id: &str) -> VolSurface {
 pub fn create_fx_matrix(eur_usd_rate: f64) -> FxMatrix {
     let provider = Arc::new(SimpleFxProvider::new());
     provider
-        .set_quote(BASE, QUOTE, eur_usd_rate)
+        .set_quotes(&[(BASE, QUOTE, eur_usd_rate)])
         .expect("valid rate");
     FxMatrix::new(provider)
 }
@@ -249,6 +249,7 @@ pub fn finite_diff_delta(
             option.base_currency,
             option.quote_currency,
             as_of,
+            Default::default(),
         ))?
         .rate;
 
@@ -282,6 +283,7 @@ pub fn finite_diff_gamma(
             option.base_currency,
             option.quote_currency,
             as_of,
+            Default::default(),
         ))?
         .rate;
 

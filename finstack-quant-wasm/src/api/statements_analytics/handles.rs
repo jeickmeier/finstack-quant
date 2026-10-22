@@ -255,7 +255,7 @@ impl JsCorkscrewExtension {
 /// const model = builder.build();
 /// const results = new statements.Evaluator().evaluate(model);
 /// const extension = new statements_analytics.CreditScorecardExtension({
-///   rating_scale: "S&P",
+///   rating_scale: "sp",
 ///   metrics: [{ name: "leverage", formula: "debt / ebitda", weight: 1.0, thresholds: { AAA: [0, 1], BBB: [1, 4] } }],
 /// });
 /// extension.execute(model, results).status;

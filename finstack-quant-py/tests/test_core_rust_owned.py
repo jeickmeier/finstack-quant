@@ -175,13 +175,22 @@ def test_realized_variance_defaults_are_rust_owned() -> None:
     assert stats.realized_variance_ohlc(o, h, lo, c) == stats.realized_variance_ohlc(o, h, lo, c, "yang_zhang", 252.0)
 
 
-def test_fx_forward_trade_date_convention_defaults_in_rust_and_accepts_short_codes() -> None:
+def test_fx_forward_trade_date_convention_defaults_in_rust_and_normalizes_names() -> None:
     args = ("F", "EUR", "USD", dt.date(2024, 1, 15), "3M", 1_000_000.0, "USD-OIS", "EUR-OIS")
     default = FxForward.from_trade_date(*args)
     assert default.maturity == dt.date(2024, 4, 17)
-    for name in ["MF", "modified_following"]:
+    for name in [" MODIFIED_FOLLOWING ", "modified_following"]:
         assert FxForward.from_trade_date(*args, business_day_convention=name).maturity == default.maturity
     with pytest.raises(
         ValueError, match="invalid business_day_convention: Validation error: Unknown business day convention"
     ):
         FxForward.from_trade_date(*args, business_day_convention="bogus")
+
+
+def test_currency_has_one_alphabetic_string_surface() -> None:
+    from finstack_quant.core.currency import Currency
+
+    currency = Currency("usd")
+    assert str(currency) == "USD"
+    assert currency.numeric == 840
+    assert not hasattr(currency, "code")

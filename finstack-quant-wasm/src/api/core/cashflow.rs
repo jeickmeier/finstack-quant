@@ -12,8 +12,8 @@ use wasm_bindgen::prelude::*;
 
 /// Parse a cashflow kind label into its `CFKind` wire string.
 ///
-/// Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
-/// ignored, plus the aliases `"coupon"` and `"principal"`.
+/// Parsed by Rust `CFKind::from_str`: the canonical snake_case wire string,
+/// ignoring surrounding whitespace and ASCII case.
 ///
 /// @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
 /// @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
@@ -77,7 +77,7 @@ pub fn cash_flow_get_balance_date(flow: JsValue) -> Result<String, JsValue> {
 /// Check a cashflow's invariants.
 ///
 /// @param flow - `CashFlow` wire object.
-/// @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
+/// @throws If `flow` is not a `CashFlow`, its accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
 #[wasm_bindgen(js_name = cashFlowValidate)]
 pub fn cash_flow_validate(flow: JsValue) -> Result<(), JsValue> {
     js_wire::<CashFlow>(&flow, "flow")?

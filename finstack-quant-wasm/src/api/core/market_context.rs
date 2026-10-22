@@ -204,7 +204,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `fx` - FX matrix to attach; it replaces any matrix already attached
-    ///   and is shared, so later `setQuote` calls on it are visible here.
+    ///   and is shared, so later `setQuotes` calls on it are visible here.
     ///
     /// @returns This context, updated in place, so calls can be chained.
     #[wasm_bindgen(js_name = insertFx)]
@@ -694,7 +694,7 @@ impl JsMarketContext {
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// const fx = new core.FxMatrix();
-/// fx.setQuote("EUR", "USD", 1.1);
+/// fx.setQuotes([["EUR", "USD", 1.1]]);
 /// const market = new core.MarketContext();
 /// market.insertFx(fx);
 /// const usd = new core.Currency("USD");

@@ -57,7 +57,7 @@ use std::num::NonZeroU32;
 ///
 /// ```text
 /// DF = e^(-r_cc × t)                    [Continuous]
-///    = (1 + r_ann)^(-t)                 [Annual]
+///    = (1 + r_ann)^(-t)                 [Periodic(1)]
 ///    = (1 + r_per/n)^(-n×t)             [Periodic(n)]
 ///    = 1 / (1 + r_simple × t)           [Simple]
 /// ```
@@ -79,15 +79,10 @@ pub enum Compounding {
     /// properties (additive over time).
     Continuous,
 
-    /// Annual compounding: r = DF^(-1/t) - 1
-    ///
-    /// Standard for many bond markets, particularly UK gilts and
-    /// European government bonds. Also common for Bloomberg zero rate display.
-    Annual,
-
     /// Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)
     ///
     /// Common values:
+    /// - n=1: Annual (UK gilts, European government bonds and annual zero rates)
     /// - n=2: Semi-annual (US Treasury, corporate bonds)
     /// - n=4: Quarterly (some FRNs)
     /// - n=12: Monthly (rare, some retail products)
@@ -137,12 +132,10 @@ impl Compounding {
     /// Returns the number of compounding periods per year, if applicable.
     ///
     /// - `Periodic(n)` returns `Some(n)`
-    /// - `Annual` returns `Some(1)` (equivalent to `Periodic(1)`)
     /// - `Continuous` and `Simple` return `None`
     #[must_use]
     pub fn periods_per_year(&self) -> Option<u32> {
         match self {
-            Compounding::Annual => Some(1),
             Compounding::Periodic(n) => Some(n.get()),
             Compounding::Continuous | Compounding::Simple => None,
         }
@@ -177,7 +170,6 @@ impl Compounding {
             // ln_1p formulations: (1 + r)^(-t) = exp(-t·ln(1+r)). Forming
             // 1 + r explicitly rounds away rates below ~1e-16; ln_1p keeps
             // full precision for small rates.
-            Compounding::Annual => (-t * rate.ln_1p()).exp(),
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
                 (-n * t * (rate / n).ln_1p()).exp()
@@ -227,7 +219,6 @@ impl Compounding {
             // exp_m1 formulations avoid cancellation when the exponent is
             // small (DF near 1 and/or short tenors): exp(x) - 1 loses all
             // significant digits for |x| ≲ 1e-8 while exp_m1 is exact.
-            Compounding::Annual => (-df.ln() / t).exp_m1(),
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
                 n * (-df.ln() / (n * t)).exp_m1()
@@ -251,7 +242,6 @@ impl Compounding {
     fn instantaneous_rate(&self, rate: f64) -> f64 {
         match self {
             Compounding::Continuous | Compounding::Simple => rate,
-            Compounding::Annual => rate.ln_1p(),
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
                 n * (rate / n).ln_1p()
@@ -274,7 +264,6 @@ impl Compounding {
     fn rate_from_instantaneous(&self, c: f64) -> f64 {
         match self {
             Compounding::Continuous | Compounding::Simple => c,
-            Compounding::Annual => c.exp_m1(),
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
                 n * (c / n).exp_m1()
@@ -324,7 +313,7 @@ impl Compounding {
     pub fn continuous_spread_shift(&self, continuous_rate: f64, spread: f64) -> f64 {
         match self {
             Compounding::Continuous | Compounding::Simple => spread,
-            _ => {
+            Compounding::Periodic(_) => {
                 self.instantaneous_rate(self.rate_from_instantaneous(continuous_rate) + spread)
                     - continuous_rate
             }
@@ -371,7 +360,6 @@ impl std::str::FromStr for Compounding {
         match s {
             "continuous" => Ok(Self::Continuous),
             "simple" => Ok(Self::Simple),
-            "annual" => Ok(Self::Annual),
             "semi_annual" => Ok(Self::SEMI_ANNUAL),
             "quarterly" => Ok(Self::QUARTERLY),
             "monthly" => Ok(Self::MONTHLY),
@@ -383,7 +371,7 @@ impl std::str::FromStr for Compounding {
                 .ok_or_else(|| {
                     crate::Error::Validation(format!(
                         "unknown compounding {other:?}; expected one of continuous, simple, \
-                         annual, semi_annual, quarterly, monthly or periodic(n)"
+                         semi_annual, quarterly, monthly or periodic(n)"
                     ))
                 }),
         }
@@ -401,7 +389,6 @@ impl std::fmt::Display for Compounding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Compounding::Continuous => write!(f, "continuous"),
-            Compounding::Annual => write!(f, "annual"),
             Compounding::Periodic(n) => match n.get() {
                 2 => write!(f, "semi_annual"),
                 4 => write!(f, "quarterly"),
@@ -488,7 +475,10 @@ mod tests {
     #[test]
     fn test_periods_per_year() {
         assert_eq!(Compounding::Continuous.periods_per_year(), None);
-        assert_eq!(Compounding::Annual.periods_per_year(), Some(1));
+        assert_eq!(
+            Compounding::Periodic(std::num::NonZeroU32::MIN).periods_per_year(),
+            Some(1)
+        );
         assert_eq!(Compounding::SEMI_ANNUAL.periods_per_year(), Some(2));
         assert_eq!(Compounding::QUARTERLY.periods_per_year(), Some(4));
         assert_eq!(Compounding::MONTHLY.periods_per_year(), Some(12));
@@ -503,7 +493,10 @@ mod tests {
     #[test]
     fn test_display() {
         assert_eq!(format!("{}", Compounding::Continuous), "continuous");
-        assert_eq!(format!("{}", Compounding::Annual), "annual");
+        assert_eq!(
+            format!("{}", Compounding::Periodic(std::num::NonZeroU32::MIN)),
+            "periodic(1)"
+        );
         assert_eq!(format!("{}", Compounding::SEMI_ANNUAL), "semi_annual");
         assert_eq!(format!("{}", Compounding::QUARTERLY), "quarterly");
         assert_eq!(format!("{}", Compounding::MONTHLY), "monthly");
@@ -511,10 +504,40 @@ mod tests {
     }
 
     #[test]
+    fn annual_uses_only_the_periodic_one_representation() {
+        let annual = Compounding::Periodic(NonZeroU32::MIN);
+        assert_eq!(
+            "periodic(1)"
+                .parse::<Compounding>()
+                .expect("canonical label"),
+            annual
+        );
+        assert!("annual".parse::<Compounding>().is_err());
+        assert!(serde_json::from_str::<Compounding>(r#""annual""#).is_err());
+        assert_eq!(
+            serde_json::to_string(&annual).expect("serialize"),
+            r#"{"periodic":1}"#
+        );
+        for rate in [-0.5_f64, -1e-12, 0.0, 1e-12, 0.05, 1.5] {
+            for time in [0.25, 1.0, 10.0] {
+                let df = annual.df_from_rate(rate, time);
+                assert!((df - (-time * rate.ln_1p()).exp()).abs() <= 1e-13 * df.max(1.0));
+                assert!((annual.rate_from_df(df, time) - rate).abs() < 1e-12);
+            }
+            let continuous = annual.convert_rate(rate, 0.0, &Compounding::Continuous);
+            assert!((continuous - rate.ln_1p()).abs() < 1e-14);
+            assert!(
+                (Compounding::Continuous.convert_rate(continuous, 0.0, &annual) - rate).abs()
+                    < 1e-12
+            );
+        }
+    }
+
+    #[test]
     fn test_serde_roundtrip() {
         let variants = [
             Compounding::Continuous,
-            Compounding::Annual,
+            Compounding::Periodic(std::num::NonZeroU32::MIN),
             Compounding::SEMI_ANNUAL,
             Compounding::Simple,
         ];
@@ -532,7 +555,7 @@ mod tests {
     fn all_conventions() -> Vec<Compounding> {
         vec![
             Compounding::Continuous,
-            Compounding::Annual,
+            Compounding::Periodic(std::num::NonZeroU32::MIN),
             Compounding::SEMI_ANNUAL,
             Compounding::QUARTERLY,
             Compounding::MONTHLY,
@@ -612,7 +635,7 @@ mod tests {
 
     #[test]
     fn test_known_value_annual_5pct_1y() {
-        let df = Compounding::Annual.df_from_rate(0.05, 1.0);
+        let df = Compounding::Periodic(std::num::NonZeroU32::MIN).df_from_rate(0.05, 1.0);
         let expected = 1.0 / 1.05; // ≈ 0.952380952380952
         assert!(
             (df - expected).abs() < TOL,
@@ -686,14 +709,22 @@ mod tests {
         let t = 0.0;
 
         // continuous → annual: e^r − 1
-        let result = Compounding::Continuous.convert_rate(rate, t, &Compounding::Annual);
+        let result = Compounding::Continuous.convert_rate(
+            rate,
+            t,
+            &Compounding::Periodic(std::num::NonZeroU32::MIN),
+        );
         assert!(
             (result - rate.exp_m1()).abs() < 1e-15,
             "continuous→annual at t=0 should be e^r - 1, got {result}"
         );
 
         // annual → continuous: ln(1 + r)
-        let result = Compounding::Annual.convert_rate(rate, t, &Compounding::Continuous);
+        let result = Compounding::Periodic(std::num::NonZeroU32::MIN).convert_rate(
+            rate,
+            t,
+            &Compounding::Continuous,
+        );
         assert!(
             (result - rate.ln_1p()).abs() < 1e-15,
             "annual→continuous at t=0 should be ln(1+r), got {result}"
@@ -714,8 +745,16 @@ mod tests {
         // The tiny-tenor path itself loses ~ε/(r·t) relative precision in
         // ln(DF), so the comparison tolerance is looser than the exact-limit
         // assertions above.
-        let at_tiny_t = Compounding::Continuous.convert_rate(rate, 1e-9, &Compounding::Annual);
-        let at_zero = Compounding::Continuous.convert_rate(rate, 0.0, &Compounding::Annual);
+        let at_tiny_t = Compounding::Continuous.convert_rate(
+            rate,
+            1e-9,
+            &Compounding::Periodic(std::num::NonZeroU32::MIN),
+        );
+        let at_zero = Compounding::Continuous.convert_rate(
+            rate,
+            0.0,
+            &Compounding::Periodic(std::num::NonZeroU32::MIN),
+        );
         assert!(
             (at_tiny_t - at_zero).abs() < 1e-7,
             "t=0 limit {at_zero} should match tiny-tenor conversion {at_tiny_t}"
@@ -786,7 +825,7 @@ mod tests {
         let df = 0.90;
         let t = 2.0;
         let r_cont = Compounding::Continuous.rate_from_df(df, t);
-        let r_ann = Compounding::Annual.rate_from_df(df, t);
+        let r_ann = Compounding::Periodic(std::num::NonZeroU32::MIN).rate_from_df(df, t);
         let r_simple = Compounding::Simple.rate_from_df(df, t);
 
         assert!(
@@ -822,7 +861,7 @@ mod tests {
         let t = 2.0;
         let r_cont = Compounding::Continuous.rate_from_df(df, t);
         let r_semi = Compounding::SEMI_ANNUAL.rate_from_df(df, t);
-        let r_ann = Compounding::Annual.rate_from_df(df, t);
+        let r_ann = Compounding::Periodic(std::num::NonZeroU32::MIN).rate_from_df(df, t);
 
         assert!(
             r_ann > r_semi,
@@ -859,7 +898,7 @@ mod tests {
         let variants = [
             Compounding::Continuous,
             Compounding::Simple,
-            Compounding::Annual,
+            Compounding::Periodic(std::num::NonZeroU32::MIN),
             Compounding::SEMI_ANNUAL,
             Compounding::QUARTERLY,
             Compounding::MONTHLY,

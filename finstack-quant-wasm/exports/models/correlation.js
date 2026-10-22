@@ -13,7 +13,6 @@ export const correlation = {
   LatentTwoFactor: wasm.LatentTwoFactor,
   LatentMultiFactor: wasm.LatentMultiFactor,
   correlationBounds: wasm.correlationBounds,
-  jointProbabilities: wasm.jointProbabilities,
   validateCorrelationMatrix: wasm.validateCorrelationMatrix,
   nearestCorrelation: wasm.nearestCorrelation,
   choleskyCorrelation: wasm.choleskyCorrelation,

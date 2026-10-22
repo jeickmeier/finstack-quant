@@ -95,16 +95,16 @@ from finstack_quant.valuations.instruments import price_instrument
 from _shared.analyst_book import book_spec, build_book, build_market, instruments
 AS_OF = date(2025, 1, 15)
 
-cash = Money(Decimal('0.1'), 'USD') + Money(Decimal('0.2'), 'USD')
+cash = Money.from_decimal(Decimal('0.1'), 'USD') + Money.from_decimal(Decimal('0.2'), 'USD')
 mixed_currency_error = None
 try:
-    cash + Money(Decimal('0.3'), 'EUR')
+    cash + Money.from_decimal(Decimal('0.3'), 'EUR')
 except ValueError as error:
     mixed_currency_error = str(error)
 print('Mixed-currency addition rejected:', mixed_currency_error)
 fx = FxMatrix()
-fx.set_quote(Currency('EUR'), Currency('USD'), 1.08)
-fx.set_quote(Currency('USD'), Currency('JPY'), 150.0)
+fx.set_quotes([(Currency('EUR'), Currency('USD'), 1.08)])
+fx.set_quotes([(Currency('USD'), Currency('JPY'), 150.0)])
 cross = fx.rate('EUR', 'JPY', AS_OF)
 config = FinstackConfig(rounding_mode=RoundingMode.BANKERS)
 market = build_market('foundations')
@@ -164,8 +164,8 @@ from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import FxMatrix, fx_pip_size, invert_fx_rate
 AS_OF = date(2025, 1, 15)
 crosses=FxMatrix()
-crosses.set_quote(Currency('EUR'),Currency('USD'),1.08)
-crosses.set_quote(Currency('USD'),Currency('JPY'),150.0)
+crosses.set_quotes([(Currency('EUR'),Currency('USD'),1.08)])
+crosses.set_quotes([(Currency('USD'),Currency('JPY'),150.0)])
 eur_jpy=crosses.rate('EUR','JPY',AS_OF).rate
 print({'JPY_per_EUR':eur_jpy,'JPY_pip':fx_pip_size('EUR','JPY'),'EUR_per_JPY':invert_fx_rate(eur_jpy)})
 ```
@@ -185,7 +185,7 @@ from decimal import Decimal
 from finstack_quant.core.money import Money
 binary_total=0.0
 for _ in range(10000):binary_total += 0.01
-decimal_total=sum((Money(Decimal('0.01'),'USD') for _ in range(10000)),Money(0,'USD'))
+decimal_total=sum((Money.from_decimal(Decimal('0.01'),'USD') for _ in range(10000)),Money(0,'USD'))
 print({'binary_total':repr(binary_total),'binary_residual':binary_total-100.0,'money_total':str(decimal_total.amount_decimal)})
 ```
 {/* /notebook-block */}
@@ -214,7 +214,7 @@ gbp.update(position_id='GBP-CASH',instrument_id='GBP-CASH')
 gbp['instrument_spec']['spec'].update(id='GBP-CASH',notional={'amount':'100000','currency':'GBP'},discount_curve_id='GBP-OIS')
 extended['positions'].append(gbp)
 gbp_market=build_market('foundations').insert(DiscountCurve.flat('GBP-OIS',AS_OF,0.04))
-quotes=FxMatrix();quotes.set_quote(Currency('EUR'),Currency('USD'),1.08);quotes.set_quote(Currency('GBP'),Currency('USD'),1.25)
+quotes=FxMatrix();quotes.set_quotes([(Currency('EUR'),Currency('USD'),1.08)]);quotes.set_quotes([(Currency('GBP'),Currency('USD'),1.25)])
 gbp_market.insert_fx(quotes)
 valuation=value_portfolio(Portfolio.from_spec(json.dumps(extended)),gbp_market,metrics=[])
 wire=json.loads(valuation.to_json());holding=wire['position_values']['GBP-CASH']

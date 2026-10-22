@@ -21,7 +21,7 @@ fn test_fx_shock() {
     // Setup FX provider
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::EUR, Currency::USD, 1.1)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("valid rate");
 
     let fx_matrix = FxMatrix::new(fx_provider);
@@ -62,8 +62,12 @@ fn test_fx_shock() {
 
     // Verify shocked FX rate
     let fx = market.fx().unwrap();
-    let query =
-        finstack_quant_core::money::fx::FxQuery::new(Currency::EUR, Currency::USD, base_date);
+    let query = finstack_quant_core::money::fx::FxQuery::new(
+        Currency::EUR,
+        Currency::USD,
+        base_date,
+        Default::default(),
+    );
     let rate = fx.rate(query).unwrap().rate;
 
     let expected = 1.1 * 1.1; // 10% increase
@@ -79,10 +83,10 @@ fn test_fx_shock() {
 fn test_fx_shock_preserves_other_quotes() {
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::EUR, Currency::USD, 1.1)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("valid rate");
     fx_provider
-        .set_quote(Currency::GBP, Currency::USD, 1.25)
+        .set_quotes(&[(Currency::GBP, Currency::USD, 1.25)])
         .expect("valid rate");
 
     let fx_matrix = FxMatrix::new(fx_provider);
@@ -117,8 +121,12 @@ fn test_fx_shock_preserves_other_quotes() {
     engine.apply(&scenario, &mut ctx).unwrap();
 
     let fx = market.fx().unwrap();
-    let gbp_query =
-        finstack_quant_core::money::fx::FxQuery::new(Currency::GBP, Currency::USD, base_date);
+    let gbp_query = finstack_quant_core::money::fx::FxQuery::new(
+        Currency::GBP,
+        Currency::USD,
+        base_date,
+        Default::default(),
+    );
     let gbp_rate = fx.rate(gbp_query).unwrap().rate;
     assert!(
         (gbp_rate - 1.25).abs() < 1e-6,

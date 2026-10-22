@@ -13660,9 +13660,8 @@ export type BoundsType = "absolute" | "relative_to_initial_spot";
  *
  * `Display`, `FromStr`, and serde share one snake_case label per kind
  * (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
- * case-insensitive and also accepts the reporting aliases `"coupon"`
- * ([`CFKind::Fixed`]) and `"principal"` ([`CFKind::Notional`]); serde
- * accepts only the canonical label.
+ * case-insensitive and ignores surrounding whitespace; serde accepts only
+ * the canonical label.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "CFKind".
@@ -15753,7 +15752,7 @@ export type D_4Ac4Dad3Ab3A5D25D3F9 = "error" | "clamp" | "linear_in_variance";
  *
  * ```text
  * DF = e^(-r_cc × t)                    [Continuous]
- *    = (1 + r_ann)^(-t)                 [Annual]
+ *    = (1 + r_ann)^(-t)                 [Periodic(1)]
  *    = (1 + r_per/n)^(-n×t)             [Periodic(n)]
  *    = 1 / (1 + r_simple × t)           [Simple]
  * ```
@@ -15770,7 +15769,6 @@ export type D_4Ac4Dad3Ab3A5D25D3F9 = "error" | "clamp" | "linear_in_variance";
  */
 export type D_5C13Df5A55F1Da604Df2 =
   | "continuous"
-  | "annual"
   | {
       periodic: number;
     }
@@ -17592,7 +17590,6 @@ export interface D_572Ad1Befb7D94914652 {
    */
   oas_quote_compounding?:
     | "continuous"
-    | "annual"
     | {
         periodic: number;
       }
@@ -58607,7 +58604,6 @@ export interface D_572Ad1Befb7D949146521 {
    */
   oas_quote_compounding?:
     | "continuous"
-    | "annual"
     | {
         periodic: number;
       }

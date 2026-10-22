@@ -96,6 +96,7 @@ pub(crate) fn collect_fx_forward_inputs(
                 request.base_currency,
                 request.quote_currency,
                 request.as_of,
+                Default::default(),
             ))?
             .rate
     };
@@ -200,7 +201,12 @@ pub(crate) fn resolve_fx_spot(
         None => {
             market
                 .fx_required()?
-                .rate(FxQuery::new(base_currency, quote_currency, as_of))?
+                .rate(FxQuery::new(
+                    base_currency,
+                    quote_currency,
+                    as_of,
+                    Default::default(),
+                ))?
                 .rate
         }
     };
@@ -445,8 +451,13 @@ pub(crate) fn fx_valuation_details(
         market
             .fx()
             .and_then(|fx| {
-                fx.rate(FxQuery::new(base_currency, quote_currency, as_of))
-                    .ok()
+                fx.rate(FxQuery::new(
+                    base_currency,
+                    quote_currency,
+                    as_of,
+                    Default::default(),
+                ))
+                .ok()
             })
             .map(|q| q.triangulated)
     };
@@ -546,7 +557,7 @@ mod tests {
             .expect("valid vol");
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.1)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .expect("valid rate");
         let fx = FxMatrix::new(provider);
         MarketContext::new()

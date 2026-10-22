@@ -259,7 +259,7 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawDiscountCurve) -> crate::Result<Self> {
-        let mut curve = DiscountCurve::builder(state.id)
+        let mut builder = DiscountCurve::builder(state.id)
             .base_date(state.base)
             .day_count(state.day_count)
             .calendar_id_opt(state.calendar_id)
@@ -272,12 +272,9 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
             .validation(ValidationMode::Raw {
                 allow_non_monotonic: state.allow_non_monotonic,
                 forward_floor: state.min_forward_rate,
-            })
-            .build()?;
-        if let Some(transform) = state.transform {
-            curve.restore_transform(transform)?;
-        }
-        Ok(curve)
+            });
+        builder.transform = state.transform;
+        builder.build()
     }
 }
 

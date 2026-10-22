@@ -49,13 +49,13 @@ class TestFxErrors:
         """Zero FX rate should raise."""
         fx = FxMatrix()
         with pytest.raises(Exception, match=r"(?i)(positive|rate|invalid input parameter)"):
-            fx.set_quote(Currency("EUR"), Currency("USD"), 0.0)
+            fx.set_quotes([(Currency("EUR"), Currency("USD"), 0.0)])
 
     def test_negative_rate(self) -> None:
         """Negative FX rate should raise."""
         fx = FxMatrix()
         with pytest.raises(Exception, match=r"(?i)(positive|rate|invalid input parameter|negative)"):
-            fx.set_quote(Currency("EUR"), Currency("USD"), -1.0)
+            fx.set_quotes([(Currency("EUR"), Currency("USD"), -1.0)])
 
     def test_missing_pair(self) -> None:
         """Looking up an unset pair should raise."""

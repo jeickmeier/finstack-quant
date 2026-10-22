@@ -462,7 +462,7 @@ CASES: dict[str, Callable[[], Any]] = {
         AmortizationSpec.custom_principal([(dt.date(2026, 1, 15), usd(250_000))]),
     ]),
     "specs.coupon_fee_floating": _coupon_fee_floating,
-    "specs.notional": lambda: [wire(Notional.par(1_000_000.005, "USD")), Notional.par(5, "JPY").currency().code],
+    "specs.notional": lambda: [wire(Notional.par(1_000_000.005, "USD")), str(Notional.par(5, "JPY").currency())],
     "specs.default_model": _default_models,
     "specs.prepayment_model": _prepayment_models,
     "specs.recovery_model": _recovery_models,

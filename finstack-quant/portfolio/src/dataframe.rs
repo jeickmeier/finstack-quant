@@ -85,7 +85,7 @@ pub fn positions_to_table(valuation: &PortfolioValuation) -> Result<TableEnvelop
         risk_errors.push(position_value.risk_error.clone());
     }
 
-    TableEnvelope::new_with_metadata(
+    TableEnvelope::new(
         vec![
             TableColumn::new("position_id", TableColumnData::String(position_ids))
                 .with_role(TableColumnRole::Dimension),
@@ -147,7 +147,7 @@ pub fn metrics_to_table(metrics: &PortfolioMetrics) -> Result<TableEnvelope> {
         }
     }
 
-    TableEnvelope::new_with_metadata(
+    TableEnvelope::new(
         vec![
             TableColumn::new("metric_id", TableColumnData::String(metric_ids))
                 .with_role(TableColumnRole::Dimension),
@@ -188,7 +188,7 @@ pub fn aggregated_metrics_to_table(metrics: &PortfolioMetrics) -> Result<TableEn
         totals.push(agg_metric.total);
     }
 
-    TableEnvelope::new_with_metadata(
+    TableEnvelope::new(
         vec![
             TableColumn::new("metric_id", TableColumnData::String(metric_ids))
                 .with_role(TableColumnRole::Dimension),

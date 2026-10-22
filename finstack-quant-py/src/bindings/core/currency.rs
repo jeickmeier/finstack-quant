@@ -50,12 +50,6 @@ impl PyCurrency {
             .map_err(crate::errors::core_to_py)
     }
 
-    /// Three-letter ISO-4217 code (uppercase).
-    #[getter]
-    fn code(&self) -> String {
-        self.inner.to_string()
-    }
-
     /// ISO-4217 numeric identifier.
     #[getter]
     fn numeric(&self) -> u16 {

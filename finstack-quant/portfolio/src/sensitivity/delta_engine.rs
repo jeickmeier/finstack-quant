@@ -448,7 +448,7 @@ mod tests {
                 }
                 MockKind::FxCross { base, quote } => Ok(market
                     .fx_required()?
-                    .rate(FxQuery::new(*base, *quote, as_of))?
+                    .rate(FxQuery::new(*base, *quote, as_of, Default::default()))?
                     .rate
                     * self.scale),
                 MockKind::NonFiniteRaw => Ok(f64::NAN),

@@ -35,7 +35,6 @@ __all__ = [
     "TrancheLossStatistics",
     "cholesky_correlation",
     "correlation_bounds",
-    "joint_probabilities",
     "nearest_correlation",
     "simulate_portfolio_loss",
     "validate_correlation_matrix",
@@ -2724,40 +2723,6 @@ def correlation_bounds(p1: float, p2: float) -> tuple[float, float]:
     >>> from finstack_quant.models.correlation import correlation_bounds
     >>> tuple(round(value, 3) for value in correlation_bounds(0.05, 0.03))
     (-0.04, 0.767)
-
-    """
-    ...
-
-def joint_probabilities(p1: float, p2: float, correlation: float) -> tuple[float, float, float, float]:
-    """
-    Joint probabilities for two correlated Bernoulli variables.
-
-    Parameters
-    ----------
-    p1 : float
-        Marginal probability of event 1.
-    p2 : float
-        Marginal probability of event 2.
-    correlation : float
-        Desired correlation.
-
-    Returns
-    -------
-    tuple[float, float, float, float]
-        ``(p11, p10, p01, p00)`` that sums to 1 and preserves marginals.
-
-    Raises
-    ------
-    ValueError
-        If either marginal is not finite and in ``[0, 1]`` or correlation is
-        not finite and in ``[-1, 1]``.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.correlation import joint_probabilities
-    >>> probabilities = joint_probabilities(0.05, 0.03, 0.3)
-    >>> (round(probabilities[0], 6), round(sum(probabilities), 6))
-    (0.012654, 1.0)
 
     """
     ...

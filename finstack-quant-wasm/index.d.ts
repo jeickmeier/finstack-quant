@@ -96,6 +96,7 @@ import type {
   MarketScalar,
   PeriodPlan,
   RateCalibrationRecipe,
+  RatingLevel,
   SabrParameterData,
   ScheduleSpec,
   ScheduleWarning,
@@ -887,18 +888,12 @@ interface FactorModel extends WasmOwned {}
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const usd = new core.Currency("USD");
- * usd.code;     // "USD"
+ * usd.toString();     // "USD"
  * usd.numeric;  // 840
  * usd.decimals; // 2
  * ```
  */
 export interface Currency extends WasmOwned {
-  /**
-   * Three-letter ISO-4217 alphabetic code.
-   *
-   * @returns The uppercase alphabetic code (e.g. `"USD"`).
-   */
-  readonly code: string;
   /**
    * ISO-4217 numeric code.
    *
@@ -912,7 +907,7 @@ export interface Currency extends WasmOwned {
    */
   readonly decimals: number;
   /**
-   * Human-readable code (same as `code`).
+   * Uppercase ISO-4217 alphabetic code.
    *
    * @returns The uppercase alphabetic ISO-4217 code.
    */
@@ -938,7 +933,7 @@ export interface Currency extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const usd = new core.Currency("USD");
- * usd.code;     // "USD"
+ * usd.toString();     // "USD"
  * usd.numeric;  // 840
  * usd.decimals; // 2
  * ```
@@ -950,7 +945,7 @@ export interface CurrencyConstructor {
    * @example
    * ```javascript
    * const eur = new core.Currency("eur"); // case-insensitive
-   * eur.code; // "EUR"
+   * eur.toString(); // "EUR"
    * ```
    * @param code - Three-letter ISO-4217 code (e.g. `"USD"`, `"eur"`, `"GBP"`). Case-insensitive; surrounding whitespace is not trimmed.
    * @returns Constructed `Currency`.
@@ -2114,7 +2109,7 @@ export interface MoneyConstructor {
    * const usd = new core.Currency("USD");
    * const m = new core.Money(1234.56, usd);
    * m.amount;          // 1234.56
-   * m.currency.code;   // "USD"
+   * m.currency.toString();   // "USD"
    * ```
    * @param amount - Numeric amount in major units (must be finite).
    * @param currency - ISO-4217 Currency object that tags the amount and controls arithmetic compatibility.
@@ -2581,7 +2576,7 @@ export interface DayCountConstructor {
    *
    * @param name - Canonical snake_case convention name, for example `"act_360"`, `"30_360"` or `"act_act"` (see the class list).
    * @returns The matching `DayCount`.
-   * @throws `TypeError` if `name` is not a string; `FinstackError` (kind `validation`) if no convention matches. Case, spaces, `/` and `-` are normalised, so term-sheet spellings such as `"ACT/360"` or `"Act/Act ICMA"` are accepted.
+   * @throws `TypeError` if `name` is not a string; `FinstackError` (kind `validation`) if no convention matches. Canonical names ignore surrounding whitespace and ASCII case; other spellings are rejected.
    */
   fromName(name: string): DayCount;
   /**
@@ -3090,7 +3085,7 @@ export interface DiscountCurve extends WasmOwned {
    * (Rust `DiscountCurve::zero_rate` / `DiscountCurve::zero_rate_on_date`).
    *
    * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
-   * @param compounding - `"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
+   * @param compounding - `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
    * @returns The zero rate as a decimal; `0` at `t = 0`.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a malformed date, an unknown compounding, or a year fraction that cannot be computed.
    */
@@ -3168,7 +3163,7 @@ export interface DiscountCurveConstructor {
    * @param id - Curve identifier stored on the curve.
    * @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
    * @param points - Flat `[t0, z0, t1, z1, …]` array: times in years and zero rates as decimals (`0.05` is 5%), with strictly increasing times.
-   * @param compounding - Compounding of the zero rates: `"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
+   * @param compounding - Compounding of the zero rates: `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
    * @returns Curve whose discount factors reproduce every zero rate.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an empty or odd-length `points`, a malformed date, an unknown compounding, or discount factors the curve validation rejects.
    */
@@ -3549,11 +3544,15 @@ export interface ForwardCurve extends WasmOwned {
    */
   toJson(): string;
   /**
-   * Simple forward rate over `[t1, t2]` implied by the curve (Rust `rate_period`).
+   * Integral-average forward rate over `[t1, t2]` on the curve day-count basis.
+   *
+   * Equal endpoints and intervals no longer than `1e-12` years return the
+   * start rate. Negative finite times retain the curve's extrapolation policy.
    *
    * @param t1 - Start of the accrual period in years from `baseDate`.
    * @param t2 - End of the accrual period in years from `baseDate`.
-   * @returns The average forward over the period as a decimal.
+   * @returns The finite period-average rate as a decimal; equal or very short intervals return the start rate.
+   * @throws If endpoints are non-finite or reversed, or the interval or result is non-finite.
    */
   ratePeriod(t1: number, t2: number): number;
   /**
@@ -3867,7 +3866,7 @@ export interface FxRateResult extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const matrix = new core.FxMatrix();
- * matrix.setQuote("EUR", "USD", 1.1);
+ * matrix.setQuotes([["EUR", "USD", 1.1]]);
  * const result = matrix.rate(
  *   "EUR",
  *   "USD",
@@ -3924,7 +3923,7 @@ export interface ConvertedMoney extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const fx = new core.FxMatrix();
- * fx.setQuote("EUR", "USD", 1.1);
+ * fx.setQuotes([["EUR", "USD", 1.1]]);
  * const market = new core.MarketContext();
  * market.insertFx(fx);
  * const usd = new core.Currency("USD");
@@ -3952,15 +3951,6 @@ export interface ConvertedMoneyConstructor {
  */
 export interface FxMatrix extends WasmOwned {
   /**
-   * Set an explicit FX quote.
-   *
-   * @param base - Base (from) currency ISO code.
-   * @param quote - Quote (to) currency ISO code.
-   * @param rate - Conversion rate.
-   * @throws Error - Throws a JavaScript exception if either currency code is invalid or `rate` is non-finite or not strictly positive.
-   */
-  setQuote(base: string, quote: string, rate: number): void;
-  /**
    * Set an authoritative quote scoped to one date and conversion policy.
    * @param base - Base currency code of the FX quote, where the rate is quote per base.
    * @param quote - Quote currency code of the FX rate, expressed per unit of base currency.
@@ -3980,7 +3970,7 @@ export interface FxMatrix extends WasmOwned {
    * Look up an FX rate.
    * Global quotes precede pinned fixings, then provider observations,
    * resolving source priority before taking a reciprocal. An omitted `policy`
-   * runs the Rust default query (`FxQuery::new`, cashflow-date policy).
+   * uses `FxConversionPolicy::default()` (cashflow-date policy).
    *
    * @returns Resolved FX rate, including whether it was triangulated.
    * @param base - Base (from) currency ISO code.
@@ -4006,7 +3996,7 @@ export interface FxMatrix extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const matrix = new core.FxMatrix();
- * matrix.setQuote("EUR", "USD", 1.1);
+ * matrix.setQuotes([["EUR", "USD", 1.1]]);
  * console.log(matrix.rate("EUR", "USD", "2026-01-02").rate);
  * ```
  */
@@ -4121,7 +4111,7 @@ export interface FxPairConvention extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const conv = core.fxPairConvention("USD", "EUR");
- * conv.base.code;          // "EUR"
+ * conv.base.toString();          // "EUR"
  * conv.usdQuotation.toString(); // "direct"
  * conv.pipSize;            // 0.0001
  * conv.settlementDays;     // 2
@@ -4307,7 +4297,7 @@ export interface MarketContext extends WasmOwned {
   /**
    * Attach the FX matrix used for currency conversion (Rust `MarketContext::insert_fx_mut`).
    *
-   * @param fx - FX matrix to attach; it replaces any matrix already attached and is shared, so later `setQuote` calls on it are visible here.
+   * @param fx - FX matrix to attach; it replaces any matrix already attached and is shared, so later `setQuotes` calls on it are visible here.
    * @returns This context, updated in place, so calls can be chained.
    */
   insertFx(fx: FxMatrix): MarketContext;
@@ -5703,7 +5693,7 @@ export interface UnknownScalePolicyConstructor {
 }
 
 /**
- * Versioned registry of scorecard rating scales (S&P, Moody's, Fitch, …).
+ * Versioned registry of scorecard rating scales (canonical ids `sp` and `moodys`).
  *
  * Get one from `embeddedRegistry()`, `registryFromConfig(config)` or
  * `RatingScaleRegistry.fromJson(json)`.
@@ -5731,9 +5721,9 @@ export interface RatingScaleRegistry extends WasmOwned {
    */
   defaultScaleId(): string;
   /**
-   * Primary id of every registered scale, in registry order.
+   * Canonical normalized id of every registered scale, in registry order.
    *
-   * @returns Scale ids; aliases are not listed.
+   * @returns Canonical trimmed, ASCII-lowercase scale ids.
    */
   scaleIds(): string[];
   /**
@@ -5743,18 +5733,18 @@ export interface RatingScaleRegistry extends WasmOwned {
    */
   unknownScalePolicy(): UnknownScalePolicy;
   /**
-   * Whether a name is a registered scale id or alias.
+   * Whether a name is a registered canonical id after trimming and ASCII case folding.
    *
-   * @param name - Scale id or alias to look up.
+   * @param name - Canonical id (`sp` or `moodys`); surrounding whitespace and ASCII case are ignored.
    * @returns `true` when the registry knows the name.
    * @throws `TypeError` if `name` is not a string.
    */
   isKnownRatingScale(name: string): boolean;
   /**
-   * Resolve a scale by id or alias under the unknown-scale policy (Rust
+   * Resolve a canonical scale id under the unknown-scale policy (Rust
    * `RatingScaleRegistry::rating_scale`).
    *
-   * @param name - Scale id or alias; an unknown name returns the default scale under a fallback policy.
+   * @param name - Canonical id, ignoring surrounding whitespace and ASCII case; an unknown name returns the default scale under a fallback policy.
    * @returns A plain `ScorecardScale` object: `scale_name`, optional `description` and `ratings` ordered best to worst, each with `name`, `score` and `min_score` on the 0–100 scale.
    * @throws `TypeError` if `name` is not a string; `FinstackError` if the name is unknown and the policy is `error`.
    */
@@ -5769,7 +5759,7 @@ export interface RatingScaleRegistry extends WasmOwned {
 }
 
 /**
- * Versioned registry of scorecard rating scales (S&P, Moody's, Fitch, …).
+ * Versioned registry of scorecard rating scales (canonical ids `sp` and `moodys`).
  *
  * Get one from `embeddedRegistry()`, `registryFromConfig(config)` or
  * `RatingScaleRegistry.fromJson(json)`.
@@ -5791,7 +5781,7 @@ export interface RatingScaleRegistryConstructor {
   /**
    * Deserialize and validate a registry (Rust `RatingScaleRegistry::from_json`).
    *
-   * @param json - Registry JSON text or plain object, such as `toJson()` output. Validation enforces the schema version, unique scale ids and aliases, an existing default scale and in-range scores.
+   * @param json - Registry JSON text or plain object, such as `toJson()` output. Validation enforces the schema version, unique normalized scale ids, an existing default scale and in-range scores.
    * @returns The validated `RatingScaleRegistry`.
    * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it is malformed or fails validation.
    */
@@ -7617,6 +7607,83 @@ export interface WorkspaceSchemaNamespace {
  */
 export interface CoreNamespace {
   /**
+   * Construct validated absolute comparison tolerances using Rust defaults.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const tolerance = core.toleranceConfigNew();
+   * console.log(tolerance.generic_epsilon); // 1e-10
+   * ```
+   * @param genericEpsilon - Optional finite, strictly positive absolute tolerance; `null` or omission uses `ToleranceConfig::default()` (currently `1e-10`).
+   * @returns A `ToleranceConfig` plain object with `generic_epsilon`.
+   * @throws `TypeError` (kind `invalid_type`) for a supplied non-number; `FinstackError` (kind `validation`) for zero, negative or non-finite values.
+   */
+  toleranceConfigNew(genericEpsilon?: number | null): ToleranceConfig;
+  /**
+   * Construct a validated rating threshold row on the 0–100 scorecard scale.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const level = core.ratingLevelTryNew("AAA", 95, 90);
+   * console.log(level.min_score); // 90
+   * ```
+   * @param name - Nonblank rating label, retained verbatim (for example `"AAA"`).
+   * @param score - Finite representative score in the inclusive range `[0, 100]`.
+   * @param minScore - Finite minimum qualifying score in `[0, 100]`.
+   * @returns A `RatingLevel` plain object with `name`, `score` and `min_score`.
+   * @throws `TypeError` (kind `invalid_type`) for a non-string name or non-number score; `FinstackError` (kind `validation`) for a blank name or invalid score.
+   */
+  ratingLevelTryNew(name: string, score: number, minScore: number): RatingLevel;
+  /**
+   * Construct a validated best-to-worst scorecard scale.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const scale = core.scorecardScaleTryNew("custom", undefined, [
+   *   core.ratingLevelTryNew("A", 90, 85),
+   *   core.ratingLevelTryNew("B", 70, 65),
+   * ]);
+   * console.log(scale.ratings.length); // 2
+   * ```
+   * @param scaleName - Display name stored verbatim and used in validation messages.
+   * @param description - Optional description; pass `null` or `undefined` for none.
+   * @param ratings - Nonempty array (or its JSON text) of `RatingLevel` objects; names must be unique and both score and minimum score must strictly descend.
+   * @returns A `ScorecardScale` plain object preserving the supplied rating order.
+   * @throws `TypeError` (kind `invalid_type`) for mistyped string arguments; `FinstackError` (kind `validation`) for malformed, empty, duplicated, out-of-range or incorrectly ordered rating data. Description precedes ratings as in Rust.
+   */
+  scorecardScaleTryNew(
+    scaleName: string,
+    description: string | null | undefined,
+    ratings: ReadonlyArray<RatingLevel> | string
+  ): ScorecardScale;
+  /**
+   * Construct validated SABR parameter data for a volatility-cube node.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const node = core.sabrParameterDataNew(0.2, 1, 0, -0.5);
+   * console.log(node.nu); // 0
+   * ```
+   * @param alpha - Finite, strictly positive initial volatility scale.
+   * @param beta - Finite CEV elasticity in the inclusive range `[0, 1]`.
+   * @param nu - Finite, nonnegative volatility of volatility; zero is deterministic.
+   * @param rho - Finite forward-volatility correlation strictly between `-1` and `1`.
+   * @param shift - Optional finite displacement in forward/strike units; `null` or omission records an unshifted node, and finite negative shifts are allowed.
+   * @returns A `SabrParameterData` plain object; an absent shift is omitted.
+   * @throws `TypeError` (kind `invalid_type`) for a non-number argument; `FinstackError` (kind `validation`) for a non-finite or out-of-range parameter.
+   */
+  sabrParameterDataNew(
+    alpha: number,
+    beta: number,
+    nu: number,
+    rho: number,
+    shift?: number | null
+  ): SabrParameterData;
+  /**
    * Registry of the JSON Schemas this crate publishes (`index` / `get` / `validate`).
    */
   schema: SchemaRegistryNamespace;
@@ -8475,8 +8542,8 @@ export interface CoreNamespace {
   /**
    * Parse a cashflow kind label into its `CFKind` wire string.
    *
-   * Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
-   * ignored, plus the aliases `"coupon"` and `"principal"`.
+   * Parsed by Rust `CFKind::from_str`: the canonical snake_case wire string,
+   * ignoring surrounding whitespace and ASCII case.
    *
    * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
    * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
@@ -8530,7 +8597,7 @@ export interface CoreNamespace {
    * Check a cashflow's invariants.
    *
    * @param flow - `CashFlow` wire object.
-   * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
+   * @throws If `flow` is not a `CashFlow`, its accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
    */
   cashFlowValidate(flow: generated.cashflows.CashFlow): void;
 }
@@ -10961,17 +11028,6 @@ export interface CorrelationNamespace {
    * @throws Error - Throws a JavaScript exception if either marginal probability is non-finite or outside `[0, 1]`.
    */
   correlationBounds(p1: number, p2: number): Float64Array;
-  /**
-   * Joint probabilities for two correlated Bernoulli variables.
-   *
-   * Returns `[p11, p10, p01, p00]`.
-   * @returns Joint probabilities `[p11, p10, p01, p00]` for the two correlated Bernoullis.
-   * @param p1 - First marginal default probability from 0 through 1.
-   * @param p2 - Second marginal default probability from 0 through 1.
-   * @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
-   * @throws Error - Throws a JavaScript exception if either marginal probability is non-finite or outside `[0, 1]`, or `correlation` is non-finite or outside `[-1, 1]`.
-   */
-  jointProbabilities(p1: number, p2: number, correlation: number): Float64Array;
   /**
    * Validate a flat row-major correlation matrix.
    *
@@ -14106,7 +14162,7 @@ export interface CashflowsNamespace {
    * The four arrays are parallel: entry `i` of each describes flow `i`.
    *
    * @param dates - ISO-8601 flow dates; the calendar year of each date is its bucket.
-   * @param kinds - Cashflow kind labels as Rust displays them (`"fixed"`, `"notional"`, `"pre_payment"`; also `"coupon"` and `"principal"`), ASCII case ignored; principal-like kinds go to `principal`, all others to `non_principal`.
+   * @param kinds - Canonical cashflow kind labels (`"fixed"`, `"notional"`, `"pre_payment"`), with surrounding whitespace and ASCII case ignored; principal-like kinds go to `principal`, all others to `non_principal`.
    * @param amounts - Flow amounts in one currency's units.
    * @param pvs - Present value of each flow, in the same units as `amounts`.
    * @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
@@ -32507,7 +32563,7 @@ export interface CorkscrewExtensionConstructor {
  * const model = builder.build();
  * const results = new statements.Evaluator().evaluate(model);
  * const extension = new statements_analytics.CreditScorecardExtension({
- * rating_scale: "S&P",
+ * rating_scale: "sp",
  * metrics: [{ name: "leverage", formula: "debt / ebitda", weight: 1.0, thresholds: { AAA: [0, 1], BBB: [1, 4] } }],
  * });
  * extension.execute(model, results).status;
@@ -32558,7 +32614,7 @@ export interface CreditScorecardExtension extends WasmOwned {
  * const model = builder.build();
  * const results = new statements.Evaluator().evaluate(model);
  * const extension = new statements_analytics.CreditScorecardExtension({
- * rating_scale: "S&P",
+ * rating_scale: "sp",
  * metrics: [{ name: "leverage", formula: "debt / ebitda", weight: 1.0, thresholds: { AAA: [0, 1], BBB: [1, 4] } }],
  * });
  * extension.execute(model, results).status;

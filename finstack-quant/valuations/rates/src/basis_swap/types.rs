@@ -220,7 +220,6 @@ impl BasisSwap {
     /// This is required for Serde-backed Rust/Python/WASM construction, which
     /// does not pass through [`BasisSwap::new`].
     pub fn validate(&self) -> Result<()> {
-        validation::validate_money_finite(self.notional, "BasisSwap notional")?;
         validation::validate_money_gt(self.notional, 0.0, "BasisSwap notional")?;
         if self.primary_leg.start >= self.primary_leg.end {
             return Err(finstack_quant_core::Error::Validation(format!(

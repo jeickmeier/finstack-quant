@@ -14737,7 +14737,7 @@ class FxForward:
     --------
     >>> from finstack_quant.valuations.instruments import FxForward
     >>> fwd = FxForward.example()
-    >>> (fwd.base_currency.code, fwd.quote_currency.code, fwd.contract_rate)
+    >>> (str(fwd.base_currency), str(fwd.quote_currency), fwd.contract_rate)
     ('EUR', 'USD', 1.12)
     """
 
@@ -15102,8 +15102,8 @@ class FxForward:
             :meth:`FxForward.standard_settlement_days` for the pair.
         business_day_convention : BusinessDayConvention | str | None
             Roll rule applied to the maturity: a ``BusinessDayConvention`` or a
-            name accepted by ``adjust`` (serde names or ``MF``/``F``/``P``/``MP``
-            short codes). ``None`` selects the Rust ``FxForward::from_trade_date``
+            canonical name accepted by ``adjust``, ignoring surrounding whitespace
+            and ASCII case. ``None`` selects the Rust ``FxForward::from_trade_date``
             default, Modified Following.
         end_of_month : bool, default False
             Apply the FX end-of-month rule when spot falls on month end.
@@ -28378,8 +28378,8 @@ def list_standard_metrics() -> list[str]:
     --------
     >>> from finstack_quant.valuations.instruments import list_standard_metrics
     >>> metrics = list_standard_metrics()
-    >>> (len(metrics), "dirty_price" in metrics, "dv01" in metrics)
-    (222, True, True)
+    >>> ("dirty_price" in metrics, "dv01" in metrics)
+    (True, True)
     """
     ...
 
@@ -32103,7 +32103,7 @@ class EnhancedMonteCarloResult:
     >>> as_of = datetime.date(2024, 1, 15)
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
     >>> result = facility.price_with_paths(market, as_of)
-    >>> (result.num_simulated_paths, len(result.path_pvs), result.pv.currency.code)
+    >>> (result.num_simulated_paths, len(result.path_pvs), str(result.pv.currency))
     (16, 16, 'USD')
     >>> list(result.to_dataframe().columns)
     ['path', 'pv', 'draw_option_cost']

@@ -1592,7 +1592,7 @@ impl PyNotional {
     /// Examples
     /// --------
     /// >>> from finstack_quant.cashflows.builder import Notional
-    /// >>> Notional.par(1_000_000.0, "USD").currency().code
+    /// >>> str(Notional.par(1_000_000.0, "USD").currency())
     /// 'USD'
     #[pyo3(text_signature = "(self)")]
     fn currency(&self, py: Python<'_>) -> PyResult<Py<PyCurrency>> {

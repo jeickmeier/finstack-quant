@@ -373,7 +373,7 @@ replay_calibrated=calibrate(replay_calibration).market
 replay_market.insert(replay_calibrated.get_discount("USD-OIS"))
 replay_market.insert(replay_calibrated.get_hazard("ACME-HZD"))
 replay_market.insert_price("SPX-SPOT",5200*equity_ratio,"USD")
-fx=FxMatrix();fx.set_quote(Currency("EUR"),Currency("USD"),1.08*fx_ratio);replay_market.insert_fx(fx)
+fx=FxMatrix();fx.set_quotes([(Currency("EUR"),Currency("USD"),1.08*fx_ratio)]);replay_market.insert_fx(fx)
 index_calibration=tracks.credit_calibration_envelope()
 for quote in index_calibration["market_data"]:
     if quote["kind"]=="rate_quote":quote["rate"]+=rate_change
@@ -581,7 +581,7 @@ for day in dates:
     dated.insert(common_market.get_discount("USD-OIS"))
     dated.insert(common_market.get_hazard("ACME-HZD"))
     dated.insert_price("SPX-SPOT",quotes["spx"],"USD")
-    fx=FxMatrix();fx.set_quote(Currency("EUR"),Currency("USD"),quotes["eur_usd"]);dated.insert_fx(fx)
+    fx=FxMatrix();fx.set_quotes([(Currency("EUR"),Currency("USD"),quotes["eur_usd"])]);dated.insert_fx(fx)
     index_calibration=tracks.credit_calibration_envelope(day)
     for quote in index_calibration["market_data"]:
         if quote["kind"]=="rate_quote":quote["rate"]+=quotes["rate_shift"]
@@ -984,7 +984,7 @@ replay_calibrated=calibrate(replay_calibration).market
 replay_market.insert(replay_calibrated.get_discount("USD-OIS"))
 replay_market.insert(replay_calibrated.get_hazard("ACME-HZD"))
 replay_market.insert_price("SPX-SPOT",5200*equity_ratio,"USD")
-fx=FxMatrix();fx.set_quote(Currency("EUR"),Currency("USD"),1.08*fx_ratio);replay_market.insert_fx(fx)
+fx=FxMatrix();fx.set_quotes([(Currency("EUR"),Currency("USD"),1.08*fx_ratio)]);replay_market.insert_fx(fx)
 replay_market.insert_price("SPX",5200*equity_ratio,"USD")
 replay_market.insert(DiscountCurve("USD-TREASURY",AS_OF,
     [(t,math.exp(-(.04+rate_change)*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
@@ -1197,7 +1197,7 @@ for day in dates:
     dated.insert(common_market.get_discount("USD-OIS"))
     dated.insert(common_market.get_hazard("ACME-HZD"))
     dated.insert_price("SPX-SPOT",quotes["spx"],"USD")
-    fx=FxMatrix();fx.set_quote(Currency("EUR"),Currency("USD"),quotes["eur_usd"]);dated.insert_fx(fx)
+    fx=FxMatrix();fx.set_quotes([(Currency("EUR"),Currency("USD"),quotes["eur_usd"])]);dated.insert_fx(fx)
     dated.insert_price("SPX",quotes["spx"],"USD")
     # Supply each realized close available on this valuation date, without look-ahead.
     observed_days=[AS_OF+timedelta(days=i) for i in range((day-AS_OF).days+1)]

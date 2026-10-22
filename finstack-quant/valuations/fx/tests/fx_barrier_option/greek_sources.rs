@@ -32,7 +32,7 @@ fn as_of() -> finstack_quant_core::dates::Date {
 fn fx_matrix(spot: f64) -> FxMatrix {
     let provider = Arc::new(SimpleFxProvider::new());
     provider
-        .set_quote(Currency::EUR, Currency::USD, spot)
+        .set_quotes(&[(Currency::EUR, Currency::USD, spot)])
         .expect("fx quote");
     FxMatrix::new(provider)
 }

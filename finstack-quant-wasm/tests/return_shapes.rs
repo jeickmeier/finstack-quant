@@ -348,7 +348,7 @@ fn numeric_vector_exports_declare_float64array() {
     let dts = index_dts();
     for (owner, export) in [
         ("CorrelationNamespace", "correlationBounds"),
-        ("CorrelationNamespace", "jointProbabilities"),
+        ("CorrelatedBernoulli", "jointProbabilities"),
         ("CorrelationNamespace", "nearestCorrelation"),
         ("SabrSmile", "generateSmile"),
     ] {

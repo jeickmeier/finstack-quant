@@ -49,10 +49,10 @@ fn create_market() -> MarketContext {
 
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::EUR, Currency::USD, 1.10)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .unwrap();
     fx_provider
-        .set_quote(Currency::CNY, Currency::USD, 7.25)
+        .set_quotes(&[(Currency::CNY, Currency::USD, 7.25)])
         .unwrap();
     let fx_matrix = FxMatrix::new(fx_provider);
 

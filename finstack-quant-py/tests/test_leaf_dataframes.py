@@ -355,7 +355,7 @@ def test_lme_analysis_to_dataframe_nulls_leverage_without_ebitda() -> None:
 
 def test_fx_rate_result_to_dataframe_is_one_row() -> None:
     matrix = FxMatrix()
-    matrix.set_quote("EUR", "USD", 1.1)
+    matrix.set_quotes([("EUR", "USD", 1.1)])
     result = matrix.rate("EUR", "USD", datetime.date(2025, 1, 1))
     df = result.to_dataframe()
     assert isinstance(df, pd.DataFrame)

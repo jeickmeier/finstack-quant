@@ -704,6 +704,11 @@
     0.0,
     0
   ],
+  "rating_level_try_new": {
+    "min_score": 90.0,
+    "name": "AAA",
+    "score": 95.0
+  },
   "rating_registry": {
     "default_scale_id": "sp",
     "default_score": 50.0,
@@ -832,6 +837,21 @@
       "moodys"
     ]
   },
+  "sabr_parameter_data_new": [
+    {
+      "alpha": 0.2,
+      "beta": 1.0,
+      "nu": 0.0,
+      "rho": -0.5
+    },
+    {
+      "alpha": 0.2,
+      "beta": 0.5,
+      "nu": 0.4,
+      "rho": -0.3,
+      "shift": -0.01
+    }
+  ],
   "scalar_time_series": {
     "currency": null,
     "id": "SOFR-FIXINGS",
@@ -882,6 +902,22 @@
     "2025-10-17",
     "2026-01-20"
   ],
+  "scorecard_scale_try_new": {
+    "description": "fixture",
+    "ratings": [
+      {
+        "min_score": 85.0,
+        "name": "A",
+        "score": 90.0
+      },
+      {
+        "min_score": 65.0,
+        "name": "B",
+        "score": 70.0
+      }
+    ],
+    "scale_name": "custom"
+  },
   "sifma_settlement_date": "2027-03-11",
   "sifma_settlement_date_class_b": "2026-01-20",
   "sifma_settlement_date_uncovered": null,
@@ -909,6 +945,14 @@
   ],
   "third_friday": "2025-03-21",
   "third_wednesday": "2025-03-19",
+  "tolerance_config_new": [
+    {
+      "generic_epsilon": 1e-10
+    },
+    {
+      "generic_epsilon": 1e-08
+    }
+  ],
   "vol_cube_expiry_slice": {
     "expiry": 1.0,
     "id": "USD-SWAPTION-1Y",

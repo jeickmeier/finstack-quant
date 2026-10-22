@@ -215,7 +215,7 @@ impl TrancheCashflows {
                 TableColumnData::Float64(by_date.values().map(|row| row[index]).collect()),
             ));
         }
-        TableEnvelope::new(columns)
+        TableEnvelope::new(columns, Default::default())
     }
 }
 

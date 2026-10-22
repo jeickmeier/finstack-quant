@@ -728,7 +728,7 @@ impl DependencyProbeInstrument {
         };
         let rate = market
             .fx_required()?
-            .rate(FxQuery::new(base, quote, as_of))?
+            .rate(FxQuery::new(base, quote, as_of, Default::default()))?
             .rate;
         Ok(
             Money::new(self.value.amount() * rate, self.value.currency())

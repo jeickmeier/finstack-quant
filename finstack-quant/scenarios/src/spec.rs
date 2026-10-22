@@ -648,7 +648,7 @@ pub enum OperationSpec {
     ///         node_id: "InterestExpense".into(),
     ///         curve_id: "USD-OIS".into(),
     ///         tenor: "1Y".into(),
-    ///         compounding: Compounding::Annual,
+    ///         compounding: Compounding::Periodic(std::num::NonZeroU32::MIN),
     ///         day_count: None,
     ///     },
     /// };
@@ -1650,7 +1650,7 @@ mod tests {
                     node_id: "Rate".into(),
                     curve_id: "USD-OIS".into(),
                     tenor: "1Y".into(),
-                    compounding: Compounding::Annual,
+                    compounding: Compounding::Periodic(std::num::NonZeroU32::MIN),
                     day_count: None,
                 },
             },

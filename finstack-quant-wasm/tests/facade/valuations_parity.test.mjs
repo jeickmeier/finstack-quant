@@ -94,14 +94,14 @@ const methodNames = (cls) =>
 function sameAsSpec(value, expected, label) {
   if (value instanceof core.Money) {
     close(value.amount, Number(expected.amount), TIGHT, label);
-    assert.equal(value.currency.code, expected.currency, label);
+    assert.equal(value.currency.toString(), expected.currency, label);
   } else if (value instanceof core.Tenor) {
     const designator = { days: 'D', weeks: 'W', months: 'M', years: 'Y' }[expected.unit];
     assert.equal(`${value.count}${value.unit}`, `${expected.count}${designator}`, label);
   } else if (value instanceof core.DayCount) {
     assert.equal(value.toString(), core.DayCount.fromName(expected).toString(), label);
   } else if (value instanceof core.Currency) {
-    assert.equal(value.code, expected, label);
+    assert.equal(value.toString(), expected, label);
   } else if (typeof value === 'number' && typeof expected === 'string') {
     // Decimal fields are numbers on the handle and exact strings on the wire.
     close(value, Number(expected), TIGHT, label);

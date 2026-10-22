@@ -86,15 +86,15 @@ class CFKind:
     @classmethod
     def parse(cls, name: str) -> CFKind:
         """
-        Parse a cashflow kind from its exact snake_case label.
+        Parse a canonical cashflow kind label, ignoring outer whitespace and ASCII case.
 
         Parameters
         ----------
         name : str
             Snake_case label such as ``"fixed"``, ``"float_reset"``, or
             ``"pre_payment"``; the same string as :attr:`name` and the
-            ``kind`` field of serialized cashflows. Matching is exact: no
-            aliases, case folding, or whitespace trimming.
+            ``kind`` field of serialized cashflows. Surrounding whitespace and
+            ASCII case are normalized; aliases are rejected.
 
         Returns
         -------
@@ -573,17 +573,19 @@ class CashFlow:
 
     def validate(self) -> None:
         """
-        Validate amount, accrual factor, rate, and reset-date ordering.
+        Validate accrual inputs, reset-date ordering and principal currency.
 
-        Zero amounts are valid (e.g. floored coupons); only non-finite
-        values, a negative accrual factor, or a reset date after the
-        payment date are rejected.
+        Monetary amounts are already validated by Money construction; zero
+        amounts are allowed. Accrual factors and rates must be finite, the
+        accrual factor must be nonnegative, reset dates cannot follow payment,
+        and principal deltas must share the cashflow currency.
 
         Raises
         ------
         ValueError
-            If a value is non-finite, the accrual factor is negative, or
-            the reset date is after the payment date.
+            If an accrual factor or rate is non-finite, the accrual factor
+            is negative, reset-date ordering or accrual metadata is invalid,
+            or the principal delta has a different currency.
         """
         ...
 

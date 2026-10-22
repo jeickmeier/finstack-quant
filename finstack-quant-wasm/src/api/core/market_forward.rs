@@ -215,19 +215,20 @@ impl JsForwardCurve {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
-    /// Simple forward rate over `[t1, t2]` implied by the curve (Rust `rate_period`).
+    /// Integral-average forward rate over `[t1, t2]` on the curve day-count basis.
     ///
     /// # Arguments
     ///
     /// * `t1` - Start of the accrual period in years from `baseDate`.
     /// * `t2` - End of the accrual period in years from `baseDate`.
     ///
-    /// @returns The average forward over the period as a decimal.
+    /// @returns The finite period-average rate as a decimal; equal or very short intervals return the start rate.
+    /// @throws If endpoints are non-finite or reversed, or the interval or result is non-finite.
     #[wasm_bindgen(js_name = ratePeriod)]
     pub fn rate_period(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
         let t1 = js_f64(&t1, "t1")?;
         let t2 = js_f64(&t2, "t2")?;
-        Ok(self.inner.rate_period(t1, t2))
+        self.inner.rate_period(t1, t2).map_err(to_js_err)
     }
 
     /// Projection discount factor implied by the forwards at year fraction `t`

@@ -66,6 +66,26 @@ fn parse_sentinel_inverts_serialize() {
 }
 
 #[test]
+fn non_finite_sentinel_parser_rejects_retired_names() {
+    for text in [
+        "+inf",
+        "infinity",
+        "+infinity",
+        "-infinity",
+        " Infinity ",
+        " INF INITY ",
+    ] {
+        assert_eq!(non_finite_f64::parse_sentinel(text), None);
+        assert!(serde_json::from_value::<NonFiniteHolder>(json!({"value": text})).is_err());
+    }
+    assert_eq!(non_finite_f64::parse_sentinel(" INF "), Some(f64::INFINITY));
+    assert_eq!(
+        non_finite_f64::parse_sentinel(" -INF "),
+        Some(f64::NEG_INFINITY)
+    );
+}
+
+#[test]
 fn date_schema_has_date_format() {
     let schema = serde_json::to_value(schemars::schema_for!(DateWire)).expect("schema");
     assert_eq!(schema["type"], "string");

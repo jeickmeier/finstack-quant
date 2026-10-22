@@ -849,7 +849,7 @@ public = [
 # directly from core: `nearest_correlation`, `validate_correlation_matrix` and
 # `cholesky_correlation` from
 # finstack_quant_core::math::linalg; `CorrelatedBernoulli`,
-# `correlation_bounds` and `joint_probabilities` from
+# `correlation_bounds` from
 # finstack_quant_core::math::probability.
 # Errors: `finstack_quant_models::correlation::Error` folds into the core
 # taxonomy (`From<correlation::Error> for core::Error`); non-convergence /
@@ -884,7 +884,6 @@ public = [
     "TrancheLossStatistics",
     "cholesky_correlation",
     "correlation_bounds",
-    "joint_probabilities",
     "nearest_correlation",
     "simulate_portfolio_loss",
     "validate_correlation_matrix",
@@ -1956,13 +1955,12 @@ types = { FinstackError = "FinstackError" }
 [parity.modules."finstack_quant.core.config"]
 js = "core"
 types = { ToleranceConfig = "ToleranceConfig" }
+constructors = { ToleranceConfig = "core.toleranceConfigNew" }
 
 [parity.modules."finstack_quant.core.currency"]
 js = "core"
-# `Currency.code` (both hosts) duplicates `__str__`/`toString()`; it is kept as
-# the documented host convenience for reading the ISO code. The other
-# host-invented `code`/`name` getters that duplicated `toString()` (HolidayCalendar,
-# PeriodId, RoundingMode, CreditRating, UnknownScalePolicy) were removed.
+# ISO alphabetic strings use Python `str(currency)` and WASM `toString()`.
+# No duplicate `code` accessor is exposed.
 # The ISO-4217 module constants (`currency.USD`) are the static factories of
 # the WASM class (`core.Currency.usd()`): a facade value cannot hold a wasm
 # handle before `init()` runs, so each constant is a factory.
@@ -1984,6 +1982,7 @@ types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "C
 [parity.modules."finstack_quant.core.market_data"]
 js = "core"
 types = { SabrParameterData = "SabrParameterData" }
+constructors = { SabrParameterData = "core.sabrParameterDataNew" }
 
 [parity.modules."finstack_quant.core.math.linalg"]
 js = "core"
@@ -2005,6 +2004,7 @@ js = "core"
 [parity.modules."finstack_quant.core.rating_scales"]
 js = "core"
 types = { RatingLevel = "RatingLevel", ScorecardScale = "ScorecardScale" }
+constructors = { RatingLevel = "core.ratingLevelTryNew", ScorecardScale = "core.scorecardScaleTryNew" }
 
 [parity.modules."finstack_quant.core.schema"]
 js = "core.schema"
@@ -2539,7 +2539,7 @@ renames = { values = { js = "features.timeSeriesOpValues", reason = "WASM TimeSe
 excluded = { carry_to_dataframe = "pandas", changes_to_dataframe = "pandas" }
 
 [parity.members."finstack_quant.scenarios.Compounding"]
-excluded = { annual = "literal", continuous = "literal", monthly = "literal", quarterly = "literal", semi_annual = "literal", simple = "literal" }
+excluded = { continuous = "literal", monthly = "literal", quarterly = "literal", semi_annual = "literal", simple = "literal" }
 
 [parity.members."finstack_quant.scenarios.CurveKind"]
 excluded = { commodity = "literal", discount = "literal", forward = "literal", inflation = "literal", par_cds = "literal" }

@@ -119,7 +119,12 @@ pub(crate) fn spot_fx_to_base(
         .fx()
         .ok_or_else(|| Error::MissingMarketData("FX matrix not available".to_string()))?;
     fx_matrix
-        .rate(FxQuery::new(from_currency, base_currency, as_of))
+        .rate(FxQuery::new(
+            from_currency,
+            base_currency,
+            as_of,
+            Default::default(),
+        ))
         .map_err(|_| Error::FxConversionFailed {
             from: from_currency,
             to: base_currency,
@@ -291,7 +296,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.25)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.25)])
             .expect("test FX quote should be valid");
         let market = MarketContext::new().insert_fx(FxMatrix::new(provider));
 
@@ -331,7 +336,7 @@ mod tests {
         let payment = date!(2026 - 01 - 01);
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::JPY, Currency::USD, 0.0067)
+            .set_quotes(&[(Currency::JPY, Currency::USD, 0.0067)])
             .expect("test FX quote should be valid");
         let market = MarketContext::new()
             .insert(flat_discount("JPY", as_of, 0.99))
@@ -359,7 +364,7 @@ mod tests {
         let payment = date!(2026 - 01 - 01);
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::JPY, Currency::USD, 0.0067)
+            .set_quotes(&[(Currency::JPY, Currency::USD, 0.0067)])
             .expect("test FX quote should be valid");
         let market = MarketContext::new()
             .insert(flat_discount("JPY-OIS", as_of, 0.99))

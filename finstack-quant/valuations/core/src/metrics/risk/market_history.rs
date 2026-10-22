@@ -447,7 +447,7 @@ impl MarketHistory {
             columns.push(TableColumn::new(name, data));
         }
         columns.push(TableColumn::new("shift", TableColumnData::Float64(shifts)));
-        TableEnvelope::new(columns)
+        TableEnvelope::new(columns, Default::default())
     }
 }
 
@@ -664,7 +664,7 @@ mod tests {
     #[test]
     fn test_fx_spot_shift_applied() -> Result<()> {
         let provider = SimpleFxProvider::new();
-        provider.set_quote(Currency::EUR, Currency::USD, 1.20)?;
+        provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.20)])?;
         let base_market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
 
         let scenario = MarketScenario::new(
@@ -686,6 +686,7 @@ mod tests {
                 Currency::EUR,
                 Currency::USD,
                 date!(2024 - 01 - 02),
+                Default::default(),
             ))?
             .rate;
 

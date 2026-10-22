@@ -36,7 +36,7 @@ use super::kinds::PyCompounding;
 /// Examples
 /// --------
 /// >>> from finstack_quant.scenarios import RateBindingSpec
-/// >>> binding = RateBindingSpec("interest_rate", "USD-OIS", "1Y", compounding="annual")
+/// >>> binding = RateBindingSpec("interest_rate", "USD-OIS", "1Y", compounding="periodic(1)")
 /// >>> binding.validate() is None
 /// True
 /// >>> binding == RateBindingSpec.from_json(binding.to_json())
