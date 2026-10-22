@@ -428,17 +428,22 @@ impl CorrelationFactor {
     ///
     /// # Arguments
     ///
-    /// * `factor` - Row-major `n × n` factor; length must be `n * n`.
-    /// * `n` - Matrix dimension implied by `factor`.
-    #[must_use]
-    pub fn from_parts(factor: Vec<f64>, n: usize) -> Self {
-        debug_assert_eq!(Some(factor.len()), n.checked_mul(n));
+    /// * `factor` - Finite row-major `n × n` factor; length must be exactly `n * n`.
+    /// * `n` - Matrix dimension; zero accepts only an empty factor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CholeskyError::DimensionMismatch`] if `n * n` overflows or
+    /// differs from the buffer length, or [`CholeskyError::NonFiniteInput`]
+    /// for the first NaN or infinite entry. Dense finite matrices are valid.
+    pub fn from_parts(factor: Vec<f64>, n: usize) -> std::result::Result<Self, CholeskyError> {
+        check_square_finite(&factor, n)?;
         let triangular = is_exactly_lower_triangular(&factor, n);
-        Self {
+        Ok(Self {
             factor,
             n,
             triangular,
-        }
+        })
     }
 }
 
@@ -509,7 +514,7 @@ pub fn cholesky_correlation(
     // absorbed into an Ok(NaN factor).
     check_square_finite(matrix, n)?;
     if n == 0 {
-        return Ok(CorrelationFactor::from_parts(vec![], 0));
+        return CorrelationFactor::from_parts(vec![], 0);
     }
 
     // Maximum diagonal value — used to set relative tolerance.
@@ -630,7 +635,7 @@ pub fn cholesky_correlation(
     // `from_parts` inspects the unpermuted factor. Unit-diagonal correlation
     // inputs typically swap, but a covariance already in pivot order can still
     // come out exactly lower triangular.
-    Ok(CorrelationFactor::from_parts(l_orig, n))
+    CorrelationFactor::from_parts(l_orig, n)
 }
 
 // ─── Symmetric eigendecomposition (shared helper) ──────────────────────────────
@@ -1588,7 +1593,7 @@ mod tests {
     fn triangular_fast_path_matches_dense_multiply_bit_for_bit() {
         let n = 8usize;
         let l = lower_triangular_factor(n);
-        let factor = CorrelationFactor::from_parts(l, n);
+        let factor = CorrelationFactor::from_parts(l, n).expect("finite square factor");
         assert!(
             factor.triangular,
             "n=8 lower-triangular factor must enter the half-matrix path"
@@ -1615,11 +1620,46 @@ mod tests {
     }
 
     #[test]
+    fn from_parts_validates_in_every_build_profile() {
+        for (factor, n) in [
+            (vec![], 1),
+            (vec![1.0; 3], 2),
+            (vec![1.0; 5], 2),
+            (vec![], usize::MAX),
+            (vec![1.0], 0),
+        ] {
+            assert!(matches!(
+                CorrelationFactor::from_parts(factor, n),
+                Err(CholeskyError::DimensionMismatch { .. })
+            ));
+        }
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                CorrelationFactor::from_parts(vec![1.0, value, 0.0, 1.0], 2),
+                Err(CholeskyError::NonFiniteInput { row: 0, col: 1, .. })
+            ));
+        }
+        let empty = CorrelationFactor::from_parts(vec![], 0).expect("empty factor");
+        assert!(empty.factor_matrix().is_empty());
+        empty.apply(&[], &mut []).expect("empty application");
+        let dense =
+            CorrelationFactor::from_parts(vec![1.0, 0.5, 0.5, 1.0], 2).expect("dense factor");
+        assert!(matches!(
+            dense.apply(&[1.0], &mut [0.0; 2]),
+            Err(CholeskyError::DimensionMismatch { .. })
+        ));
+        assert!(matches!(
+            dense.apply(&[1.0; 2], &mut [0.0]),
+            Err(CholeskyError::DimensionMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn from_parts_factor_uses_the_dense_path() {
         // Callers may hand a full (non-triangular) matrix to `from_parts`;
         // it must take the dense path.
         let corr = vec![1.0, 0.5, 0.5, 1.0];
-        let factor = CorrelationFactor::from_parts(corr.clone(), 2);
+        let factor = CorrelationFactor::from_parts(corr.clone(), 2).expect("finite dense factor");
         let z = [0.3, -0.7];
 
         let mut via_apply = vec![0.0; 2];
