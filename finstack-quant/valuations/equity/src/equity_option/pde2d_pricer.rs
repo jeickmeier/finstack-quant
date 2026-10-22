@@ -16,7 +16,7 @@ use finstack_quant_valuations_core::pricer::{
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
-use finstack_quant_models::pde::{CraigSneydStepper, Grid1D, Grid2D, HestonPde, Solver2D};
+use finstack_quant_models::pde::{Grid1D, Grid2D, HestonPde, McsStepper, Solver2D};
 use finstack_quant_models::types::OptionType;
 
 /// Reject an unstable PDE result rather than returning an arbitrage-violating
@@ -170,7 +170,7 @@ impl EquityOptionHestonPdePricer {
         // payoff-kink error before the second-order MCS scheme takes over
         // (In 't Hout & Foulon 2010) — the configuration the tight-tolerance
         // bridge2d reference tests use.
-        let solver = Solver2D::new(grid, CraigSneydStepper::with_damping(2, self.time_steps));
+        let solver = Solver2D::new(grid, McsStepper::with_damping(2, self.time_steps));
 
         let solution = solver.solve(&pde, t).map_err(|e| {
             PricingError::model_failure_with_context(
