@@ -30592,75 +30592,45 @@ export interface CalibrationNamespace {
     fields: generated.calibration.CdsTrancheQuote
   ): generated.calibration.CdsTrancheQuote;
   /**
-   * Run the calendar-spread, butterfly-spread and volatility-bound checks on a surface.
+   * Run the forward-aware calendar-spread and call-convexity checks plus the volatility bounds.
    *
    * Free-function twin of Python `calibration.validate_surface` (Rust `validation::validate_surface`).
    * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
-   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the two arbitrage checks and `lenient_arbitrage: true` logs arbitrage violations instead of throwing (the volatility bounds are always checked).
-   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed or any check fails.
-   */
-  validateSurface(surface: VolSurface, config: generated.calibration.ValidationConfig): void;
-  /**
-   * Run the forward-aware calendar-spread and call-convexity checks plus the volatility bounds.
-   *
-   * Free-function twin of Python `calibration.validate_surface_with_forwards` (Rust `validation::validate_surface_with_forwards`).
-   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
-   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the arbitrage checks and `lenient_arbitrage: true` logs arbitrage violations instead of throwing.
-   * @param forwards - Forward price for each surface expiry, in expiry order (same units as the strikes).
+   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the arbitrage checks; forward-input validation remains active.
+   * @param forwards - Positive finite forward price for each surface expiry, in expiry order and strike units, even when arbitrage checks are disabled.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not have one finite positive entry per expiry, or any check fails.
    */
-  validateSurfaceWithForwards(
+  validateSurface(
     surface: VolSurface,
     config: generated.calibration.ValidationConfig,
     forwards: number[] | Float64Array
   ): void;
-  /**
-   * Check that total variance does not decrease with expiry at each strike.
-   *
-   * Free-function twin of Python `calibration.validate_calendar_spread` (Rust `validation::validate_calendar_spread`).
-   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
-   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check and `lenient_arbitrage: true` logs violations instead of throwing.
-   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed or total variance decreases between two expiries.
-   */
-  validateCalendarSpread(surface: VolSurface, config: generated.calibration.ValidationConfig): void;
   /**
    * Check that total variance does not decrease with expiry at each forward moneyness.
    *
-   * Free-function twin of Python `calibration.validate_calendar_spread_with_forwards` (Rust `validation::validate_calendar_spread_with_forwards`).
+   * Free-function twin of Python `calibration.validate_calendar_spread` (Rust `validation::validate_calendar_spread`).
    * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
-   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check and `lenient_arbitrage: true` logs violations instead of throwing.
-   * @param forwards - Forward price for each surface expiry, in expiry order.
+   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check; forward-input validation remains active.
+   * @param forwards - Positive finite forward price for each surface expiry, in expiry order and strike units, even when arbitrage checks are disabled.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not match the expiries, or total variance decreases at fixed forward moneyness.
    */
-  validateCalendarSpreadWithForwards(
+  validateCalendarSpread(
     surface: VolSurface,
     config: generated.calibration.ValidationConfig,
     forwards: number[] | Float64Array
-  ): void;
-  /**
-   * Check that total variance is convex in strike at each expiry (butterfly spread).
-   *
-   * Free-function twin of Python `calibration.validate_butterfly_spread` (Rust `validation::validate_butterfly_spread`).
-   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
-   * @param config - `ValidationConfig` object (`butterfly_upper_ratio`, `butterfly_lower_ratio`; `lenient_arbitrage: true` logs violations instead of throwing); `check_arbitrage: false` skips the check.
-   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed or a butterfly violation exceeds the tolerance.
-   */
-  validateButterflySpread(
-    surface: VolSurface,
-    config: generated.calibration.ValidationConfig
   ): void;
   /**
    * Check that undiscounted Black call prices are convex in strike at each expiry.
    *
-   * Every adjacent vertical call spread must also cost between zero and its strike width; the price tolerance is `config.tolerance` times the forward.
+   * Every adjacent vertical call spread must also cost between zero and its strike width; the price tolerance is `max(config.tolerance, 1e-12)` times the forward.
    *
-   * Free-function twin of Python `calibration.validate_butterfly_call_convexity` (Rust `validation::validate_butterfly_call_convexity`).
+   * Free-function twin of Python `calibration.validate_butterfly_spread` (Rust `validation::validate_butterfly_spread`).
    * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
-   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check and `lenient_arbitrage: true` logs violations instead of throwing.
-   * @param forwards - Forward price for each surface expiry, in expiry order.
+   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check; forward-input validation remains active.
+   * @param forwards - Positive finite forward price for each surface expiry, in expiry order and strike units, even when arbitrage checks are disabled.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not match the expiries, or call prices are not convex in strike.
    */
-  validateButterflyCallConvexity(
+  validateButterflySpread(
     surface: VolSurface,
     config: generated.calibration.ValidationConfig,
     forwards: number[] | Float64Array

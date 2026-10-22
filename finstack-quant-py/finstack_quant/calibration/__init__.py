@@ -39,13 +39,10 @@ XccyQuote = _calibration.XccyQuote
 calibrate = _calibration.calibrate
 calibrate_bermudan_lmm_base_vol = _calibration.calibrate_bermudan_lmm_base_vol
 dry_run = _calibration.dry_run
-validate_butterfly_call_convexity = _calibration.validate_butterfly_call_convexity
 validate_butterfly_spread = _calibration.validate_butterfly_spread
 validate_calendar_spread = _calibration.validate_calendar_spread
-validate_calendar_spread_with_forwards = _calibration.validate_calendar_spread_with_forwards
 validate_calibration = _calibration.validate_calibration
 validate_surface = _calibration.validate_surface
-validate_surface_with_forwards = _calibration.validate_surface_with_forwards
 validate_vol_bounds = _calibration.validate_vol_bounds
 hull_white = _calibration.hull_white
 schema = _calibration.schema
@@ -77,12 +74,9 @@ __all__ = [
     "dry_run",
     "hull_white",
     "schema",
-    "validate_butterfly_call_convexity",
     "validate_butterfly_spread",
     "validate_calendar_spread",
-    "validate_calendar_spread_with_forwards",
     "validate_calibration",
     "validate_surface",
-    "validate_surface_with_forwards",
     "validate_vol_bounds",
 ]

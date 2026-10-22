@@ -21,12 +21,9 @@ from finstack_quant.calibration import (
     VolQuote,
     XccyQuote,
     calibrate,
-    validate_butterfly_call_convexity,
     validate_butterfly_spread,
     validate_calendar_spread,
-    validate_calendar_spread_with_forwards,
     validate_surface,
-    validate_surface_with_forwards,
     validate_vol_bounds,
 )
 from finstack_quant.calibration.hull_white import CapFloorQuote, SwaptionQuote
@@ -218,20 +215,17 @@ def test_surface_validators_accept_a_clean_surface_and_reject_arbitrage() -> Non
     """CFCC-009: the Rust vol-surface checks run on a standalone surface."""
     clean = _surface([[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
     config = ValidationConfig()
-    validate_surface(clean, config)
-    validate_calendar_spread(clean, config)
-    validate_butterfly_spread(clean, config)
     validate_vol_bounds(clean, config)
-    validate_surface_with_forwards(clean, config, [100.0, 100.0])
-    validate_calendar_spread_with_forwards(clean, config, [100.0, 100.0])
-    validate_butterfly_call_convexity(clean, config, [100.0, 100.0])
+    validate_surface(clean, config, [100.0, 100.0])
+    validate_calendar_spread(clean, config, [100.0, 100.0])
+    validate_butterfly_spread(clean, config, [100.0, 100.0])
 
     inverted = _surface([[0.30, 0.30, 0.30], [0.10, 0.10, 0.10]])
     with pytest.raises(ValueError, match=r"(?i)calendar"):
-        validate_calendar_spread(inverted, config)
-    validate_calendar_spread(inverted, ValidationConfig(check_arbitrage=False))
+        validate_calendar_spread(inverted, config, [100.0, 100.0])
+    validate_calendar_spread(inverted, ValidationConfig(check_arbitrage=False), [100.0, 100.0])
     with pytest.raises(ValueError, match="forward"):
-        validate_surface_with_forwards(clean, config, [100.0])
+        validate_surface(clean, config, [100.0])
     with pytest.raises(ValueError, match="volatility"):
         validate_vol_bounds(clean, ValidationConfig(max_volatility=0.1))
 
@@ -311,3 +305,26 @@ def test_calibration_currency_conversion_uses_the_core_contract(
         factory(CurrencyLike())
     with pytest.raises(ValueError, match=r"currency|Currency"):
         factory("NOT-A-CURRENCY")
+
+
+@pytest.mark.parametrize("check_arbitrage", [False, True])
+@pytest.mark.parametrize(
+    "forwards", [[], [100.0], [100.0, 0.0], [100.0, -1.0], [100.0, float("nan")], [100.0, float("inf")]]
+)
+def test_surface_validation_requires_forward_inputs(check_arbitrage: bool, forwards: list[float]) -> None:
+    surface = _surface([[0.20, 0.20, 0.20], [0.21, 0.21, 0.21]])
+    config = ValidationConfig(check_arbitrage=check_arbitrage)
+    for validate in (validate_surface, validate_calendar_spread, validate_butterfly_spread):
+        with pytest.raises(ValueError, match="forward"):
+            validate(surface, config, forwards)
+
+
+def test_surface_calendar_uses_forward_moneyness() -> None:
+    surface = VolSurface("MONEYNESS", [1.0, 2.0], [100.0, 200.0], [[0.4, 0.1], [0.3, 0.2]])
+    config = ValidationConfig()
+    validate_calendar_spread(surface, config, [100.0, 100.0])
+    with pytest.raises(ValueError, match="fixed forward-moneyness"):
+        validate_calendar_spread(surface, config, [100.0, 200.0])
+    validate_calendar_spread(surface, ValidationConfig(tolerance=0.09), [100.0, 200.0])
+    with pytest.raises(ValueError, match="volatility"):
+        validate_surface(surface, ValidationConfig(check_arbitrage=False, max_volatility=0.1), [100.0, 200.0])

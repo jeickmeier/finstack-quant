@@ -58,12 +58,9 @@ export default [
             "use_parallel": false,
             "validation": {
               "allow_negative_rates": false,
-              "butterfly_lower_ratio": 0.9,
-              "butterfly_upper_ratio": 1.1,
               "check_arbitrage": true,
               "check_forward_positivity": true,
               "check_monotonicity": true,
-              "lenient_arbitrage": false,
               "max_cpi_growth": 0.5,
               "max_forward_rate": 0.5,
               "max_fwd_inflation": 0.5,
@@ -2160,20 +2157,6 @@ export default [
     "description": "Allow negative rate environments (DF > 1.0 at short end)"
   },
   {
-    "path": "#/$defs/d_62f16222adf57cd5e917/properties/butterfly_lower_ratio",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/butterfly_lower_ratio",
-    "default": 0.9,
-    "description": "Butterfly spread convexity tolerance ratio (lower bound).\nActual variance must be >= interpolated * this ratio to pass.\nDefault 0.90 (10% tolerance); use values closer to 1.0 for stricter checking.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_62f16222adf57cd5e917/properties/butterfly_upper_ratio",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/butterfly_upper_ratio",
-    "default": 1.1,
-    "description": "Butterfly spread convexity tolerance ratio (upper bound).\nActual variance must be <= interpolated * this ratio to pass.\nDefault 1.10 (10% tolerance); use values closer to 1.0 for stricter checking.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/check_arbitrage",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/check_arbitrage",
     "default": true,
@@ -2190,12 +2173,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/check_monotonicity",
     "default": true,
     "description": "Enable monotonicity checks"
-  },
-  {
-    "path": "#/$defs/d_62f16222adf57cd5e917/properties/lenient_arbitrage",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/lenient_arbitrage",
-    "default": false,
-    "description": "When true, arbitrage violations (calendar/butterfly) produce warnings instead of errors.\nDefault is false - arbitrage violations fail validation.\nSet to true only for exploratory analysis or when arbitrage-free fitting is not required."
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/max_cpi_growth",
@@ -6461,12 +6438,9 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationConfig/properties/validation",
     "default": {
       "allow_negative_rates": false,
-      "butterfly_lower_ratio": 0.9,
-      "butterfly_upper_ratio": 1.1,
       "check_arbitrage": true,
       "check_forward_positivity": true,
       "check_monotonicity": true,
-      "lenient_arbitrage": false,
       "max_cpi_growth": 0.5,
       "max_forward_rate": 0.5,
       "max_fwd_inflation": 0.5,
@@ -6601,12 +6575,9 @@ export default [
       "use_parallel": false,
       "validation": {
         "allow_negative_rates": false,
-        "butterfly_lower_ratio": 0.9,
-        "butterfly_upper_ratio": 1.1,
         "check_arbitrage": true,
         "check_forward_positivity": true,
         "check_monotonicity": true,
-        "lenient_arbitrage": false,
         "max_cpi_growth": 0.5,
         "max_forward_rate": 0.5,
         "max_fwd_inflation": 0.5,

@@ -9,7 +9,7 @@ use crate::targets::util::{
     extract_equity_option_quotes, interpolate_total_variance, resolve_equity_forward_inputs,
     resolve_equity_spot, surface_quote_residuals,
 };
-use crate::validation::ValidationConfig;
+use crate::validation::attach_validation_result;
 use crate::CalibrationReport;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
@@ -18,9 +18,7 @@ use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters, Sa
 use std::collections::BTreeMap;
 
 use crate::constants::OrderedF64;
-use crate::validation::surfaces::{
-    validate_butterfly_call_convexity, validate_calendar_spread_with_forwards,
-};
+use crate::validation::surfaces::{surface_violations, violations_result};
 
 /// Bootstrapper for calibrating option volatility surfaces.
 ///
@@ -224,25 +222,12 @@ pub(crate) fn solve(
         params.base_date,
     )?;
 
-    // Forward-aware arbitrage violations fail the calibration.
-    let validation_cfg = ValidationConfig {
-        lenient_arbitrage: false,
-        ..ValidationConfig::default()
-    };
     let target_forwards: Vec<f64> = params
         .target_expiries
         .iter()
         .map(|&t| forward_fn(t))
         .collect::<Result<Vec<_>>>()?;
-    let calendar_warning =
-        validate_calendar_spread_with_forwards(&surface, &validation_cfg, &target_forwards)
-            .err()
-            .map(|e| format!("SABR calendar-spread arbitrage: {e}"));
-    let butterfly_warning =
-        validate_butterfly_call_convexity(&surface, &validation_cfg, &target_forwards)
-            .err()
-            .map(|e| format!("SABR butterfly-spread arbitrage: {e}"));
-
+    let violations = surface_violations(&surface, &config.validation, &target_forwards)?;
     let calibrated_expiries: Vec<String> = sabr_params_by_expiry
         .keys()
         .map(|k| format!("{:.6}", k.into_inner()))
@@ -281,14 +266,7 @@ pub(crate) fn solve(
     );
     report.update_metadata("sabr_parameters_at_bounds", sabr_bound_hits.join(";"));
 
-    let warnings: Vec<String> = [calendar_warning, butterfly_warning]
-        .into_iter()
-        .flatten()
-        .collect();
-    if !warnings.is_empty() {
-        let detail = warnings.join("; ");
-        report = report.with_validation_result(false, Some(detail));
-    }
+    let report = attach_validation_result(report, violations_result(violations), config);
 
     Ok((surface, report))
 }

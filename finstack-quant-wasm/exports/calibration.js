@@ -66,11 +66,8 @@ export const calibration = {
   calibrateHullWhiteToCapFloors,
   bootstrapHullWhiteSigmaScheduleToCapFloors,
   validateSurface: wasm.validateSurface,
-  validateSurfaceWithForwards: wasm.validateSurfaceWithForwards,
   validateCalendarSpread: wasm.validateCalendarSpread,
-  validateCalendarSpreadWithForwards: wasm.validateCalendarSpreadWithForwards,
   validateButterflySpread: wasm.validateButterflySpread,
-  validateButterflyCallConvexity: wasm.validateButterflyCallConvexity,
   validateVolBounds: wasm.validateVolBounds,
   schema,
 };

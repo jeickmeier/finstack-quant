@@ -217,8 +217,7 @@ wire_methods!(PyRateBounds, RateBounds, "RateBounds", validate);
 /// ``check_monotonicity``, ``check_arbitrage``, ``tolerance``,
 /// ``max_hazard_rate``, ``min_cpi_growth``, ``max_cpi_growth``,
 /// ``min_fwd_inflation``, ``max_fwd_inflation``, ``max_volatility``,
-/// ``allow_negative_rates``, ``lenient_arbitrage``, ``butterfly_upper_ratio``,
-/// ``butterfly_lower_ratio``, ``recovery_rate_abs_tolerance``,
+/// ``allow_negative_rates``, ``recovery_rate_abs_tolerance``,
 /// ``minimum_lgd_for_hazard_guess``).
 ///
 /// Examples

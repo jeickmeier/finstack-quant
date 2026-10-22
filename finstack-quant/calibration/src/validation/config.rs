@@ -206,35 +206,12 @@ pub struct ValidationConfig {
     /// Allow negative rate environments (DF > 1.0 at short end)
     #[serde(default)]
     pub allow_negative_rates: bool,
-    /// When true, arbitrage violations (calendar/butterfly) produce warnings instead of errors.
-    /// Default is false - arbitrage violations fail validation.
-    /// Set to true only for exploratory analysis or when arbitrage-free fitting is not required.
-    #[serde(default)]
-    pub lenient_arbitrage: bool,
-    /// Butterfly spread convexity tolerance ratio (upper bound).
-    /// Actual variance must be <= interpolated * this ratio to pass.
-    /// Default 1.10 (10% tolerance); use values closer to 1.0 for stricter checking.
-    #[serde(default = "default_butterfly_upper_ratio")]
-    pub butterfly_upper_ratio: f64,
-    /// Butterfly spread convexity tolerance ratio (lower bound).
-    /// Actual variance must be >= interpolated * this ratio to pass.
-    /// Default 0.90 (10% tolerance); use values closer to 1.0 for stricter checking.
-    #[serde(default = "default_butterfly_lower_ratio")]
-    pub butterfly_lower_ratio: f64,
     /// Absolute tolerance for comparing configured and quoted recovery rates.
     #[serde(default = "default_recovery_rate_abs_tolerance")]
     pub recovery_rate_abs_tolerance: f64,
     /// Minimum LGD denominator used for hazard-rate initial guesses.
     #[serde(default = "default_minimum_lgd_for_hazard_guess")]
     pub minimum_lgd_for_hazard_guess: f64,
-}
-
-fn default_butterfly_upper_ratio() -> f64 {
-    1.10 // Variance must be at most 10% above linear interpolation
-}
-
-fn default_butterfly_lower_ratio() -> f64 {
-    0.90 // Variance must be at least 10% below linear interpolation
 }
 
 fn default_recovery_rate_abs_tolerance() -> f64 {
@@ -263,11 +240,6 @@ impl Default for ValidationConfig {
             // Default to strict mode: enforce monotonicity in positive-rate regimes.
             // Set to true for EUR/JPY/CHF negative-rate environments where DFs > 1.0 is valid.
             allow_negative_rates: false,
-            // Default to strict mode: arbitrage violations fail validation.
-            // Set to true only for exploratory analysis.
-            lenient_arbitrage: false,
-            butterfly_upper_ratio: default_butterfly_upper_ratio(),
-            butterfly_lower_ratio: default_butterfly_lower_ratio(),
             recovery_rate_abs_tolerance: default_recovery_rate_abs_tolerance(),
             minimum_lgd_for_hazard_guess: default_minimum_lgd_for_hazard_guess(),
         }
@@ -294,8 +266,6 @@ impl ValidationConfig {
             ("min_fwd_inflation", self.min_fwd_inflation),
             ("max_fwd_inflation", self.max_fwd_inflation),
             ("max_volatility", self.max_volatility),
-            ("butterfly_upper_ratio", self.butterfly_upper_ratio),
-            ("butterfly_lower_ratio", self.butterfly_lower_ratio),
         ] {
             if !value.is_finite() {
                 return Err(Error::Validation(format!(
@@ -349,15 +319,6 @@ impl ValidationConfig {
             return Err(Error::Validation(format!(
                 "ValidationConfig invalid: max_volatility must be > 0.0, got {}",
                 self.max_volatility
-            )));
-        }
-        if self.butterfly_lower_ratio < 0.0
-            || self.butterfly_upper_ratio <= 0.0
-            || self.butterfly_upper_ratio < self.butterfly_lower_ratio
-        {
-            return Err(Error::Validation(format!(
-                "ValidationConfig invalid: butterfly_upper_ratio ({}) must be positive and >= non-negative butterfly_lower_ratio ({})",
-                self.butterfly_upper_ratio, self.butterfly_lower_ratio
             )));
         }
         if !self.recovery_rate_abs_tolerance.is_finite() || self.recovery_rate_abs_tolerance < 0.0 {
