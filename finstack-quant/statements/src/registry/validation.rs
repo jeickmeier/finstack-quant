@@ -1,6 +1,6 @@
 //! Validation for metric definitions.
 
-use crate::dsl::parse_and_compile;
+use crate::dsl::{ast::StmtExpr, compile, parse_formula};
 use crate::error::{Error, Result};
 use crate::registry::schema::MetricDefinition;
 
@@ -11,12 +11,12 @@ use crate::registry::schema::MetricDefinition;
 /// * `namespace` - Namespace used for error reporting
 ///
 /// # Validation Rules
-/// - ID must be non-empty and contain only `[a-zA-Z0-9_-]`
+/// - ID must match `[A-Za-z_][A-Za-z0-9_]*`
 /// - Name must be non-empty
 /// - Formula must be non-empty, parseable, and compilable
 ///
-/// Returns `Ok(())` when the definition passes all checks.
-pub fn validate_metric_definition(metric: &MetricDefinition, namespace: &str) -> Result<()> {
+/// Returns the parsed AST after validation so dependency analysis can reuse it.
+pub fn validate_metric_definition(metric: &MetricDefinition, namespace: &str) -> Result<StmtExpr> {
     if metric.id.is_empty() {
         return Err(Error::registry(
             "Metric ID cannot be empty. Provide a unique identifier (e.g., 'gross_margin').",
@@ -55,14 +55,15 @@ pub fn validate_metric_definition(metric: &MetricDefinition, namespace: &str) ->
         )));
     }
 
-    parse_and_compile(&metric.formula).map_err(|e| {
+    let invalid_formula = |e| {
         Error::registry(format!(
             "Invalid formula for metric '{}.{}': {}",
             namespace, metric.id, e
         ))
-    })?;
-
-    Ok(())
+    };
+    let ast = parse_formula(&metric.formula).map_err(&invalid_formula)?;
+    compile(&ast).map_err(invalid_formula)?;
+    Ok(ast)
 }
 
 #[cfg(test)]
