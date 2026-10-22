@@ -33,6 +33,8 @@ mod tree_pricer;
 
 pub use bond_valuator::BondValuator;
 pub(crate) use config::bond_tree_settings;
-pub use config::{bond_tree_config, TreeModelChoice, TreePricerConfig};
+#[cfg(test)]
+use config::TreePricerConfig;
+pub(crate) use config::{bond_tree_config, TreeModelChoice};
 pub(crate) use tree_pricer::TreePriceOutcome;
-pub use tree_pricer::TreePricer;
+pub(crate) use tree_pricer::TreePricer;

@@ -45,9 +45,9 @@ bond/
 ├── json.rs                  # bond_from_cashflows_json
 ├── pricing/
 │   ├── mod.rs               # the model-preserving BondPricer adapter
-│   ├── discount.rs          # BondEngine: PV = Σ CF_i × DF_i
-│   ├── hazard.rs            # HazardBondEngine: non-callable survival-weighted PV + FRP
-│   ├── tree/                # TreePricer: rates-only and joint rates-credit optionality + OAS
+│   ├── discount.rs          # Discounting kernel: PV = Σ CF_i × DF_i
+│   ├── hazard.rs            # Hazard-rate kernel: non-callable survival-weighted PV + FRP
+│   ├── tree/                # Internal tree pricer: rates-only and joint rates-credit optionality + OAS
 │   ├── merton_mc/           # MertonMcEngine: structural credit and PIK
 │   ├── quote_conversions/   # yield↔price, spread↔price, annuity helpers
 │   ├── ytm_solver.rs        # Newton/Brent yield-to-maturity solver
