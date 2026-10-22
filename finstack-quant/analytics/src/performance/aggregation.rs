@@ -95,9 +95,6 @@ impl Performance {
     pub fn correlation_matrix(&self) -> finstack_quant_core::Result<(Vec<Vec<f64>>, bool)> {
         let n = self.ticker_names().len();
         let mut matrix = vec![vec![0.0; n]; n];
-        if n == 0 {
-            return Ok((matrix, false));
-        }
 
         let common = self.common_active_span();
         let complete_case = common.len() >= 2;
