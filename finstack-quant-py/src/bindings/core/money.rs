@@ -5,7 +5,6 @@ use std::hash::{Hash, Hasher};
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::{FormatOpts, Money};
-use finstack_quant_core::Error;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -129,13 +128,6 @@ pub(crate) fn money_from_amount(obj: &Bound<'_, PyAny>, ccy: Currency) -> PyResu
         PyTypeError::new_err("Money amount must be float, int, str, or decimal.Decimal")
     })?;
     Money::new(amount, ccy).map_err(core_to_py)
-}
-
-fn currency_mismatch(lhs: Money, rhs: Money) -> PyErr {
-    core_to_py(Error::CurrencyMismatch {
-        expected: lhs.currency(),
-        actual: rhs.currency(),
-    })
 }
 
 #[pymethods]
@@ -277,10 +269,7 @@ impl PyMoney {
             CompareOp::Eq => Ok((self.inner == rhs.inner).into_py_any(py)?),
             CompareOp::Ne => Ok((self.inner != rhs.inner).into_py_any(py)?),
             CompareOp::Lt | CompareOp::Le | CompareOp::Gt | CompareOp::Ge => {
-                if self.inner.currency() != rhs.inner.currency() {
-                    return Err(currency_mismatch(self.inner, rhs.inner));
-                }
-                let ord = self.inner.amount_decimal().cmp(&rhs.inner.amount_decimal());
+                let ord = self.inner.checked_cmp(rhs.inner).map_err(core_to_py)?;
                 Ok(op.matches(ord).into_py_any(py)?)
             }
         }

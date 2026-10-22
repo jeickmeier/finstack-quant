@@ -138,3 +138,17 @@ def test_format_with_rejects_precision_above_native_bound() -> None:
 
 def test_from_decimal_applies_scientific_exponent_exactly() -> None:
     assert Money.from_decimal(Decimal("2000e-31"), "USD").amount_decimal == Decimal("2e-28")
+
+
+def test_comparison_currency_errors_and_python_protocol() -> None:
+    usd = Money(1, "USD")
+    eur = Money(1, "EUR")
+    assert usd != eur
+    assert usd.__eq__(eur) is False
+    for compare in [lambda: usd < eur, lambda: usd <= eur, lambda: usd > eur, lambda: usd >= eur]:
+        with pytest.raises(ValueError, match=r"currency|Currency"):
+            compare()
+    assert usd.__eq__(object()) is NotImplemented
+    assert usd.__lt__(object()) is NotImplemented
+    with pytest.raises(TypeError):
+        _ = usd < object()
