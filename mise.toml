@@ -104,19 +104,24 @@ run = [
 ]
 
 [tasks.all-ci]
-description = "Regenerate derived artifacts, then run the CI checks locally (--release adds the release gates)"
-usage = 'flag "--release" help="Also run the release gates (docs, doctests, slow suites, publish checks, semver)"'
+description = "Regenerate derived artifacts, then run the PR checks locally (--full adds the nightly tier, --release the release gates)"
+usage = '''
+flag "--full" help="Also run the nightly tier: docs, doctests and the slow suites"
+flag "--release" help="Also run the nightly tier and the release gates (publish checks, semver)"
+'''
 depends = ["gen-write"]
 run = [
   { tasks = ["pre-commit-run", "gen-check", "all-test", "all-audit"] },
   '''
-  if [ "${usage_release:-false}" = "true" ]; then
+  if [ "${usage_full:-false}" = "true" ] || [ "${usage_release:-false}" = "true" ]; then
     mise run all-doc
     mise run rust-test --doctest
     mise run python-test --doctest
     mise run wasm-test --doctest
     mise run rust-test --slow
     mise run python-test --slow
+  fi
+  if [ "${usage_release:-false}" = "true" ]; then
     mise run rust-publish-checks
     baseline=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' --exclude '*-*' HEAD^)
     echo "Baseline: $baseline"
