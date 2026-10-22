@@ -32,7 +32,7 @@ pub mod non_finite_f64 {
     use serde::{Deserialize, Serialize};
 
     /// Wire form: a number when finite, a sentinel string otherwise.
-    #[derive(Serialize, Deserialize)]
+    #[derive(Deserialize)]
     #[serde(untagged)]
     enum Wire {
         Number(f64),
@@ -53,17 +53,7 @@ pub mod non_finite_f64 {
     where
         S: serde::Serializer,
     {
-        if value.is_finite() {
-            return Wire::Number(*value).serialize(serializer);
-        }
-        let sentinel = if value.is_nan() {
-            "nan"
-        } else if value.is_sign_positive() {
-            "inf"
-        } else {
-            "-inf"
-        };
-        Wire::Sentinel(sentinel.to_string()).serialize(serializer)
+        super::NonFiniteF64Wire::from(*value).serialize(serializer)
     }
 
     /// Deserialize an `f64` that may arrive as a sentinel string.
