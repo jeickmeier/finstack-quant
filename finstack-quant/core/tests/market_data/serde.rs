@@ -451,7 +451,7 @@ fn semantic_restore_fixture() -> MarketContextState {
         "USD-SWAPTION",
         &[1.0],
         &[5.0],
-        &[SabrParameterData::new(0.035, 0.5, 0.4, -0.2).expect("SABR parameters")],
+        &[SabrParameterData::new(0.035, 0.5, 0.4, -0.2, None).expect("SABR parameters")],
         &[0.03],
     )
     .expect("vol cube");
