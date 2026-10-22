@@ -149,48 +149,64 @@ impl Registry {
     ///
     /// * `registry` - Registry whose validated definitions are loaded or queried.
     pub fn load_registry(&mut self, registry: MetricRegistry) -> Result<()> {
-        let namespace = registry.namespace.clone();
-
+        let namespace = registry.namespace;
         if namespace.is_empty() {
             return Err(Error::registry(
                 "Namespace cannot be empty. Provide a namespace identifier (e.g., 'fin', 'custom')."
             ));
         }
 
-        let sorted_metrics = self.sort_metrics_by_dependencies(&registry)?;
-
-        // Validate and stage into a local buffer first, committing to `self`
-        // only after the whole document passes. A failure part-way through must
-        // not leave the registry half-mutated (a stale namespace, or some
-        // metrics from a document that was rejected), which would otherwise
-        // produce spurious "Duplicate metric ID" errors on a corrected retry.
-        let mut staged: Vec<(String, StoredMetric)> = Vec::with_capacity(sorted_metrics.len());
-        for metric in sorted_metrics {
-            validate_metric_definition(&metric, &namespace)?;
-
+        // Prepare every definition once before changing the live registry.
+        // The parsed AST serves both compiler validation and dependency analysis.
+        let mut prepared = IndexMap::with_capacity(registry.metrics.len());
+        for metric in registry.metrics {
             let qualified_id = metric.qualified_id(&namespace);
-            if self.metrics.contains_key(&qualified_id)
-                || staged.iter().any(|(id, _)| id == &qualified_id)
-            {
+            if self.metrics.contains_key(&qualified_id) || prepared.contains_key(&metric.id) {
                 return Err(Error::registry(format!(
                     "Duplicate metric ID: '{}'. This metric is already registered in the registry.",
                     qualified_id
                 )));
             }
-
-            staged.push((
-                qualified_id,
-                StoredMetric {
-                    namespace: namespace.clone(),
-                    definition: metric,
-                },
-            ));
+            let ast = validate_metric_definition(&metric, &namespace)?;
+            prepared.insert(metric.id.clone(), (metric, ast));
         }
 
-        for (qualified_id, stored) in staged {
-            self.metrics.insert(qualified_id, stored);
+        let prefix = format!("{namespace}.");
+        let all_metric_ids: IndexSet<String> = self
+            .namespace(&namespace)
+            .filter_map(|(id, _)| id.strip_prefix(&prefix).map(str::to_owned))
+            .chain(prepared.keys().cloned())
+            .collect();
+        let mut dependencies = IndexMap::with_capacity(prepared.len());
+        for (id, (_, ast)) in &prepared {
+            let mut identifiers = IndexSet::new();
+            crate::utils::formula::collect_identifiers_from_ast(ast, &mut identifiers, false);
+            identifiers.retain(|identifier| all_metric_ids.contains(identifier));
+            dependencies.insert(id.clone(), identifiers);
         }
+        let order = crate::utils::graph::toposort_ids(&dependencies).map_err(|remaining| {
+            Error::registry(format!(
+                "Circular dependency detected among metrics: {}",
+                remaining.join(" -> ")
+            ))
+        })?;
 
+        let staged = order
+            .into_iter()
+            .map(|id| {
+                let (definition, _) = prepared.swap_remove(&id).ok_or_else(|| {
+                    Error::registry(format!("internal error: prepared metric '{id}' is missing"))
+                })?;
+                Ok((
+                    definition.qualified_id(&namespace),
+                    StoredMetric {
+                        namespace: namespace.clone(),
+                        definition,
+                    },
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        self.metrics.extend(staged);
         Ok(())
     }
 
@@ -276,81 +292,6 @@ impl Registry {
         self.metrics.is_empty()
     }
 
-    /// Sort metrics by dependency order using topological sort.
-    ///
-    /// This allows metrics to reference other metrics in the same registry.
-    fn sort_metrics_by_dependencies(
-        &self,
-        registry: &MetricRegistry,
-    ) -> Result<Vec<MetricDefinition>> {
-        let namespace = &registry.namespace;
-
-        // Collision must be detected here rather than left to `IndexMap`'s
-        // last-wins insert: coalescing two same-id definitions into one entry
-        // would silently discard a metric *before* `load_registry`'s duplicate
-        // check runs, leaving that check able to catch only cross-document
-        // collisions.
-        let mut metric_map: IndexMap<String, MetricDefinition> =
-            IndexMap::with_capacity(registry.metrics.len());
-        for m in &registry.metrics {
-            if metric_map.contains_key(&m.id) {
-                return Err(Error::registry(format!(
-                    "Duplicate metric ID: '{}' is defined more than once in namespace '{}'. \
-                     Each metric ID must be unique within a document; keeping only one \
-                     definition would silently discard the other.",
-                    m.qualified_id(namespace),
-                    namespace
-                )));
-            }
-            metric_map.insert(m.id.to_owned(), m.clone());
-        }
-
-        let mut dependencies: IndexMap<String, IndexSet<String>> = IndexMap::new();
-
-        let mut existing_metric_ids: IndexSet<String> = IndexSet::new();
-        for (qualified_id, stored) in &self.metrics {
-            if stored.namespace == *namespace {
-                if let Some(id) = qualified_id.strip_prefix(&format!("{}.", namespace)) {
-                    existing_metric_ids.insert(id.to_string());
-                }
-            }
-        }
-
-        // Include already-loaded metrics in this namespace so intra-document
-        // cycles are detected while prior metrics remain valid dependencies.
-        let mut all_metric_ids: IndexSet<String> = existing_metric_ids;
-        for metric_id in metric_map.keys() {
-            all_metric_ids.insert(metric_id.clone());
-        }
-
-        for (metric_id, metric) in &metric_map {
-            let deps =
-                crate::utils::formula::extract_identifiers(&metric.formula, &all_metric_ids)?;
-            dependencies.insert(metric_id.to_owned(), deps);
-        }
-
-        let order = crate::utils::graph::toposort_ids(&dependencies).map_err(|remaining| {
-            Error::registry(format!(
-                "Circular dependency detected among metrics: {}",
-                remaining.join(" -> ")
-            ))
-        })?;
-
-        let sorted = order
-            .into_iter()
-            .map(|metric_id| {
-                metric_map.get(&metric_id).cloned().ok_or_else(|| {
-                    Error::registry(format!(
-                        "internal error: metric '{}' missing from map despite dependency entry",
-                        metric_id
-                    ))
-                })
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-
-        Ok(sorted)
-    }
-
     /// Get a metric's transitive dependencies in insertion order.
     ///
     /// Returns fully-qualified IDs in an order suitable for constructing a
@@ -420,11 +361,9 @@ mod tests {
 
     /// Two metrics sharing an `id` inside one document must be rejected.
     ///
-    /// `sort_metrics_by_dependencies` builds its lookup with
-    /// `IndexMap::collect`, which overwrites on a duplicate key. That silently
-    /// coalesced the pair into a single last-wins entry *before* the duplicate
-    /// check ran, so the guard could only ever catch cross-document
-    /// collisions. For a financial metric registry, silently discarding one of
+    /// Collecting definitions into an `IndexMap` without checking keys can
+    /// silently coalesce a pair into a single last-wins entry. For a financial
+    /// metric registry, silently discarding one of
     /// two conflicting definitions of the same metric is a data-integrity
     /// hazard.
     #[test]
