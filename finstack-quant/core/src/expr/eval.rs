@@ -13,7 +13,7 @@
 use super::{
     ast::*,
     context::SimpleContext,
-    dag::{DagBuilder, ExecutionPlan},
+    dag::{build_plan, ExecutionPlan, Operation},
 };
 use smallvec::SmallVec;
 
@@ -59,46 +59,6 @@ impl<'a> EvalNodeContext<'a> {
     }
 }
 
-/// Reject expressions the scalar evaluator cannot execute.
-///
-/// The single source of truth for which functions belong in the statements
-/// layer is [`Function::is_scalar_evaluable`]; capital-structure references
-/// (`CsRef`) are statements-only as well.
-fn ensure_scalar_evaluable(ast: &Expr) -> crate::Result<()> {
-    match &ast.node {
-        ExprNode::Column(_) | ExprNode::Literal(_) => Ok(()),
-        ExprNode::CsRef { .. } => Err(crate::Error::Validation(
-            "capital-structure references require the statements evaluator".to_string(),
-        )),
-        ExprNode::Call(func, args) => {
-            if !func.is_scalar_evaluable() {
-                return Err(crate::Error::Validation(format!(
-                    "Expression function '{func}' is a statements-layer function; \
-                     compile it via the statements crate instead of core::expr::CompiledExpr::new"
-                )));
-            }
-            for arg in args {
-                ensure_scalar_evaluable(arg)?;
-            }
-            Ok(())
-        }
-        ExprNode::BinOp { left, right, .. } => {
-            ensure_scalar_evaluable(left)?;
-            ensure_scalar_evaluable(right)
-        }
-        ExprNode::UnaryOp { operand, .. } => ensure_scalar_evaluable(operand),
-        ExprNode::IfThenElse {
-            condition,
-            then_expr,
-            else_expr,
-        } => {
-            ensure_scalar_evaluable(condition)?;
-            ensure_scalar_evaluable(then_expr)?;
-            ensure_scalar_evaluable(else_expr)
-        }
-    }
-}
-
 impl CompiledExpr {
     /// Compile an expression for the scalar evaluator.
     ///
@@ -118,8 +78,7 @@ impl CompiledExpr {
     /// * `ast` - Expression tree to compile: column references, literals,
     ///   operators, conditionals and elementwise functions only.
     pub fn new(ast: Expr) -> crate::Result<Self> {
-        ensure_scalar_evaluable(&ast)?;
-        let plan = DagBuilder::default().build_plan(ast)?;
+        let plan = build_plan(ast)?;
         Ok(Self { plan })
     }
 
@@ -202,8 +161,8 @@ impl CompiledExpr {
         node: &super::dag::DagNode,
         out: &mut [f64],
     ) -> crate::Result<()> {
-        match &node.expr.node {
-            ExprNode::Column(name) => {
+        match &node.operation {
+            Operation::Column(name) => {
                 let Some(idx) = env.ctx.index_of(name) else {
                     return Err(crate::InputError::NotFound {
                         id: format!("expr column:{name}"),
@@ -220,15 +179,10 @@ impl CompiledExpr {
                 out[..len].copy_from_slice(&col_data[..len]);
                 out[len..].fill(f64::NAN);
             }
-            ExprNode::CsRef { .. } => {
-                return Err(crate::Error::Validation(
-                    "capital-structure references require the statements evaluator".to_string(),
-                ));
+            Operation::Literal(bits) => {
+                out.fill(f64::from_bits(*bits));
             }
-            ExprNode::Literal(val) => {
-                out.fill(*val);
-            }
-            ExprNode::Call(func, _args) => {
+            Operation::Call(func) => {
                 let arg_slices: SmallVec<[&[f64]; 4]> = node
                     .dependencies
                     .iter()
@@ -244,7 +198,7 @@ impl CompiledExpr {
                 }
                 Self::eval_function_into(*func, &arg_slices, out)?;
             }
-            ExprNode::BinOp { op, .. } => {
+            Operation::BinOp(op) => {
                 // Binary operations should have exactly 2 dependencies
                 if node.dependencies.len() < 2 {
                     return Err(crate::Error::Validation(format!(
@@ -266,7 +220,7 @@ impl CompiledExpr {
                 })?;
                 Self::eval_bin_op_into(*op, left, right, out);
             }
-            ExprNode::UnaryOp { op, .. } => {
+            Operation::UnaryOp(op) => {
                 // Unary operations should have exactly 1 dependency
                 if node.dependencies.is_empty() {
                     return Err(crate::Error::Validation(format!(
@@ -282,7 +236,7 @@ impl CompiledExpr {
                 })?;
                 Self::eval_unary_op_into(*op, operand, out);
             }
-            ExprNode::IfThenElse { .. } => {
+            Operation::IfThenElse => {
                 // If-then-else should have exactly 3 dependencies
                 if node.dependencies.len() < 3 {
                     return Err(crate::Error::Validation(format!(
