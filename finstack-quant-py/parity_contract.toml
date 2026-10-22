@@ -1912,6 +1912,7 @@ js = "attribution.schema"
 
 [parity.modules."finstack_quant.calibration"]
 js = "calibration"
+constructors = { XccyQuote = "calibration.xccyQuote", CdsTrancheQuote = "calibration.cdsTrancheQuote" }
 types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResultEnvelope = "CalibrationResultEnvelope", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
 
 [parity.modules."finstack_quant.calibration.hull_white"]

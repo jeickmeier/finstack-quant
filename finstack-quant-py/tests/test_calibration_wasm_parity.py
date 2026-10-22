@@ -24,11 +24,13 @@ from finstack_quant.calibration import (
     CalibrationEnvelopeError,
     CalibrationStep,
     CdsQuote,
+    CdsTrancheQuote,
     InflationQuote,
     RateBounds,
     RateQuote,
     ValidationConfig,
     VolQuote,
+    XccyQuote,
     calibrate,
     dry_run,
     validate_calibration,
@@ -50,6 +52,10 @@ HW: dict[str, Any] = GOLDEN["hull_white"]
 BASE = "2026-05-08"
 
 QUOTES = {
+    "xccy": lambda: XccyQuote("X5Y", "EUR-USD", "5Y", -12.0, 1.1),
+    "cds_tranche": lambda: CdsTrancheQuote(
+        "T", "CDX.NA.IG", 42, 0.03, 0.07, "2031-05-08", 0.0425, 100.0, "USD", "cr14"
+    ),
     "deposit": lambda: RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052),
     "fra": lambda: RateQuote.fra("F", "USD-SOFR-OIS", "3M", "6M", 0.05),
     "futures": lambda: RateQuote.futures("FUT", "CME:SR3", "2026-09-15", 96.5),
@@ -213,3 +219,46 @@ def test_hull_white_swaption_fit_matches_the_shared_golden() -> None:
     assert report.success is expected["success"]
     assert params.kappa == pytest.approx(expected["params"]["kappa"], rel=1e-6)
     assert params.sigma == pytest.approx(expected["params"]["sigma"], rel=1e-6)
+
+
+def test_checked_quote_constructors_reject_invalid_values() -> None:
+    for value in (math.nan, math.inf, -math.inf):
+        with pytest.raises(ValueError, match="basis_spread_bp"):
+            XccyQuote("X", "EUR-USD", "5Y", value, 1.1)
+        with pytest.raises(ValueError, match="spot_fx"):
+            XccyQuote("X", "EUR-USD", "5Y", -12.0, value)
+    for spot in (0.0, -1.0):
+        with pytest.raises(ValueError, match="spot_fx"):
+            XccyQuote("X", "EUR-USD", "5Y", -12.0, spot)
+    fields: dict[str, Any] = {
+        "id": "T",
+        "index": "CDX.NA.IG",
+        "series": 42,
+        "attachment": 0.03,
+        "detachment": 0.07,
+        "maturity": "2031-05-08",
+        "upfront_pct": 0.0425,
+        "coupon_bp": 100.0,
+        "currency": "USD",
+        "doc_clause": "cr14",
+    }
+    invalid = [
+        {"attachment": -0.01},
+        {"detachment": 1.01},
+        {"attachment": 0.07},
+        {"upfront_pct": 4.25},
+        {"coupon_bp": 0.0},
+        {"doc_clause": "bad_clause"},
+        {"currency": "NOT_CURRENCY"},
+        {"maturity": "not-a-date"},
+    ]
+    invalid.extend(
+        {field: value}
+        for field in ("attachment", "detachment", "upfront_pct", "coupon_bp")
+        for value in (math.nan, math.inf, -math.inf)
+    )
+    for patch in invalid:
+        with pytest.raises(
+            ValueError, match=r"attachment|detachment|upfront_pct|coupon_bp|currency|Currency|date|CDS doc clause"
+        ):
+            CdsTrancheQuote(**(fields | patch))

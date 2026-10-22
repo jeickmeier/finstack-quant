@@ -461,3 +461,45 @@ test('surface validators match the Python validate_* functions', () => {
     validation
   );
 });
+
+test('checked quote constructors match Python and reject invalid fields', () => {
+  const xccy = GOLDEN.quotes.xccy;
+  const tranche = GOLDEN.quotes.cds_tranche;
+  assert.deepEqual(plain(calibration.xccyQuote(xccy)), xccy);
+  assert.deepEqual(plain(calibration.cdsTrancheQuote(tranche)), tranche);
+  const withoutSpot = { ...xccy };
+  delete withoutSpot.spot_fx;
+  assert.deepEqual(plain(calibration.xccyQuote(withoutSpot)), withoutSpot);
+  for (const spot of [0, -1]) {
+    assert.throws(() => calibration.xccyQuote({ ...xccy, spot_fx: spot }), validation);
+  }
+  for (const patch of [
+    { attachment: -0.01 },
+    { detachment: 1.01 },
+    { attachment: 0.07 },
+    { upfront_pct: 4.25 },
+    { coupon_bp: 0 },
+    { convention: { currency: 'USD', doc_clause: 'bad_clause' } },
+    { convention: { currency: 'NOT_CURRENCY', doc_clause: 'cr14' } },
+    { maturity: 'not-a-date' },
+    { bogus: true },
+  ]) {
+    assert.throws(() => calibration.cdsTrancheQuote({ ...tranche, ...patch }), validation);
+  }
+  assert.throws(() => calibration.xccyQuote({ ...xccy, bogus: true }), validation);
+  assert.throws(() => calibration.xccyQuote({ ...xccy, far_pillar: 'soon' }), validation);
+  for (const value of [NaN, Infinity, -Infinity]) {
+    for (const field of ['basis_spread_bp', 'spot_fx']) {
+      assert.throws(
+        () => calibration.xccyQuote({ ...xccy, [field]: value }),
+        (error) => error.name === 'TypeError' && error.kind === 'invalid_type'
+      );
+    }
+    for (const field of ['attachment', 'detachment', 'upfront_pct', 'coupon_bp']) {
+      assert.throws(
+        () => calibration.cdsTrancheQuote({ ...tranche, [field]: value }),
+        (error) => error.name === 'TypeError' && error.kind === 'invalid_type'
+      );
+    }
+  }
+});
