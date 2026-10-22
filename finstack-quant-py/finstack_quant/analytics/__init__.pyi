@@ -1728,9 +1728,7 @@ class Performance:
             Benchmark column name. Defaults to the first column when ``None``.
         frequency : str, optional
             Return aggregation frequency. One of ``"daily"``, ``"weekly"``,
-            ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, or ``"annual"``,
-            or a pandas offset alias (``D``/``B``, ``W``, ``M``/``ME``,
-            ``Q``/``QE``, ``A``/``Y``/``YE``). Sets the annualization factor
+            ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, or ``"annual"``. Sets the annualization factor
             (252, 52, 12, 4, 2, 1).
             ``None`` uses the Rust default ``DEFAULT_FREQUENCY`` (daily).
 
@@ -1771,8 +1769,7 @@ class Performance:
             Benchmark ticker name. Defaults to the first column when ``None``.
         frequency : str, optional
             One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
-            ``"semi_annual"``, or ``"annual"``, or a pandas offset alias
-            (``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``).
+            ``"semi_annual"``, or ``"annual"``.
             Default ``"daily"``.
 
         Returns
@@ -1819,8 +1816,7 @@ class Performance:
             Benchmark column name. Defaults to the first column when ``None``.
         frequency : str, optional
             One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
-            ``"semi_annual"``, or ``"annual"``, or a pandas offset alias
-            (``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``).
+            ``"semi_annual"``, or ``"annual"``.
             Default ``"daily"``.
 
         Raises
@@ -1872,8 +1868,7 @@ class Performance:
             Benchmark ticker name.
         frequency : str, optional
             One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
-            ``"semi_annual"``, or ``"annual"``, or a pandas offset alias
-            (``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``).
+            ``"semi_annual"``, or ``"annual"``.
             Default ``"daily"``.
 
         Returns
@@ -3356,8 +3351,7 @@ class Performance:
             Rust ``Performance::ticker_index``.
         aggregation_frequency : str, optional
             Aggregation frequency (``"daily"``, ``"weekly"``, ``"monthly"``,
-            ``"quarterly"``, ``"semi_annual"``, ``"annual"`` or a pandas
-            offset alias); ``None`` uses the Rust default
+            ``"quarterly"``, ``"semi_annual"``, ``"annual"``); ``None`` uses the Rust default
             ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
         fiscal_year_start_month : int, optional
             Fiscal year start month in ``1..=12``. When only the day is given
@@ -3390,8 +3384,7 @@ class Performance:
         frequency : str, optional
             Calendar-bucketing frequency: one of ``"daily"``, ``"weekly"``,
             ``"monthly"``, ``"quarterly"``, ``"semi_annual"``, or
-            ``"annual"`` (pandas offset aliases ``D``/``B``, ``W``, ``M``/``ME``,
-            ``Q``/``QE``, ``A``/``Y``/``YE`` are accepted too); ``None`` uses the Rust
+            ``"annual"``; ``None`` uses the Rust
             default ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
 
         Returns

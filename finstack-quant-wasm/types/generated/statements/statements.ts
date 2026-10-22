@@ -2012,11 +2012,9 @@ export type TableColumnRole = "dimension" | "index" | "measure" | "attribute";
  * calendar-day convention (365 per year). Use `Weekly` if you need
  * calendar-week granularity.
  *
- * Parses the snake_case wire values via [`std::str::FromStr`]
- * (for example, `"quarterly"` or `"semi_annual"`). The parser also accepts
- * the `"semiannual"` spelling and the pandas offset aliases `D`/`B`
- * (daily), `W` (weekly), `M`/`ME` (monthly), `Q`/`QE` (quarterly) and
- * `A`/`Y`/`YE` (annual); serde (de)serialization stays strict snake_case.
+ * Parses only the canonical snake_case wire values via [`std::str::FromStr`]:
+ * `daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.
+ * Aliases, whitespace padding and case variants are rejected.
  */
 export type PeriodKind = "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
 /**

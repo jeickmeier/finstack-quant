@@ -1408,7 +1408,9 @@ class PeriodKind:
     """
     Frequency kind used to label schedule periods (month, quarter, year).
 
-    Immutable, hashable enum-style type.
+    Immutable, hashable enum-style type. Parsing accepts only ``daily``,
+    ``weekly``, ``monthly``, ``quarterly``, ``semi_annual`` and ``annual``.
+    Aliases, case variants and whitespace padding are rejected.
 
     Examples
     --------
@@ -1439,7 +1441,8 @@ class PeriodKind:
         Parameters
         ----------
         name : str
-            Exact canonical period-kind name, such as ``"quarterly"`` or ``"annual"``.
+            Exact canonical name: ``daily``, ``weekly``, ``monthly``,
+            ``quarterly``, ``semi_annual`` or ``annual``.
 
         Returns
         -------

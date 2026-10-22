@@ -40,13 +40,17 @@ impl std::str::FromStr for CagrDayCount {
 
     /// Parse a CAGR day-count label.
     ///
-    /// Accepts `"act365_25"`, `"act_365_25"` or `"act/365.25"` for
-    /// [`CagrDayCount::Act365_25`]; every other token is parsed as a core
+    /// Accepts only `"act365_25"` for
+    /// [`CagrDayCount::Act365_25`]; every other token is parsed as a canonical core
     /// [`DayCount`] name (for example `"act_365f"`, `"bus_252"`).
+    ///
+    /// # Arguments
+    ///
+    /// * `label` - Exact canonical day-count token; case variants, aliases and padding are rejected.
     fn from_str(label: &str) -> Result<Self, Self::Err> {
         match label {
-            "act365_25" | "act_365_25" | "act/365.25" => Ok(Self::Act365_25),
-            other => other.parse::<DayCount>().map(Self::DayCount),
+            "act365_25" => Ok(Self::Act365_25),
+            other => finstack_quant_core::wire::serde_parse::<DayCount>(other).map(Self::DayCount),
         }
     }
 }
@@ -576,6 +580,27 @@ pub(crate) fn modified_sharpe(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cagr_day_count_rejects_noncanonical_labels() {
+        assert_eq!(
+            "act365_25"
+                .parse::<super::CagrDayCount>()
+                .expect("canonical"),
+            super::CagrDayCount::Act365_25
+        );
+        for label in [
+            "act_365_25",
+            "act/365.25",
+            "Act365_25",
+            " act365_25",
+            "ACT/365F",
+            "act_365_fixed",
+            "",
+        ] {
+            assert!(label.parse::<super::CagrDayCount>().is_err(), "{label}");
+        }
+    }
+
     use super::*;
     use finstack_quant_core::math::stats::{mean, variance};
     use time::Month;

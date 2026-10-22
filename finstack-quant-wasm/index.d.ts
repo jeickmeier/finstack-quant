@@ -9001,7 +9001,7 @@ declare class Performance {
    * const [[point]] = perf.periodicReturns();
    * console.log(point.date, point.value); // "2024-01-02", 0.0302
    * ```
-   * @param frequency - Optional calendar frequency token: `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE` are accepted too); defaults to `"monthly"`.
+   * @param frequency - Optional calendar frequency token: `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or `"annual"`; defaults to `"monthly"`.
    * @returns Ticker-major nested arrays of chronological Rust `PeriodicReturn` `{ date, value }` points with simple decimal returns.
    * @throws Error - Rejects an unsupported frequency or a panel that cannot be serialized to JavaScript.
    */
@@ -28419,11 +28419,7 @@ export interface VolatilityNamespace {
    * @returns The bilinearly interpolated volatility in the slice's quote convention.
    * @throws Error - Throws a `validation` error if a coordinate is non-finite or outside the grid.
    */
-  getCubeExpirySliceVol(
-    slice: VolCubeExpirySlice,
-    tenor: number,
-    strike: number
-  ): number;
+  getCubeExpirySliceVol(slice: VolCubeExpirySlice, tenor: number, strike: number): number;
   /**
    * Interpolate a fixed-expiry cube slice with flat clamping to the grid edges.
    * @param slice - `core.VolCubeExpirySlice` handle.
@@ -28432,11 +28428,7 @@ export interface VolatilityNamespace {
    * @returns The interpolated volatility in the slice's quote convention; `NaN` for non-finite coordinates.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `tenor` or `strike` is not a number.
    */
-  getCubeExpirySliceVolClamped(
-    slice: VolCubeExpirySlice,
-    tenor: number,
-    strike: number
-  ): number;
+  getCubeExpirySliceVolClamped(slice: VolCubeExpirySlice, tenor: number, strike: number): number;
   /**
    * Evaluate checked normal/Bachelier volatility from a data-only SABR cube.
    * @returns Annualized normal volatility in absolute rate units.
@@ -28728,11 +28720,7 @@ export interface VolatilityNamespace {
    * @returns The interpolated volatility, as a decimal.
    * @throws Error - Throws a `validation` error if a coordinate is outside the grid.
    */
-  getSurfaceVol(
-    surface: VolSurface,
-    expiry: number,
-    strike: number
-  ): number;
+  getSurfaceVol(surface: VolSurface, expiry: number, strike: number): number;
   /**
    * Interpolate a volatility surface with flat clamping to the grid edges.
    * @param surface - `core.VolSurface` handle.
@@ -28741,11 +28729,7 @@ export interface VolatilityNamespace {
    * @returns The interpolated volatility, as a decimal; `NaN` for non-finite coordinates.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `expiry` or `strike` is not a number.
    */
-  getSurfaceVolClamped(
-    surface: VolSurface,
-    expiry: number,
-    strike: number
-  ): number;
+  getSurfaceVolClamped(surface: VolSurface, expiry: number, strike: number): number;
   /**
    * Materialize the Black volatility slice of a SABR cube at one option expiry.
    * @param cube - `core.VolCube` handle.
@@ -28780,11 +28764,7 @@ export interface VolatilityNamespace {
    * @returns The expiry by strike `core.VolSurface` handle.
    * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
-  materializeCubeTenorSlice(
-    cube: VolCube,
-    tenor: number,
-    strikes: NumericArray
-  ): VolSurface;
+  materializeCubeTenorSlice(cube: VolCube, tenor: number, strikes: NumericArray): VolSurface;
   /**
    * Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.
    * @param cube - `core.VolCube` handle.
@@ -28793,11 +28773,7 @@ export interface VolatilityNamespace {
    * @returns The expiry by strike `core.VolSurface` handle of normal volatilities.
    * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
-  materializeCubeTenorSliceNormal(
-    cube: VolCube,
-    tenor: number,
-    strikes: NumericArray
-  ): VolSurface;
+  materializeCubeTenorSliceNormal(cube: VolCube, tenor: number, strikes: NumericArray): VolSurface;
   /**
    * Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
    * @param surface - `core.FxDeltaVolSurface` handle.
@@ -34258,7 +34234,10 @@ export interface PortfolioNamespace {
    * @param market - `core.MarketContext` handle supplying the FX spots that convert out-of-base metrics.
    * @throws Error - Throws a JavaScript exception if the valuation input is malformed, a required FX conversion is unavailable or invalid, or the metrics cannot be converted to a JavaScript value.
    */
-  aggregateMetrics(valuationJson: PortfolioValuation | string, market: MarketContext): PortfolioMetrics;
+  aggregateMetrics(
+    valuationJson: PortfolioValuation | string,
+    market: MarketContext
+  ): PortfolioMetrics;
   /**
    * Decoded series of one base metric from aggregated portfolio metrics (twin of Python `PortfolioMetrics.metric_series`).
    * @param metricsJson - `PortfolioMetrics` from `aggregateMetrics` (object or JSON).

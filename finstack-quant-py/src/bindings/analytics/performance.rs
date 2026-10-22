@@ -6,6 +6,7 @@ use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{dates_to_pylist, int_values_to_series, values_to_series};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::analytics_to_py;
 use finstack_quant_analytics::{
     CagrDayCount, Performance, ReturnKind, DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE,
@@ -44,12 +45,7 @@ fn resolve_optional_calendar(
         .map_err(analytics_to_py)
 }
 
-/// Parse a frequency token into a [`PeriodKind`].
-///
-/// Accepts the canonical tokens (`daily`, `weekly`, `monthly`, `quarterly`,
-/// `semi_annual`, `annual`) plus the pandas offset aliases `D`/`B`, `W`,
-/// `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE`; the descriptive error comes from core.
-/// An omitted token resolves to `default`, a Rust-owned constant.
+/// Parse a canonical frequency label, or use the Rust default when omitted.
 fn parse_frequency(frequency: Option<&str>, default: PeriodKind) -> PyResult<PeriodKind> {
     Ok(frequency
         .map(str::parse::<PeriodKind>)
@@ -226,36 +222,6 @@ impl PyPerformance {
 
 #[pymethods]
 impl PyPerformance {
-    /// Construct from a pandas DataFrame (or Series) of prices.
-    ///
-    /// The index must contain ``datetime.date`` or ``pd.Timestamp`` values,
-    /// and each column represents one ticker's price series. A
-    /// ``pandas.Series`` is treated as a single-asset panel whose ticker is
-    /// the series ``name`` (``"asset"`` when unnamed).
-    ///
-    /// Parameters
-    /// ----------
-    /// prices : pandas.DataFrame | pandas.Series
-    ///     Price panel with a date-like index and one ``str`` column per
-    ///     ticker, or a single-asset price ``Series``.
-    /// benchmark_ticker : str, optional
-    ///     Benchmark column name; defaults to the first column.
-    /// frequency : str, optional
-    ///     Observation frequency: ``"daily"``, ``"weekly"``, ``"monthly"``,
-    ///     ``"quarterly"``, ``"semi_annual"``, ``"annual"`` or a pandas offset
-    ///     alias (``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``,
-    ///     ``A``/``Y``/``YE``). Sets the annualization factor
-    ///     (252, 52, 12, 4, 2, 1). ``None`` uses the Rust
-    ///     default ``DEFAULT_FREQUENCY`` (daily).
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``prices`` is not a DataFrame or Series, or its columns are not
-    ///     ``str``.
-    /// AnalyticsError
-    ///     If the panel is empty, dates are not strictly ascending, or
-    ///     ``frequency`` is unknown.
     #[new]
     #[pyo3(signature = (prices, benchmark_ticker=None, frequency=None))]
     fn new(
@@ -280,7 +246,7 @@ impl PyPerformance {
         )
     }
 
-    /// Construct from raw arrays (dates, prices matrix, ticker names).
+    #[doc = pydoc!("finstack_quant.analytics", "Performance.from_arrays")]
     #[staticmethod]
     #[pyo3(signature = (dates, prices, ticker_names, benchmark_ticker=None, frequency=None))]
     fn from_arrays(
@@ -303,12 +269,7 @@ impl PyPerformance {
         )
     }
 
-    /// Construct from a pandas DataFrame (or Series) of simple returns.
-    ///
-    /// The index must contain ``datetime.date`` or ``pd.Timestamp`` values,
-    /// and each column represents one ticker's simple-return series aligned
-    /// with the index. A ``pandas.Series`` is treated as a single-asset panel
-    /// whose ticker is the series ``name`` (``"asset"`` when unnamed).
+    #[doc = pydoc!("finstack_quant.analytics", "Performance.from_returns")]
     #[staticmethod]
     #[pyo3(signature = (returns, benchmark_ticker=None, frequency=None))]
     fn from_returns(
@@ -333,7 +294,7 @@ impl PyPerformance {
         )
     }
 
-    /// Construct from raw return arrays (dates, returns matrix, ticker names).
+    #[doc = pydoc!("finstack_quant.analytics", "Performance.from_returns_arrays")]
     #[staticmethod]
     #[pyo3(signature = (dates, returns, ticker_names, benchmark_ticker=None, frequency=None))]
     fn from_returns_arrays(
@@ -385,12 +346,7 @@ impl PyPerformance {
         self.inner.benchmark_idx()
     }
 
-    /// Observation frequency, as the canonical lowercase token (``"daily"``,
-    /// ``"weekly"``, ``"monthly"``, ``"quarterly"``, ``"semi_annual"``,
-    /// ``"annual"``) that round-trips through the ``frequency`` constructor
-    /// argument and the :meth:`period_stats` ``aggregation_frequency``
-    /// parameter. Inputs also accept the pandas offset aliases ``D``/``B``,
-    /// ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``.
+    #[doc = pydoc!("finstack_quant.analytics", "Performance.frequency")]
     #[getter]
     fn frequency(&self) -> String {
         self.inner.frequency().to_string()
@@ -432,17 +388,7 @@ impl PyPerformance {
 
     // -- Scalar-per-ticker methods --
 
-    /// CAGR for each ticker.
-    ///
-    /// ``day_count=None`` uses Act/365.25 (the Rust ``CagrDayCount`` default). Pass ``"act365_25"`` for the same
-    /// default, a core DayCount name such as ``"act_365f"`` / ``"bus_252"``,
-    /// or a :class:`~finstack_quant.core.dates.DayCount`. ``bus_252`` requires
-    /// ``calendar_id``.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.Series
-    ///     Compound annual growth rate indexed by ticker name.
+    #[doc = pydoc!("finstack_quant.analytics", "Performance.cagr")]
     #[pyo3(signature = (day_count = None, calendar_id = None))]
     fn cagr<'py>(
         &self,
@@ -1002,20 +948,7 @@ impl PyPerformance {
         self.inner.cumulative_returns()
     }
 
-    /// Calendar-bucketed compounded returns for each ticker.
-    ///
-    /// ``frequency`` accepts ``"daily"``, ``"weekly"``, ``"monthly"``,
-    /// ``"quarterly"``, ``"semi_annual"``, or ``"annual"`` (or the pandas
-    /// offset aliases ``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``). The outer list is
-    /// ticker-major in :attr:`ticker_names` order. Each inner list contains
-    /// chronological ``(period_end_date, compounded_return)`` tuples, where
-    /// returns are decimal fractions (``0.01`` means 1%). Chaining the values
-    /// for a ticker reconciles with its final :meth:`cumulative_returns` value.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``frequency`` is not a supported token.
+    #[doc = pydoc!("finstack_quant.analytics", "Performance.periodic_returns")]
     #[pyo3(signature = (frequency = None))]
     fn periodic_returns<'py>(
         &self,
@@ -1257,7 +1190,7 @@ impl PyPerformance {
         })
     }
 
-    /// Period statistics for a specific ticker at a given aggregation frequency.
+    #[doc = pydoc!("finstack_quant.analytics", "Performance.period_stats")]
     #[pyo3(signature = (ticker_idx, aggregation_frequency = None, fiscal_year_start_month = None, fiscal_year_start_day = None))]
     fn period_stats(
         &self,
