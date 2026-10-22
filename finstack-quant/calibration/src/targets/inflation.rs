@@ -323,28 +323,22 @@ impl InflationCurveTarget {
         Ok((curve, report))
     }
 
-    fn cpi_hard_min(&self) -> f64 {
-        self.config.inflation_curve.cpi_hard_min
-    }
-
-    fn cpi_hard_max(&self) -> f64 {
-        self.config.inflation_curve.cpi_hard_max
-    }
-
     /// Compute CPI bounds for a given time based on reasonable inflation rate bounds.
     fn cpi_bounds_for_time(&self, time: f64) -> Result<(f64, f64)> {
         let base_cpi = self.effective_base_cpi()?;
         let min_inflation = -0.10_f64;
         let max_inflation = 0.50_f64;
-        let cpi_lo = (base_cpi * (1.0 + min_inflation).powf(time)).max(self.cpi_hard_min());
-        let cpi_hi = (base_cpi * (1.0 + max_inflation).powf(time)).min(self.cpi_hard_max());
+        let cpi_lo = (base_cpi * (1.0 + min_inflation).powf(time))
+            .max(self.config.inflation_curve.cpi_hard_min);
+        let cpi_hi = (base_cpi * (1.0 + max_inflation).powf(time))
+            .min(self.config.inflation_curve.cpi_hard_max);
         Ok((cpi_lo, cpi_hi))
     }
 
     /// Validate a CPI knot value.
     fn validate_cpi_knot(&self, time: f64, value: f64) -> Result<()> {
-        let cpi_min = self.cpi_hard_min();
-        let cpi_max = self.cpi_hard_max();
+        let cpi_min = self.config.inflation_curve.cpi_hard_min;
+        let cpi_max = self.config.inflation_curve.cpi_hard_max;
         if !value.is_finite() {
             return Err(finstack_quant_core::Error::Calibration {
                 message: format!(

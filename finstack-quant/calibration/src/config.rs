@@ -547,7 +547,7 @@ pub struct CalibrationConfig {
     #[serde(default)]
     pub validation: crate::validation::ValidationConfig,
     /// Policy for selecting rate bounds (explicit vs currency-derived).
-    #[serde(default = "crate::validation::default_rate_bounds_policy_for_serde")]
+    #[serde(default)]
     pub rate_bounds_policy: RateBoundsPolicy,
     /// Rate bounds for forward/zero rate calibration (when policy is `Explicit`).
     #[serde(default)]

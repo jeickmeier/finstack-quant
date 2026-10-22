@@ -4,11 +4,6 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
-pub(crate) fn default_rate_bounds_policy_for_serde() -> RateBoundsPolicy {
-    // plan-driven default: choose currency-aware bounds unless explicitly overridden.
-    RateBoundsPolicy::AutoCurrency
-}
-
 /// Configurable bounds for forward/zero rates during calibration.
 ///
 /// Different market regimes require different rate bounds:

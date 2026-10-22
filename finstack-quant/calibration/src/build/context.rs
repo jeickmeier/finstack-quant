@@ -126,14 +126,9 @@ impl BuildCtx {
         self.notional
     }
 
-    /// Get a curve ID by role name.
-    pub(crate) fn curve_id(&self, role: &str) -> Option<&str> {
-        self.curve_ids.get(role).map(|s| s.as_str())
-    }
-
     /// Get a required curve ID by role name.
     pub(crate) fn require_curve_id(&self, role: &str) -> Result<&str> {
-        self.curve_id(role).ok_or_else(|| {
+        self.curve_ids.get(role).map(String::as_str).ok_or_else(|| {
             Error::Input(InputError::NotFound {
                 id: format!("curve role '{}'", role),
             })

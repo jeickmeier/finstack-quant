@@ -15,7 +15,6 @@ mod points;
 mod preflight;
 pub(crate) mod surfaces;
 
-pub(crate) use config::default_rate_bounds_policy_for_serde;
 pub use config::{RateBounds, RateBoundsPolicy, ValidationConfig, ValidationMode};
 pub use curves::CurveValidator;
 pub(crate) use preflight::preflight_step;
