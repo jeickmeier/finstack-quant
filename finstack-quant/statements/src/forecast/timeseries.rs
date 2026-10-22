@@ -313,12 +313,11 @@ pub(super) fn timeseries_forecast(
 /// # Returns
 ///
 /// A tuple `(slope, intercept)` where `y = slope * x + intercept`.
-/// For degenerate cases (constant x or insufficient data), returns `(0.0, mean_y)`.
+/// The caller must provide at least two observations, validated by
+/// [`timeseries_forecast`].
 fn calculate_linear_trend(data: &[f64]) -> (f64, f64) {
+    debug_assert!(data.len() >= 2);
     let n = data.len() as f64;
-    if n == 0.0 {
-        return (0.0, 0.0);
-    }
 
     // Mean of x values (1-indexed: 1, 2, ..., n)
     let x_bar = (n + 1.0) / 2.0;
@@ -335,11 +334,6 @@ fn calculate_linear_trend(data: &[f64]) -> (f64, f64) {
         den += dx * dx;
     }
 
-    // Guard against degenerate cases (near-zero denominator)
-    if den.abs() < ZERO_TOLERANCE {
-        return (0.0, y_bar);
-    }
-
     let slope = num / den;
     let intercept = y_bar - slope * x_bar;
 
@@ -354,17 +348,12 @@ fn calculate_linear_trend(data: &[f64]) -> (f64, f64) {
 /// `ℓ_t = α·y_t + (1−α)(ℓ_{t−1} + φ·b_{t−1})`,
 /// `b_t = β(ℓ_t − ℓ_{t−1}) + (1−β)·φ·b_{t−1}`.
 fn double_exponential_smoothing(data: &[f64], alpha: f64, beta: f64, phi: f64) -> (f64, f64) {
-    if data.is_empty() {
-        return (0.0, 0.0);
-    }
+    // The public forecast entry requires at least two observations.
+    debug_assert!(data.len() >= 2);
 
     let mut level = data[0];
     let init_window = data.len().min(10);
-    let mut trend = if init_window >= 2 {
-        (data[init_window - 1] - data[0]) / (init_window - 1) as f64
-    } else {
-        0.0
-    };
+    let mut trend = (data[init_window - 1] - data[0]) / (init_window - 1) as f64;
 
     for &value in data.iter().skip(1) {
         let prev_level = level;
@@ -508,7 +497,7 @@ fn seasonal_forecast_with_decomposition(
         // Seasonal factors are keyed by data position; adding season_start here
         // would double-shift the cycle (e.g. apply the Q4 uplift to Q1).
         let season_idx = (hist_data.len() + i) % season_length;
-        let seasonal_value = seasonal.get(season_idx).copied().unwrap_or(0.0);
+        let seasonal_value = seasonal[season_idx];
 
         let value = match mode {
             SeasonalMode::Additive => trend_value + seasonal_value,
@@ -530,7 +519,8 @@ fn seasonal_forecast_with_decomposition(
 }
 
 /// Decompose a time series into trend and seasonal components using a simple
-/// moving-average trend.
+/// moving-average trend. The caller validates a positive season length and
+/// at least two complete seasons before entering the decomposition helpers.
 fn decompose_series_with_mode(
     data: &[f64],
     season_length: usize,
@@ -547,9 +537,7 @@ fn decompose_series_with_mode(
 fn calculate_trend_component(data: &[f64], season_length: usize) -> Vec<f64> {
     debug_assert!(season_length > 0, "season_length must be > 0");
     debug_assert!(!data.is_empty(), "data must not be empty");
-    if season_length == 0 || data.is_empty() {
-        return Vec::new();
-    }
+    debug_assert!(data.len() / season_length >= 2);
     let n = data.len();
     let mut trend = vec![0.0; n];
     let half_season = season_length / 2;
@@ -579,13 +567,29 @@ fn calculate_trend_component(data: &[f64], season_length: usize) -> Vec<f64> {
     // Extrapolate trend to edges using linear extrapolation from the first /
     // last two centered-MA points. Guard indices and require finite, non-equal
     // values before computing the slope.
-    if n > season_length {
-        // Front extrapolation: slope from the first two centered trend points.
-        let slope_front = if half_season + 1 < n
-            && trend[half_season].is_finite()
-            && trend[half_season + 1].is_finite()
-        {
-            let diff = trend[half_season + 1] - trend[half_season];
+    // Front extrapolation: slope from the first two centered trend points.
+    let slope_front = if half_season + 1 < n
+        && trend[half_season].is_finite()
+        && trend[half_season + 1].is_finite()
+    {
+        let diff = trend[half_season + 1] - trend[half_season];
+        if diff.abs() > ZERO_TOLERANCE {
+            diff
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+    for i in 0..half_season {
+        trend[i] = trend[half_season] - slope_front * (half_season - i) as f64;
+    }
+
+    // Back extrapolation: slope from the last two centered trend points.
+    let last_valid = n.saturating_sub(half_season + 1);
+    let slope_back =
+        if last_valid > 0 && trend[last_valid].is_finite() && trend[last_valid - 1].is_finite() {
+            let diff = trend[last_valid] - trend[last_valid - 1];
             if diff.abs() > ZERO_TOLERANCE {
                 diff
             } else {
@@ -594,34 +598,9 @@ fn calculate_trend_component(data: &[f64], season_length: usize) -> Vec<f64> {
         } else {
             0.0
         };
-        for i in 0..half_season {
-            trend[i] = trend[half_season] - slope_front * (half_season - i) as f64;
-        }
-
-        // Back extrapolation: slope from the last two centered trend points.
-        let last_valid = n.saturating_sub(half_season + 1);
-        let slope_back =
-            if last_valid > 0 && trend[last_valid].is_finite() && trend[last_valid - 1].is_finite()
-            {
-                let diff = trend[last_valid] - trend[last_valid - 1];
-                if diff.abs() > ZERO_TOLERANCE {
-                    diff
-                } else {
-                    0.0
-                }
-            } else {
-                0.0
-            };
-        for i in (n.saturating_sub(half_season))..n {
-            let steps = i - (n - half_season - 1);
-            trend[i] = trend[n - half_season - 1] + slope_back * steps as f64;
-        }
-    } else {
-        // For short series, use simple average as trend
-        let avg = data.iter().sum::<f64>() / n as f64;
-        for trend_val in trend.iter_mut().take(n) {
-            *trend_val = avg;
-        }
+    for i in (n.saturating_sub(half_season))..n {
+        let steps = i - (n - half_season - 1);
+        trend[i] = trend[n - half_season - 1] + slope_back * steps as f64;
     }
 
     trend
@@ -629,9 +608,6 @@ fn calculate_trend_component(data: &[f64], season_length: usize) -> Vec<f64> {
 
 fn decompose_additive(data: &[f64], season_length: usize, trend: Vec<f64>) -> (Vec<f64>, Vec<f64>) {
     debug_assert!(season_length > 0, "season_length must be > 0");
-    if season_length == 0 {
-        return (trend, Vec::new());
-    }
     let n = data.len();
 
     let detrended: Vec<f64> = data.iter().zip(&trend).map(|(d, t)| d - t).collect();
@@ -648,9 +624,7 @@ fn decompose_additive(data: &[f64], season_length: usize, trend: Vec<f64>) -> (V
             idx += season_length;
         }
 
-        if count > 0 {
-            *seasonal_val = sum / count as f64;
-        }
+        *seasonal_val = sum / count as f64;
     }
 
     // Normalize seasonal component (sum to zero for additive)
@@ -668,9 +642,6 @@ fn decompose_multiplicative(
     trend: Vec<f64>,
 ) -> Result<(Vec<f64>, Vec<f64>)> {
     debug_assert!(season_length > 0, "season_length must be > 0");
-    if season_length == 0 {
-        return Ok((trend, Vec::new()));
-    }
     let n = data.len();
 
     // A multiplicative decomposition divides by the trend, so it is undefined
@@ -707,9 +678,7 @@ fn decompose_multiplicative(
             idx += season_length;
         }
 
-        if count > 0 {
-            *seasonal_val = sum / count as f64;
-        }
+        *seasonal_val = sum / count as f64;
     }
 
     let seasonal_mean = seasonal.iter().sum::<f64>() / season_length as f64;
