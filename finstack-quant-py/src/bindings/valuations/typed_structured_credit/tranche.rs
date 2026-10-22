@@ -16,11 +16,10 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 };
 use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
 
-use super::super::instruments::enum_from_str;
+use super::super::convert::enum_from_str;
 use super::super::typed_macros::builder_set;
 
-type TrancheBuilderInner =
-    finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder;
 
 /// Typed wrapper for the Rust `Tranche`.
 #[pyclass(
@@ -219,7 +218,7 @@ crate::bindings::macros::py_getters!(PyTranche |s| {
     skip_from_py_object
 )]
 pub struct PyTrancheBuilder {
-    inner: Option<TrancheBuilderInner>,
+    inner: Option<TrancheBuilder>,
     attach_pct: Option<f64>,
     detach_pct: Option<f64>,
 }
@@ -245,7 +244,7 @@ impl PyTrancheBuilder {
     ///     :meth:`TrancheBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, |b: TrancheBuilderInner| b.id(value))
+        builder_set!(slf, |b: TrancheBuilder| b.id(value))
     }
 
     /// Set the attachment point.
@@ -319,7 +318,7 @@ impl PyTrancheBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn seniority<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let seniority: TrancheSeniority = enum_from_str(value, "seniority")?;
-        builder_set!(slf, |b: TrancheBuilderInner| b.seniority(seniority))
+        builder_set!(slf, |b: TrancheBuilder| b.seniority(seniority))
     }
 
     /// Set the original tranche balance.
@@ -348,7 +347,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, |b: TrancheBuilderInner| b.balance(value.inner))
+        builder_set!(slf, |b: TrancheBuilder| b.balance(value.inner))
     }
 
     /// Set a fixed-rate coupon.
@@ -374,8 +373,7 @@ impl PyTrancheBuilder {
         rate: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let rate = extract_rate_decimal(rate, "rate")?;
-        builder_set!(slf, |b: TrancheBuilderInner| b
-            .coupon(RateSpec::Fixed { rate }))
+        builder_set!(slf, |b: TrancheBuilder| b.coupon(RateSpec::Fixed { rate }))
     }
 
     /// Set a floating-rate coupon from a JSON ``RateSpec::Floating`` payload.
@@ -406,7 +404,7 @@ impl PyTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let coupon: RateSpec = crate::bindings::module_utils::py_to_serde(py, value, "coupon")?;
-        builder_set!(slf, |b: TrancheBuilderInner| b.coupon(coupon))
+        builder_set!(slf, |b: TrancheBuilder| b.coupon(coupon))
     }
 
     /// Set the legal final maturity date.
@@ -432,7 +430,7 @@ impl PyTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let maturity = py_to_date(value)?;
-        builder_set!(slf, |b: TrancheBuilderInner| b.maturity(maturity))
+        builder_set!(slf, |b: TrancheBuilder| b.maturity(maturity))
     }
 
     /// Set the payment frequency.
@@ -458,7 +456,7 @@ impl PyTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let frequency = crate::bindings::core::dates::tenor::extract_tenor(value)?;
-        builder_set!(slf, |b: TrancheBuilderInner| b.frequency(frequency))
+        builder_set!(slf, |b: TrancheBuilder| b.frequency(frequency))
     }
 
     /// Set the day count convention for interest accrual.
@@ -485,7 +483,7 @@ impl PyTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let day_count =
             crate::bindings::valuations::convert::day_count_from_py(value, "day_count")?;
-        builder_set!(slf, |b: TrancheBuilderInner| b.day_count(day_count))
+        builder_set!(slf, |b: TrancheBuilder| b.day_count(day_count))
     }
 
     /// Set the current (factored) balance.
@@ -511,7 +509,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, |b: TrancheBuilderInner| b.current_balance(value.inner))
+        builder_set!(slf, |b: TrancheBuilder| b.current_balance(value.inner))
     }
 
     /// Set interest already deferred (unpaid, still owed) at closing.
@@ -537,8 +535,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, |b: TrancheBuilderInner| b
-            .deferred_interest(value.inner))
+        builder_set!(slf, |b: TrancheBuilder| b.deferred_interest(value.inner))
     }
 
     /// Enable payment-in-kind accretion of interest shortfalls.
@@ -564,7 +561,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, |b: TrancheBuilderInner| b.pik_enabled(value))
+        builder_set!(slf, |b: TrancheBuilder| b.pik_enabled(value))
     }
 
     /// Mark the coupon non-deferrable or deferrable, overriding the
@@ -592,7 +589,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, |b: TrancheBuilderInner| b.non_deferrable(value))
+        builder_set!(slf, |b: TrancheBuilder| b.non_deferrable(value))
     }
 
     /// Set the credit rating.
@@ -614,7 +611,7 @@ impl PyTrancheBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn rating<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let rating: CreditRating = value.parse().map_err(core_to_py)?;
-        builder_set!(slf, |b: TrancheBuilderInner| b.rating(rating))
+        builder_set!(slf, |b: TrancheBuilder| b.rating(rating))
     }
 
     /// Attach a per-tranche overcollateralization trigger.
@@ -643,7 +640,7 @@ impl PyTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let trigger: CoverageTrigger =
             crate::bindings::module_utils::py_to_serde(py, value, "oc_trigger")?;
-        builder_set!(slf, |b: TrancheBuilderInner| b.oc_trigger(trigger))
+        builder_set!(slf, |b: TrancheBuilder| b.oc_trigger(trigger))
     }
 
     /// Attach a per-tranche interest-coverage trigger.
@@ -670,7 +667,7 @@ impl PyTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let trigger: CoverageTrigger =
             crate::bindings::module_utils::py_to_serde(py, value, "ic_trigger")?;
-        builder_set!(slf, |b: TrancheBuilderInner| b.ic_trigger(trigger))
+        builder_set!(slf, |b: TrancheBuilder| b.ic_trigger(trigger))
     }
 
     /// Set free-form attributes (tags and metadata).
@@ -699,7 +696,7 @@ impl PyTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attributes = attributes_from_py(value)?;
-        builder_set!(slf, |b: TrancheBuilderInner| b.attributes(attributes))
+        builder_set!(slf, |b: TrancheBuilder| b.attributes(attributes))
     }
 
     /// Build the validated tranche.

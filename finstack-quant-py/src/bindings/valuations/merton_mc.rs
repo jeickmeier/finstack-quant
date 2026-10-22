@@ -529,7 +529,7 @@ impl PyMertonMcCalibrationSpec {
         Ok(Self {
             inner: MertonMcCalibrationSpec {
                 target,
-                parameter: super::instruments::enum_from_str(parameter, "calibration parameter")?,
+                parameter: super::convert::enum_from_str(parameter, "calibration parameter")?,
                 low_paths: low_paths.unwrap_or(defaults.low_paths),
                 max_iterations: max_iterations.unwrap_or(defaults.max_iterations),
                 tolerance_pv: tolerance_pv.unwrap_or(defaults.tolerance_pv),

@@ -598,12 +598,12 @@ setters!(JsFxForwardBuilder, "FxForwardBuilder", {
         /// @param value - Maturity/settlement date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => date,
+        maturity as maturity => js_date,
         /// Set the contract forward rate (quote per base).
         /// @param value - Contract forward rate; when never set the forward is valued at-market (zero PV at inception).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        contract_rate as contractRate => num,
+        contract_rate as contractRate => js_f64,
         /// Set the domestic (quote currency) discount curve identifier.
         /// @param value - Domestic (quote currency) discount curve identifier.
         /// @returns The builder, for chaining.
@@ -618,7 +618,7 @@ setters!(JsFxForwardBuilder, "FxForwardBuilder", {
         /// @param value - Spot FX rate; when never set the spot is sourced from the market's FX matrix.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        quoted_spot as quotedSpot => num,
+        quoted_spot as quotedSpot => js_f64,
         /// Set the base currency calendar identifier for business day adjustment.
         /// @param value - Base currency holiday calendar identifier.
         /// @returns The builder, for chaining.
@@ -716,17 +716,17 @@ setters!(JsFxOptionBuilder, "FxOptionBuilder", {
         /// @param value - Strike exchange rate, quote currency per unit of base currency.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        strike as strike => num,
+        strike as strike => js_f64,
         /// Set the option type: `"call"` or `"put"` on base currency.
         /// @param value - Option type of the FX option.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        option_type as optionType => en,
+        option_type as optionType => js_wire,
         /// Set the option expiry date.
         /// @param value - Option expiry date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        expiry as expiry => date,
+        expiry as expiry => js_date,
         /// Set the domestic currency discount curve identifier.
         /// @param value - Domestic currency discount curve identifier.
         /// @returns The builder, for chaining.

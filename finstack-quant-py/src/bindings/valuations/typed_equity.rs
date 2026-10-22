@@ -12,17 +12,16 @@ use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOptionMarketData, EquityOptionParams,
 };
 
+use super::convert::enum_from_str;
 use super::convert::{
     attributes_from_py, bool_repr, date_repr, day_count_from_py, enum_to_py_string, float_repr,
 };
-use super::instruments::enum_from_str;
-use super::typed_fx::typed_option_greeks;
+use super::pricing::typed_option_greeks;
 use super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_greek_methods, instrument_pricing_methods,
 };
 
-type EquityOptionBuilderInner =
-    finstack_quant_valuations::instruments::equity::equity_option::EquityOptionBuilder;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionBuilder;
 
 /// Vanilla equity option (typed wrapper for Rust ``EquityOption``).
 ///
@@ -354,7 +353,7 @@ instrument_greek_methods!(PyEquityOption("EquityOption") { delta, gamma, vega, t
     skip_from_py_object
 )]
 pub struct PyEquityOptionBuilder {
-    inner: Option<EquityOptionBuilderInner>,
+    inner: Option<EquityOptionBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -373,12 +372,8 @@ impl PyEquityOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            id,
-            format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.id(InstrumentId::new(value.to_string()))
-        )
+        builder_set!(slf, id, format!("{value:?}"), |b: EquityOptionBuilder| b
+            .id(InstrumentId::new(value.to_string())))
     }
 
     /// Set the underlying equity ticker symbol.
@@ -401,7 +396,7 @@ impl PyEquityOptionBuilder {
             slf,
             underlying_ticker,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.underlying_ticker(value.to_string())
+            |b: EquityOptionBuilder| b.underlying_ticker(value.to_string())
         )
     }
 
@@ -418,12 +413,8 @@ impl PyEquityOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn strike<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            strike,
-            float_repr(value),
-            |b: EquityOptionBuilderInner| b.strike(value)
-        )
+        builder_set!(slf, strike, float_repr(value), |b: EquityOptionBuilder| b
+            .strike(value))
     }
 
     /// Set the option type.
@@ -452,7 +443,7 @@ impl PyEquityOptionBuilder {
             slf,
             option_type,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.option_type(option_type)
+            |b: EquityOptionBuilder| b.option_type(option_type)
         )
     }
 
@@ -483,7 +474,7 @@ impl PyEquityOptionBuilder {
             slf,
             exercise_style,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.exercise_style(exercise_style)
+            |b: EquityOptionBuilder| b.exercise_style(exercise_style)
         )
     }
 
@@ -504,12 +495,8 @@ impl PyEquityOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let expiry = py_to_date(value)?;
-        builder_set!(
-            slf,
-            expiry,
-            date_repr(expiry),
-            |b: EquityOptionBuilderInner| b.expiry(expiry)
-        )
+        builder_set!(slf, expiry, date_repr(expiry), |b: EquityOptionBuilder| b
+            .expiry(expiry))
     }
 
     /// Set the day count for the time-to-expiry year fraction.
@@ -538,7 +525,7 @@ impl PyEquityOptionBuilder {
             slf,
             day_count,
             format!("DayCount('{day_count}')"),
-            |b: EquityOptionBuilderInner| b.day_count(day_count)
+            |b: EquityOptionBuilder| b.day_count(day_count)
         )
     }
 
@@ -565,7 +552,7 @@ impl PyEquityOptionBuilder {
             slf,
             settlement,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.settlement(settlement)
+            |b: EquityOptionBuilder| b.settlement(settlement)
         )
     }
 
@@ -607,7 +594,7 @@ impl PyEquityOptionBuilder {
             date_repr(exercise.settlement_date),
             bool_repr(exercise.exercised)
         );
-        builder_set!(slf, exercise, shown, |b: EquityOptionBuilderInner| b
+        builder_set!(slf, exercise, shown, |b: EquityOptionBuilder| b
             .exercise(exercise))
     }
 
@@ -628,7 +615,7 @@ impl PyEquityOptionBuilder {
             slf,
             quantity,
             float_repr(value),
-            |b: EquityOptionBuilderInner| b.quantity(value)
+            |b: EquityOptionBuilder| b.quantity(value)
         )
     }
 
@@ -658,7 +645,7 @@ impl PyEquityOptionBuilder {
             slf,
             currency,
             format!("{:?}", ccy.to_string()),
-            |b: EquityOptionBuilderInner| b.currency(ccy)
+            |b: EquityOptionBuilder| b.currency(ccy)
         )
     }
 
@@ -682,7 +669,7 @@ impl PyEquityOptionBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: EquityOptionBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -703,7 +690,7 @@ impl PyEquityOptionBuilder {
             slf,
             spot_id,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.spot_id(PriceId::new(value.to_string()))
+            |b: EquityOptionBuilder| b.spot_id(PriceId::new(value.to_string()))
         )
     }
 
@@ -727,7 +714,7 @@ impl PyEquityOptionBuilder {
             slf,
             vol_surface_id,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.vol_surface_id(CurveId::new(value.to_string()))
+            |b: EquityOptionBuilder| b.vol_surface_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -752,7 +739,7 @@ impl PyEquityOptionBuilder {
             slf,
             div_yield_id,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.div_yield_id(PriceId::new(value.to_string()))
+            |b: EquityOptionBuilder| b.div_yield_id(PriceId::new(value.to_string()))
         )
     }
 
@@ -787,12 +774,8 @@ impl PyEquityOptionBuilder {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-        builder_set!(
-            slf,
-            discrete_dividends,
-            shown,
-            |b: EquityOptionBuilderInner| b.discrete_dividends(dividends)
-        )
+        builder_set!(slf, discrete_dividends, shown, |b: EquityOptionBuilder| b
+            .discrete_dividends(dividends))
     }
 
     /// Set the exercise schedule for Bermudan options.
@@ -821,7 +804,7 @@ impl PyEquityOptionBuilder {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-        builder_set!(slf, exercise_dates, shown, |b: EquityOptionBuilderInner| b
+        builder_set!(slf, exercise_dates, shown, |b: EquityOptionBuilder| b
             .exercise_dates(dates))
     }
 
@@ -852,7 +835,7 @@ impl PyEquityOptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, attributes, shown, |b: EquityOptionBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: EquityOptionBuilder| b
             .attributes(attrs))
     }
 }

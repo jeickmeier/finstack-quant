@@ -23,19 +23,17 @@ use super::convert::{attributes_from_py, enum_to_py_string, money_from_py, money
 use super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
 use crate::bindings::extract::extract_rate_decimal;
 use crate::bindings::valuations::convert::money_repr;
-use crate::bindings::valuations::instruments::{
+use crate::bindings::valuations::convert::{
     decimal_from_f64, enum_from_str, instrument_expiry, opt_serde_to_py, stub_kind_from_py,
 };
 use crate::bindings::valuations::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 
-type IrsBuilder = finstack_quant_valuations::instruments::rates::irs::InterestRateSwapBuilder;
-type SwaptionBuilderInner =
-    finstack_quant_valuations::instruments::rates::swaption::SwaptionBuilder;
-type CapFloorBuilderInner =
-    finstack_quant_valuations::instruments::rates::cap_floor::CapFloorBuilder;
-type OtcMarginSpec = finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_valuations::instruments::rates::cap_floor::CapFloorBuilder;
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwapBuilder;
+use finstack_quant_valuations::instruments::rates::swaption::SwaptionBuilder;
 
 /// Render a `Decimal` as a Python float literal for reprs.
 fn decimal_f64(value: rust_decimal::Decimal) -> f64 {
@@ -248,7 +246,7 @@ crate::bindings::macros::py_getters!(PyInterestRateSwap |s| {
     skip_from_py_object
 )]
 pub struct PyInterestRateSwapBuilder {
-    inner: Option<IrsBuilder>,
+    inner: Option<InterestRateSwapBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -267,8 +265,12 @@ impl PyInterestRateSwapBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: IrsBuilder| b
-            .id(InstrumentId::new(value.to_string())))
+        builder_set!(
+            slf,
+            id,
+            format!("{value:?}"),
+            |b: InterestRateSwapBuilder| b.id(InstrumentId::new(value.to_string()))
+        )
     }
 
     /// Set the notional (both legs).
@@ -297,8 +299,12 @@ impl PyInterestRateSwapBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        builder_set!(slf, notional, money_repr(money), |b: IrsBuilder| b
-            .notional(money))
+        builder_set!(
+            slf,
+            notional,
+            money_repr(money),
+            |b: InterestRateSwapBuilder| b.notional(money)
+        )
     }
 
     /// Set the swap direction: ``"pay"`` or ``"receive"`` (fixed leg).
@@ -321,8 +327,12 @@ impl PyInterestRateSwapBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
-        builder_set!(slf, side, format!("{value:?}"), |b: IrsBuilder| b
-            .side(side))
+        builder_set!(
+            slf,
+            side,
+            format!("{value:?}"),
+            |b: InterestRateSwapBuilder| b.side(side)
+        )
     }
 
     /// Set the fixed leg specification.
@@ -341,8 +351,12 @@ impl PyInterestRateSwapBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFixedLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, fixed_leg, value.__repr__(), |b: IrsBuilder| b
-            .fixed_leg(value.inner.clone()))
+        builder_set!(
+            slf,
+            fixed_leg,
+            value.__repr__(),
+            |b: InterestRateSwapBuilder| b.fixed_leg(value.inner.clone())
+        )
     }
 
     /// Set the floating leg specification.
@@ -361,8 +375,12 @@ impl PyInterestRateSwapBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFloatLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, float_leg, value.__repr__(), |b: IrsBuilder| b
-            .float_leg(value.inner.clone()))
+        builder_set!(
+            slf,
+            float_leg,
+            value.__repr__(),
+            |b: InterestRateSwapBuilder| b.float_leg(value.inner.clone())
+        )
     }
 
     /// Select adjustment of fixed coupon accrual dates independently of payment dates.
@@ -378,7 +396,7 @@ impl PyInterestRateSwapBuilder {
             slf,
             adjust_fixed_accrual_dates,
             value.to_string(),
-            |b: IrsBuilder| b.adjust_fixed_accrual_dates(value)
+            |b: InterestRateSwapBuilder| b.adjust_fixed_accrual_dates(value)
         )
     }
 
@@ -395,7 +413,7 @@ impl PyInterestRateSwapBuilder {
             slf,
             adjust_float_accrual_dates,
             value.to_string(),
-            |b: IrsBuilder| b.adjust_float_accrual_dates(value)
+            |b: InterestRateSwapBuilder| b.adjust_float_accrual_dates(value)
         )
     }
 
@@ -422,8 +440,12 @@ impl PyInterestRateSwapBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: OtcMarginSpec = spec_from_py(py, value, "margin_spec")?;
-        builder_set!(slf, margin_spec, "{...}".to_string(), |b: IrsBuilder| b
-            .margin_spec(spec))
+        builder_set!(
+            slf,
+            margin_spec,
+            "{...}".to_string(),
+            |b: InterestRateSwapBuilder| b.margin_spec(spec)
+        )
     }
 
     /// Set instrument attributes (tags and metadata).
@@ -456,7 +478,7 @@ impl PyInterestRateSwapBuilder {
             slf,
             attributes,
             "Attributes(...)".to_string(),
-            |b: IrsBuilder| b.attributes(attrs)
+            |b: InterestRateSwapBuilder| b.attributes(attrs)
         )
     }
 }
@@ -635,7 +657,7 @@ crate::bindings::macros::py_getters!(PySwaption |s| {
     skip_from_py_object
 )]
 pub struct PySwaptionBuilder {
-    inner: Option<SwaptionBuilderInner>,
+    inner: Option<SwaptionBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -654,7 +676,7 @@ impl PySwaptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: SwaptionBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: SwaptionBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
@@ -684,7 +706,7 @@ impl PySwaptionBuilder {
             slf,
             option_type,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.option_type(option_type)
+            |b: SwaptionBuilder| b.option_type(option_type)
         )
     }
 
@@ -714,12 +736,8 @@ impl PySwaptionBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        builder_set!(
-            slf,
-            notional,
-            money_repr(money),
-            |b: SwaptionBuilderInner| b.notional(money)
-        )
+        builder_set!(slf, notional, money_repr(money), |b: SwaptionBuilder| b
+            .notional(money))
     }
 
     /// Set the option expiry date.
@@ -739,12 +757,8 @@ impl PySwaptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let expiry = py_to_date(value)?;
-        builder_set!(
-            slf,
-            expiry,
-            expiry.to_string(),
-            |b: SwaptionBuilderInner| b.expiry(expiry)
-        )
+        builder_set!(slf, expiry, expiry.to_string(), |b: SwaptionBuilder| b
+            .expiry(expiry))
     }
 
     /// Set the settlement method.
@@ -770,7 +784,7 @@ impl PySwaptionBuilder {
             slf,
             settlement,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.settlement(settlement)
+            |b: SwaptionBuilder| b.settlement(settlement)
         )
     }
 
@@ -803,7 +817,7 @@ impl PySwaptionBuilder {
             slf,
             cash_settlement_method,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.cash_settlement_method(method)
+            |b: SwaptionBuilder| b.cash_settlement_method(method)
         )
     }
 
@@ -830,7 +844,7 @@ impl PySwaptionBuilder {
             slf,
             vol_model,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.vol_model(vol_model)
+            |b: SwaptionBuilder| b.vol_model(vol_model)
         )
     }
 
@@ -854,7 +868,7 @@ impl PySwaptionBuilder {
             slf,
             vol_surface_id,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.vol_surface_id(CurveId::new(value.to_string()))
+            |b: SwaptionBuilder| b.vol_surface_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -878,7 +892,7 @@ impl PySwaptionBuilder {
             slf,
             underlying_fixed_leg,
             value.__repr__(),
-            |b: SwaptionBuilderInner| b.underlying_fixed_leg(value.inner.clone())
+            |b: SwaptionBuilder| b.underlying_fixed_leg(value.inner.clone())
         )
     }
 
@@ -902,7 +916,7 @@ impl PySwaptionBuilder {
             slf,
             underlying_float_leg,
             value.__repr__(),
-            |b: SwaptionBuilderInner| b.underlying_float_leg(value.inner.clone())
+            |b: SwaptionBuilder| b.underlying_float_leg(value.inner.clone())
         )
     }
 
@@ -935,7 +949,7 @@ impl PySwaptionBuilder {
             slf,
             sabr_params,
             "{...}".to_string(),
-            |b: SwaptionBuilderInner| b.sabr_params(sabr_params)
+            |b: SwaptionBuilder| b.sabr_params(sabr_params)
         )
     }
 
@@ -969,7 +983,7 @@ impl PySwaptionBuilder {
             slf,
             attributes,
             "Attributes(...)".to_string(),
-            |b: SwaptionBuilderInner| b.attributes(attrs)
+            |b: SwaptionBuilder| b.attributes(attrs)
         )
     }
 }
@@ -1137,7 +1151,7 @@ crate::bindings::macros::py_getters!(PyCapFloor |s| {
     skip_from_py_object
 )]
 pub struct PyCapFloorBuilder {
-    inner: Option<CapFloorBuilderInner>,
+    inner: Option<CapFloorBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -1156,7 +1170,7 @@ impl PyCapFloorBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: CapFloorBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: CapFloorBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
@@ -1188,7 +1202,7 @@ impl PyCapFloorBuilder {
             slf,
             rate_option_type,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.rate_option_type(rate_option_type)
+            |b: CapFloorBuilder| b.rate_option_type(rate_option_type)
         )
     }
 
@@ -1218,12 +1232,8 @@ impl PyCapFloorBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        builder_set!(
-            slf,
-            notional,
-            money_repr(money),
-            |b: CapFloorBuilderInner| b.notional(money)
-        )
+        builder_set!(slf, notional, money_repr(money), |b: CapFloorBuilder| b
+            .notional(money))
     }
 
     /// Set the strike.
@@ -1251,12 +1261,8 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let strike = extract_rate_decimal(value, "strike")?;
         let strike = decimal_from_f64(strike, "strike")?;
-        builder_set!(
-            slf,
-            strike,
-            strike.to_string(),
-            |b: CapFloorBuilderInner| b.strike(strike)
-        )
+        builder_set!(slf, strike, strike.to_string(), |b: CapFloorBuilder| b
+            .strike(strike))
     }
 
     /// Set the contractual margin added to the referenced rate.
@@ -1289,7 +1295,7 @@ impl PyCapFloorBuilder {
             slf,
             spread_bp,
             spread_bp.to_string(),
-            |b: CapFloorBuilderInner| b.spread_bp(spread_bp)
+            |b: CapFloorBuilder| b.spread_bp(spread_bp)
         )
     }
 
@@ -1331,7 +1337,7 @@ impl PyCapFloorBuilder {
             slf,
             premium,
             format!("({payment_date}, {})", money_repr(amount)),
-            |b: CapFloorBuilderInner| b.premium((payment_date, amount))
+            |b: CapFloorBuilder| b.premium((payment_date, amount))
         )
     }
 
@@ -1356,7 +1362,7 @@ impl PyCapFloorBuilder {
             slf,
             start_date,
             start_date.to_string(),
-            |b: CapFloorBuilderInner| b.start_date(start_date)
+            |b: CapFloorBuilder| b.start_date(start_date)
         )
     }
 
@@ -1377,12 +1383,8 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let maturity = py_to_date(value)?;
-        builder_set!(
-            slf,
-            maturity,
-            maturity.to_string(),
-            |b: CapFloorBuilderInner| b.maturity(maturity)
-        )
+        builder_set!(slf, maturity, maturity.to_string(), |b: CapFloorBuilder| b
+            .maturity(maturity))
     }
 
     /// Set the payment frequency.
@@ -1407,12 +1409,8 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let tenor = crate::bindings::core::dates::tenor::extract_tenor(value)?;
-        builder_set!(
-            slf,
-            frequency,
-            tenor.to_string(),
-            |b: CapFloorBuilderInner| b.frequency(tenor)
-        )
+        builder_set!(slf, frequency, tenor.to_string(), |b: CapFloorBuilder| b
+            .frequency(tenor))
     }
 
     /// Set the day count convention.
@@ -1442,7 +1440,7 @@ impl PyCapFloorBuilder {
             slf,
             day_count,
             day_count.to_string(),
-            |b: CapFloorBuilderInner| b.day_count(day_count)
+            |b: CapFloorBuilder| b.day_count(day_count)
         )
     }
 
@@ -1472,7 +1470,7 @@ impl PyCapFloorBuilder {
             slf,
             stub,
             format!("{:?}", enum_to_py_string(&stub).unwrap_or_default()),
-            |b: CapFloorBuilderInner| b.stub(stub)
+            |b: CapFloorBuilder| b.stub(stub)
         )
     }
 
@@ -1502,7 +1500,7 @@ impl PyCapFloorBuilder {
             slf,
             business_day_convention,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.business_day_convention(convention)
+            |b: CapFloorBuilder| b.business_day_convention(convention)
         )
     }
 
@@ -1526,7 +1524,7 @@ impl PyCapFloorBuilder {
             slf,
             calendar_id,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.calendar_id(CalendarId::new(value.to_string()))
+            |b: CapFloorBuilder| b.calendar_id(CalendarId::new(value.to_string()))
         )
     }
 
@@ -1556,7 +1554,7 @@ impl PyCapFloorBuilder {
             slf,
             exercise_style,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.exercise_style(style)
+            |b: CapFloorBuilder| b.exercise_style(style)
         )
     }
 
@@ -1583,7 +1581,7 @@ impl PyCapFloorBuilder {
             slf,
             settlement,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.settlement(settlement)
+            |b: CapFloorBuilder| b.settlement(settlement)
         )
     }
 
@@ -1607,7 +1605,7 @@ impl PyCapFloorBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: CapFloorBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -1631,7 +1629,7 @@ impl PyCapFloorBuilder {
             slf,
             forward_curve_id,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.forward_curve_id(CurveId::new(value.to_string()))
+            |b: CapFloorBuilder| b.forward_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -1655,7 +1653,7 @@ impl PyCapFloorBuilder {
             slf,
             vol_surface_id,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.vol_surface_id(CurveId::new(value.to_string()))
+            |b: CapFloorBuilder| b.vol_surface_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -1683,12 +1681,8 @@ impl PyCapFloorBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn vol_type<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let vol_type = enum_from_str(value, "vol_type")?;
-        builder_set!(
-            slf,
-            vol_type,
-            format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.vol_type(vol_type)
-        )
+        builder_set!(slf, vol_type, format!("{value:?}"), |b: CapFloorBuilder| b
+            .vol_type(vol_type))
     }
 
     /// Set the displacement shift used for shifted-lognormal pricing.
@@ -1704,12 +1698,8 @@ impl PyCapFloorBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn vol_shift<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            vol_shift,
-            value.to_string(),
-            |b: CapFloorBuilderInner| b.vol_shift(value)
-        )
+        builder_set!(slf, vol_shift, value.to_string(), |b: CapFloorBuilder| b
+            .vol_shift(value))
     }
 
     /// Set the overnight (RFR) coupon convention for compounded caplets.
@@ -1742,7 +1732,7 @@ impl PyCapFloorBuilder {
             slf,
             overnight_coupon,
             "{...}".to_string(),
-            |b: CapFloorBuilderInner| b.overnight_coupon(convention)
+            |b: CapFloorBuilder| b.overnight_coupon(convention)
         )
     }
 
@@ -1776,7 +1766,7 @@ impl PyCapFloorBuilder {
             slf,
             attributes,
             "Attributes(...)".to_string(),
-            |b: CapFloorBuilderInner| b.attributes(attrs)
+            |b: CapFloorBuilder| b.attributes(attrs)
         )
     }
 }

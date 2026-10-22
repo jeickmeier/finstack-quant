@@ -146,37 +146,37 @@ setters!(JsEquityOptionBuilder, "EquityOptionBuilder", {
         /// @param value - Strike price; must be finite and positive.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        strike as strike => num,
+        strike as strike => js_f64,
         /// Set the option type.
         /// @param value - Option type of the equity option.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        option_type as optionType => en,
+        option_type as optionType => js_wire,
         /// Set the exercise style.
         /// @param value - Exercise style; defaults to `"european"` when never set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        exercise_style as exerciseStyle => en,
+        exercise_style as exerciseStyle => js_wire,
         /// Set the option expiry date.
         /// @param value - Option expiry date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        expiry as expiry => date,
+        expiry as expiry => js_date,
         /// Set the settlement method.
         /// @param value - Physical delivery or fixed cash settlement.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        settlement as settlement => en,
+        settlement as settlement => js_wire,
         /// Set the number of underlying units the option is written on.
         /// @param value - Number of underlying units; PV and Greeks scale linearly with it.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        quantity as quantity => num,
+        quantity as quantity => js_f64,
         /// Set the currency of the strike, premium and present value.
         /// @param value - ISO-4217 currency code of the strike and the payoff, e.g. `"USD"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        currency as currency => en,
+        currency as currency => js_wire,
         /// Set the discount curve identifier for present value calculations.
         /// @param value - Discount curve identifier.
         /// @returns The builder, for chaining.

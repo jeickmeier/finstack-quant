@@ -15,7 +15,7 @@ use crate::bindings::valuations::convert::{
     attributes_from_py, bdc_from_py, day_count_from_py, enum_to_py_string, money_from_py,
     money_repr, money_to_py,
 };
-use crate::bindings::valuations::instruments::{instrument_expiry, stub_kind_from_py};
+use crate::bindings::valuations::convert::{instrument_expiry, stub_kind_from_py};
 use crate::bindings::valuations::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
@@ -30,8 +30,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 
 use super::PyEnhancedMonteCarloResult;
 
-type RevolvingCreditBuilderInner =
-    finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditBuilder;
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditBuilder;
 
 /// Typed wrapper for the Rust `RevolvingCredit` instrument.
 ///
@@ -358,7 +357,7 @@ crate::bindings::macros::py_getters!(PyRevolvingCredit |s| {
     skip_from_py_object
 )]
 pub struct PyRevolvingCreditBuilder {
-    inner: Option<RevolvingCreditBuilderInner>,
+    inner: Option<RevolvingCreditBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -386,7 +385,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             id,
             format!("{value:?}"),
-            |b: RevolvingCreditBuilderInner| b.id(InstrumentId::new(value.to_string()))
+            |b: RevolvingCreditBuilder| b.id(InstrumentId::new(value.to_string()))
         )
     }
 
@@ -423,7 +422,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             commitment,
             money_repr(money),
-            |b: RevolvingCreditBuilderInner| b.commitment(money)
+            |b: RevolvingCreditBuilder| b.commitment(money)
         )
     }
 
@@ -462,7 +461,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             drawn,
             money_repr(money),
-            |b: RevolvingCreditBuilderInner| b.drawn(money)
+            |b: RevolvingCreditBuilder| b.drawn(money)
         )
     }
 
@@ -492,7 +491,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             issue_date,
             date.to_string(),
-            |b: RevolvingCreditBuilderInner| b.issue_date(date)
+            |b: RevolvingCreditBuilder| b.issue_date(date)
         )
     }
 
@@ -522,7 +521,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             maturity,
             date.to_string(),
-            |b: RevolvingCreditBuilderInner| b.maturity(date)
+            |b: RevolvingCreditBuilder| b.maturity(date)
         )
     }
 
@@ -558,8 +557,7 @@ impl PyRevolvingCreditBuilder {
             spec_from_py(py, value, "rate")?
         };
         let repr = serde_json::to_string(&spec).unwrap_or_default();
-        builder_set!(slf, rate, repr, |b: RevolvingCreditBuilderInner| b
-            .rate(spec))
+        builder_set!(slf, rate, repr, |b: RevolvingCreditBuilder| b.rate(spec))
     }
 
     /// Set the interest accrual day count.
@@ -590,7 +588,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             day_count,
             format!("{day_count:?}"),
-            |b: RevolvingCreditBuilderInner| b.day_count(day_count)
+            |b: RevolvingCreditBuilder| b.day_count(day_count)
         )
     }
 
@@ -622,7 +620,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             frequency,
             format!("{tenor:?}"),
-            |b: RevolvingCreditBuilderInner| b.frequency(tenor)
+            |b: RevolvingCreditBuilder| b.frequency(tenor)
         )
     }
 
@@ -659,7 +657,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             fees,
             "{..}".to_string(),
-            |b: RevolvingCreditBuilderInner| b.fees(fees)
+            |b: RevolvingCreditBuilder| b.fees(fees)
         )
     }
 
@@ -699,7 +697,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             commitment_steps,
             "[..]".to_string(),
-            |b: RevolvingCreditBuilderInner| b.commitment_steps(steps)
+            |b: RevolvingCreditBuilder| b.commitment_steps(steps)
         )
     }
 
@@ -735,7 +733,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             scheduled_fees,
             "[..]".to_string(),
-            |b: RevolvingCreditBuilderInner| b.scheduled_fees(fees)
+            |b: RevolvingCreditBuilder| b.scheduled_fees(fees)
         )
     }
 
@@ -772,7 +770,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             oid_eir,
             repr.to_string(),
-            |b: RevolvingCreditBuilderInner| b.oid_eir_opt(spec)
+            |b: RevolvingCreditBuilder| b.oid_eir_opt(spec)
         )
     }
 
@@ -809,12 +807,8 @@ impl PyRevolvingCreditBuilder {
             finstack_quant_valuations::instruments::fixed_income::loan_terms::LetterOfCreditSpec,
         > = opt_spec_from_py(py, value, "lc")?;
         let repr = if lc.is_some() { "{..}" } else { "None" };
-        builder_set!(
-            slf,
-            lc,
-            repr.to_string(),
-            |b: RevolvingCreditBuilderInner| b.lc_opt(lc)
-        )
+        builder_set!(slf, lc, repr.to_string(), |b: RevolvingCreditBuilder| b
+            .lc_opt(lc))
     }
 
     /// Set the dated margin steps.
@@ -851,7 +845,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             margin_steps,
             "[..]".to_string(),
-            |b: RevolvingCreditBuilderInner| b.margin_steps(steps)
+            |b: RevolvingCreditBuilder| b.margin_steps(steps)
         )
     }
 
@@ -892,7 +886,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             draw_repay_spec,
             kind.to_string(),
-            |b: RevolvingCreditBuilderInner| b.draw_repay_spec(spec)
+            |b: RevolvingCreditBuilder| b.draw_repay_spec(spec)
         )
     }
 
@@ -921,7 +915,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: RevolvingCreditBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: RevolvingCreditBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -953,7 +947,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             credit_curve_id,
             format!("{value:?}"),
-            |b: RevolvingCreditBuilderInner| b
+            |b: RevolvingCreditBuilder| b
                 .credit_curve_id_opt(value.map(|v| CurveId::new(v.to_string())))
         )
     }
@@ -983,7 +977,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             recovery_rate,
             value.to_string(),
-            |b: RevolvingCreditBuilderInner| b.recovery_rate(value)
+            |b: RevolvingCreditBuilder| b.recovery_rate(value)
         )
     }
 
@@ -1006,12 +1000,8 @@ impl PyRevolvingCreditBuilder {
     ///     If the builder was already consumed.
     #[pyo3(text_signature = "($self, value)")]
     fn leq<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            leq,
-            value.to_string(),
-            |b: RevolvingCreditBuilderInner| b.leq(value)
-        )
+        builder_set!(slf, leq, value.to_string(), |b: RevolvingCreditBuilder| b
+            .leq(value))
     }
 
     /// Set the stub rule for schedule generation.
@@ -1044,7 +1034,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             stub,
             format!("{stub:?}"),
-            |b: RevolvingCreditBuilderInner| b.stub(stub)
+            |b: RevolvingCreditBuilder| b.stub(stub)
         )
     }
 
@@ -1078,7 +1068,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             business_day_convention,
             format!("{convention:?}"),
-            |b: RevolvingCreditBuilderInner| b.business_day_convention(convention)
+            |b: RevolvingCreditBuilder| b.business_day_convention(convention)
         )
     }
 
@@ -1110,7 +1100,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             calendar_id,
             format!("{value:?}"),
-            |b: RevolvingCreditBuilderInner| b.calendar_id_opt(value.clone().map(Into::into))
+            |b: RevolvingCreditBuilder| b.calendar_id_opt(value.clone().map(Into::into))
         )
     }
 
@@ -1140,7 +1130,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             payment_lag_days,
             value.to_string(),
-            |b: RevolvingCreditBuilderInner| b.payment_lag_days(value)
+            |b: RevolvingCreditBuilder| b.payment_lag_days(value)
         )
     }
 
@@ -1171,7 +1161,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             settlement_days,
             value.to_string(),
-            |b: RevolvingCreditBuilderInner| b.settlement_days(value)
+            |b: RevolvingCreditBuilder| b.settlement_days(value)
         )
     }
 
@@ -1207,7 +1197,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             attributes,
             "{..}".to_string(),
-            |b: RevolvingCreditBuilderInner| b.attributes(attributes)
+            |b: RevolvingCreditBuilder| b.attributes(attributes)
         )
     }
 }

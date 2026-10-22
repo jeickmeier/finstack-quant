@@ -487,37 +487,37 @@ setters!(JsStructuredCreditBuilder, "StructuredCreditBuilder", {
         /// @param value - Deal classification.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        deal_type as dealType => en,
+        deal_type as dealType => js_wire,
         /// Set the structured-credit asset pool backing the deal.
         /// @param value - Asset pool definition.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        pool as pool => json,
+        pool as pool => from_js_json,
         /// Set the tranche capital structure.
         /// @param value - Tranche capital structure.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        tranches as tranches => json,
+        tranches as tranches => from_js_json,
         /// Set the deal closing (issuance) date.
         /// @param value - Deal closing date.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        closing_date as closingDate => date,
+        closing_date as closingDate => js_date,
         /// Set the first payment date to tranches.
         /// @param value - First payment date.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        first_payment_date as firstPaymentDate => date,
+        first_payment_date as firstPaymentDate => js_date,
         /// Set buyer settlement for prices, yields and spreads.
         /// @param value - Settlement on or after valuation and closing. Payments on or before this date are excluded. Omission uses the valuation date.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        quote_settlement_date as quoteSettlementDate => date,
+        quote_settlement_date as quoteSettlementDate => js_date,
         /// Set the legal final maturity date.
         /// @param value - Legal final maturity date.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => date,
+        maturity as maturity => js_date,
         /// Set the payment calendar identifier for schedule adjustments.
         /// @param value - Holiday calendar identifier (e.g. `"nyse"`). Required for accurate schedule generation.
         /// @returns The builder, for chaining.
@@ -527,7 +527,7 @@ setters!(JsStructuredCreditBuilder, "StructuredCreditBuilder", {
         /// @param value - Business day convention (e.g. `"following"`, `"modified_following"`). Defaults to `"following"` when never set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        business_day_convention as businessDayConvention => en,
+        business_day_convention as businessDayConvention => js_wire,
         /// Set the discount curve identifier for valuation.
         /// @param value - Discount curve identifier.
         /// @returns The builder, for chaining.
@@ -537,137 +537,137 @@ setters!(JsStructuredCreditBuilder, "StructuredCreditBuilder", {
         /// @param value - `MarketConditions` object with finite annual decimal `refi_rate` for Richard-Roll refinancing incentives. Negative rates are accepted. This replaces the registry default; unknown macro-factor fields fail.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        market_conditions as marketConditions => json,
+        market_conditions as marketConditions => from_js_json,
         /// Set declarative waterfall rules from a JSON object.
         /// @param value - JSON-encoded `WaterfallRules` object (available-funds caps, step-down, shifting interest, controlled accumulation), layered onto the base waterfall.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        waterfall_rules as waterfallRules => json,
+        waterfall_rules as waterfallRules => from_js_json,
         /// Set senior transaction fees from a JSON object.
         /// @param value - JSON-encoded `DealFees` object (trustee, senior management, servicing, and optional master/special servicer fees), paid ahead of every note. Optional `workout_fee_pct` (percent of the P&I collected on specially serviced loans) and `liquidation_fee_pct` (percent of liquidation proceeds) are taken inside the collateral flows. Skipped (`null`) by default.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        fees as fees => json,
+        fees as fees => from_js_json,
         /// Replace the whole credit model (prepayment, default, recovery, stochastic and correlation specs, delinquency and card models).
         /// @param value - `CreditModelConfig` serde object. Later per-field setters (`prepayment_spec` ...) modify this model.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        credit_model as creditModel => json,
+        credit_model as creditModel => from_js_json,
         /// Set the deterministic prepayment model.
         /// @param value - Typed spec (`PrepaymentModelSpec.constant_cpr` / `psa` / `abs` / `vector` / `cmbs_with_lockout`) or its serde form.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        prepayment_spec as prepaymentSpec => json,
+        prepayment_spec as prepaymentSpec => from_js_json,
         /// Set the deterministic default model.
         /// @param value - Typed spec (`DefaultModelSpec.constant_cdr` / `sda` / `vector` / `cumulative_loss` / `timing`) or its serde form.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        default_spec as defaultSpec => json,
+        default_spec as defaultSpec => from_js_json,
         /// Set the recovery model.
         /// @param value - Typed spec (rate, lag, optional severity vector) or its serde form.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        recovery_spec as recoverySpec => json,
+        recovery_spec as recoverySpec => from_js_json,
         /// Set the stochastic prepayment specification used by `StructuredCredit.price_stochastic`.
         /// @param value - `StochasticPrepaySpec` serde object (Richard-Roll or factor parameters).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        stochastic_prepay_spec as stochasticPrepaySpec => json,
+        stochastic_prepay_spec as stochasticPrepaySpec => from_js_json,
         /// Set the stochastic default specification used by `StructuredCredit.price_stochastic`.
         /// @param value - `StochasticDefaultSpec` serde object.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        stochastic_default_spec as stochasticDefaultSpec => json,
+        stochastic_default_spec as stochasticDefaultSpec => from_js_json,
         /// Set the stochastic recovery specification used by `StructuredCredit.price_stochastic`.
         /// @param value - `RecoverySpec` serde object: `{"type": "constant", "rate": 0.4}` or `{"type": "market_correlated", "mean_recovery": 0.4, "recovery_volatility": 0.25, "factor_correlation": 0.4}` (recovery falls with the systematic factor, so heavy-default paths recover less).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        stochastic_recovery_spec as stochasticRecoverySpec => json,
+        stochastic_recovery_spec as stochasticRecoverySpec => from_js_json,
         /// Set the default correlation structure used by `StructuredCredit.price_stochastic`.
         /// @param value - `CorrelationStructure` serde object (factor loadings).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        correlation_structure as correlationStructure => json,
+        correlation_structure as correlationStructure => from_js_json,
         /// Set the delinquency roll-rate, advancing and modification model (ABS/RMBS asset and rep-line pools).
         /// @param value - `DelinquencyModel` serde object: `roll_rates` (per bucket, the last rolls to charge-off), `cure_rates`, `advancing` (`{"policy": "none"}` or `{"policy": "principal_and_interest", "recoverability_cap_pct": ..., "reimburse_from_collections": false}`) and optional `modification`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        delinquency as delinquency => json,
+        delinquency as delinquency => from_js_json,
         /// Set the card master-trust portfolio model.
         /// @param value - `CardPortfolioSpec` serde object: `monthly_payment_rate`, `portfolio_yield` and `charge_off_rate` (annual decimals), plus the optional `seller_interest` (`Money` serde object in the pool currency) and `fixed_allocation_decimal` (decimal in `(0, 1]`) that fix the investor allocation of trust collections once the revolving period ends.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        card as card => json,
+        card as card => from_js_json,
         /// Set the deal-level OC / IC coverage tests.
         /// @param value - `CoverageTestSpec` objects (`id`, `tranche_id`, `kind` (`"oc"` / `"ic"`), `trigger_level` ratio, `action`, optional `placement` (`{"kind": "after_tranche", "tranche_id": ...}` or `{"kind": "after_junior_fees"}`) and `divert_pct`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        coverage_triggers as coverageTriggers => json,
+        coverage_triggers as coverageTriggers => from_js_json,
         /// Set the collateral valuation rules for the coverage tests.
         /// @param value - Typed `CoverageRules` or its serde form.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        coverage_rules as coverageRules => json,
+        coverage_rules as coverageRules => from_js_json,
         /// Set the assumed optional redemption for price-to-call analytics.
         /// @param value - Typed `CallAssumption` or its serde form (`date`, `price_pct`, `scope`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        call_assumption as callAssumption => json,
+        call_assumption as callAssumption => from_js_json,
         /// Set a custom priority of payments in place of the deal-type template.
         /// @param value - Typed `Waterfall` or its serde form (`tiers`, `currency`, optional `coverage_rules`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        waterfall as waterfall => json,
+        waterfall as waterfall => from_js_json,
         /// Set the interest-rate hedges settled through the waterfall.
         /// @param value - Typed `HedgeSwap` objects, their serde plain objects, or a JSON array string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        hedge_swaps as hedgeSwaps => json,
+        hedge_swaps as hedgeSwaps => from_js_json,
         /// Set the clean-up call pool-factor threshold.
         /// @param value - Pool factor (decimal in `(0, 1)`, typically `0.10`) below which the deal is redeemed when the liquidation proceeds cover the notes.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        cleanup_call_decimal as cleanupCallDecimal => num,
+        cleanup_call_decimal as cleanupCallDecimal => js_f64,
         /// Set the collateral liquidation price used by deal calls and clean-up calls.
         /// @param value - Percent of par the collateral realizes (`100.0` = par).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        liquidation_price_pct as liquidationPricePct => num,
+        liquidation_price_pct as liquidationPricePct => js_f64,
         /// Set how collateral losses reach the note balances.
         /// @param value - `"write_down"` allocates realized losses junior-first at default (RMBS/CMBS convention); `"par_preserving"` keeps note balances at par and realizes shortfalls at legal final (CLO/ABS convention). The deal type's default applies when never set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        loss_allocation as lossAllocation => en,
+        loss_allocation as lossAllocation => js_wire,
         /// Set when collateral losses are booked.
         /// @param value - `"at_default"` books the expected net loss on the default date (CLO/ABS convention); `"at_liquidation"` books the realized loss when the claim settles after the recovery lag (RMBS/CMBS convention), which delays write-downs and every cumulative-loss trigger. The deal type's default applies when never set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        loss_recognition as lossRecognition => en,
+        loss_recognition as lossRecognition => js_wire,
         /// Set the scheduled lender draws on notes after closing.
         /// @param value - `TrancheDraw` serde objects `{"tranche_id": "A", "date": "2025-01-01", "amount": {"amount": "5000000", "currency": "USD"}}`, ascending by date; each is applied on the first payment date at or after its date, lifting the note's balance and adding the cash to principal proceeds.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        tranche_draws as trancheDraws => json,
+        tranche_draws as trancheDraws => from_js_json,
         /// Set the per-period re-advance of one note up to its commitment and the borrowing base while the deal revolves.
         /// @param value - `TrancheReadvance` serde object `{"tranche_id": "A", "commitment": {"amount": "70000000", "currency": "USD"}}`; requires `coverage_rules.borrowing_base`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        tranche_readvance as trancheReadvance => json,
+        tranche_readvance as trancheReadvance => from_js_json,
         /// Set whether principal proceeds cover senior fees and senior interest shortfalls before any note is redeemed.
         /// @param value - `true` for the CLO principal-waterfall convention, `false` for strictly separate accounts. The deal type's default applies when never set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        principal_covers_senior_interest as principalCoversSeniorInterest => flag,
+        principal_covers_senior_interest as principalCoversSeniorInterest => js_bool,
         /// Set deal metadata (counterparties, identifiers).
         /// @param value - `Metadata` serde object.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        deal_metadata as dealMetadata => json,
+        deal_metadata as dealMetadata => from_js_json,
         /// Set free-form attributes (tags and metadata) on the deal.
         /// @param value - Attribute bag; a plain object populates `meta` (an optional `"tags"` list populates `tags`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
+        attributes as attributes => from_js_json,
 });
 
 common_setters!(
@@ -689,62 +689,62 @@ setters!(JsTrancheBuilder, "TrancheBuilder", {
         /// @param value - Unique identifier for the tranche.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        id as id => text,
+        id as id => js_string,
         /// Set the attachment point.
         /// @param value - Attachment point quoted in percent on a 0-100 scale (e.g. `0.0` for equity, `10.0` for a tranche attaching at 10%).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attach_pct as attachPct => num,
+        attach_pct as attachPct => js_f64,
         /// Set the detachment point.
         /// @param value - Detachment point quoted in percent on a 0-100 scale (e.g. `100.0` for the most senior tranche).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        detach_pct as detachPct => num,
+        detach_pct as detachPct => js_f64,
         /// Set the tranche seniority.
         /// @param value - Structural seniority of the tranche.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        seniority as seniority => en,
+        seniority as seniority => js_wire,
         /// Set a floating-rate coupon from a JSON `RateSpec::Floating` payload.
         /// @param value - JSON-encoded, externally-tagged `RateSpec` value, e.g. `{"floating": {...FloatingRateSpec fields...}}`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        coupon_floating as couponFloating => json via coupon,
+        coupon_floating as couponFloating => from_js_json via coupon,
         /// Set the legal final maturity date.
         /// @param value - Legal final maturity date.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => date,
+        maturity as maturity => js_date,
         /// Enable payment-in-kind accretion of interest shortfalls.
         /// @param value - `true` capitalizes unpaid interest into the balance; `false` (the default) defers it as a claim.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        pik_enabled as pikEnabled => flag,
+        pik_enabled as pikEnabled => js_bool,
         /// Mark the coupon non-deferrable or deferrable, overriding the seniority convention.
         /// @param value - `true` for a coupon the template pays from principal proceeds when interest falls short (the senior default); `false` for one that defers (the default for every other class).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        non_deferrable as nonDeferrable => flag,
+        non_deferrable as nonDeferrable => js_bool,
         /// Set the credit rating.
         /// @param value - Rating string (`"AAA"`, `"BBB"`, `"NR"` ...).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        rating as rating => en,
+        rating as rating => js_wire,
         /// Attach a per-tranche overcollateralization trigger.
         /// @param value - `CoverageTrigger` serde object: `trigger_level` (ratio), optional `cure_level`, `consequence` and breach memory fields.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        oc_trigger as ocTrigger => json,
+        oc_trigger as ocTrigger => from_js_json,
         /// Attach a per-tranche interest-coverage trigger.
         /// @param value - `CoverageTrigger` serde object (see `oc_trigger`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        ic_trigger as icTrigger => json,
+        ic_trigger as icTrigger => from_js_json,
         /// Set free-form attributes (tags and metadata).
         /// @param value - Attribute bag; a plain object populates `meta` (an optional `"tags"` list populates `tags`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
+        attributes as attributes => from_js_json,
 });
 
 handle_setters!(JsTrancheBuilder, "TrancheBuilder", {

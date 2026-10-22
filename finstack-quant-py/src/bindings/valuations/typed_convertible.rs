@@ -22,8 +22,7 @@ use super::convert::{
 };
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
 
-type ConvertibleBondBuilderInner =
-    finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBondBuilder;
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBondBuilder;
 
 /// Deserialize a serde value from `str | dict | list` Python input.
 fn serde_from_py<T: serde::de::DeserializeOwned>(
@@ -119,9 +118,9 @@ impl PyConversionSpec {
     ) -> PyResult<Self> {
         let policy: ConversionPolicy = serde_from_py(py, policy, "conversion policy")?;
         let anti_dilution: AntiDilutionPolicy =
-            super::instruments::enum_from_str(anti_dilution, "anti_dilution")?;
+            super::convert::enum_from_str(anti_dilution, "anti_dilution")?;
         let dividend_adjustment: DividendAdjustment =
-            super::instruments::enum_from_str(dividend_adjustment, "dividend_adjustment")?;
+            super::convert::enum_from_str(dividend_adjustment, "dividend_adjustment")?;
         let dilution_events: Vec<DilutionEvent> = match dilution_events {
             Some(events) if !events.is_none() => serde_from_py(py, events, "dilution_events")?,
             _ => Vec::new(),
@@ -717,7 +716,7 @@ crate::bindings::macros::py_getters!(PyConvertibleBond |s| {
     skip_from_py_object
 )]
 pub struct PyConvertibleBondBuilder {
-    inner: Option<ConvertibleBondBuilderInner>,
+    inner: Option<ConvertibleBondBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -740,7 +739,7 @@ impl PyConvertibleBondBuilder {
             slf,
             id,
             format!("{value:?}"),
-            |b: ConvertibleBondBuilderInner| b.id(InstrumentId::new(value.to_string()))
+            |b: ConvertibleBondBuilder| b.id(InstrumentId::new(value.to_string()))
         )
     }
 
@@ -765,7 +764,7 @@ impl PyConvertibleBondBuilder {
             slf,
             notional,
             money_repr(money),
-            |b: ConvertibleBondBuilderInner| b.notional(money)
+            |b: ConvertibleBondBuilder| b.notional(money)
         )
     }
 
@@ -790,7 +789,7 @@ impl PyConvertibleBondBuilder {
             slf,
             issue_date,
             date_repr(issue_date),
-            |b: ConvertibleBondBuilderInner| b.issue_date(issue_date)
+            |b: ConvertibleBondBuilder| b.issue_date(issue_date)
         )
     }
 
@@ -815,7 +814,7 @@ impl PyConvertibleBondBuilder {
             slf,
             maturity,
             date_repr(maturity),
-            |b: ConvertibleBondBuilderInner| b.maturity(maturity)
+            |b: ConvertibleBondBuilder| b.maturity(maturity)
         )
     }
 
@@ -840,7 +839,7 @@ impl PyConvertibleBondBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: ConvertibleBondBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: ConvertibleBondBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -867,7 +866,7 @@ impl PyConvertibleBondBuilder {
             slf,
             credit_curve_id,
             format!("{value:?}"),
-            |b: ConvertibleBondBuilderInner| b.credit_curve_id(CurveId::new(value.to_string()))
+            |b: ConvertibleBondBuilder| b.credit_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -901,7 +900,7 @@ impl PyConvertibleBondBuilder {
             inner: conversion.clone(),
         }
         .__repr__();
-        builder_set!(slf, conversion, shown, |b: ConvertibleBondBuilderInner| b
+        builder_set!(slf, conversion, shown, |b: ConvertibleBondBuilder| b
             .conversion(conversion))
     }
 
@@ -923,7 +922,7 @@ impl PyConvertibleBondBuilder {
             slf,
             spot_id,
             format!("{value:?}"),
-            |b: ConvertibleBondBuilderInner| b.spot_id(PriceId::new(value))
+            |b: ConvertibleBondBuilder| b.spot_id(PriceId::new(value))
         )
     }
 
@@ -948,7 +947,7 @@ impl PyConvertibleBondBuilder {
             slf,
             vol_surface_id,
             format!("{value:?}"),
-            |b: ConvertibleBondBuilderInner| b.vol_surface_id(CurveId::new(value))
+            |b: ConvertibleBondBuilder| b.vol_surface_id(CurveId::new(value))
         )
     }
 
@@ -973,7 +972,7 @@ impl PyConvertibleBondBuilder {
             slf,
             div_yield_id,
             format!("{value:?}"),
-            |b: ConvertibleBondBuilderInner| b.div_yield_id(PriceId::new(value))
+            |b: ConvertibleBondBuilder| b.div_yield_id(PriceId::new(value))
         )
     }
 
@@ -1006,7 +1005,7 @@ impl PyConvertibleBondBuilder {
             call_put.calls.len(),
             call_put.puts.len()
         );
-        builder_set!(slf, call_put, shown, |b: ConvertibleBondBuilderInner| b
+        builder_set!(slf, call_put, shown, |b: ConvertibleBondBuilder| b
             .call_put(call_put))
     }
 
@@ -1045,7 +1044,7 @@ impl PyConvertibleBondBuilder {
             slf,
             soft_call_trigger,
             shown,
-            |b: ConvertibleBondBuilderInner| b.soft_call_trigger(trigger)
+            |b: ConvertibleBondBuilder| b.soft_call_trigger(trigger)
         )
     }
 
@@ -1071,7 +1070,7 @@ impl PyConvertibleBondBuilder {
             slf,
             settlement_days,
             value.to_string(),
-            |b: ConvertibleBondBuilderInner| b.settlement_days(value)
+            |b: ConvertibleBondBuilder| b.settlement_days(value)
         )
     }
 
@@ -1097,7 +1096,7 @@ impl PyConvertibleBondBuilder {
             slf,
             recovery_rate,
             float_repr(value),
-            |b: ConvertibleBondBuilderInner| b.recovery_rate(value)
+            |b: ConvertibleBondBuilder| b.recovery_rate(value)
         )
     }
 
@@ -1131,7 +1130,7 @@ impl PyConvertibleBondBuilder {
             slf,
             resolved_settlement,
             "{...}".to_string(),
-            |b: ConvertibleBondBuilderInner| b.resolved_settlement(claim)
+            |b: ConvertibleBondBuilder| b.resolved_settlement(claim)
         )
     }
 
@@ -1166,7 +1165,7 @@ impl PyConvertibleBondBuilder {
             slf,
             cashflow_spec,
             "{...}".to_string(),
-            |b: ConvertibleBondBuilderInner| b.cashflow_spec(spec)
+            |b: ConvertibleBondBuilder| b.cashflow_spec(spec)
         )
     }
 
@@ -1197,7 +1196,7 @@ impl PyConvertibleBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, attributes, shown, |b: ConvertibleBondBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: ConvertibleBondBuilder| b
             .attributes(attrs))
     }
 }

@@ -9,7 +9,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     HedgeSwap, SwapNotional, SwapPriority,
 };
 
-use super::super::instruments::enum_from_str;
+use super::super::convert::enum_from_str;
 
 /// An interest-rate swap settled through the deal waterfall: net receipts
 /// join interest collections (and the IC test), net payments rank as a

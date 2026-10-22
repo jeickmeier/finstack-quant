@@ -18,9 +18,15 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::types::PyAttributes;
-use crate::errors::value_error;
+use crate::bindings::date_utils::date_to_py;
+use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
+use crate::bindings::pandas_utils::serde_to_py;
+use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::Instrument;
 
 /// Coerce `Money | float | int` to [`Money`](finstack_quant_core::money::Money).
 ///
@@ -194,7 +200,7 @@ pub(crate) fn day_count_from_py(
         return Ok(day_count.borrow().inner);
     }
     if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return crate::bindings::valuations::instruments::enum_from_str(&text, what);
+        return enum_from_str(&text, what);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(format!(
         "{what}: expected finstack_quant.core.dates.DayCount or its string name, got {}",
@@ -348,4 +354,111 @@ where
             }
         })
         .collect()
+}
+
+/// Parse a canonical typed-instrument envelope through the shared Rust path.
+pub(crate) fn parse_typed_instrument_json<T>(json: &str) -> PyResult<T>
+where
+    T: TryFrom<InstrumentJson, Error = finstack_quant_core::Error>,
+{
+    finstack_quant_valuations::pricer::parse_typed_instrument_json(json).map_err(core_to_py)
+}
+
+/// Serialize a typed instrument as the canonical v1 persistence envelope.
+pub(crate) fn serialize_typed_instrument_json(
+    instrument: InstrumentJson,
+    what: &str,
+) -> PyResult<String> {
+    serde_json::to_string(&InstrumentEnvelope::new(instrument)).map_err(|err| {
+        serde_json_to_py(
+            err,
+            &format!("failed to serialize {what} instrument envelope"),
+        )
+    })
+}
+
+// Shared helpers for typed instrument builders (bond/term_loan today; every
+// later typed-instrument task reuses these).
+
+/// Parse a serde-tagged unit-enum value from its snake_case string form.
+///
+/// Used by typed builders so Python passes plain strings (typed as
+/// ``Literal[...]`` in the stubs) for Rust enums like ``PayReceive``.
+pub(crate) fn enum_from_str<T: serde::de::DeserializeOwned>(
+    value: &str,
+    what: &str,
+) -> PyResult<T> {
+    serde_json::from_value(serde_json::Value::String(value.to_string()))
+        .map_err(|err| value_error(format!("invalid {what}: {err}")))
+}
+
+/// Convert a Python float to `Decimal`, rejecting non-finite values.
+pub(crate) fn decimal_from_f64(value: f64, what: &str) -> PyResult<rust_decimal::Decimal> {
+    finstack_quant_core::decimal::f64_to_decimal(value)
+        .map_err(|err| value_error(format!("invalid {what}: {err}")))
+}
+
+/// Coerce `StubKind | str | None` to a Rust stub rule (`None` → short front).
+pub(crate) fn stub_kind_from_py(
+    obj: Option<&Bound<'_, PyAny>>,
+    what: &str,
+) -> PyResult<finstack_quant_core::dates::StubKind> {
+    let Some(obj) = obj else {
+        return Ok(finstack_quant_core::dates::StubKind::ShortFront);
+    };
+    if obj.is_none() {
+        return Ok(finstack_quant_core::dates::StubKind::ShortFront);
+    }
+    if let Ok(stub) = obj.cast::<PyStubKind>() {
+        return Ok(stub.borrow().inner);
+    }
+    if let Ok(name) = obj.extract::<&str>() {
+        return enum_from_str(name, what);
+    }
+    Err(pyo3::exceptions::PyTypeError::new_err(format!(
+        "{what}: expected finstack_quant.core.dates.StubKind or a stub name such as \"none\" or \"short_front\", got {}",
+        obj.get_type().name()?
+    )))
+}
+
+/// Coerce `float | int | Rate | Bps` to a core `Rate` (decimal units).
+pub(crate) fn rate_from_py(
+    obj: &Bound<'_, PyAny>,
+    what: &str,
+) -> PyResult<finstack_quant_core::types::Rate> {
+    extract_rate_decimal(obj, what).and_then(|value| {
+        finstack_quant_core::types::Rate::from_decimal(value).map_err(crate::errors::core_to_py)
+    })
+}
+
+/// Coerce `float | int | Bps | Rate` to a core `Bps`.
+///
+/// The basis points go through the Rust `Bps::try_new`, which rejects
+/// non-finite, fractional and out-of-range basis points (`ValueError`),
+/// exactly as WASM `Bps` does; a `Bps` object round-trips unchanged.
+pub(crate) fn bps_value_from_py(
+    obj: &Bound<'_, PyAny>,
+    what: &str,
+) -> PyResult<finstack_quant_core::types::Bps> {
+    extract_basis_points(obj, what)
+        .and_then(|bp| finstack_quant_core::types::Bps::try_new(bp).map_err(core_to_py))
+}
+
+/// `Instrument::expiry` as `datetime.date | None`.
+pub(crate) fn instrument_expiry<'py>(
+    py: Python<'py>,
+    instrument: &dyn Instrument,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    instrument
+        .expiry()
+        .map(|date| date_to_py(py, date))
+        .transpose()
+}
+
+/// Serialize an optional serde value as `dict | None`.
+pub(crate) fn opt_serde_to_py<'py, T: serde::Serialize>(
+    py: Python<'py>,
+    value: Option<&T>,
+) -> PyResult<Option<Bound<'py, PyAny>>> {
+    value.map(|v| serde_to_py(py, v)).transpose()
 }

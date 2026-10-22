@@ -238,7 +238,7 @@ impl PyConcentrationLimit {
     #[pyo3(text_signature = "(scope, max_pct)")]
     fn new(scope: &str, max_pct: f64) -> PyResult<Self> {
         let inner = ConcentrationLimit {
-            scope: crate::bindings::valuations::instruments::enum_from_str::<ConcentrationScope>(
+            scope: crate::bindings::valuations::convert::enum_from_str::<ConcentrationScope>(
                 scope, "scope",
             )?,
             max_pct,

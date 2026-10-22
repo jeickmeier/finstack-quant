@@ -1,8 +1,7 @@
 //! Typed FX instruments: `FxForward` and `FxOption`.
 //! Mirrors the `PyInterestRateSwap` pattern in `typed_rates.rs`.
 //!
-//! This module also hosts the standard option Greek presentation helper
-//! (`typed_option_greeks`); the `instrument_pricing_methods!` /
+//! The `instrument_pricing_methods!` /
 //! `instrument_envelope_methods!` / `builder_set!` macros shared by every
 //! typed wrapper live in `typed_macros.rs`.
 
@@ -20,62 +19,18 @@ use finstack_quant_valuations::instruments::fx::fx_option::{
 };
 use finstack_quant_valuations::instruments::Instrument;
 
+use super::convert::enum_from_str;
 use super::convert::{
     attributes_from_py, bdc_from_py, date_repr, day_count_from_py, enum_to_py_string, float_repr,
     money_repr, money_to_py, opt_repr,
 };
-use super::instruments::enum_from_str;
+use super::pricing::typed_option_greeks;
 use super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_greek_methods, instrument_pricing_methods,
 };
 
-/// Compute the standard option Greek set for a native Rust instrument.
-///
-/// Mirrors the WASM `greeks` method: non-finite Greeks are rejected rather
-/// than returned, so both hosts fail identically instead of one silently
-/// yielding `NaN`.
-///
-/// # Arguments
-///
-/// * `py` - GIL token; the pricer runs with the GIL released.
-/// * `instrument` - Owned native Rust instrument, validated before pricing.
-/// * `market` - `MarketContext` object or market-context JSON string.
-/// * `as_of` - Valuation date (date-like or ISO string).
-/// * `model` - Model key (`"default"` selects the instrument-native model).
-pub(crate) fn typed_option_greeks<'py>(
-    py: Python<'py>,
-    instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
-    market: &Bound<'py, PyAny>,
-    as_of: &Bound<'py, PyAny>,
-    model: &str,
-) -> PyResult<Bound<'py, PyDict>> {
-    let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let model = model.to_owned();
-    let pairs = py
-        .detach(move || {
-            let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-                instrument, None,
-            )?;
-            finstack_quant_valuations::pricer::present_standard_option_greeks(
-                &instrument,
-                &market,
-                &as_of,
-                &model,
-                finstack_quant_calibration::recalibration::pricing_options(),
-            )
-        })
-        .map_err(core_to_py)?;
-    let out = PyDict::new(py);
-    for (metric, value) in pairs {
-        out.set_item(metric, value)?;
-    }
-    Ok(out)
-}
-
-type FxForwardBuilderInner =
-    finstack_quant_valuations::instruments::fx::fx_forward::FxForwardBuilder;
-type FxOptionBuilderInner = finstack_quant_valuations::instruments::fx::fx_option::FxOptionBuilder;
+use finstack_quant_valuations::instruments::fx::fx_forward::FxForwardBuilder;
+use finstack_quant_valuations::instruments::fx::fx_option::FxOptionBuilder;
 
 /// Outright FX forward on a currency pair (typed wrapper for Rust ``FxForward``).
 ///
@@ -448,7 +403,7 @@ crate::bindings::macros::py_getters!(PyFxForward |s| {
     skip_from_py_object
 )]
 pub struct PyFxForwardBuilder {
-    inner: Option<FxForwardBuilderInner>,
+    inner: Option<FxForwardBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -467,7 +422,7 @@ impl PyFxForwardBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: FxForwardBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: FxForwardBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
@@ -497,7 +452,7 @@ impl PyFxForwardBuilder {
             slf,
             base_currency,
             format!("Currency('{ccy}')"),
-            |b: FxForwardBuilderInner| b.base_currency(ccy)
+            |b: FxForwardBuilder| b.base_currency(ccy)
         )
     }
 
@@ -527,7 +482,7 @@ impl PyFxForwardBuilder {
             slf,
             quote_currency,
             format!("Currency('{ccy}')"),
-            |b: FxForwardBuilderInner| b.quote_currency(ccy)
+            |b: FxForwardBuilder| b.quote_currency(ccy)
         )
     }
 
@@ -548,12 +503,8 @@ impl PyFxForwardBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let maturity = py_to_date(value)?;
-        builder_set!(
-            slf,
-            maturity,
-            date_repr(maturity),
-            |b: FxForwardBuilderInner| b.maturity(maturity)
-        )
+        builder_set!(slf, maturity, date_repr(maturity), |b: FxForwardBuilder| b
+            .maturity(maturity))
     }
 
     /// Set the notional amount in base currency.
@@ -573,12 +524,8 @@ impl PyFxForwardBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        builder_set!(
-            slf,
-            notional,
-            money_repr(money),
-            |b: FxForwardBuilderInner| b.notional(money)
-        )
+        builder_set!(slf, notional, money_repr(money), |b: FxForwardBuilder| b
+            .notional(money))
     }
 
     /// Set the contract forward rate (quote per base).
@@ -603,7 +550,7 @@ impl PyFxForwardBuilder {
             slf,
             contract_rate,
             float_repr(value),
-            |b: FxForwardBuilderInner| b.contract_rate(value)
+            |b: FxForwardBuilder| b.contract_rate(value)
         )
     }
 
@@ -627,8 +574,7 @@ impl PyFxForwardBuilder {
             slf,
             domestic_discount_curve_id,
             format!("{value:?}"),
-            |b: FxForwardBuilderInner| b
-                .domestic_discount_curve_id(CurveId::new(value.to_string()))
+            |b: FxForwardBuilder| b.domestic_discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -652,7 +598,7 @@ impl PyFxForwardBuilder {
             slf,
             foreign_discount_curve_id,
             format!("{value:?}"),
-            |b: FxForwardBuilderInner| b.foreign_discount_curve_id(CurveId::new(value.to_string()))
+            |b: FxForwardBuilder| b.foreign_discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -675,7 +621,7 @@ impl PyFxForwardBuilder {
             slf,
             quoted_spot,
             float_repr(value),
-            |b: FxForwardBuilderInner| b.quoted_spot(value)
+            |b: FxForwardBuilder| b.quoted_spot(value)
         )
     }
 
@@ -699,7 +645,7 @@ impl PyFxForwardBuilder {
             slf,
             base_calendar_id,
             format!("{value:?}"),
-            |b: FxForwardBuilderInner| b.base_calendar_id(value.into())
+            |b: FxForwardBuilder| b.base_calendar_id(value.into())
         )
     }
 
@@ -723,7 +669,7 @@ impl PyFxForwardBuilder {
             slf,
             quote_calendar_id,
             format!("{value:?}"),
-            |b: FxForwardBuilderInner| b.quote_calendar_id(value.into())
+            |b: FxForwardBuilder| b.quote_calendar_id(value.into())
         )
     }
 
@@ -754,7 +700,7 @@ impl PyFxForwardBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, attributes, shown, |b: FxForwardBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: FxForwardBuilder| b
             .attributes(attrs))
     }
 }
@@ -1057,7 +1003,7 @@ instrument_greek_methods!(PyFxOption("FxOption") { delta, gamma, vega, theta, rh
     skip_from_py_object
 )]
 pub struct PyFxOptionBuilder {
-    inner: Option<FxOptionBuilderInner>,
+    inner: Option<FxOptionBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -1076,7 +1022,7 @@ impl PyFxOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: FxOptionBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: FxOptionBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
@@ -1106,7 +1052,7 @@ impl PyFxOptionBuilder {
             slf,
             base_currency,
             format!("Currency('{ccy}')"),
-            |b: FxOptionBuilderInner| b.base_currency(ccy)
+            |b: FxOptionBuilder| b.base_currency(ccy)
         )
     }
 
@@ -1136,7 +1082,7 @@ impl PyFxOptionBuilder {
             slf,
             quote_currency,
             format!("Currency('{ccy}')"),
-            |b: FxOptionBuilderInner| b.quote_currency(ccy)
+            |b: FxOptionBuilder| b.quote_currency(ccy)
         )
     }
 
@@ -1153,7 +1099,7 @@ impl PyFxOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn strike<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, strike, float_repr(value), |b: FxOptionBuilderInner| b
+        builder_set!(slf, strike, float_repr(value), |b: FxOptionBuilder| b
             .strike(value))
     }
 
@@ -1183,7 +1129,7 @@ impl PyFxOptionBuilder {
             slf,
             option_type,
             format!("{value:?}"),
-            |b: FxOptionBuilderInner| b.option_type(option_type)
+            |b: FxOptionBuilder| b.option_type(option_type)
         )
     }
 
@@ -1219,7 +1165,7 @@ impl PyFxOptionBuilder {
             "({kind:?}, Currency('{}'), {venue:?})",
             convention.premium_currency
         );
-        builder_set!(slf, delta_convention, shown, |b: FxOptionBuilderInner| b
+        builder_set!(slf, delta_convention, shown, |b: FxOptionBuilder| b
             .delta_convention(convention))
     }
 
@@ -1240,7 +1186,7 @@ impl PyFxOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let expiry = py_to_date(value)?;
-        builder_set!(slf, expiry, date_repr(expiry), |b: FxOptionBuilderInner| b
+        builder_set!(slf, expiry, date_repr(expiry), |b: FxOptionBuilder| b
             .expiry(expiry))
     }
 
@@ -1270,7 +1216,7 @@ impl PyFxOptionBuilder {
             slf,
             day_count,
             format!("DayCount('{day_count}')"),
-            |b: FxOptionBuilderInner| b.day_count(day_count)
+            |b: FxOptionBuilder| b.day_count(day_count)
         )
     }
 
@@ -1291,12 +1237,8 @@ impl PyFxOptionBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        builder_set!(
-            slf,
-            notional,
-            money_repr(money),
-            |b: FxOptionBuilderInner| b.notional(money)
-        )
+        builder_set!(slf, notional, money_repr(money), |b: FxOptionBuilder| b
+            .notional(money))
     }
 
     /// Set the domestic currency discount curve identifier.
@@ -1319,7 +1261,7 @@ impl PyFxOptionBuilder {
             slf,
             domestic_discount_curve_id,
             format!("{value:?}"),
-            |b: FxOptionBuilderInner| b.domestic_discount_curve_id(CurveId::new(value.to_string()))
+            |b: FxOptionBuilder| b.domestic_discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -1343,7 +1285,7 @@ impl PyFxOptionBuilder {
             slf,
             foreign_discount_curve_id,
             format!("{value:?}"),
-            |b: FxOptionBuilderInner| b.foreign_discount_curve_id(CurveId::new(value.to_string()))
+            |b: FxOptionBuilder| b.foreign_discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -1367,7 +1309,7 @@ impl PyFxOptionBuilder {
             slf,
             vol_surface_id,
             format!("{value:?}"),
-            |b: FxOptionBuilderInner| b.vol_surface_id(CurveId::new(value.to_string()))
+            |b: FxOptionBuilder| b.vol_surface_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -1398,7 +1340,7 @@ impl PyFxOptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, attributes, shown, |b: FxOptionBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: FxOptionBuilder| b
             .attributes(attrs))
     }
 }

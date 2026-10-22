@@ -20,14 +20,13 @@ use super::super::convert::{
     attributes_from_py, bdc_from_py, date_repr, dated_money_from_py, day_count_from_py,
     enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py,
 };
-use super::super::instruments::{enum_from_str, stub_kind_from_py};
+use super::super::convert::{enum_from_str, stub_kind_from_py};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 use crate::bindings::extract::extract_basis_points;
 
-type CdsTrancheBuilderInner =
-    finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheBuilder;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheBuilder;
 
 /// Economic terms of an index tranche (typed wrapper for Rust ``CdsTrancheParams``).
 ///
@@ -577,7 +576,7 @@ crate::bindings::macros::py_getters!(PyCdsTranche |s| {
     skip_from_py_object
 )]
 pub struct PyCdsTrancheBuilder {
-    inner: Option<CdsTrancheBuilderInner>,
+    inner: Option<CdsTrancheBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -596,12 +595,8 @@ impl PyCdsTrancheBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            id,
-            format!("{value:?}"),
-            |b: CdsTrancheBuilderInner| b.id(InstrumentId::new(value.to_string()))
-        )
+        builder_set!(slf, id, format!("{value:?}"), |b: CdsTrancheBuilder| b
+            .id(InstrumentId::new(value.to_string())))
     }
 
     /// Set the underlying index name.
@@ -621,7 +616,7 @@ impl PyCdsTrancheBuilder {
             slf,
             index_name,
             format!("{value:?}"),
-            |b: CdsTrancheBuilderInner| b.index_name(value.to_string())
+            |b: CdsTrancheBuilder| b.index_name(value.to_string())
         )
     }
 
@@ -638,12 +633,8 @@ impl PyCdsTrancheBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn series<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            series,
-            value.to_string(),
-            |b: CdsTrancheBuilderInner| b.series(value)
-        )
+        builder_set!(slf, series, value.to_string(), |b: CdsTrancheBuilder| b
+            .series(value))
     }
 
     /// Set the attachment point.
@@ -664,7 +655,7 @@ impl PyCdsTrancheBuilder {
             slf,
             attach_pct,
             float_repr(value),
-            |b: CdsTrancheBuilderInner| b.attach_pct(value)
+            |b: CdsTrancheBuilder| b.attach_pct(value)
         )
     }
 
@@ -686,7 +677,7 @@ impl PyCdsTrancheBuilder {
             slf,
             detach_pct,
             float_repr(value),
-            |b: CdsTrancheBuilderInner| b.detach_pct(value)
+            |b: CdsTrancheBuilder| b.detach_pct(value)
         )
     }
 
@@ -707,12 +698,8 @@ impl PyCdsTrancheBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        builder_set!(
-            slf,
-            notional,
-            money_repr(money),
-            |b: CdsTrancheBuilderInner| b.notional(money)
-        )
+        builder_set!(slf, notional, money_repr(money), |b: CdsTrancheBuilder| b
+            .notional(money))
     }
 
     /// Set the maturity date of the tranche.
@@ -736,7 +723,7 @@ impl PyCdsTrancheBuilder {
             slf,
             maturity,
             date_repr(maturity),
-            |b: CdsTrancheBuilderInner| b.maturity(maturity)
+            |b: CdsTrancheBuilder| b.maturity(maturity)
         )
     }
 
@@ -762,12 +749,8 @@ impl PyCdsTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let bp = extract_basis_points(value, "coupon_bp")?;
-        builder_set!(
-            slf,
-            coupon_bp,
-            float_repr(bp),
-            |b: CdsTrancheBuilderInner| b.coupon_bp(bp)
-        )
+        builder_set!(slf, coupon_bp, float_repr(bp), |b: CdsTrancheBuilder| b
+            .coupon_bp(bp))
     }
 
     /// Set the payment frequency.
@@ -796,7 +779,7 @@ impl PyCdsTrancheBuilder {
             slf,
             frequency,
             format!("Tenor({:?})", tenor.to_string()),
-            |b: CdsTrancheBuilderInner| b.frequency(tenor)
+            |b: CdsTrancheBuilder| b.frequency(tenor)
         )
     }
 
@@ -826,7 +809,7 @@ impl PyCdsTrancheBuilder {
             slf,
             day_count,
             format!("DayCount('{day_count}')"),
-            |b: CdsTrancheBuilderInner| b.day_count(day_count)
+            |b: CdsTrancheBuilder| b.day_count(day_count)
         )
     }
 
@@ -857,7 +840,7 @@ impl PyCdsTrancheBuilder {
             slf,
             business_day_convention,
             shown,
-            |b: CdsTrancheBuilderInner| b.business_day_convention(convention)
+            |b: CdsTrancheBuilder| b.business_day_convention(convention)
         )
     }
 
@@ -881,7 +864,7 @@ impl PyCdsTrancheBuilder {
             slf,
             calendar_id,
             format!("{value:?}"),
-            |b: CdsTrancheBuilderInner| b.calendar_id(value.into())
+            |b: CdsTrancheBuilder| b.calendar_id(value.into())
         )
     }
 
@@ -905,7 +888,7 @@ impl PyCdsTrancheBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: CdsTrancheBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: CdsTrancheBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -929,7 +912,7 @@ impl PyCdsTrancheBuilder {
             slf,
             credit_index_id,
             format!("{value:?}"),
-            |b: CdsTrancheBuilderInner| b.credit_index_id(CurveId::new(value.to_string()))
+            |b: CdsTrancheBuilder| b.credit_index_id(CurveId::new(value.to_string()))
         )
     }
 
@@ -952,12 +935,8 @@ impl PyCdsTrancheBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side: PayReceive = enum_from_str(value, "side")?;
-        builder_set!(
-            slf,
-            side,
-            format!("{value:?}"),
-            |b: CdsTrancheBuilderInner| b.side(side)
-        )
+        builder_set!(slf, side, format!("{value:?}"), |b: CdsTrancheBuilder| b
+            .side(side))
     }
 
     /// Set the contract start (effective) date for schedule anchoring.
@@ -982,7 +961,7 @@ impl PyCdsTrancheBuilder {
             slf,
             start_date,
             date_repr(start_date),
-            |b: CdsTrancheBuilderInner| b.start_date(start_date)
+            |b: CdsTrancheBuilder| b.start_date(start_date)
         )
     }
 
@@ -1007,7 +986,7 @@ impl PyCdsTrancheBuilder {
             slf,
             realized_loss,
             float_repr(value),
-            |b: CdsTrancheBuilderInner| b.realized_loss(value)
+            |b: CdsTrancheBuilder| b.realized_loss(value)
         )
     }
 
@@ -1035,7 +1014,7 @@ impl PyCdsTrancheBuilder {
             slf,
             roll_rule,
             format!("{rule:?}"),
-            |b: CdsTrancheBuilderInner| b.roll_rule(rule)
+            |b: CdsTrancheBuilder| b.roll_rule(rule)
         )
     }
 
@@ -1062,12 +1041,8 @@ impl PyCdsTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let stub = stub_kind_from_py(Some(value), "stub")?;
-        builder_set!(
-            slf,
-            stub,
-            format!("{stub:?}"),
-            |b: CdsTrancheBuilderInner| b.stub(stub)
-        )
+        builder_set!(slf, stub, format!("{stub:?}"), |b: CdsTrancheBuilder| b
+            .stub(stub))
     }
 
     /// Set the upfront payment.
@@ -1094,7 +1069,7 @@ impl PyCdsTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let (date, money) = dated_money_from_py(value, None, "upfront")?;
         let shown = format!("({}, {})", date_repr(date), money_repr(money));
-        builder_set!(slf, upfront, shown, |b: CdsTrancheBuilderInner| b
+        builder_set!(slf, upfront, shown, |b: CdsTrancheBuilder| b
             .upfront((date, money)))
     }
 
@@ -1125,7 +1100,7 @@ impl PyCdsTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, attributes, shown, |b: CdsTrancheBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: CdsTrancheBuilder| b
             .attributes(attrs))
     }
 }
