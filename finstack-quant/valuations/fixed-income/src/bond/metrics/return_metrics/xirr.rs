@@ -27,7 +27,7 @@
 
 use super::moic::{cost_basis, exit_paths, lifetime_dated_cashflows, ExitPaths};
 use crate::bond::Bond;
-use finstack_quant_core::cashflow::xirr_with_daycount;
+use finstack_quant_core::cashflow::xirr;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
@@ -62,7 +62,7 @@ impl MetricCalculator for XirrCalculator {
         let bond: &Bond = ctx.instrument_as()?;
         let (t0, v0) = cost_basis(bond)?;
         let flows = lifetime_dated_cashflows(bond, &ctx.curves)?;
-        xirr_with_daycount(
+        xirr(
             &held_to_maturity_path(&flows, t0, v0),
             day_count(bond),
             None,
@@ -121,8 +121,7 @@ impl MetricCalculator for XirrToWorstCalculator {
             exits,
         } = exit_paths(ctx)?;
 
-        let mut worst =
-            xirr_with_daycount(&held_to_maturity_path(&flows, t0, v0), day_count, None)?;
+        let mut worst = xirr(&held_to_maturity_path(&flows, t0, v0), day_count, None)?;
 
         // Each call/put candidate path.
         for (exit_date, redemption) in exits {
@@ -136,7 +135,7 @@ impl MetricCalculator for XirrToWorstCalculator {
             // and must be included exactly once in the realized return path.
             path.push((exit_date, redemption));
 
-            if let Ok(r) = xirr_with_daycount(&path, day_count, None) {
+            if let Ok(r) = xirr(&path, day_count, None) {
                 worst = worst.min(r);
             }
         }
@@ -275,14 +274,13 @@ mod tests {
                 .map(|(date, amount)| (*date, amount.amount())),
         );
         expected_path.push((call_date, 0.90 * outstanding));
-        let expected = xirr_with_daycount(&expected_path, DayCount::Act365F, None)
+        let expected = xirr(&expected_path, DayCount::Act365F, None)
             .expect("independent outstanding-principal XIRR");
 
         let mut initial_notional_path = expected_path[..expected_path.len() - 1].to_vec();
         initial_notional_path.push((call_date, 0.90 * bond.notional.amount()));
-        let initial_notional_result =
-            xirr_with_daycount(&initial_notional_path, DayCount::Act365F, None)
-                .expect("initial-notional comparison XIRR");
+        let initial_notional_result = xirr(&initial_notional_path, DayCount::Act365F, None)
+            .expect("initial-notional comparison XIRR");
 
         let mut ctx = MetricContext::new(
             Arc::new(bond.clone()),

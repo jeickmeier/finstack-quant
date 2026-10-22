@@ -230,7 +230,11 @@ pub(super) fn worst_call_period(
                 pct / 100.0 * balance_by_period[end_period],
             ));
         }
-        finstack_quant_core::cashflow::xirr(&flows, None)
+        finstack_quant_core::cashflow::xirr(
+            &flows,
+            finstack_quant_core::dates::DayCount::Act365F,
+            None,
+        )
     };
     let last = period_dates.len() - 1;
     let mut best: Option<(f64, Option<usize>)> = None;

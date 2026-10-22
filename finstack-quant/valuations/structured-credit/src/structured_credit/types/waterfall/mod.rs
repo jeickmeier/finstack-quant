@@ -215,9 +215,13 @@ impl EquityHistory {
                 .map(|(date, amount)| (*date, amount.amount())),
         );
         flows.push((payment_date, candidate.amount()));
-        finstack_quant_core::cashflow::xirr(&flows, None)
-            .ok()
-            .filter(|irr| irr.is_finite())
+        finstack_quant_core::cashflow::xirr(
+            &flows,
+            finstack_quant_core::dates::DayCount::Act365F,
+            None,
+        )
+        .ok()
+        .filter(|irr| irr.is_finite())
     }
 
     /// Cash on `payment_date` that lifts the equity IRR to `hurdle_irr`,
