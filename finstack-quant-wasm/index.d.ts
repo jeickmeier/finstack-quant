@@ -21171,51 +21171,6 @@ export interface EquityOption extends WasmOwned {
    */
   readonly attributes: generated.valuations.EquityOption['attributes'];
   /**
-   * Spot delta of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Spot delta produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Gamma of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Gamma produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Vega (per 1% vol) of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Vega (per 1% vol) produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Theta (per day on `metric_pricing_overrides.theta_day_basis`, calendar days by default) of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Theta (per day on `metric_pricing_overrides.theta_day_basis`, calendar days by default) produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Rho of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Rho produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
    * Identifier of the underlying equity referenced by the option.
    * @returns Ticker string exactly as supplied at construction; it is the key used to look up the spot price and volatility surface in the market context, so it must match the market-data identifier.
    */
@@ -24150,7 +24105,17 @@ export interface FxForwardFromTradeDateOptions {
 /**
  * Vanilla FX option handle: the option Greeks plus implied volatility.
  */
-export interface FxOption extends FxOptionGreeks {
+export interface FxOption extends FxHandle {
+  /**
+   * Named first-order greeks produced by the selected model.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Map of Greek name to value, with keys in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; a returned Greek is non-finite; or the result cannot be converted to a JavaScript value.
+   */
+  greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
+
   /**
    * Implied volatility that reproduces `targetPrice` (mirrors Rust `FxOption::implied_vol`, Garman–Kohlhagen inversion).
    * @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot.

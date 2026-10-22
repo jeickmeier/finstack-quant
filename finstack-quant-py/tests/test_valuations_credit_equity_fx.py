@@ -454,7 +454,7 @@ class TestEquityOption:
         greeks = option.greeks(market, "2024-01-15")
         # Greeks are quantity-scaled; per-unit delta lies in (0, 1) for a call.
         assert 0.0 < greeks["delta"] / option.quantity < 1.0
-        assert option.delta(market, "2024-01-15") == pytest.approx(greeks["delta"])
+        assert option.metric(market, "2024-01-15", "delta") == pytest.approx(greeks["delta"])
         implied = option.implied_vol(market, "2024-01-15", result.price)
         assert implied == pytest.approx(0.2, abs=2e-3)
 

@@ -37,6 +37,45 @@ macro_rules! fx_class {
     };
 }
 
+/// Expose the complete selected-model Greek bundle on an FX option class.
+macro_rules! fx_greeks_bundle {
+    ($rust_name:ident, $js_name:literal) => {
+        #[wasm_bindgen(js_class = $js_name)]
+        impl $rust_name {
+            /// Compute every Greek that applies to this instrument as a JavaScript object.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+            /// @returns Map of Greek name to value, with keys in the Rust
+            /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …);
+            /// only the Greeks that apply to the instrument are present.
+            ///
+            /// # Errors
+            ///
+            /// Throws a JavaScript exception if the instrument or market JSON,
+            /// `asOf`, or `model` is invalid; required market data is missing;
+            /// pricing fails; a returned Greek is non-finite; or the result cannot
+            /// be converted to a JavaScript value.
+            pub fn greeks(
+                &self,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
+            ) -> Result<JsValue, JsValue> {
+                let market_json = json_text(&market_json, "marketJson")?;
+                let as_of = js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
+                super::option_greeks(
+                    Box::new(self.inner.clone()),
+                    &market_json,
+                    &as_of,
+                    model.as_deref(),
+                )
+            }
+        }
+    };
+}
+
 /// Emit an FX option class: the `fx_class!` surface plus one method per
 /// applicable Greek (through `greek_methods!`) and `greeks()`.
 ///
@@ -81,39 +120,7 @@ macro_rules! fx_option_class {
             )+
         });
 
-        #[wasm_bindgen(js_class = $js_name)]
-        impl $rust_name {
-            /// Compute every Greek that applies to this instrument as a JavaScript object.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Map of Greek name to value, with keys in the Rust
-            /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …);
-            /// only the Greeks that apply to the instrument are present.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; a returned Greek is non-finite; or the result cannot
-            /// be converted to a JavaScript value.
-            pub fn greeks(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<JsValue, JsValue> {
-                let market_json = json_text(&market_json, "marketJson")?;
-                let as_of = js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                super::option_greeks(
-                    Box::new(self.inner.clone()),
-                    &market_json,
-                    &as_of,
-                    model.as_deref(),
-                )
-            }
-        }
+        fx_greeks_bundle!($rust_name, $js_name);
     };
 }
 
@@ -172,15 +179,9 @@ macro_rules! fx_option_with_all_greeks {
     };
 }
 
-// `FxOption` registers the model (analytic) theta; `QuantoOption` keeps the
-// universal theta-horizon P&L.
-fx_option_with_all_greeks!(
-    JsFxOption,
-    "FxOption",
-    instruments::fx::fx_option::FxOption,
-    FxOption,
-    "@returns Model theta per day: annual analytic theta divided by the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days); not annualized."
-);
+fx_class!(JsFxOption, "FxOption", instruments::fx::fx_option::FxOption);
+fx_greeks_bundle!(JsFxOption, "FxOption");
+// `QuantoOption` keeps the universal theta-horizon P&L.
 fx_option_with_all_greeks!(
     JsQuantoOption,
     "QuantoOption",
@@ -486,8 +487,7 @@ mod tests {
 
     #[test]
     fn option_greek_methods_match_the_metric_registry() {
-        let classes: [(&[&str], InstrumentType); 5] = [
-            (JsFxOption::GREEK_METHODS, JsFxOption::INSTRUMENT_TYPE),
+        let classes: [(&[&str], InstrumentType); 4] = [
             (
                 JsQuantoOption::GREEK_METHODS,
                 JsQuantoOption::INSTRUMENT_TYPE,

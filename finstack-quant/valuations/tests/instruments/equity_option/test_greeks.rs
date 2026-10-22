@@ -727,14 +727,14 @@ fn test_all_greeks_computed_together() {
     assert!(rho > 0.0, "Call rho should be positive");
 }
 
-/// `EquityOption::rho()` reports currency per 1bp, the same unit as the `rho`
+/// The native `OptionGreeksProvider` rho reports currency per 1bp, the same unit as the `rho`
 /// metric, for every exercise style.
 ///
 /// Reference: the QuantLib `spx_atm_call_1y` golden (AnalyticEuropeanEngine,
 /// rho rescaled to per 1bp). Both sides use the same Black-Scholes-Merton
 /// closed form, so the golden's own 1e-7 absolute tolerance applies.
 #[test]
-fn equity_option_rho_accessor_is_per_bp() {
+fn equity_option_native_rho_is_per_bp() {
     use finstack_quant_models::types::ExerciseStyle;
     use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 
@@ -750,17 +750,29 @@ fn equity_option_rho_accessor_is_per_bp() {
     let as_of = date!(2026 - 04 - 30);
     let quantlib_rho = fixture["expected"]["rho"].as_f64().expect("expected rho");
 
-    let rho = option.rho(&market, as_of).expect("rho accessor");
+    let rho = crate::metrics::common::direct_equity_greek(
+        &option,
+        &market,
+        as_of,
+        finstack_quant_valuations::instruments::OptionGreekKind::Rho,
+    )
+    .expect("native rho");
     assert!(
         (rho - quantlib_rho).abs() < 1e-7,
-        "EquityOption::rho() must be per 1bp: got {rho}, QuantLib {quantlib_rho}"
+        "Native rho must be per 1bp: got {rho}, QuantLib {quantlib_rho}"
     );
 
-    // The accessor and the metric share one unit for every exercise style.
+    // The native provider and the metric share one unit for every exercise style.
     for style in [ExerciseStyle::European, ExerciseStyle::American] {
         let mut styled = option.clone();
         styled.exercise_style = style;
-        let accessor = styled.rho(&market, as_of).expect("rho accessor");
+        let native = crate::metrics::common::direct_equity_greek(
+            &styled,
+            &market,
+            as_of,
+            finstack_quant_valuations::instruments::OptionGreekKind::Rho,
+        )
+        .expect("native rho");
         let metric = *styled
             .price_with_metrics(
                 &market,
@@ -773,9 +785,9 @@ fn equity_option_rho_accessor_is_per_bp() {
             .get("rho")
             .expect("rho measure");
         assert_eq!(
-            accessor.to_bits(),
+            native.to_bits(),
             metric.to_bits(),
-            "{style:?}: accessor {accessor} and metric {metric} must agree"
+            "{style:?}: native provider {native} and metric {metric} must agree"
         );
     }
 }

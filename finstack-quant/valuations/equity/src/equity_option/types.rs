@@ -436,77 +436,6 @@ impl EquityOption {
         )
     }
 
-    /// Calculate Greeks for this equity option
-    pub(crate) fn greeks(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<crate::equity_option::pricing::EquityOptionGreeks> {
-        use crate::equity_option::pricing;
-        pricing::compute_greeks(self, market, as_of)
-    }
-
-    /// Calculate delta of this equity option
-    pub fn delta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, as_of)?;
-        Ok(greeks.delta)
-    }
-
-    /// Calculate gamma of this equity option
-    pub fn gamma(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, as_of)?;
-        Ok(greeks.gamma)
-    }
-
-    /// Calculate vega of this equity option
-    pub fn vega(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, as_of)?;
-        Ok(greeks.vega)
-    }
-
-    /// Calculate theta of this equity option
-    pub fn theta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, as_of)?;
-        Ok(greeks.theta)
-    }
-
-    /// Rho of this equity option: PV change per 1bp (0.0001) move in the
-    /// risk-free rate, in the option's currency (same unit as the `rho` metric).
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market data holding the discount curve, spot, dividend
-    ///   yield and volatility surface named by the option.
-    /// * `as_of` - Valuation date; time to expiry is measured from it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a required market input is missing or pricing fails.
-    pub fn rho(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(market, as_of)?;
-        Ok(greeks.rho)
-    }
-
     /// Recover decimal annualized volatility using the option's exercise and dividend model.
     ///
     /// # Arguments
@@ -588,14 +517,25 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Equit
         request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
     {
+        use crate::equity_option::pricing;
         use finstack_quant_valuations_core::instruments::OptionGreekKind;
         let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
         match request.greek {
-            OptionGreekKind::Delta => greeks.delta = Some(self.greeks(market, as_of)?.delta),
-            OptionGreekKind::Gamma => greeks.gamma = Some(self.greeks(market, as_of)?.gamma),
-            OptionGreekKind::Vega => greeks.vega = Some(self.greeks(market, as_of)?.vega),
-            OptionGreekKind::Theta => greeks.theta = Some(self.greeks(market, as_of)?.theta),
-            OptionGreekKind::Rho => greeks.rho_bp = Some(self.greeks(market, as_of)?.rho),
+            OptionGreekKind::Delta => {
+                greeks.delta = Some(pricing::compute_greeks(self, market, as_of)?.delta)
+            }
+            OptionGreekKind::Gamma => {
+                greeks.gamma = Some(pricing::compute_greeks(self, market, as_of)?.gamma)
+            }
+            OptionGreekKind::Vega => {
+                greeks.vega = Some(pricing::compute_greeks(self, market, as_of)?.vega)
+            }
+            OptionGreekKind::Theta => {
+                greeks.theta = Some(pricing::compute_greeks(self, market, as_of)?.theta)
+            }
+            OptionGreekKind::Rho => {
+                greeks.rho_bp = Some(pricing::compute_greeks(self, market, as_of)?.rho)
+            }
             OptionGreekKind::Vanna => {
                 greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
             }
@@ -947,7 +887,7 @@ mod tests {
         assert_eq!(option.day_count, DayCount::Act365F);
     }
 
-    /// API-WIRING check only: `value()`/`greeks()`/`delta()`… delegate to
+    /// API-WIRING check only: `value()` and `OptionGreeksProvider` delegate to
     /// `pricing::compute_pv`/`compute_greeks`, so both sides of these
     /// assertions run the same code — this cannot detect a formula error.
     /// Formula correctness is anchored non-circularly in
@@ -976,52 +916,41 @@ mod tests {
         // Slightly wider tolerance due to MonotoneConvex interpolation (vs Linear)
         approx_eq(price.amount(), expected_unit * option.quantity, 5e-3);
 
-        let greeks = option
-            .greeks(&curves, as_of)
-            .expect("Greeks calculation should succeed in test");
         let expected = pricing::compute_greeks(&option, &curves, as_of)
             .expect("Greeks computation should succeed in test");
-        approx_eq(greeks.delta, expected.delta, 1e-6);
-        approx_eq(greeks.gamma, expected.gamma, 1e-10);
-        approx_eq(greeks.vega, expected.vega, 1e-6);
-        approx_eq(greeks.theta, expected.theta, 1e-8);
-        approx_eq(greeks.rho, expected.rho, 1e-6);
 
-        approx_eq(
-            option
-                .delta(&curves, as_of)
-                .expect("Delta calculation should succeed in test"),
-            greeks.delta,
-            1e-12,
-        );
-        approx_eq(
-            option
-                .gamma(&curves, as_of)
-                .expect("Gamma calculation should succeed in test"),
-            greeks.gamma,
-            1e-12,
-        );
-        approx_eq(
-            option
-                .vega(&curves, as_of)
-                .expect("Vega calculation should succeed in test"),
-            greeks.vega,
-            1e-12,
-        );
-        approx_eq(
-            option
-                .theta(&curves, as_of)
-                .expect("Theta calculation should succeed in test"),
-            greeks.theta,
-            1e-12,
-        );
-        approx_eq(
-            option
-                .rho(&curves, as_of)
-                .expect("Rho calculation should succeed in test"),
-            greeks.rho,
-            1e-12,
-        );
+        use finstack_quant_valuations_core::instruments::{
+            GreekBumps, OptionGreekKind, OptionGreeksProvider, OptionGreeksRequest,
+        };
+        for (kind, expected_value) in [
+            (OptionGreekKind::Delta, expected.delta),
+            (OptionGreekKind::Gamma, expected.gamma),
+            (OptionGreekKind::Vega, expected.vega),
+            (OptionGreekKind::Theta, expected.theta),
+            (OptionGreekKind::Rho, expected.rho),
+        ] {
+            let result = option
+                .option_greeks(
+                    &curves,
+                    as_of,
+                    &OptionGreeksRequest {
+                        greek: kind,
+                        base_pv: None,
+                        bumps: GreekBumps::default(),
+                    },
+                )
+                .expect("direct kernel provider");
+            let value = match kind {
+                OptionGreekKind::Delta => result.delta,
+                OptionGreekKind::Gamma => result.gamma,
+                OptionGreekKind::Vega => result.vega,
+                OptionGreekKind::Theta => result.theta,
+                OptionGreekKind::Rho => result.rho_bp,
+                _ => unreachable!(),
+            }
+            .expect("requested Greek");
+            approx_eq(value, expected_value, 1e-12);
+        }
     }
 
     #[test]
@@ -1046,7 +975,9 @@ mod tests {
             .compute(&[MetricId::Dividend01], &mut context)
             .expect("dividend risk");
         let actual = results[&MetricId::Dividend01];
-        let delta = option.delta(&curves, as_of).expect("delta");
+        let delta = pricing::compute_greeks(&option, &curves, as_of)
+            .expect("delta")
+            .delta;
         let pricing::inputs::EquityOptionInputs {
             spot: prepaid,
             t_vol: t,
@@ -1086,11 +1017,15 @@ mod tests {
         let expiry = date(2026, 1, 3);
         let curves = build_market_context(as_of, 100.0, 0.9, 0.02, 0.0);
         let mut option = base_option(expiry);
-        let expected = option.gamma(&curves, as_of).expect("analytic gamma");
+        let expected = pricing::compute_greeks(&option, &curves, as_of)
+            .expect("analytic gamma")
+            .gamma;
         option.exercise_style = ExerciseStyle::American;
         for steps in [101, 201, 401] {
             option.instrument_pricing_overrides.model_config.tree_steps = Some(steps);
-            let actual = option.gamma(&curves, as_of).expect("tree gamma");
+            let actual = pricing::compute_greeks(&option, &curves, as_of)
+                .expect("tree gamma")
+                .gamma;
             assert!(
                 (actual / expected - 1.0).abs() < 0.01,
                 "{steps}: {actual} vs {expected}"
@@ -1187,7 +1122,7 @@ mod tests {
         let pv = option.value(&curves, as_of).expect("should succeed");
         assert_eq!(pv.amount(), (120.0 - 100.0) * 50.0);
 
-        let greeks = option.greeks(&curves, as_of).expect("should succeed");
+        let greeks = pricing::compute_greeks(&option, &curves, as_of).expect("should succeed");
         assert_eq!(greeks.delta, 0.0);
         assert_eq!(greeks.gamma, 0.0);
         assert_eq!(greeks.vega, 0.0);
@@ -1277,8 +1212,7 @@ mod tests {
         approx_eq(bsm_forward, no_arb_forward, 1e-9);
 
         // Verify greeks are computed correctly
-        let greeks = option
-            .greeks(&curves, as_of)
+        let greeks = pricing::compute_greeks(&option, &curves, as_of)
             .expect("Greeks should succeed with mixed day counts");
         assert!(greeks.delta > 0.0 && greeks.delta < option.quantity);
         assert!(greeks.gamma > 0.0);
@@ -1586,8 +1520,7 @@ mod tests {
 
         let curves = build_market_context(as_of, 105.0, 0.22, 0.03, 0.0);
 
-        let greeks = option
-            .greeks(&curves, as_of)
+        let greeks = pricing::compute_greeks(&option, &curves, as_of)
             .expect("Greeks should succeed with discrete dividends");
 
         // For an ITM call with dividends, delta should be positive
@@ -1610,7 +1543,7 @@ mod tests {
             "Expected Bermudan pricing to fail without exercise schedule"
         );
 
-        let greeks = option.greeks(&curves, as_of);
+        let greeks = pricing::compute_greeks(&option, &curves, as_of);
         assert!(
             greeks.is_err(),
             "Expected Bermudan greeks to fail without exercise schedule"
