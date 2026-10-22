@@ -288,7 +288,7 @@ python_package = "finstack_quant.cashflows.builder"
 # OvernightObservationSlice, OvernightRateAccumulator, OvernightRateConstraints,
 # OvernightRateReplay, overnight_day_count_basis} and rate_helpers
 # {FloatingRateParams, project_floating_rate, project_index_rate,
-# project_overnight_rate, calculate_floating_rate, observed_term_fixing,
+# project_overnight_rate, calculate_floating_rate, observed_index_fixing,
 # apply_bp_bounds} (pricer coupon-replay plumbing; raw observations are exposed
 # through fixings.ProjectedFixing); periods {SchedulePeriod, BuildPeriodsParams,
 # build_periods, build_single_period, period_accrual, compute_reset_date};

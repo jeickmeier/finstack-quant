@@ -14,7 +14,7 @@
 //!
 //! - [`project_floating_rate`]: all-in coupon rate from a resolved forward curve and params
 //! - [`project_index_rate`] / [`project_overnight_rate`]: the raw term or overnight index rate
-//! - [`observed_term_fixing`]: the realized fixing for a reset already in the past
+//! - [`observed_index_fixing`]: the realized term or overnight fixing at a valuation cutoff
 //! - [`calculate_floating_rate`]: gearing, spread, floors and caps applied to an index rate
 //! - [`apply_bp_bounds`]: basis-point floor and cap on a decimal rate
 //!
@@ -315,32 +315,39 @@ pub fn project_floating_rate(
     Ok(calculate_floating_rate(index_rate, params))
 }
 
-/// Recorded term fixing for a reset, when one applies instead of a projection.
+/// Recorded term or overnight index fixing at a valuation cutoff.
 ///
-/// A fixing applies when the reset precedes `as_of`, or falls on `as_of` and
-/// that day's fixing is already published; otherwise `None` tells the caller
-/// to project the rate from its forward curve.
+/// A fixing is required before `as_of`. On `as_of`, a published exact-date
+/// fixing applies when present; otherwise `None` asks the caller to project.
+/// Dates after `as_of` always return `None`, even if the series contains a
+/// future observation. The forward curve's base date does not set this cutoff.
 ///
 /// # Arguments
 ///
-/// * `reset_date` - Fixing (reset) date of the term index.
-/// * `fixings` - Recorded `FIXING:{forward_curve_id}` series, when supplied.
-/// * `forward_curve_id` - Index curve identifier, used in error messages.
-/// * `as_of` - Valuation date separating realized from projected fixings.
+/// * `observation_date` - Contractual index publication date (term reset or
+///   overnight observation), without carrying earlier observations forward.
+/// * `fixings` - Optional recorded `FIXING:{forward_curve_id}` series of decimal
+///   annual rates. Missing exact historical observations are errors.
+/// * `forward_curve_id` - Index identifier used for canonical-series guidance
+///   and error diagnostics; this function does not look up a forward curve.
+/// * `as_of` - Valuation date separating realized from projected observations.
 ///
 /// # Errors
 ///
-/// Returns an error when a past reset has no recorded fixing.
-pub fn observed_term_fixing(
-    reset_date: Date,
+/// Returns a validation error when an observation before `as_of` has no
+/// exact fixing, whether the series is absent or incomplete.
+pub fn observed_index_fixing(
+    observation_date: Date,
     fixings: Option<&ScalarTimeSeries>,
     forward_curve_id: &str,
     as_of: Date,
 ) -> Result<Option<f64>> {
-    let published_today = reset_date == as_of
-        && fixings.is_some_and(|series| series.value_on_exact(reset_date).is_ok());
-    if reset_date < as_of || published_today {
-        return require_fixing_value_exact(fixings, forward_curve_id, reset_date, as_of).map(Some);
+    if observation_date < as_of {
+        return require_fixing_value_exact(fixings, forward_curve_id, observation_date, as_of)
+            .map(Some);
+    }
+    if observation_date == as_of {
+        return Ok(fixings.and_then(|series| series.value_on_exact(observation_date).ok()));
     }
     Ok(None)
 }
@@ -493,6 +500,40 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use time::Month;
+
+    #[test]
+    fn index_fixing_policy_requires_history_and_ignores_future_observations() {
+        let past = Date::from_calendar_date(2025, Month::January, 3).expect("past");
+        let as_of = Date::from_calendar_date(2025, Month::January, 6).expect("valuation");
+        let future = Date::from_calendar_date(2025, Month::January, 7).expect("future");
+        let complete = ScalarTimeSeries::new(
+            "FIXING:TEST",
+            vec![(past, 0.041), (as_of, 0.042), (future, 0.99)],
+            None,
+        )
+        .expect("complete series with a future observation");
+        let incomplete = ScalarTimeSeries::new("FIXING:TEST", vec![(future, 0.99)], None)
+            .expect("no historical or valuation-day observation");
+        for history in [None, Some(&incomplete), Some(&complete)] {
+            let past_result = observed_index_fixing(past, history, "TEST", as_of);
+            if history.is_some_and(|series| series.value_on_exact(past).is_ok()) {
+                assert_eq!(past_result.expect("recorded fixing"), Some(0.041));
+            } else {
+                assert!(matches!(
+                    past_result,
+                    Err(finstack_quant_core::Error::Validation(_))
+                ));
+            }
+            assert_eq!(
+                observed_index_fixing(as_of, history, "TEST", as_of).expect("same-day policy"),
+                history.and_then(|series| series.value_on_exact(as_of).ok()),
+            );
+            assert_eq!(
+                observed_index_fixing(future, history, "TEST", as_of).expect("future projection"),
+                None,
+            );
+        }
+    }
 
     fn project_floating_rate_from_market(
         reset_date: Date,
