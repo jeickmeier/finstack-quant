@@ -67,7 +67,7 @@ pyo3::create_exception!(
     finstack_quant.analytics,
     AnalyticsError,
     FinstackError,
-    "Analytics validation or calculation failure (inherits FinstackError, ValueError)."
+    crate::bindings::pydoc::pydoc!("finstack_quant.analytics", "AnalyticsError")
 );
 
 pyo3::create_exception!(
