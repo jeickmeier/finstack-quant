@@ -860,3 +860,114 @@ fn strict_projection_preserves_nullable_array_values() {
         "number"
     );
 }
+
+#[test]
+fn generator_renders_once_and_preserves_unowned_files() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static GENERATIONS: AtomicUsize = AtomicUsize::new(0);
+    fn counted_examples() -> crate::Result<Vec<serde_json::Value>> {
+        GENERATIONS.fetch_add(1, Ordering::SeqCst);
+        Ok(vec![json!({"value": "counted"})])
+    }
+
+    let root = tempfile::tempdir().expect("temporary output root");
+    let artifact = SchemaArtifact::new::<SuffixProbe>(
+        "schemas/probe/count.schema.json",
+        "https://example.test/count.schema.json",
+        "Counting probe",
+        "Checks single-pass schema rendering.",
+    )
+    .with_examples(counted_examples);
+    let command = SchemaGenerationCommand {
+        mode: SchemaGenerationMode::Write,
+        output_root: Some(root.path().to_path_buf()),
+    };
+    let owned = root.path().join("schemas/probe");
+    std::fs::create_dir_all(&owned).expect("owned directory");
+    std::fs::write(owned.join("retired.schema.json"), "{}").expect("stale schema");
+    std::fs::write(owned.join("notes.txt"), "keep").expect("non-schema file");
+    let unowned = root.path().join("schemas/unowned");
+    std::fs::create_dir_all(&unowned).expect("unowned directory");
+    std::fs::write(unowned.join("keep.schema.json"), "{}").expect("unowned schema");
+
+    run_schema_generator(
+        root.path(),
+        &["schemas/probe"],
+        &[artifact],
+        Some(std::path::Path::new("schemas/index.json")),
+        &command,
+    )
+    .expect("write schema and index");
+    assert_eq!(GENERATIONS.load(Ordering::SeqCst), 1);
+    assert!(!owned.join("retired.schema.json").exists());
+    assert!(owned.join("notes.txt").exists());
+    assert!(unowned.join("keep.schema.json").exists());
+    let bytes = std::fs::read(root.path().join(artifact.relative_path)).expect("artifact bytes");
+    let index: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(root.path().join("schemas/index.json")).expect("index bytes"),
+    )
+    .expect("index JSON");
+    assert_eq!(index["artifacts"][0]["bytes"], json!(bytes.len()));
+
+    let mut command = command;
+    command.mode = SchemaGenerationMode::List;
+    run_schema_generator(
+        root.path(),
+        &["schemas/probe"],
+        &[artifact],
+        Some(std::path::Path::new("schemas/index.json")),
+        &command,
+    )
+    .expect("list does not render");
+    assert_eq!(GENERATIONS.load(Ordering::SeqCst), 1);
+    command.mode = SchemaGenerationMode::Check;
+    run_schema_generator(
+        root.path(),
+        &["schemas/probe"],
+        &[artifact],
+        Some(std::path::Path::new("schemas/index.json")),
+        &command,
+    )
+    .expect("clean check");
+    assert_eq!(GENERATIONS.load(Ordering::SeqCst), 2);
+
+    std::fs::write(root.path().join(artifact.relative_path), "stale").expect("stale artifact");
+    std::fs::remove_file(root.path().join("schemas/index.json")).expect("missing index");
+    let error = run_schema_generator(
+        root.path(),
+        &["schemas/probe"],
+        &[artifact],
+        Some(std::path::Path::new("schemas/index.json")),
+        &command,
+    )
+    .expect_err("check reports document and index drift");
+    let message = error.to_string();
+    assert!(message.contains("changed schemas/probe/count.schema.json"));
+    assert!(message.contains("missing schemas/index.json"));
+    assert_eq!(
+        std::fs::read(root.path().join(artifact.relative_path)).expect("unchanged stale file"),
+        b"stale"
+    );
+}
+
+#[test]
+fn artifact_only_generation_does_not_create_an_index() {
+    let root = tempfile::tempdir().expect("temporary output root");
+    let command = SchemaGenerationCommand {
+        mode: SchemaGenerationMode::Write,
+        output_root: Some(root.path().to_path_buf()),
+    };
+    run_schema_generator(
+        root.path(),
+        &["schemas/probe"],
+        INDEX_PROBE_ARTIFACTS,
+        None,
+        &command,
+    )
+    .expect("artifact-only generation");
+    assert!(!root.path().join("schemas/index.json").exists());
+    for artifact in INDEX_PROBE_ARTIFACTS {
+        assert!(root.path().join(artifact.relative_path).exists());
+    }
+}

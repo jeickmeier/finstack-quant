@@ -18,9 +18,8 @@ mod tests;
 
 pub use externalize::{externalize_schema_definitions, ExternalSchemaDefinition};
 pub use generator::{
-    build_schema_index, deterministic_json_bytes, run_schema_generator, run_schema_index_generator,
-    schema_index_row, sync_generated_files, SchemaGenerationCommand, SchemaGenerationMode,
-    SCHEMA_INDEX_VERSION,
+    build_schema_index, deterministic_json_bytes, run_schema_generator, schema_index_row,
+    sync_generated_files, SchemaGenerationCommand, SchemaGenerationMode, SCHEMA_INDEX_VERSION,
 };
 pub use llm::{project_llm, LlmProfile, DEFAULT_MAX_INLINE_BYTES, RESOLVES_FROM_KEYWORD};
 pub use registry::{
