@@ -120,7 +120,12 @@ impl Instrument for FxLinkedInstrument {
                 "FX matrix missing for FxLinkedInstrument".to_string(),
             )
         })?;
-        let query = FxQuery::new(self.base_currency, self.reporting_currency, as_of);
+        let query = FxQuery::new(
+            self.base_currency,
+            self.reporting_currency,
+            as_of,
+            Default::default(),
+        );
         let rate = fx_matrix.rate(query)?;
 
         Ok(

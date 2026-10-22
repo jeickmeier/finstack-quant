@@ -193,7 +193,7 @@ impl JsFxQuoteConvention {
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// const conv = core.fxPairConvention("USD", "EUR");
-/// conv.base.code;          // "EUR"
+/// conv.base.toString();          // "EUR"
 /// conv.usdQuotation.toString(); // "direct"
 /// conv.pipSize;            // 0.0001
 /// conv.settlementDays;     // 2
@@ -342,29 +342,6 @@ impl JsFxMatrix {
         }
     }
 
-    /// Set an explicit FX quote.
-    ///
-    /// # Arguments
-    /// * `base` - Base (from) currency ISO code.
-    /// * `quote` - Quote (to) currency ISO code.
-    /// * `rate` - Conversion rate.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if either currency code is invalid or
-    /// `rate` is non-finite or not strictly positive.
-    #[wasm_bindgen(js_name = setQuote)]
-    pub fn set_quote(&self, base: JsValue, quote: JsValue, rate: JsValue) -> Result<(), JsValue> {
-        let rate = js_f64(&rate, "rate")?;
-        self.inner
-            .set_quote(
-                js_currency(&base, "base")?,
-                js_currency(&quote, "quote")?,
-                rate,
-            )
-            .map_err(to_js_err)
-    }
-
     /// Set several pair-global quotes atomically (Rust `FxMatrix::set_quotes`).
     ///
     /// # Arguments
@@ -482,7 +459,7 @@ impl JsFxMatrix {
         date: JsValue,
         policy: &JsFxConversionPolicy,
     ) -> Result<JsFxRateResult, JsValue> {
-        let query = FxQuery::with_policy(
+        let query = FxQuery::new(
             js_currency(&base, "base")?,
             js_currency(&quote, "quote")?,
             js_date(&date, "date")?,

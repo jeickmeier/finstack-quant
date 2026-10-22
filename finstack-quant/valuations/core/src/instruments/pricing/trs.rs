@@ -1215,7 +1215,9 @@ mod tests {
                 .day_count
                 .year_fraction(as_of, period_end, ctx_day_count)
                 .expect("t_end");
-            let fwd_naive = fwd.rate_period(t_start, t_end);
+            let fwd_naive = fwd
+                .rate_period(t_start, t_end)
+                .expect("finite ordered period");
             let df_naive = disc.df(t_end);
             naive += 1_000_000.0 * fwd_naive * yf * df_naive;
         }

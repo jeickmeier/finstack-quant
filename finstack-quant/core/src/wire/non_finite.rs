@@ -65,7 +65,7 @@ pub mod non_finite_f64 {
     /// # Errors
     ///
     /// Returns an error when the value is `null`, or is neither a number nor a
-    /// recognized sentinel (`"inf"`, `"+inf"`, `"-inf"`, `"infinity"`, `"nan"`).
+    /// recognized sentinel (`"inf"`, `"-inf"`, `"nan"`).
     pub fn deserialize<'de, D>(deserializer: D) -> Result<f64, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -90,8 +90,8 @@ pub mod non_finite_f64 {
     /// # Arguments
     ///
     /// * `text` - Candidate sentinel. Matching ignores surrounding whitespace
-    ///   and ASCII case; `"inf"`, `"+inf"`, `"infinity"` and `"+infinity"` map
-    ///   to `+∞`, `"-inf"` and `"-infinity"` to `-∞`, and `"nan"` to `NaN`.
+    ///   and ASCII case; `"inf"` maps to `+∞`, `"-inf"` to `-∞`, and `"nan"`
+    ///   to `NaN`. Other spellings are rejected.
     ///
     /// # Returns
     ///
@@ -99,8 +99,8 @@ pub mod non_finite_f64 {
     #[must_use]
     pub fn parse_sentinel(text: &str) -> Option<f64> {
         match text.trim().to_ascii_lowercase().as_str() {
-            "inf" | "+inf" | "infinity" | "+infinity" => Some(f64::INFINITY),
-            "-inf" | "-infinity" => Some(f64::NEG_INFINITY),
+            "inf" => Some(f64::INFINITY),
+            "-inf" => Some(f64::NEG_INFINITY),
             "nan" => Some(f64::NAN),
             _ => None,
         }

@@ -1,25 +1,13 @@
 {
-  "schema": "finstack_quant.rating_scales/1",
+  "schema": "finstack_quant.rating_scales/2",
   "scorecard_policy": {
     "default_score": 50.0,
     "default_scale_id": "sp",
-    "unknown_scale_policy": "fallback_to_default",
-    "aliases": [
-      { "alias": "S&P", "scale_id": "sp" },
-      { "alias": "S&P Global", "scale_id": "sp" },
-      { "alias": "SP", "scale_id": "sp" },
-      { "alias": "sp", "scale_id": "sp" },
-      { "alias": "s&p", "scale_id": "sp" },
-      { "alias": "Fitch", "scale_id": "sp" },
-      { "alias": "FITCH", "scale_id": "sp" },
-      { "alias": "Moody's", "scale_id": "moodys" },
-      { "alias": "MOODYS", "scale_id": "moodys" },
-      { "alias": "Moodys", "scale_id": "moodys" }
-    ]
+    "unknown_scale_policy": "fallback_to_default"
   },
   "rating_scales": [
     {
-      "ids": ["sp", "standard_and_poors"],
+      "id": "sp",
       "source": "Standard & Poor's credit rating scale",
       "scale": {
         "scale_name": "S&P",
@@ -51,7 +39,7 @@
       }
     },
     {
-      "ids": ["moodys"],
+      "id": "moodys",
       "source": "Moody's Investors Service credit rating scale",
       "scale": {
         "scale_name": "Moody's",

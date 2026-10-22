@@ -158,10 +158,6 @@ impl FxBarrierOption {
             self.barrier,
             "FxBarrierOption barrier",
         )?;
-        finstack_quant_core::validation::validate_money_finite(
-            self.notional,
-            "FxBarrierOption notional",
-        )?;
         if self.notional.amount() <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "FxBarrierOption notional must be positive".to_string(),

@@ -301,27 +301,29 @@ fn business_day_convention_display_strings() {
 }
 
 #[test]
-fn business_day_convention_from_str_accepts_short_codes_case_insensitively() {
-    let cases = [
-        ("MF", BusinessDayConvention::ModifiedFollowing),
-        ("mf", BusinessDayConvention::ModifiedFollowing),
-        ("ModFollowing", BusinessDayConvention::ModifiedFollowing),
-        ("F", BusinessDayConvention::Following),
-        ("P", BusinessDayConvention::Preceding),
-        ("MP", BusinessDayConvention::ModifiedPreceding),
-        ("NONE", BusinessDayConvention::Unadjusted),
-        (
-            "Modified_Following",
-            BusinessDayConvention::ModifiedFollowing,
-        ),
-        (" nearest ", BusinessDayConvention::Nearest),
-    ];
-    for (input, expected) in cases {
-        assert_eq!(
-            input.parse::<BusinessDayConvention>().expect(input),
-            expected,
-            "{input}"
-        );
+fn business_day_convention_parser_accepts_only_normalized_canonical_names() {
+    for convention in [
+        BusinessDayConvention::Unadjusted,
+        BusinessDayConvention::Following,
+        BusinessDayConvention::ModifiedFollowing,
+        BusinessDayConvention::Preceding,
+        BusinessDayConvention::ModifiedPreceding,
+        BusinessDayConvention::Nearest,
+    ] {
+        let name = format!(" {} ", convention.to_string().to_ascii_uppercase());
+        assert_eq!(name.parse::<BusinessDayConvention>(), Ok(convention));
+    }
+    for alias in [
+        "MF",
+        "mf",
+        "ModFollowing",
+        "F",
+        "P",
+        "MP",
+        "NONE",
+        "modified-following",
+    ] {
+        assert!(alias.parse::<BusinessDayConvention>().is_err(), "{alias}");
     }
     let err = "bogus"
         .parse::<BusinessDayConvention>()

@@ -389,6 +389,7 @@ impl XccySwap {
                 leg.notional.currency(),
                 self.reporting_currency,
                 leg.leg.start,
+                Default::default(),
             ))
             .map_err(|err| {
                 finstack_quant_core::Error::Validation(format!(
@@ -791,6 +792,7 @@ impl XccySwap {
                     leg.notional.currency(),
                     self.reporting_currency,
                     as_of,
+                    Default::default(),
                 ))?
                 .rate;
             Ok(amount * rate)
@@ -1476,7 +1478,7 @@ mod tests {
         };
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("set EUR/USD rate");
         let market = MarketContext::new()
             .insert(curve("USD-OIS", 0.02))
@@ -1548,7 +1550,7 @@ mod tests {
 
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("set EUR/USD rate");
         let fx = FxMatrix::new(provider);
 

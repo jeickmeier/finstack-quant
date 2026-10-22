@@ -627,7 +627,7 @@ class ScorecardConfig:
     ----------
     rating_scale : str
         Rating-scale identifier used to interpret metric thresholds; defaults
-        to the ``"S&P"`` scale.
+        to the canonical ``"sp"`` scale.
     metrics : list[ScorecardMetric]
         Weighted metric definitions used to calculate the composite rating.
     min_rating : str or None
@@ -641,13 +641,13 @@ class ScorecardConfig:
     >>> from finstack_quant.statements_analytics import ScorecardConfig
     >>> config = ScorecardConfig(period="2025Q1")
     >>> (config.rating_scale, config.period, config.metrics)
-    ('S&P', '2025Q1', [])
+    ('sp', '2025Q1', [])
 
     """
 
     def __init__(
         self,
-        rating_scale: str = "S&P",
+        rating_scale: str | None = None,
         metrics: list[ScorecardMetric] = ...,
         min_rating: str | None = None,
         period: str | None = None,
@@ -657,8 +657,9 @@ class ScorecardConfig:
 
         Parameters
         ----------
-        rating_scale : str, default "S&P"
-            Registered rating-scale identifier used to interpret thresholds.
+        rating_scale : str | None, default None
+            Canonical id (``"sp"`` or ``"moodys"``) used to interpret thresholds.
+            None uses the Rust default, ``"sp"``.
         metrics : list[ScorecardMetric]
             Weighted metric definitions included in the composite rating.
         min_rating : str or None, default None
@@ -676,7 +677,7 @@ class ScorecardConfig:
     @property
     def rating_scale(self) -> str:
         """
-        Rating scale identifier (e.g. ``"S&P"``, ``"Moody's"``, ``"Fitch"``).
+        Configured rating scale identifier (for example ``"sp"`` or ``"moodys"``).
 
         Returns
         -------
@@ -1012,7 +1013,7 @@ class CreditScorecardExtension:
     --------
     >>> from finstack_quant.statements_analytics import ScorecardConfig, CreditScorecardExtension
     >>> CreditScorecardExtension(ScorecardConfig()).config().rating_scale
-    'S&P'
+    'sp'
 
     """
 
@@ -10834,7 +10835,7 @@ def evaluate_dcf(
     >>> _ = b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
     >>> _ = b.with_meta("currency", '"USD"')
     >>> result = evaluate_dcf(b.build(), 0.10, TerminalValueSpec.gordon_growth(0.02), net_debt_override=0.0)
-    >>> result.enterprise_value.currency.code
+    >>> str(result.enterprise_value.currency)
     'USD'
     """
 

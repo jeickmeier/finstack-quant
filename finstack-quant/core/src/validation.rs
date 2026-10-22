@@ -240,23 +240,6 @@ pub fn validate_date_range_non_strict(
     })
 }
 
-/// Validate that a monetary amount is finite.
-///
-/// # Arguments
-///
-/// * `money` - Amount to check.
-/// * `context` - Name of the amount used in the error message.
-///
-/// # Errors
-///
-/// Returns `Error::Validation` when the amount is NaN or infinite.
-#[inline]
-pub fn validate_money_finite(money: crate::money::Money, context: &str) -> crate::Result<()> {
-    require_with(money.amount().is_finite(), || {
-        format!("Invalid {context}: amount must be finite.")
-    })
-}
-
 /// Validate that a monetary amount exceeds a threshold.
 ///
 /// # Arguments
@@ -437,9 +420,8 @@ mod tests {
     }
 
     #[test]
-    fn validate_money_checks_finite_gt_and_currency() {
+    fn validate_money_checks_gt_and_currency() {
         let money = crate::money::Money::from((1_i64, crate::currency::Currency::USD));
-        assert!(validate_money_finite(money, "test").is_ok());
         assert!(validate_money_gt(money, 0.0, "test").is_ok());
         assert!(validate_money_gt(money, 2.0, "test").is_err());
         assert!(validate_money_currency(money, crate::currency::Currency::USD, "test").is_ok());

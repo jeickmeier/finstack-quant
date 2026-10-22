@@ -621,7 +621,7 @@ impl InflationLinkedBond {
     /// * `nominal_bond_yield` — yield of the comparable nominal bond, quoted in
     ///   **effective-annual (annually-compounded)** convention.
     ///   When calling from `BreakevenInflationCalculator`, this comes from
-    ///   `disc_curve.zero_rate(t, Compounding::Annual)`.
+    ///   `disc_curve.zero_rate(t, Compounding::Periodic(std::num::NonZeroU32::MIN))`.
     ///
     /// This is more accurate than the simplified approximation (`nominal - real`)
     /// at higher inflation levels where the cross-term becomes significant.
@@ -672,9 +672,12 @@ impl InflationLinkedBond {
         let n_u32 = n_f.round() as u32;
         let real_compounding = NonZeroU32::new(n_u32)
             .map(Compounding::Periodic)
-            .unwrap_or(Compounding::Annual);
-        let real_yield_annual =
-            real_compounding.convert_rate(real_yield_street, t, &Compounding::Annual);
+            .unwrap_or(Compounding::Periodic(std::num::NonZeroU32::MIN));
+        let real_yield_annual = real_compounding.convert_rate(
+            real_yield_street,
+            t,
+            &Compounding::Periodic(std::num::NonZeroU32::MIN),
+        );
 
         // Both yields are now effective-annual. Apply the exact Fisher identity.
         // Guard against division by zero for extreme negative real yields.

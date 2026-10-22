@@ -75,18 +75,11 @@ impl FromStr for PeriodKind {
     ///
     /// * `s` - One of daily, weekly, monthly, quarterly, semi_annual, or annual; aliases, case variants and padding are rejected.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "daily" => Ok(PeriodKind::Daily),
-            "weekly" => Ok(PeriodKind::Weekly),
-            "monthly" => Ok(PeriodKind::Monthly),
-            "quarterly" => Ok(PeriodKind::Quarterly),
-            "semi_annual" => Ok(PeriodKind::SemiAnnual),
-            "annual" => Ok(PeriodKind::Annual),
-            _ => Err(crate::Error::Validation(format!(
-                "unknown period kind '{s}'; expected one of daily, weekly, monthly, quarterly, \
-                 semi_annual, annual"
-            ))),
-        }
+        crate::wire::serde_parse(s).map_err(|_| {
+            crate::Error::Validation(format!(
+                "unknown period kind '{s}'; expected one of daily, weekly, monthly, quarterly, semi_annual, annual"
+            ))
+        })
     }
 }
 

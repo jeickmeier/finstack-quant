@@ -785,13 +785,16 @@
       "prevCdsSemiannualRoll",
       "quantile",
       "quarter",
+      "ratingLevelTryNew",
       "ratingScalesExtensionKey",
       "realizedVariance",
       "realizedVarianceOhlc",
       "registryFromConfig",
+      "sabrParameterDataNew",
       "sampleStdOrNan",
       "sampleVarianceOrNan",
       "schema",
+      "scorecardScaleTryNew",
       "sifmaSettlementDate",
       "singularThreshold",
       "standardNormalInvCdf",
@@ -801,8 +804,21 @@
       "symmetryTolerance",
       "thirdFriday",
       "thirdWednesday",
+      "toleranceConfigNew",
       "variance"
     ]
+  },
+  "core.toleranceConfigNew": {
+    "kind": "function"
+  },
+  "core.ratingLevelTryNew": {
+    "kind": "function"
+  },
+  "core.scorecardScaleTryNew": {
+    "kind": "function"
+  },
+  "core.sabrParameterDataNew": {
+    "kind": "function"
   },
   "core.Currency": {
     "kind": "class",
@@ -971,7 +987,7 @@
       "zwl"
     ],
     "methods": ["free", "toJson", "toString"],
-    "getters": ["code", "decimals", "numeric"]
+    "getters": ["decimals", "numeric"]
   },
   "core.Money": {
     "kind": "class",
@@ -1597,7 +1613,7 @@
     "kind": "class",
     "constructor": true,
     "statics": ["fromDict"],
-    "methods": ["free", "rate", "setQuote", "setQuoteOn", "setQuotes"],
+    "methods": ["free", "rate", "setQuoteOn", "setQuotes"],
     "getters": []
   },
   "core.FxQuoteConvention": {
@@ -2466,7 +2482,6 @@
       "RecoverySpec",
       "choleskyCorrelation",
       "correlationBounds",
-      "jointProbabilities",
       "maxPortfolioLossPaths",
       "nearestCorrelation",
       "simulatePortfolioLoss",
@@ -2566,9 +2581,6 @@
     "getters": ["correlationMatrix", "numFactors", "volatilities"]
   },
   "models.correlation.correlationBounds": {
-    "kind": "function"
-  },
-  "models.correlation.jointProbabilities": {
     "kind": "function"
   },
   "models.correlation.validateCorrelationMatrix": {

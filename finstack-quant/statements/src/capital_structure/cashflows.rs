@@ -455,7 +455,7 @@ fn flows_table<'a>(
         "source".to_string(),
         serde_json::json!("capital_structure_cashflows"),
     );
-    TableEnvelope::new_with_metadata(
+    TableEnvelope::new(
         vec![
             TableColumn::new("instrument", TableColumnData::String(instruments))
                 .with_role(TableColumnRole::Dimension),

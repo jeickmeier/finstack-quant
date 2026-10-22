@@ -250,7 +250,6 @@ impl Swaption {
     /// Checks date ordering (expiry <= underlying_start_date < underlying_maturity), notional
     /// finiteness and positivity, and strike finiteness and magnitude.
     pub fn validate(&self) -> Result<()> {
-        validation::validate_money_finite(self.notional, "swaption notional")?;
         validation::validate_money_gt(self.notional, 0.0, "swaption notional")?;
 
         validation::validate_date_range_non_strict(

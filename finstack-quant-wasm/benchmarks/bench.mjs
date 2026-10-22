@@ -618,8 +618,9 @@ async function main() {
     w.correlationBounds(0.05, 0.08);
   });
 
-  bench('correlation', 'jointProbabilities', 20000, () => {
-    w.jointProbabilities(0.05, 0.08, 0.2);
+  const bernoulliPair = new w.CorrelatedBernoulli(0.05, 0.08, 0.2);
+  bench('correlation', 'CorrelatedBernoulli.jointProbabilities', 20000, () => {
+    bernoulliPair.jointProbabilities();
   });
 
   bench('models', 'bsPrice (call)', 20000, () => {
@@ -721,9 +722,9 @@ async function main() {
     fc.rate(1.25);
   });
 
-  bench('core', 'FxMatrix setQuote + rate', 4000, () => {
+  bench('core', 'FxMatrix setQuotes + rate', 4000, () => {
     const fx = new w.FxMatrix();
-    fx.setQuote('USD', 'EUR', 0.92);
+    fx.setQuotes([['USD', 'EUR', 0.92]]);
     // Raw pkg-node twin of the facade's `rate(base, quote, date)`.
     fx.rateWithDefaultPolicy('USD', 'EUR', '2024-01-02');
   });

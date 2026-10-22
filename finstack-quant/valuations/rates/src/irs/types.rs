@@ -398,7 +398,6 @@ impl InterestRateSwap {
     /// ```
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         // Validate finiteness early to avoid NaN poisoning and panics in downstream code.
-        validation::validate_money_finite(self.notional, "notional")?;
         // Decimal values are always finite (no NaN/Infinity), so we just check they're valid
         // by verifying they can be converted to f64 for magnitude checks
 

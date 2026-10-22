@@ -125,7 +125,6 @@ impl RevolvingCredit {
 
         // Commitment amount must be positive
         validation::validate_money_gt(self.commitment, 0.0, "RevolvingCredit commitment")?;
-        validation::validate_money_finite(self.drawn, "RevolvingCredit drawn")?;
 
         // Drawn amount must be non-negative (check before relationship check
         // so a negative drawn is reported clearly rather than passing
@@ -201,10 +200,6 @@ impl RevolvingCredit {
             true,
         )?;
         for (index, step) in self.commitment_steps.iter().enumerate() {
-            validation::validate_money_finite(
-                step.amount,
-                &format!("RevolvingCredit commitment_steps[{index}].amount"),
-            )?;
             validation::require_with(step.amount.amount() >= 0.0, || {
                 format!(
                     "RevolvingCredit commitment_steps[{index}].amount must be non-negative \
@@ -232,7 +227,6 @@ impl RevolvingCredit {
                 self.commitment.currency(),
                 "RevolvingCredit lc.sublimit currency",
             )?;
-            validation::validate_money_finite(lc.outstanding, "RevolvingCredit lc.outstanding")?;
             validation::validate_money_currency(
                 lc.outstanding,
                 self.commitment.currency(),
@@ -360,7 +354,6 @@ impl RevolvingCredit {
 
         match &self.fees.upfront_fee {
             Some(UpfrontFee::Amount(upfront_fee)) => {
-                validation::validate_money_finite(*upfront_fee, "RevolvingCredit upfront_fee")?;
                 validation::validate_money_currency(
                     *upfront_fee,
                     self.commitment.currency(),
@@ -398,7 +391,6 @@ impl RevolvingCredit {
                     )
                 },
             )?;
-            validation::validate_money_finite(fee.amount, "RevolvingCredit scheduled_fees amount")?;
             validation::validate_money_currency(
                 fee.amount,
                 self.commitment.currency(),
@@ -482,10 +474,6 @@ impl RevolvingCredit {
                                 event.date, self.issue_date, self.maturity
                             )
                         },
-                    )?;
-                    validation::validate_money_finite(
-                        event.amount,
-                        "RevolvingCredit draw/repay amount",
                     )?;
                     validation::validate_money_gt(
                         event.amount,

@@ -118,7 +118,7 @@ fn to_basket_currency(
     ))?;
 
     let rate = fx
-        .rate(FxQuery::with_policy(
+        .rate(FxQuery::new(
             money.currency(),
             target,
             as_of,

@@ -118,6 +118,8 @@ fn create_market() -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0, 3.0],         // Expiries in years
         &[0.005, 0.0075, 0.01, 0.015, 0.02], // Strikes as decimal rates
         &[0.30; 25],                         // Flat 30% vol
+        Default::default(),
+        None,
     )
     .unwrap();
 

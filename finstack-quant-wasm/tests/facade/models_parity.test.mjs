@@ -31,6 +31,13 @@ const REL_TOL = 1e-9;
 const ABS_TOL = 1e-12;
 
 const { correlation, credit, liquidity, monteCarlo, volatility } = models;
+
+test('joint probabilities are exposed by the validated Bernoulli distribution', () => {
+  assert.equal('jointProbabilities' in correlation, false);
+  const pair = new correlation.CorrelatedBernoulli(0.5, 0.5, 0);
+  assert.deepEqual(Array.from(pair.jointProbabilities()), [0.25, 0.25, 0.25, 0.25]);
+});
+
 const factorCredit = models.factor.credit;
 const factorRisk = models.factor.risk;
 const { dtsm, hullWhite } = models.rates;

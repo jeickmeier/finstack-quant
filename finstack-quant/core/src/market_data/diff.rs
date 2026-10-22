@@ -38,7 +38,7 @@
 //! # }
 //! ```
 
-use super::context::MarketContext;
+use super::context::{CurveStorage, MarketContext};
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::math::units::BASIS_POINTS_PER_UNIT;
@@ -322,8 +322,8 @@ pub(crate) fn measure_per_tenor_par_spread_shift(
 ///   ([`measure_discount_curve_shift`]), the basis a discount-style `Cs01` is
 ///   bumped on.
 ///
-/// The hazard interpretation is tried first, falling back to the discount
-/// interpretation, so the returned move is always unit-consistent with the
+/// The baseline curve's stored type selects its interpretation; errors from
+/// that measurement are returned without switching models. The move matches the
 /// instrument's own CS01. Used by P&L attribution so credit-spread P&L from a
 /// discount-style credit curve is attributed to the credit factor rather than
 /// leaking into the residual.
@@ -339,8 +339,8 @@ pub(crate) fn measure_per_tenor_par_spread_shift(
 ///
 /// # Errors
 ///
-/// Returns an error when `curve_id` is neither a hazard curve nor a discount
-/// curve in both market contexts.
+/// Returns an error for a missing curve, inconsistent or unsupported stored
+/// types, invalid sampling inputs, or a failure of the selected measurement.
 pub fn measure_credit_curve_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -348,19 +348,22 @@ pub fn measure_credit_curve_shift(
     method: TenorSamplingMethod,
 ) -> Result<f64> {
     let curve_id = curve_id.as_ref();
-    if let Ok(shift) = measure_par_spread_shift(curve_id, market_t0, market_t1, method.clone()) {
-        return Ok(shift);
+    match market_t0.get_curve(curve_id)? {
+        CurveStorage::Hazard(_) => measure_par_spread_shift(curve_id, market_t0, market_t1, method),
+        CurveStorage::Discount(_) => {
+            measure_discount_curve_shift(curve_id, market_t0, market_t1, method)
+        }
+        storage => Err(unsupported_credit_curve(curve_id, storage)),
     }
-    measure_discount_curve_shift(curve_id, market_t0, market_t1, method)
 }
 
 /// Measure the **per-tenor** credit-curve shift (basis points) at the given
 /// tenors, accepting either curve representation.
 ///
 /// The per-tenor counterpart of [`measure_credit_curve_shift`] (see that
-/// function for the hazard / discount duality): tries the par CDS spread
-/// interpretation first (`measure_per_tenor_par_spread_shift`); on failure
-/// falls back to the per-tenor discount zero-rate shift. Returns one entry per
+/// function for the hazard / discount duality): the baseline curve's stored
+/// type selects par CDS spread or discount zero-rate measurement. Errors from
+/// that measurement propagate unchanged. Returns one entry per
 /// input tenor, in order, so callers can pair it with a per-tenor (key-rate)
 /// `BucketedCs01`.
 ///
@@ -375,8 +378,8 @@ pub fn measure_credit_curve_shift(
 ///
 /// # Errors
 ///
-/// Returns an error when `curve_id` is neither a hazard curve nor a discount
-/// curve in both market contexts.
+/// Returns an error for a missing curve, inconsistent or unsupported stored
+/// types, invalid sampling inputs, or a failure of the selected measurement.
 pub fn measure_per_tenor_credit_curve_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -384,8 +387,12 @@ pub fn measure_per_tenor_credit_curve_shift(
     tenors: &[f64],
 ) -> Result<Vec<f64>> {
     let curve_id = curve_id.as_ref();
-    if let Ok(shifts) = measure_per_tenor_par_spread_shift(curve_id, market_t0, market_t1, tenors) {
-        return Ok(shifts);
+    match market_t0.get_curve(curve_id)? {
+        CurveStorage::Hazard(_) => {
+            return measure_per_tenor_par_spread_shift(curve_id, market_t0, market_t1, tenors)
+        }
+        CurveStorage::Discount(_) => {}
+        storage => return Err(unsupported_credit_curve(curve_id, storage)),
     }
     let curve_t0 = market_t0.get_discount(curve_id)?;
     let curve_t1 = market_t1.get_discount(curve_id)?;
@@ -394,6 +401,15 @@ pub fn measure_per_tenor_credit_curve_shift(
             - curve_t0.zero_rate(t, crate::math::Compounding::Continuous))
             * BASIS_POINTS_PER_UNIT
     })
+}
+
+fn unsupported_credit_curve(id: &str, storage: &CurveStorage) -> crate::Error {
+    crate::InputError::WrongCurveType {
+        id: id.to_owned(),
+        expected: "Hazard or Discount".to_owned(),
+        actual: storage.curve_type().to_owned(),
+    }
+    .into()
 }
 
 /// Measure average inflation rate shift (basis points).
@@ -555,8 +571,8 @@ pub fn measure_fx_shift(
     let fx_t1 = market_t1.fx_required()?;
 
     // Get rates using FxQuery with the provided valuation dates
-    let query_t0 = FxQuery::new(base_currency, quote_currency, as_of_t0);
-    let query_t1 = FxQuery::new(base_currency, quote_currency, as_of_t1);
+    let query_t0 = FxQuery::new(base_currency, quote_currency, as_of_t0, Default::default());
+    let query_t1 = FxQuery::new(base_currency, quote_currency, as_of_t1, Default::default());
     let rate_t0 = fx_t0.rate(query_t0)?.rate;
     let rate_t1 = fx_t1.rate(query_t1)?.rate;
 
@@ -851,9 +867,9 @@ mod tests {
     }
 
     #[test]
-    fn test_credit_curve_shift_falls_back_to_discount_zero_rate() {
+    fn test_credit_curve_shift_selects_discount_zero_rate() {
         // A credit curve modelled as a `DiscountCurve` has no par CDS quote — `measure_credit_curve_shift`
-        // must fall back to the zero-rate shift instead of erroring.
+        // selects the zero-rate shift from the stored curve type.
         let base_date = sample_date();
         let curve = |rate: f64| {
             DiscountCurve::builder("USD-CREDIT")
@@ -873,7 +889,7 @@ mod tests {
             &market_t1,
             TenorSamplingMethod::Standard,
         )
-        .expect("credit-curve shift should fall back to discount measurement");
+        .expect("credit-curve shift should use discount measurement");
         assert!(
             (shift - 40.0).abs() < 1.0,
             "expected ~40bp zero-rate shift, got {shift}"
@@ -885,7 +901,7 @@ mod tests {
             &market_t1,
             &[1.0, 5.0, 10.0],
         )
-        .expect("per-tenor credit-curve shift should fall back to discount measurement");
+        .expect("per-tenor credit-curve shift should use discount measurement");
         assert_eq!(per_tenor.len(), 3, "one entry per requested tenor");
         for s in per_tenor {
             assert!(
@@ -933,6 +949,52 @@ mod tests {
             credit_shift, par_shift,
             "hazard-curve credit shift must equal the par-spread shift"
         );
+    }
+
+    #[test]
+    fn credit_curve_dispatch_preserves_selected_errors() {
+        let hazard = HazardCurve::builder("CREDIT")
+            .base_date(sample_date())
+            .recovery_rate(0.4)
+            .knots([(1.0, 0.01), (5.0, 0.02)])
+            .build()
+            .expect("hazard");
+        let market = MarketContext::new().insert(hazard);
+        let invalid = TenorSamplingMethod::Custom(vec![f64::NAN]);
+        let selected = measure_par_spread_shift("CREDIT", &market, &market, invalid.clone())
+            .expect_err("invalid grid");
+        let actual = measure_credit_curve_shift("CREDIT", &market, &market, invalid)
+            .expect_err("invalid grid");
+        assert_eq!(actual.to_string(), selected.to_string());
+        let selected = measure_per_tenor_par_spread_shift("CREDIT", &market, &market, &[f64::NAN])
+            .expect_err("invalid tenor");
+        let actual = measure_per_tenor_credit_curve_shift("CREDIT", &market, &market, &[f64::NAN])
+            .expect_err("invalid tenor");
+        assert_eq!(actual.to_string(), selected.to_string());
+        let discount = DiscountCurve::builder("CREDIT")
+            .base_date(sample_date())
+            .knots([(0.0, 1.0), (5.0, 0.9)])
+            .build()
+            .expect("discount");
+        let wrong_kind = MarketContext::new().insert(discount);
+        for other in [MarketContext::new(), wrong_kind] {
+            let selected =
+                measure_par_spread_shift("CREDIT", &market, &other, TenorSamplingMethod::Standard)
+                    .expect_err("missing or wrong curve");
+            let actual = measure_credit_curve_shift(
+                "CREDIT",
+                &market,
+                &other,
+                TenorSamplingMethod::Standard,
+            )
+            .expect_err("missing or wrong curve");
+            assert_eq!(actual.to_string(), selected.to_string());
+            let selected = measure_per_tenor_par_spread_shift("CREDIT", &market, &other, &[1.0])
+                .expect_err("missing or wrong curve");
+            let actual = measure_per_tenor_credit_curve_shift("CREDIT", &market, &other, &[1.0])
+                .expect_err("missing or wrong curve");
+            assert_eq!(actual.to_string(), selected.to_string());
+        }
     }
 
     #[test]

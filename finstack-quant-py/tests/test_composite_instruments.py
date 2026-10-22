@@ -168,7 +168,7 @@ def test_portfolio_primitive_exposures_net_composite_legs_against_direct_positio
     report = primitive_exposures(book, market, [])
 
     assert isinstance(report, PortfolioPrimitiveExposureReport)
-    assert (report.base_currency.code, report.path_count, report.aggregate_count) == ("USD", 3, 2)
+    assert (str(report.base_currency), report.path_count, report.aggregate_count) == ("USD", 3, 2)
     frame = report.to_dataframe().set_index("instrument_id")
     assert frame.loc["A", "net_quantity"] == 0.0
     assert frame.loc["A", "gross_quantity"] == 4.0

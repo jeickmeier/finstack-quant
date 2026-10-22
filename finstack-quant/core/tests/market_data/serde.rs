@@ -193,7 +193,7 @@ fn market_context_roundtrip() {
 
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::USD, Currency::EUR, 1.1)
+        .set_quotes(&[(Currency::USD, Currency::EUR, 1.1)])
         .expect("valid test quote");
     let fx = FxMatrix::try_with_config(fx_provider, FxConfig::default()).expect("valid FxConfig");
 
@@ -573,9 +573,9 @@ fn market_context_restore_uses_quote_only_fx_snapshot() {
         },
     )
     .expect("valid FxConfig");
-    fx.set_quote(Currency::USD, Currency::EUR, 1.10)
+    fx.set_quotes(&[(Currency::USD, Currency::EUR, 1.10)])
         .expect("valid test quote");
-    fx.set_quote(Currency::USD, Currency::GBP, 0.80)
+    fx.set_quotes(&[(Currency::USD, Currency::GBP, 0.80)])
         .expect("valid test quote");
 
     let ctx = MarketContext::new().insert_fx(fx);
@@ -584,17 +584,32 @@ fn market_context_restore_uses_quote_only_fx_snapshot() {
     let restored_fx = restored.fx().expect("restored snapshot should contain FX");
 
     let direct = restored_fx
-        .rate(FxQuery::new(Currency::USD, Currency::EUR, test_date()))
+        .rate(FxQuery::new(
+            Currency::USD,
+            Currency::EUR,
+            test_date(),
+            Default::default(),
+        ))
         .expect("captured direct quote should restore");
     assert!((direct.rate - 1.10).abs() < 1e-12);
 
     let reciprocal = restored_fx
-        .rate(FxQuery::new(Currency::EUR, Currency::USD, test_date()))
+        .rate(FxQuery::new(
+            Currency::EUR,
+            Currency::USD,
+            test_date(),
+            Default::default(),
+        ))
         .expect("reciprocal of captured quote should restore");
     assert!((reciprocal.rate - (1.0 / 1.10)).abs() < 1e-12);
 
     let triangulated = restored_fx
-        .rate(FxQuery::new(Currency::EUR, Currency::GBP, test_date()))
+        .rate(FxQuery::new(
+            Currency::EUR,
+            Currency::GBP,
+            test_date(),
+            Default::default(),
+        ))
         .expect("restored snapshot should triangulate from captured quotes");
     assert!((triangulated.rate - (1.0 / 1.10) * 0.80).abs() < 1e-12);
 }

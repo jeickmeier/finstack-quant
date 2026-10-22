@@ -109,9 +109,8 @@ export type AmortizationSpec =
  *
  * `Display`, `FromStr`, and serde share one snake_case label per kind
  * (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
- * case-insensitive and also accepts the reporting aliases `"coupon"`
- * ([`CFKind::Fixed`]) and `"principal"` ([`CFKind::Notional`]); serde
- * accepts only the canonical label.
+ * case-insensitive and ignores surrounding whitespace; serde accepts only
+ * the canonical label.
  */
 export type CFKind =
   | "fixed"

@@ -2264,7 +2264,7 @@ class Compounding:
         Parameters
         ----------
         label : str
-            One of ``"simple"``, ``"continuous"``, ``"annual"``, ``"semi_annual"``, ``"quarterly"``, ``"monthly"``.
+            One of ``"simple"``, ``"continuous"``, ``"semi_annual"``, ``"quarterly"``, ``"monthly"`` or ``"periodic(n)"`` for a positive integer n; annual compounding is ``"periodic(1)"``.
 
         Raises
         ------
@@ -2274,8 +2274,8 @@ class Compounding:
         Examples
         --------
         >>> from finstack_quant.scenarios import Compounding
-        >>> Compounding("annual").value
-        'annual'
+        >>> Compounding("periodic(1)").value
+        'periodic(1)'
         """
         ...
 
@@ -2357,28 +2357,6 @@ class Compounding:
         >>> from finstack_quant.scenarios import Compounding
         >>> str(Compounding.continuous())
         'Compounding.continuous'
-        """
-        ...
-
-    @classmethod
-    def annual(cls) -> Compounding:
-        """
-        Annual compounding convention for the bound rate.
-
-        Returns
-        -------
-        Compounding
-            The ``annual`` variant.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.scenarios import Compounding
-        >>> str(Compounding.annual())
-        'Compounding.annual'
         """
         ...
 
@@ -2517,7 +2495,7 @@ class RateBindingSpec:
             Tenor string (e.g. ``"5Y"``); parsed eagerly by :meth:`validate`.
         compounding : Compounding | str, optional
             Output compounding convention, typed or as its wire label
-            (``"continuous"``, ``"annual"``, ...). Defaults to continuous.
+            (``"continuous"``, ``"periodic(1)"``, ...). Defaults to continuous.
             The extracted rate stays a decimal annualized rate.
         day_count : DayCount, optional
             Output quote day-count convention; ``None`` uses the curve default.

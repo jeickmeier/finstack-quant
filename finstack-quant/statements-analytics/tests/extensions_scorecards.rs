@@ -8,7 +8,7 @@ use finstack_quant_statements_analytics::extensions::{
 #[test]
 fn test_scorecard_extension_with_config() {
     let config = ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![ScorecardMetric {
             name: "leverage".into(),
             formula: "debt / ebitda".into(),
@@ -27,7 +27,7 @@ fn test_scorecard_extension_with_config() {
 #[test]
 fn test_scorecard_config_validation() {
     let config = ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![ScorecardMetric {
             name: "leverage".into(),
             formula: "debt / ebitda".into(),
@@ -51,7 +51,7 @@ fn test_scorecard_config_validation() {
 #[test]
 fn test_scorecard_config_validation_invalid_weights() {
     let config = ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![ScorecardMetric {
             name: "leverage".into(),
             formula: "debt / ebitda".into(),
@@ -177,7 +177,7 @@ fn test_scorecard_ttm_formula_uses_full_history() {
     thresholds.insert("A".into(), (2.0, 3.0));
 
     let config = ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![ScorecardMetric {
             name: "leverage".into(),
             formula: "total_debt / ttm(ebitda)".into(),
@@ -243,7 +243,7 @@ fn test_scorecard_warns_when_thresholds_do_not_cover_metric_value() {
     thresholds.insert("AAA".into(), (0.0, 1.0));
 
     let config = ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![ScorecardMetric {
             name: "leverage".into(),
             formula: "total_debt / ebitda".into(),

@@ -235,3 +235,14 @@ test('horizonResultExplainText and horizonResultFactorContribution match Python'
     (error) => error.kind === 'validation'
   );
 });
+
+test('annual compounding uses only periodic one on the wire', () => {
+  const binding = {
+    node_id: 'rate',
+    curve_id: 'USD-OIS',
+    tenor: '1Y',
+    compounding: { periodic: 1 },
+  };
+  assert.equal(scenarios.rateBindingSpecValidate(binding), undefined);
+  assert.throws(() => scenarios.rateBindingSpecValidate({ ...binding, compounding: 'annual' }));
+});

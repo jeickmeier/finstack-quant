@@ -325,31 +325,17 @@ impl core::fmt::Display for BusinessDayConvention {
     }
 }
 
-/// Parses the snake_case serde name or a market short code, ASCII
-/// case-insensitively: `MF`/`MODFOLLOWING` → `ModifiedFollowing`, `F` →
-/// `Following`, `P` → `Preceding`, `MP`/`MODPRECEDING` → `ModifiedPreceding`,
-/// `NONE` → `Unadjusted`.
+/// Parses the canonical snake_case serde name, ignoring surrounding whitespace
+/// and ASCII case.
 impl core::str::FromStr for BusinessDayConvention {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "unadjusted" | "none" => Ok(BusinessDayConvention::Unadjusted),
-            "following" | "f" => Ok(BusinessDayConvention::Following),
-            "modified_following" | "mf" | "modfollowing" => {
-                Ok(BusinessDayConvention::ModifiedFollowing)
-            }
-            "preceding" | "p" => Ok(BusinessDayConvention::Preceding),
-            "modified_preceding" | "mp" | "modpreceding" => {
-                Ok(BusinessDayConvention::ModifiedPreceding)
-            }
-            "nearest" => Ok(BusinessDayConvention::Nearest),
-            _ => Err(crate::Error::Validation(format!(
-                "Unknown business day convention: '{s}'; expected one of unadjusted, \
-                 following, modified_following, preceding, modified_preceding, nearest \
-                 (or short codes NONE, F, MF, P, MP)"
-            ))),
-        }
+        crate::wire::serde_parse(&s.trim().to_ascii_lowercase()).map_err(|_| {
+            crate::Error::Validation(format!(
+                "Unknown business day convention: '{s}'; expected one of unadjusted, following, modified_following, preceding, modified_preceding, nearest"
+            ))
+        })
     }
 }
 

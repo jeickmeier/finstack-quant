@@ -223,38 +223,20 @@ impl DiscountCurveBuilder {
         let base = self.base.ok_or_else(|| {
             crate::Error::Validation("DiscountCurve requires base_date".to_string())
         })?;
-        if !self.points.is_empty() {
-            self.points.sort_by(|a, b| a.0.total_cmp(&b.0));
-            let first_t = self.points[0].0;
-            if first_t > 0.0 {
-                self.points.insert(0, (0.0, 1.0));
-            }
-        }
-
-        if self.points.len() < 2 {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
-        if self.points.iter().any(|&(_, df)| df <= 0.0) {
-            return Err(crate::InputError::NonPositiveValue.into());
-        }
-        validate_origin(&self.points)?;
-
-        let (knots_vec, dfs_vec): (Vec<f64>, Vec<f64>) =
-            std::mem::take(&mut self.points).into_iter().unzip();
-        crate::math::interp::validate_knots(&knots_vec)?;
-
-        if !self.allow_non_monotonic {
-            validate_monotonic_df(&knots_vec, &dfs_vec)?;
-        }
-
-        if let Some(min_fwd) = self.min_forward_rate {
-            validate_forward_rates(&knots_vec, &dfs_vec, min_fwd)?;
-        }
-
-        self.finish(base, knots_vec, dfs_vec)
+        let (knots, dfs) = validate_points(
+            std::mem::take(&mut self.points),
+            self.allow_non_monotonic,
+            self.min_forward_rate,
+        )?;
+        self.finish(base, knots, dfs)
     }
 
-    fn finish(self, base: Date, knots: Vec<f64>, dfs: Vec<f64>) -> crate::Result<DiscountCurve> {
+    fn finish(
+        mut self,
+        base: Date,
+        knots: Vec<f64>,
+        dfs: Vec<f64>,
+    ) -> crate::Result<DiscountCurve> {
         let calendar = self
             .calendar_id
             .as_deref()
@@ -266,36 +248,70 @@ impl DiscountCurveBuilder {
                 self.id
             )));
         }
-        let knots = knots.into_boxed_slice();
-        let dfs = dfs.into_boxed_slice();
-
+        // A transformed curve evaluates its original source interpolation;
+        // visible pillars are independently validated samples of that source.
+        let (interp_knots, interp_dfs) = match &self.transform {
+            Some(transform) => validate_points(transform.source_points().to_vec(), true, None)?,
+            None => (knots.clone(), dfs.clone()),
+        };
         let interp = self.style.build_enum(
-            knots.clone(),
-            dfs.clone(),
+            interp_knots.into_boxed_slice(),
+            interp_dfs.into_boxed_slice(),
             self.extrapolation,
             ValidationPolicy::AllowNegative,
         )?;
 
-        let mut curve = DiscountCurve {
+        if let Some(transform) = &mut self.transform {
+            transform.validate(&interp, &knots, &dfs)?;
+        }
+        Ok(DiscountCurve {
             id: self.id,
             base,
             day_count: self.day_count,
             calendar,
-            knots,
-            dfs,
+            knots: knots.into_boxed_slice(),
+            dfs: dfs.into_boxed_slice(),
             interp,
-            transform: None,
+            transform: self.transform,
             min_forward_rate: self.min_forward_rate,
             allow_non_monotonic: self.allow_non_monotonic,
             min_forward_tenor: self.min_forward_tenor,
             rate_calibration: self.rate_calibration,
             fx_policy: self.fx_policy,
-        };
-        if let Some(transform) = self.transform {
-            curve.restore_transform(transform)?;
-        }
-        Ok(curve)
+        })
     }
+}
+
+/// Validate visible or source pillars without constructing an interpolator.
+fn validate_points(
+    mut points: Vec<(f64, f64)>,
+    allow_non_monotonic: bool,
+    min_forward_rate: Option<f64>,
+) -> crate::Result<(Vec<f64>, Vec<f64>)> {
+    if !points.is_empty() {
+        points.sort_by(|a, b| a.0.total_cmp(&b.0));
+        if points[0].0 > 0.0 {
+            points.insert(0, (0.0, 1.0));
+        }
+    }
+    if points.len() < 2 {
+        return Err(crate::InputError::TooFewPoints.into());
+    }
+    if points.iter().any(|&(_, df)| df <= 0.0) {
+        return Err(crate::InputError::NonPositiveValue.into());
+    }
+    validate_origin(&points)?;
+    let (knots, dfs): (Vec<f64>, Vec<f64>) = points.into_iter().unzip();
+    crate::math::interp::validate_knots(&knots)?;
+    crate::math::interp::validate_finite_series(&dfs)?;
+    if !allow_non_monotonic {
+        validate_monotonic_df(&knots, &dfs)?;
+    }
+    if let Some(floor) = min_forward_rate {
+        validate_forward_rates(&knots, &dfs, floor)?;
+    }
+    crate::math::interp::validate_knot_spacing(&knots, crate::math::interp::MIN_RELATIVE_KNOT_GAP)?;
+    Ok((knots, dfs))
 }
 
 fn validate_origin(points: &[(f64, f64)]) -> crate::Result<()> {

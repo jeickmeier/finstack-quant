@@ -230,7 +230,8 @@ pub(crate) fn selected_envelope_to_pandas<'py>(
             ))
         })
         .collect::<PyResult<Vec<_>>>()?;
-    let projected = TableEnvelope::new(columns).map_err(crate::errors::core_to_py)?;
+    let projected =
+        TableEnvelope::new(columns, Default::default()).map_err(crate::errors::core_to_py)?;
     envelope_to_pandas(py, &projected)
 }
 

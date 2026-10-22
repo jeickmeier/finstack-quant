@@ -596,7 +596,7 @@ mod tests {
     fn market_with_eurusd_fx(as_of: Date, eurusd: f64) -> MarketContext {
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, eurusd)
+            .set_quotes(&[(Currency::EUR, Currency::USD, eurusd)])
             .expect("test FX quote should be valid");
         build_test_market_at(as_of)
             .insert(flat_discount("EUR", as_of, 1.0))
@@ -1032,7 +1032,7 @@ mod tests {
     fn market_with_cip_eurusd(as_of: Date, eurusd: f64, df_eur: f64, df_usd: f64) -> MarketContext {
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, eurusd)
+            .set_quotes(&[(Currency::EUR, Currency::USD, eurusd)])
             .expect("test FX quote should be valid");
         MarketContext::new()
             .insert(flat_discount("EUR", as_of, df_eur))
@@ -1081,7 +1081,7 @@ mod tests {
         let full = single_kind_flow(payment, Money::from((1_i64, Currency::EUR)), CFKind::Fixed);
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("test FX quote should be valid");
         let market = MarketContext::new()
             .insert(flat_discount("USD", as_of, 0.95))
@@ -1104,7 +1104,7 @@ mod tests {
         let full = single_kind_flow(payment, Money::from((1_i64, Currency::EUR)), CFKind::Fixed);
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("test FX quote should be valid");
         let market = MarketContext::new()
             .insert(flat_discount("EUR-OIS", as_of, 0.99))

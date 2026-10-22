@@ -671,34 +671,9 @@ impl std::fmt::Display for DayCount {
 impl std::str::FromStr for DayCount {
     type Err = crate::Error;
 
+    /// Parse the canonical wire label, ignoring surrounding whitespace and ASCII case.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut normalized = String::with_capacity(s.len());
-        let mut last_sep = true;
-        for ch in s.trim().chars() {
-            if ch == '/' || ch == '-' || ch == '_' || ch.is_whitespace() {
-                if !last_sep {
-                    normalized.push('_');
-                }
-                last_sep = true;
-            } else {
-                normalized.push(ch.to_ascii_lowercase());
-                last_sep = false;
-            }
-        }
-        let normalized = normalized.trim_end_matches('_');
-        let canonical = match normalized {
-            "1_1" => "one_one",
-            "act_act_icma" | "act_act_isma" => "act_act_isma",
-            "act_act_isda" | "act_act" | "actual_actual" => "act_act",
-            "act_365" | "act_365_fixed" | "act_365f" | "actual_365" => "act_365f",
-            "act_360" => "act_360",
-            "30_360_us" | "30_360_bond" | "30u_360" | "30_360" => "30_360",
-            "30e_360_isda" | "30_360_isda" => "30e_360_isda",
-            "30e_360" | "30_360_eurobond" => "30e_360",
-            "30_360_it" | "30_360_italian" => "30_360_it",
-            other => other,
-        };
-        crate::wire::serde_parse(canonical).map_err(|_| {
+        crate::wire::serde_parse(&s.trim().to_ascii_lowercase()).map_err(|_| {
             crate::Error::Validation(format!(
                 "unknown day-count convention: '{s}'; expected one of {}",
                 Self::NAMES.join(", ")
@@ -712,28 +687,13 @@ mod parse_tests {
     use super::DayCount;
 
     #[test]
-    fn lenient_parse_accepts_term_sheet_spellings() {
-        let cases = [
-            ("1/1", DayCount::OneOne),
-            ("ACT/360", DayCount::Act360),
-            ("act_360", DayCount::Act360),
-            ("Act/365", DayCount::Act365F),
-            ("ACT/365F", DayCount::Act365F),
-            ("ACT/ACT ICMA", DayCount::ActActIsma),
-            ("act/act isma", DayCount::ActActIsma),
-            ("ACT/ACT ISDA", DayCount::ActAct),
-            ("Act/Act", DayCount::ActAct),
-            ("ACT/ACT AFB", DayCount::ActActAfb),
-            ("30/360", DayCount::Thirty360),
-            ("30E/360", DayCount::ThirtyE360),
-            ("30E/360 ISDA", DayCount::ThirtyE360Isda),
-            ("30/360 IT", DayCount::Thirty360It),
-            ("NL/365", DayCount::Nl365),
-            ("BUS/252", DayCount::Bus252),
-            (" bus-252 ", DayCount::Bus252),
-        ];
-        for (input, expected) in cases {
-            assert_eq!(input.parse::<DayCount>().expect(input), expected, "{input}");
+    fn canonical_parse_normalizes_only_case_and_surrounding_whitespace() {
+        for name in DayCount::NAMES {
+            let normalized = format!("  {}  ", name.to_ascii_uppercase());
+            assert_eq!(
+                normalized.parse::<DayCount>().expect(name).to_string(),
+                *name
+            );
         }
     }
 
@@ -749,6 +709,7 @@ mod parse_tests {
 #[cfg(test)]
 mod tests {
     use super::act_act::act_act_isma_year_fraction_with_reference_period;
+    use super::DayCount;
     use time::macros::date;
 
     /// Per-year and bulk additions differ for a representative ISDA seed.
@@ -855,44 +816,65 @@ mod tests {
     }
 
     #[test]
-    fn daycount_from_str_accepts_market_spellings_and_rejects_unknown_aliases() {
-        // schema-rejection-test
-        use super::DayCount;
-
-        for (spelling, expected) in [
-            ("ACT/360", DayCount::Act360),
-            ("NL/365", DayCount::Nl365),
-            ("30/360", DayCount::Thirty360),
-            ("30E/360", DayCount::ThirtyE360),
-            ("30E/360 ISDA", DayCount::ThirtyE360Isda),
-            ("30/360 IT", DayCount::Thirty360It),
-            ("30_360_italian", DayCount::Thirty360It),
-            ("act/act ISDA", DayCount::ActAct),
-            ("act_act_icma", DayCount::ActActIsma),
-        ] {
-            assert_eq!(
-                spelling.parse::<DayCount>().expect(spelling),
-                expected,
-                "{spelling}"
-            );
-        }
+    fn daycount_from_str_rejects_retired_spellings() {
+        // schema-rejection-test: retired spellings must never regain parser support.
         for rejected in [
+            "1/1",
+            "ACT/360",
             "act360",
             "actual_360",
+            "act_365",
+            "act_365_fixed",
+            "actual_365",
             "act365f",
             "actual_365l",
             "act_365_nl",
+            "30/360",
+            "30_360_us",
+            "30_360_bond",
+            "30u_360",
+            "30_360_isda",
+            "30_360_eurobond",
+            "30_360_italian",
+            "30E/360",
             "thirty360",
             "bond_basis",
             "eurobond_basis",
             "act_365afb",
             "isda",
             "icma",
+            "act_act_icma",
+            "act_act_isda",
+            "actual_actual",
             "bus252",
             "business_252",
+            "act 360",
+            "act-360",
+            "act__360",
         ] {
             assert!(rejected.parse::<DayCount>().is_err(), "{rejected}");
         }
+    }
+
+    #[test]
+    fn rejected_30_360_isda_alias_cannot_select_30e_360_isda() {
+        let start = time::macros::date!(2025 - 02 - 28);
+        let end = time::macros::date!(2025 - 03 - 31);
+        assert_eq!(
+            super::days_30_360(start, end, super::Thirty360Convention::Isda),
+            33
+        );
+        let european_isda: DayCount = "30e_360_isda".parse().expect("canonical");
+        assert!(
+            (european_isda
+                .year_fraction(start, end, Default::default())
+                .expect("fraction")
+                * 360.0
+                - 30.0)
+                .abs()
+                < 1e-12
+        );
+        assert!("30_360_isda".parse::<DayCount>().is_err());
     }
 
     #[test]

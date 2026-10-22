@@ -156,7 +156,7 @@ fn xccy_flat_leg_keys_are_rejected() {
 }
 
 #[test]
-fn oas_quote_compounding_semi_annual_label_is_rejected() {
+fn oas_quote_compounding_rejects_labels_and_unsupported_periodicity() {
     let json = serde_json::json!({ "oas_quote_compounding": "semi_annual" });
     // schema-rejection-test: OasQuoteCompounding's `semi_annual` is core `{"periodic": 2}`.
     assert!(serde_json::from_value::<ModelConfig>(json).is_err());
@@ -165,8 +165,10 @@ fn oas_quote_compounding_semi_annual_label_is_rejected() {
     config
         .validate()
         .expect("semiannual OAS basis is supported");
-    let annual = serde_json::json!({ "oas_quote_compounding": "annual" });
-    let config: ModelConfig = serde_json::from_value(annual).expect("core annual basis");
+    let retired = serde_json::json!({ "oas_quote_compounding": "annual" });
+    assert!(serde_json::from_value::<ModelConfig>(retired).is_err());
+    let annual = serde_json::json!({ "oas_quote_compounding": { "periodic": 1 } });
+    let config: ModelConfig = serde_json::from_value(annual).expect("core annual periodic basis");
     let err = config
         .validate()
         .expect_err("annual OAS basis is not supported");

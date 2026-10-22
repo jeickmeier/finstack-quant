@@ -255,7 +255,6 @@ impl CdsOption {
             self.index_factor,
         )?;
         self.validate_strike_state()?;
-        validation::validate_money_finite(self.notional, "CDS option notional")?;
         validation::validate_money_gt(self.notional, 0.0, "CDS option notional")?;
 
         if let Some(exercise_settlement) = self.exercise_settlement_date {

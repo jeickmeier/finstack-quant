@@ -535,7 +535,7 @@ fn quanto_market() -> MarketContext {
         .expect("jpy");
     let provider = Arc::new(SimpleFxProvider::new());
     provider
-        .set_quote(Currency::JPY, Currency::USD, 1.0 / 150.0)
+        .set_quotes(&[(Currency::JPY, Currency::USD, 1.0 / 150.0)])
         .expect("rate");
     MarketContext::new()
         .insert(usd)

@@ -64,14 +64,14 @@ test('Rate and Bps: parse, getters, conversions and JSON', () => {
   );
 });
 
-test('DayCount.fromName is the lenient Rust parser', () => {
+test('DayCount.fromName is the canonical Rust parser', () => {
   assert.equal(core.DayCount.fromName('act_360').toString(), 'act_360');
   assert.throws(
     () => core.DayCount.fromName('nope'),
     (error) => error.kind === 'validation'
   );
-  assert.equal(core.DayCount.fromName('Act/Act ICMA').toString(), 'act_act_isma');
-  assert.equal(core.DayCount.fromName('ACT/360').toString(), 'act_360');
+  assert.equal(core.DayCount.fromName(' Act_Act_Isma ').toString(), 'act_act_isma');
+  assert.equal(core.DayCount.fromName(' ACT_360 ').toString(), 'act_360');
   assert.equal(core.DayCount.nl365().toString(), 'nl_365');
   assert.equal(typeof core.DayCount.fromName, 'function');
 });
@@ -170,7 +170,7 @@ test('FxDeltaVolSurface round trips JSON and exposes its quotes', () => {
 
 test('FxRateResult round trips its JSON', () => {
   const fx = new core.FxMatrix();
-  fx.setQuote('EUR', 'USD', 1.1);
+  fx.setQuotes([['EUR', 'USD', 1.1]]);
   const result = fx.rate('EUR', 'USD', '2025-01-02');
   const back = core.FxRateResult.fromJson(result.toJson());
   assert.equal(back.rate, result.rate);

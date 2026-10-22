@@ -154,7 +154,6 @@ impl ForwardRateAgreement {
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         validation::validate_date_range_strict(self.start_date, self.maturity, "FRA")?;
 
-        validation::validate_money_finite(self.notional, "FRA notional")?;
         validation::require_with(self.notional.amount() > 0.0, || {
             format!(
                 "FRA notional must be positive, got {}",

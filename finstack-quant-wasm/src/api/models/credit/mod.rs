@@ -697,8 +697,8 @@ impl JsMertonModel {
         let base_date = parse_iso_date(&js_string(&base_date, "baseDate")?)?;
         let tenors = js_f64_seq(&tenors, "tenors")?;
         let recovery = js_f64(&recovery, "recovery")?;
-        // `FromStr`, not `js_wire`: the day-count parser accepts aliases
-        // ("ACT/360") that the strict serde names reject.
+        // `FromStr` applies the canonical parser's outer whitespace and
+        // ASCII case normalization, unlike strict serde labels.
         let day_count: DayCount = js_parse(&day_count, "dayCount")?;
         self.inner
             .to_hazard_curve(&id, base_date, &tenors, recovery, day_count)

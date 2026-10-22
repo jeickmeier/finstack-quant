@@ -495,7 +495,7 @@ export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "lever
  *
  * ```text
  * DF = e^(-r_cc × t)                    [Continuous]
- *    = (1 + r_ann)^(-t)                 [Annual]
+ *    = (1 + r_ann)^(-t)                 [Periodic(1)]
  *    = (1 + r_per/n)^(-n×t)             [Periodic(n)]
  *    = 1 / (1 + r_simple × t)           [Simple]
  * ```
@@ -509,7 +509,6 @@ export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "lever
  */
 export type Compounding =
   | "continuous"
-  | "annual"
   | {
       periodic: number;
     }
@@ -1274,9 +1273,8 @@ export type StubKind = "none" | "short_front" | "short_back" | "long_front" | "l
  *
  * `Display`, `FromStr`, and serde share one snake_case label per kind
  * (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
- * case-insensitive and also accepts the reporting aliases `"coupon"`
- * ([`CFKind::Fixed`]) and `"principal"` ([`CFKind::Notional`]); serde
- * accepts only the canonical label.
+ * case-insensitive and ignores surrounding whitespace; serde accepts only
+ * the canonical label.
  */
 export type CFKind =
   | "fixed"

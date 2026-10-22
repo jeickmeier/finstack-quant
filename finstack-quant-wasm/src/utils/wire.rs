@@ -68,7 +68,7 @@ pub fn js_opt_wire<T: DeserializeOwned>(
 /// A string argument parsed by the Rust type's `FromStr`.
 ///
 /// For types whose text parser accepts more than their serde names (currency
-/// codes in any case, day-count aliases such as `"ACT/360"`, rating notches),
+/// codes, case-normalized day-count labels, and rating notches),
 /// so [`js_wire`] would narrow the accepted input.
 ///
 /// # Arguments

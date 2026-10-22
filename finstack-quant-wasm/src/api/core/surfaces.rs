@@ -3,10 +3,10 @@
 //! `VolCubeExpirySlice` and `FxDeltaVolSurface`.
 
 use crate::utils::input::{
-    from_js_json, js_f64, js_f64_seq, js_opt_f64_seq, js_opt_string, js_string, js_uint,
+    from_js_json, js_f64, js_f64_seq, js_opt_f64, js_opt_f64_seq, js_opt_string, js_string, js_uint,
 };
-use crate::utils::to_js_err;
 use crate::utils::wire::{label, parse_label};
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::market_data::surfaces::{
     FxDeltaVolSurface as RustFxDeltaVolSurface, SabrParameterData, VolCube as RustVolCube,
     VolCubeExpirySlice as RustVolCubeExpirySlice, VolGridOpts, VolInterpolationMode,
@@ -14,6 +14,47 @@ use finstack_quant_core::market_data::surfaces::{
 };
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
+
+/// Construct validated SABR parameter data for a volatility-cube node.
+///
+/// # Arguments
+///
+/// * `alpha` - Finite, strictly positive initial volatility scale.
+/// * `beta` - Finite CEV elasticity in the inclusive range `[0, 1]`.
+/// * `nu` - Finite, nonnegative volatility of volatility; zero is deterministic.
+/// * `rho` - Finite forward-volatility correlation strictly between `-1` and `1`.
+/// * `shift` - Optional finite displacement in forward/strike units; `null` or
+///   omission records an unshifted node, and finite negative shifts are allowed.
+///
+/// @returns A `SabrParameterData` plain object; an absent shift is omitted.
+/// @throws `TypeError` (kind `invalid_type`) for a non-number argument;
+/// `FinstackError` (kind `validation`) for a non-finite or out-of-range parameter.
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const node = core.sabrParameterDataNew(0.2, 1, 0, -0.5);
+/// console.log(node.nu); // 0
+/// ```
+#[wasm_bindgen(js_name = sabrParameterDataNew)]
+pub fn sabr_parameter_data_new(
+    alpha: JsValue,
+    beta: JsValue,
+    nu: JsValue,
+    rho: JsValue,
+    shift: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    to_js_value(
+        &SabrParameterData::new(
+            js_f64(&alpha, "alpha")?,
+            js_f64(&beta, "beta")?,
+            js_f64(&nu, "nu")?,
+            js_f64(&rho, "rho")?,
+            js_opt_f64(shift.as_ref(), "shift")?,
+        )
+        .map_err(to_js_err)?,
+    )
+}
 
 /// SABR volatility cube for swaption pricing.
 ///

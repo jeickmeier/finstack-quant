@@ -41,7 +41,9 @@ fn curves(as_of: Date) -> MarketContext {
 
 fn market_with_quote(as_of: Date, from: Currency, to: Currency, rate: f64) -> MarketContext {
     let provider = Arc::new(SimpleFxProvider::new());
-    provider.set_quote(from, to, rate).expect("valid rate");
+    provider
+        .set_quotes(&[(from, to, rate)])
+        .expect("valid rate");
     curves(as_of).insert_fx(FxMatrix::new(provider))
 }
 

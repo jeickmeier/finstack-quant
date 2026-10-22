@@ -51,7 +51,7 @@ pub fn market_with_fx() -> MarketContext {
 
     let provider = {
         let p = Arc::new(SimpleFxProvider::new());
-        p.set_quote(Currency::EUR, Currency::USD, 1.10)
+        p.set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         p
     };
@@ -210,7 +210,7 @@ pub fn market_with_extended_curves() -> MarketContext {
 
     let provider = {
         let p = Arc::new(SimpleFxProvider::new());
-        p.set_quote(Currency::EUR, Currency::USD, 1.10)
+        p.set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         p
     };

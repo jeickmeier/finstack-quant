@@ -155,7 +155,6 @@ impl FxForward {
                 self.base_currency
             )
         })?;
-        validation::validate_money_finite(self.notional, "FX forward notional")?;
         validation::validate_money_gt(self.notional, 0.0, "FX forward notional")?;
 
         // Contract rate must be positive if provided
@@ -626,7 +625,7 @@ mod tests {
 
         let fx_provider = Arc::new(SimpleFxProvider::new());
         fx_provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         let fx_matrix = FxMatrix::new(fx_provider);
 
@@ -805,7 +804,7 @@ mod tests {
             .expect("should build");
         let fx_provider = Arc::new(SimpleFxProvider::new());
         fx_provider
-            .set_quote(Currency::EUR, Currency::USD, 1.20)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.20)])
             .expect("valid rate");
         let moved_market = MarketContext::new()
             .insert(usd_curve)

@@ -1670,6 +1670,55 @@ mod continuous_transform_regressions {
     }
 
     #[test]
+    fn transformed_restore_validates_visible_and_source_pillars_for_all_styles() {
+        for style in [
+            InterpStyle::Linear,
+            InterpStyle::LogLinear,
+            InterpStyle::MonotoneConvex,
+            InterpStyle::CubicHermite,
+            InterpStyle::PiecewiseQuadraticForward,
+        ] {
+            let curve = shaped(style)
+                .roll_forward(73)
+                .expect("roll")
+                .apply_bump(BumpSpec::parallel_bp(10.0))
+                .expect("bump");
+            let json = serde_json::to_value(&curve).expect("serialize");
+            let restored: DiscountCurve = serde_json::from_value(json.clone()).expect("restore");
+            let renamed = curve
+                .to_builder_with_id("RESTORED")
+                .build()
+                .expect("rename");
+            for time in [0.0, 0.1, 0.5, 1.5, 3.0, 8.0] {
+                close(restored.df(time), curve.df(time));
+                close(renamed.df(time), curve.df(time));
+            }
+            for field in ["knot_points", "source_points"] {
+                for points in [
+                    serde_json::json!([[0.0, 0.9], [1.0, 0.95]]),
+                    serde_json::json!([[0.0, 1.0], [1.0, 0.0]]),
+                    serde_json::json!([[0.0, 1.0], [1.0, 0.95], [1.0, 0.94]]),
+                    serde_json::json!([[0.0, 1.0], [1e-12, 0.99], [1.0, 0.95]]),
+                ] {
+                    let mut invalid = json.clone();
+                    if field == "knot_points" {
+                        invalid[field] = points;
+                    } else {
+                        invalid["transform"][field] = points;
+                    }
+                    assert!(
+                        serde_json::from_value::<DiscountCurve>(invalid).is_err(),
+                        "{style:?}: {field}"
+                    );
+                }
+            }
+            let mut no_calendar = json.clone();
+            no_calendar["day_count"] = serde_json::to_value(DayCount::Bus252).expect("day count");
+            assert!(serde_json::from_value::<DiscountCurve>(no_calendar).is_err());
+        }
+    }
+
+    #[test]
     fn roll_rejects_overflow_and_preserves_explicit_validation_policy() {
         use finstack_quant_core::market_data::term_structures::ValidationMode;
         let raw = ValidationMode::Raw {
@@ -1729,9 +1778,12 @@ fn tiny_annual_zero_rate_avoids_subtractive_cancellation() {
         .build()
         .unwrap();
     let expected = (1.0 - df) / df;
-    assert!((curve.zero_rate(1.0, Compounding::Annual) - expected).abs() < 1e-23);
+    assert!(
+        (curve.zero_rate(1.0, Compounding::Periodic(std::num::NonZeroU32::MIN)) - expected).abs()
+            < 1e-23
+    );
     for convention in [
-        Compounding::Annual,
+        Compounding::Periodic(std::num::NonZeroU32::MIN),
         Compounding::Continuous,
         Compounding::Simple,
         Compounding::Periodic(4.try_into().unwrap()),

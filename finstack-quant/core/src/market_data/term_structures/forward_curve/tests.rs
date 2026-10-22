@@ -23,7 +23,7 @@ fn sparse_key_rate_shocks_preserve_continuous_rates_and_exact_bucket_area() {
     assert!((bumped.rate(5.0) - 0.04).abs() < 1e-12);
     // The 4Y Simpson grid misses this 0.04Y-wide bucket entirely; the exact
     // triangular area is 0.5 * 0.04 * 0.01, averaged over four years.
-    assert!((bumped.rate_period(0.0, 4.0) - 0.04005).abs() < 1e-12);
+    assert!((bumped.rate_period(0.0, 4.0).expect("finite ordered period") - 0.04005).abs() < 1e-12);
 }
 
 #[test]
@@ -65,7 +65,14 @@ fn continuous_forward_shocks_survive_roll_scaling_serde_and_rename() {
             assert!((restored.rate(t) - scaled.rate(t)).abs() < 1e-12);
             assert!((renamed.rate(t) - scaled.rate(t)).abs() < 1e-12);
         }
-        assert!((rolled.rate_period(0.0, 1.0) - shocked.rate_period(0.2, 1.2)).abs() < 1e-12);
+        assert!(
+            (rolled.rate_period(0.0, 1.0).expect("finite ordered period")
+                - shocked
+                    .rate_period(0.2, 1.2)
+                    .expect("finite ordered period"))
+            .abs()
+                < 1e-12
+        );
     }
 }
 
@@ -106,7 +113,7 @@ fn point_average_and_discount_factor_implied_forwards_are_distinct_on_steep_curv
     let (t1, t2) = (0.25, 0.75);
 
     let point_rate = fc.rate(t1);
-    let integrated_average = fc.rate_period(t1, t2);
+    let integrated_average = fc.rate_period(t1, t2).expect("finite ordered period");
     let df_implied_rate = fc
         .rate_between(t1, t2)
         .expect("strictly increasing finite times should produce a forward rate");
@@ -365,21 +372,47 @@ fn failed_bump_in_place_is_atomic() {
     assert_eq!(curve.rate(0.5).to_bits(), before_rate.to_bits());
 }
 
-// Reversed times are a caller bug: debug builds fire a `debug_assert`,
-// release builds return NaN (documented NaN contract on `rate_period`).
-#[cfg(debug_assertions)]
 #[test]
-#[should_panic(expected = "rate_period requires t1 <= t2")]
-fn rate_period_reversed_times_debug_asserts() {
+fn rate_period_rejects_invalid_intervals_in_every_build_profile() {
     let fc = sample_forward();
-    let _ = fc.rate_period(1.0, 0.5);
+    for (t1, t2) in [
+        (1.0, 0.5),
+        (f64::NAN, 1.0),
+        (0.0, f64::NAN),
+        (f64::NEG_INFINITY, 1.0),
+        (0.0, f64::INFINITY),
+        (-f64::MAX, f64::MAX),
+    ] {
+        assert!(fc.rate_period(t1, t2).is_err(), "{t1}, {t2}");
+    }
 }
 
-#[cfg(not(debug_assertions))]
 #[test]
-fn rate_period_reversed_times_returns_nan() {
+fn rate_period_preserves_point_and_negative_time_policies() {
     let fc = sample_forward();
-    assert!(fc.rate_period(1.0, 0.5).is_nan());
+    for time in [-1.0, 0.0, 1.0] {
+        assert_eq!(
+            fc.rate_period(time, time).expect("equal endpoints"),
+            fc.rate(time)
+        );
+        assert_eq!(
+            fc.rate_period(time, time + 1e-13).expect("short interval"),
+            fc.rate(time)
+        );
+    }
+    assert!(fc
+        .rate_period(-1.0, -0.5)
+        .expect("negative finite interval")
+        .is_finite());
+}
+
+#[test]
+fn rate_period_rejects_non_finite_integrated_arithmetic() {
+    let sample = sample_forward();
+    let extreme = ForwardCurve::flat("EXTREME", 0.25, sample.base_date(), f64::MAX)
+        .expect("finite flat input");
+    assert_eq!(extreme.rate_period(0.0, 0.0).expect("point rate"), f64::MAX);
+    assert!(extreme.rate_period(0.0, 1.0).is_err());
 }
 
 #[test]

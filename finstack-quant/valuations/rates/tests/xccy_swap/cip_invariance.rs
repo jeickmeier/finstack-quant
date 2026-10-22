@@ -69,7 +69,7 @@ fn build_forward(id: &str, base: Date, zero: f64) -> ForwardCurve {
 fn build_fx_matrix(spot_eur_to_usd: f64) -> FxMatrix {
     let provider = Arc::new(SimpleFxProvider::new());
     provider
-        .set_quote(Currency::EUR, Currency::USD, spot_eur_to_usd)
+        .set_quotes(&[(Currency::EUR, Currency::USD, spot_eur_to_usd)])
         .expect("set EUR/USD FX rate");
     FxMatrix::new(provider)
 }
@@ -411,6 +411,7 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
                         ccy,
                         Currency::USD,
                         as_of,
+                        Default::default(),
                     ))
                     .expect("fx rate")
                     .rate;

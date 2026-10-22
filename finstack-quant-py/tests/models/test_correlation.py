@@ -12,7 +12,6 @@ from finstack_quant.models.correlation import (
     LatentMultiFactor,
     cholesky_correlation,
     correlation_bounds,
-    joint_probabilities,
     nearest_correlation,
     validate_correlation_matrix,
 )
@@ -146,11 +145,17 @@ class TestCorrelatedBernoulli:
 
 
 class TestJointProbabilities:
-    """Module-level joint_probabilities function."""
+    """Joint probabilities of the validated CorrelatedBernoulli distribution."""
+
+    def test_free_function_is_not_exported(self) -> None:
+        from finstack_quant.models import correlation
+
+        assert not hasattr(correlation, "joint_probabilities")
+        assert "joint_probabilities" not in correlation.__all__
 
     def test_sum_to_one(self) -> None:
         """Four-tuple sums to 1.0."""
-        p11, p10, p01, p00 = joint_probabilities(0.3, 0.4, 0.1)
+        p11, p10, p01, p00 = CorrelatedBernoulli(0.3, 0.4, 0.1).joint_probabilities()
         assert p11 + p10 + p01 + p00 == pytest.approx(1.0, abs=1e-10)
 
 

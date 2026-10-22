@@ -58,7 +58,7 @@ fn market(as_of: Date) -> MarketContext {
         .build()
         .expect("EUR discount curve fixture");
     let fx = Arc::new(SimpleFxProvider::new());
-    fx.set_quote(Currency::EUR, Currency::USD, 1.10)
+    fx.set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .expect("EURUSD quote fixture");
     MarketContext::new()
         .insert(usd)

@@ -102,7 +102,7 @@ cf_kind_classattrs! {
 
 #[pymethods]
 impl PyCFKind {
-    /// Parse a cashflow kind from its exact snake_case label (e.g. ``"fixed"``, ``"pre_payment"``).
+    /// Parse a canonical cashflow kind label, ignoring outer whitespace and ASCII case.
     #[classmethod]
     #[pyo3(text_signature = "(cls, name)")]
     fn parse(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {

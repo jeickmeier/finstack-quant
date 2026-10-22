@@ -85,7 +85,7 @@ crate; malformed metadata JSON returns `Error::Validation`.
 - Zero rows with columns export with the schema preserved.
 - The row count is passed explicitly via `RecordBatchOptions::with_row_count`,
   so column-less tables keep their declared `row_count`.
-- `TableEnvelope::new`/`new_with_metadata` already reject mismatched column
+- `TableEnvelope::new` already rejects mismatched column
   lengths and duplicate column names, so a valid envelope cannot fail export on
   shape; the exported batch row count matches `TableEnvelope::row_count`.
 
@@ -101,7 +101,7 @@ fn export() -> finstack_quant_core::Result<()> {
             .with_role(TableColumnRole::Dimension),
         TableColumn::new("pv", TableColumnData::Float64(vec![101.5, 99.25]))
             .with_role(TableColumnRole::Measure),
-    ])?;
+    ], Default::default())?;
 
     let batch = to_record_batch(&table)?;
     assert_eq!(batch.num_rows(), 2);

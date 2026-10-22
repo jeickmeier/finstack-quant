@@ -38,7 +38,7 @@ def doc(obj: Any) -> Any:
 
 
 def money(value: Money | None) -> dict[str, Any] | None:
-    return None if value is None else {"amount": float(value.amount), "currency": value.currency.code}
+    return None if value is None else {"amount": float(value.amount), "currency": str(value.currency)}
 
 
 def built_model() -> st.FinancialModelSpec:
@@ -264,7 +264,7 @@ def analytics_cases() -> dict[str, Any]:
         "dcf": {
             "enterprise_value": float(dcf.enterprise_value.amount),
             "equity_value": float(dcf.equity_value.amount),
-            "currency": dcf.enterprise_value.currency.code,
+            "currency": str(dcf.enterprise_value.currency),
         },
         "corporate": {
             "node_count": sa.run_corporate_analysis(MODEL).statement.node_count,

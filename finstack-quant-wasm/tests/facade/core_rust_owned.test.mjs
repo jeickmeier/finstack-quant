@@ -26,7 +26,7 @@ const validation = (message) => (error) => {
 };
 
 test('one Rust currency parser: case-insensitive, not trimmed, error names the code', () => {
-  assert.equal(new core.Currency('usd').code, 'USD');
+  assert.equal(new core.Currency('usd').toString(), 'USD');
   assert.equal(new core.Currency('usd').numeric, 840);
   for (const [build, code] of [
     [() => new core.Currency(' USD '), ' USD '],
@@ -186,7 +186,7 @@ test('DayCountContext is built by DayCountContextState::try_new', () => {
 
 test('FxMatrix.rate takes an optional policy defaulting to the Rust default', () => {
   const fx = new core.FxMatrix();
-  fx.setQuote('EUR', 'USD', 1.1);
+  fx.setQuotes([['EUR', 'USD', 1.1]]);
   const cashflowDate = core.FxConversionPolicy.cashflowDate();
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02').rate, 1.1);
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02', null).rate, 1.1);
@@ -253,5 +253,69 @@ test('tiny annual zero rates avoid subtractive cancellation', () => {
     knots: [0, 1, 1, df],
     interp: 'log_linear',
   });
-  assert.ok(Math.abs(curve.zeroRate(1, 'annual') - (1 - df) / df) < 1e-23);
+  assert.ok(Math.abs(curve.zeroRate(1, 'periodic(1)') - (1 - df) / df) < 1e-23);
+  assert.throws(
+    () => curve.zeroRate(1, 'annual'),
+    (error) => error.kind === 'validation' && /unknown compounding/.test(error.message)
+  );
+  curve.free();
+});
+
+test('plain-object constructor factories use Rust validation and defaults', () => {
+  assert.deepEqual(core.toleranceConfigNew(), { generic_epsilon: 1e-10 });
+  assert.deepEqual(core.toleranceConfigNew(null), core.toleranceConfigNew());
+  for (const epsilon of [0, -1, NaN, Infinity]) {
+    assert.throws(
+      () => core.toleranceConfigNew(epsilon),
+      (error) => error.kind === 'validation'
+    );
+  }
+  assert.throws(
+    () => core.toleranceConfigNew('small'),
+    (error) => error.kind === 'invalid_type'
+  );
+  for (const [name, score, minimum] of [
+    ['', 50, 40],
+    ['A', 101, 90],
+    ['A', 50, -1],
+    ['A', NaN, 40],
+    ['A', 50, Infinity],
+  ]) {
+    assert.throws(
+      () => core.ratingLevelTryNew(name, score, minimum),
+      (error) => error.kind === 'validation'
+    );
+  }
+  const high = core.ratingLevelTryNew('A', 90, 85);
+  const low = core.ratingLevelTryNew('B', 70, 65);
+  for (const ratings of [[], [high, high], [low, high]]) {
+    assert.throws(
+      () => core.scorecardScaleTryNew('invalid', null, ratings),
+      (error) => error.kind === 'validation'
+    );
+  }
+  assert.equal('description' in core.scorecardScaleTryNew('valid', undefined, [high, low]), false);
+  for (const params of [
+    [0, 0.5, 0.4, -0.3],
+    [0.2, 1.1, 0.4, -0.3],
+    [0.2, 0.5, -0.1, -0.3],
+    [0.2, 0.5, 0.4, 1],
+    [NaN, 0.5, 0.4, -0.3],
+    [0.2, 0.5, 0.4, -0.3, Infinity],
+  ]) {
+    assert.throws(
+      () => core.sabrParameterDataNew(...params),
+      (error) => error.kind === 'validation'
+    );
+  }
+  assert.equal('shift' in core.sabrParameterDataNew(0.2, 0.5, 0.4, -0.3), false);
+  assert.equal(core.sabrParameterDataNew(0.2, 0.5, 0.4, -0.3, -0.01).shift, -0.01);
+});
+
+test('Currency has one alphabetic string surface', () => {
+  const currency = new core.Currency('usd');
+  assert.equal(currency.toString(), 'USD');
+  assert.equal(currency.numeric, 840);
+  assert.equal('code' in currency, false);
+  currency.free();
 });

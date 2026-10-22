@@ -147,5 +147,5 @@ def test_coupon_rate_round_trip_preserves_metadata_and_accrual(
     assert restored_schedule.to_json() == schedule.to_json()
     for value in (schedule, restored_schedule):
         accrued = accrued_interest_amount(value, dt.date(2025, 4, 1), AccrualConfig())
-        assert accrued.currency.code == "USD"
+        assert str(accrued.currency) == "USD"
         assert accrued.amount == pytest.approx(amount * 90 / 181)

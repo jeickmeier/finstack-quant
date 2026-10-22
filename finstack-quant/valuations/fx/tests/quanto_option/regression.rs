@@ -64,7 +64,7 @@ fn build_market(equity_vol: f64, fx_vol: f64) -> MarketContext {
         .expect("jpy disc");
     let provider = Arc::new(SimpleFxProvider::new());
     provider
-        .set_quote(Currency::JPY, Currency::USD, 1.0 / 150.0)
+        .set_quotes(&[(Currency::JPY, Currency::USD, 1.0 / 150.0)])
         .expect("rate");
     let fx = FxMatrix::new(provider);
 

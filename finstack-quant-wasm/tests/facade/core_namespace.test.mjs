@@ -44,7 +44,7 @@ test('core namespace exposes expected constructors', () => {
 
 test('core.Currency creation', () => {
   const usd = new core.Currency('USD');
-  assert.equal(usd.code, 'USD');
+  assert.equal(usd.toString(), 'USD');
 });
 
 test('core log-normal CDF preserves underflowed tail probabilities', () => {
@@ -62,7 +62,7 @@ test('core.Money amount and lossless amountDecimal', () => {
   assert.equal(m.amountDecimal, '1234.56');
   const eur = new core.Currency('EUR');
   const converted = m.convertAtRate(eur, 0.9);
-  assert.equal(converted.currency.code, 'EUR');
+  assert.equal(converted.currency.toString(), 'EUR');
   assert.equal(converted.amount, 1111.104);
   const subCent = new core.Money(1.2345, usd);
   assert.equal(subCent.amountDecimal, '1.2345');
@@ -331,11 +331,11 @@ test('core FX delta surface absent wings use omitted arguments, not empty arrays
 
 test('core FX pair convention helpers', () => {
   const pair = core.fxMarketPair('USD', 'EUR');
-  assert.equal(pair[0].code, 'EUR');
-  assert.equal(pair[1].code, 'USD');
+  assert.equal(pair[0].toString(), 'EUR');
+  assert.equal(pair[1].toString(), 'USD');
   const conv = core.fxPairConvention('USD', 'JPY');
-  assert.equal(conv.base.code, 'USD');
-  assert.equal(conv.quote.code, 'JPY');
+  assert.equal(conv.base.toString(), 'USD');
+  assert.equal(conv.quote.toString(), 'JPY');
   assert.equal(conv.usdQuotation.toString(), 'indirect');
   assert.equal(conv.pipSize, 0.01);
   assert.equal(conv.settlementDays, 2);
@@ -349,9 +349,11 @@ test('core.FxMatrix quote updates invalidate cached crosses', () => {
     const fx = new core.FxMatrix();
     const policy = core.FxConversionPolicy.cashflowDate();
     const date = '2025-01-02';
-    fx.setQuote('GBP', 'USD', 1.25);
+    fx.setQuotes([['GBP', 'USD', 1.25]]);
     const setEurUsd = (rate) =>
-      pinned ? fx.setQuoteOn('EUR', 'USD', date, policy, rate) : fx.setQuote('EUR', 'USD', rate);
+      pinned
+        ? fx.setQuoteOn('EUR', 'USD', date, policy, rate)
+        : fx.setQuotes([['EUR', 'USD', rate]]);
     setEurUsd(1.1);
     assert.ok(Math.abs(fx.rate('EUR', 'GBP', date).rate - 0.88) < 1e-12);
     setEurUsd(1.2);
@@ -375,7 +377,7 @@ test('core.Money.fromDecimalStr accepts exact fixed and scientific text', () => 
     const m = decimalMoney(text, currency);
     try {
       assert.equal(m.amountDecimal, expected);
-      assert.equal(m.currency.code, currency);
+      assert.equal(m.currency.toString(), currency);
     } finally {
       m.free();
     }
@@ -474,4 +476,11 @@ test('core.FxMatrix rate returns FxRateResult with rate/triangulated getters', (
   const reused = fx.rate('EUR', 'USD', '2025-01-15', policy);
   assert.equal(reused.rate, 1.1);
   assert.match(policy.toString(), /cashflow/i);
+});
+
+test('FxMatrix exposes the atomic batch setter without a singleton alias', () => {
+  assert.equal('setQuote' in core.FxMatrix.prototype, false);
+  const fx = new core.FxMatrix();
+  fx.setQuotes([['EUR', 'USD', 1.1]]);
+  assert.equal(fx.rate('EUR', 'USD', '2025-01-02').rate, 1.1);
 });

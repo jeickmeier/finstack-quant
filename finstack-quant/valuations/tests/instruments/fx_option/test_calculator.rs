@@ -38,7 +38,7 @@ fn test_npv_matches_garman_kohlhagen() {
     let spot = market
         .fx()
         .expect("fx matrix")
-        .rate(FxQuery::new(BASE, QUOTE, as_of))
+        .rate(FxQuery::new(BASE, QUOTE, as_of, Default::default()))
         .expect("spot")
         .rate;
     let surf = market.get_surface(VOL_ID).expect("vol surface");
@@ -129,7 +129,7 @@ fn test_surface_vol_used_in_pricing() {
     let spot = market
         .fx()
         .expect("fx matrix")
-        .rate(FxQuery::new(BASE, QUOTE, as_of))
+        .rate(FxQuery::new(BASE, QUOTE, as_of, Default::default()))
         .expect("spot")
         .rate;
     let disc_domestic = market.get_discount(DOMESTIC_ID).unwrap();

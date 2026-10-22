@@ -121,7 +121,7 @@ class TestCurrencyParity:
     def test_construction_and_properties(self) -> None:
         """USD should have code 'USD', numeric 840, decimals 2."""
         usd = Currency("USD")
-        assert usd.code == "USD"
+        assert str(usd) == "USD"
         assert usd.numeric == 840
         assert usd.decimals == 2
 
@@ -129,7 +129,7 @@ class TestCurrencyParity:
         """Lowercase input should resolve identically."""
         usd1 = Currency("USD")
         usd2 = Currency("usd")
-        assert usd1.code == usd2.code
+        assert str(usd1) == str(usd2)
         assert usd1.numeric == usd2.numeric
 
     def test_equality(self) -> None:
@@ -165,13 +165,13 @@ class TestMoneyParity:
         """Amount and currency round-trip correctly."""
         m = Money(100.50, usd)
         assert m.amount == pytest.approx(100.50)
-        assert m.currency.code == "USD"
+        assert str(m.currency) == "USD"
 
     def test_addition(self, usd: Currency) -> None:
         """Same-currency addition."""
         result = Money(100.0, usd) + Money(50.0, usd)
         assert result.amount == pytest.approx(150.0)
-        assert result.currency.code == "USD"
+        assert str(result.currency) == "USD"
 
     def test_subtraction(self, usd: Currency) -> None:
         """Same-currency subtraction."""
@@ -339,10 +339,10 @@ class TestFxConventionParity:
 
     def test_fx_market_pair_and_convention(self) -> None:
         base, quote = fx_market_pair("USD", "EUR")
-        assert [base.code, quote.code] == ["EUR", "USD"]
+        assert [str(base), str(quote)] == ["EUR", "USD"]
         conv = fx_pair_convention("USD", "JPY")
-        assert conv.base.code == "USD"
-        assert conv.quote.code == "JPY"
+        assert str(conv.base) == "USD"
+        assert str(conv.quote) == "JPY"
         assert str(conv.usd_quotation) == "indirect"
         assert conv.usd_quotation == FxQuoteConvention.INDIRECT
         assert conv.pip_size == 0.01
@@ -660,11 +660,14 @@ class TestForwardCurveParity:
 class TestFxMatrixParity:
     """FX matrix operations match Rust."""
 
+    def test_singleton_setter_is_removed(self) -> None:
+        assert not hasattr(FxMatrix, "set_quote")
+
     def test_direct_quote(self) -> None:
         """Direct EUR/USD lookup returns the stored rate."""
         fx = FxMatrix()
         eur, usd = Currency("EUR"), Currency("USD")
-        fx.set_quote(eur, usd, 1.10)
+        fx.set_quotes([(eur, usd, 1.10)])
         result = fx.rate(eur, usd, date(2024, 1, 1), FxConversionPolicy.CASHFLOW_DATE)
         assert result.rate == pytest.approx(1.10, abs=1e-10)
 
@@ -672,7 +675,7 @@ class TestFxMatrixParity:
         """Inverse USD/EUR lookup returns 1/rate."""
         fx = FxMatrix()
         eur, usd = Currency("EUR"), Currency("USD")
-        fx.set_quote(eur, usd, 1.10)
+        fx.set_quotes([(eur, usd, 1.10)])
         result = fx.rate(usd, eur, date(2024, 1, 1), FxConversionPolicy.CASHFLOW_DATE)
         assert result.rate == pytest.approx(1.0 / 1.10, abs=1e-8)
 
@@ -687,8 +690,8 @@ class TestFxMatrixParity:
         """Cross triangulation (EUR->GBP via USD) returns the implied rate."""
         fx = FxMatrix()
         usd, eur, gbp = Currency("USD"), Currency("EUR"), Currency("GBP")
-        fx.set_quote(eur, usd, 1.10)
-        fx.set_quote(gbp, usd, 1.25)
+        fx.set_quotes([(eur, usd, 1.10)])
+        fx.set_quotes([(gbp, usd, 1.25)])
         result = fx.rate(eur, gbp, date(2024, 1, 1), FxConversionPolicy.CASHFLOW_DATE)
         assert result.rate == pytest.approx(1.10 / 1.25, abs=1e-10)
         assert result.triangulated is True
@@ -698,7 +701,7 @@ class TestFxMatrixParity:
         fx = FxMatrix()
         eur, usd = Currency("EUR"), Currency("USD")
         with pytest.raises(Exception, match=r"(?i)(positive|rate|invalid input parameter)"):
-            fx.set_quote(eur, usd, 0.0)
+            fx.set_quotes([(eur, usd, 0.0)])
 
     def test_policy_as_string(self) -> None:
         """FxConversionPolicy can also be passed as its enum variant."""
@@ -711,16 +714,16 @@ class TestFxMatrixParity:
     def test_quote_update_invalidates_cached_cross(self, pinned: bool) -> None:
         fx = FxMatrix()
         fixing_date = date(2025, 1, 2)
-        fx.set_quote("GBP", "USD", 1.25)
+        fx.set_quotes([("GBP", "USD", 1.25)])
         if pinned:
             fx.set_quote_on("EUR", "USD", fixing_date, "cashflow_date", 1.10)
         else:
-            fx.set_quote("EUR", "USD", 1.10)
+            fx.set_quotes([("EUR", "USD", 1.10)])
         assert fx.rate("EUR", "GBP", fixing_date).rate == pytest.approx(0.88)
         if pinned:
             fx.set_quote_on("EUR", "USD", fixing_date, "cashflow_date", 1.20)
         else:
-            fx.set_quote("EUR", "USD", 1.20)
+            fx.set_quotes([("EUR", "USD", 1.20)])
         result = fx.rate("EUR", "GBP", fixing_date)
         assert result.rate == pytest.approx(0.96)
         assert result.triangulated
@@ -741,7 +744,7 @@ class TestFxMatrixParity:
     def test_explicit_and_pinned_quotes_survive_market_context_json_roundtrip(self) -> None:
         fx = FxMatrix()
         eur, gbp, usd = Currency("EUR"), Currency("GBP"), Currency("USD")
-        fx.set_quote(eur, usd, 1.10)
+        fx.set_quotes([(eur, usd, 1.10)])
         pinned_date = date(2024, 1, 2)
         fx.set_quote_on(gbp, usd, pinned_date, FxConversionPolicy.CASHFLOW_DATE, 1.25)
 

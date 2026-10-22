@@ -207,7 +207,7 @@ impl ForwardCurve {
     pub fn rate_period_between_dates(&self, start: Date, end: Date) -> crate::Result<f64> {
         let t_start = self.curve_time(start)?;
         let t_end = self.curve_time(end)?;
-        Ok(self.rate_period(t_start, t_end))
+        self.rate_period(t_start, t_end)
     }
 
     /// Curve-basis forward rate starting at time `t` for the curve's tenor.
@@ -377,71 +377,62 @@ impl ForwardCurve {
     /// accumulated continuous rate shocks are integrated analytically so a
     /// narrow key-rate bucket cannot disappear between quadrature samples.
     ///
-    /// # NaN contract
+    /// # Errors
     ///
-    /// Returns [`f64::NAN`] (rather than an error) if `t2 < t1` — misordered
-    /// arguments are a caller bug, and changing the signature to `Result`
-    /// would be too breaking. A `debug_assert` fires in debug builds and a
-    /// `tracing` warning is emitted in release builds; callers must be
-    /// prepared for NaN to propagate if they pass misordered times.
+    /// Returns a validation error if either endpoint, the interval length or
+    /// the resulting average is non-finite, or if `t2 < t1`. Equal endpoints
+    /// and intervals no longer than `1e-12` years return the point rate at `t1`.
+    /// Negative finite times retain the curve's existing extrapolation policy.
     ///
     /// # Arguments
     ///
-    /// * `t1` - Start year-fraction of the forward or rate interval being queried
-    /// * `t2` - End year-fraction of the forward or rate interval being queried
+    /// * `t1` - Finite start year fraction from the curve base date, on its day-count basis.
+    /// * `t2` - Finite end year fraction on the same basis; must be at least `t1`.
     #[inline]
-    #[must_use]
-    pub fn rate_period(&self, t1: f64, t2: f64) -> f64 {
-        debug_assert!(
-            t2 >= t1,
-            "ForwardCurve::rate_period requires t1 <= t2 (got t1={t1}, t2={t2})"
-        );
-        if t2 < t1 {
-            tracing::warn!(
-                curve_id = %self.id,
-                t1 = t1,
-                t2 = t2,
-                "ForwardCurve::rate_period called with t2 < t1; returning NaN. \
-                 This is likely a caller bug — time arguments should satisfy t1 <= t2.",
-            );
-            return f64::NAN;
+    pub fn rate_period(&self, t1: f64, t2: f64) -> crate::Result<f64> {
+        if !t1.is_finite() || !t2.is_finite() || t2 < t1 {
+            return Err(crate::Error::Validation(format!(
+                "ForwardCurve::rate_period requires finite t1 <= t2 (got t1={t1}, t2={t2})"
+            )));
         }
-        // Market-standard interpretation: average forward over the interval.
-        //
-        // We approximate the integral average of the interpolated forward curve:
-        //   avg = (1 / (t2 - t1)) * ∫_{t1}^{t2} f(t) dt
-        //
-        // Use fixed-segment Simpson's rule for determinism (no adaptive stepping).
-        // This is materially better than endpoint averaging for curved/interpolated shapes.
         let dt = t2 - t1;
-        if dt <= 1e-12 {
-            return self.rate(t1);
+        if !dt.is_finite() {
+            return Err(crate::Error::Validation(
+                "ForwardCurve::rate_period interval length must be finite".to_string(),
+            ));
         }
-
-        let n: usize = if dt > 20.0 {
-            32
-        } else if dt > 5.0 {
-            16
+        let average = if dt <= 1e-12 {
+            self.rate(t1)
         } else {
-            8
-        };
-        if let Some(transform) = &self.transform {
-            let source = simpson_rule(
-                |time| self.interp.interp(time + transform.offset),
-                t1,
-                t2,
-                n,
-            );
-            source.map_or(f64::NAN, |integral| {
-                (transform.scale * integral
+            let n = if dt > 20.0 {
+                32
+            } else if dt > 5.0 {
+                16
+            } else {
+                8
+            };
+            if let Some(transform) = &self.transform {
+                let source = simpson_rule(
+                    |time| self.interp.interp(time + transform.offset),
+                    t1,
+                    t2,
+                    n,
+                )?;
+                (transform.scale * source
                     + transform
                         .adjustment
                         .integral(t1 + transform.offset, t2 + transform.offset))
                     / dt
-            })
-        } else {
-            simpson_rule(|t| self.rate(t), t1, t2, n).map_or(f64::NAN, |integral| integral / dt)
+            } else {
+                simpson_rule(|t| self.rate(t), t1, t2, n)? / dt
+            }
+        };
+        if !average.is_finite() {
+            return Err(crate::Error::Validation(
+                "ForwardCurve::rate_period average must be finite".to_string(),
+            ));
         }
+        Ok(average)
     }
 
     /// Logarithm of the implied projection discount factor from zero to `t`.

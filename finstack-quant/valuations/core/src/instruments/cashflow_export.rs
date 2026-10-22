@@ -555,6 +555,7 @@ fn envelope_for_priced(
                         ccy,
                         row_reporting_currency,
                         as_of_date,
+                        Default::default(),
                     ))?
                     .rate,
             )

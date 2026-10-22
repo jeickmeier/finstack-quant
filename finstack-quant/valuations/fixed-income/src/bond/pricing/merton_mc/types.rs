@@ -171,6 +171,6 @@ impl MertonMcResult {
             "pik_exercise_rate",
             TableColumnData::Float64(vec![self.path_statistics.pik_exercise_rate]),
         ));
-        TableEnvelope::new(columns)
+        TableEnvelope::new(columns, Default::default())
     }
 }

@@ -2,7 +2,7 @@
 Type stubs for ``finstack_quant.core.rating_scales``.
 
 Bindings for the shared credit rating-scale registry (scorecard scales such as
-S&P, Moody's, and Fitch) from the ``finstack-quant-core`` Rust crate.
+S&P and Moody's) from the ``finstack-quant-core`` Rust crate.
 
 Distinct from ``finstack_quant.models.credit.migration.RatingScale``, which models
 the ordered state set of a credit-migration transition matrix.
@@ -494,7 +494,7 @@ class RatingScaleRegistry:
     >>> registry = registry_from_config(FinstackConfig())
     >>> (registry.default_scale_id(), registry.default_scorecard_score(), str(registry.unknown_scale_policy()))
     ('sp', 50.0, 'fallback_to_default')
-    >>> (registry.is_known_rating_scale("S&P"), registry.rating_scale("S&P").scale_name)
+    >>> (registry.is_known_rating_scale(" SP "), registry.rating_scale(" SP ").scale_name)
     (True, 'S&P')
 
     """
@@ -530,15 +530,14 @@ class RatingScaleRegistry:
 
     def scale_ids(self) -> list[str]:
         """
-        Primary id of every registered scale, in registry order.
+        Canonical normalized id of every registered scale, in registry order.
 
-        Aliases (e.g. ``"Fitch"``) are not included; resolve them through
-        :meth:`rating_scale` or :meth:`is_known_rating_scale`.
+        Registry ids are trimmed and ASCII-lowercased during loading.
 
         Returns
         -------
         list[str]
-            Primary scale ids such as ``["sp", "moodys"]``.
+            Canonical scale ids such as ``["sp", "moodys"]``.
 
         Notes
         -----
@@ -568,12 +567,12 @@ class RatingScaleRegistry:
 
     def is_known_rating_scale(self, name: str) -> bool:
         """
-        Return whether ``name`` is a known scale id or alias.
+        Return whether ``name`` is a known canonical id after trimming and ASCII case folding.
 
         Parameters
         ----------
         name : str
-            Scale id or alias to test.
+            Canonical id (`sp` or `moodys`); surrounding whitespace and ASCII case are ignored.
 
         Returns
         -------
@@ -588,7 +587,7 @@ class RatingScaleRegistry:
 
     def rating_scale(self, name: str) -> ScorecardScale:
         """
-        Resolve a scale name or alias to a :class:`ScorecardScale`.
+        Resolve a canonical scale id to a :class:`ScorecardScale`.
 
         Honours the configured unknown-scale policy: this may fall back to the
         default scale or raise ``ValueError``.
@@ -596,7 +595,7 @@ class RatingScaleRegistry:
         Parameters
         ----------
         name : str
-            Scale id or alias (e.g. ``"sp"``, ``"moodys"``).
+            Canonical id (``"sp"`` or ``"moodys"``); surrounding whitespace and ASCII case are ignored.
 
         Returns
         -------
@@ -633,7 +632,7 @@ class RatingScaleRegistry:
         Parameters
         ----------
         json : str
-            JSON document matching the registry schema.
+            JSON document with schema ``finstack_quant.rating_scales/2`` and exactly one ``id`` per scale; ids are trimmed and ASCII-lowercased.
 
         Returns
         -------
@@ -643,7 +642,7 @@ class RatingScaleRegistry:
         ------
         ValueError
             If *json* is malformed or violates the supported schema version,
-            identifier, alias, default-scale, score-range, or rating-order
+            identifier, default-scale, score-range, or rating-order
             invariants.
 
         Examples
@@ -725,7 +724,7 @@ def registry_from_config(config: FinstackConfig) -> RatingScaleRegistry:
     >>> registry = registry_from_config(FinstackConfig())
     >>> (registry.default_scale_id(), registry.default_scorecard_score(), str(registry.unknown_scale_policy()))
     ('sp', 50.0, 'fallback_to_default')
-    >>> (registry.is_known_rating_scale("S&P"), registry.rating_scale("S&P").scale_name)
+    >>> (registry.is_known_rating_scale(" SP "), registry.rating_scale(" SP ").scale_name)
     (True, 'S&P')
 
     """

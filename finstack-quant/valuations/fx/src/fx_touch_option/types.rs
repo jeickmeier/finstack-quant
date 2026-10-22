@@ -163,10 +163,6 @@ impl FxTouchOption {
             self.payout_amount.amount(),
             "FxTouchOption payout_amount",
         )?;
-        finstack_quant_core::validation::validate_money_finite(
-            self.payout_amount,
-            "FxTouchOption payout_amount",
-        )?;
         // Pricing discounts the payout at the domestic (quote-currency) rate;
         // a base-currency payout would need the foreign-cash touch formula.
         // Reject rather than silently mispricing.
@@ -347,6 +343,7 @@ impl FxTouchOption {
                 self.base_currency,
                 self.quote_currency,
                 as_of,
+                Default::default(),
             ))?
             .rate)
     }
@@ -610,7 +607,7 @@ mod tests {
     /// Item 8 regression: the FD spot bumps in `option_delta`/`option_gamma`
     /// rebuild `FxMatrix` via `provider().clone()` (an `Arc` clone — the
     /// provider is shared). This test pins that the bumped scenarios do NOT
-    /// corrupt the base market's FX spot: `FxMatrix::set_quote` writes a
+    /// corrupt the base market's FX spot: `FxMatrix::set_quotes` writes a
     /// matrix-local explicit quote and `FxMatrix` never mutates the provider.
     #[test]
     fn touch_fd_greeks_do_not_corrupt_base_market_fx_spot() {
@@ -645,7 +642,7 @@ mod tests {
             .expect("vol surface");
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         let market = MarketContext::new()
             .insert(usd)
@@ -675,7 +672,12 @@ mod tests {
         let spot_before = market
             .fx()
             .expect("fx")
-            .rate(FxQuery::new(Currency::EUR, Currency::USD, as_of))
+            .rate(FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                as_of,
+                Default::default(),
+            ))
             .expect("spot")
             .rate;
 
@@ -696,7 +698,12 @@ mod tests {
         let spot_after = market
             .fx()
             .expect("fx")
-            .rate(FxQuery::new(Currency::EUR, Currency::USD, as_of))
+            .rate(FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                as_of,
+                Default::default(),
+            ))
             .expect("spot")
             .rate;
         assert!(

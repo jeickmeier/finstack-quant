@@ -137,8 +137,7 @@ pub(crate) fn bool_repr(value: bool) -> &'static str {
 
 /// Parse a business-day-convention name with the Rust `FromStr` (the parser
 /// `adjust` uses), so every Python BDC string argument accepts the same
-/// spellings: serde names and the `MF`/`F`/`P`/`MP`/`NONE` short codes,
-/// case-insensitive.
+/// canonical serde names, ignoring surrounding whitespace and ASCII case.
 ///
 /// # Arguments
 ///
@@ -160,7 +159,7 @@ pub(crate) fn bdc_from_str(
 /// * `obj` - A `finstack_quant.core.dates.BusinessDayConvention` or a name
 ///   accepted by the Rust `BusinessDayConvention` `FromStr` (the parser
 ///   `adjust` uses): `"modified_following"`, `"following"`, `"preceding"`, …
-///   or the short codes `"MF"`, `"F"`, `"P"`, `"MP"`, case-insensitive.
+///   with surrounding whitespace and ASCII case ignored.
 /// * `what` - Parameter name used in the error message.
 pub(crate) fn bdc_from_py(
     obj: &Bound<'_, PyAny>,

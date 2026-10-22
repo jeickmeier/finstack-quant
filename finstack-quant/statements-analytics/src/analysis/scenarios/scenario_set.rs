@@ -780,7 +780,7 @@ impl ScenarioResults {
         metadata.insert("source".to_string(), json!("scenario_results"));
         metadata.insert("baseline".to_string(), json!(baseline_name));
 
-        TableEnvelope::new_with_metadata(columns, metadata).map_err(Into::into)
+        TableEnvelope::new(columns, metadata).map_err(Into::into)
     }
 }
 
