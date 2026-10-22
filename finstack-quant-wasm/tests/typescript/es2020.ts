@@ -187,3 +187,42 @@ void [
   horizonOperations,
   requiredAnnualized,
 ];
+
+// Rust tuple schemas must retain both element types and exact tuple lengths.
+import type {
+  AmortizationSpec,
+  CashFlowAccrual,
+  StepUpCouponSpec,
+} from '../../types/generated/cashflows/cashflows.js';
+type PrincipalDates = Extract<
+  AmortizationSpec,
+  { custom_principal: unknown }
+>['custom_principal']['items'];
+const principalDates: PrincipalDates = [['2025-01-15', { amount: '100', currency: 'USD' }]];
+const couponDates: CashFlowAccrual['coupon_period'] = ['2025-01-15', '2025-07-15'];
+const absentCouponDates: CashFlowAccrual['coupon_period'] = null;
+const couponSteps: StepUpCouponSpec['step_schedule'] = [['2025-01-15', '0.05']];
+// @ts-expect-error date-money pairs require a Money object in the second position
+const badPrincipalAmount: PrincipalDates = [['2025-01-15', '100']];
+// @ts-expect-error dates are ISO strings, not numeric timestamps
+const badPrincipalDate: PrincipalDates = [[20250115, { amount: '100', currency: 'USD' }]];
+// @ts-expect-error a principal tuple has exactly two elements
+const longPrincipal: PrincipalDates = [['2025-01-15', { amount: '100', currency: 'USD' }, 1]];
+// @ts-expect-error a coupon period must supply both boundaries
+const shortCouponDates: CashFlowAccrual['coupon_period'] = ['2025-01-15'];
+// @ts-expect-error a coupon boundary is a date string
+const badCouponDate: CashFlowAccrual['coupon_period'] = ['2025-01-15', 20250715];
+// @ts-expect-error decimal rates use the Rust string wire representation
+const badCouponStep: StepUpCouponSpec['step_schedule'] = [['2025-01-15', 0.05]];
+void [
+  principalDates,
+  couponDates,
+  absentCouponDates,
+  couponSteps,
+  badPrincipalAmount,
+  badPrincipalDate,
+  longPrincipal,
+  shortCouponDates,
+  badCouponDate,
+  badCouponStep,
+];

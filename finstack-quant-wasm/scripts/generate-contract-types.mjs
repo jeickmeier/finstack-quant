@@ -26,6 +26,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { compile } from 'json-schema-to-typescript';
 import { byCodeUnit } from './order.mjs';
+import { prepareSchema } from './prepare-schema.mjs';
 
 const PACKAGE = new URL('../', import.meta.url);
 const WORKSPACE = new URL('../finstack-quant/', PACKAGE);
@@ -164,7 +165,7 @@ const hostSchema = JSON.parse(
 );
 await emit(
   new URL('types/valuation-result.d.ts', PACKAGE),
-  await compile(withoutRustExamples(hostTypes(hostSchema)), 'ValuationResult', {
+  await compile(prepareSchema(withoutRustExamples(hostTypes(hostSchema))), 'ValuationResult', {
     bannerComment:
       '// Generated from the Rust facade host schema by scripts/generate-contract-types.mjs. Do not edit.',
     unknownAny: true,
@@ -275,7 +276,7 @@ function bundle(crate) {
 const ROOT = '__FinstackContractBundle';
 for (const crate of crates) {
   const { schema, imports } = bundle(crate);
-  const compiled = await compile(withoutRustExamples(schema), ROOT, {
+  const compiled = await compile(prepareSchema(withoutRustExamples(schema)), ROOT, {
     bannerComment: '',
     unknownAny: true,
     unreachableDefinitions: true,

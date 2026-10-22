@@ -386,13 +386,13 @@ export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor
  */
 export type PositiveF64Wire = number;
 /**
- * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
- */
-export type DateWire = string;
-/**
  * Exact decimal encoded only as a JSON string.
  */
 export type DecimalWire = string;
+/**
+ * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+ */
+export type DateWire = string;
 /**
  * A single warning emitted by an adapter, the engine, or a downstream helper.
  *
@@ -1317,6 +1317,26 @@ export type NettingSetId =
       kind: "cleared";
     };
 /**
+ * SIMM credit sector for bucket assignment.
+ *
+ * Maps reference entities to ISDA SIMM credit qualifying buckets.
+ * See ISDA SIMM v2.6 Table 2.
+ */
+export type SimmCreditSector =
+  | "sovereign"
+  | "financial"
+  | "basic_materials"
+  | "consumer_goods"
+  | "technology_media"
+  | "health_care"
+  | "high_yield_sovereign"
+  | "high_yield_financial"
+  | "high_yield_basic_materials"
+  | "high_yield_consumer_goods"
+  | "high_yield_technology_media"
+  | "high_yield_health_care"
+  | "residual";
+/**
  * Risk classes for SIMM categorization.
  */
 export type SimmRiskClass =
@@ -1485,26 +1505,6 @@ export type ReplayMode = "pv_only" | "pv_and_pnl" | "full_attribution";
  * What to do when a single snapshot fails to revalue.
  */
 export type ReplayErrorPolicy = "strict" | "best_effort";
-/**
- * SIMM credit sector for bucket assignment.
- *
- * Maps reference entities to ISDA SIMM credit qualifying buckets.
- * See ISDA SIMM v2.6 Table 2.
- */
-export type SimmCreditSector =
-  | "sovereign"
-  | "financial"
-  | "basic_materials"
-  | "consumer_goods"
-  | "technology_media"
-  | "health_care"
-  | "high_yield_sovereign"
-  | "high_yield_financial"
-  | "high_yield_basic_materials"
-  | "high_yield_consumer_goods"
-  | "high_yield_technology_media"
-  | "high_yield_health_care"
-  | "residual";
 
 /**
  * Aggregated metric across the portfolio.
@@ -1812,11 +1812,16 @@ export interface RollForwardReport {
   /**
    * Instruments whose carry calculation failed but did not abort the roll.
    */
-  failed_instruments: [unknown, unknown][];
+  failed_instruments: [string, string][];
   /**
    * Per-instrument carry accrual (if instruments provided), grouped by currency.
    */
-  instrument_carry: [unknown, unknown][];
+  instrument_carry: [
+    string,
+    {
+      [k: string]: Money;
+    }
+  ][];
   /**
    * New as-of date after roll.
    */
@@ -2928,7 +2933,7 @@ export interface PositionAssignment {
   /**
    * Matched `(dependency, factor_id, beta)` triples for this position.
    */
-  mappings: [unknown, unknown, unknown][];
+  mappings: [MarketDependency, Id, number][];
   /**
    * Portfolio position identifier.
    */
@@ -3922,27 +3927,27 @@ export interface SimmSensitivitiesJson {
   /**
    * Commodity delta buckets as `(bucket, amount)`.
    */
-  commodity_delta?: [unknown, unknown][];
+  commodity_delta?: [string, number][];
   /**
    * Commodity vega buckets as `(bucket, amount)`.
    */
-  commodity_vega?: [unknown, unknown][];
+  commodity_vega?: [string, number][];
   /**
    * Credit non-qualifying delta buckets as `(name, tenor, amount)`.
    */
-  credit_non_qualifying_delta?: [unknown, unknown, unknown][];
+  credit_non_qualifying_delta?: [string, string, number][];
   /**
    * Credit non-qualifying vega buckets as `(name, tenor, amount)`.
    */
-  credit_non_qualifying_vega?: [unknown, unknown, unknown][];
+  credit_non_qualifying_vega?: [string, string, number][];
   /**
    * Credit qualifying deltas as `(sector, name, tenor, amount)`.
    */
-  credit_qualifying_delta?: [unknown, unknown, unknown, unknown][];
+  credit_qualifying_delta?: [SimmCreditSector, string, string, number][];
   /**
    * Credit qualifying vegas as `(sector, name, tenor, amount)`.
    */
-  credit_qualifying_vega?: [unknown, unknown, unknown, unknown][];
+  credit_qualifying_vega?: [SimmCreditSector, string, string, number][];
   /**
    * Expiry-resolved volatility-weighted vega inputs before curvature scaling.
    */
@@ -3950,27 +3955,27 @@ export interface SimmSensitivitiesJson {
   /**
    * Equity delta buckets as `(underlier, amount)`.
    */
-  equity_delta?: [unknown, unknown][];
+  equity_delta?: [string, number][];
   /**
    * Equity vega buckets as `(underlier, amount)`.
    */
-  equity_vega?: [unknown, unknown][];
+  equity_vega?: [string, number][];
   /**
    * FX delta buckets as `(currency, amount)`.
    */
-  fx_delta?: [unknown, unknown][];
+  fx_delta?: [Currency, number][];
   /**
    * FX vega buckets as `(ccy1, ccy2, amount)`.
    */
-  fx_vega?: [unknown, unknown, unknown][];
+  fx_vega?: [Currency, Currency, number][];
   /**
    * Interest-rate delta buckets as `(currency, tenor, amount)`.
    */
-  ir_delta?: [unknown, unknown, unknown][];
+  ir_delta?: [Currency, string, number][];
   /**
    * Interest-rate vega buckets as `(currency, tenor, amount)`.
    */
-  ir_vega?: [unknown, unknown, unknown][];
+  ir_vega?: [Currency, string, number][];
 }
 /**
  * One volatility-weighted vega input before SIMM curvature scaling.
@@ -5631,7 +5636,7 @@ export interface ReplayResult {
    * run was configured for [`ReplayErrorPolicy::BestEffort`]. Empty in
    * strict mode (the run would have aborted instead).
    */
-  skipped_dates?: [unknown, unknown][];
+  skipped_dates?: [DateWire, string][];
   /**
    * Per-step output.
    */
@@ -5952,7 +5957,7 @@ export interface StressPnl {
   /**
    * Per-position P&L contributions.
    */
-  position_pnl: [unknown, unknown][];
+  position_pnl: [Id, number][];
   /**
    * Total portfolio P&L under the stressed market.
    */
@@ -5966,7 +5971,7 @@ export interface StressResult {
   /**
    * Per-position P&L contributions.
    */
-  position_pnl: [unknown, unknown][];
+  position_pnl: [Id, number][];
   /**
    * Risk decomposition recomputed under the stressed market.
    */

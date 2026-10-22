@@ -443,6 +443,7 @@ run = '''
 set -eu
 cargo build --workspace --exclude finstack-quant-py --example generate_contracts
 "${CARGO_TARGET_DIR:-target}/debug/examples/generate_contracts" --check
+node --test finstack-quant-wasm/tests/scripts/prepare_schema.test.mjs
 node finstack-quant-wasm/scripts/generate-contract-types.mjs --check
 uv run --no-sync python scripts/sync_generated_ts_index.py --check \
   || (echo 'Generated TypeScript index is out of date'; exit 1)
