@@ -251,7 +251,6 @@ impl RangeAccrualMcPricer {
             effective_upper,
             inst.terms.coupon_rate * inst.terms.accrual_year_fraction()?,
             inst.terms.notional.amount(),
-            inst.terms.notional.currency(),
             inst.terms.past_observations_in_range.unwrap_or(0),
             inst.terms.total_past_observations.unwrap_or(0),
         )?
