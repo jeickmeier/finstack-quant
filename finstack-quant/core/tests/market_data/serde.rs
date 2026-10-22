@@ -702,6 +702,50 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
 
     let state = MarketContextState::try_from(&ctx).expect("coherent market snapshot");
 
+    // Restore the same rich index directly after all referenced curves are loaded.
+    let mut without_indices = state.clone();
+    without_indices.credit_indices.clear();
+    let mut direct = MarketContext::try_from(without_indices).expect("curve-only context");
+    let credit_state = &state.credit_indices[0];
+    direct
+        .insert_credit_index_state(credit_state)
+        .expect("restore index");
+    assert_eq!(
+        serde_json::to_value(MarketContextState::try_from(&direct).expect("direct snapshot"))
+            .unwrap(),
+        serde_json::to_value(&state).unwrap(),
+    );
+    let original = direct.get_credit_index("CDX").unwrap();
+    for invalid in 0..6 {
+        let mut bad = credit_state.clone();
+        match invalid {
+            0 => bad.index_credit_curve_id = "MISSING".into(),
+            1 => bad.base_correlation_curve_id = "MISSING".into(),
+            2 => {
+                bad.issuer_credit_curve_ids
+                    .as_mut()
+                    .unwrap()
+                    .insert("ISSUER1".into(), "MISSING".into());
+            }
+            3 => bad.recovery_rate = f64::NAN,
+            4 => bad.num_constituents = 0,
+            _ => {
+                bad.issuer_weights
+                    .as_mut()
+                    .unwrap()
+                    .insert("ISSUER1".into(), 0.9);
+            }
+        }
+        assert!(
+            direct.insert_credit_index_state(&bad).is_err(),
+            "case {invalid}"
+        );
+        assert!(std::sync::Arc::ptr_eq(
+            &original,
+            &direct.get_credit_index("CDX").unwrap()
+        ));
+    }
+
     // Curves are sorted by id in the state representation.
     let ids: Vec<String> = state
         .curves

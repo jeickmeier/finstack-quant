@@ -4,7 +4,6 @@
 //! restore market contexts, including typed curve state, FX state, and scalar
 //! containers.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::contract::{
@@ -540,36 +539,7 @@ fn restore_market_context(
     }
 
     for credit_state in state.credit_indices {
-        let index_curve = ctx.get_hazard(&credit_state.index_credit_curve_id)?;
-        let base_corr = ctx.get_base_correlation(&credit_state.base_correlation_curve_id)?;
-        let issuer_curves = if let Some(issuer_ids) = credit_state.issuer_credit_curve_ids {
-            let mut map = BTreeMap::new();
-            for (issuer, curve_id) in issuer_ids {
-                let curve = ctx.get_hazard(&curve_id)?;
-                map.insert(issuer, curve);
-            }
-            Some(map)
-        } else {
-            None
-        };
-
-        let mut builder = crate::market_data::term_structures::CreditIndexData::builder()
-            .num_constituents(credit_state.num_constituents)
-            .recovery_rate(credit_state.recovery_rate)
-            .index_credit_curve(index_curve)
-            .base_correlation_curve(base_corr);
-        if let Some(issuer_curves) = issuer_curves {
-            builder = builder.issuer_curves(issuer_curves);
-        }
-        if let Some(recovery_rates) = credit_state.issuer_recovery_rates {
-            builder = builder.issuer_recovery_rates(recovery_rates);
-        }
-        if let Some(weights) = credit_state.issuer_weights {
-            builder = builder.issuer_weights(weights);
-        }
-        // Every referenced curve resolved above, so the typed insert's own
-        // rebind cannot fail here.
-        ctx.insert_credit_index_mut(credit_state.id, builder.build()?)?;
+        ctx.insert_credit_index_state(&credit_state)?;
     }
 
     for surface in state.fx_delta_vol_surfaces {
