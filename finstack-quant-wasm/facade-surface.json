@@ -737,6 +737,7 @@
       "fxMarketPair",
       "fxPairConvention",
       "fxPipSize",
+      "fxStandardSettlementDays",
       "immOptionExpiry",
       "invertFxRate",
       "isCdsDate",
@@ -1191,6 +1192,9 @@
     "statics": ["days", "fromName", "months", "weeks", "years"],
     "methods": ["free", "toString"],
     "getters": []
+  },
+  "core.fxStandardSettlementDays": {
+    "kind": "function"
   },
   "core.createDate": {
     "kind": "function"
@@ -5217,7 +5221,7 @@
   "valuations.instruments.FxForward": {
     "kind": "class",
     "constructor": false,
-    "statics": ["builder", "example", "fromJson", "fromTradeDate", "standardSettlementDays"],
+    "statics": ["builder", "example", "fromJson", "fromTradeDate"],
     "methods": [
       "free",
       "marketDependencies",

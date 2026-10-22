@@ -197,29 +197,6 @@ impl FxForward {
             .build()
     }
 
-    /// Returns the standard spot settlement days for a currency pair.
-    ///
-    /// # Market Conventions
-    ///
-    /// | Pair | Settlement | Notes |
-    /// |------|------------|-------|
-    /// | USD/CAD | T+1 | North American same-day zone |
-    /// | USD/MXN | T+2 | Standard emerging market convention |
-    /// | USD/TRY | T+1 | Istanbul market convention |
-    /// | Other | T+2 | Standard settlement |
-    ///
-    /// # Arguments
-    ///
-    /// * `base` - Base currency (foreign)
-    /// * `quote` - Quote currency (domestic)
-    ///
-    /// # Returns
-    ///
-    /// Number of business days for spot settlement (1 or 2).
-    pub fn standard_settlement_days(base: Currency, quote: Currency) -> u32 {
-        finstack_quant_core::dates::fx::fx_standard_settlement_days(base, quote)
-    }
-
     /// Construct an FX forward from trade date and tenor using joint calendar spot roll.
     ///
     /// # Arguments
@@ -236,7 +213,7 @@ impl FxForward {
     /// * `quote_calendar_id` - Optional quote currency calendar
     /// * `settlement_days` - T+N spot lag in business days (typically 2, or 1 for
     ///   USD/CAD). `None` selects the pair's market-standard lag from
-    ///   [`standard_settlement_days`](Self::standard_settlement_days).
+    ///   [`finstack_quant_core::dates::fx::fx_standard_settlement_days`].
     /// * `business_day_convention` - Business day convention used to roll the
     ///   maturity on the joint calendar. `None` selects Modified Following,
     ///   the ISDA FX settlement convention (and the `FxSpot` builder default).
@@ -257,9 +234,11 @@ impl FxForward {
         business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
+        use finstack_quant_core::dates::fx::{
+            add_fx_standard_tenor, fx_spot_date, fx_standard_settlement_days,
+        };
         let settlement_days = settlement_days
-            .unwrap_or_else(|| Self::standard_settlement_days(base_currency, quote_currency));
+            .unwrap_or_else(|| fx_standard_settlement_days(base_currency, quote_currency));
         let business_day_convention = business_day_convention
             .unwrap_or_else(finstack_quant_valuations_core::serde_defaults::bdc_modified_following);
 
@@ -864,25 +843,5 @@ mod tests {
             .unwrap();
         assert!((eur_flow.1.amount() - 1_000_000.0).abs() < 1e-10);
         assert!((usd_flow.1.amount() + 1_120_000.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn standard_spot_days_matches_core_helper() {
-        assert_eq!(
-            FxForward::standard_settlement_days(Currency::USD, Currency::CAD),
-            1
-        );
-        assert_eq!(
-            FxForward::standard_settlement_days(Currency::USD, Currency::TRY),
-            1
-        );
-        assert_eq!(
-            FxForward::standard_settlement_days(Currency::EUR, Currency::USD),
-            2
-        );
-        assert_eq!(
-            FxForward::standard_settlement_days(Currency::USD, Currency::MXN),
-            2
-        );
     }
 }
