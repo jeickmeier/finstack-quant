@@ -210,7 +210,7 @@ fn computation_results_are_structured_not_strings() {
         ("StatementsAnalyticsNamespace", "generateTornadoEntries"),
         ("FactorCovarianceForecast", "covarianceAt"),
         ("FactorCovarianceForecast", "factorModelAt"),
-        ("FxInstrument", "price"),
+        ("FxHandle", "price"),
         ("ValuationInstrumentsNamespace", "instrumentCashflows"),
         (
             "ValuationInstrumentsNamespace",
