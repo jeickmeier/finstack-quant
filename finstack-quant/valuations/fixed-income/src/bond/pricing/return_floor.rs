@@ -609,7 +609,12 @@ mod tests {
             (date!(2024 - 07 - 15), 5.0),
             (date!(2025 - 01 - 15), 5.0 + redemption),
         ];
-        let realized = finstack_quant_core::cashflow::xirr(&flows, None).unwrap();
+        let realized = finstack_quant_core::cashflow::xirr(
+            &flows,
+            finstack_quant_core::dates::DayCount::Act365F,
+            None,
+        )
+        .unwrap();
         assert!(
             (realized - 0.12).abs() < 1e-4,
             "realized XIRR {realized} != 12% (redemption {redemption})"
@@ -702,7 +707,12 @@ mod tests {
             (bond.issue_date, -bond.notional.amount()),
             (exercise_date, call.price_pct_of_par + accrued),
         ];
-        let realized = finstack_quant_core::cashflow::xirr(&flows, None).unwrap();
+        let realized = finstack_quant_core::cashflow::xirr(
+            &flows,
+            finstack_quant_core::dates::DayCount::Act365F,
+            None,
+        )
+        .unwrap();
         assert!(
             (realized - target).abs() < 1.0e-10,
             "realized XIRR {realized} must equal target {target}; clean={}, accrued={accrued}",
@@ -1098,8 +1108,12 @@ mod tests {
                     .expect("call-date accrued");
             flows.push((call.start, distribution_on_call + redemption));
 
-            let realized = finstack_quant_core::cashflow::xirr(&flows, None)
-                .unwrap_or_else(|e| panic!("XIRR solver failed at call date {}: {e}", call.start));
+            let realized = finstack_quant_core::cashflow::xirr(
+                &flows,
+                finstack_quant_core::dates::DayCount::Act365F,
+                None,
+            )
+            .unwrap_or_else(|e| panic!("XIRR solver failed at call date {}: {e}", call.start));
 
             assert!(
                 realized >= xirr_target - 1e-6,

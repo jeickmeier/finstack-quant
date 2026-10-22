@@ -3,7 +3,7 @@
 use crate::instruments::equity::real_estate::{levered_pricer, pricer, LeveredRealEstateEquity};
 use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::cashflow::xirr_with_daycount;
+use finstack_quant_core::cashflow::xirr;
 use finstack_quant_core::Error;
 
 /// Levered equity IRR (XIRR-style) from the levered equity cashflow schedule.
@@ -15,7 +15,7 @@ impl MetricCalculator for LeveredIrr {
         let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
         let flows = levered_pricer::equity_cashflows(inst, &context.curves, context.as_of)?;
-        xirr_with_daycount(flows.as_slice(), inst.irr_day_count(), None)
+        xirr(flows.as_slice(), inst.irr_day_count(), None)
     }
 }
 

@@ -12,14 +12,11 @@
 //!    evaluation points (the shared bilinear kernel regression test).
 //! 5. `Rate::from_decimal` and `Bps::try_new` reject non-finite input (the
 //!    only fallible constructors; the `TryFrom<f64>` twins were removed).
-//! 6. `xirr(flows, None)` equals
-//!    `xirr_with_daycount(flows, DayCount::Act365F, None)`.
 //!
 //! These tests lock the canonical APIs produced by the simplicity audit.
 
-use finstack_quant_core::cashflow::{xirr, xirr_with_daycount};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
 };
@@ -301,18 +298,4 @@ fn bp_try_new_rejects_non_finite() {
     assert_eq!(Bps::try_new(25.0).unwrap().as_bp(), 25);
     assert!(Bps::try_new(f64::NAN).is_err());
     assert!(Bps::try_new(f64::INFINITY).is_err());
-}
-
-// XIRR: xirr() delegation to xirr_with_daycount(Act365F)
-
-#[test]
-fn xirr_trait_matches_daycount_helper_on_act365f_default() {
-    let flows = [
-        (d(2024, 1, 1), -100_000.0),
-        (d(2024, 7, 1), 50_000.0),
-        (d(2025, 1, 1), 60_000.0),
-    ];
-    let a = xirr(&flows, None).expect("xirr converges");
-    let b = xirr_with_daycount(&flows, DayCount::Act365F, None).expect("daycount helper converges");
-    assert_eq!(a, b, "XIRR parity mismatch");
 }

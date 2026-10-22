@@ -3,7 +3,7 @@
 //! Brent root finding, XIRR/IRR, and Levenberg-Marquardt system solves.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::cashflow::{irr, xirr, xirr_with_daycount};
+use finstack_quant_core::cashflow::{irr, xirr};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver;
@@ -100,7 +100,7 @@ fn benchmark_xirr_performance(c: &mut Criterion) {
         BenchmarkId::new("simple", "2_flows"),
         &simple_flows,
         |b, flows| {
-            b.iter(|| xirr(black_box(flows), None).expect("Should converge"));
+            b.iter(|| xirr(black_box(flows), DayCount::Act365F, None).expect("Should converge"));
         },
     );
 
@@ -108,7 +108,7 @@ fn benchmark_xirr_performance(c: &mut Criterion) {
         BenchmarkId::new("complex", "6_flows"),
         &complex_flows,
         |b, flows| {
-            b.iter(|| xirr(black_box(flows), None).expect("Should converge"));
+            b.iter(|| xirr(black_box(flows), DayCount::Act365F, None).expect("Should converge"));
         },
     );
 
@@ -131,15 +131,13 @@ fn benchmark_xirr_daycount_variants(c: &mut Criterion) {
 
     group.bench_function("act365f", |b| {
         b.iter(|| {
-            xirr_with_daycount(black_box(&flows), black_box(DayCount::Act365F), None)
-                .expect("Should converge")
+            xirr(black_box(&flows), black_box(DayCount::Act365F), None).expect("Should converge")
         })
     });
 
     group.bench_function("act360", |b| {
         b.iter(|| {
-            xirr_with_daycount(black_box(&flows), black_box(DayCount::Act360), None)
-                .expect("Should converge")
+            xirr(black_box(&flows), black_box(DayCount::Act360), None).expect("Should converge")
         })
     });
 

@@ -13,7 +13,7 @@
 //! - Hull - *Options, Futures, and Other Derivatives* (10th ed), Chapter 4
 //! - Microsoft Excel XIRR function specification
 
-use finstack_quant_core::cashflow::{irr, xirr, xirr_with_daycount};
+use finstack_quant_core::cashflow::{irr, xirr};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::Error;
 use time::Month;
@@ -74,7 +74,7 @@ fn xirr_brealey_myers_three_year_annuity() {
         (d(2027, 1, 1), 400.0),
     ];
 
-    let result = xirr(&flows, None).expect("XIRR calculation should succeed");
+    let result = xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed");
 
     // Verify NPV at computed rate is approximately zero
     let npv_at_irr = compute_dated_npv(&flows, result);
@@ -103,7 +103,7 @@ fn xirr_brealey_myers_three_year_annuity() {
 fn xirr_hull_simple_annual_return() {
     let flows = vec![(d(2025, 1, 1), -1000.0), (d(2026, 1, 1), 1100.0)];
 
-    let result = xirr(&flows, None).expect("XIRR calculation should succeed");
+    let result = xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed");
 
     // 2025 is not a leap year, so year fraction = 365/365 = 1.0
     // Expected: (1100/1000)^(1/1) - 1 = 0.10
@@ -142,7 +142,7 @@ fn xirr_gips_pe_j_curve() {
         (d(2024, 1, 1), 800_000.0),  // Exit distribution
     ];
 
-    let result = xirr(&flows, None).expect("XIRR calculation should succeed");
+    let result = xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed");
 
     // Verify NPV at computed rate is approximately zero
     let npv_at_irr = compute_dated_npv(&flows, result);
@@ -172,7 +172,7 @@ fn xirr_gips_vc_high_return() {
         (d(2023, 7, 1), 500_000.0), // 1.5 years later
     ];
 
-    let result = xirr(&flows, None).expect("XIRR calculation should succeed");
+    let result = xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed");
 
     // Verify NPV at computed rate is approximately zero
     let npv_at_irr = compute_dated_npv(&flows, result);
@@ -208,7 +208,7 @@ fn xirr_excel_quarterly_returns() {
         (d(2025, 1, 15), 2_750.0),
     ];
 
-    let result = xirr(&flows, None).expect("XIRR calculation should succeed");
+    let result = xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed");
 
     // Verify NPV at computed rate is approximately zero
     let npv_at_irr = compute_dated_npv(&flows, result);
@@ -241,7 +241,7 @@ fn xirr_excel_irregular_dates() {
         (d(2025, 6, 15), 25_000.0),
     ];
 
-    let result = xirr(&flows, None).expect("XIRR calculation should succeed");
+    let result = xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed");
 
     // Verify NPV at computed rate is approximately zero
     let npv_at_irr = compute_dated_npv(&flows, result);
@@ -270,10 +270,10 @@ fn xirr_daycount_act365f_vs_act360() {
         (d(2024, 7, 1), 102_500.0), // 6-month return
     ];
 
-    let result_365 = xirr_with_daycount(&flows, DayCount::Act365F, None)
-        .expect("XIRR with Act/365F should succeed");
-    let result_360 = xirr_with_daycount(&flows, DayCount::Act360, None)
-        .expect("XIRR with Act/360 should succeed");
+    let result_365 =
+        xirr(&flows, DayCount::Act365F, None).expect("XIRR with Act/365F should succeed");
+    let result_360 =
+        xirr(&flows, DayCount::Act360, None).expect("XIRR with Act/360 should succeed");
 
     // Both should be positive returns
     assert!(result_365 > 0.0, "Act/365F result should be positive");
@@ -300,7 +300,7 @@ fn xirr_daycount_act365f_vs_act360() {
 fn xirr_breakeven_zero_return() {
     let flows = [(d(2024, 1, 1), -100_000.0), (d(2025, 1, 1), 100_000.0)];
 
-    let result = xirr(&flows, None).expect("XIRR calculation should succeed");
+    let result = xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed");
 
     // Should be exactly 0% return
     // 2024 is leap year: 366 days, so year fraction = 366/365
@@ -320,7 +320,7 @@ fn xirr_same_day_instant_return() {
     // This should return a typed error (no panic).
     let flows = [(d(2024, 6, 15), -100_000.0), (d(2024, 6, 15), 110_000.0)];
 
-    let result = xirr(&flows, None);
+    let result = xirr(&flows, DayCount::Act365F, None);
     assert!(
         result.is_err(),
         "Same-day cashflows have constant NPV and should not yield a defined IRR"
@@ -350,7 +350,7 @@ fn xirr_long_duration_30_years() {
         (d(2054, 1, 1), 500_000.0), // 30 years later
     ];
 
-    let result = xirr(&flows, None).expect("XIRR calculation should succeed");
+    let result = xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed");
 
     // Verify NPV at computed rate is approximately zero
     let npv_at_irr = compute_dated_npv(&flows, result);
@@ -554,7 +554,7 @@ fn xirr_handles_very_short_duration() {
         (d(2025, 1, 8), 101_000.0), // 1% return in 1 week
     ];
 
-    let result = xirr(&flows, None);
+    let result = xirr(&flows, DayCount::Act365F, None);
     let irr = result.expect("Short duration XIRR should converge");
 
     // 1% return in 1 week ≈ 67% annualized (approximately (1.01)^52 - 1)
@@ -582,7 +582,7 @@ fn xirr_handles_same_day_multiple_flows() {
         (d(2026, 1, 1), 110_000.0),
     ];
 
-    let result = xirr(&flows, None);
+    let result = xirr(&flows, DayCount::Act365F, None);
     let irr = result.expect("Same-day flows XIRR should converge");
 
     // Total: -100K, +110K over 1 year = 10% return
@@ -609,7 +609,7 @@ fn xirr_handles_distant_horizon() {
         (d(2075, 1, 1), 1_000_000.0), // 10x over 50 years
     ];
 
-    let result = xirr(&flows, None);
+    let result = xirr(&flows, DayCount::Act365F, None);
     let irr = result.expect("Long horizon XIRR should converge");
 
     // 10x over 50 years: IRR = 10^(1/t) - 1 where t is the Act/365F year fraction.
@@ -669,14 +669,14 @@ fn irr_rejects_all_negative_cashflows() {
 #[test]
 fn xirr_rejects_single_flow() {
     let flows = [(d(2025, 1, 1), -100_000.0)];
-    let result = xirr(&flows, None);
+    let result = xirr(&flows, DayCount::Act365F, None);
     assert!(result.is_err(), "Single dated flow should error");
 }
 
 #[test]
 fn xirr_rejects_all_same_sign() {
     let flows = [(d(2025, 1, 1), 100_000.0), (d(2026, 1, 1), 200_000.0)];
-    let result = xirr(&flows, None);
+    let result = xirr(&flows, DayCount::Act365F, None);
     assert!(result.is_err(), "All same sign flows should error");
 }
 
@@ -688,7 +688,8 @@ fn xirr_rejects_unsorted_multi_sign_change_flows_after_sorting() {
         (d(2027, 1, 1), -175.0),
     ];
 
-    let error = xirr(&flows, None).expect_err("time-ordered net flows have two sign changes");
+    let error = xirr(&flows, DayCount::Act365F, None)
+        .expect_err("time-ordered net flows have two sign changes");
     assert!(error.to_string().contains("exactly one sign change"));
 }
 
@@ -700,8 +701,8 @@ fn xirr_ignores_zero_flows_when_detecting_sign_changes() {
         (d(2026, 1, 1), 120.0),
     ];
 
-    let result =
-        xirr(&flows, None).expect("zero-valued intermediate flows should not create ambiguity");
+    let result = xirr(&flows, DayCount::Act365F, None)
+        .expect("zero-valued intermediate flows should not create ambiguity");
     let npv_at_irr = compute_dated_npv(&flows, result);
     assert!(
         npv_at_irr.abs() < 0.01,

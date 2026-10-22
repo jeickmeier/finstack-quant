@@ -2,7 +2,7 @@
 //!
 //! This module provides:
 //! - `irr` for periodic cashflows (`[f64]`): Standard IRR
-//! - `xirr` / `xirr_with_daycount` for irregular
+//! - `xirr` for irregular
 //!   cashflows (`[(Date, f64)]`): XIRR (Extended internal rate of return)
 //!
 //! # Mathematical Foundation
@@ -13,7 +13,7 @@
 //! Σ CF_i / (1 + r)^t_i = 0  (irregular, XIRR)
 //! ```
 //!
-//! XIRR uses a day count convention (defaulting to Act/365F) to calculate year fractions.
+//! XIRR uses the supplied day-count convention to calculate year fractions.
 //!
 //! # Unique-Return Contract
 //!
@@ -100,56 +100,9 @@ pub fn irr(cashflows: &[f64], guess: Option<f64>) -> crate::Result<f64> {
     )
 }
 
-/// Calculate XIRR for dated cashflows using the default `Act365F` convention.
-///
-/// XIRR nets flows by date, measures each remaining date from the earliest
-/// nonzero net dated flow, and solves for an annualized decimal rate. Prefer
-/// [`xirr_with_daycount`] when the valuation convention should be explicit at
-/// the call site.
-///
-/// # Arguments
-///
-/// - `cashflows`: `(date, amount)` pairs with finite amounts. The input may be
-///   unsorted; same-date flows are netted and zero net dates are ignored before
-///   selecting the time origin. Net flows must have exactly one sign change.
-/// - `guess`: Optional finite decimal annual rate greater than -1 used to
-///   split the search bracket. `None` uses 10%; it does not select a root.
-///
-/// # Returns
-///
-/// Returns the annualized rate `r` that makes the dated NPV approximately zero
-/// under `Act365F` year fractions.
-///
-/// # Errors
-///
-/// Returns an error if an amount or net amount is non-finite, there are fewer
-/// than two nonzero net flows, there is not exactly one net sign change, the
-/// guess is non-finite or at most -1, a day-count calculation fails, or no
-/// sufficiently accurate finite rate greater than -1 can be found.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::cashflow::xirr;
-/// use finstack_quant_core::dates::create_date;
-/// use time::Month;
-///
-/// let flows = [
-///     (create_date(2025, Month::January, 1)?, -100.0),
-///     (create_date(2026, Month::January, 1)?, 110.0),
-/// ];
-/// let rate = xirr(&flows, None)?;
-/// assert!((rate - 0.10).abs() < 1e-8);
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-#[inline]
-pub fn xirr(cashflows: &[(Date, f64)], guess: Option<f64>) -> crate::Result<f64> {
-    xirr_with_daycount(cashflows, DayCount::Act365F, guess)
-}
-
 /// Calculate XIRR for dated cashflows with an explicit day-count convention.
 ///
-/// Use this overload when the annualization basis matters for pricing,
+/// The explicit day-count convention controls annualization for pricing,
 /// reporting, or reconciliation.
 ///
 /// # Arguments
@@ -179,7 +132,7 @@ pub fn xirr(cashflows: &[(Date, f64)], guess: Option<f64>) -> crate::Result<f64>
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::cashflow::xirr_with_daycount;
+/// use finstack_quant_core::cashflow::xirr;
 /// use finstack_quant_core::dates::{create_date, DayCount};
 /// use time::Month;
 ///
@@ -187,15 +140,11 @@ pub fn xirr(cashflows: &[(Date, f64)], guess: Option<f64>) -> crate::Result<f64>
 ///     (create_date(2025, Month::January, 1)?, -100.0),
 ///     (create_date(2026, Month::January, 1)?, 110.0),
 /// ];
-/// let rate = xirr_with_daycount(&flows, DayCount::Act365F, None)?;
+/// let rate = xirr(&flows, DayCount::Act365F, None)?;
 /// assert!((rate - 0.10).abs() < 1e-8);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-pub fn xirr_with_daycount(
-    flows: &[(Date, f64)],
-    day_count: DayCount,
-    guess: Option<f64>,
-) -> crate::Result<f64> {
+pub fn xirr(flows: &[(Date, f64)], day_count: DayCount, guess: Option<f64>) -> crate::Result<f64> {
     let ctx = DayCountContext::default();
     if flows.len() < 2 {
         return Err(crate::Error::Validation(
@@ -526,13 +475,19 @@ mod tests {
         let d1 = create_date(2031, Month::January, 1).expect("date");
         let d2 = create_date(2032, Month::January, 1).expect("date");
 
-        let expected = xirr(&[(d0, -100.0), (d1, 110.0)], None).expect("valid root");
-        let actual = xirr(&[(early, 0.0), (d0, -100.0), (d1, 110.0)], None)
-            .expect("zero amount does not change the root");
+        let expected =
+            xirr(&[(d0, -100.0), (d1, 110.0)], DayCount::Act365F, None).expect("valid root");
+        let actual = xirr(
+            &[(early, 0.0), (d0, -100.0), (d1, 110.0)],
+            DayCount::Act365F,
+            None,
+        )
+        .expect("zero amount does not change the root");
         assert!((actual - expected).abs() < 1e-12);
 
         assert!(xirr(
             &[(early, 0.0), (d0, -100.0), (d1, 100.0), (d2, -100.0)],
+            DayCount::Act365F,
             None
         )
         .is_err());
@@ -551,7 +506,7 @@ mod tests {
         ] {
             let mut flows = prefix;
             flows.extend([(d0, -100.0), (d1, 110.0)]);
-            let rate = xirr_with_daycount(&flows, DayCount::Thirty360, None)
+            let rate = xirr(&flows, DayCount::Thirty360, None)
                 .expect("net-zero date does not affect the origin");
             assert!((rate - expected).abs() < 1e-8);
         }
@@ -572,7 +527,11 @@ mod tests {
         ] {
             let mut flows: Vec<_> = order.into_iter().map(|i| (d0, amounts[i])).collect();
             flows.push((d1, 1.1));
-            assert!((xirr(&flows, None).expect("compensated net outflow") - 0.1).abs() < 1e-8);
+            assert!(
+                (xirr(&flows, DayCount::Act365F, None).expect("compensated net outflow") - 0.1)
+                    .abs()
+                    < 1e-8
+            );
         }
     }
 
@@ -582,8 +541,8 @@ mod tests {
         let same_time = create_date(2025, Month::January, 31).expect("date");
         let d1 = create_date(2026, Month::January, 30).expect("date");
         let flows = [(d0, -1e16), (same_time, -1.0), (same_time, 1e16), (d1, 1.1)];
-        let rate = xirr_with_daycount(&flows, DayCount::Thirty360, None)
-            .expect("compensated net time-zero outflow");
+        let rate =
+            xirr(&flows, DayCount::Thirty360, None).expect("compensated net time-zero outflow");
         assert!((rate - 0.1).abs() < 1e-8);
     }
 
@@ -635,7 +594,7 @@ mod tests {
                 110_000.0,
             ),
         ];
-        let xirr_res = xirr(&dated_flows, None).expect("XIRR failed");
+        let xirr_res = xirr(&dated_flows, DayCount::Act365F, None).expect("XIRR failed");
         let expected = (1.1_f64).powf(365.0 / 366.0) - 1.0;
         assert!((xirr_res - expected).abs() < 1e-6);
     }
@@ -653,7 +612,8 @@ mod tests {
             ),
         ];
 
-        let result = xirr(&flows, None).expect("XIRR calculation should succeed in test");
+        let result =
+            xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed in test");
         let expected = (1.1_f64).powf(365.0 / 366.0) - 1.0;
         assert!((result - expected).abs() < 1e-6);
     }
@@ -675,7 +635,8 @@ mod tests {
             ),
         ];
 
-        let result = xirr(&flows, None).expect("XIRR calculation should succeed in test");
+        let result =
+            xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed in test");
         assert!(result > 0.1 && result < 0.2);
     }
 
@@ -694,8 +655,10 @@ mod tests {
         let mut unsorted = sorted.to_vec();
         unsorted.reverse();
 
-        let r1 = xirr(&sorted, None).expect("XIRR calculation should succeed in test");
-        let r2 = xirr(&unsorted, None).expect("XIRR calculation should succeed in test");
+        let r1 = xirr(&sorted, DayCount::Act365F, None)
+            .expect("XIRR calculation should succeed in test");
+        let r2 = xirr(&unsorted, DayCount::Act365F, None)
+            .expect("XIRR calculation should succeed in test");
         assert!((r1 - r2).abs() < 1e-8);
     }
 
@@ -712,7 +675,8 @@ mod tests {
             ),
         ];
 
-        let result = xirr(&flows, None).expect("XIRR calculation should succeed in test");
+        let result =
+            xirr(&flows, DayCount::Act365F, None).expect("XIRR calculation should succeed in test");
         let expected = (0.9_f64).powf(365.0 / 366.0) - 1.0;
         assert!((result - expected).abs() < 1e-6);
     }
@@ -730,7 +694,7 @@ mod tests {
             ),
         ];
 
-        let result = xirr(&flows, None);
+        let result = xirr(&flows, DayCount::Act365F, None);
         assert!(result.is_err());
     }
 
@@ -741,28 +705,8 @@ mod tests {
             -100_000.0,
         )];
 
-        let result = xirr(&flows, None);
+        let result = xirr(&flows, DayCount::Act365F, None);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_xirr_with_daycount_act365f() {
-        let flows = [
-            (
-                create_date(2024, Month::January, 1).expect("Valid test date"),
-                -100_000.0,
-            ),
-            (
-                create_date(2025, Month::January, 1).expect("Valid test date"),
-                110_000.0,
-            ),
-        ];
-
-        let result1 = xirr(&flows, None).expect("XIRR calculation should succeed in test");
-        let result2 = xirr_with_daycount(&flows, DayCount::Act365F, None)
-            .expect("XIRR with Act/365F should succeed in test");
-
-        assert!((result1 - result2).abs() < 1e-12);
     }
 
     /// IRR is scale-invariant: a 1e9-notional stream must converge to the
@@ -777,8 +721,9 @@ mod tests {
         let unit = [(d0, -1.0), (d1, 0.03), (d2, 1.05)];
         let large = [(d0, -1.0e9), (d1, 0.03e9), (d2, 1.05e9)];
 
-        let r_unit = xirr(&unit, None).expect("unit-scale XIRR should converge");
-        let r_large = xirr(&large, None).expect("1e9-notional XIRR should converge");
+        let r_unit = xirr(&unit, DayCount::Act365F, None).expect("unit-scale XIRR should converge");
+        let r_large =
+            xirr(&large, DayCount::Act365F, None).expect("1e9-notional XIRR should converge");
 
         assert!(
             (r_unit - r_large).abs() < 1e-10,
@@ -796,8 +741,9 @@ mod tests {
         let unit = [(d0, -1.0), (d1, 12.0)]; // ~1100% annual return
         let large = [(d0, -1.0e9), (d1, 12.0e9)];
 
-        let r_unit = xirr(&unit, None).expect("unit-scale XIRR should converge");
-        let r_large = xirr(&large, None).expect("large-scale XIRR should converge");
+        let r_unit = xirr(&unit, DayCount::Act365F, None).expect("unit-scale XIRR should converge");
+        let r_large =
+            xirr(&large, DayCount::Act365F, None).expect("large-scale XIRR should converge");
 
         assert!(r_unit > 10.0, "expected ~1100% IRR, got {r_unit}");
         assert!(
@@ -823,7 +769,8 @@ mod tests {
             ),
         ];
 
-        let error = xirr(&flows, Some(0.10)).expect_err("ambiguous return is rejected");
+        let error =
+            xirr(&flows, DayCount::Act365F, Some(0.10)).expect_err("ambiguous return is rejected");
         assert!(error.to_string().contains("exactly one sign change"));
     }
 
@@ -852,7 +799,7 @@ mod tests {
             .enumerate()
             .map(|(i, &amount)| (start + time::Duration::days(365 * i as i64), amount))
             .collect();
-        assert!(xirr(&dated, None).is_err());
+        assert!(xirr(&dated, DayCount::Act365F, None).is_err());
     }
 
     #[test]
@@ -865,7 +812,7 @@ mod tests {
             for guess in [None, Some(-0.99), Some(100.0)] {
                 let rate = irr(&amounts, guess).expect("unique finite return");
                 assert!(((1.0 + rate) / expected_growth - 1.0).abs() < 1e-8);
-                let dated = xirr(&[(start, -100.0), (end, payoff)], guess)
+                let dated = xirr(&[(start, -100.0), (end, payoff)], DayCount::Act365F, guess)
                     .expect("dated unique finite return");
                 assert!(((1.0 + dated) / expected_growth - 1.0).abs() < 1e-8);
             }

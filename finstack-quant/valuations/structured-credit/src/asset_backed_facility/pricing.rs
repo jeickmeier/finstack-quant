@@ -369,7 +369,11 @@ impl AssetBackedFacility {
                 .into_iter()
                 .map(|(date, amount)| (date, amount.amount())),
         );
-        finstack_quant_core::cashflow::xirr(&flows, None)
+        finstack_quant_core::cashflow::xirr(
+            &flows,
+            finstack_quant_core::dates::DayCount::Act365F,
+            None,
+        )
     }
 }
 

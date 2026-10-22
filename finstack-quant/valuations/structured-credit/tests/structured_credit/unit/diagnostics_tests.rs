@@ -191,7 +191,12 @@ fn equity_irr_reproduces_xirr_of_the_equity_flows() {
             .iter()
             .map(|(date, amount)| (*date, amount.amount())),
     );
-    let expected = finstack_quant_core::cashflow::xirr(&flows, None).expect("xirr");
+    let expected = finstack_quant_core::cashflow::xirr(
+        &flows,
+        finstack_quant_core::dates::DayCount::Act365F,
+        None,
+    )
+    .expect("xirr");
 
     assert_eq!(metrics.tranche_id, "E");
     assert_eq!(metrics.invested, 25_000_000.0);

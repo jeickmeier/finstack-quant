@@ -11,7 +11,7 @@
 //!   **Note:** these exclude flows dated on or before the valuation date
 //!   (market-standard pricing semantics).
 //! - Use [`crate::cashflow::irr`] for periodic cashflows and
-//!   [`crate::cashflow::xirr`] / [`crate::cashflow::xirr_with_daycount`]
+//!   [`crate::cashflow::xirr`]
 //!   for dated cashflows when the
 //!   unknown quantity is the rate that makes NPV equal to zero.
 //!
@@ -90,4 +90,4 @@ mod xirr;
 
 pub use discounting::{flat_discount_factor, npv, npv_amounts_with_curve};
 pub use primitives::{CFKind, CashFlow, CashFlowAccrual};
-pub use xirr::{irr, xirr, xirr_with_daycount};
+pub use xirr::{irr, xirr};

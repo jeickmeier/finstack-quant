@@ -10,7 +10,7 @@
 //! - **IRR**: Tests for `irr()` and `irr_with_daycount()`
 //! - **Quadrature**: Tests for `GaussHermiteQuadrature::new()`
 
-use finstack_quant_core::cashflow::{irr, npv, xirr_with_daycount};
+use finstack_quant_core::cashflow::{irr, npv, xirr};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
@@ -195,7 +195,7 @@ mod irr_tests {
         ];
 
         for flows in test_cases {
-            let rate = xirr_with_daycount(&flows, DayCount::Act365F, None).unwrap();
+            let rate = xirr(&flows, DayCount::Act365F, None).unwrap();
             // All test cases have positive returns
             assert!(rate > 0.0, "IRR should be positive for these flows");
         }
@@ -206,8 +206,8 @@ mod irr_tests {
     fn irr_day_count_affects_result() {
         let flows: Vec<(Date, f64)> = vec![(d(2024, 1, 1), -100_000.0), (d(2024, 7, 1), 102_500.0)];
 
-        let irr_365f = xirr_with_daycount(&flows, DayCount::Act365F, None).unwrap();
-        let irr_360 = xirr_with_daycount(&flows, DayCount::Act360, None).unwrap();
+        let irr_365f = xirr(&flows, DayCount::Act365F, None).unwrap();
+        let irr_360 = xirr(&flows, DayCount::Act360, None).unwrap();
 
         // Different day counts should produce different rates
         assert!(

@@ -183,7 +183,7 @@ impl MetricCalculator for CarryAccruedCalculator {
 /// Calculate the LP/fund IRR for dated currency cashflows.
 ///
 /// Thin adapter over the canonical
-/// [`xirr_with_daycount`](finstack_quant_core::cashflow::xirr_with_daycount)
+/// [`xirr`](finstack_quant_core::cashflow::xirr)
 /// solver. It drops currency from the `Money` amounts — the IRR is a pure scalar
 /// root of NPV — and measures cashflow times with `day_count` from the earliest
 /// flow. Both the discount form `(1 + r)^{-t}` and multi-root handling
@@ -203,7 +203,7 @@ impl MetricCalculator for CarryAccruedCalculator {
 /// # Errors
 ///
 /// Propagates errors from
-/// [`xirr_with_daycount`](finstack_quant_core::cashflow::xirr_with_daycount):
+/// [`xirr`](finstack_quant_core::cashflow::xirr):
 /// fewer than two cashflows, no sign change in the cashflow stream, a day-count
 /// failure on any flow date, or no valid root.
 pub(crate) fn calculate_irr(
@@ -211,7 +211,7 @@ pub(crate) fn calculate_irr(
     day_count: DayCount,
 ) -> finstack_quant_core::Result<f64> {
     let dated: Vec<(Date, f64)> = flows.iter().map(|(d, m)| (*d, m.amount())).collect();
-    finstack_quant_core::cashflow::xirr_with_daycount(&dated, day_count, None)
+    finstack_quant_core::cashflow::xirr(&dated, day_count, None)
 }
 
 /// Register all private markets fund metrics.

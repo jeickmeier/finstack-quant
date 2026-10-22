@@ -81,7 +81,7 @@ pub(crate) fn ytm_from_schedule(
             .filter(|cf| cf.date > settlement && cf.kind.is_cash_settlement())
             .map(|cf| (cf.date, cf.amount.amount())),
     );
-    finstack_quant_core::cashflow::xirr_with_daycount(&flows, day_count, None)
+    finstack_quant_core::cashflow::xirr(&flows, day_count, None)
 }
 
 /// Contractual floating margin of `spec` as a decimal (`spread_bp × 1e-4`).
@@ -405,8 +405,7 @@ pub fn oid_eir_schedule_from_flows(
         .map(|(d, b)| (*d, b.total))
         .filter(|(_, amt)| amt.abs() > 0.0)
         .collect();
-    let effective_rate =
-        finstack_quant_core::cashflow::xirr_with_daycount(flows.as_slice(), day_count, None)?;
+    let effective_rate = finstack_quant_core::cashflow::xirr(flows.as_slice(), day_count, None)?;
 
     let mut periods = Vec::new();
     let mut iter = buckets.iter();
