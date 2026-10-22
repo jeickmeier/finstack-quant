@@ -232,23 +232,16 @@ impl JsFxDeltaVolSurface {
         rr10d: Option<JsValue>,
         bf10d: Option<JsValue>,
     ) -> Result<JsFxDeltaVolSurface, JsValue> {
-        let expiries: &[f64] = &js_f64_seq(&expiries, "expiries")?;
-        let atm_vols: &[f64] = &js_f64_seq(&atm_vols, "atmVols")?;
-        let rr25d: &[f64] = &js_f64_seq(&rr25d, "rr25d")?;
-        let bf25d: &[f64] = &js_f64_seq(&bf25d, "bf25d")?;
+        let expiries = js_f64_seq(&expiries, "expiries")?;
+        let atm_vols = js_f64_seq(&atm_vols, "atmVols")?;
+        let rr25d = js_f64_seq(&rr25d, "rr25d")?;
+        let bf25d = js_f64_seq(&bf25d, "bf25d")?;
         let rr10d = js_opt_f64_seq(rr10d.as_ref(), "rr10d")?;
         let bf10d = js_opt_f64_seq(bf10d.as_ref(), "bf10d")?;
         let id: &str = &js_string(&id, "id")?;
-        let surface = RustFxDeltaVolSurface::new(
-            id,
-            expiries.to_vec(),
-            atm_vols.to_vec(),
-            rr25d.to_vec(),
-            bf25d.to_vec(),
-            rr10d,
-            bf10d,
-        )
-        .map_err(to_js_err)?;
+        let surface =
+            RustFxDeltaVolSurface::new(id, expiries, atm_vols, rr25d, bf25d, rr10d, bf10d)
+                .map_err(to_js_err)?;
         Ok(Self {
             inner: Arc::new(surface),
         })
