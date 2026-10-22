@@ -30,12 +30,13 @@ use crate::bindings::core::market_data::curves::{
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::local_vol::LocalVolSurface;
 use finstack_quant_models::volatility::sabr::{
-    SabrCalibrator, SabrParameters, SabrShift, SabrSmile,
+    SabrCalibrationOutcome, SabrCalibrator, SabrParameters, SabrShift, SabrSmile,
 };
 use finstack_quant_models::volatility::svi::{calibrate_svi as rust_calibrate_svi, SviParams};
 use finstack_quant_models::volatility::VolatilityConvention;
@@ -246,6 +247,71 @@ impl PySabrParameters {
 }
 
 wire_methods!(PySabrParameters, SabrParameters, "SabrParameters");
+
+#[pyclass(
+    name = "SabrCalibrationOutcome",
+    module = "finstack_quant.models.volatility",
+    frozen,
+    from_py_object
+)]
+#[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome")]
+#[derive(Clone)]
+pub struct PySabrCalibrationOutcome {
+    pub(crate) inner: SabrCalibrationOutcome,
+}
+
+#[pymethods]
+impl PySabrCalibrationOutcome {
+    #[getter]
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.parameters")]
+    fn parameters(&self) -> PySabrParameters {
+        PySabrParameters {
+            inner: self.inner.parameters.clone(),
+        }
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.total_iterations")]
+    fn total_iterations(&self) -> usize {
+        self.inner.total_iterations
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.winning_iterations")]
+    fn winning_iterations(&self) -> usize {
+        self.inner.winning_iterations
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.residual_evaluations")]
+    fn residual_evaluations(&self) -> usize {
+        self.inner.residual_evaluations
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.winning_start")]
+    fn winning_start(&self) -> [f64; 3] {
+        self.inner.winning_start
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.quote_errors")]
+    fn quote_errors(&self) -> Vec<f64> {
+        self.inner.quote_errors.clone()
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.max_relative_quote_error")]
+    fn max_relative_quote_error(&self) -> f64 {
+        self.inner.max_relative_quote_error
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.parameters_at_bounds")]
+    fn parameters_at_bounds(&self) -> Vec<String> {
+        self.inner.parameters_at_bounds.clone()
+    }
+}
 
 /// Volatility smile generator for a fixed ``(forward, t)`` pair.
 ///
@@ -542,7 +608,8 @@ impl PySabrCalibrator {
     /// strikes : list[float]
     ///     Strikes at which market vols are quoted.
     /// market_vols : list[float]
-    ///     Observed Black implied volatilities at each strike.
+    ///     Decimal normal volatilities for beta near zero, or annual Black
+    ///     volatilities in relative decimals otherwise.
     /// t : float
     ///     Time to expiry in years.
     /// beta : float
@@ -552,8 +619,8 @@ impl PySabrCalibrator {
     ///
     /// Returns
     /// -------
-    /// SabrParameters
-    ///     Calibrated parameters (``beta`` fixed to the input value).
+    /// SabrCalibrationOutcome
+    ///     Calibrated parameters, signed quote errors, and deterministic solver diagnostics.
     fn calibrate(
         &self,
         py: Python<'_>,
@@ -562,12 +629,12 @@ impl PySabrCalibrator {
         market_vols: Vec<f64>,
         t: f64,
         beta: f64,
-    ) -> PyResult<PySabrParameters> {
+    ) -> PyResult<PySabrCalibrationOutcome> {
         py.detach(|| {
             self.inner
                 .calibrate(forward, &strikes, &market_vols, t, beta)
         })
-        .map(|inner| PySabrParameters { inner })
+        .map(|inner| PySabrCalibrationOutcome { inner })
         .map_err(core_to_py)
     }
 
@@ -1341,6 +1408,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySabrParameters>()?;
     m.add_class::<PySabrSmile>()?;
     m.add_class::<PySabrCalibrator>()?;
+    m.add_class::<PySabrCalibrationOutcome>()?;
     m.add_class::<PySviParams>()?;
     m.add_class::<PyLocalVolSurface>()?;
     m.add_function(wrap_pyfunction!(calibrate_svi, &m)?)?;
@@ -1372,6 +1440,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             [
                 "ArbitrageReport",
                 "LocalVolSurface",
+                "SabrCalibrationOutcome",
                 "SabrCalibrator",
                 "SabrParameters",
                 "SabrSmile",

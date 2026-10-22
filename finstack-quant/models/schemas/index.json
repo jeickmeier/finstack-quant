@@ -712,6 +712,15 @@
       "type_name": "RoughHestonParams"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/sabr_calibration_outcome.schema.json",
+      "bytes": 4199,
+      "kind": "output",
+      "path": "schemas/models/1/sabr_calibration_outcome.schema.json",
+      "summary": "Calibrated SABR parameters and deterministic solver diagnostics.",
+      "title": "SabrCalibrationOutcome",
+      "type_name": "SabrCalibrationOutcome"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/sabr_parameters.schema.json",
       "bytes": 2049,
       "kind": "input",
