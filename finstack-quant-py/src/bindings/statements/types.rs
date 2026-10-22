@@ -193,22 +193,20 @@ impl PyForecastMethod {
         }
     }
 
-    /// Canonical snake_case wire discriminant (``"growth_pct"``,
-    /// ``"log_normal"``, ``"override"``, ...), derived from the Rust serde
-    /// rename so the string can never drift from the JSON schema.
+    #[doc = pydoc!("finstack_quant.statements", "ForecastMethod.kind")]
     #[getter]
-    fn kind(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner)
+    fn kind(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner)
     }
 
     /// Return the canonical snake_case discriminant (same as ``kind``).
-    fn __str__(&self) -> String {
+    fn __str__(&self) -> PyResult<String> {
         self.kind()
     }
 
     /// Return ``ForecastMethod('growth_pct')`` style representation.
-    fn __repr__(&self) -> String {
-        format!("ForecastMethod({:?})", self.kind())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("ForecastMethod({:?})", self.kind()?))
     }
 }
 
@@ -544,7 +542,7 @@ impl PyForecastSpec {
     }
 
     /// Return ``ForecastSpec(method='growth_pct', params={'rate': 0.05})``.
-    fn __repr__(&self) -> String {
+    fn __repr__(&self) -> PyResult<String> {
         let params = serde_json::Value::Object(
             self.inner
                 .params
@@ -552,11 +550,11 @@ impl PyForecastSpec {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
         );
-        format!(
+        Ok(format!(
             "ForecastSpec(method={:?}, params={})",
-            crate::bindings::statements_analytics::serde_variant_str(&self.inner.method),
+            crate::bindings::extract::label(&self.inner.method)?,
             super::python_literal(&params)
-        )
+        ))
     }
 }
 
@@ -626,22 +624,20 @@ impl PyNodeType {
         }
     }
 
-    /// The canonical snake_case wire discriminant (``"value"``,
-    /// ``"calculated"``, or ``"mixed"``), derived from the Rust serde
-    /// rename so the string can never drift from the JSON schema.
+    #[doc = pydoc!("finstack_quant.statements", "NodeType.kind")]
     #[getter]
-    fn kind(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner)
+    fn kind(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner)
     }
 
     /// Return the canonical snake_case discriminant (same as :attr:`kind`).
-    fn __str__(&self) -> String {
+    fn __str__(&self) -> PyResult<String> {
         self.kind()
     }
 
     /// Return ``NodeType('mixed')`` style representation.
-    fn __repr__(&self) -> String {
-        format!("NodeType({:?})", self.kind())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("NodeType({:?})", self.kind()?))
     }
 }
 
@@ -728,11 +724,11 @@ impl PyNumericMode {
     }
 
     /// Return ``NumericMode('float64')`` style representation.
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "NumericMode({:?})",
-            crate::bindings::statements_analytics::serde_variant_str(&self.inner)
-        )
+            crate::bindings::extract::label(&self.inner)?
+        ))
     }
 }
 
@@ -927,18 +923,18 @@ impl PyNodeSpec {
     }
 
     /// Return ``NodeSpec(node_id='revenue', node_type='mixed', ...)``.
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "NodeSpec(node_id={:?}, node_type={:?}, values={}, forecast={}, formula_text={})",
             self.inner.node_id.as_str(),
-            crate::bindings::statements_analytics::serde_variant_str(&self.inner.node_type),
+            crate::bindings::extract::label(&self.inner.node_type)?,
             self.inner.values.as_ref().map_or(0, IndexMap::len),
             self.inner.forecast.is_some(),
             self.inner
                 .formula_text
                 .as_deref()
                 .map_or_else(|| "None".to_string(), |f| format!("{f:?}")),
-        )
+        ))
     }
 }
 
@@ -1128,13 +1124,7 @@ impl PyFinancialModelSpec {
         self.inner.schema_version.into()
     }
 
-    /// Export one row per node as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``node_id``, ``node_type`` (``value`` / ``calculated`` /
-    /// ``mixed``), ``name``, ``formula_text``, ``forecast_method`` (snake
-    /// case method name or ``None``), ``value_type`` (``monetary`` /
-    /// ``scalar`` / ``None``), ``currency`` (ISO code for monetary nodes),
-    /// ``where_text``. Rows follow declaration order.
+    #[doc = pydoc!("finstack_quant.statements", "FinancialModelSpec.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self
@@ -1149,20 +1139,18 @@ impl PyFinancialModelSpec {
                     Some(NodeValueType::Scalar) => (Some("scalar"), None),
                     None => (None, None),
                 };
-                serde_json::json!({
+                Ok(serde_json::json!({
                     "node_id": node.node_id.as_str(),
-                    "node_type": crate::bindings::statements_analytics::serde_variant_str(&node.node_type),
+                    "node_type": crate::bindings::extract::label(&node.node_type)?,
                     "name": node.name,
                     "formula_text": node.formula_text,
-                    "forecast_method": node.forecast.as_ref().map(|f| {
-                        crate::bindings::statements_analytics::serde_variant_str(&f.method)
-                    }),
+                    "forecast_method": node.forecast.as_ref().map(|f| crate::bindings::extract::label(&f.method)).transpose()?,
                     "value_type": value_type,
                     "currency": currency,
                     "where_text": node.where_text,
-                })
+                }))
             })
-            .collect();
+            .collect::<PyResult<_>>()?;
         serde_rows_to_dataframe_with_schema(py, &rows, &NODE_COLUMNS)
     }
 

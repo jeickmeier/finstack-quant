@@ -89,7 +89,23 @@ _INSTRUMENT_MACRO_OWNERS = (
 )
 
 CONVERTED: dict[str, tuple[str, ...] | None] = {
+    "finstack_quant.statements_analytics": (
+        "CorkscrewReport.to_dataframe",
+        "ScorecardReport.to_dataframe",
+        "CorkscrewReport.status",
+        "LeaseSpec.to_dataframe",
+        "ScorecardReport.status",
+    ),
     "finstack_quant.statements": (
+        "Adjustment.cap_base_mode",
+        "CheckConfig.min_severity",
+        "CheckFinding.severity",
+        "FinancialModelSpec.to_dataframe",
+        "ForecastMethod.kind",
+        "FormulaCheckSpec.category",
+        "FormulaCheckSpec.severity",
+        "MetricDefinition.unit_type",
+        "NodeType.kind",
         "MonteCarloResults.metrics",
         "MonteCarloResults.warnings",
         "MonteCarloResults.breach_probability",

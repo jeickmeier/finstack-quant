@@ -201,10 +201,10 @@ impl PyCheckConfig {
         self.inner.materiality_threshold
     }
 
-    /// Lowest retained severity name (``"info"``, ``"warning"``, ``"error"``).
+    #[doc = pydoc!("finstack_quant.statements", "CheckConfig.min_severity")]
     #[getter]
-    fn min_severity(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner.min_severity)
+    fn min_severity(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.min_severity)
     }
 
     /// Identify this value in notebooks and logs.
@@ -317,16 +317,16 @@ impl PyFormulaCheckSpec {
         &self.inner.message_template
     }
 
-    /// Category discriminant (``"internal_consistency"``, ...).
+    #[doc = pydoc!("finstack_quant.statements", "FormulaCheckSpec.category")]
     #[getter]
-    fn category(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner.category)
+    fn category(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.category)
     }
 
-    /// Severity discriminant (``"info"``, ``"warning"``, ``"error"``).
+    #[doc = pydoc!("finstack_quant.statements", "FormulaCheckSpec.severity")]
     #[getter]
-    fn severity(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner.severity)
+    fn severity(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.severity)
     }
 
     /// Optional absolute tolerance, or ``None``.
@@ -570,10 +570,10 @@ impl PyCheckFinding {
         &self.inner.check_id
     }
 
-    /// Severity discriminant (``"info"``, ``"warning"``, ``"error"``).
+    #[doc = pydoc!("finstack_quant.statements", "CheckFinding.severity")]
     #[getter]
-    fn severity(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner.severity)
+    fn severity(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.severity)
     }
 
     /// Human-readable description of the issue.
@@ -656,15 +656,15 @@ impl PyCheckFinding {
     }
 
     /// Return ``CheckFinding(check_id=..., severity=..., period=..., message=...)``.
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "CheckFinding(check_id={:?}, severity={:?}, period={}, message={:?})",
             self.inner.check_id,
-            self.severity(),
+            self.severity()?,
             self.period()
                 .map_or_else(|| "None".to_string(), |p| format!("{p:?}")),
             self.inner.message,
-        )
+        ))
     }
 }
 
