@@ -433,7 +433,7 @@ fn test_aggregate_period_flows() {
     let market_ctx = MarketContext::new();
 
     let cashflows =
-        super::support::aggregate_period_flows(&instruments, &periods, &market_ctx, as_of);
+        crate::support::aggregate_period_flows(&instruments, &periods, &market_ctx, as_of);
 
     assert!(cashflows.is_ok());
     let cf = cashflows.unwrap();
@@ -484,7 +484,7 @@ fn test_build_instrument_from_spec_swap_variant() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let swap = super::rates_support::usd_irs_swap(
+    let swap = crate::rates_support::usd_irs_swap(
         InstrumentId::new("SWAP-002"),
         Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"),
         0.045,

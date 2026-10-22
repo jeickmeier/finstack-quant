@@ -186,7 +186,7 @@ mod period_flow_waterfall_integration {
     use std::sync::Arc;
     use time::Month;
 
-    use crate::dsl_all::support::ScheduleInstrument;
+    use crate::support::ScheduleInstrument;
 
     fn quarter_period(year: i32, q: u8) -> Period {
         let month = |q: u8| match q {
@@ -630,7 +630,7 @@ mod period_flow_waterfall_integration {
         instruments.insert("DDTL-1".to_string(), instrument);
 
         let periods: Vec<Period> = (1..=4).map(|q| quarter_period(2025, q)).collect();
-        let cashflows = crate::integration_all::support::aggregate_period_flows(
+        let cashflows = crate::support::aggregate_period_flows(
             &instruments,
             &periods,
             &MarketContext::new(),

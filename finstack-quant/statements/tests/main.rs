@@ -69,3 +69,8 @@ mod senior_review_dsl;
 mod senior_review_engine_checks;
 #[path = "spec_tests.rs"]
 mod spec_tests;
+
+#[path = "support/rates.rs"]
+mod rates_support;
+#[path = "support/period_flows.rs"]
+mod support;

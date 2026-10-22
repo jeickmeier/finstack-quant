@@ -64,7 +64,7 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         (PayReceive::Pay, 0.0, -0.01),
         (PayReceive::Pay, -0.02, 0.01),
     ] {
-        let swap = crate::dsl_all::rates_support::usd_irs_swap(
+        let swap = crate::rates_support::usd_irs_swap(
             "IRS".into(),
             Money::from((100_000_i64, Currency::USD)),
             fixed_rate,
@@ -275,7 +275,7 @@ fn placeholder_rate_option_schedule_is_rejected_explicitly() {
 #[test]
 fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
     let as_of = date!(2025 - 01 - 01);
-    let swap = crate::dsl_all::rates_support::usd_irs_swap(
+    let swap = crate::rates_support::usd_irs_swap(
         "IRS".into(),
         Money::from((100_000_i64, Currency::USD)),
         0.01,
@@ -364,7 +364,7 @@ fn oid_loan(issue: Date, oid_bp: u32) -> TermLoan {
     loan
 }
 
-use crate::dsl_all::support::ScheduleInstrument;
+use crate::support::ScheduleInstrument;
 
 fn no_funding_schedule(initial: f64, issue: Date) -> ScheduleInstrument {
     let flows = if initial > 0.0 {
@@ -548,7 +548,7 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
 
 #[test]
 fn plain_evaluate_names_instruments_that_need_market_data() {
-    let swap = crate::dsl_all::rates_support::usd_irs_swap(
+    let swap = crate::rates_support::usd_irs_swap(
         "IRS".into(),
         Money::from((100_000_i64, Currency::USD)),
         0.01,
