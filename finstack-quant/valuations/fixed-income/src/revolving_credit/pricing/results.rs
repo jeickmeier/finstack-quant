@@ -72,26 +72,29 @@ impl EnhancedMonteCarloResult {
                 })
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-        TableEnvelope::new(vec![
-            TableColumn::new("path", TableColumnData::Int64(ids)),
-            TableColumn::new(
-                "pv",
-                TableColumnData::Float64(
-                    self.path_results
-                        .iter()
-                        .map(|path| path.pv.amount())
-                        .collect(),
+        TableEnvelope::new(
+            vec![
+                TableColumn::new("path", TableColumnData::Int64(ids)),
+                TableColumn::new(
+                    "pv",
+                    TableColumnData::Float64(
+                        self.path_results
+                            .iter()
+                            .map(|path| path.pv.amount())
+                            .collect(),
+                    ),
                 ),
-            ),
-            TableColumn::new(
-                "draw_option_cost",
-                TableColumnData::Float64(
-                    self.path_results
-                        .iter()
-                        .map(|path| path.draw_option_cost.amount())
-                        .collect(),
+                TableColumn::new(
+                    "draw_option_cost",
+                    TableColumnData::Float64(
+                        self.path_results
+                            .iter()
+                            .map(|path| path.draw_option_cost.amount())
+                            .collect(),
+                    ),
                 ),
-            ),
-        ])
+            ],
+            Default::default(),
+        )
     }
 }

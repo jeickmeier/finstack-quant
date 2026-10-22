@@ -242,7 +242,7 @@ impl PLSummaryReport<'_> {
         let mut metadata = IndexMap::new();
         metadata.insert("layout".to_string(), serde_json::json!("long"));
         metadata.insert("source".to_string(), serde_json::json!("pl_summary_report"));
-        TableEnvelope::new_with_metadata(columns, metadata)
+        TableEnvelope::new(columns, metadata)
     }
 }
 

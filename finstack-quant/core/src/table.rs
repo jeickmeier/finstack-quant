@@ -32,22 +32,6 @@ pub struct TableEnvelope {
 }
 
 impl TableEnvelope {
-    /// Construct a table from validated columns.
-    ///
-    /// # Arguments
-    ///
-    /// * `columns` - Owned columns in the desired export order; names must be
-    ///   unique and every column must have the same number of values. An empty
-    ///   list constructs a table with zero rows and no columns.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Validation`] if columns have mismatched lengths or if
-    /// duplicate column names are provided.
-    pub fn new(columns: Vec<TableColumn>) -> Result<Self> {
-        Self::new_with_metadata(columns, IndexMap::new())
-    }
-
     /// Construct a table from validated columns and metadata.
     ///
     /// # Arguments
@@ -61,7 +45,7 @@ impl TableEnvelope {
     ///
     /// Returns [`Error::Validation`] if columns have mismatched lengths or if
     /// duplicate column names are provided.
-    pub fn new_with_metadata(
+    pub fn new(
         columns: Vec<TableColumn>,
         metadata: IndexMap<String, serde_json::Value>,
     ) -> Result<Self> {
@@ -267,20 +251,26 @@ mod tests {
 
     #[test]
     fn table_validates_column_lengths() {
-        let result = TableEnvelope::new(vec![
-            TableColumn::new("a", TableColumnData::String(vec!["x".into(), "y".into()])),
-            TableColumn::new("b", TableColumnData::Float64(vec![1.0])),
-        ]);
+        let result = TableEnvelope::new(
+            vec![
+                TableColumn::new("a", TableColumnData::String(vec!["x".into(), "y".into()])),
+                TableColumn::new("b", TableColumnData::Float64(vec![1.0])),
+            ],
+            Default::default(),
+        );
 
         assert!(result.is_err());
     }
 
     #[test]
     fn table_rejects_duplicate_column_names() {
-        let result = TableEnvelope::new(vec![
-            TableColumn::new("a", TableColumnData::String(vec!["x".into()])),
-            TableColumn::new("a", TableColumnData::Float64(vec![1.0])),
-        ]);
+        let result = TableEnvelope::new(
+            vec![
+                TableColumn::new("a", TableColumnData::String(vec!["x".into()])),
+                TableColumn::new("a", TableColumnData::Float64(vec![1.0])),
+            ],
+            Default::default(),
+        );
 
         assert!(result.is_err());
     }
@@ -296,7 +286,7 @@ mod tests {
         let mut metadata = IndexMap::new();
         metadata.insert("orientation".to_string(), json!("long"));
 
-        let table = TableEnvelope::new_with_metadata(vec![column], metadata).expect("valid table");
+        let table = TableEnvelope::new(vec![column], metadata).expect("valid table");
         let json = serde_json::to_string(&table).expect("serializes");
         let restored: TableEnvelope = serde_json::from_str(&json).expect("deserializes");
 
@@ -307,7 +297,7 @@ mod tests {
 
     #[test]
     fn empty_table_and_columns_report_empty_state() {
-        let table = TableEnvelope::new(vec![]).expect("empty table is valid");
+        let table = TableEnvelope::new(vec![], Default::default()).expect("empty table is valid");
         let column = TableColumn::new("empty", TableColumnData::Int64(vec![]));
 
         assert!(table.is_empty());

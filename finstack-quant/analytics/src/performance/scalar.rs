@@ -746,7 +746,7 @@ impl Performance {
                     .with_role(TableColumnRole::Measure),
             );
         }
-        TableEnvelope::new(columns)
+        TableEnvelope::new(columns, Default::default())
     }
 }
 

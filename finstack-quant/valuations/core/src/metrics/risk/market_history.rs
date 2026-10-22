@@ -447,7 +447,7 @@ impl MarketHistory {
             columns.push(TableColumn::new(name, data));
         }
         columns.push(TableColumn::new("shift", TableColumnData::Float64(shifts)));
-        TableEnvelope::new(columns)
+        TableEnvelope::new(columns, Default::default())
     }
 }
 

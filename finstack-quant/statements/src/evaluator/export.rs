@@ -55,7 +55,7 @@ pub(crate) fn to_table_long(results: &StatementResult) -> Result<TableEnvelope> 
         }
     }
 
-    TableEnvelope::new_with_metadata(
+    TableEnvelope::new(
         vec![
             TableColumn::new("node_id", TableColumnData::String(node_ids))
                 .with_role(TableColumnRole::Dimension),
@@ -111,7 +111,7 @@ pub(crate) fn to_table_wide(results: &StatementResult) -> Result<TableEnvelope> 
         );
     }
 
-    TableEnvelope::new_with_metadata(columns, table_metadata("wide")).map_err(Into::into)
+    TableEnvelope::new(columns, table_metadata("wide")).map_err(Into::into)
 }
 
 #[cfg(test)]
