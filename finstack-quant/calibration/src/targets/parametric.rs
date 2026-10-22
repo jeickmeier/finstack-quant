@@ -10,6 +10,7 @@ use crate::quotes::rates::RateQuote;
 use crate::quotes::MarketQuote;
 use crate::solver::global;
 use crate::solver::traits::GlobalSolveTarget;
+use crate::solver::traits::TimeGridAndGuesses;
 use crate::targets::util::{
     discount_and_forward_curve_ids, prepare_rate_calibration_quotes, ContextScratch,
 };
@@ -233,12 +234,16 @@ impl GlobalSolveTarget for ParametricCurveTarget {
     fn build_time_grid_and_guesses(
         &self,
         quotes: &[Self::Quote],
-    ) -> Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
+    ) -> Result<TimeGridAndGuesses<Self::Quote>> {
         let guesses = self.params.initial_params.to_params_vec();
         // This target ignores `times`, but the shared input validation
         // requires a positive, increasing grid.
         let times: Vec<f64> = (1..=guesses.len()).map(|i| i as f64).collect();
-        Ok((times, guesses, quotes.to_vec()))
+        Ok(TimeGridAndGuesses {
+            times,
+            initials: guesses,
+            quotes: quotes.to_vec(),
+        })
     }
 
     fn build_curve_from_params(&self, _times: &[f64], params: &[f64]) -> Result<Self::Curve> {

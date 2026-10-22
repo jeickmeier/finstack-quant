@@ -8,6 +8,7 @@ use super::multi_start::{perturb_initial_guess, MultiStartConfig};
 use super::traits::GlobalSolveTarget;
 use crate::constants::PENALTY;
 use crate::report::{CalibrationDiagnostics, QuoteQuality};
+use crate::solver::traits::TimeGridAndGuesses;
 use crate::{CalibrationConfig, CalibrationReport};
 use finstack_quant_core::explain::{ExplanationTrace, TraceEntry};
 use finstack_quant_core::Result;
@@ -198,14 +199,22 @@ fn optimize_impl<T>(
     config: &CalibrationConfig,
     success_tolerance: f64,
     multi_start: Option<&MultiStartConfig>,
-    run_restarts: RestartRunner<T>,
+    run_restarts: impl Fn(
+        &SolveInputs<'_, T>,
+        &[f64],
+        &MultiStartConfig,
+    ) -> Vec<Result<SingleSolveResult>>,
     use_analytical_jacobian: bool,
 ) -> Result<(T::Curve, CalibrationReport)>
 where
     T: GlobalSolveTarget,
 {
     // 1. Build grid and guesses
-    let (times, initials, active_quotes) = target.build_time_grid_and_guesses(quotes)?;
+    let TimeGridAndGuesses {
+        times,
+        initials,
+        quotes: active_quotes,
+    } = target.build_time_grid_and_guesses(quotes)?;
     let n_residuals = active_quotes.len();
 
     if n_residuals == 0 {
@@ -262,7 +271,7 @@ where
         config,
         use_analytical_jacobian,
     };
-    let mut best: Option<(SingleSolveResult, f64)> = match run_single_solve(&inputs, &initials) {
+    let mut best = match run_single_solve(&inputs, &initials) {
         Ok(v) => Some(v),
         Err(err) => {
             tracing::warn!(
@@ -287,16 +296,18 @@ where
         let restart_results = run_restarts(&inputs, &initials, ms);
         for (restart_idx, outcome) in restart_results.into_iter().enumerate() {
             match outcome {
-                Ok((result, wl2)) => {
-                    let improved = best.as_ref().is_none_or(|(_, prev)| wl2 < *prev);
+                Ok(result) => {
+                    let improved = best
+                        .as_ref()
+                        .is_none_or(|prev| result.weighted_l2 < prev.weighted_l2);
                     if improved {
                         tracing::debug!(
                             "global: restart {} improved weighted L2: {:?} -> {:.4e}",
                             restart_idx,
-                            best.as_ref().map(|(_, l)| *l),
-                            wl2,
+                            best.as_ref().map(|previous| previous.weighted_l2),
+                            result.weighted_l2,
                         );
-                        best = Some((result, wl2));
+                        best = Some(result);
                         winning_start = Some(restart_idx);
                     }
                 }
@@ -313,7 +324,7 @@ where
 
     // If the primary solve failed and no restart rescued it, propagate the original
     // error rather than feeding a sentinel into the final-curve build.
-    let Some((best_result, _best_weighted_l2)) = best else {
+    let Some(best_result) = best else {
         return Err(
             primary_error.unwrap_or_else(|| finstack_quant_core::Error::Calibration {
                 message: "global: every solve attempt failed".to_string(),
@@ -321,8 +332,14 @@ where
             }),
         );
     };
-    let (solved_params, stats, eval_counter_val, eval_diagnostics_val, final_n_clamped) =
-        best_result;
+    let SingleSolveResult {
+        solved_params,
+        stats,
+        residual_evals: eval_counter_val,
+        diagnostics: eval_diagnostics_val,
+        parameters_clamped: final_n_clamped,
+        ..
+    } = best_result;
 
     let final_curve = target.build_curve_final_from_params(&times, &solved_params)?;
 
@@ -508,14 +525,15 @@ where
 // strategy. See that module for documentation, references, and unit
 // tests.
 
-// The final field counts parameters clamped back inside their bounds.
-type SingleSolveResult = (
-    Vec<f64>,
-    finstack_quant_core::math::solver_multi::LmStats,
-    usize,
-    EvalDiagnostics,
-    usize,
-);
+/// One solve's parameters, diagnostics and restart-ranking objective.
+struct SingleSolveResult {
+    solved_params: Vec<f64>,
+    stats: finstack_quant_core::math::solver_multi::LmStats,
+    residual_evals: usize,
+    diagnostics: EvalDiagnostics,
+    parameters_clamped: usize,
+    weighted_l2: f64,
+}
 
 /// Inputs shared by the primary solve and every multi-start restart of one fit.
 #[derive(Clone, Copy)]
@@ -530,17 +548,12 @@ struct SolveInputs<'a, T: GlobalSolveTarget> {
     use_analytical_jacobian: bool,
 }
 
-/// Runs the multi-start restarts for one fit and returns one outcome per restart,
-/// in restart-index order.
-type RestartRunner<T> =
-    fn(&SolveInputs<'_, T>, &[f64], &MultiStartConfig) -> Vec<Result<(SingleSolveResult, f64)>>;
-
 /// Restart runner for [`optimize`], which never restarts.
 fn no_restarts<T: GlobalSolveTarget>(
     _inputs: &SolveInputs<'_, T>,
     _initials: &[f64],
     _multi_start: &MultiStartConfig,
-) -> Vec<Result<(SingleSolveResult, f64)>> {
+) -> Vec<Result<SingleSolveResult>> {
     Vec::new()
 }
 
@@ -551,7 +564,7 @@ fn parallel_restarts<T>(
     inputs: &SolveInputs<'_, T>,
     initials: &[f64],
     multi_start: &MultiStartConfig,
-) -> Vec<Result<(SingleSolveResult, f64)>>
+) -> Vec<Result<SingleSolveResult>>
 where
     T: GlobalSolveTarget + Sync,
     T::Quote: Sync,
@@ -584,10 +597,7 @@ where
 
 /// Run one LM solve and return parameters, statistics, evaluation diagnostics,
 /// clamp count, and the final weighted L2 residual norm.
-fn run_single_solve<T>(
-    inputs: &SolveInputs<'_, T>,
-    initials: &[f64],
-) -> Result<(SingleSolveResult, f64)>
+fn run_single_solve<T>(inputs: &SolveInputs<'_, T>, initials: &[f64]) -> Result<SingleSolveResult>
 where
     T: GlobalSolveTarget,
 {
@@ -710,14 +720,13 @@ where
         }
     };
 
-    type OptionalBoundRef<'a> = &'a Option<Vec<f64>>;
     struct TargetDerivatives<'a, T: GlobalSolveTarget> {
         target: &'a T,
         active_quotes: &'a [T::Quote],
         weight_scales: &'a [f64],
         times: &'a [f64],
-        lb: OptionalBoundRef<'a>,
-        ub: OptionalBoundRef<'a>,
+        lb: &'a Option<Vec<f64>>,
+        ub: &'a Option<Vec<f64>>,
     }
 
     impl<'a, T: GlobalSolveTarget> finstack_quant_core::math::solver_multi::AnalyticalDerivatives
@@ -819,16 +828,14 @@ where
     let eval_count = eval_counter.get();
     let diagnostics = eval_diagnostics.into_inner();
 
-    Ok((
-        (
-            solved_params,
-            stats,
-            eval_count,
-            diagnostics,
-            final_n_clamped,
-        ),
+    Ok(SingleSolveResult {
+        solved_params,
+        stats,
+        residual_evals: eval_count,
+        diagnostics,
+        parameters_clamped: final_n_clamped,
         weighted_l2,
-    ))
+    })
 }
 
 fn validate_global_inputs(times: &[f64], initials: &[f64], n_residuals: usize) -> Result<()> {
@@ -1410,8 +1417,12 @@ mod tests {
         fn build_time_grid_and_guesses(
             &self,
             quotes: &[Self::Quote],
-        ) -> Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
-            Ok((self.times.clone(), self.initials.clone(), quotes.to_vec()))
+        ) -> Result<TimeGridAndGuesses<Self::Quote>> {
+            Ok(TimeGridAndGuesses {
+                times: self.times.clone(),
+                initials: self.initials.clone(),
+                quotes: quotes.to_vec(),
+            })
         }
 
         fn build_curve_from_params(&self, _times: &[f64], params: &[f64]) -> Result<Self::Curve> {
@@ -1814,7 +1825,7 @@ mod tests {
             fn build_time_grid_and_guesses(
                 &self,
                 quotes: &[Self::Quote],
-            ) -> Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
+            ) -> Result<TimeGridAndGuesses<Self::Quote>> {
                 self.inner.build_time_grid_and_guesses(quotes)
             }
 
@@ -1893,8 +1904,12 @@ mod tests {
             fn build_time_grid_and_guesses(
                 &self,
                 quotes: &[Self::Quote],
-            ) -> Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
-                Ok((self.times.clone(), vec![0.0, 0.0], quotes.to_vec()))
+            ) -> Result<TimeGridAndGuesses<Self::Quote>> {
+                Ok(TimeGridAndGuesses {
+                    times: self.times.clone(),
+                    initials: vec![0.0, 0.0],
+                    quotes: quotes.to_vec(),
+                })
             }
 
             fn build_curve_from_params(

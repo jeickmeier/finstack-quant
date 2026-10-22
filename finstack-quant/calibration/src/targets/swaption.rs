@@ -83,7 +83,7 @@ pub(crate) fn solve(
     config: &CalibrationConfig,
 ) -> Result<(VolCube, CalibrationReport)> {
     // Group quotes by (expiry_years, tenor_years) using stable basis-point keys.
-    let mut grouped_quotes: QuotesByExpiryTenor<'_> = BTreeMap::new();
+    let mut grouped_quotes: BTreeMap<(u64, u64), Vec<&VolQuote>> = BTreeMap::new();
     // Option time matches the swaption pricers and is independent of the
     // fixed leg's accrual convention.
     let day_count = DayCount::Act365F;
@@ -139,7 +139,7 @@ pub(crate) fn solve(
         ));
     }
 
-    let mut sabr_params: SABRParamsByExpiryTenor = BTreeMap::new();
+    let mut sabr_params: BTreeMap<(u64, u64), SabrParameters> = BTreeMap::new();
     // Preserve each bucket's calibration forward for its ATM anchor.
     let mut calibration_forwards: BTreeMap<(u64, u64), f64> = BTreeMap::new();
     let mut bucket_errors: BTreeMap<(u64, u64), String> = BTreeMap::new();
@@ -871,7 +871,7 @@ fn bracket_axis(
 fn interpolate_sabr_params_bilinear(
     target_expiry: f64,
     target_tenor: f64,
-    sabr_params: &SABRParamsByExpiryTenor,
+    sabr_params: &BTreeMap<(u64, u64), SabrParameters>,
     axes: (&[f64], &[f64]),
     extrapolation: SurfaceExtrapolationPolicy,
     allow_missing_bucket_fallback: bool,
@@ -1005,9 +1005,6 @@ fn interpolate_sabr_bilinear(
     let p1 = interpolate_sabr_linear(p_01, p_11, wx);
     interpolate_sabr_linear(&p0, &p1, wy)
 }
-
-type QuotesByExpiryTenor<'a> = BTreeMap<(u64, u64), Vec<&'a VolQuote>>;
-type SABRParamsByExpiryTenor = BTreeMap<(u64, u64), SabrParameters>;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SwaptionLegConventions<'a> {
@@ -1758,7 +1755,7 @@ mod tests {
 
     #[test]
     fn sabr_param_bilinear_interpolation_interpolates_in_log_space_for_positive_params() {
-        let mut grid: SABRParamsByExpiryTenor = BTreeMap::new();
+        let mut grid: BTreeMap<(u64, u64), SabrParameters> = BTreeMap::new();
         let p00 = SabrParameters {
             alpha: 0.01,
             beta: 0.5,

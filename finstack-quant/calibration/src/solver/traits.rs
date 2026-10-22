@@ -3,8 +3,15 @@
 use crate::report::ResidualUnits;
 use finstack_quant_core::Result;
 
-/// Result type for building time grid and initial guesses.
-pub(crate) type TimeGridAndGuesses<Q> = (Vec<f64>, Vec<f64>, Vec<Q>);
+/// Prepared grid, parameter seeds and active quotes for a global solve.
+pub(crate) struct TimeGridAndGuesses<Q> {
+    /// Ordered parameter times on the target's year-fraction clock.
+    pub(crate) times: Vec<f64>,
+    /// Initial parameter values aligned with `times`.
+    pub(crate) initials: Vec<f64>,
+    /// Quotes retained by the target for residual evaluation.
+    pub(crate) quotes: Vec<Q>,
+}
 
 /// Trait defining the specific physics for a bootstrapping process.
 ///
@@ -128,7 +135,7 @@ pub(crate) trait GlobalSolveTarget {
 
     /// Build the time grid and initial guesses for the optimization.
     ///
-    /// Returns `(times, initial_params, active_quotes)`. The length of `times`
+    /// Returns the parameter times, initial values and active quotes. The length of `times`
     /// determines the dimensionality of the problem.
     fn build_time_grid_and_guesses(
         &self,

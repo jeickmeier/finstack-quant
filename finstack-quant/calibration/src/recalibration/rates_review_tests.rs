@@ -18,9 +18,7 @@ use finstack_quant_valuations_core::recalibration::{
 use finstack_quant_valuations_rates::irs::{ConventionSwapParams, InterestRateSwap};
 use serde_json::{json, Value};
 
-type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
-
-fn calibrate(input: &str) -> TestResult<Arc<MarketContext>> {
+fn calibrate(input: &str) -> std::result::Result<Arc<MarketContext>, Box<dyn std::error::Error>> {
     let result = calibrate_from_json(input)?;
     for (step, report) in &result.result.step_reports {
         assert!(report.success, "fixture step {step} failed: {report:?}");
@@ -30,7 +28,7 @@ fn calibrate(input: &str) -> TestResult<Arc<MarketContext>> {
     )?))
 }
 
-fn joint_swap_fixture() -> TestResult<Value> {
+fn joint_swap_fixture() -> std::result::Result<Value, Box<dyn std::error::Error>> {
     let mut input: Value = serde_json::from_str(include_str!(
         "../../examples/market_bootstrap/02_usd_3m_forward_curve.json"
     ))?;
@@ -53,7 +51,8 @@ fn joint_swap_fixture() -> TestResult<Value> {
 }
 
 #[test]
-fn linked_rate_replay_reprices_bumped_swaps_with_bumped_discounting() -> TestResult {
+fn linked_rate_replay_reprices_bumped_swaps_with_bumped_discounting(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut input = joint_swap_fixture()?;
     let source = calibrate(&input.to_string())?;
     for quote in input["market_data"]
@@ -125,7 +124,8 @@ fn linked_rate_replay_reprices_bumped_swaps_with_bumped_discounting() -> TestRes
 }
 
 #[test]
-fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity() -> TestResult {
+fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let source = calibrate(include_str!(
         "../../examples/market_bootstrap/01_usd_discount.json"
     ))?;
@@ -174,7 +174,8 @@ fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity() -> TestR
 }
 
 #[test]
-fn linked_rate_quote_replay_composes_both_curve_recipes() -> TestResult {
+fn linked_rate_quote_replay_composes_both_curve_recipes(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let source = calibrate(&joint_swap_fixture()?.to_string())?;
     let provider = CachedRecalibrationProvider::new();
     let bump = |market: Arc<MarketContext>, bp: f64| {
@@ -226,7 +227,7 @@ fn linked_rate_quote_replay_composes_both_curve_recipes() -> TestResult {
 fn discount_floor_fixture(
     rate: f64,
     forward_floor: Option<f64>,
-) -> TestResult<(DiscountCurve, RateCalibrationRecipe)> {
+) -> std::result::Result<(DiscountCurve, RateCalibrationRecipe), Box<dyn std::error::Error>> {
     let mut quotes = Vec::new();
     for tenor in ["1Y", "2Y"] {
         quotes.push(RateCalibrationQuote::Deposit {
@@ -259,7 +260,8 @@ fn discount_floor_fixture(
 }
 
 #[test]
-fn discount_replay_preserves_absent_forward_floor_in_negative_rate_market() -> TestResult {
+fn discount_replay_preserves_absent_forward_floor_in_negative_rate_market(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let (source, recipe) = discount_floor_fixture(-0.015, None)?;
     let replay = bump_discount_curve_from_rate_calibration(
         &source,
@@ -281,7 +283,8 @@ fn discount_replay_preserves_absent_forward_floor_in_negative_rate_market() -> T
 }
 
 #[test]
-fn discount_replay_preserves_and_enforces_positive_forward_floor() -> TestResult {
+fn discount_replay_preserves_and_enforces_positive_forward_floor(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let (source, recipe) = discount_floor_fixture(0.03, Some(0.01))?;
     let replay = bump_discount_curve_from_rate_calibration(
         &source,

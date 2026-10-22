@@ -9,6 +9,7 @@ use crate::quotes::cds::CdsQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap;
 use crate::solver::global;
+use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::util::{
     scheme_factor, sorted_knot_grid, validate_global_knot_grid, ContextScratch,
@@ -671,7 +672,7 @@ impl GlobalSolveTarget for HazardCurveTarget {
     fn build_time_grid_and_guesses(
         &self,
         quotes: &[Self::Quote],
-    ) -> Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
+    ) -> Result<TimeGridAndGuesses<Self::Quote>> {
         let seed_curve = self
             .base_context
             .get_hazard(self.params.curve_id.as_str())

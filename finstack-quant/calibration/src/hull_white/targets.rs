@@ -1,5 +1,6 @@
 use super::swaption::hw1f_swaption_price_prepared;
 use super::*;
+use crate::solver::traits::TimeGridAndGuesses;
 
 // HW1F mean-reversion bounds.
 pub(super) const KAPPA_MIN: f64 = 0.001;
@@ -234,12 +235,16 @@ impl PreparedSwaption {
 fn hw1f_two_param_grid_and_guesses<Q: Clone>(
     initial_x0: [f64; 2],
     quotes: &[Q],
-) -> finstack_quant_core::Result<(Vec<f64>, Vec<f64>, Vec<Q>)> {
+) -> finstack_quant_core::Result<TimeGridAndGuesses<Q>> {
     // HW1F has 2 scalar parameters (lnκ, lnσ); we use a dummy 2-point
     // time grid to satisfy the framework's knot-oriented API. Values
     // must be strictly positive to clear `validate_global_inputs`,
     // so we use `[1.0, 2.0]`.
-    Ok((vec![1.0, 2.0], initial_x0.to_vec(), quotes.to_vec()))
+    Ok(TimeGridAndGuesses {
+        times: vec![1.0, 2.0],
+        initials: initial_x0.to_vec(),
+        quotes: quotes.to_vec(),
+    })
 }
 
 fn hw1f_params_from_log(params: &[f64]) -> finstack_quant_core::Result<HullWhiteCalibrationParams> {
@@ -274,7 +279,7 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
     fn build_time_grid_and_guesses(
         &self,
         quotes: &[Self::Quote],
-    ) -> finstack_quant_core::Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
+    ) -> finstack_quant_core::Result<TimeGridAndGuesses<Self::Quote>> {
         hw1f_two_param_grid_and_guesses(self.initial_x0, quotes)
     }
 
@@ -355,7 +360,7 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
     fn build_time_grid_and_guesses(
         &self,
         quotes: &[Self::Quote],
-    ) -> finstack_quant_core::Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
+    ) -> finstack_quant_core::Result<TimeGridAndGuesses<Self::Quote>> {
         hw1f_two_param_grid_and_guesses(self.initial_x0, quotes)
     }
 

@@ -12,11 +12,13 @@ use std::sync::{Arc, Mutex};
 /// caller. Poisoned locks are recovered because the guarded state is only ever
 /// `None` or a fully constructed `Arc<V>`.
 pub(crate) struct KeyedOnceCache<K, V> {
-    entries: Mutex<HashMap<K, Slot<V>>>,
+    entries: Mutex<HashMap<K, Arc<CacheEntry<V>>>>,
 }
 
 /// Per-key slot: `None` while the first computation is in flight.
-type Slot<V> = Arc<Mutex<Option<Arc<V>>>>;
+struct CacheEntry<V> {
+    result: Mutex<Option<Arc<V>>>,
+}
 
 impl<K, V> Default for KeyedOnceCache<K, V> {
     fn default() -> Self {
@@ -54,13 +56,13 @@ impl<K: Eq + Hash, V> KeyedOnceCache<K, V> {
                 Ok(entries) => entries,
                 Err(poisoned) => poisoned.into_inner(),
             };
-            Arc::clone(
-                entries
-                    .entry(key)
-                    .or_insert_with(|| Arc::new(Mutex::new(None))),
-            )
+            Arc::clone(entries.entry(key).or_insert_with(|| {
+                Arc::new(CacheEntry {
+                    result: Mutex::new(None),
+                })
+            }))
         };
-        let mut cached = match entry.lock() {
+        let mut cached = match entry.result.lock() {
             Ok(cached) => cached,
             Err(poisoned) => poisoned.into_inner(),
         };
