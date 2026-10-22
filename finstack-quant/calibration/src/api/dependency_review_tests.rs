@@ -5,7 +5,7 @@ use crate::api::errors::EnvelopeError;
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::api::schema::{CalibrationEnvelope, StepParams};
-use crate::api::validate::{dry_run_json, validate, CalibrationValidationReport};
+use crate::api::validate::{dry_run, validate, CalibrationValidationReport};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -167,7 +167,7 @@ fn xccy_dependencies_include_both_convention_projection_curves(
         // The JSON/bindings preflight must expose the same missing dependency
         // before any XCCY instrument is priced or any solver is started.
         let wire_report: CalibrationValidationReport =
-            serde_json::from_str(&dry_run_json(&serde_json::to_string(&incomplete)?)?)?;
+            dry_run(&serde_json::to_string(&incomplete)?)?;
         assert_eq!(wire_report.errors, report.errors);
     }
     Ok(())
@@ -310,8 +310,7 @@ fn equity_carry_dependency_resolves_schedule_id_and_prefers_existing_yield(
             schedule_fallback.dependency_graph.nodes[0].reads,
             ["AAPL", "PAYMENTS-42", "USD-OIS"]
         );
-        let wire_report: CalibrationValidationReport =
-            serde_json::from_str(&dry_run_json(&serde_json::to_string(&envelope)?)?)?;
+        let wire_report: CalibrationValidationReport = dry_run(&serde_json::to_string(&envelope)?)?;
         assert!(wire_report.errors.is_empty());
         assert_eq!(
             wire_report.dependency_graph.nodes[0].reads,

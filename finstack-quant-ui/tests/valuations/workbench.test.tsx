@@ -71,9 +71,9 @@ beforeEach(() => {
         }
       }
       case "validateCalibration":
-        return native.validateCalibrationJson(request);
+        return native.validateCalibration(request);
       case "dryRun":
-        return native.dryRunJson(request);
+        return native.dryRun(request);
       case "calibrate":
         return native.calibrate(request);
       case "scenarioTable":

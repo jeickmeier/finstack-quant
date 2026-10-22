@@ -34,7 +34,7 @@ export function useCalibrate(envelopeJson: string | null) {
     enabled: worker.status === "ready" && envelopeJson !== null,
   }));
 }
-/** Static dependency/error report; no solver is invoked and returned JSON stays unchanged. */
+/** Static dependency/error report; no solver is invoked and returns the native structured report. */
 export function useCalibrationDryRun(envelopeJson: string | null) {
   return useWorkerQuery((worker) => ({
     ...calibrationOptions(

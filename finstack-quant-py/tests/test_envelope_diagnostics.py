@@ -16,7 +16,7 @@ from finstack_quant.calibration import (
     RateQuote,
     calibrate,
     dry_run,
-    validate_calibration_json,
+    validate_calibration,
 )
 
 
@@ -33,7 +33,7 @@ def test_shared_quotes_are_explicit_envelope_inputs() -> None:
 def test_removed_inline_quotes_and_plan_execution_are_rejected() -> None:
     with pytest.raises(ValueError, match="quotes"):
         CalibrationStep.discount("A", "USD", "2026-05-08", quotes=[])
-    for operation in (calibrate, dry_run, validate_calibration_json):
+    for operation in (calibrate, dry_run, validate_calibration):
         with pytest.raises((TypeError, CalibrationEnvelopeError)):
             operation(CalibrationPlan([]))
 
@@ -93,7 +93,7 @@ def test_dry_run_surfaces_undefined_quote_set_with_suggestion() -> None:
     assert undef["suggestion"] == "usd_quotes"
 
 
-@pytest.mark.parametrize("operation", [validate_calibration_json, calibrate])
+@pytest.mark.parametrize("operation", [validate_calibration, calibrate])
 def test_calibration_entry_points_enforce_semantic_validation(
     operation: Callable[[str], str],
 ) -> None:
@@ -131,7 +131,7 @@ def test_calibration_envelope_error_inherits_runtime_error() -> None:
 
 @pytest.mark.parametrize(
     "operation",
-    [validate_calibration_json, calibrate, dry_run],
+    [validate_calibration, calibrate, dry_run],
 )
 def test_all_calibration_entry_points_expose_execution_error_details(
     operation: Callable[[str], object],
@@ -173,7 +173,7 @@ def test_runtime_error_handler_catches_calibration_envelope_error() -> None:
     assert isinstance(excinfo.value, CalibrationEnvelopeError)
 
 
-@pytest.mark.parametrize("entry", [calibrate, dry_run, validate_calibration_json])
+@pytest.mark.parametrize("entry", [calibrate, dry_run, validate_calibration])
 def test_malformed_json_reports_the_rust_parse_diagnostic(entry: Callable[[str], object]) -> None:
     # A str goes straight to the Rust strict loader (same diagnostic as WASM).
     with pytest.raises(CalibrationEnvelopeError) as info:
@@ -189,7 +189,7 @@ def test_unusable_solver_settings_are_rejected_everywhere(solver: dict) -> None:
 
     envelope = _empty_envelope()
     envelope["plan"]["settings"] = {"solver": solver}
-    for entry in (calibrate, dry_run, validate_calibration_json):
+    for entry in (calibrate, dry_run, validate_calibration):
         with pytest.raises(CalibrationEnvelopeError, match=r"solver (tolerance|max_iterations)"):
             entry(json.dumps(envelope))
     with pytest.raises(ValueError, match=r"solver (tolerance|max_iterations)"):
@@ -200,11 +200,9 @@ def test_unusable_solver_settings_are_rejected_everywhere(solver: dict) -> None:
         CalibrationConfig(solver=solver)
 
 
-def test_dry_run_json_is_the_wire_twin_of_dry_run() -> None:
-    from finstack_quant.calibration import dry_run_json
-
-    envelope = json.dumps(_empty_envelope())
-    assert json.loads(dry_run_json(envelope)) == json.loads(dry_run(envelope).to_json())
+def test_dry_run_report_serializes() -> None:
+    report = dry_run(json.dumps(_empty_envelope()))
+    assert json.loads(report.to_json())["errors"] == report.errors
 
 
 @pytest.mark.parametrize("key", ["interp_style", "extrapolation_policy"])
@@ -214,18 +212,19 @@ def test_discount_solve_settings_reject_removed_curve_shape_keys(key: str) -> No
         "plan": {"id": "p", "steps": [], "settings": {"discount_curve": {key: "linear"}}},
     }
     with pytest.raises(CalibrationEnvelopeError, match=f"unknown field `{key}`") as info:
-        validate_calibration_json(envelope)
+        validate_calibration(envelope)
     assert info.value.kind == "strict_load"
 
 
-def test_market_freshness_age_is_a_plain_integer() -> None:
+@pytest.mark.parametrize("age", [3600, 9007199254740993])
+def test_market_freshness_age_is_a_plain_integer(age: int) -> None:
     envelope = {
         "schema": "finstack_quant.calibration/1",
-        "plan": {"id": "p", "steps": [], "settings": {"market_freshness": {"max_age_seconds": 3600}}},
+        "plan": {"id": "p", "steps": [], "settings": {"market_freshness": {"max_age_seconds": age}}},
     }
     assert dry_run(envelope).errors == []
-    canonical = json.loads(validate_calibration_json(envelope))
-    assert canonical["plan"]["settings"]["market_freshness"]["max_age_seconds"] == 3600
+    canonical = json.loads(validate_calibration(envelope).to_json())
+    assert canonical["plan"]["settings"]["market_freshness"]["max_age_seconds"] == age
 
 
 def _request() -> CalibrationEnvelope:

@@ -96,7 +96,7 @@ test('object calibration inputs reject non-finite optional spreads before JSON c
   ]) {
     for (const operation of [
       calibration.calibrate,
-      calibration.validateCalibrationJson,
+      calibration.validateCalibration,
       calibration.dryRun,
     ]) {
       // The Rust `json_text` boundary rejects a non-finite number before any JSON is built.
@@ -122,7 +122,7 @@ test('object calibration inputs reject non-finite optional spreads before JSON c
 test('object calibration inputs preserve finite and absent optional spreads', () => {
   for (const spread of [null, 0, 0.001, -0.001]) {
     const envelope = swapEnvelope(spread);
-    const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
+    const canonical = calibration.validateCalibration(envelope);
     assert.equal(canonical.market_data[0].spread_decimal, spread);
     assert.equal(calibration.calibrate(envelope).result.report.success, true);
   }
@@ -133,8 +133,7 @@ test('calibration is owned only by the calibration namespace', () => {
     'calibrate',
     'calibrateBermudanLmmBaseVol',
     'dryRun',
-    'dryRunJson',
-    'validateCalibrationJson',
+    'validateCalibration',
   ]) {
     assert.equal(typeof calibration[name], 'function');
     assert.equal(valuations[name], undefined);
@@ -201,7 +200,7 @@ test('market re-ingestion requires an explicit supported schema version', () => 
 });
 
 test('malformed calibration input exposes canonical ingestion details', () => {
-  const error = captureError(() => calibration.validateCalibrationJson('{ malformed'));
+  const error = captureError(() => calibration.validateCalibration('{ malformed'));
 
   assertStructuredError(error);
   assert.equal(error.kind, 'strict_load');
@@ -212,7 +211,7 @@ test('malformed calibration input exposes canonical ingestion details', () => {
 });
 
 test('every envelope entry point reports malformed JSON with the same parse diagnostic', () => {
-  for (const name of ['calibrate', 'dryRun', 'dryRunJson', 'validateCalibrationJson']) {
+  for (const name of ['calibrate', 'dryRun', 'validateCalibration']) {
     const error = captureError(() => calibration[name]('not json'));
     assertStructuredError(error);
     assert.equal(error.kind, 'strict_load', name);
@@ -221,7 +220,7 @@ test('every envelope entry point reports malformed JSON with the same parse diag
   }
 });
 
-test('dryRun returns the typed report and dryRunJson its wire twin', () => {
+test('dryRun returns a structured report that can be serialized', () => {
   const envelope = {
     schema: 'finstack_quant.calibration/1',
     plan: {
@@ -244,7 +243,7 @@ test('dryRun returns the typed report and dryRunJson its wire twin', () => {
   assert.equal(typeof report, 'object');
   assert.equal(report.errors[0].kind, 'undefined_quote_set');
   assert.equal(report.dependency_graph.nodes[0].step_id, 'discount_step');
-  assert.deepEqual(report, JSON.parse(calibration.dryRunJson(envelope)));
+  assert.deepEqual(report, JSON.parse(JSON.stringify(report)));
 });
 
 test('unusable solver settings are rejected by validation and execution', () => {
@@ -252,7 +251,7 @@ test('unusable solver settings are rejected by validation and execution', () => 
   for (const solver of [{ tolerance: 0 }, { tolerance: -1 }, { max_iterations: 0 }]) {
     const envelope = structuredClone(EMPTY);
     envelope.plan.settings.solver = solver;
-    for (const name of ['calibrate', 'validateCalibrationJson', 'dryRun']) {
+    for (const name of ['calibrate', 'validateCalibration', 'dryRun']) {
       const error = captureError(() => calibration[name](envelope));
       assertStructuredError(error);
       assert.match(
@@ -283,7 +282,7 @@ test('Hull-White calibration requires an explicit quoted-volatility fit budget',
       ],
     },
   };
-  const error = captureError(() => calibration.validateCalibrationJson(JSON.stringify(envelope)));
+  const error = captureError(() => calibration.validateCalibration(JSON.stringify(envelope)));
   assertStructuredError(error);
   assert.equal(error.stage, 'ingestion');
   assert.match(error.message, /fit_tolerance/);
@@ -317,7 +316,7 @@ test('cap/floor Hull-White inputs require index conventions and reject frequency
   envelope.plan.steps[0].index_id = 'EUR-EURIBOR-3M';
   const report = calibration.dryRun(envelope);
   assert.ok(Array.isArray(report.errors));
-  assert.deepEqual(report, JSON.parse(calibration.dryRunJson(envelope)));
+  assert.deepEqual(report, JSON.parse(JSON.stringify(report)));
 
   envelope.plan.steps[0].payment_frequency = 'quarterly';
   const override = captureError(() => calibration.dryRun(envelope));
@@ -414,7 +413,7 @@ test('parametric calibration rejects a separate discount curve', () => {
 test('discount solve settings reject the removed curve-shape keys', () => {
   for (const key of ['interp_style', 'extrapolation_policy']) {
     const error = captureError(() =>
-      calibration.validateCalibrationJson({
+      calibration.validateCalibration({
         schema: 'finstack_quant.calibration/1',
         plan: { id: 'p', steps: [], settings: { discount_curve: { [key]: 'linear' } } },
       })
@@ -431,7 +430,7 @@ test('market freshness age is accepted as a plain number', () => {
     plan: { id: 'p', steps: [], settings: { market_freshness: { max_age_seconds: 3600 } } },
   };
   assert.deepEqual(calibration.dryRun(envelope).errors, []);
-  const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
+  const canonical = calibration.validateCalibration(envelope);
   assert.equal(canonical.plan.settings.market_freshness.max_age_seconds, 3600);
 });
 
@@ -469,4 +468,15 @@ test('dividend schedules use direct market-datum fields', () => {
   const error = captureError(() => calibration.validateCalibration(envelope));
   assertStructuredError(error);
   assert.match(error.message, /schedule/);
+});
+
+test('validated envelopes reject integers that structured JavaScript results cannot preserve', () => {
+  const envelope =
+    '{"schema":"finstack_quant.calibration/1","plan":{"id":"wide","steps":[],"settings":{"market_freshness":{"max_age_seconds":9007199254740993}}}}';
+  assert.throws(
+    () => calibration.validateCalibration(envelope),
+    /can't be represented as a JavaScript number/
+  );
+  // Diagnostics do not echo the settings, so the same exact input remains valid for dry runs.
+  assert.deepEqual(calibration.dryRun(envelope).errors, []);
 });

@@ -43,7 +43,6 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     ("finstack_quant.attribution", "attribute_pnl_envelope", "wrapper"),
     # calibration
     ("finstack_quant.calibration", "dry_run", "wrapper"),
-    ("finstack_quant.calibration", "dry_run_json", "json"),
     ("finstack_quant.statements", "normalize", "list"),
     # scenarios
     ("finstack_quant.scenarios", "compose_scenarios", "wrapper"),

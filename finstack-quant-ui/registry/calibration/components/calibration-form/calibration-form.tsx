@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   SchemaForm,
   type SchemaFormProps,
 } from "@/components/finstack/core/components/schema-form/schema-form";
+import type { CalibrationEnvelope } from "finstack-quant-wasm";
 import { calibrationModule } from "./calibration";
 /** Edit the complete generated envelope. Remount to load a different initial document. */
 export function CalibrationForm({
@@ -15,12 +16,17 @@ export function CalibrationForm({
 }: {
   /** Full canonical envelope; no market, quote, model or solver defaults are inferred. */
   defaultJson: string;
-  validate: SchemaFormProps["validate"];
+  validate(json: string, signal?: AbortSignal): Promise<CalibrationEnvelope>;
   /** Receives native canonical JSON on explicit submission. Connect it to useCalibrate. */
   onSubmit: SchemaFormProps["onSubmit"];
   onValidated?: SchemaFormProps["onValidated"];
   onInputJson?: SchemaFormProps["onInputJson"];
 }) {
+  const validateJson = useCallback(
+    async (json: string, signal?: AbortSignal) =>
+      JSON.stringify(await validate(json, signal)),
+    [validate],
+  );
   const [initial] = useState(() => {
     try {
       const value = calibrationModule.codec.parse(defaultJson);
@@ -36,7 +42,7 @@ export function CalibrationForm({
     <SchemaForm
       module={calibrationModule}
       defaultValues={initial.value}
-      validate={validate}
+      validate={validateJson}
       onSubmit={onSubmit}
       onValidated={onValidated}
       onInputJson={onInputJson}

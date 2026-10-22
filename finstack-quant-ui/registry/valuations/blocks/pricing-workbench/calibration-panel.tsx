@@ -157,7 +157,12 @@ export function CalibrationPanel({
       {dry.isFetching && (
         <p role="status">Checking calibration dependencies…</p>
       )}
-      {dry.data && <JsonViewer label="Static diagnostics" text={dry.data} />}
+      {dry.data && (
+        <JsonViewer
+          label="Static diagnostics"
+          text={JSON.stringify(dry.data)}
+        />
+      )}
       {dry.error && <p role="alert">{dry.error.message}</p>}
       {solve.isFetching && <p role="status">Calibrating…</p>}
       {failure && (

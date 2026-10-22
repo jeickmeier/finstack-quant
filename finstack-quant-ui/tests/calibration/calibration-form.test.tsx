@@ -75,7 +75,7 @@ it("edits generated quotes, prior markets and settings and submits the exact nat
   initial.prior_market[0].knot_points[1][1] = 0.0013;
   initial.plan.settings.compute_diagnostics = true;
   expect(onSubmit.mock.calls.at(-1)![0]).toBe(
-    native.validateCalibrationJson(JSON.stringify(initial)),
+    JSON.stringify(native.validateCalibration(JSON.stringify(initial))),
   );
   expect(
     calibrationModule.codec.stringify(
@@ -96,7 +96,7 @@ it("keeps native semantic failures in the summary and prevents calibration accep
   );
   let message;
   try {
-    native.validateCalibrationJson(JSON.stringify(initial));
+    native.validateCalibration(JSON.stringify(initial));
   } catch (error) {
     message = (error as Error).message;
   }
