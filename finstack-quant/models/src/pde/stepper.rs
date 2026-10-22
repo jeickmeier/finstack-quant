@@ -245,17 +245,21 @@ impl ThetaStepper {
     /// * `maturity` - Time to maturity in years, split into `n_steps` equal
     ///   intervals.
     pub fn time_levels(&self, maturity: f64) -> Vec<f64> {
-        let n = self.n_steps;
-        if n == 0 {
-            return vec![maturity];
-        }
-        let dt = maturity / n as f64;
-        let mut levels: Vec<f64> = (0..n)
-            .map(|i| (maturity - i as f64 * dt).max(0.0))
-            .collect();
-        levels.push(0.0);
-        levels
+        backward_time_levels(maturity, self.n_steps)
     }
+}
+
+/// Equally spaced backward time levels with an exact final zero.
+pub(super) fn backward_time_levels(maturity: f64, n: usize) -> Vec<f64> {
+    if n == 0 {
+        return vec![maturity];
+    }
+    let dt = maturity / n as f64;
+    let mut levels: Vec<f64> = (0..n)
+        .map(|i| (maturity - i as f64 * dt).max(0.0))
+        .collect();
+    levels.push(0.0);
+    levels
 }
 
 /// Largest time step permitted by the CFL / von-Neumann stability condition
