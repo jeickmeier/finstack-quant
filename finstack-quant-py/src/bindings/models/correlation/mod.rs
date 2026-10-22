@@ -1328,16 +1328,6 @@ fn correlation_bounds(p1: f64, p2: f64) -> PyResult<(f64, f64)> {
     probability::correlation_bounds(p1, p2).map_err(core_to_py)
 }
 
-/// Joint probabilities for two correlated Bernoulli variables.
-///
-/// Returns ``(p11, p10, p01, p00)`` that sums to 1 and exactly
-/// preserves the marginals.
-#[pyfunction]
-#[pyo3(text_signature = "(p1, p2, correlation)")]
-fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> PyResult<(f64, f64, f64, f64)> {
-    probability::joint_probabilities(p1, p2, correlation).map_err(core_to_py)
-}
-
 /// Validate a correlation matrix.
 ///
 /// ``matrix`` is either flat row-major (length ``n * n``) or a 2-D
@@ -1483,7 +1473,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTrancheLossStatistics>()?;
     m.add("MAX_PORTFOLIO_LOSS_PATHS", corr::MAX_PORTFOLIO_LOSS_PATHS)?;
     m.add_function(wrap_pyfunction!(correlation_bounds, &m)?)?;
-    m.add_function(wrap_pyfunction!(joint_probabilities, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_correlation_matrix, &m)?)?;
     m.add_function(wrap_pyfunction!(nearest_correlation, &m)?)?;
     m.add_function(wrap_pyfunction!(cholesky_correlation, &m)?)?;
@@ -1509,7 +1498,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "TrancheLossStatistics",
             "cholesky_correlation",
             "correlation_bounds",
-            "joint_probabilities",
             "nearest_correlation",
             "simulate_portfolio_loss",
             "validate_correlation_matrix",

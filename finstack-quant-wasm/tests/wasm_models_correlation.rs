@@ -249,8 +249,10 @@ fn correlation_bounds_ordered() {
 
 #[wasm_bindgen_test]
 fn joint_probabilities_sum_to_one() {
-    let j = joint_probabilities(JsValue::from(0.05), JsValue::from(0.10), JsValue::from(0.3))
-        .expect("valid inputs");
+    let j =
+        JsCorrelatedBernoulli::new(JsValue::from(0.05), JsValue::from(0.10), JsValue::from(0.3))
+            .expect("valid inputs")
+            .joint_probabilities();
     assert_eq!(j.len(), 4);
     let sum: f64 = j.iter().sum();
     assert!((sum - 1.0).abs() < 1e-9);

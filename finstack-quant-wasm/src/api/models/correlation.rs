@@ -339,31 +339,6 @@ pub fn correlation_bounds(p1: JsValue, p2: JsValue) -> Result<Box<[f64]>, JsValu
     Ok(Box::new([lo, hi]))
 }
 
-/// Joint probabilities for two correlated Bernoulli variables.
-///
-/// Returns `[p11, p10, p01, p00]`.
-/// @param p1 - First marginal default probability from 0 through 1.
-/// @param p2 - Second marginal default probability from 0 through 1.
-/// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if either marginal probability is non-finite
-/// or outside `[0, 1]`, or `correlation` is non-finite or outside `[-1, 1]`.
-#[wasm_bindgen(js_name = jointProbabilities)]
-pub fn joint_probabilities(
-    p1: JsValue,
-    p2: JsValue,
-    correlation: JsValue,
-) -> Result<Box<[f64]>, JsValue> {
-    let p1 = js_f64(&p1, "p1")?;
-    let p2 = js_f64(&p2, "p2")?;
-    let correlation = js_f64(&correlation, "correlation")?;
-    let (p11, p10, p01, p00) =
-        probability::joint_probabilities(p1, p2, correlation).map_err(to_js_err)?;
-    Ok(Box::new([p11, p10, p01, p00]))
-}
-
 /// Validate a flat row-major correlation matrix.
 ///
 /// Accepts a `Float64Array`/`number[]` of `n * n` row-major entries and

@@ -37,60 +37,6 @@
 /// (i.e., probability is effectively 0 or 1, making correlation meaningless).
 const DEGENERATE_VARIANCE_THRESHOLD: f64 = 1e-10;
 
-/// Compute joint probabilities for two correlated Bernoulli random variables.
-///
-/// Given marginal probabilities p1 and p2 with correlation ρ, returns
-/// the four joint probabilities (p11, p10, p01, p00) where:
-/// - p11 = P(X₁=1, X₂=1)
-/// - p10 = P(X₁=1, X₂=0)
-/// - p01 = P(X₁=0, X₂=1)
-/// - p00 = P(X₁=0, X₂=0)
-///
-/// Correlations inside `[-1, 1]` are clamped to the feasible
-/// Fréchet-Hoeffding bounds to preserve valid joint probabilities and exact
-/// marginals. Inputs outside their mathematical domains are rejected.
-///
-/// # Arguments
-/// * `p1` - Finite marginal probability P(X₁=1) in [0, 1]
-/// * `p2` - Finite marginal probability P(X₂=1) in [0, 1]
-/// * `correlation` - Finite correlation in [-1, 1], clamped to feasible bounds
-///
-/// # Returns
-/// Tuple (p11, p10, p01, p00) that sums to 1.0 and exactly preserves marginals.
-/// For a mathematically valid but infeasible requested correlation, the function
-/// uses the nearest Fréchet-Hoeffding bound; it therefore preserves marginals
-/// and probability non-negativity but may return an effective correlation
-/// different from the one requested. Degenerate marginals near zero or one
-/// produce the independent coupling because Pearson correlation is undefined
-/// when a Bernoulli variance vanishes.
-///
-/// # Example
-/// ```
-/// use finstack_quant_core::math::probability::joint_probabilities;
-///
-/// let (p11, p10, p01, p00) = joint_probabilities(0.6, 0.4, 0.3)?;
-/// assert!((p11 + p10 + p01 + p00 - 1.0).abs() < 1e-10);
-/// // Marginals are exactly preserved:
-/// assert!((p11 + p10 - 0.6).abs() < 1e-10);
-/// assert!((p11 + p01 - 0.4).abs() < 1e-10);
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-///
-/// # Errors
-///
-/// Returns [`crate::Error::Validation`] if either marginal is `NaN`, infinite,
-/// or outside `[0, 1]`, or if `correlation` is non-finite or outside `[-1, 1]`.
-/// Correlations inside that mathematical range but outside the feasible range
-/// for the particular marginals are clamped rather than rejected.
-#[must_use = "joint probability validation errors must be handled"]
-pub fn joint_probabilities(
-    p1: f64,
-    p2: f64,
-    correlation: f64,
-) -> crate::Result<(f64, f64, f64, f64)> {
-    Ok(CorrelatedBernoulli::new(p1, p2, correlation)?.joint_probabilities())
-}
-
 /// Correlated Bernoulli distribution for scenario generation.
 ///
 /// Provides methods for working with correlated binary outcomes,
@@ -127,10 +73,22 @@ impl CorrelatedBernoulli {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] under the same input-domain rules
-    /// as [`joint_probabilities`]. A correlation that is in `[-1, 1]` but
-    /// infeasible for `p1` and `p2` is not an error; it is clamped to the
-    /// attainable interval.
+    /// Returns [`crate::Error::Validation`] if either marginal is non-finite or
+    /// outside `[0, 1]`, or correlation is non-finite or outside `[-1, 1]`.
+    /// A correlation that is in `[-1, 1]` but infeasible for `p1` and `p2`
+    /// is clamped to the attainable interval.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use finstack_quant_core::math::probability::CorrelatedBernoulli;
+    /// let distribution = CorrelatedBernoulli::new(0.6, 0.4, 0.3)?;
+    /// let (p11, p10, p01, p00) = distribution.joint_probabilities();
+    /// assert!((p11 + p10 - 0.6).abs() < 1e-10);
+    /// assert!((p11 + p01 - 0.4).abs() < 1e-10);
+    /// assert!((p11 + p10 + p01 + p00 - 1.0).abs() < 1e-10);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
     #[must_use = "construction validation errors must be handled"]
     pub fn new(p1: f64, p2: f64, correlation: f64) -> crate::Result<Self> {
         validate_inputs(p1, p2, Some(correlation))?;
@@ -354,8 +312,9 @@ mod tests {
         ];
 
         for (p1, p2, corr) in test_cases {
-            let (p11, p10, p01, p00) =
-                joint_probabilities(p1, p2, corr).expect("valid probabilities");
+            let (p11, p10, p01, p00) = CorrelatedBernoulli::new(p1, p2, corr)
+                .expect("valid probabilities")
+                .joint_probabilities();
             let sum = p11 + p10 + p01 + p00;
             assert!(
                 (sum - 1.0).abs() < 1e-10,
@@ -379,8 +338,9 @@ mod tests {
         ];
 
         for (p1, p2, corr) in test_cases {
-            let (p11, p10, p01, p00) =
-                joint_probabilities(p1, p2, corr).expect("valid probabilities");
+            let (p11, p10, p01, p00) = CorrelatedBernoulli::new(p1, p2, corr)
+                .expect("valid probabilities")
+                .joint_probabilities();
 
             // Check marginal p1 = p11 + p10 (must be exact)
             let computed_p1 = p11 + p10;
@@ -420,21 +380,27 @@ mod tests {
         let (rho_min, rho_max) = correlation_bounds(p1, p2).expect("valid marginals");
 
         // Correlations outside the mathematical [-1, 1] domain are rejected.
-        assert!(joint_probabilities(p1, p2, 2.0).is_err());
-        assert!(joint_probabilities(p1, p2, -2.0).is_err());
+        assert!(CorrelatedBernoulli::new(p1, p2, 2.0).is_err());
+        assert!(CorrelatedBernoulli::new(p1, p2, -2.0).is_err());
 
         // At exact bounds
-        let (p11, p10, _, _) = joint_probabilities(p1, p2, rho_max).expect("upper feasible bound");
+        let (p11, p10, _, _) = CorrelatedBernoulli::new(p1, p2, rho_max)
+            .expect("upper feasible bound")
+            .joint_probabilities();
         assert!((p11 + p10 - p1).abs() < 1e-10);
 
-        let (p11, p10, _, _) = joint_probabilities(p1, p2, rho_min).expect("lower feasible bound");
+        let (p11, p10, _, _) = CorrelatedBernoulli::new(p1, p2, rho_min)
+            .expect("lower feasible bound")
+            .joint_probabilities();
         assert!((p11 + p10 - p1).abs() < 1e-10);
     }
 
     #[test]
     fn test_joint_probabilities_independent() {
         let (p1, p2) = (0.4, 0.6);
-        let (p11, p10, p01, p00) = joint_probabilities(p1, p2, 0.0).expect("valid probabilities");
+        let (p11, p10, p01, p00) = CorrelatedBernoulli::new(p1, p2, 0.0)
+            .expect("valid probabilities")
+            .joint_probabilities();
 
         // With zero correlation, should be independent
         assert!(
@@ -455,9 +421,15 @@ mod tests {
     #[test]
     fn test_positive_correlation_increases_joint() {
         let (p1, p2) = (0.5, 0.5);
-        let (p11_pos, _, _, _) = joint_probabilities(p1, p2, 0.5).expect("positive correlation");
-        let (p11_zero, _, _, _) = joint_probabilities(p1, p2, 0.0).expect("zero correlation");
-        let (p11_neg, _, _, _) = joint_probabilities(p1, p2, -0.5).expect("negative correlation");
+        let (p11_pos, _, _, _) = CorrelatedBernoulli::new(p1, p2, 0.5)
+            .expect("positive correlation")
+            .joint_probabilities();
+        let (p11_zero, _, _, _) = CorrelatedBernoulli::new(p1, p2, 0.0)
+            .expect("zero correlation")
+            .joint_probabilities();
+        let (p11_neg, _, _, _) = CorrelatedBernoulli::new(p1, p2, -0.5)
+            .expect("negative correlation")
+            .joint_probabilities();
 
         // Positive correlation should increase P(both happen)
         assert!(p11_pos > p11_zero);
@@ -509,7 +481,6 @@ mod tests {
             assert!(CorrelatedBernoulli::new(invalid, 0.5, 0.0).is_err());
             assert!(CorrelatedBernoulli::new(0.5, invalid, 0.0).is_err());
             assert!(CorrelatedBernoulli::new(0.5, 0.5, invalid).is_err());
-            assert!(joint_probabilities(invalid, 0.5, 0.0).is_err());
         }
         assert!(CorrelatedBernoulli::new(-0.1, 0.5, 0.0).is_err());
         assert!(CorrelatedBernoulli::new(0.5, 1.1, 0.0).is_err());

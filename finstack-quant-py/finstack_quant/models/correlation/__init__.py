@@ -30,7 +30,6 @@ PortfolioLossConfig = _corr.PortfolioLossConfig
 PortfolioLossResult = _corr.PortfolioLossResult
 TrancheLossStatistics = _corr.TrancheLossStatistics
 correlation_bounds = _corr.correlation_bounds
-joint_probabilities = _corr.joint_probabilities
 validate_correlation_matrix = _corr.validate_correlation_matrix
 nearest_correlation = _corr.nearest_correlation
 cholesky_correlation = _corr.cholesky_correlation
@@ -54,7 +53,6 @@ __all__: list[str] = [
     "TrancheLossStatistics",
     "cholesky_correlation",
     "correlation_bounds",
-    "joint_probabilities",
     "nearest_correlation",
     "simulate_portfolio_loss",
     "validate_correlation_matrix",

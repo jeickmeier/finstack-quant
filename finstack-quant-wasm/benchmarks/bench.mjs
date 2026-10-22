@@ -618,8 +618,9 @@ async function main() {
     w.correlationBounds(0.05, 0.08);
   });
 
-  bench('correlation', 'jointProbabilities', 20000, () => {
-    w.jointProbabilities(0.05, 0.08, 0.2);
+  const bernoulliPair = new w.CorrelatedBernoulli(0.05, 0.08, 0.2);
+  bench('correlation', 'CorrelatedBernoulli.jointProbabilities', 20000, () => {
+    bernoulliPair.jointProbabilities();
   });
 
   bench('models', 'bsPrice (call)', 20000, () => {
