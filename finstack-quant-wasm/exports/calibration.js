@@ -47,6 +47,8 @@ export const calibration = {
   volQuoteCapFloorVol: wasm.volQuoteCapFloorVol,
   inflationQuoteInflationSwap: wasm.inflationQuoteInflationSwap,
   inflationQuoteYoyInflationSwap: wasm.inflationQuoteYoyInflationSwap,
+  xccyQuote: wasm.xccyQuote,
+  cdsTrancheQuote: wasm.cdsTrancheQuote,
   rateBoundsForCurrency: wasm.rateBoundsForCurrency,
   rateBoundsEmergingMarkets: wasm.rateBoundsEmergingMarkets,
   calibrationStepDiscount: wasm.calibrationStepDiscount,

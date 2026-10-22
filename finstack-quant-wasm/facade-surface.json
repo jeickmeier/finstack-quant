@@ -217,6 +217,7 @@
       "calibrationStepXccyBasis",
       "cdsQuoteParSpread",
       "cdsQuoteUpfront",
+      "cdsTrancheQuote",
       "dryRun",
       "dryRunJson",
       "inflationQuoteInflationSwap",
@@ -239,7 +240,8 @@
       "validateVolBounds",
       "volQuoteCapFloorVol",
       "volQuoteOptionVol",
-      "volQuoteSwaptionVol"
+      "volQuoteSwaptionVol",
+      "xccyQuote"
     ]
   },
   "calibration.calibrate": {
@@ -303,6 +305,12 @@
     "kind": "function"
   },
   "calibration.inflationQuoteYoyInflationSwap": {
+    "kind": "function"
+  },
+  "calibration.xccyQuote": {
+    "kind": "function"
+  },
+  "calibration.cdsTrancheQuote": {
     "kind": "function"
   },
   "calibration.rateBoundsForCurrency": {
@@ -4124,6 +4132,9 @@
   "statements.checkReportFindingsBySeverity": {
     "kind": "function"
   },
+  "statements.capitalStructureCashflowsGetComponent": {
+    "kind": "function"
+  },
   "statements.normalizationConfigAddAdjustment": {
     "kind": "function"
   },
@@ -6139,9 +6150,6 @@
     "kind": "function"
   },
   "valuations.valuationResultFailedCovenants": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetComponent": {
     "kind": "function"
   }
 }

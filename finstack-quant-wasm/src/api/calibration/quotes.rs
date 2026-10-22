@@ -12,11 +12,11 @@ use crate::utils::input::{
     from_js_json, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string,
 };
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
-use finstack_quant_calibration::quotes::CdsQuote;
 use finstack_quant_calibration::quotes::InflationQuote;
 use finstack_quant_calibration::quotes::Pillar;
 use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::VolQuote;
+use finstack_quant_calibration::quotes::{CdsQuote, CdsTrancheQuote, XccyQuote};
 use finstack_quant_calibration::validation::RateBounds;
 use finstack_quant_core::currency::Currency;
 use wasm_bindgen::prelude::*;
@@ -454,6 +454,65 @@ pub fn inflation_quote_yoy_inflation_swap(
         js_string(&index, "index")?,
         &js_string(&frequency, "frequency")?,
         js_string(&convention, "convention")?.as_str(),
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
+}
+
+/// Build a validated cross-currency basis-swap quote using the canonical Rust constructor.
+///
+/// # Arguments
+///
+/// * `fields` - Quote fields: identifier, convention identifier, maturity pillar, basis spread in basis points, and optional positive spot FX in quote currency per base currency. Omitted spot FX uses market FX during instrument construction.
+///
+/// @returns The validated canonical cross-currency quote object.
+///
+/// # Errors
+///
+/// Throws `TypeError` for non-JSON values including nonfinite numbers, or
+/// `FinstackError` with kind `validation` for malformed fields, an invalid pillar,
+/// or nonpositive spot FX. Convention identifiers are resolved during calibration.
+#[wasm_bindgen(js_name = xccyQuote)]
+pub fn xccy_quote(fields: JsValue) -> Result<JsValue, JsValue> {
+    let fields: XccyQuote = from_js_json(&fields, "fields")?;
+    let quote = XccyQuote::new(
+        fields.id,
+        fields.convention,
+        fields.far_pillar,
+        fields.basis_spread_bp,
+        fields.spot_fx,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&quote)
+}
+
+/// Build a validated CDS index tranche quote using the canonical Rust constructor.
+///
+/// # Arguments
+///
+/// * `fields` - Quote fields including the index and series, ISO maturity date, decimal attachment and detachment in [0, 1] with attachment below detachment, decimal upfront in [-1, 1], positive running coupon in basis points, and currency/documentation convention.
+///
+/// @returns The validated canonical CDS index tranche quote object.
+///
+/// # Errors
+///
+/// Throws `TypeError` for non-JSON values including nonfinite numbers, or
+/// `FinstackError` with kind `validation` for malformed fields, invalid dates or
+/// conventions, or violated tranche, upfront, or coupon bounds.
+#[wasm_bindgen(js_name = cdsTrancheQuote)]
+pub fn cds_tranche_quote(fields: JsValue) -> Result<JsValue, JsValue> {
+    let fields: CdsTrancheQuote = from_js_json(&fields, "fields")?;
+    let quote = CdsTrancheQuote::new(
+        fields.id,
+        fields.index,
+        fields.series,
+        fields.attachment,
+        fields.detachment,
+        fields.maturity,
+        fields.upfront_pct,
+        fields.coupon_bp,
+        fields.convention.currency.as_ref(),
+        fields.convention.doc_clause.as_str(),
     )
     .map_err(to_js_err)?;
     to_js_value(&quote)

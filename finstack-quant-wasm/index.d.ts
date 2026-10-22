@@ -30588,6 +30588,26 @@ export interface CalibrationNamespace {
     convention: string
   ): generated.calibration.InflationQuote;
   /**
+   * Build a validated cross-currency basis-swap quote using the canonical Rust constructor.
+   * @example
+   * const quote = calibration.xccyQuote({ id: "X5Y", convention: "EUR-USD", far_pillar: { tenor: { count: 5, unit: "years" } }, basis_spread_bp: -12, spot_fx: 1.1 });
+   * @param fields - Quote fields: identifier, convention identifier, maturity pillar, basis spread in basis points, and optional positive spot FX in quote currency per base currency. Omitted spot FX uses market FX during instrument construction.
+   * @returns The validated canonical cross-currency quote object.
+   * @throws Error - Throws `TypeError` for non-JSON values including nonfinite numbers, or `FinstackError` with kind `validation` for malformed fields, an invalid pillar, or nonpositive spot FX. Convention identifiers are resolved during calibration.
+   */
+  xccyQuote(fields: generated.calibration.XccyQuote): generated.calibration.XccyQuote;
+  /**
+   * Build a validated CDS index tranche quote using the canonical Rust constructor.
+   * @example
+   * const quote = calibration.cdsTrancheQuote({ id: "T", index: "CDX.NA.IG", series: 42, attachment: 0.03, detachment: 0.07, maturity: "2031-05-08", upfront_pct: 0.0425, coupon_bp: 100, convention: { currency: "USD", doc_clause: "cr14" } });
+   * @param fields - Quote fields including the index and series, ISO maturity date, decimal attachment and detachment in [0, 1] with attachment below detachment, decimal upfront in [-1, 1], positive running coupon in basis points, and currency/documentation convention.
+   * @returns The validated canonical CDS index tranche quote object.
+   * @throws Error - Throws `TypeError` for non-JSON values including nonfinite numbers, or `FinstackError` with kind `validation` for malformed fields, invalid dates or conventions, or violated tranche, upfront, or coupon bounds.
+   */
+  cdsTrancheQuote(
+    fields: generated.calibration.CdsTrancheQuote
+  ): generated.calibration.CdsTrancheQuote;
+  /**
    * Run the calendar-spread, butterfly-spread and volatility-bound checks on a surface.
    *
    * Free-function twin of Python `calibration.validate_surface` (Rust `validation::validate_surface`).

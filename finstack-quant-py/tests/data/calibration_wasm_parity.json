@@ -149,6 +149,32 @@
         },
         "convention": "USD"
       }
+    },
+    "xccy": {
+      "id": "X5Y",
+      "convention": "EUR-USD",
+      "far_pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "basis_spread_bp": -12.0,
+      "spot_fx": 1.1
+    },
+    "cds_tranche": {
+      "id": "T",
+      "index": "CDX.NA.IG",
+      "series": 42,
+      "attachment": 0.03,
+      "detachment": 0.07,
+      "maturity": "2031-05-08",
+      "upfront_pct": 0.0425,
+      "coupon_bp": 100.0,
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "cr14"
+      }
     }
   },
   "rate_bounds": {
