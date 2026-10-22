@@ -1831,24 +1831,18 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0",
-    "description": "A schedule-to-model balance ratio exceeded the safety bound and was clamped."
+    "description": "The residual schedule opening differs from the stateful opening balance."
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/clamped_ratio",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/clamped_ratio",
-    "description": "Ratio used after applying the safety bound.",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/applied_ratio",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/applied_ratio",
+    "description": "Actual ratio of stateful to scheduled opening applied to the cashflows.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/kind",
-    "const": "scale_clamped"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/raw_ratio",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/raw_ratio",
-    "description": "Unbounded ratio calculated from model and schedule balances.",
-    "format": "double"
+    "const": "residual_scale_mismatch"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1",

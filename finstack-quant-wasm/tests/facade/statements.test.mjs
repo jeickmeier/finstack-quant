@@ -214,3 +214,30 @@ test('statements.parseFormula returns the canonical text Python parse_formula re
     (error) => error.kind === 'validation'
   );
 });
+
+test('statements residual scale warning accepts the applied ratio and rejects obsolete clamping', () => {
+  const evaluator = new statements.Evaluator();
+  try {
+    const result = evaluator.evaluate(MODEL_JSON);
+    result.meta.warnings = [
+      {
+        capital_structure: {
+          period: '2025Q1',
+          warning: { kind: 'residual_scale_mismatch', applied_ratio: 10000000 },
+        },
+      },
+    ];
+    assert.equal(statements.statementResultGet(result, 'revenue', '2025Q1'), 100000);
+    result.meta.warnings[0].capital_structure.warning = {
+      kind: 'scale_clamped',
+      raw_ratio: 10000000,
+      clamped_ratio: 1,
+    };
+    assert.throws(
+      () => statements.statementResultGet(result, 'revenue', '2025Q1'),
+      /scale_clamped/
+    );
+  } finally {
+    evaluator.free();
+  }
+});

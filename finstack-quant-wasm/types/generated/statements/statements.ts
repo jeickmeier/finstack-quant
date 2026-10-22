@@ -1720,14 +1720,10 @@ export type PaymentPriority =
 export type CapitalStructureWarning =
   | {
       /**
-       * Ratio used after applying the safety bound.
+       * Actual ratio of stateful to scheduled opening applied to the cashflows.
        */
-      clamped_ratio: number;
-      kind: "scale_clamped";
-      /**
-       * Unbounded ratio calculated from model and schedule balances.
-       */
-      raw_ratio: number;
+      applied_ratio: number;
+      kind: "residual_scale_mismatch";
       [k: string]: unknown;
     }
   | {

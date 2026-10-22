@@ -400,12 +400,10 @@ impl std::fmt::Display for CapitalStructureClaimCategory {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CapitalStructureWarning {
-    /// A schedule-to-model balance ratio exceeded the safety bound and was clamped.
-    ScaleClamped {
-        /// Unbounded ratio calculated from model and schedule balances.
-        raw_ratio: f64,
-        /// Ratio used after applying the safety bound.
-        clamped_ratio: f64,
+    /// The residual schedule opening differs from the stateful opening balance.
+    ResidualScaleMismatch {
+        /// Actual ratio of stateful to scheduled opening applied to the cashflows.
+        applied_ratio: f64,
     },
     /// A contractual cashflow kind is not represented in statement debt service.
     CashflowIgnored {
