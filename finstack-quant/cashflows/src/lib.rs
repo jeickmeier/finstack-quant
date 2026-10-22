@@ -27,7 +27,7 @@
 //!
 //! # Conventions
 //!
-//! Amounts retain their [`Money`] currency, and checked aggregation does not
+//! Amounts retain their [`Money`](finstack_quant_core::money::Money) currency, and checked aggregation does not
 //! perform FX conversion. Coupon rates are decimals (`0.05` means 5%); fields
 //! ending in `_bp` are basis points. Schedule dates follow the day-count,
 //! calendar, business-day, stub, roll, and payment-lag rules in
