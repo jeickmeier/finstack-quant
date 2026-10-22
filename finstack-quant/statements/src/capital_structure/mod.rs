@@ -106,11 +106,13 @@ pub(crate) use cashflows::add_optional_money;
 pub use cashflows::{CapitalStructureCashflows, CashflowBreakdown, TOTAL_ROW_LABEL};
 pub use integration::build_instrument_from_spec;
 pub use period_flows::calculate_period_flows;
-pub use principal::PrincipalClaim;
-pub use state::CapitalStructureState;
-pub use waterfall::{execute_waterfall, WaterfallPeriodResult};
+pub(crate) use principal::PrincipalClaim;
+pub(crate) use state::CapitalStructureState;
 pub(crate) use waterfall_spec::reject_available_cash_debt_service;
 pub use waterfall_spec::{
     default_priority_of_payments, EcfSweepSpec, PaymentClassSpec, PaymentPriority, PikToggleSpec,
     WaterfallSpec,
 };
+
+#[cfg(test)]
+mod tests;

@@ -11,13 +11,13 @@ use finstack_quant_core::money::Money;
 /// so an advance payment cannot create debt before its principal movement and
 /// a delayed settlement cannot reduce outstanding a second time.
 #[derive(Debug, Clone, PartialEq)]
-pub struct PrincipalClaim {
+pub(crate) struct PrincipalClaim {
     /// Date on which this principal cash payment is contractually due.
-    pub payment_date: Date,
+    pub(crate) payment_date: Date,
     /// Date on which the contractual outstanding principal is reduced.
-    pub balance_date: Date,
+    pub(crate) balance_date: Date,
     /// Nonnegative principal cash owed, in the instrument's native currency.
-    pub amount: Money,
+    pub(crate) amount: Money,
 }
 
 #[derive(Debug, Clone)]

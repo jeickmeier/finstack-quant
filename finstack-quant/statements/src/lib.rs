@@ -115,3 +115,12 @@ pub use error::{Error, Result};
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
 struct ReadmeDoctests;
+
+#[cfg(test)]
+extern crate self as finstack_quant_statements;
+#[cfg(test)]
+#[path = "../tests/support/rates.rs"]
+mod rates_support;
+#[cfg(test)]
+#[path = "../tests/support/period_flows.rs"]
+mod support;

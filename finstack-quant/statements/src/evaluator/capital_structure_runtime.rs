@@ -108,7 +108,6 @@ impl Evaluator {
                     }
                 }
                 let waterfall_result = crate::capital_structure::waterfall::execute_waterfall(
-                    &period_id,
                     &context,
                     waterfall_spec,
                     cs_state,

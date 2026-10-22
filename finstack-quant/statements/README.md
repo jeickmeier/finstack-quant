@@ -54,7 +54,7 @@ exclusive end date.
 | `evaluator` | `Evaluator`, `StatementResult`, `PreparedEvaluation`, `EvaluationContext`, `DependencyGraph`, `MonteCarloConfig`/`MonteCarloResults`, `node_to_dated_schedule` |
 | `dsl` | `parse_formula`, `compile`, `parse_and_compile`, `extract_all_identifiers`, `StmtExpr`, `BinOp`, `UnaryOp` |
 | `registry` | `Registry`, `MetricRegistry`, `MetricDefinition`, `UnitType` — the `fin.*` built-in catalog and user namespaces |
-| `capital_structure` | `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`, `CapitalStructureCashflows`, `CashflowBreakdown`, `CapitalStructureState`, `PrincipalClaim`, `execute_waterfall`, `calculate_period_flows` |
+| `capital_structure` | `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`, `CapitalStructureCashflows`, `CashflowBreakdown`, `calculate_period_flows` |
 | `checks` | `CheckSuite`, `CheckSuiteSpec`, `Check`, `CheckReport`, `FormulaCheckSpec`, and the `builtins` implementations |
 | `adjustments` | `normalize`, `merge_into_results`, `NormalizationConfig`, `Adjustment`, `AdjustmentValue`, `AdjustmentCap` |
 | `schema` | `ARTIFACTS` schema registry |
@@ -199,17 +199,13 @@ missing-data error naming the instrument and must be evaluated with
 `Evaluator::evaluate_with_market(&model, &market_ctx, as_of)`, which also hides
 actuals not yet available at `as_of`.
 
-Rust callers using `execute_waterfall` directly can supply dated principal
-claims through `CapitalStructureState::set_period_principal_flows`. Each
-`PrincipalClaim` carries its cash payment date, economic principal-reduction
-date and native-currency amount. Unpaid claims retain those dates in
-`principal_shortfall`; paid advances remain in `principal_advance_payments`
-until their economic dates and reserve the principal already settled in cash.
-Market-aware evaluation supplies these runtime inputs using the actual model
-period, including fiscal dates. Aggregate-only callers that omit dated claims
-must ensure cash and economic principal movements fall in the same allocation
-period. These state types are intentionally absent from Python and WASM; both
-hosts use the canonical evaluator.
+The evaluator owns dated principal claims and waterfall state. It retains each
+claim's cash payment date, economic principal-reduction date, and native-currency
+amount so unpaid claims and paid advances affect outstanding balances exactly
+once. Market-aware evaluation derives those inputs from canonical instrument
+schedules and the actual model periods, including fiscal dates. Runtime state
+and allocation machinery are private; Rust, Python, and WASM callers use the
+canonical evaluator.
 
 Known limits (also stated in the module rustdoc): waterfall allocation is
 pro-rata inside each payment class, walking class rank (empty
