@@ -193,7 +193,7 @@ impl JsFxQuoteConvention {
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// const conv = core.fxPairConvention("USD", "EUR");
-/// conv.base.code;          // "EUR"
+/// conv.base.toString();          // "EUR"
 /// conv.usdQuotation.toString(); // "direct"
 /// conv.pipSize;            // 0.0001
 /// conv.settlementDays;     // 2

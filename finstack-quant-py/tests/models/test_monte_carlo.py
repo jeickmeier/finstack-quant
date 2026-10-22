@@ -266,7 +266,7 @@ def test_lrm_greeks_share_the_plain_asian_price_and_bracket_the_bump_delta() -> 
 
     assert isinstance(greeks, LrmGreeks)
     assert greeks.price.mean.amount == pricer.price_asian(*args, True, num_steps=12).mean.amount
-    assert greeks.price.mean.currency.code == "USD"
+    assert str(greeks.price.mean.currency) == "USD"
     assert greeks.delta.num_paths == greeks.vega.num_paths == 20_000
 
     bump = 0.5
@@ -277,7 +277,7 @@ def test_lrm_greeks_share_the_plain_asian_price_and_bracket_the_bump_delta() -> 
 
     put = pricer.price_with_lrm_greeks(*args, False, num_steps=12, currency="EUR")
     assert put.delta.mean < 0.0
-    assert put.price.mean.currency.code == "EUR"
+    assert str(put.price.mean.currency) == "EUR"
 
 
 def test_lrm_greeks_round_trip_and_tabulate() -> None:

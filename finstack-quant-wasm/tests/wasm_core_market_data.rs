@@ -427,8 +427,8 @@ fn fx_matrix_quote_and_rate() {
 fn fx_pair_convention_helpers() {
     let conv =
         fx_pair_convention(JsValue::from("USD"), JsValue::from("JPY")).expect("USDJPY convention");
-    assert_eq!(conv.base().code(), "USD");
-    assert_eq!(conv.quote().code(), "JPY");
+    assert_eq!(conv.base().to_string(), "USD");
+    assert_eq!(conv.quote().to_string(), "JPY");
     assert_eq!(conv.usd_quotation().to_string(), "indirect");
     assert!((conv.pip_size() - 0.01).abs() < 1e-12);
     assert_eq!(conv.settlement_days(), 2);

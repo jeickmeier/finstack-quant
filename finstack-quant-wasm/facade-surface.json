@@ -981,7 +981,7 @@
       "zwl"
     ],
     "methods": ["free", "toJson", "toString"],
-    "getters": ["code", "decimals", "numeric"]
+    "getters": ["decimals", "numeric"]
   },
   "core.Money": {
     "kind": "class",

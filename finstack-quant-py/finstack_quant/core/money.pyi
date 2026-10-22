@@ -10,7 +10,7 @@ Example::
     >>> m = Money(100.0, "USD")
     >>> m.amount
     100.0
-    >>> m.currency.code
+    >>> str(m.currency)
     'USD'
     >>> m + Money(50.0, "USD")
     Money(150, 'USD')

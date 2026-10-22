@@ -611,7 +611,6 @@ def variance_inputs() -> dict[str, dict[str, Any]]:
         "spec": {
             "id": "VIX-FUTURE",
             "attributes": {},
-            "discount_curve_id": "USD-OIS",
             "vol_index_curve_id": "VIX",
             "terms": {
                 "contracts": 100000.0 / (1000.0 * 21.5),

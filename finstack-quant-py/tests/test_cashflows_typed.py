@@ -186,7 +186,7 @@ class TestBuilderSpecs:
         assert AmortizationSpec.NONE is not None
         n = Notional.par(1_000_000.0, "USD")
         assert n.initial.amount == pytest.approx(1_000_000.0)
-        assert n.currency().code == "USD"
+        assert str(n.currency()) == "USD"
         n.validate()
         spec = AmortizationSpec.linear_to(Money(0.0, "USD"))
         n2 = Notional(Money(1_000_000.0, "USD"), amort=spec)
@@ -649,7 +649,7 @@ class TestCashFlowBuilder:
         for flow, (date, amount) in zip(coupon_flows, expected_coupons, strict=True):
             assert flow.date == date
             assert flow.amount.amount == pytest.approx(amount, abs=1e-6)
-            assert flow.amount.currency.code == "USD"
+            assert str(flow.amount.currency) == "USD"
             assert flow.rate == pytest.approx(0.05)
 
         # Redemption at maturity, after the same-date final coupon.
@@ -1037,7 +1037,7 @@ class TestAccrual:
         # Hand-computed: coupon 25,000 per period; 30/360 elapsed 90/360 = 0.25 of a
         # 0.5-year period -> 25,000 * 0.5 = 12,500.00 exactly (see plan Task 5).
         accrued = accrued_interest_amount(schedule, dt.date(2025, 4, 15))
-        assert accrued.currency.code == "USD"
+        assert str(accrued.currency) == "USD"
         assert accrued.amount == pytest.approx(12_500.0, abs=1e-6)
 
     def test_accrued_zero_outside_periods(self) -> None:
@@ -1146,7 +1146,7 @@ class TestAggregation:
         ]
         total = aggregate_cashflows_checked(flows, "USD")
         assert total.amount == pytest.approx(100_000.0)
-        assert total.currency.code == "USD"
+        assert str(total.currency) == "USD"
         # Currency mismatch is rejected, never silently converted.
         with pytest.raises(ValueError, match="Currency mismatch"):
             aggregate_cashflows_checked(flows, "EUR")
@@ -1183,7 +1183,7 @@ class TestAggregation:
 
         rows = calendar_year_ladder(
             [dt.date(2027, 3, 15), dt.date(2027, 9, 15), dt.date(2034, 3, 15)],
-            ["coupon", "fixed", "Notional"],
+            ["fixed", "fixed", "Notional"],
             [100.0, 50.0, 1000.0],
             [90.0, 40.0, 700.0],
         )
@@ -1207,14 +1207,14 @@ class TestAggregation:
         with pytest.raises(ValueError, match="amount must be finite"):
             calendar_year_ladder(
                 [dt.date(2027, 3, 15)],
-                ["coupon"],
+                ["fixed"],
                 [float("nan")],
                 [90.0],
             )
         with pytest.raises(ValueError, match="pv must be finite"):
             calendar_year_ladder(
                 [dt.date(2027, 3, 15)],
-                ["coupon"],
+                ["fixed"],
                 [100.0],
                 [float("inf")],
             )
@@ -1251,7 +1251,7 @@ class TestTypedJsonEquivalence:
         typed = accrued_interest_amount(schedule, dt.date(2025, 4, 15))
         roundtrip = accrued_interest_amount(CashFlowSchedule.from_json(schedule.to_json()), "2025-04-15")
         assert typed.amount == pytest.approx(roundtrip.amount, abs=1e-9)
-        assert typed.currency.code == "USD"
+        assert str(typed.currency) == "USD"
         assert typed.amount == pytest.approx(12_500.0, abs=1e-6)
 
     def test_typed_flows_match_dated_flows_json(self) -> None:

@@ -224,7 +224,7 @@ def test_attribute_pnl_typed_inputs_many_and_bridge() -> None:
     assert table["total_pnl"].iloc[0] == pytest.approx(attr.total_pnl)
 
     bridge = pnl_bridge(_bond_json(), market_t0, market_t1, AS_OF_T0, AS_OF_T1, "USD")
-    assert bridge.currency.code == "USD"
+    assert str(bridge.currency) == "USD"
     assert attr.mark_to_market_pnl == pytest.approx(bridge.amount, rel=1e-9)
 
 

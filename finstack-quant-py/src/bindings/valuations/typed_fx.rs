@@ -91,7 +91,7 @@ type FxOptionBuilderInner = finstack_quant_valuations::instruments::fx::fx_optio
 /// --------
 /// >>> from finstack_quant.valuations.instruments import FxForward
 /// >>> fwd = FxForward.example()
-/// >>> (fwd.base_currency.code, fwd.quote_currency.code, fwd.contract_rate)
+/// >>> (str(fwd.base_currency), str(fwd.quote_currency), fwd.contract_rate)
 /// ('EUR', 'USD', 1.12)
 #[pyclass(
     module = "finstack_quant.valuations.instruments",

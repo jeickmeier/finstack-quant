@@ -158,7 +158,7 @@ const usd = new core.Currency("USD");
 const usd = new core.Currency("USD");
 const eur = new core.Currency("EUR");
 
-console.log(usd.code); // "USD"
+console.log(usd.toString()); // "USD"
 console.log(usd.numeric); // 840
 console.log(eur.decimals); // 2
 
@@ -247,7 +247,7 @@ await init({
 
 test("core.Currency creation", () => {
   const usd = new core.Currency("USD");
-  assert.equal(usd.code, "USD");
+  assert.equal(usd.toString(), "USD");
 });
 
 test("analytics.Performance.sharpe returns a typed array", () => {

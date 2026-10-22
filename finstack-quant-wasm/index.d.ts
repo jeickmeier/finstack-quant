@@ -888,18 +888,12 @@ interface FactorModel extends WasmOwned {}
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const usd = new core.Currency("USD");
- * usd.code;     // "USD"
+ * usd.toString();     // "USD"
  * usd.numeric;  // 840
  * usd.decimals; // 2
  * ```
  */
 export interface Currency extends WasmOwned {
-  /**
-   * Three-letter ISO-4217 alphabetic code.
-   *
-   * @returns The uppercase alphabetic code (e.g. `"USD"`).
-   */
-  readonly code: string;
   /**
    * ISO-4217 numeric code.
    *
@@ -913,7 +907,7 @@ export interface Currency extends WasmOwned {
    */
   readonly decimals: number;
   /**
-   * Human-readable code (same as `code`).
+   * Uppercase ISO-4217 alphabetic code.
    *
    * @returns The uppercase alphabetic ISO-4217 code.
    */
@@ -939,7 +933,7 @@ export interface Currency extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const usd = new core.Currency("USD");
- * usd.code;     // "USD"
+ * usd.toString();     // "USD"
  * usd.numeric;  // 840
  * usd.decimals; // 2
  * ```
@@ -951,7 +945,7 @@ export interface CurrencyConstructor {
    * @example
    * ```javascript
    * const eur = new core.Currency("eur"); // case-insensitive
-   * eur.code; // "EUR"
+   * eur.toString(); // "EUR"
    * ```
    * @param code - Three-letter ISO-4217 code (e.g. `"USD"`, `"eur"`, `"GBP"`). Case-insensitive; surrounding whitespace is not trimmed.
    * @returns Constructed `Currency`.
@@ -2115,7 +2109,7 @@ export interface MoneyConstructor {
    * const usd = new core.Currency("USD");
    * const m = new core.Money(1234.56, usd);
    * m.amount;          // 1234.56
-   * m.currency.code;   // "USD"
+   * m.currency.toString();   // "USD"
    * ```
    * @param amount - Numeric amount in major units (must be finite).
    * @param currency - ISO-4217 Currency object that tags the amount and controls arithmetic compatibility.
@@ -4117,7 +4111,7 @@ export interface FxPairConvention extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const conv = core.fxPairConvention("USD", "EUR");
- * conv.base.code;          // "EUR"
+ * conv.base.toString();          // "EUR"
  * conv.usdQuotation.toString(); // "direct"
  * conv.pipSize;            // 0.0001
  * conv.settlementDays;     // 2

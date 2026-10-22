@@ -9,7 +9,7 @@ Example::
 
     >>> from finstack_quant.core.currency import Currency, USD
     >>> usd = Currency("USD")
-    >>> usd.code
+    >>> str(usd)
     'USD'
     >>> usd.numeric
     840
@@ -19,7 +19,7 @@ Example::
 Examples
 --------
 >>> from finstack_quant.core.currency import Currency
->>> Currency.from_numeric(840).code
+>>> str(Currency.from_numeric(840))
 'USD'
 
 """
@@ -211,7 +211,7 @@ class Currency:
     --------
     >>> from finstack_quant.core.currency import Currency
     >>> eur = Currency("EUR")
-    >>> eur.code
+    >>> str(eur)
     'EUR'
     >>> eur.numeric
     978
@@ -263,25 +263,9 @@ class Currency:
         Examples
         --------
         >>> from finstack_quant.core.currency import Currency
-        >>> Currency.from_numeric(840).code
+        >>> str(Currency.from_numeric(840))
         'USD'
 
-        """
-        ...
-
-    @property
-    def code(self) -> str:
-        """
-        Three-letter ISO-4217 alphabetic code (uppercase).
-
-        Returns
-        -------
-        str
-            Three-letter ISO-4217 alphabetic code (uppercase).
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
         """
         ...
 
@@ -358,7 +342,7 @@ class Currency:
         Examples
         --------
         >>> from finstack_quant.core.currency import Currency
-        >>> Currency.from_json(Currency.from_numeric(840).to_json()).code
+        >>> str(Currency.from_json(Currency.from_numeric(840).to_json()))
         'USD'
 
         """

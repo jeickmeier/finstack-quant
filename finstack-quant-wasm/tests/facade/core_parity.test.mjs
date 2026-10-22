@@ -305,10 +305,10 @@ const CASES = {
   rate_zero: () => [core.Rate.zero().asDecimal, core.Bps.zero().asBp],
   money: () => [
     JSON.parse(core.Money.zero(core.Currency.usd()).toJson()),
-    [money(12.5, 'EUR').amount, money(12.5, 'EUR').currency.code],
+    [money(12.5, 'EUR').amount, money(12.5, 'EUR').currency.toString()],
   ],
   currency: () => [
-    core.Currency.fromNumeric(840).code,
+    core.Currency.fromNumeric(840).toString(),
     core.Currency.jpy().decimals,
     core.Currency.try().numeric,
   ],
@@ -426,8 +426,9 @@ const CASES = {
     converted: [
       market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount
         .amount,
-      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount
-        .currency.code,
+      market()
+        .convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02')
+        .amount.currency.toString(),
       market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').rate.rate,
       market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').rate
         .triangulated,
@@ -582,7 +583,7 @@ test('every ISO-4217 currency has a Currency static', () => {
     (name) => /^[a-z]{3}$/.test(name) && typeof core.Currency[name] === 'function'
   );
   assert.equal(statics.length, 159);
-  for (const name of statics) assert.equal(core.Currency[name]().code, name.toUpperCase());
+  for (const name of statics) assert.equal(core.Currency[name]().toString(), name.toUpperCase());
 });
 
 test('handles round-trip through their JSON wire form', () => {

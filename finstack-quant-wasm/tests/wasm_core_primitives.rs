@@ -18,7 +18,7 @@ fn json_roundtrip() {
     let c = currency("GBP");
     let json = c.to_json().expect("serialize");
     let c2 = JsCurrency::from_json(JsValue::from(&json)).expect("deserialize");
-    assert_eq!(c2.code(), "GBP");
+    assert_eq!(c2.to_string(), "GBP");
 }
 
 fn epoch(y: i32, m: u8, d: u8) -> i32 {
@@ -103,14 +103,14 @@ fn json_roundtrip_binding() {
     let json = m.to_json().expect("serialize");
     let back = JsMoney::from_json(JsValue::from(&json)).expect("deserialize");
     assert_eq!(back.amount_decimal(), m.amount_decimal());
-    assert_eq!(back.currency().code(), "USD");
+    assert_eq!(back.currency().to_string(), "USD");
 }
 
 #[wasm_bindgen_test]
 fn construct_and_getters() {
     let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
     assert!((m.amount() - 10.0).abs() < 1e-10);
-    assert_eq!(m.currency().code(), "USD");
+    assert_eq!(m.currency().to_string(), "USD");
 }
 
 #[wasm_bindgen_test]

@@ -121,7 +121,7 @@ class TestCurrencyParity:
     def test_construction_and_properties(self) -> None:
         """USD should have code 'USD', numeric 840, decimals 2."""
         usd = Currency("USD")
-        assert usd.code == "USD"
+        assert str(usd) == "USD"
         assert usd.numeric == 840
         assert usd.decimals == 2
 
@@ -129,7 +129,7 @@ class TestCurrencyParity:
         """Lowercase input should resolve identically."""
         usd1 = Currency("USD")
         usd2 = Currency("usd")
-        assert usd1.code == usd2.code
+        assert str(usd1) == str(usd2)
         assert usd1.numeric == usd2.numeric
 
     def test_equality(self) -> None:
@@ -165,13 +165,13 @@ class TestMoneyParity:
         """Amount and currency round-trip correctly."""
         m = Money(100.50, usd)
         assert m.amount == pytest.approx(100.50)
-        assert m.currency.code == "USD"
+        assert str(m.currency) == "USD"
 
     def test_addition(self, usd: Currency) -> None:
         """Same-currency addition."""
         result = Money(100.0, usd) + Money(50.0, usd)
         assert result.amount == pytest.approx(150.0)
-        assert result.currency.code == "USD"
+        assert str(result.currency) == "USD"
 
     def test_subtraction(self, usd: Currency) -> None:
         """Same-currency subtraction."""
@@ -339,10 +339,10 @@ class TestFxConventionParity:
 
     def test_fx_market_pair_and_convention(self) -> None:
         base, quote = fx_market_pair("USD", "EUR")
-        assert [base.code, quote.code] == ["EUR", "USD"]
+        assert [str(base), str(quote)] == ["EUR", "USD"]
         conv = fx_pair_convention("USD", "JPY")
-        assert conv.base.code == "USD"
-        assert conv.quote.code == "JPY"
+        assert str(conv.base) == "USD"
+        assert str(conv.quote) == "JPY"
         assert str(conv.usd_quotation) == "indirect"
         assert conv.usd_quotation == FxQuoteConvention.INDIRECT
         assert conv.pip_size == 0.01

@@ -22,7 +22,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde_json::{Map, Value};
 
-/// ISO-4217 code from a ``Currency`` object (``.code``) or a plain string.
+/// ISO-4217 code from a ``Currency`` object (``str(currency)``) or a plain string.
 pub(crate) fn currency_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(code) = obj.getattr("code") {
         if let Ok(code) = code.extract::<String>() {

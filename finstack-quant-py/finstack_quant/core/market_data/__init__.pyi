@@ -4344,7 +4344,7 @@ class ConvertedMoney:
     >>> fx = FxMatrix()
     >>> fx.set_quotes([("EUR", "USD", 1.1)])
     >>> converted = MarketContext().insert_fx(fx).convert_money(Money(10.0, "EUR"), "USD", "2025-01-02")
-    >>> (converted.amount.currency.code, converted.rate.rate)
+    >>> (str(converted.amount.currency), converted.rate.rate)
     ('USD', 1.1)
 
     """
@@ -4516,7 +4516,7 @@ class FxPairConvention:
     --------
     >>> from finstack_quant.core.market_data import fx_pair_convention
     >>> conv = fx_pair_convention("USD", "EUR")
-    >>> (conv.base.code, conv.quote.code, str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
+    >>> (str(conv.base), str(conv.quote), str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
     ('EUR', 'USD', 'direct', 0.0001, 2)
 
     """
@@ -4636,7 +4636,7 @@ def fx_market_pair(
     Examples
     --------
     >>> from finstack_quant.core.market_data import fx_market_pair
-    >>> [c.code for c in fx_market_pair("USD", "EUR")]
+    >>> [str(c) for c in fx_market_pair("USD", "EUR")]
     ['EUR', 'USD']
 
     """
@@ -4675,7 +4675,7 @@ def fx_pair_convention(
     --------
     >>> from finstack_quant.core.market_data import fx_pair_convention
     >>> conv = fx_pair_convention("USD", "JPY")
-    >>> (conv.base.code, conv.quote.code, str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
+    >>> (str(conv.base), str(conv.quote), str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
     ('USD', 'JPY', 'indirect', 0.01, 2)
 
     """
@@ -4987,7 +4987,7 @@ class ScalarTimeSeries:
         Examples
         --------
         >>> from finstack_quant.core.market_data import ScalarTimeSeries
-        >>> ScalarTimeSeries("PX", [("2025-01-01", 100.0)], currency="USD").currency.code
+        >>> str(ScalarTimeSeries("PX", [("2025-01-01", 100.0)], currency="USD").currency)
         'USD'
 
         """

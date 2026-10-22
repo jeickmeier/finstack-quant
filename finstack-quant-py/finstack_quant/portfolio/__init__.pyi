@@ -8573,7 +8573,7 @@ class PortfolioPrimitiveExposureReport:
     --------
     >>> from finstack_quant.portfolio import PortfolioPrimitiveExposureReport
     >>> report = PortfolioPrimitiveExposureReport.from_json('{"base_currency":"USD","paths":[],"aggregates":[]}')
-    >>> (report.base_currency.code, report.path_count, report.aggregate_count)
+    >>> (str(report.base_currency), report.path_count, report.aggregate_count)
     ('USD', 0, 0)
     """
 
@@ -8600,9 +8600,8 @@ class PortfolioPrimitiveExposureReport:
         Examples
         --------
         >>> from finstack_quant.portfolio import PortfolioPrimitiveExposureReport
-        >>> PortfolioPrimitiveExposureReport.from_json(
-        ...     '{"base_currency":"EUR","paths":[],"aggregates":[]}'
-        ... ).base_currency.code
+        >>> report = PortfolioPrimitiveExposureReport.from_json('{"base_currency":"EUR","paths":[],"aggregates":[]}')
+        >>> str(report.base_currency)
         'EUR'
         """
         ...
