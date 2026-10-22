@@ -7,7 +7,8 @@
 //! `Rate` serializes as its decimal and rejects non-finite values when
 //! deserialized. `Bps` serializes as its integer basis-point quote. The
 //! floating-point `Bps` conversion rejects invalid values with validation
-//! errors. Percent quotes use [`Rate::from_percent`] and [`Rate::as_percent`].
+//! errors. Arithmetic uses fallible `checked_*` methods; only `Rate` negation
+//! is infallible. Percent quotes use [`Rate::from_percent`] and [`Rate::as_percent`].
 //!
 //! # Example
 //!
@@ -22,7 +23,7 @@
 //! ```
 
 use std::fmt;
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::ops::Neg;
 
 use serde::{Deserialize, Serialize};
 
@@ -74,30 +75,6 @@ fn ensure_finite(value: f64) -> Result<f64> {
             kind: NonFiniteKind::classify(value),
         }
         .into())
-    }
-}
-
-/// Unwrap a checked `Rate` operation inside an infallible `std::ops` operator.
-#[expect(
-    clippy::panic,
-    reason = "std::ops operators cannot return Result; the checked_* methods are the fallible API"
-)]
-fn rate_from_checked(result: Result<Rate>) -> Rate {
-    match result {
-        Ok(rate) => rate,
-        Err(error) => panic!("rate arithmetic failed: {error}"),
-    }
-}
-
-/// Unwrap a checked `Bps` operation inside an infallible `std::ops` operator.
-#[expect(
-    clippy::panic,
-    reason = "std::ops operators cannot return Result; the checked_* methods are the fallible API"
-)]
-fn bps_from_checked(result: Result<Bps>) -> Bps {
-    match result {
-        Ok(bps) => bps,
-        Err(error) => panic!("basis-point arithmetic failed: {error}"),
     }
 }
 
@@ -353,42 +330,6 @@ impl From<Rate> for f64 {
     }
 }
 
-// Arithmetic operators panic when the matching `checked_*` method returns an
-// error: a non-finite `Rate` result, or a `Bps` overflow or
-// zero divisor. The panic is the same in debug and release. Untrusted inputs
-// should call `checked_*`, which returns that error instead.
-impl Add for Rate {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        rate_from_checked(self.checked_add(rhs))
-    }
-}
-
-impl Sub for Rate {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        rate_from_checked(self.checked_sub(rhs))
-    }
-}
-
-impl Mul<f64> for Rate {
-    type Output = Self;
-
-    fn mul(self, rhs: f64) -> Self::Output {
-        rate_from_checked(self.checked_mul(rhs))
-    }
-}
-
-impl Div<f64> for Rate {
-    type Output = Self;
-
-    fn div(self, rhs: f64) -> Self::Output {
-        rate_from_checked(self.checked_div(rhs))
-    }
-}
-
 impl Neg for Rate {
     type Output = Self;
 
@@ -592,46 +533,6 @@ impl From<Bps> for i32 {
 // basis-point count (25.0 → 25bp), so an f64 conversion returning the decimal
 // (25bp → 0.0025) would be asymmetric with it. Use [`Bps::as_decimal`],
 // [`Bps::as_percent`], or `f64::from(bp.as_bp())`.
-
-impl Add for Bps {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        bps_from_checked(self.checked_add(rhs))
-    }
-}
-
-impl Sub for Bps {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        bps_from_checked(self.checked_sub(rhs))
-    }
-}
-
-impl Mul<i32> for Bps {
-    type Output = Self;
-
-    fn mul(self, rhs: i32) -> Self::Output {
-        bps_from_checked(self.checked_mul(rhs))
-    }
-}
-
-impl Div<i32> for Bps {
-    type Output = Self;
-
-    fn div(self, rhs: i32) -> Self::Output {
-        bps_from_checked(self.checked_div(rhs))
-    }
-}
-
-impl Neg for Bps {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        bps_from_checked(self.checked_neg())
-    }
-}
 
 /// Converts to whole basis points, **rounding** to the nearest bp — `Bps` is an
 /// integer type, so sub-bp precision (common for credit/swap spreads) is lost.
