@@ -36,11 +36,9 @@ use time::Month;
 /// calendar-day convention (365 per year). Use `Weekly` if you need
 /// calendar-week granularity.
 ///
-/// Parses the snake_case wire values via [`std::str::FromStr`]
-/// (for example, `"quarterly"` or `"semi_annual"`). The parser also accepts
-/// the `"semiannual"` spelling and the pandas offset aliases `D`/`B`
-/// (daily), `W` (weekly), `M`/`ME` (monthly), `Q`/`QE` (quarterly) and
-/// `A`/`Y`/`YE` (annual); serde (de)serialization stays strict snake_case.
+/// Parses only the canonical snake_case wire values via [`std::str::FromStr`]:
+/// `daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.
+/// Aliases, whitespace padding and case variants are rejected.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
@@ -71,17 +69,22 @@ impl fmt::Display for PeriodKind {
 impl FromStr for PeriodKind {
     type Err = crate::Error;
 
+    /// Parse one exact canonical observation frequency.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - One of daily, weekly, monthly, quarterly, semi_annual, or annual; aliases, case variants and padding are rejected.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "daily" | "D" | "B" => Ok(PeriodKind::Daily),
-            "weekly" | "W" => Ok(PeriodKind::Weekly),
-            "monthly" | "M" | "ME" => Ok(PeriodKind::Monthly),
-            "quarterly" | "Q" | "QE" => Ok(PeriodKind::Quarterly),
-            "semi_annual" | "semiannual" => Ok(PeriodKind::SemiAnnual),
-            "annual" | "A" | "Y" | "YE" => Ok(PeriodKind::Annual),
+            "daily" => Ok(PeriodKind::Daily),
+            "weekly" => Ok(PeriodKind::Weekly),
+            "monthly" => Ok(PeriodKind::Monthly),
+            "quarterly" => Ok(PeriodKind::Quarterly),
+            "semi_annual" => Ok(PeriodKind::SemiAnnual),
+            "annual" => Ok(PeriodKind::Annual),
             _ => Err(crate::Error::Validation(format!(
                 "unknown period kind '{s}'; expected one of daily, weekly, monthly, quarterly, \
-                 semi_annual, semiannual, annual (or a pandas offset alias D, B, W, M, ME, Q, QE, A, Y, YE)"
+                 semi_annual, annual"
             ))),
         }
     }

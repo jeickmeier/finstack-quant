@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/performance.schema.json",
-      "bytes": 3633,
+      "bytes": 3494,
       "kind": "input",
       "path": "schemas/analytics/1/performance.schema.json",
       "summary": "Central performance analytics engine.",

@@ -2,6 +2,7 @@
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{label_enum, wire_methods};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
     build_fiscal_periods, build_periods, FiscalConfig, Period, PeriodId, PeriodKind, PeriodPlan,
@@ -9,17 +10,7 @@ use finstack_quant_core::dates::{
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyIterator, PyList, PyModule, PyType};
 
-/// Period frequency kind (Daily, Weekly, Monthly, Quarterly, Semi-annual, Annual).
-///
-/// Immutable, hashable enum-style type. ``str()`` gives the snake_case wire
-/// name (``"quarterly"``), which ``from_name`` parses along with the pandas
-/// offset aliases ``D``/``W``/``M``/``Q``/``A``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.core.dates import PeriodKind
-/// >>> (PeriodKind.QUARTERLY.periods_per_year, PeriodKind.from_name("m") == PeriodKind.MONTHLY)
-/// (4, True)
+#[doc = pydoc!("finstack_quant.core.dates", "PeriodKind")]
 #[pyclass(
     name = "PeriodKind",
     module = "finstack_quant.core.dates",
@@ -41,7 +32,7 @@ impl PyPeriodKind {
     }
 }
 
-label_enum!(PyPeriodKind, PeriodKind, "PeriodKind", from_name, {
+label_enum!(PyPeriodKind, PeriodKind, "PeriodKind", {
     /// Daily periods (252 trading days per year).
     DAILY => Daily,
     /// Weekly periods.
@@ -58,33 +49,22 @@ label_enum!(PyPeriodKind, PeriodKind, "PeriodKind", from_name, {
 
 #[pymethods]
 impl PyPeriodKind {
-    /// Number of periods per year for this frequency.
+    #[doc = pydoc!("finstack_quant.core.dates", "PeriodKind.from_name")]
+    #[classmethod]
+    #[pyo3(text_signature = "(cls, name)")]
+    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
+        name.parse::<PeriodKind>()
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.core.dates", "PeriodKind.periods_per_year")]
     #[getter]
     fn periods_per_year(&self) -> u16 {
         self.inner.periods_per_year()
     }
 
-    /// Observation date one period before ``first``.
-    ///
-    /// Daily and weekly step back 1 and 7 calendar days; monthly, quarterly,
-    /// semi-annual and annual step back 1, 3, 6 and 12 months with month-end
-    /// clamping. Used to seed a prior observation for period-over-period
-    /// series.
-    ///
-    /// Parameters
-    /// ----------
-    /// first : datetime.date | str
-    ///     First observation date of the series.
-    ///
-    /// Returns
-    /// -------
-    /// datetime.date
-    ///     The prior observation date.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``first`` is invalid or the prior observation date underflows the supported calendar.
+    #[doc = pydoc!("finstack_quant.core.dates", "PeriodKind.prior_observation_date")]
     #[pyo3(text_signature = "(self, first)")]
     fn prior_observation_date<'py>(
         &self,

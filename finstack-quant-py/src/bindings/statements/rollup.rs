@@ -4,37 +4,14 @@
 //! mirroring Rust's `StatementResult::rollup`.
 
 use crate::bindings::macros::wire_methods;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::dates::PeriodKind;
 use finstack_quant_statements::evaluator::{RollupMethod, RollupSpec as RustRollupSpec};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 
-/// Target frequency and per-node methods for ``StatementResult.rollup``.
-///
-/// Parameters
-/// ----------
-/// frequency : str
-///     Target frequency: ``"quarterly"``, ``"semi_annual"`` or ``"annual"``
-///     (pandas aliases such as ``"Q"`` and ``"A"`` are accepted). It must be
-///     coarser than the model's periods and hold a whole number of them.
-/// methods : dict[str, str] | None
-///     Rollup method per node id: ``"sum"`` (flows, the default for nodes not
-///     listed), ``"period_end"`` (balances and trailing metrics such as LTM
-///     EBITDA take the last source period) or ``"formula"`` (ratios re-evaluate
-///     their formula on the rolled-up values).
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``frequency`` or a method is not a recognized label.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements import RollupSpec
-/// >>> spec = RollupSpec("annual", {"cash": "period_end", "margin": "formula"})
-/// >>> (spec.frequency, spec.methods)
-/// ('annual', {'cash': 'period_end', 'margin': 'formula'})
+#[doc = pydoc!("finstack_quant.statements", "RollupSpec")]
 #[pyclass(
     name = "RollupSpec",
     module = "finstack_quant.statements",
@@ -45,7 +22,12 @@ pub(crate) struct PyRollupSpec {
     pub(crate) inner: RustRollupSpec,
 }
 
-wire_methods!(PyRollupSpec, RustRollupSpec, "RollupSpec");
+wire_methods!(
+    PyRollupSpec,
+    RustRollupSpec,
+    "RollupSpec",
+    module = "finstack_quant.statements"
+);
 
 #[pymethods]
 impl PyRollupSpec {
@@ -67,23 +49,13 @@ impl PyRollupSpec {
         })
     }
 
-    /// Target frequency label (``"quarterly"``, ``"semi_annual"`` or ``"annual"``).
+    #[doc = pydoc!("finstack_quant.statements", "RollupSpec.frequency")]
     #[getter]
     fn frequency(&self) -> String {
         self.inner.frequency.to_string()
     }
 
-    /// Rollup method label per listed node id; unlisted nodes are summed.
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, str]
-    ///     Node id to ``"sum"``, ``"period_end"`` or ``"formula"``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a method cannot be rendered as its label.
+    #[doc = pydoc!("finstack_quant.statements", "RollupSpec.methods")]
     #[getter]
     fn methods(&self) -> PyResult<IndexMap<String, String>> {
         self.inner

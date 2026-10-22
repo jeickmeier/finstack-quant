@@ -222,15 +222,44 @@ fn period_kind_display_parse_and_counts() {
         Ok(PeriodKind::SemiAnnual)
     );
     assert_eq!(PeriodKind::from_str("annual"), Ok(PeriodKind::Annual));
-    assert_eq!(
-        PeriodKind::from_str("semiannual"),
-        Ok(PeriodKind::SemiAnnual)
-    );
-    assert_eq!(PeriodKind::from_str("Y"), Ok(PeriodKind::Annual));
-    assert_eq!(PeriodKind::from_str("B"), Ok(PeriodKind::Daily));
-    assert_eq!(PeriodKind::from_str("Q"), Ok(PeriodKind::Quarterly));
-    for noncanonical in ["q", "SemiAnnual", " quarterly"] {
-        assert!(PeriodKind::from_str(noncanonical).is_err());
+    for noncanonical in [
+        "D",
+        "B",
+        "W",
+        "M",
+        "ME",
+        "Q",
+        "QE",
+        "A",
+        "Y",
+        "YE",
+        "semiannual",
+        "q",
+        "SemiAnnual",
+        "DAILY",
+        " quarterly",
+        "monthly ",
+        "",
+    ] {
+        assert!(
+            PeriodKind::from_str(noncanonical).is_err(),
+            "{noncanonical}"
+        );
+    }
+    for kind in [
+        PeriodKind::Daily,
+        PeriodKind::Weekly,
+        PeriodKind::Monthly,
+        PeriodKind::Quarterly,
+        PeriodKind::SemiAnnual,
+        PeriodKind::Annual,
+    ] {
+        assert_eq!(
+            kind.to_string()
+                .parse::<PeriodKind>()
+                .expect("canonical label"),
+            kind
+        );
     }
     assert!(PeriodKind::from_str("unknown").is_err());
 

@@ -32,10 +32,7 @@ struct PanelInputs {
     frequency: PeriodKind,
 }
 
-/// Parse a frequency token (`daily`, `weekly`, `monthly`, `quarterly`,
-/// `semi_annual`/`semiannual`, `annual` or a pandas offset alias `D`/`B`, `W`,
-/// `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE`); the descriptive error comes from core.
-/// An omitted token resolves to `default`, a Rust-owned constant.
+/// Parse a canonical frequency label, or use the Rust default when omitted.
 fn parse_frequency(frequency: Option<&str>, default: PeriodKind) -> Result<PeriodKind, JsValue> {
     frequency
         .map(str::parse::<PeriodKind>)
@@ -876,7 +873,7 @@ impl JsPerformance {
     ///
     /// * `frequency` - Optional calendar frequency token: `"daily"`,
     ///   `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or
-    ///   `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE` are accepted too); defaults to `"monthly"`.
+    ///   `"annual"`; defaults to `"monthly"`.
     ///
     /// # Errors
     ///

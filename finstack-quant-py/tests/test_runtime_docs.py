@@ -89,7 +89,18 @@ _INSTRUMENT_MACRO_OWNERS = (
 )
 
 CONVERTED: dict[str, tuple[str, ...] | None] = {
-    "finstack_quant.analytics": ("AnalyticsError",),
+    "finstack_quant.analytics": (
+        "AnalyticsError",
+        "Performance.from_arrays",
+        "Performance.from_returns",
+        "Performance.from_returns_arrays",
+        "Performance.frequency",
+        "Performance.periodic_returns",
+        "Performance.period_stats",
+        "Performance.cagr",
+    ),
+    "finstack_quant.core.dates": ("PeriodKind",),
+    "finstack_quant.statements": ("RollupSpec",),
     "finstack_quant.valuations.composite": None,
     "finstack_quant.valuations.market": None,
     "finstack_quant.valuations.schema": None,

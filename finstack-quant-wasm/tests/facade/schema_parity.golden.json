@@ -2148,7 +2148,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3898
+            "bytes": 3759
           },
           {
             "path": "schemas/statements/1/statement_result.schema.json",
@@ -4539,7 +4539,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3898
+            "bytes": 3759
           },
           {
             "domain": "statements",
