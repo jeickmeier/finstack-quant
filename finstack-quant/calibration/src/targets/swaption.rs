@@ -1808,7 +1808,11 @@ mod tests {
                 / fwd.df(t_end).expect("projection end DF")
                 - 1.0)
                 * discount;
-            legacy_float_pv += fwd.rate_period(t_start, t_end) * accrual * discount;
+            legacy_float_pv += fwd
+                .rate_period(t_start, t_end)
+                .expect("finite ordered period")
+                * accrual
+                * discount;
         }
         let expected = expected_float_pv / pv01;
         let legacy = legacy_float_pv / pv01;

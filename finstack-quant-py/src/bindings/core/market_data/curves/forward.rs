@@ -239,9 +239,15 @@ impl PyForwardCurve {
     /// Returns
     /// -------
     /// float
+    ///     Finite period-average rate as a decimal; equal or very short intervals return the start rate.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If endpoints are non-finite or reversed, or the interval or result is non-finite.
     #[pyo3(text_signature = "(self, t1, t2)")]
-    fn rate_period(&self, t1: f64, t2: f64) -> f64 {
-        self.inner.rate_period(t1, t2)
+    fn rate_period(&self, t1: f64, t2: f64) -> PyResult<f64> {
+        self.inner.rate_period(t1, t2).map_err(core_to_py)
     }
 
     /// Discount factor implied by compounding the forwards to a year fraction or date.

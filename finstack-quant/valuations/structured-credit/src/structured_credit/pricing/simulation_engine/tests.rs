@@ -757,7 +757,9 @@ mod cases {
             term_rate_for_period(&curve, &MarketContext::new(), start_date, DayCount::Act360)
                 .expect("term projection should succeed");
 
-        assert!((expected - curve.rate_period(t1, t2)).abs() > 1e-6);
+        assert!(
+            (expected - curve.rate_period(t1, t2).expect("finite ordered period")).abs() > 1e-6
+        );
         assert!((actual - expected).abs() < 1e-14);
         let curve_basis_rate = curve.rate_between(t1, t2).expect("curve-basis rate");
         assert!((actual - curve_basis_rate).abs() > 1e-5);
