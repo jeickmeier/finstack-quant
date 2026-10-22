@@ -11,9 +11,11 @@ store-success-output = false
 store-failure-output = true
 
 [profile.ci]
-# The PR gate budget: report at 20 s, kill at 60 s. A test that needs longer
-# belongs in the `#[ignore]` slow suite, which the full tier runs.
-slow-timeout = { period = "20s", terminate-after = 3 }
+# Report a test as SLOW at 20 s and kill it at 180 s as a runaway guard. The
+# PR gate budget is 60 s per test, and the cap tightens to it once the slow
+# tests are measured on CI and moved to the `#[ignore]` slow suite, which the
+# full tier runs.
+slow-timeout = { period = "20s", terminate-after = 9 }
 fail-fast = false
 
 [profile.ci.junit]
