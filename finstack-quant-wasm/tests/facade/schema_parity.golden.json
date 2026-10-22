@@ -1821,7 +1821,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json",
             "type_name": "PortfolioResult",
             "kind": "output",
-            "bytes": 44518
+            "bytes": 44514
           },
           {
             "path": "schemas/portfolio/1/position_change.schema.json",
@@ -4314,7 +4314,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json",
             "type_name": "PortfolioResult",
             "kind": "output",
-            "bytes": 44518
+            "bytes": 44514
           },
           {
             "domain": "portfolio",

@@ -144,14 +144,7 @@
         "variance_time_to_maturity",
         "weight_risk"
       ],
-      "FX": [
-        "base_amount",
-        "fx01",
-        "fx_delta",
-        "fx_vega",
-        "inverse_rate",
-        "spot_rate"
-      ],
+      "FX": ["base_amount", "fx01", "fx_vega", "inverse_rate", "spot_rate"],
       "Greeks": [
         "bucketed_vega",
         "charm",
@@ -12068,7 +12061,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "9c88720101020a5ecbdf10d1fc4fd7d66d7485bfb8b3b34879da26367105c3a5"
+        "sha256": "cd6ca198c4297d933233ca622d8c0b869f0246124d77e6dfb658dc4f5d320454"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",
@@ -12173,7 +12166,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "9c88720101020a5ecbdf10d1fc4fd7d66d7485bfb8b3b34879da26367105c3a5"
+        "sha256": "cd6ca198c4297d933233ca622d8c0b869f0246124d77e6dfb658dc4f5d320454"
       },
       {
         "path": "finstack-quant-wasm/tests/facade/covenants.test.mjs",

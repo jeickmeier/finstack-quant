@@ -14880,7 +14880,7 @@ class FxForward:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this instrument (e.g. ``"dv01"`` or ``"fx_delta"``).
+        Compute one scalar metric for this instrument (e.g. ``"dv01"`` or ``"fx01"``).
 
         Parameters
         ----------

@@ -36,7 +36,7 @@ pub(crate) fn register_quanto_option_metrics(
             (Vanna, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::vanna()),
             (Volga, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::volga()),
             // FX-specific and correlation metrics.
-            (FxDelta, FxDeltaCalculator),
+            (Fx01, Fx01Calculator),
             (FxVega, fx_vega::FxVegaCalculator),
             (Correlation01, correlation01::Correlation01Calculator),
         ]
@@ -44,15 +44,15 @@ pub(crate) fn register_quanto_option_metrics(
     Ok(())
 }
 
-/// FX Delta calculator for quanto options.
+/// FX01 calculator for quanto options.
 ///
 /// Computes FX delta (FX rate sensitivity) using a central finite difference
 /// against a relative SPOT bump. Quanto options have payoffs dependent on an
 /// equity in one currency but settled in another; FX delta measures sensitivity
 /// to changes in the FX exchange rate between those currencies.
-pub struct FxDeltaCalculator;
+pub struct Fx01Calculator;
 
-impl MetricCalculator for FxDeltaCalculator {
+impl MetricCalculator for Fx01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let spot_bump = sens_config::resolve(context)?.spot_bump_decimal;
         let option: &QuantoOption = context.instrument_as()?;
@@ -64,7 +64,7 @@ impl MetricCalculator for FxDeltaCalculator {
 
         let fx_spot_id = option.fx_spot_id.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
-                "QuantoOption {}: fx_spot_id is required to compute FX Delta",
+                "QuantoOption {}: fx_spot_id is required to compute FX01",
                 option.id
             ))
         })?;
@@ -74,7 +74,7 @@ impl MetricCalculator for FxDeltaCalculator {
         let pv_up = option.value(&market_up, as_of)?.amount();
         let pv_down = option.value(&market_down, as_of)?.amount();
 
-        // FxDelta is the cash P&L for a 1% relative FX move, not a derivative
+        // Fx01 is the cash P&L for a 1% relative FX move, not a derivative
         // per one unit of spot: normalise the ±`spot_bump` central difference
         // by the bump width expressed in 1% units (2.0 at the 1% default).
         Ok((pv_up - pv_down) / (2.0 * spot_bump * 100.0))
