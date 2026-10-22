@@ -421,7 +421,7 @@ fn envelope_for_priced(
     // The exporter must report *conditional* survival Q(as_of, T) = S(T)/S(as_of)
     // so the PV is correct even when the hazard curve's base date differs from
     // `as_of` (a seasoned instrument or a reused prior-day curve). This mirrors
-    // `HazardBondEngine::price_raw`, which renormalizes by S(as_of).
+    // the hazard-rate pricing kernel, which renormalizes by S(as_of).
     let survival_at_as_of = match hazard_arc.as_ref() {
         Some(h) => {
             let s0 = h.sp_on_date(as_of_date)?;
