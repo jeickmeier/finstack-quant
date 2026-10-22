@@ -128,15 +128,11 @@ def test_tranche_metrics_happy_path_uses_model_price() -> None:
 
 def test_tranche_metrics_values_requested_registry_metrics_on_the_note() -> None:
     """``metrics`` adds registry metrics valued on the tranche; unknown ids raise."""
-    metrics = instruments.tranche_metrics(
-        _valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", metrics=["dv01"]
-    )
+    metrics = instruments.tranche_metrics(_valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", metrics=["dv01"])
     assert set(metrics.metrics) == {"dv01"}
     assert math.isfinite(metrics.metrics["dv01"])
     with pytest.raises(ValueError, match="Unknown metric 'not_a_metric'"):
-        instruments.tranche_metrics(
-            _valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", metrics=["not_a_metric"]
-        )
+        instruments.tranche_metrics(_valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", metrics=["not_a_metric"])
 
 
 def test_tranche_metrics_returns_typed_wrapper() -> None:
@@ -164,9 +160,7 @@ def test_tranche_oas_returns_typed_wrapper() -> None:
     deal_json = _valid_deal_json()
     # Solve against the deal's own model price so the Brent search starts
     # inside its bracket; this test is about the return type, not the level.
-    model_price_pct = instruments.tranche_metrics(
-        deal_json, "CLONOTES-A", market, "2024-01-01"
-    ).clean_price_pct
+    model_price_pct = instruments.tranche_metrics(deal_json, "CLONOTES-A", market, "2024-01-01").clean_price_pct
 
     result = instruments.tranche_oas(
         deal_json,
@@ -198,9 +192,7 @@ def test_tranche_scenario_table_returns_typed_wrapper() -> None:
     """The scenario-table entry point returns ``ScenarioTable``, not JSON."""
     grid_json = json.dumps({"cprs": [0.10], "cdrs": [0.02], "severities": [0.40]})
 
-    table = instruments.tranche_scenario_table(
-        _valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", grid_json
-    )
+    table = instruments.tranche_scenario_table(_valid_deal_json(), "CLONOTES-A", _market(), "2024-01-01", grid_json)
 
     assert isinstance(table, instruments.ScenarioTable)
     assert not isinstance(table, str)
@@ -223,9 +215,7 @@ def test_unknown_tranche_raises_key_error_not_panic() -> None:
     Missing identifiers map to ``KeyError`` per the binding error contract.
     """
     with pytest.raises(KeyError, match="NO_SUCH_TRANCHE"):
-        instruments.tranche_breakeven_cdr(
-            _valid_deal_json(), "NO_SUCH_TRANCHE", _market(), "2024-01-01"
-        )
+        instruments.tranche_breakeven_cdr(_valid_deal_json(), "NO_SUCH_TRANCHE", _market(), "2024-01-01")
 
 
 def test_invalid_deal_reports_an_actionable_error() -> None:
@@ -248,6 +238,4 @@ def test_invalid_deal_reports_an_actionable_error() -> None:
 def test_malformed_json_raises_rather_than_panics() -> None:
     """Garbage input must be rejected cleanly at the boundary."""
     with pytest.raises(ValueError, match=r"(?i)json|parse|expected"):
-        instruments.tranche_breakeven_cdr(
-            "{not valid json", "CLONOTES-A", MarketContext(), "2024-01-01"
-        )
+        instruments.tranche_breakeven_cdr("{not valid json", "CLONOTES-A", MarketContext(), "2024-01-01")
