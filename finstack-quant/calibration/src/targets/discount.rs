@@ -56,8 +56,6 @@ pub(crate) struct DiscountCurveTargetParams {
     /// a realistic notional can be used for instrument construction without making
     /// solver tolerances unrealistically tight in absolute currency terms.
     pub(crate) residual_notional: f64,
-    /// Context needed for pricing against OTHER curves (if any).
-    pub(crate) base_context: MarketContext,
 }
 
 /// Target for discount curve calibration (Bootstrap and Global).
@@ -79,8 +77,8 @@ pub(crate) struct DiscountCurveTarget {
 
 impl DiscountCurveTarget {
     /// Create a new [`DiscountCurveTarget`] from parameters.
-    pub(crate) fn new(params: DiscountCurveTargetParams) -> Self {
-        let scratch = ContextScratch::new(params.base_context.clone());
+    pub(crate) fn new(params: DiscountCurveTargetParams, base_context: MarketContext) -> Self {
+        let scratch = ContextScratch::new(base_context);
         Self {
             params,
             scratch,
@@ -366,21 +364,23 @@ impl DiscountCurveTarget {
         )?;
         let prepared_quotes = prepared.quotes;
 
-        let mut target = DiscountCurveTarget::new(DiscountCurveTargetParams {
-            base_date: params.base_date,
-            currency: params.currency,
-            curve_id: params.curve_id.clone(),
-            discount_curve_id: params
-                .pricing_discount_id
-                .clone()
-                .unwrap_or(params.curve_id.clone()),
-            solve_interp: params.interpolation,
-            extrapolation: params.extrapolation,
-            config: config.clone(),
-            curve_day_count,
-            residual_notional,
-            base_context: context.clone(),
-        });
+        let mut target = DiscountCurveTarget::new(
+            DiscountCurveTargetParams {
+                base_date: params.base_date,
+                currency: params.currency,
+                curve_id: params.curve_id.clone(),
+                discount_curve_id: params
+                    .pricing_discount_id
+                    .clone()
+                    .unwrap_or(params.curve_id.clone()),
+                solve_interp: params.interpolation,
+                extrapolation: params.extrapolation,
+                config: config.clone(),
+                curve_day_count,
+                residual_notional,
+            },
+            context.clone(),
+        );
 
         // Target-specific validation tolerance for discount curves.
         let success_tolerance = config.discount_curve.validation_tolerance;
@@ -928,18 +928,20 @@ mod tests {
             .year_fraction(base_date, pay_date, DayCountContext::default())
             .expect("expected year_fraction to succeed");
 
-        let target = DiscountCurveTarget::new(DiscountCurveTargetParams {
-            base_date,
-            currency: Currency::USD,
-            curve_id: CurveId::new("USD-OIS"),
-            discount_curve_id: CurveId::new("USD-OIS"),
-            solve_interp: InterpStyle::Linear,
-            extrapolation: ExtrapolationPolicy::FlatZero,
-            config: CalibrationConfig::default(),
-            curve_day_count: DayCount::Act365F,
-            residual_notional: 1.0,
-            base_context: MarketContext::new(),
-        });
+        let target = DiscountCurveTarget::new(
+            DiscountCurveTargetParams {
+                base_date,
+                currency: Currency::USD,
+                curve_id: CurveId::new("USD-OIS"),
+                discount_curve_id: CurveId::new("USD-OIS"),
+                solve_interp: InterpStyle::Linear,
+                extrapolation: ExtrapolationPolicy::FlatZero,
+                config: CalibrationConfig::default(),
+                curve_day_count: DayCount::Act365F,
+                residual_notional: 1.0,
+            },
+            MarketContext::new(),
+        );
 
         // Mock instrument using Deposit with all required fields
         let instrument = std::sync::Arc::new(finstack_quant_valuations_rates::deposit::Deposit {
@@ -976,18 +978,20 @@ mod tests {
         let mut config = CalibrationConfig::default();
         config.solver = config.solver.with_tolerance(1e-9);
 
-        let target = DiscountCurveTarget::new(DiscountCurveTargetParams {
-            base_date,
-            currency: Currency::USD,
-            curve_id: CurveId::new("USD-OIS"),
-            discount_curve_id: CurveId::new("USD-OIS"),
-            solve_interp: InterpStyle::Linear,
-            extrapolation: ExtrapolationPolicy::FlatZero,
-            config: config.clone(),
-            curve_day_count: DayCount::Act365F,
-            residual_notional: 1.0,
-            base_context: MarketContext::new(),
-        });
+        let target = DiscountCurveTarget::new(
+            DiscountCurveTargetParams {
+                base_date,
+                currency: Currency::USD,
+                curve_id: CurveId::new("USD-OIS"),
+                discount_curve_id: CurveId::new("USD-OIS"),
+                solve_interp: InterpStyle::Linear,
+                extrapolation: ExtrapolationPolicy::FlatZero,
+                config: config.clone(),
+                curve_day_count: DayCount::Act365F,
+                residual_notional: 1.0,
+            },
+            MarketContext::new(),
+        );
 
         // Manual Simple Quote (Deposit)
         let maturity = base_date + time::Duration::days(365);
@@ -1044,18 +1048,20 @@ mod tests {
 
         // Helper function to run calibration with a given notional
         let run_calibration = |notional: f64| -> DiscountCurve {
-            let target = DiscountCurveTarget::new(DiscountCurveTargetParams {
-                base_date,
-                currency: Currency::USD,
-                curve_id: CurveId::new("USD-OIS"),
-                discount_curve_id: CurveId::new("USD-OIS"),
-                solve_interp: InterpStyle::Linear,
-                extrapolation: ExtrapolationPolicy::FlatZero,
-                config: config.clone(),
-                curve_day_count: DayCount::Act365F,
-                residual_notional: notional, // Different notionals
-                base_context: MarketContext::new(),
-            });
+            let target = DiscountCurveTarget::new(
+                DiscountCurveTargetParams {
+                    base_date,
+                    currency: Currency::USD,
+                    curve_id: CurveId::new("USD-OIS"),
+                    discount_curve_id: CurveId::new("USD-OIS"),
+                    solve_interp: InterpStyle::Linear,
+                    extrapolation: ExtrapolationPolicy::FlatZero,
+                    config: config.clone(),
+                    curve_day_count: DayCount::Act365F,
+                    residual_notional: notional, // Different notionals
+                },
+                MarketContext::new(),
+            );
 
             // Create a few deposit quotes with different maturities
             let mut quotes = Vec::new();
@@ -1154,18 +1160,20 @@ mod tests {
         let base_date = Date::from_calendar_date(2025, Month::December, 10).expect("base_date");
         let config = CalibrationConfig::default();
 
-        let target = DiscountCurveTarget::new(DiscountCurveTargetParams {
-            base_date,
-            currency: Currency::USD,
-            curve_id: CurveId::new("USD-OIS"),
-            discount_curve_id: CurveId::new("USD-OIS"),
-            solve_interp: InterpStyle::Linear,
-            extrapolation: ExtrapolationPolicy::FlatZero,
-            config,
-            curve_day_count: DayCount::Act365F,
-            residual_notional: 1.0,
-            base_context: MarketContext::new(),
-        });
+        let target = DiscountCurveTarget::new(
+            DiscountCurveTargetParams {
+                base_date,
+                currency: Currency::USD,
+                curve_id: CurveId::new("USD-OIS"),
+                discount_curve_id: CurveId::new("USD-OIS"),
+                solve_interp: InterpStyle::Linear,
+                extrapolation: ExtrapolationPolicy::FlatZero,
+                config,
+                curve_day_count: DayCount::Act365F,
+                residual_notional: 1.0,
+            },
+            MarketContext::new(),
+        );
 
         let maturity = base_date + time::Duration::days(90);
         let p_time = DayCount::Act365F
