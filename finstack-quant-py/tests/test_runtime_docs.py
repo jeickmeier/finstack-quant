@@ -89,6 +89,13 @@ _INSTRUMENT_MACRO_OWNERS = (
 )
 
 CONVERTED: dict[str, tuple[str, ...] | None] = {
+    "finstack_quant.statements": (
+        "MonteCarloResults.metrics",
+        "MonteCarloResults.warnings",
+        "MonteCarloResults.breach_probability",
+        "FinancialModelSpec.content_hash",
+        "CheckReport.findings_by_severity",
+    ),
     "finstack_quant.valuations.composite": None,
     "finstack_quant.valuations.market": None,
     "finstack_quant.valuations.schema": None,

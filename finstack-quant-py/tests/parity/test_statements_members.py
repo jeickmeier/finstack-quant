@@ -14,6 +14,23 @@ def test_statements_class_members_match_published_stub() -> None:
         if not isinstance(node, ast.ClassDef):
             continue
         runtime_class = getattr(statements, node.name)
+        members: dict[str, list[ast.FunctionDef]] = {}
+        for item in node.body:
+            if isinstance(item, ast.FunctionDef):
+                members.setdefault(item.name, []).append(item)
+        for name, definitions in members.items():
+            # Overload signatures and property setters legitimately share a name.
+            implementations = [
+                definition
+                for definition in definitions
+                if not any(
+                    (isinstance(decorator, ast.Name) and decorator.id == "overload")
+                    or (isinstance(decorator, ast.Attribute) and decorator.attr in {"setter", "deleter"})
+                    for decorator in definition.decorator_list
+                )
+            ]
+            if len(implementations) > 1:
+                differences.append(f"{node.name}.{name}: duplicate declarations")
         declared = {
             item.name
             for item in node.body

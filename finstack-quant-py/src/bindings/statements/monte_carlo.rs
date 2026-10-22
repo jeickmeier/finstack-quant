@@ -6,6 +6,7 @@
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements::evaluator::{
     MonteCarloConfig as RustMonteCarloConfig, MonteCarloResults as RustMonteCarloResults,
@@ -171,19 +172,13 @@ impl PyMonteCarloResults {
             .collect()
     }
 
-    /// Metric (node) identifiers that were simulated, in model order.
+    #[doc = pydoc!("finstack_quant.statements", "MonteCarloResults.metrics")]
     #[getter]
     fn metrics(&self) -> Vec<String> {
         self.inner.percentile_results.keys().cloned().collect()
     }
 
-    /// Warnings raised while evaluating paths, in their serde form.
-    ///
-    /// One dict per ``EvalWarning`` with a single snake_case variant key
-    /// (``"division_by_zero"``, ``"non_finite_value"``, ...) whose value holds
-    /// the variant fields (periods as ``"2025Q1"``-style ids, non-finite
-    /// numbers as ``"nan"`` / ``"inf"`` / ``"-inf"``), identical to the WASM
-    /// ``Evaluator.evaluateMonteCarlo`` result. Empty when every path evaluated cleanly.
+    #[doc = pydoc!("finstack_quant.statements", "MonteCarloResults.warnings")]
     #[getter]
     fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.warnings)
@@ -222,27 +217,7 @@ impl PyMonteCarloResults {
         Ok(Some(series))
     }
 
-    /// Probability that a metric exceeds ``threshold`` in **any** forecast
-    /// period, estimated across paths.
-    ///
-    /// Counts upside breaches only (``value > threshold``); for a downside
-    /// test (DSCR below a floor) simulate a negated metric or a derived node
-    /// that flips the sign.
-    ///
-    /// Parameters
-    /// ----------
-    /// metric : str
-    ///     Simulated node identifier.
-    /// threshold : float
-    ///     Breach level in the metric's own units.
-    ///
-    /// Returns
-    /// -------
-    /// float | None
-    ///     Fraction of paths in [0, 1] with at least one breach, or ``None``
-    ///     when the metric was not simulated, there are no forecast periods,
-    ///     the path buffer is incomplete, or the result was reconstructed
-    ///     from JSON / pickle (the per-path buffer is not serialized).
+    #[doc = pydoc!("finstack_quant.statements", "MonteCarloResults.breach_probability")]
     #[pyo3(text_signature = "($self, metric, threshold)")]
     fn breach_probability(&self, metric: &str, threshold: f64) -> Option<f64> {
         self.inner.breach_probability(metric, threshold)

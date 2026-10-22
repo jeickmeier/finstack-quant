@@ -5,6 +5,7 @@ use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{
     serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_statements::types::{NodeSpec, NodeValueType};
 use indexmap::IndexMap;
@@ -1112,18 +1113,7 @@ impl PyFinancialModelSpec {
             .transpose()
     }
 
-    /// Versioned SHA-256 hash of the model's canonical JSON.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Stable content hash; two models with identical canonical JSON
-    ///     share a hash regardless of key order.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the model contains a non-finite number.
+    #[doc = pydoc!("finstack_quant.statements", "FinancialModelSpec.content_hash")]
     #[pyo3(text_signature = "($self)")]
     fn content_hash(&self) -> PyResult<String> {
         self.inner.content_hash().map_err(core_to_py)
