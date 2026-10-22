@@ -516,7 +516,13 @@ impl LsmcPricer {
     where
         B: BasisFunctions + ?Sized,
     {
-        let paths = self.generate_paths(process, initial_spot, time_to_maturity, num_steps)?;
+        let paths = self.generate_paths_with_seed(
+            process,
+            initial_spot,
+            time_to_maturity,
+            num_steps,
+            self.config.seed,
+        )?;
 
         let (values, _) = self.train_exercise_policy(
             &paths,
@@ -533,23 +539,6 @@ impl LsmcPricer {
             .contains(&0)
             .then(|| exercise.exercise_value(initial_spot));
         self.summarize_present_values(&values, intrinsic_floor, currency)
-    }
-
-    /// Generate Monte Carlo paths (serial or parallel depending on config).
-    fn generate_paths(
-        &self,
-        process: &GbmProcess,
-        initial_spot: f64,
-        time_to_maturity: f64,
-        num_steps: usize,
-    ) -> Result<PathMatrix> {
-        self.generate_paths_with_seed(
-            process,
-            initial_spot,
-            time_to_maturity,
-            num_steps,
-            self.config.seed,
-        )
     }
 
     /// Generate Monte Carlo paths with an explicit seed override.
@@ -676,7 +665,13 @@ impl LsmcPricer {
     where
         B: BasisFunctions + ?Sized,
     {
-        let paths = self.generate_paths(process, initial_spot, time_to_maturity, num_steps)?;
+        let paths = self.generate_paths_with_seed(
+            process,
+            initial_spot,
+            time_to_maturity,
+            num_steps,
+            self.config.seed,
+        )?;
         let (_, policy) = self.train_exercise_policy(
             &paths,
             exercise,
@@ -1190,7 +1185,9 @@ mod tests {
         config.num_paths = usize::MAX;
         let pricer = LsmcPricer::new(config);
         let process = GbmProcess::with_params(0.05, 0.0, 0.2).expect("process");
-        assert!(pricer.generate_paths(&process, 100.0, 1.0, 1).is_err());
+        assert!(pricer
+            .generate_paths_with_seed(&process, 100.0, 1.0, 1, pricer.config.seed)
+            .is_err());
     }
 
     #[test]
@@ -1206,8 +1203,9 @@ mod tests {
                     .expect("two independent estimators")
                     .with_antithetic(antithetic);
                 config.num_paths = num_paths;
+                let seed = config.seed;
                 assert!(LsmcPricer::new(config)
-                    .generate_paths(&process, 100.0, 1.0, 1)
+                    .generate_paths_with_seed(&process, 100.0, 1.0, 1, seed)
                     .is_err());
             }
             assert!(checked_path_values(2, 1, antithetic).is_ok());

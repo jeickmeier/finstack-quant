@@ -147,7 +147,7 @@ impl Default for HestonFourierSettings {
     }
 }
 
-/// Gauss-Legendre orders supported by `composite_gauss_legendre_grid`.
+/// Gauss-Legendre orders supported by `gauss_legendre_grid`.
 ///
 /// A `gl_order` outside this set has no node/weight table, which would make
 /// `HestonStripPricer::new` return `None` and silently degrade to the slower
