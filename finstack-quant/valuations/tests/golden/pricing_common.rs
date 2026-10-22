@@ -31,7 +31,7 @@ fn price_instrument_from_json(
         metrics,
         market_history_json,
         PricingOptions::default()
-            .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new())),
+            .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::default())),
     )
 }
 

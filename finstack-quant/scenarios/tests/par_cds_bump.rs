@@ -576,7 +576,7 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
     let original = source.get_hazard("ISSUER-A-CDS").unwrap();
     let base = original.base_date();
     let engine = ScenarioEngine::new()
-        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()));
+        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::default()));
     for (period, discount_bp) in [("1M", 0.0), ("2Y", 0.0), ("1M", 25.0)] {
         let mut horizon_pars = Vec::new();
         for bp in [0.0, 25.0] {
@@ -624,7 +624,7 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
                 as_of: base,
             };
             ScenarioEngine::new()
-                .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()))
+                .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::default()))
                 .apply(&scenario, &mut independent_ctx)
                 .expect("uncached horizon scenario");
             let expected = independent.get_hazard("ISSUER-A-CDS").unwrap();
@@ -701,7 +701,7 @@ fn standalone_roll_preserves_calibrated_hazard_for_a_later_zero_spread_shock() {
     let original = source.get_hazard("ISSUER-A-CDS").expect("source hazard");
     let base = original.base_date();
     let engine = ScenarioEngine::new()
-        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()));
+        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::default()));
     for (period, apply_shocks) in [("1M", false), ("2Y", true)] {
         let unrelated_discount = DiscountCurve::builder("EUR-OIS")
             .base_date(base)
@@ -878,7 +878,7 @@ fn zero_day_business_rolls_preserve_recipes_and_allow_subsequent_shocks_without_
             };
             let scenario_engine = if with_provider {
                 ScenarioEngine::new()
-                    .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()))
+                    .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::default()))
             } else {
                 ScenarioEngine::new()
             };

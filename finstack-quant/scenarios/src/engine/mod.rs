@@ -239,7 +239,7 @@ impl ScenarioEngine {
     pub fn with_config(config: finstack_quant_core::config::FinstackConfig) -> Self {
         Self {
             config,
-            recalibration_provider: Arc::new(CachedRecalibrationProvider::new()),
+            recalibration_provider: Arc::new(CachedRecalibrationProvider::default()),
         }
     }
 

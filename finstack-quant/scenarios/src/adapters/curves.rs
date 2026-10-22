@@ -1246,7 +1246,7 @@ mod tests {
         };
 
         let curve_id = CurveId::from("USD-OIS");
-        let provider = CachedRecalibrationProvider::new();
+        let provider = CachedRecalibrationProvider::default();
         let env = solve_env(&provider);
         let effects = curve_node_effects(
             CurveKind::Discount,
@@ -1320,7 +1320,7 @@ mod tests {
             as_of,
         };
 
-        let provider = CachedRecalibrationProvider::new();
+        let provider = CachedRecalibrationProvider::default();
         let env = solve_env(&provider);
         let error = curve_node_effects(
             CurveKind::ParCDS,
@@ -1364,7 +1364,7 @@ mod tests {
             as_of,
         };
 
-        let provider = CachedRecalibrationProvider::new();
+        let provider = CachedRecalibrationProvider::default();
         let env = solve_env(&provider);
         // Exact pillar hit on a direct-shift discount curve: no approximation.
         let effects = curve_node_effects(
@@ -1471,7 +1471,7 @@ mod tests {
             calendar: None,
             as_of,
         };
-        let provider = CachedRecalibrationProvider::new();
+        let provider = CachedRecalibrationProvider::default();
         let env = solve_env(&provider);
         let effects = curve_node_effects(
             CurveKind::Commodity,
@@ -1509,7 +1509,7 @@ mod tests {
             calendar: None,
             as_of,
         };
-        let provider = CachedRecalibrationProvider::new();
+        let provider = CachedRecalibrationProvider::default();
         let env = solve_env(&provider);
         let effects = curve_node_effects(
             CurveKind::Commodity,
@@ -1550,7 +1550,7 @@ mod tests {
         };
 
         let curve_id = CurveId::from("WTI");
-        let provider = CachedRecalibrationProvider::new();
+        let provider = CachedRecalibrationProvider::default();
         let env = solve_env(&provider);
         let effects = curve_parallel_effects(
             CurveKind::Commodity,

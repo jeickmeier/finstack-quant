@@ -186,7 +186,7 @@ fn bench_cds_index_par_spread(c: &mut Criterion) {
 fn bench_cds_index_cs01(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_index_cs01");
     let market = create_market_single_curve();
-    let recalibration_provider = CachedRecalibrationProvider::new();
+    let recalibration_provider = CachedRecalibrationProvider::default();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for tenor in [1, 3, 5, 10].iter() {

@@ -247,7 +247,7 @@ fn metrics_based_explains_convertible_credit_spread_move() {
     );
     let opts = finstack_quant_valuations::instruments::PricingOptions::default()
         .with_recalibration_provider(Arc::new(
-            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
+            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default(),
         ));
     let val_t0 = conv
         .price_with_metrics(&market_t0, t0(), &metrics, opts.clone())

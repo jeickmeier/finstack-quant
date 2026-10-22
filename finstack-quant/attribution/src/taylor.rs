@@ -275,7 +275,7 @@ fn compute_taylor_result(
         .filter(|id| !market_deps.curves.credit_curves.contains(id))
         .cloned()
         .collect();
-    let recalibration_provider = CachedRecalibrationProvider::new();
+    let recalibration_provider = CachedRecalibrationProvider::default();
     // Key-rate DV01 per discount curve, then per projection curve.
     for (kind, factor_kind, curve_ids) in [
         (CurveKind::Discount, "rate", rate_curve_ids.as_slice()),
@@ -2469,7 +2469,7 @@ mod tests {
             &market,
             &CurveId::new("HAZ"),
             10.0,
-            &CachedRecalibrationProvider::new(),
+            &CachedRecalibrationProvider::default(),
         )
         .unwrap();
         let delivered = bumped.get_hazard("HAZ").unwrap();
@@ -2487,7 +2487,7 @@ mod tests {
             &missing,
             &CurveId::new("BARE"),
             10.0,
-            &CachedRecalibrationProvider::new(),
+            &CachedRecalibrationProvider::default(),
         )
         .unwrap_err();
         assert!(error.to_string().contains("calibration recipe"));

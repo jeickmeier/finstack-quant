@@ -33,7 +33,7 @@ fn registered_cs01(
         )
         .expect("valid sensitivity configuration");
     let provider =
-        Arc::new(finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new());
+        Arc::new(finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default());
     Ok(tranche
         .price_with_metrics(
             market,

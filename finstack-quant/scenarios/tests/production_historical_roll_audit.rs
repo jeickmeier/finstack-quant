@@ -86,7 +86,7 @@ fn production_history_reuses_the_pricing_boundary_recalibration_provider() {
     let initial_spread = recipe.spread_risk_inputs()[0].quote["spread_bp"]
         .as_f64()
         .expect("spread");
-    let provider = Arc::new(CachedRecalibrationProvider::new());
+    let provider = Arc::new(CachedRecalibrationProvider::default());
     let rebuilt = provider
         .rebuild_hazard_curve(&HazardRecalibrationRequest {
             hazard: Arc::clone(&hazard),

@@ -351,7 +351,7 @@ fn bench_hazard_bootstrap(c: &mut Criterion) {
                 black_box(hazard.as_ref()),
                 black_box(&market),
                 black_box(&QuoteBump::ParallelBp(1.0)),
-                Some(black_box(&discount_id)),
+                black_box(&discount_id),
                 Some(CdsDocClause::IsdaNa),
                 None,
             )
@@ -416,7 +416,7 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
                         black_box(as_of),
                         black_box(&[MetricId::Dv01]),
                         PricingOptions::default().with_recalibration_provider(Arc::new(
-                            CachedRecalibrationProvider::new(),
+                            CachedRecalibrationProvider::default(),
                         )),
                     )
                 })
@@ -428,7 +428,7 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
         b.iter_batched(
             || {
                 PricingOptions::default()
-                    .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()))
+                    .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::default()))
             },
             |options| {
                 fras.iter()

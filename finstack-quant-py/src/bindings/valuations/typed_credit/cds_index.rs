@@ -666,7 +666,7 @@ impl PyCdsIndex {
         let market = extract_market(py, market)?;
         let as_of = py_to_date(as_of)?;
         let provider =
-            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
+            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default();
         self.inner
             .cs01(&market, as_of, &provider)
             .map_err(core_to_py)

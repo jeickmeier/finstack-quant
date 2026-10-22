@@ -366,7 +366,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         credit_factor_detail_options,
         ..
     } = *request;
-    let recalibration_provider = CachedRecalibrationProvider::new();
+    let recalibration_provider = CachedRecalibrationProvider::default();
     let dependencies = instrument.market_dependencies()?;
 
     // Endpoint repricings remain part of the workflow's accounting even when

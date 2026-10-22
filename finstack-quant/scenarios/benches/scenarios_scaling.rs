@@ -130,7 +130,7 @@ fn historical_credit_quote_replay(c: &mut Criterion) {
             shift: 0.001,
         }],
     );
-    let provider = CachedRecalibrationProvider::new();
+    let provider = CachedRecalibrationProvider::default();
     c.bench_function("historical_credit_quote_replay_10bp/cached_result", |b| {
         b.iter(|| {
             black_box(
@@ -142,7 +142,7 @@ fn historical_credit_quote_replay(c: &mut Criterion) {
     });
     c.bench_function("historical_credit_quote_replay_10bp/fresh_provider", |b| {
         b.iter(|| {
-            let provider = CachedRecalibrationProvider::new();
+            let provider = CachedRecalibrationProvider::default();
             black_box(
                 scenario
                     .apply(black_box(&market), Some(&provider))

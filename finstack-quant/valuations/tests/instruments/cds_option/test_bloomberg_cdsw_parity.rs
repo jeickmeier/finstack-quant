@@ -142,7 +142,7 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
         hazard_curve_base.as_ref(),
         &market,
         &QuoteBump::ParallelBp(1.0),
-        Some(&cds.premium_leg.discount_curve_id),
+        &cds.premium_leg.discount_curve_id,
         None,
         None,
     )
@@ -173,7 +173,7 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
             hazard_curve_base.as_ref(),
             &market,
             &QuoteBump::ParallelBp(bump_bp),
-            Some(&cds.premium_leg.discount_curve_id),
+            &cds.premium_leg.discount_curve_id,
             None,
             None,
         )
@@ -253,7 +253,7 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
             hazard_curve_base.as_ref(),
             &market,
             &QuoteBump::ParallelBp(0.0),
-            Some(&cds.premium_leg.discount_curve_id),
+            &cds.premium_leg.discount_curve_id,
             None,
             None,
         )

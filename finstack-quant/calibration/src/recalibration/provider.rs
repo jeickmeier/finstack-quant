@@ -20,18 +20,11 @@ use std::sync::Arc;
 ///
 /// Rate cache keys include source market and recipe content, so opening and
 /// closing snapshots in the same pricing batch cannot share stale results.
+/// Create a fresh instance with [`Default`] for each immutable pricing batch.
 #[derive(Default)]
 pub struct CachedRecalibrationProvider {
     rate: RateRecalibrationCache,
     hazard: HazardRecalibrationCache,
-}
-
-impl CachedRecalibrationProvider {
-    /// Create an empty provider for one immutable pricing or scenario batch.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
 }
 
 /// Default pricing options for one pricing batch: [`PricingOptions::default`]
@@ -53,7 +46,7 @@ impl CachedRecalibrationProvider {
 #[must_use]
 pub fn pricing_options() -> PricingOptions {
     PricingOptions::default()
-        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()))
+        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::default()))
 }
 
 impl RecalibrationProvider for CachedRecalibrationProvider {
@@ -109,7 +102,7 @@ impl RecalibrationProvider for CachedRecalibrationProvider {
             )?),
             None => Arc::clone(&request.hazard),
         };
-        let discount_id = Some(&request.discount_curve_id);
+        let discount_id = &request.discount_curve_id;
         let doc_clause = request.doc_clause;
         let convention = request.cds_valuation_convention;
         match &request.action {

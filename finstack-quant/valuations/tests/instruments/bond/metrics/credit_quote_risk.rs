@@ -296,7 +296,8 @@ fn cross_credit_rates_recalibrates_after_discount_shock_and_converges() {
     let as_of = date!(2025 - 01 - 01);
     let market = build_market(as_of);
     let bond = build_credit_bond(as_of);
-    let provider = finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
+    let provider =
+        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default();
     let corner = |rate: f64, spread: f64| {
         let rate_market = market
             .bump([MarketBump::Curve {
