@@ -173,10 +173,8 @@ export type RollingMetric = "volatility" | "sortino" | "sharpe" | "return";
  * calendar-week granularity.
  *
  * Parses the snake_case wire values via [`std::str::FromStr`]
- * (for example, `"quarterly"` or `"semi_annual"`). The parser also accepts
- * the `"semiannual"` spelling and the pandas offset aliases `D`/`B`
- * (daily), `W` (weekly), `M`/`ME` (monthly), `Q`/`QE` (quarterly) and
- * `A`/`Y`/`YE` (annual); serde (de)serialization stays strict snake_case.
+ * (for example, `"quarterly"` or `"semi_annual"`), ignoring surrounding
+ * whitespace and ASCII case. Serde (de)serialization stays strict snake_case.
  */
 export type PeriodKind = "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
 /**

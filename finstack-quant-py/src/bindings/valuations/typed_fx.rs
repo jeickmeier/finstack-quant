@@ -172,8 +172,8 @@ impl PyFxForward {
     ///     USD/TRY, USD/RUB and T+2 otherwise.
     /// business_day_convention : BusinessDayConvention | str | None
     ///     Roll rule applied to the maturity: a ``BusinessDayConvention`` or a
-    ///     name accepted by ``adjust`` (serde names or ``MF``/``F``/``P``/``MP``
-    ///     short codes). ``None`` selects the Rust ``FxForward::from_trade_date``
+    ///     canonical name accepted by ``adjust``, ignoring surrounding whitespace
+    ///     and ASCII case. ``None`` selects the Rust ``FxForward::from_trade_date``
     ///     default, Modified Following.
     /// end_of_month : bool
     ///     Apply the FX end-of-month rule when spot falls on month end.

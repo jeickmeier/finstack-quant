@@ -12,8 +12,8 @@ use wasm_bindgen::prelude::*;
 
 /// Parse a cashflow kind label into its `CFKind` wire string.
 ///
-/// Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
-/// ignored, plus the aliases `"coupon"` and `"principal"`.
+/// Parsed by Rust `CFKind::from_str`: the canonical snake_case wire string,
+/// ignoring surrounding whitespace and ASCII case.
 ///
 /// @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
 /// @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.

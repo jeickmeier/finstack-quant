@@ -173,7 +173,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_cashflows.schema.json",
-      "bytes": 54418,
+      "bytes": 54337,
       "kind": "component",
       "path": "schemas/portfolio/1/portfolio_cashflows.schema.json",
       "summary": "Rich portfolio cashflow ladder preserving event classifications.",

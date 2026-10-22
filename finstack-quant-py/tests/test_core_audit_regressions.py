@@ -63,9 +63,9 @@ def test_market_roll_preserves_price_and_cpi_near_origin() -> None:
     assert rolled.get_price_curve("PRICE").price(1e-8) == pytest.approx(price.price(dt + 1e-8))
 
 
-# CORE-004: one day-count parser (DayCount | str through the lenient DayCount::from_str).
-@pytest.mark.parametrize("day_count", ["act_360", "ACT/360", "Act/360"])
-def test_curve_constructors_accept_daycount_objects_and_lenient_names(day_count: str) -> None:
+# CORE-004: one day-count parser (DayCount | str through the canonical DayCount::from_str).
+@pytest.mark.parametrize("day_count", ["act_360", " ACT_360 ", "Act_360"])
+def test_curve_constructors_accept_daycount_objects_and_normalized_names(day_count: str) -> None:
     from finstack_quant.core.dates import DayCount
     from finstack_quant.core.market_data import DiscountCurve, ForwardCurve
     from finstack_quant.models.credit import MertonModel

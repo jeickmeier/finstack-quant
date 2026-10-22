@@ -761,9 +761,8 @@ export type OvernightIndexConstraintApplication = "daily" | "period";
  *
  * `Display`, `FromStr`, and serde share one snake_case label per kind
  * (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
- * case-insensitive and also accepts the reporting aliases `"coupon"`
- * ([`CFKind::Fixed`]) and `"principal"` ([`CFKind::Notional`]); serde
- * accepts only the canonical label.
+ * case-insensitive and ignores surrounding whitespace; serde accepts only
+ * the canonical label.
  */
 export type CFKind =
   | "fixed"
@@ -2013,10 +2012,8 @@ export type TableColumnRole = "dimension" | "index" | "measure" | "attribute";
  * calendar-week granularity.
  *
  * Parses the snake_case wire values via [`std::str::FromStr`]
- * (for example, `"quarterly"` or `"semi_annual"`). The parser also accepts
- * the `"semiannual"` spelling and the pandas offset aliases `D`/`B`
- * (daily), `W` (weekly), `M`/`ME` (monthly), `Q`/`QE` (quarterly) and
- * `A`/`Y`/`YE` (annual); serde (de)serialization stays strict snake_case.
+ * (for example, `"quarterly"` or `"semi_annual"`), ignoring surrounding
+ * whitespace and ASCII case. Serde (de)serialization stays strict snake_case.
  */
 export type PeriodKind = "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
 /**

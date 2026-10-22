@@ -47,8 +47,8 @@ fn resolve_optional_calendar(
 /// Parse a frequency token into a [`PeriodKind`].
 ///
 /// Accepts the canonical tokens (`daily`, `weekly`, `monthly`, `quarterly`,
-/// `semi_annual`, `annual`) plus the pandas offset aliases `D`/`B`, `W`,
-/// `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE`; the descriptive error comes from core.
+/// `semi_annual`, `annual`), ignoring outer whitespace and ASCII case;
+/// the descriptive error comes from core.
 /// An omitted token resolves to `default`, a Rust-owned constant.
 fn parse_frequency(frequency: Option<&str>, default: PeriodKind) -> PyResult<PeriodKind> {
     Ok(frequency
@@ -242,9 +242,8 @@ impl PyPerformance {
     ///     Benchmark column name; defaults to the first column.
     /// frequency : str, optional
     ///     Observation frequency: ``"daily"``, ``"weekly"``, ``"monthly"``,
-    ///     ``"quarterly"``, ``"semi_annual"``, ``"annual"`` or a pandas offset
-    ///     alias (``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``,
-    ///     ``A``/``Y``/``YE``). Sets the annualization factor
+    ///     ``"quarterly"``, ``"semi_annual"`` or ``"annual"``, ignoring outer
+    ///     whitespace and ASCII case. Sets the annualization factor
     ///     (252, 52, 12, 4, 2, 1). ``None`` uses the Rust
     ///     default ``DEFAULT_FREQUENCY`` (daily).
     ///
@@ -389,8 +388,7 @@ impl PyPerformance {
     /// ``"weekly"``, ``"monthly"``, ``"quarterly"``, ``"semi_annual"``,
     /// ``"annual"``) that round-trips through the ``frequency`` constructor
     /// argument and the :meth:`period_stats` ``aggregation_frequency``
-    /// parameter. Inputs also accept the pandas offset aliases ``D``/``B``,
-    /// ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``.
+    /// parameter. Inputs ignore surrounding whitespace and ASCII case.
     #[getter]
     fn frequency(&self) -> String {
         self.inner.frequency().to_string()
@@ -1013,8 +1011,8 @@ impl PyPerformance {
     /// Calendar-bucketed compounded returns for each ticker.
     ///
     /// ``frequency`` accepts ``"daily"``, ``"weekly"``, ``"monthly"``,
-    /// ``"quarterly"``, ``"semi_annual"``, or ``"annual"`` (or the pandas
-    /// offset aliases ``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``). The outer list is
+    /// ``"quarterly"``, ``"semi_annual"``, or ``"annual"``, ignoring outer
+    /// whitespace and ASCII case. The outer list is
     /// ticker-major in :attr:`ticker_names` order. Each inner list contains
     /// chronological ``(period_end_date, compounded_return)`` tuples, where
     /// returns are decimal fractions (``0.01`` means 1%). Chaining the values

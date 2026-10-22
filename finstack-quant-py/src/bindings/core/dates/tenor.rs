@@ -61,7 +61,7 @@ typed_or_label!(
 /// Immutable, hashable value type combining a positive count and a
 /// ``TenorUnit``. The constructor takes a count plus unit (``Tenor(3, "M")``,
 /// ``Tenor(3, TenorUnit.MONTHS)``); ``Tenor.parse`` reads tenor strings
-/// (``"3M"``; money-market aliases ``"ON"``/``"TN"``/``"SN"`` map to ``1D``).
+/// (``"3M"``); parsing ignores surrounding whitespace and ASCII case.
 ///
 /// Parameters
 /// ----------
@@ -121,7 +121,7 @@ impl PyTenor {
             .map_err(core_to_py)
     }
 
-    /// Parse a tenor string (e.g. ``"3M"``, ``"1Y"``, ``"2W"``; ``"ON"``/``"TN"``/``"SN"`` give ``1D``).
+    /// Parse a positive integer and D/W/M/Y unit, ignoring outer whitespace and ASCII case.
     #[classmethod]
     #[pyo3(text_signature = "(cls, s)")]
     fn parse(_cls: &Bound<'_, PyType>, s: &str) -> PyResult<Self> {
@@ -271,7 +271,7 @@ impl PyTenor {
     ///     ``"nyse+gblo"`` joins calendars). ``None`` skips adjustment.
     /// business_day_convention : BusinessDayConvention | str
     ///     Roll rule applied when ``calendar`` is given (default
-    ///     ``"modified_following"``; short codes ``MF``/``F``/``P`` accepted).
+    ///     ``"modified_following"``; canonical names ignore outer whitespace and ASCII case).
     ///
     /// Returns
     /// -------

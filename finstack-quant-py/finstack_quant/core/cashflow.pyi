@@ -86,15 +86,15 @@ class CFKind:
     @classmethod
     def parse(cls, name: str) -> CFKind:
         """
-        Parse a cashflow kind from its exact snake_case label.
+        Parse a canonical cashflow kind label, ignoring outer whitespace and ASCII case.
 
         Parameters
         ----------
         name : str
             Snake_case label such as ``"fixed"``, ``"float_reset"``, or
             ``"pre_payment"``; the same string as :attr:`name` and the
-            ``kind`` field of serialized cashflows. Matching is exact: no
-            aliases, case folding, or whitespace trimming.
+            ``kind`` field of serialized cashflows. Surrounding whitespace and
+            ASCII case are normalized; aliases are rejected.
 
         Returns
         -------

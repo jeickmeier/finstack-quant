@@ -374,7 +374,7 @@ impl PyScheduleBuilder {
     /// Parameters
     /// ----------
     /// convention : BusinessDayConvention | str
-    ///     Roll rule (``"modified_following"``, short codes ``MF``/``F``/``P``).
+    ///     Roll rule (for example ``"modified_following"``), ignoring outer whitespace and ASCII case.
     /// calendar : HolidayCalendar | str
     ///     Holiday calendar object or registry id (``"usny"``; ``"nyse+gblo"``
     ///     joins calendars). A string id is resolved at ``build()`` under the
