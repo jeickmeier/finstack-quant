@@ -126,62 +126,6 @@ impl AdiWorkBuffers {
             cached_ops: None,
         }
     }
-
-    /// Resize all buffers in place if the grid shape changed.
-    fn resize_for(&mut self, grid: &Grid2D) {
-        let nx_int = grid.nx_interior();
-        let ny_int = grid.ny_interior();
-        let interior = nx_int * ny_int;
-        let line_max = nx_int.max(ny_int);
-        if self.x_line.len() != nx_int || self.y_line.len() != ny_int {
-            self.cached_ops = None;
-        }
-        if self.x_line.len() != nx_int {
-            self.x_line.resize(nx_int, 0.0);
-        }
-        if self.y_line.len() != ny_int {
-            self.y_line.resize(ny_int, 0.0);
-        }
-        if self.line_out.len() != line_max {
-            self.line_out.resize(line_max, 0.0);
-        }
-        if self.rhs_buf.len() != line_max {
-            self.rhs_buf.resize(line_max, 0.0);
-        }
-        if self.thomas_scratch.len() != line_max {
-            self.thomas_scratch.resize(line_max, 0.0);
-        }
-        if self.y0.len() != interior {
-            self.y0.resize(interior, 0.0);
-        }
-        if self.y1.len() != interior {
-            self.y1.resize(interior, 0.0);
-        }
-        if self.y2.len() != interior {
-            self.y2.resize(interior, 0.0);
-        }
-        if self.ytld.len() != interior {
-            self.ytld.resize(interior, 0.0);
-        }
-        if self.ax_u.len() != interior {
-            self.ax_u.resize(interior, 0.0);
-        }
-        if self.ay_u.len() != interior {
-            self.ay_u.resize(interior, 0.0);
-        }
-        if self.ax_y2.len() != interior {
-            self.ax_y2.resize(interior, 0.0);
-        }
-        if self.ay_y2.len() != interior {
-            self.ay_y2.resize(interior, 0.0);
-        }
-        if self.cross.len() != interior {
-            self.cross.resize(interior, 0.0);
-        }
-        if self.cross_y2.len() != interior {
-            self.cross_y2.resize(interior, 0.0);
-        }
-    }
 }
 
 /// Default MCS `theta`: second-order accurate and unconditionally stable for
@@ -401,7 +345,6 @@ impl CraigSneydStepper {
 
         let interior = nx_int * ny_int;
 
-        buffers.resize_for(grid);
         let AdiWorkBuffers {
             x_line,
             y_line,

@@ -250,11 +250,7 @@ impl AlmgrenChrissModel {
             )));
         }
 
-        let kappa_sq = if self.eta > 0.0 {
-            risk_aversion * sigma * sigma / self.eta
-        } else {
-            0.0
-        };
+        let kappa_sq = risk_aversion * sigma * sigma / self.eta;
         let kappa = kappa_sq.sqrt();
         let kappa_t = kappa * t;
 
