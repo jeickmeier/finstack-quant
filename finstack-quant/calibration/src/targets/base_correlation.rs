@@ -270,7 +270,7 @@ impl BaseCorrelationTarget {
         global_config: &CalibrationConfig,
     ) -> Result<(
         BaseCorrelationCurve,
-        Option<finstack_quant_core::market_data::term_structures::CreditIndexData>,
+        finstack_quant_core::market_data::term_structures::CreditIndexData,
         CalibrationReport,
     )> {
         let tranche_quotes: Vec<CdsTrancheQuote> = quotes.extract_quotes();
@@ -307,14 +307,10 @@ impl BaseCorrelationTarget {
         report.update_solver_config(global_config.solver.clone());
 
         let index_update = context
-            .get_credit_index(params.index_id.as_str())
-            .ok()
-            .and_then(|idx| {
-                idx.to_builder()
-                    .base_correlation_curve(Arc::new(curve.clone()))
-                    .build()
-                    .ok()
-            });
+            .get_credit_index(params.index_id.as_str())?
+            .to_builder()
+            .base_correlation_curve(Arc::new(curve.clone()))
+            .build()?;
         Ok((curve, index_update, report))
     }
 }
@@ -519,6 +515,68 @@ mod tests {
 
     fn test_target() -> BaseCorrelationTarget {
         BaseCorrelationTarget::new(test_params(), MarketContext::new())
+    }
+
+    #[test]
+    fn solve_returns_refreshed_index_and_requires_the_index() {
+        let mut envelope = crate::api::validate::parse_envelope(include_str!(
+            "../../examples/market_bootstrap/05_cdx_base_correlation.json"
+        ))
+        .expect("reference envelope");
+        let step = envelope.plan.steps.pop().expect("correlation step");
+        let crate::api::schema::StepParams::BaseCorrelation(params) = step.params else {
+            panic!("expected base correlation step");
+        };
+        let quotes: Vec<_> = envelope
+            .market_data
+            .iter()
+            .filter_map(|datum| match datum.as_quote() {
+                Some(quote @ MarketQuote::CdsTranche(_)) => Some(quote),
+                _ => None,
+            })
+            .collect();
+        let result =
+            crate::api::engine::calibrate(&envelope).expect("preceding rate and hazard steps");
+        let market = MarketContext::try_from(result.result.final_market).expect("source market");
+        let original = market
+            .get_credit_index(&params.index_id)
+            .expect("original index");
+        let (curve, index, report) =
+            BaseCorrelationTarget::solve(&params, &quotes, &market, &envelope.plan.settings)
+                .expect("base correlation solve");
+        assert!(report.success);
+        assert_eq!(
+            index.base_correlation_curve().correlations(),
+            curve.correlations()
+        );
+        assert_eq!(
+            index.base_correlation_curve().detachment_points(),
+            curve.detachment_points()
+        );
+        assert!(!Arc::ptr_eq(
+            index.base_correlation_curve(),
+            original.base_correlation_curve()
+        ));
+        assert!(Arc::ptr_eq(
+            index.index_credit_curve(),
+            original.index_credit_curve()
+        ));
+        assert_eq!(index.recovery_rate(), original.recovery_rate());
+        assert_eq!(index.num_constituents(), original.num_constituents());
+
+        let missing_index = MarketContext::new()
+            .insert(
+                market
+                    .get_discount(&params.discount_curve_id)
+                    .expect("discount")
+                    .as_ref()
+                    .clone(),
+            )
+            .insert(original.index_credit_curve().as_ref().clone());
+        let error =
+            BaseCorrelationTarget::solve(&params, &quotes, &missing_index, &envelope.plan.settings)
+                .expect_err("missing index must fail");
+        assert!(error.to_string().contains(&params.index_id), "{error}");
     }
 
     #[test]

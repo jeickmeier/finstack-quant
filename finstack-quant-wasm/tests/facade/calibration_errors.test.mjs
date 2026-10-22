@@ -480,3 +480,22 @@ test('validated envelopes reject integers that structured JavaScript results can
   // Diagnostics do not echo the settings, so the same exact input remains valid for dry runs.
   assert.deepEqual(calibration.dryRun(envelope).errors, []);
 });
+
+test('base correlation requires its credit index', () => {
+  const envelope = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json',
+        import.meta.url
+      ),
+      'utf8'
+    )
+  );
+  envelope.market_data = envelope.market_data.filter((datum) => datum.kind !== 'credit_index');
+  const error = captureError(() => calibration.calibrate(envelope));
+  assertStructuredError(error);
+  assert.equal(error.kind, 'input');
+  assert.equal(error.stage, 'preflight');
+  assert.equal(error.step_id, 'CDX-NA-IG-46-BASE-CORR-STEP');
+  assert.match(error.message, /CDX-NA-IG-46/);
+});

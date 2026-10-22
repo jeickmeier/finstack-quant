@@ -346,7 +346,7 @@ fn execute_params(
                 global_config,
             );
             let output = StepOutput::Curve(curve.into());
-            let credit_index_update = index_update.map(|idx| (p.index_id.clone(), idx));
+            let credit_index_update = Some((p.index_id.clone(), index_update));
             Ok(StepOutcome {
                 output,
                 credit_index_update,

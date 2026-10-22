@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import json
+from pathlib import Path
 import pickle
 
 import pytest
@@ -268,3 +269,18 @@ def test_envelope_rejects_duplicate_market_data_during_validation() -> None:
     assert any(error["kind"] == "duplicate_market_datum_id" for error in dry_run(repeated).errors)
     with pytest.raises(CalibrationEnvelopeError, match="duplicate"):
         calibrate(repeated)
+
+
+def test_base_correlation_requires_credit_index() -> None:
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json"
+    )
+    envelope = json.loads(path.read_text())
+    envelope["market_data"] = [datum for datum in envelope["market_data"] if datum["kind"] != "credit_index"]
+    with pytest.raises(CalibrationEnvelopeError) as caught:
+        calibrate(envelope)
+    assert caught.value.kind == "input"
+    assert caught.value.stage == "preflight"
+    assert caught.value.step_id == "CDX-NA-IG-46-BASE-CORR-STEP"
+    assert "CDX-NA-IG-46" in str(caught.value)
