@@ -29,13 +29,13 @@ fn s(v: f64) -> AmountOrScalar {
 #[test]
 fn leverage_within_range_passes() {
     // Annual window size 1: Debt/TTM EBITDA = 500/200 = 2.5x
-    let model = ModelBuilder::new("test")
-        .periods("2025..2025", None)
-        .unwrap()
-        .value("debt", &[(y(), s(500.0))])
-        .value("ebitda", &[(y(), s(200.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025..2025", None).unwrap();
+        model_builder.value("debt", &[(y(), s(500.0))]);
+        model_builder.value("ebitda", &[(y(), s(200.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -57,13 +57,13 @@ fn leverage_within_range_passes() {
 #[test]
 fn leverage_above_warn_flags_warning() {
     // Annual window size 1: Debt/TTM EBITDA = 1400/200 = 7.0x → above warn 6.0, below error 10.0
-    let model = ModelBuilder::new("test")
-        .periods("2025..2025", None)
-        .unwrap()
-        .value("debt", &[(y(), s(1400.0))])
-        .value("ebitda", &[(y(), s(200.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025..2025", None).unwrap();
+        model_builder.value("debt", &[(y(), s(1400.0))]);
+        model_builder.value("ebitda", &[(y(), s(200.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -86,13 +86,13 @@ fn leverage_above_warn_flags_warning() {
 #[test]
 fn leverage_above_error_flags_error() {
     // Annual window size 1: Debt/TTM EBITDA = 2200/200 = 11.0x → above error 10.0
-    let model = ModelBuilder::new("test")
-        .periods("2025..2025", None)
-        .unwrap()
-        .value("debt", &[(y(), s(2200.0))])
-        .value("ebitda", &[(y(), s(200.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025..2025", None).unwrap();
+        model_builder.value("debt", &[(y(), s(2200.0))]);
+        model_builder.value("ebitda", &[(y(), s(200.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -115,13 +115,13 @@ fn leverage_above_error_flags_error() {
 fn leverage_flags_non_positive_ebitda_as_error() {
     // Debt/TTM EBITDA is undefined when TTM EBITDA <= 0; the check must
     // surface this as a high-severity finding rather than silently passing.
-    let model = ModelBuilder::new("test")
-        .periods("2025..2025", None)
-        .unwrap()
-        .value("debt", &[(y(), s(500.0))])
-        .value("ebitda", &[(y(), s(-100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025..2025", None).unwrap();
+        model_builder.value("debt", &[(y(), s(500.0))]);
+        model_builder.value("ebitda", &[(y(), s(-100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -146,13 +146,13 @@ fn leverage_flags_non_positive_ebitda_as_error() {
 fn leverage_skips_incomplete_quarterly_ttm() {
     // Quarterly window is 4 periods. A single quarter must not be treated as
     // annual EBITDA (500/200 = 2.5x would otherwise pass).
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("debt", &[(q(1), s(500.0))])
-        .value("ebitda", &[(q(1), s(200.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("debt", &[(q(1), s(500.0))]);
+        model_builder.value("ebitda", &[(q(1), s(200.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -174,10 +174,10 @@ fn leverage_skips_incomplete_quarterly_ttm() {
 #[test]
 fn leverage_uses_four_quarter_ttm() {
     // Debt 1400 / TTM EBITDA 200 = 7.0x at Q4; Q1–Q3 are incomplete and skipped.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "debt",
             &[
                 (q(1), s(1400.0)),
@@ -185,8 +185,8 @@ fn leverage_uses_four_quarter_ttm() {
                 (q(3), s(1400.0)),
                 (q(4), s(1400.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "ebitda",
             &[
                 (q(1), s(50.0)),
@@ -194,9 +194,9 @@ fn leverage_uses_four_quarter_ttm() {
                 (q(3), s(50.0)),
                 (q(4), s(50.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -222,13 +222,13 @@ fn leverage_uses_four_quarter_ttm() {
 #[test]
 fn coverage_above_floor_passes() {
     // Ratio = 300/100 = 3.0x, above both floors
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("ebitda", &[(q(1), s(300.0))])
-        .value("debt_service", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("ebitda", &[(q(1), s(300.0))]);
+        model_builder.value("debt_service", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -250,13 +250,13 @@ fn coverage_above_floor_passes() {
 #[test]
 fn coverage_below_warning_flags() {
     // Ratio = 120/100 = 1.2x, below 1.5 warning but above 1.0 error
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("ebitda", &[(q(1), s(120.0))])
-        .value("debt_service", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("ebitda", &[(q(1), s(120.0))]);
+        model_builder.value("debt_service", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -279,13 +279,13 @@ fn coverage_below_warning_flags() {
 #[test]
 fn coverage_below_error_flags() {
     // Ratio = 80/100 = 0.8x, below 1.0 error
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("ebitda", &[(q(1), s(80.0))])
-        .value("debt_service", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("ebitda", &[(q(1), s(80.0))]);
+        model_builder.value("debt_service", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -308,13 +308,13 @@ fn coverage_below_error_flags() {
 fn coverage_negative_denominator_is_error() {
     // Negative debt service makes the ratio undefined — must surface as an
     // Error finding (consistent with LeverageRangeCheck), not a silent skip.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("ebitda", &[(q(1), s(300.0))])
-        .value("debt_service", &[(q(1), s(-100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("ebitda", &[(q(1), s(300.0))]);
+        model_builder.value("debt_service", &[(q(1), s(-100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -338,13 +338,13 @@ fn coverage_negative_denominator_is_error() {
 #[test]
 fn coverage_zero_denominator_is_skipped() {
     // Zero debt service: nothing to cover — documented skip.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("ebitda", &[(q(1), s(300.0))])
-        .value("debt_service", &[(q(1), s(0.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("ebitda", &[(q(1), s(300.0))]);
+        model_builder.value("debt_service", &[(q(1), s(0.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -367,10 +367,10 @@ fn coverage_zero_denominator_is_skipped() {
 
 #[test]
 fn fcf_positive_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "fcf",
             &[
                 (q(1), s(10.0)),
@@ -378,9 +378,9 @@ fn fcf_positive_passes() {
                 (q(3), s(15.0)),
                 (q(4), s(25.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -400,10 +400,10 @@ fn fcf_positive_passes() {
 
 #[test]
 fn fcf_consecutive_negative_warning() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "fcf",
             &[
                 (q(1), s(10.0)),
@@ -411,9 +411,9 @@ fn fcf_consecutive_negative_warning() {
                 (q(3), s(-10.0)),
                 (q(4), s(5.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -439,10 +439,10 @@ fn fcf_consecutive_negative_warning() {
 
 #[test]
 fn fcf_consecutive_negative_error() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "fcf",
             &[
                 (q(1), s(-1.0)),
@@ -450,9 +450,9 @@ fn fcf_consecutive_negative_error() {
                 (q(3), s(-3.0)),
                 (q(4), s(-4.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -479,10 +479,10 @@ fn fcf_consecutive_negative_error() {
 
 #[test]
 fn trend_improving_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "coverage",
             &[
                 (q(1), s(1.5)),
@@ -490,9 +490,9 @@ fn trend_improving_passes() {
                 (q(3), s(1.7)),
                 (q(4), s(1.8)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -513,10 +513,10 @@ fn trend_improving_passes() {
 #[test]
 fn trend_deteriorating_flags() {
     // 3 consecutive decreases when IncreasingIsGood
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "coverage",
             &[
                 (q(1), s(2.0)),
@@ -524,9 +524,9 @@ fn trend_deteriorating_flags() {
                 (q(3), s(1.5)),
                 (q(4), s(1.2)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -548,10 +548,10 @@ fn trend_deteriorating_flags() {
 #[test]
 fn trend_decreasing_is_good_deterioration() {
     // Leverage increasing = bad when DecreasingIsGood
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "leverage",
             &[
                 (q(1), s(3.0)),
@@ -559,9 +559,9 @@ fn trend_decreasing_is_good_deterioration() {
                 (q(3), s(4.0)),
                 (q(4), s(4.5)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -585,13 +585,13 @@ fn trend_decreasing_is_good_deterioration() {
 fn liquidity_runway_adequate_passes() {
     // Quarterly model: runway = (1200 / 100) quarters * 3 months = 36 months,
     // above both thresholds.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("cash", &[(q(1), s(1200.0))])
-        .value("burn", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("cash", &[(q(1), s(1200.0))]);
+        model_builder.value("burn", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -614,13 +614,13 @@ fn liquidity_runway_adequate_passes() {
 fn liquidity_runway_below_warning() {
     // Quarterly model: runway = (150 / 100) quarters * 3 months = 4.5
     // months, below 6 warning but above 3 error.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("cash", &[(q(1), s(150.0))])
-        .value("burn", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("cash", &[(q(1), s(150.0))]);
+        model_builder.value("burn", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -644,13 +644,13 @@ fn liquidity_runway_below_warning() {
 fn liquidity_runway_below_error() {
     // Quarterly model: runway = (50 / 100) quarters * 3 months = 1.5
     // months, below 3 error.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("cash", &[(q(1), s(50.0))])
-        .value("burn", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("cash", &[(q(1), s(50.0))]);
+        model_builder.value("burn", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -674,13 +674,13 @@ fn liquidity_runway_converts_periods_to_months() {
     // Regression for periods-as-months bug: a quarterly model with exactly
     // 2 periods of runway has 6 months — at the 6-month warning floor it
     // must pass (not be treated as "2 months" and error).
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("cash", &[(q(1), s(200.0))])
-        .value("burn", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("cash", &[(q(1), s(200.0))]);
+        model_builder.value("burn", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -708,13 +708,13 @@ fn liquidity_runway_converts_periods_to_months() {
 
 #[test]
 fn liquidity_runway_skips_no_burn() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("cash", &[(q(1), s(200.0))])
-        .value("burn", &[(q(1), s(0.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("cash", &[(q(1), s(200.0))]);
+        model_builder.value("burn", &[(q(1), s(0.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -736,10 +736,10 @@ fn liquidity_runway_skips_no_burn() {
 fn trend_nan_period_warns_and_resets() {
     // Q3 is NaN: the streak must reset (no deterioration finding) and the
     // poisoned period must be reported rather than silently swallowed.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "coverage",
             &[
                 (q(1), s(2.0)),
@@ -747,9 +747,9 @@ fn trend_nan_period_warns_and_resets() {
                 (q(3), s(1.5)),
                 (q(4), s(1.2)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let mut results = ev.evaluate(&model).unwrap();

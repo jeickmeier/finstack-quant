@@ -7,10 +7,10 @@ use finstack_quant_statements::types::AmountOrScalar;
 
 #[test]
 fn test_min_two_args() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "a",
             &[
                 (
@@ -22,8 +22,8 @@ fn test_min_two_args() {
                     AmountOrScalar::scalar(50.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "b",
             &[
                 (
@@ -35,11 +35,10 @@ fn test_min_two_args() {
                     AmountOrScalar::scalar(120.0),
                 ),
             ],
-        )
-        .compute("minimum", "min(a, b)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("minimum", "min(a, b)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -69,10 +68,10 @@ fn test_min_two_args() {
 
 #[test]
 fn test_max_two_args() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "a",
             &[
                 (
@@ -84,8 +83,8 @@ fn test_max_two_args() {
                     AmountOrScalar::scalar(50.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "b",
             &[
                 (
@@ -97,11 +96,10 @@ fn test_max_two_args() {
                     AmountOrScalar::scalar(120.0),
                 ),
             ],
-        )
-        .compute("maximum", "max(a, b)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("maximum", "max(a, b)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -131,34 +129,33 @@ fn test_max_two_args() {
 
 #[test]
 fn test_min_three_args() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "a",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "b",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(80.0),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "c",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(120.0),
             )],
-        )
-        .compute("minimum", "min(a, b, c)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("minimum", "min(a, b, c)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -177,34 +174,33 @@ fn test_min_three_args() {
 
 #[test]
 fn test_max_three_args() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "a",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "b",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(80.0),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "c",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(120.0),
             )],
-        )
-        .compute("maximum", "max(a, b, c)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("maximum", "max(a, b, c)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -223,10 +219,10 @@ fn test_max_three_args() {
 
 #[test]
 fn test_min_with_literal() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -238,11 +234,12 @@ fn test_min_with_literal() {
                     AmountOrScalar::scalar(800000.0),
                 ),
             ],
-        )
-        .compute("capped_revenue", "min(revenue, 1000000)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("capped_revenue", "min(revenue, 1000000)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -272,10 +269,10 @@ fn test_min_with_literal() {
 
 #[test]
 fn test_max_with_literal() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -287,11 +284,12 @@ fn test_max_with_literal() {
                     AmountOrScalar::scalar(150000.0),
                 ),
             ],
-        )
-        .compute("min_revenue", "max(revenue, 100000)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("min_revenue", "max(revenue, 100000)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -321,20 +319,19 @@ fn test_max_with_literal() {
 
 #[test]
 fn test_min_single_arg() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "a",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(42.0),
             )],
-        )
-        .compute("result", "min(a)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("result", "min(a)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -353,34 +350,35 @@ fn test_min_single_arg() {
 
 #[test]
 fn test_min_max_nested() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "a",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(50.0),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "b",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "c",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(75.0),
             )],
-        )
-        .compute("result", "max(min(a, b), c)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("result", "max(min(a, b), c)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

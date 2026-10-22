@@ -99,18 +99,20 @@ mod tests {
     fn model() -> FinancialModelSpec {
         let q1 = PeriodId::quarter(2025, 1).expect("valid period");
         let q2 = PeriodId::quarter(2025, 2).expect("valid period");
-        ModelBuilder::new("dated")
-            .periods("2025Q1..Q2", None)
-            .expect("valid periods")
-            .value(
+        {
+            let mut model_builder = ModelBuilder::new("dated");
+            model_builder
+                .periods("2025Q1..Q2", None)
+                .expect("valid periods");
+            model_builder.value(
                 "revenue",
                 &[
                     (q1, AmountOrScalar::scalar(100.0)),
                     (q2, AmountOrScalar::scalar(110.0)),
                 ],
-            )
-            .build()
-            .expect("valid model")
+            );
+            model_builder.build().expect("valid model")
+        }
     }
 
     #[test]

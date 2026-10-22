@@ -321,9 +321,10 @@ pub(crate) struct DcfEvalContext<'a> {
 /// use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let model = ModelBuilder::new("acme")
-///     .periods("2025Q1..Q4", Some("2025Q1"))?
-///     .value_money(
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("acme");
+///     model_builder.periods("2025Q1..Q4", Some("2025Q1"))?;
+///     model_builder.value_money(
 ///         "ufcf",
 ///         &[
 ///             (PeriodId::quarter(2025, 1).expect("valid period fixture"), Money::from((1_000_000_i64, Currency::USD))),
@@ -331,9 +332,10 @@ pub(crate) struct DcfEvalContext<'a> {
 ///             (PeriodId::quarter(2025, 3).expect("valid period fixture"), Money::from((1_100_000_i64, Currency::USD))),
 ///             (PeriodId::quarter(2025, 4).expect("valid period fixture"), Money::from((1_150_000_i64, Currency::USD))),
 ///         ],
-///     )
-///     .with_meta("currency", serde_json::json!("USD"))
-///     .build()?;
+///     );
+///     model_builder.with_meta("currency", serde_json::json!("USD"));
+///     model_builder.build()?
+/// };
 ///
 /// let result = evaluate_dcf(
 ///     &model,
@@ -1273,10 +1275,12 @@ mod tests {
 
     #[test]
     fn evaluate_dcf_requires_explicit_currency_metadata() {
-        let model = ModelBuilder::new("dcf-missing-currency")
-            .periods("2025Q1..Q2", None)
-            .expect("valid periods")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("dcf-missing-currency");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("valid periods");
+            model_builder_1.value(
                 "ufcf",
                 &[
                     (
@@ -1288,23 +1292,23 @@ mod tests {
                         AmountOrScalar::scalar(110_000.0),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder_1.value(
                 "total_debt",
                 &[(
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(50_000.0),
                 )],
-            )
-            .value(
+            );
+            model_builder_1.value(
                 "cash",
                 &[(
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(10_000.0),
                 )],
-            )
-            .build()
-            .expect("valid model");
+            );
+            model_builder_1.build().expect("valid model")
+        };
 
         let result = evaluate_dcf(
             &model,
@@ -1323,10 +1327,12 @@ mod tests {
 
     #[test]
     fn evaluate_dcf_requires_balance_sheet_inputs_without_override() {
-        let model = ModelBuilder::new("dcf-missing-balance-sheet")
-            .periods("2025Q1..Q2", None)
-            .expect("valid periods")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("dcf-missing-balance-sheet");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("valid periods");
+            model_builder_1.value(
                 "ufcf",
                 &[
                     (
@@ -1338,10 +1344,10 @@ mod tests {
                         AmountOrScalar::scalar(110_000.0),
                     ),
                 ],
-            )
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("valid model");
+            );
+            model_builder_1.with_meta("currency", serde_json::json!("USD"));
+            model_builder_1.build().expect("valid model")
+        };
 
         let result = evaluate_dcf(
             &model,
@@ -1501,10 +1507,12 @@ mod tests {
     }
 
     fn sensitivity_model() -> FinancialModelSpec {
-        ModelBuilder::new("dcf-sensitivity")
-            .periods("2025..2027", None)
-            .expect("valid periods")
-            .value_money(
+        {
+            let mut model_builder_1 = ModelBuilder::new("dcf-sensitivity");
+            model_builder_1
+                .periods("2025..2027", None)
+                .expect("valid periods");
+            model_builder_1.value_money(
                 "ufcf",
                 &[
                     (
@@ -1520,10 +1528,10 @@ mod tests {
                         Money::from((120_i64, Currency::USD)),
                     ),
                 ],
-            )
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("valid model")
+            );
+            model_builder_1.with_meta("currency", serde_json::json!("USD"));
+            model_builder_1.build().expect("valid model")
+        }
     }
 
     #[test]
@@ -1682,10 +1690,12 @@ mod tests {
     }
 
     fn exit_multiple_model() -> FinancialModelSpec {
-        ModelBuilder::new("exit-multiple-node")
-            .periods("2025..2027", None)
-            .expect("valid periods")
-            .value_money(
+        {
+            let mut model_builder_1 = ModelBuilder::new("exit-multiple-node");
+            model_builder_1
+                .periods("2025..2027", None)
+                .expect("valid periods");
+            model_builder_1.value_money(
                 "ufcf",
                 &[
                     (
@@ -1701,8 +1711,8 @@ mod tests {
                         Money::from((120_i64, Currency::USD)),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder_1.value(
                 "ebitda",
                 &[
                     (
@@ -1718,10 +1728,10 @@ mod tests {
                         AmountOrScalar::amount(150.0, Currency::USD).unwrap(),
                     ),
                 ],
-            )
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("valid model")
+            );
+            model_builder_1.with_meta("currency", serde_json::json!("USD"));
+            model_builder_1.build().expect("valid model")
+        }
     }
 
     #[test]
@@ -1782,13 +1792,15 @@ mod tests {
                     )
                 })
                 .collect();
-            let mut model = ModelBuilder::new("ltm")
-                .periods("2024Q1..Q4", Some("2024Q2"))
-                .unwrap()
-                .value("ebitda", &vals)
-                .with_meta("currency", serde_json::json!("USD"))
-                .build()
-                .unwrap();
+            let mut model = {
+                let mut model_builder_1 = ModelBuilder::new("ltm");
+                model_builder_1
+                    .periods("2024Q1..Q4", Some("2024Q2"))
+                    .unwrap();
+                model_builder_1.value("ebitda", &vals);
+                model_builder_1.with_meta("currency", serde_json::json!("USD"));
+                model_builder_1.build().unwrap()
+            };
             for (p, w) in model.periods.iter_mut().zip(boundaries.windows(2)) {
                 p.start = w[0];
                 p.end = w[1];

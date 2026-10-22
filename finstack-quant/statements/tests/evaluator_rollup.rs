@@ -32,41 +32,48 @@ fn quarters(values: [f64; 8]) -> Vec<(PeriodId, f64)> {
 
 /// Two years of quarterly flows, balances and ratios.
 fn quarterly_model() -> FinancialModelSpec {
-    ModelBuilder::new("rollup")
-        .periods("2024Q1..2025Q4", Some("2024Q4"))
-        .expect("valid periods")
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("rollup");
+        model_builder
+            .periods("2024Q1..2025Q4", Some("2024Q4"))
+            .expect("valid periods");
+        model_builder.value(
             "revenue",
             &usd(&quarters([
                 100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0,
             ])),
-        )
-        .value(
+        );
+        model_builder.value(
             "opex",
             &usd(&quarters([60.0, 60.0, 70.0, 70.0, 80.0, 80.0, 90.0, 90.0])),
-        )
-        .value(
+        );
+        model_builder.value(
             "cash",
             &usd(&quarters([10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0])),
-        )
-        .value(
+        );
+        model_builder.value(
             "debt",
             &usd(&quarters([
                 500.0, 500.0, 480.0, 460.0, 440.0, 420.0, 400.0, 380.0,
             ])),
-        )
-        .compute("ebitda", "revenue - opex")
-        .expect("valid formula")
-        .compute("ltm_ebitda", "rolling_sum(ebitda, 4)")
-        .expect("valid formula")
-        .compute("margin", "ebitda / revenue")
-        .expect("valid formula")
-        .compute("leverage", "debt / ltm_ebitda")
-        .expect("valid formula")
-        .compute("growth", "revenue / lag(revenue, 1) - 1")
-        .expect("valid formula")
-        .build()
-        .expect("valid model")
+        );
+        model_builder
+            .compute("ebitda", "revenue - opex")
+            .expect("valid formula");
+        model_builder
+            .compute("ltm_ebitda", "rolling_sum(ebitda, 4)")
+            .expect("valid formula");
+        model_builder
+            .compute("margin", "ebitda / revenue")
+            .expect("valid formula");
+        model_builder
+            .compute("leverage", "debt / ltm_ebitda")
+            .expect("valid formula");
+        model_builder
+            .compute("growth", "revenue / lag(revenue, 1) - 1")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    }
 }
 
 fn annual_spec() -> RollupSpec {
@@ -147,12 +154,14 @@ fn monthly_results_roll_up_to_quarters() {
             )
         })
         .collect();
-    let model = ModelBuilder::new("monthly")
-        .periods("2025M1..M6", None)
-        .expect("valid periods")
-        .value("sales", &months)
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("monthly");
+        model_builder
+            .periods("2025M1..M6", None)
+            .expect("valid periods");
+        model_builder.value("sales", &months);
+        model_builder.build().expect("valid model")
+    };
     let monthly = Evaluator::new().evaluate(&model).expect("evaluation");
 
     let quarterly = monthly
@@ -181,12 +190,14 @@ fn fiscal_quarters_roll_up_to_fiscal_years_and_halves() {
         .zip([1.0, 2.0, 4.0, 8.0])
         .map(|(period, value)| (period.id, AmountOrScalar::scalar(value)))
         .collect();
-    let model = ModelBuilder::new("fiscal-rollup")
-        .periods_explicit(periods)
-        .expect("valid periods")
-        .value("x", &values)
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("fiscal-rollup");
+        model_builder
+            .periods_explicit(periods)
+            .expect("valid periods");
+        model_builder.value("x", &values);
+        model_builder.build().expect("valid model")
+    };
     let results = Evaluator::new().evaluate(&model).expect("evaluation");
 
     let annual = results

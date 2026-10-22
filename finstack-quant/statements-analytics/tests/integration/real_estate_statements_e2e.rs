@@ -21,10 +21,12 @@ fn e2e_statements_to_real_estate_asset_cashflows_prices() {
 
     // Build a tiny statement model with NOI and CapEx, then export to dated schedules.
     let model = real_estate::add_noi_buildup(
-        ModelBuilder::new("re_e2e")
-            .periods("2025Q1..Q2", None)
-            .expect("periods should parse")
-            .value(
+        {
+            let mut model_builder = ModelBuilder::new("re_e2e");
+            model_builder
+                .periods("2025Q1..Q2", None)
+                .expect("periods should parse");
+            model_builder.value(
                 "rent",
                 &[
                     (
@@ -36,8 +38,8 @@ fn e2e_statements_to_real_estate_asset_cashflows_prices() {
                         AmountOrScalar::scalar(110.0),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder.value(
                 "taxes",
                 &[
                     (
@@ -49,8 +51,8 @@ fn e2e_statements_to_real_estate_asset_cashflows_prices() {
                         AmountOrScalar::scalar(22.0),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder.value(
                 "capex",
                 &[
                     (
@@ -62,7 +64,9 @@ fn e2e_statements_to_real_estate_asset_cashflows_prices() {
                         AmountOrScalar::scalar(6.0),
                     ),
                 ],
-            ),
+            );
+            model_builder
+        },
         "total_rev",
         &["rent"],
         "total_exp",

@@ -8,11 +8,11 @@ use indexmap::indexmap;
 
 #[test]
 fn test_mixed_builder_basic() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .mixed("revenue")
-        .values(&[
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        let mut model_builder = model_builder.mixed("revenue");
+        model_builder.values(&[
             (
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
@@ -21,17 +21,15 @@ fn test_mixed_builder_basic() {
                 PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
-        ])
-        .forecast(ForecastSpec {
+        ]);
+        model_builder.forecast(ForecastSpec {
             method: ForecastMethod::GrowthPct,
             params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-        })
-        .formula("lag(revenue, 1) * 1.05")
-        .unwrap()
-        .build()
-        .unwrap()
-        .build()
-        .unwrap();
+        });
+        model_builder.formula("lag(revenue, 1) * 1.05").unwrap();
+        let model_builder = model_builder.build().unwrap();
+        model_builder.build().unwrap()
+    };
 
     let node = model.get_node("revenue").unwrap();
     assert_eq!(node.node_type, NodeType::Mixed);
@@ -42,19 +40,18 @@ fn test_mixed_builder_basic() {
 
 #[test]
 fn test_mixed_builder_with_name() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .mixed("revenue")
-        .name("Total Revenue")
-        .values(&[(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        let mut model_builder = model_builder.mixed("revenue");
+        model_builder.name("Total Revenue");
+        model_builder.values(&[(
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
             AmountOrScalar::scalar(100_000.0),
-        )])
-        .build()
-        .unwrap()
-        .build()
-        .unwrap();
+        )]);
+        let model_builder = model_builder.build().unwrap();
+        model_builder.build().unwrap()
+    };
 
     let node = model.get_node("revenue").unwrap();
     assert_eq!(node.name.as_ref().unwrap(), "Total Revenue");
@@ -62,11 +59,11 @@ fn test_mixed_builder_with_name() {
 
 #[test]
 fn test_mixed_builder_evaluation() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .mixed("revenue")
-        .values(&[
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        let mut model_builder = model_builder.mixed("revenue");
+        model_builder.values(&[
             (
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
@@ -75,15 +72,14 @@ fn test_mixed_builder_evaluation() {
                 PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
-        ])
-        .forecast(ForecastSpec {
+        ]);
+        model_builder.forecast(ForecastSpec {
             method: ForecastMethod::GrowthPct,
             params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-        })
-        .build()
-        .unwrap()
-        .build()
-        .unwrap();
+        });
+        let model_builder = model_builder.build().unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -125,10 +121,10 @@ fn test_mixed_builder_evaluation() {
 #[test]
 fn test_mixed_builder_formula_fallback() {
     // Test that formula is used when no value or forecast applies
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
             "base",
             &[
                 (
@@ -148,18 +144,16 @@ fn test_mixed_builder_formula_fallback() {
                     AmountOrScalar::scalar(130.0),
                 ),
             ],
-        )
-        .mixed("derived")
-        .values(&[(
+        );
+        let mut model_builder = model_builder.mixed("derived");
+        model_builder.values(&[(
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
             AmountOrScalar::scalar(50.0),
-        )])
-        .formula("base * 0.5")
-        .unwrap()
-        .build()
-        .unwrap()
-        .build()
-        .unwrap();
+        )]);
+        model_builder.formula("base * 0.5").unwrap();
+        let model_builder = model_builder.build().unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -199,11 +193,15 @@ fn test_mixed_builder_formula_fallback() {
 
 #[test]
 fn test_mixed_builder_empty_formula_error() {
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .mixed("revenue")
-        .formula("");
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        let mut model_builder = model_builder.mixed("revenue");
+        match model_builder.formula("") {
+            Ok(_) => Ok(model_builder),
+            Err(error) => Err(error),
+        }
+    };
 
     assert!(result.is_err());
 }
@@ -211,18 +209,17 @@ fn test_mixed_builder_empty_formula_error() {
 #[test]
 fn test_mixed_builder_minimal() {
     // Test that you can create a mixed node with just values
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .mixed("revenue")
-        .values(&[(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        let mut model_builder = model_builder.mixed("revenue");
+        model_builder.values(&[(
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
             AmountOrScalar::scalar(100.0),
-        )])
-        .build()
-        .unwrap()
-        .build()
-        .unwrap();
+        )]);
+        let model_builder = model_builder.build().unwrap();
+        model_builder.build().unwrap()
+    };
 
     let node = model.get_node("revenue").unwrap();
     assert_eq!(node.node_type, NodeType::Mixed);

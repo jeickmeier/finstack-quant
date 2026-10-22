@@ -245,3 +245,47 @@ test('checkConfigValidate is the Rust CheckConfig::validate', () => {
   );
   assert.throws(() => statements.checkConfigValidate(1), TypeError);
 });
+
+test('empty explicit periods preserve the model builder for retry', () => {
+  const builder = new statements.ModelBuilder('recoverable');
+  try {
+    builder.valueScalar('revenue', { '2025Q1': 100 });
+    builder.withMeta('marker', { retained: true });
+    assert.throws(() => builder.periodsExplicit([]), /at least one period/);
+    builder.periods('2025Q1..Q2', '2025Q1');
+    builder.forecast('revenue', { method: 'forward_fill', params: {} });
+    const model = builder.build();
+    assert.equal(model.nodes.revenue.values['2025Q1'], 100);
+    assert.deepEqual(model.meta.marker, { retained: true });
+  } finally {
+    builder.free();
+  }
+});
+
+test('failed mixed formula preserves values, forecast, name and parent', () => {
+  const parent = new statements.ModelBuilder('mixed-recovery');
+  let mixed;
+  let ready;
+  try {
+    parent.periods('2025Q1..Q2', '2025Q1');
+    parent.valueScalar('base', { '2025Q1': 100 });
+    parent.withMeta('marker', 'retained');
+    mixed = parent.mixed('mixed');
+    mixed.values({ '2025Q1': 40 });
+    mixed.forecast({ method: 'forward_fill', params: {} });
+    mixed.name('Retained name');
+    assert.throws(() => mixed.formula('('));
+    mixed.formula('base * 0.5');
+    ready = mixed.build();
+    const model = ready.build();
+    assert.equal(model.nodes.mixed.values['2025Q1'], 40);
+    assert.equal(model.nodes.mixed.name, 'Retained name');
+    assert.equal(model.nodes.mixed.formula_text, 'base * 0.5');
+    assert.equal(model.meta.marker, 'retained');
+    assert.ok(model.nodes.base);
+  } finally {
+    ready?.free();
+    mixed?.free();
+    parent.free();
+  }
+});

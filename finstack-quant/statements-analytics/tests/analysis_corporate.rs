@@ -23,10 +23,12 @@ fn non_finite_suite() -> CheckSuite {
 
 #[test]
 fn test_dcf_evaluation_gordon_growth() {
-    let model = ModelBuilder::new("test-corp")
-        .periods("2025Q1..Q4", None)
-        .expect("valid periods")
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test-corp");
+        model_builder
+            .periods("2025Q1..Q4", None)
+            .expect("valid periods");
+        model_builder.value_money(
             "ufcf",
             &[
                 (
@@ -46,10 +48,10 @@ fn test_dcf_evaluation_gordon_growth() {
                     Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("valid model");
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("valid model")
+    };
 
     let result = evaluate_dcf(
         &model,
@@ -71,19 +73,19 @@ fn test_dcf_evaluation_gordon_growth() {
 
 #[test]
 fn test_dcf_rejects_scalar_ufcf_node() {
-    let model = ModelBuilder::new("scalar-ufcf")
-        .periods("2025Q1..Q1", None)
-        .expect("periods")
-        .value_scalar(
+    let model = {
+        let mut model_builder = ModelBuilder::new("scalar-ufcf");
+        model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value_scalar(
             "ufcf",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 100_000.0,
             )],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("model");
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("model")
+    };
 
     let error = evaluate_dcf(
         &model,
@@ -106,10 +108,12 @@ fn test_cs_cashflows_populated_on_statement_result() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
 
-    let model = ModelBuilder::new("cs-test")
-        .periods("2025Q1..Q2", None)
-        .expect("valid periods")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("cs-test");
+        model_builder
+            .periods("2025Q1..Q2", None)
+            .expect("valid periods");
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -121,18 +125,19 @@ fn test_cs_cashflows_populated_on_statement_result() {
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
-        )
-        .add_bond(
-            "BOND-001",
-            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-            0.05,
-            issue,
-            maturity,
-            "USD-OIS",
-        )
-        .expect("valid bond")
-        .build()
-        .expect("model should build");
+        );
+        model_builder
+            .add_bond(
+                "BOND-001",
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                0.05,
+                issue,
+                maturity,
+                "USD-OIS",
+            )
+            .expect("valid bond");
+        model_builder.build().expect("model should build")
+    };
 
     // Market context with a simple discount curve
     let disc_curve = DiscountCurve::builder("USD-OIS")
@@ -180,10 +185,12 @@ fn test_cs_cashflows_populated_on_statement_result() {
 
 #[test]
 fn test_dcf_with_market_context() {
-    let model = ModelBuilder::new("mkt-test")
-        .periods("2025Q1..Q4", None)
-        .expect("valid periods")
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("mkt-test");
+        model_builder
+            .periods("2025Q1..Q4", None)
+            .expect("valid periods");
+        model_builder.value_money(
             "ufcf",
             &[
                 (
@@ -203,10 +210,10 @@ fn test_dcf_with_market_context() {
                     Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("valid model");
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("valid model")
+    };
 
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let options = DcfOptions::default();
@@ -273,10 +280,12 @@ fn test_dcf_with_market_context() {
 
 #[test]
 fn test_dcf_excludes_historical_periods_from_explicit_flows() {
-    let model = ModelBuilder::new("hist-vs-forecast")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .expect("valid periods")
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("hist-vs-forecast");
+        model_builder
+            .periods("2025Q1..Q4", Some("2025Q2"))
+            .expect("valid periods");
+        model_builder.value_money(
             "ufcf",
             &[
                 (
@@ -296,10 +305,10 @@ fn test_dcf_excludes_historical_periods_from_explicit_flows() {
                     Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("valid model");
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("valid model")
+    };
 
     let result = evaluate_dcf(
         &model,
@@ -329,10 +338,12 @@ fn test_dcf_excludes_historical_periods_from_explicit_flows() {
 
 #[test]
 fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
-    let model = ModelBuilder::new("hist-boundary-dcf")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .expect("valid periods")
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("hist-boundary-dcf");
+        model_builder
+            .periods("2025Q1..Q4", Some("2025Q2"))
+            .expect("valid periods");
+        model_builder.value_money(
             "ufcf",
             &[
                 (
@@ -352,8 +363,8 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
                     Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_debt",
             &[
                 (
@@ -373,8 +384,8 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
                     AmountOrScalar::amount(10.0, Currency::USD).unwrap(),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cash",
             &[
                 (
@@ -394,10 +405,10 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
                     AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
             ],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("valid model");
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("valid model")
+    };
 
     let as_of = Date::from_calendar_date(2025, Month::August, 15).expect("valid date");
     let result = evaluate_dcf(
@@ -441,10 +452,12 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
 
 #[test]
 fn test_dcf_forecast_only_requires_opening_balance_or_override() {
-    let model = ModelBuilder::new("forecast-only-dcf")
-        .periods("2025Q1..Q4", None)
-        .expect("valid periods")
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("forecast-only-dcf");
+        model_builder
+            .periods("2025Q1..Q4", None)
+            .expect("valid periods");
+        model_builder.value_money(
             "ufcf",
             &[
                 (
@@ -464,8 +477,8 @@ fn test_dcf_forecast_only_requires_opening_balance_or_override() {
                     Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_debt",
             &[
                 (
@@ -485,8 +498,8 @@ fn test_dcf_forecast_only_requires_opening_balance_or_override() {
                     AmountOrScalar::amount(10.0, Currency::USD).unwrap(),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cash",
             &[
                 (
@@ -506,10 +519,10 @@ fn test_dcf_forecast_only_requires_opening_balance_or_override() {
                     AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
             ],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("valid model");
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("valid model")
+    };
 
     let result = evaluate_dcf(
         &model,
@@ -530,10 +543,12 @@ fn test_dcf_forecast_only_requires_opening_balance_or_override() {
 // --- Parity tests: all wrapper entrypoints must produce identical results ---
 
 fn make_simple_dcf_model() -> finstack_quant_statements::types::FinancialModelSpec {
-    ModelBuilder::new("parity-dcf")
-        .periods("2025Q1..Q4", None)
-        .expect("valid periods")
-        .value_money(
+    {
+        let mut model_builder = ModelBuilder::new("parity-dcf");
+        model_builder
+            .periods("2025Q1..Q4", None)
+            .expect("valid periods");
+        model_builder.value_money(
             "ufcf",
             &[
                 (
@@ -553,10 +568,10 @@ fn make_simple_dcf_model() -> finstack_quant_statements::types::FinancialModelSp
                     Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("valid model")
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("valid model")
+    }
 }
 
 #[test]
@@ -634,10 +649,12 @@ fn quarterly_gordon_terminal_value_uses_annualized_flow() {
 /// Annual grid: terminal value behavior is unchanged (last flow used as-is).
 #[test]
 fn annual_gordon_terminal_value_unchanged() {
-    let model = ModelBuilder::new("annual-dcf")
-        .periods("2025..2027", None)
-        .expect("valid periods")
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("annual-dcf");
+        model_builder
+            .periods("2025..2027", None)
+            .expect("valid periods");
+        model_builder.value_money(
             "ufcf",
             &[
                 (
@@ -653,10 +670,10 @@ fn annual_gordon_terminal_value_unchanged() {
                     Money::new(480_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("valid model");
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("valid model")
+    };
 
     let result = evaluate_dcf(
         &model,
@@ -798,10 +815,12 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
         .expect("curve");
     let market = MarketContext::new().insert(disc_curve);
 
-    let model = ModelBuilder::new("dcf-cs-interest")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .expect("periods")
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("dcf-cs-interest");
+        model_builder
+            .periods("2025Q1..Q4", Some("2025Q1"))
+            .expect("periods");
+        model_builder.value_money(
             "revenue",
             &[
                 (
@@ -821,29 +840,32 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
                     Money::new(1_300_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .availability_dates(
-            "revenue",
-            &[(
-                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        );
+        model_builder
+            .availability_dates(
+                "revenue",
+                &[(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    as_of,
+                )],
+            )
+            .expect("availability");
+        model_builder
+            .add_bond(
+                "BOND-001",
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+                0.05,
                 as_of,
-            )],
-        )
-        .expect("availability")
-        .add_bond(
-            "BOND-001",
-            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-            0.05,
-            as_of,
-            Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
-            "USD-OIS",
-        )
-        .expect("bond")
-        .compute("ufcf", "revenue - cs.interest_expense.total")
-        .expect("formula")
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("model");
+                Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
+                "USD-OIS",
+            )
+            .expect("bond");
+        model_builder
+            .compute("ufcf", "revenue - cs.interest_expense.total")
+            .expect("formula");
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("model")
+    };
 
     let no_market = evaluate_dcf(
         &model,

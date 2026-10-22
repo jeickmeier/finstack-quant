@@ -67,20 +67,21 @@ fn credit_mapping() -> CreditMapping {
 
 #[test]
 fn integration_imbalanced_model_catches_errors_and_warnings() {
-    let model = ModelBuilder::new("imbalanced_3stmt")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        // Balance sheet
-        .value(
-            "total_assets",
-            &[
-                (q(1), s(1000.0)),
-                (q(2), s(1050.0)),
-                (q(3), s(1100.0)),
-                (q(4), s(1150.0)),
-            ],
-        )
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("imbalanced_3stmt");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder
+            // Balance sheet
+            .value(
+                "total_assets",
+                &[
+                    (q(1), s(1000.0)),
+                    (q(2), s(1050.0)),
+                    (q(3), s(1100.0)),
+                    (q(4), s(1150.0)),
+                ],
+            );
+        model_builder.value(
             "total_liabilities",
             &[
                 (q(1), s(600.0)),
@@ -88,8 +89,8 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
                 (q(3), s(660.0)),
                 (q(4), s(690.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_equity",
             &[
                 (q(1), s(400.0)),
@@ -97,8 +98,8 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
                 (q(3), s(440.0)),
                 (q(4), s(455.0)), // intentionally wrong — should be 460
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cash",
             &[
                 (q(1), s(100.0)),
@@ -106,8 +107,8 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
                 (q(3), s(135.0)),
                 (q(4), s(150.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "retained_earnings",
             &[
                 (q(1), s(200.0)),
@@ -115,18 +116,19 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
                 (q(3), s(240.0)),
                 (q(4), s(255.0)),
             ],
-        )
-        // Income statement
-        .value(
-            "revenue",
-            &[
-                (q(1), s(500.0)),
-                (q(2), s(525.0)),
-                (q(3), s(550.0)),
-                (q(4), s(575.0)),
-            ],
-        )
-        .value(
+        );
+        model_builder
+            // Income statement
+            .value(
+                "revenue",
+                &[
+                    (q(1), s(500.0)),
+                    (q(2), s(525.0)),
+                    (q(3), s(550.0)),
+                    (q(4), s(575.0)),
+                ],
+            );
+        model_builder.value(
             "net_income",
             &[
                 (q(1), s(20.0)),
@@ -134,8 +136,8 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
                 (q(3), s(20.0)),
                 (q(4), s(15.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "ebitda",
             &[
                 (q(1), s(80.0)),
@@ -143,8 +145,8 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
                 (q(3), s(88.0)),
                 (q(4), s(65.0)), // deliberately low for leverage warning
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "interest_expense",
             &[
                 (q(1), s(30.0)),
@@ -152,29 +154,31 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
                 (q(3), s(30.0)),
                 (q(4), s(30.0)),
             ],
-        )
-        // Cash flow
-        .value(
-            "total_cf",
-            &[
-                (q(1), s(20.0)),
-                (q(2), s(20.0)),
-                (q(3), s(15.0)),
-                (q(4), s(15.0)),
-            ],
-        )
-        // Debt
-        .value(
-            "total_debt",
-            &[
-                (q(1), s(400.0)),
-                (q(2), s(420.0)),
-                (q(3), s(440.0)),
-                (q(4), s(2219.0)), // 7.0x TTM: 80+84+88+65 = 317, 317 * 7 = 2219
-            ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder
+            // Cash flow
+            .value(
+                "total_cf",
+                &[
+                    (q(1), s(20.0)),
+                    (q(2), s(20.0)),
+                    (q(3), s(15.0)),
+                    (q(4), s(15.0)),
+                ],
+            );
+        model_builder
+            // Debt
+            .value(
+                "total_debt",
+                &[
+                    (q(1), s(400.0)),
+                    (q(2), s(420.0)),
+                    (q(3), s(440.0)),
+                    (q(4), s(2219.0)), // 7.0x TTM: 80+84+88+65 = 317, 317 * 7 = 2219
+                ],
+            );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -243,20 +247,21 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
 
 #[test]
 fn integration_balanced_model_passes_all_checks() {
-    let model = ModelBuilder::new("balanced_3stmt")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        // Balance sheet — assets = liabilities + equity every period
-        .value(
-            "total_assets",
-            &[
-                (q(1), s(1000.0)),
-                (q(2), s(1050.0)),
-                (q(3), s(1100.0)),
-                (q(4), s(1150.0)),
-            ],
-        )
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("balanced_3stmt");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder
+            // Balance sheet — assets = liabilities + equity every period
+            .value(
+                "total_assets",
+                &[
+                    (q(1), s(1000.0)),
+                    (q(2), s(1050.0)),
+                    (q(3), s(1100.0)),
+                    (q(4), s(1150.0)),
+                ],
+            );
+        model_builder.value(
             "total_liabilities",
             &[
                 (q(1), s(600.0)),
@@ -264,8 +269,8 @@ fn integration_balanced_model_passes_all_checks() {
                 (q(3), s(660.0)),
                 (q(4), s(690.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_equity",
             &[
                 (q(1), s(400.0)),
@@ -273,8 +278,8 @@ fn integration_balanced_model_passes_all_checks() {
                 (q(3), s(440.0)),
                 (q(4), s(460.0)), // correctly balanced
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cash",
             &[
                 (q(1), s(100.0)),
@@ -282,28 +287,30 @@ fn integration_balanced_model_passes_all_checks() {
                 (q(3), s(135.0)),
                 (q(4), s(150.0)),
             ],
-        )
-        // RE(t) = RE(t-1) + NI(t): 200+20=220, 220+20=240, 240+15=255
-        .value(
-            "retained_earnings",
-            &[
-                (q(1), s(200.0)),
-                (q(2), s(220.0)),
-                (q(3), s(240.0)),
-                (q(4), s(255.0)),
-            ],
-        )
-        // Income statement
-        .value(
-            "revenue",
-            &[
-                (q(1), s(500.0)),
-                (q(2), s(525.0)),
-                (q(3), s(550.0)),
-                (q(4), s(575.0)),
-            ],
-        )
-        .value(
+        );
+        model_builder
+            // RE(t) = RE(t-1) + NI(t): 200+20=220, 220+20=240, 240+15=255
+            .value(
+                "retained_earnings",
+                &[
+                    (q(1), s(200.0)),
+                    (q(2), s(220.0)),
+                    (q(3), s(240.0)),
+                    (q(4), s(255.0)),
+                ],
+            );
+        model_builder
+            // Income statement
+            .value(
+                "revenue",
+                &[
+                    (q(1), s(500.0)),
+                    (q(2), s(525.0)),
+                    (q(3), s(550.0)),
+                    (q(4), s(575.0)),
+                ],
+            );
+        model_builder.value(
             "net_income",
             &[
                 (q(1), s(20.0)),
@@ -311,18 +318,19 @@ fn integration_balanced_model_passes_all_checks() {
                 (q(3), s(20.0)),
                 (q(4), s(15.0)),
             ],
-        )
-        // EBITDA increasing — no trend warning
-        .value(
-            "ebitda",
-            &[
-                (q(1), s(80.0)),
-                (q(2), s(84.0)),
-                (q(3), s(88.0)),
-                (q(4), s(92.0)),
-            ],
-        )
-        .value(
+        );
+        model_builder
+            // EBITDA increasing — no trend warning
+            .value(
+                "ebitda",
+                &[
+                    (q(1), s(80.0)),
+                    (q(2), s(84.0)),
+                    (q(3), s(88.0)),
+                    (q(4), s(92.0)),
+                ],
+            );
+        model_builder.value(
             "interest_expense",
             &[
                 (q(1), s(30.0)),
@@ -330,29 +338,31 @@ fn integration_balanced_model_passes_all_checks() {
                 (q(3), s(30.0)),
                 (q(4), s(30.0)),
             ],
-        )
-        // Cash reconciles: cash(t) = cash(t-1) + total_cf(t)
-        .value(
-            "total_cf",
-            &[
-                (q(1), s(0.0)),
-                (q(2), s(20.0)),
-                (q(3), s(15.0)),
-                (q(4), s(15.0)),
-            ],
-        )
-        // Debt decreasing — no trend warning; leverage stays within (0, 6)
-        .value(
-            "total_debt",
-            &[
-                (q(1), s(400.0)),
-                (q(2), s(395.0)),
-                (q(3), s(390.0)),
-                (q(4), s(385.0)),
-            ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder
+            // Cash reconciles: cash(t) = cash(t-1) + total_cf(t)
+            .value(
+                "total_cf",
+                &[
+                    (q(1), s(0.0)),
+                    (q(2), s(20.0)),
+                    (q(3), s(15.0)),
+                    (q(4), s(15.0)),
+                ],
+            );
+        model_builder
+            // Debt decreasing — no trend warning; leverage stays within (0, 6)
+            .value(
+                "total_debt",
+                &[
+                    (q(1), s(400.0)),
+                    (q(2), s(395.0)),
+                    (q(3), s(390.0)),
+                    (q(4), s(385.0)),
+                ],
+            );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();

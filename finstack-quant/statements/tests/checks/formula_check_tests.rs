@@ -25,12 +25,12 @@ fn s(v: f64) -> AmountOrScalar {
 
 #[test]
 fn revenue_positive_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(100.0)), (q(2), s(200.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(100.0)), (q(2), s(200.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -56,12 +56,12 @@ fn revenue_positive_passes() {
 
 #[test]
 fn failing_formula_produces_finding() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(-50.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(-50.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -90,12 +90,12 @@ fn failing_formula_produces_finding() {
 
 #[test]
 fn warning_severity_does_not_fail() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("margin", &[(q(1), s(0.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("margin", &[(q(1), s(0.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -122,13 +122,13 @@ fn warning_severity_does_not_fail() {
 
 #[test]
 fn arithmetic_formula_evaluates() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("assets", &[(q(1), s(100.0))])
-        .value("liabilities", &[(q(1), s(60.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("assets", &[(q(1), s(100.0))]);
+        model_builder.value("liabilities", &[(q(1), s(60.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -177,11 +177,11 @@ fn json_deserialization_works() {
 
 #[test]
 fn missing_node_returns_error() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -206,13 +206,13 @@ fn missing_node_returns_error() {
 
 #[test]
 fn nested_expression_gross_margin() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(1000.0))])
-        .value("cogs", &[(q(1), s(700.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(1000.0))]);
+        model_builder.value("cogs", &[(q(1), s(700.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -237,13 +237,13 @@ fn nested_expression_gross_margin() {
 
 #[test]
 fn nested_expression_gross_margin_fails() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(1000.0))])
-        .value("cogs", &[(q(1), s(850.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(1000.0))]);
+        model_builder.value("cogs", &[(q(1), s(850.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -270,14 +270,14 @@ fn nested_expression_gross_margin_fails() {
 
 #[test]
 fn abs_function_in_formula() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("total_assets", &[(q(1), s(1000.0))])
-        .value("total_liabilities", &[(q(1), s(600.0))])
-        .value("total_equity", &[(q(1), s(400.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("total_assets", &[(q(1), s(1000.0))]);
+        model_builder.value("total_liabilities", &[(q(1), s(600.0))]);
+        model_builder.value("total_equity", &[(q(1), s(400.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -301,14 +301,14 @@ fn abs_function_in_formula() {
 
 #[test]
 fn abs_function_detects_imbalance() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("total_assets", &[(q(1), s(1000.0))])
-        .value("total_liabilities", &[(q(1), s(600.0))])
-        .value("total_equity", &[(q(1), s(300.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("total_assets", &[(q(1), s(1000.0))]);
+        model_builder.value("total_liabilities", &[(q(1), s(600.0))]);
+        model_builder.value("total_equity", &[(q(1), s(300.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -335,15 +335,15 @@ fn abs_function_detects_imbalance() {
 
 #[test]
 fn multi_operator_addition() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("a", &[(q(1), s(10.0))])
-        .value("b", &[(q(1), s(20.0))])
-        .value("c", &[(q(1), s(30.0))])
-        .value("total", &[(q(1), s(60.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("a", &[(q(1), s(10.0))]);
+        model_builder.value("b", &[(q(1), s(20.0))]);
+        model_builder.value("c", &[(q(1), s(30.0))]);
+        model_builder.value("total", &[(q(1), s(60.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -369,13 +369,13 @@ fn multi_operator_addition() {
 
 #[test]
 fn max_min_functions() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("x", &[(q(1), s(5.0))])
-        .value("y", &[(q(1), s(10.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("x", &[(q(1), s(5.0))]);
+        model_builder.value("y", &[(q(1), s(10.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -414,12 +414,12 @@ fn max_min_functions() {
 
 #[test]
 fn if_conditional_formula() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(1000.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(1000.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -442,13 +442,13 @@ fn if_conditional_formula() {
 
 #[test]
 fn canonical_variadic_function_is_supported() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("a", &[(q(1), s(10.0))])
-        .value("b", &[(q(1), s(20.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("a", &[(q(1), s(10.0))]);
+        model_builder.value("b", &[(q(1), s(20.0))]);
+        model_builder.build().unwrap()
+    };
     let results = Evaluator::new().evaluate(&model).unwrap();
     let check = FormulaCheckSpec {
         id: "sum_check".into(),
@@ -467,12 +467,12 @@ fn canonical_variadic_function_is_supported() {
 
 #[test]
 fn canonical_time_series_function_uses_evaluated_history() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(100.0)), (q(2), s(110.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(100.0)), (q(2), s(110.0))]);
+        model_builder.build().unwrap()
+    };
     let results = Evaluator::new().evaluate(&model).unwrap();
     let check = FormulaCheckSpec {
         id: "lag_check".into(),
@@ -491,15 +491,15 @@ fn canonical_time_series_function_uses_evaluated_history() {
 
 #[test]
 fn capital_structure_reference_uses_result_cashflows() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value(
             "expected_interest",
             &[(q(1), AmountOrScalar::amount(25.0, Currency::USD).unwrap())],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
     breakdown.interest_expense_cash = Money::new(25.0, Currency::USD).expect("valid money fixture");
@@ -548,12 +548,12 @@ fn insufficient_periods(result: &finstack_quant_statements::checks::CheckResult)
 
 #[test]
 fn non_finite_input_reports_insufficient_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("leverage", &[(q(1), s(4.0)), (q(2), s(5.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("leverage", &[(q(1), s(4.0)), (q(2), s(5.0))]);
+        model_builder.build().unwrap()
+    };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     results
         .nodes
@@ -586,12 +586,12 @@ fn non_finite_input_reports_insufficient_data() {
 
 #[test]
 fn missing_input_cell_reports_insufficient_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(100.0)), (q(2), s(110.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(100.0)), (q(2), s(110.0))]);
+        model_builder.build().unwrap()
+    };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     results
         .nodes
@@ -609,15 +609,15 @@ fn missing_input_cell_reports_insufficient_data() {
 
 #[test]
 fn lag_before_first_period_reports_insufficient_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q3", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q3", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(q(1), s(100.0)), (q(2), s(110.0)), (q(3), s(500.0))],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
     let results = Evaluator::new().evaluate(&model).unwrap();
 
     let result = predicate_check("revenue / lag(revenue, 1) - 1 < 0.5", None)
@@ -638,13 +638,13 @@ fn lag_before_first_period_reports_insufficient_data() {
 
 #[test]
 fn division_by_zero_over_finite_inputs_still_fails() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("debt", &[(q(1), s(300.0))])
-        .value("ebitda", &[(q(1), s(0.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("debt", &[(q(1), s(300.0))]);
+        model_builder.value("ebitda", &[(q(1), s(0.0))]);
+        model_builder.build().unwrap()
+    };
     let results = Evaluator::new().evaluate(&model).unwrap();
 
     let result = predicate_check("debt / ebitda < 6", None)

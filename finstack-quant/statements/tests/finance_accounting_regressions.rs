@@ -36,20 +36,20 @@ fn formula_check(formula: &str, tolerance: Option<f64>) -> FormulaCheckSpec {
 }
 
 fn currency_model() -> FinancialModelSpec {
-    ModelBuilder::new("check units")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("check units");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value(
             "usd",
             &[(q1(), AmountOrScalar::amount(100.0, Currency::USD).unwrap())],
-        )
-        .value(
+        );
+        model_builder.value(
             "eur",
             &[(q1(), AmountOrScalar::amount(100.0, Currency::EUR).unwrap())],
-        )
-        .value("count", &[(q1(), 100.0.into())])
-        .build()
-        .unwrap()
+        );
+        model_builder.value("count", &[(q1(), 100.0.into())]);
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
@@ -156,13 +156,13 @@ fn formula_checks_keep_native_instrument_units_distinct_from_reporting_totals() 
         CurveId::new("EUR-OIS"),
     )
     .unwrap();
-    model.capital_structure = ModelBuilder::new("native currency declaration")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .add_debt("EUR_BOND", FinancialStatementInstrument::Bond(bond))
-        .build()
-        .unwrap()
-        .capital_structure;
+    model.capital_structure = {
+        let mut model_builder = ModelBuilder::new("native currency declaration");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.add_debt("EUR_BOND", FinancialStatementInstrument::Bond(bond));
+        model_builder.build().unwrap()
+    }
+    .capital_structure;
     model.capital_structure.as_mut().unwrap().reporting_currency = Some(Currency::USD);
 
     let mut native = CashflowBreakdown::with_currency(Currency::EUR);
@@ -217,14 +217,14 @@ fn formula_checks_keep_native_instrument_units_distinct_from_reporting_totals() 
 }
 
 fn checked_balance_sheet() -> (FinancialModelSpec, StatementResult, CheckSuite) {
-    let model = ModelBuilder::new("balance sheet")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("assets", &[(q1(), 100.0.into())])
-        .value("liabilities", &[(q1(), 60.0.into())])
-        .value("equity", &[(q1(), 40.0.into())])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("balance sheet");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("assets", &[(q1(), 100.0.into())]);
+        model_builder.value("liabilities", &[(q1(), 60.0.into())]);
+        model_builder.value("equity", &[(q1(), 40.0.into())]);
+        model_builder.build().unwrap()
+    };
     let suite = CheckSuite::builder("balance sheet")
         .add_check(BalanceSheetArticulation {
             assets_nodes: vec![NodeId::new("assets")],

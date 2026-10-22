@@ -28,14 +28,16 @@ use crate::types::NodeId;
 /// # use finstack_quant_statements::evaluator::Evaluator;
 /// # use finstack_quant_core::dates::PeriodId;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let model = ModelBuilder::new("demo")
-///     .periods("2025Q1..Q2", None)?
-///     .value("revenue", &[
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("demo");
+///     model_builder.periods("2025Q1..Q2", None)?;
+///     model_builder.value("revenue", &[
 ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), 100_000.0.into()),
 ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), 105_000.0.into()),
-///     ])
-///     .compute("gross_profit", "revenue * 0.6")?
-///     .build()?;
+///     ]);
+///     model_builder.compute("gross_profit", "revenue * 0.6")?;
+///     model_builder.build()?
+/// };
 ///
 /// let mut evaluator = Evaluator::new();
 /// let result = evaluator.evaluate(&model)?;

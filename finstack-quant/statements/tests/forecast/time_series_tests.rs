@@ -7,10 +7,10 @@ use finstack_quant_statements::types::AmountOrScalar;
 
 #[test]
 fn test_lag_function() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -30,11 +30,12 @@ fn test_lag_function() {
                     AmountOrScalar::scalar(130.0),
                 ),
             ],
-        )
-        .compute("lagged_revenue", "lag(revenue, 1)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("lagged_revenue", "lag(revenue, 1)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -84,10 +85,10 @@ fn test_lag_function() {
 
 #[test]
 fn test_lag_multiple_periods() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -107,11 +108,12 @@ fn test_lag_multiple_periods() {
                     AmountOrScalar::scalar(130.0),
                 ),
             ],
-        )
-        .compute("lagged_revenue_2", "lag(revenue, 2)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("lagged_revenue_2", "lag(revenue, 2)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -157,10 +159,10 @@ fn test_lag_multiple_periods() {
 
 #[test]
 fn test_diff_function() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -180,11 +182,12 @@ fn test_diff_function() {
                     AmountOrScalar::scalar(135.0),
                 ),
             ],
-        )
-        .compute("revenue_change", "diff(revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("revenue_change", "diff(revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -234,10 +237,10 @@ fn test_diff_function() {
 
 #[test]
 fn test_pct_change_function() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -257,11 +260,12 @@ fn test_pct_change_function() {
                     AmountOrScalar::scalar(133.1),
                 ),
             ],
-        )
-        .compute("revenue_growth", "pct_change(revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("revenue_growth", "pct_change(revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -309,10 +313,10 @@ fn test_pct_change_function() {
 
 #[test]
 fn test_yoy_growth() {
-    let model = ModelBuilder::new("test")
-        .periods("2024Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2024Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 // 2024
@@ -350,11 +354,12 @@ fn test_yoy_growth() {
                     AmountOrScalar::scalar(156.0),
                 ),
             ],
-        )
-        .compute("yoy_growth", "pct_change(revenue, 4)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("yoy_growth", "pct_change(revenue, 4)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -409,10 +414,10 @@ fn test_yoy_growth() {
 
 #[test]
 fn test_complex_time_series() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -432,13 +437,15 @@ fn test_complex_time_series() {
                     AmountOrScalar::scalar(130.0),
                 ),
             ],
-        )
-        .compute("qoq_growth", "pct_change(revenue, 1)")
-        .unwrap()
-        .compute("revenue_acceleration", "diff(qoq_growth)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("qoq_growth", "pct_change(revenue, 1)")
+            .unwrap();
+        model_builder
+            .compute("revenue_acceleration", "diff(qoq_growth)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

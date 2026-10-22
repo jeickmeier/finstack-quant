@@ -8,21 +8,27 @@ use indexmap::indexmap;
 
 #[test]
 fn test_timeseries_forecast_with_trend_detection() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value("sales", &[
-            (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
-        ])
-        .forecast("sales", ForecastSpec {
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
+            "sales",
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100_000.0),
+            )],
+        );
+        model_builder.forecast("sales", ForecastSpec {
             method: ForecastMethod::TimeSeries,
             params: indexmap! {
                 "historical".into() => serde_json::json!([80_000, 85_000, 90_000, 95_000, 100_000]),
                 "method".into() => serde_json::json!("linear"),
             },
-        })
-        .build()
-        .unwrap();
+        });
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -75,17 +81,17 @@ fn test_seasonal_forecast_with_decomposition() {
         110.0, 100.0, 120.0, 95.0, // Year 3: continued growth
     ];
 
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "seasonal_sales",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(115.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "seasonal_sales",
             ForecastSpec {
                 method: ForecastMethod::Seasonal,
@@ -96,9 +102,9 @@ fn test_seasonal_forecast_with_decomposition() {
                     "mode".into() => serde_json::json!("additive"),
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -151,14 +157,27 @@ fn test_seasonal_forecast_with_decomposition() {
 #[test]
 fn test_all_features_integrated() {
     // Build a comprehensive model using all new features
-    let model = ModelBuilder::new("comprehensive")
-        .periods("2025Q1..2025Q4", Some("2025Q2"))
-        .unwrap()
-        // Historical revenue with seasonality
-        .value("revenue", &[
-            (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
-            (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(90_000.0)),
-        ])
+    let model = {
+        let mut model_builder = ModelBuilder::new("comprehensive");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q2"))
+            .unwrap();
+        model_builder
+            // Historical revenue with seasonality
+            .value(
+                "revenue",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(90_000.0),
+                    ),
+                ],
+            );
+        model_builder
         // Seasonal forecast with decomposition
         .forecast("revenue", ForecastSpec {
             method: ForecastMethod::Seasonal,
@@ -168,13 +187,23 @@ fn test_all_features_integrated() {
                 "mode".into() => serde_json::json!("multiplicative"),
                 "growth".into() => serde_json::json!(0.02),
             },
-        })
-        // Cost with time-series forecast
-        .value("costs", &[
-            (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(60_000.0)),
-            (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(55_000.0)),
-        ])
-        .forecast("costs", ForecastSpec {
+        });
+        model_builder
+            // Cost with time-series forecast
+            .value(
+                "costs",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(60_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(55_000.0),
+                    ),
+                ],
+            );
+        model_builder.forecast("costs", ForecastSpec {
             method: ForecastMethod::TimeSeries,
             params: indexmap! {
                 "historical".into() => serde_json::json!([50_000, 52_000, 55_000, 58_000, 60_000]),
@@ -182,16 +211,26 @@ fn test_all_features_integrated() {
                 "alpha".into() => serde_json::json!(0.3),
                 "beta".into() => serde_json::json!(0.1),
             },
-        })
-        // Statistical calculations
-        .compute("profit", "revenue - costs").unwrap()
-        .compute("profit_rank", "rank(profit)").unwrap()
-        .compute("profit_75th", "quantile(profit, 0.75)").unwrap()
-        .compute("profit_ewm", "ewm_mean(profit, 0.2)").unwrap()
-        // Margins
-        .compute("margin", "profit / revenue").unwrap()
-        .build()
-        .unwrap();
+        });
+        model_builder
+            // Statistical calculations
+            .compute("profit", "revenue - costs")
+            .unwrap();
+        model_builder
+            .compute("profit_rank", "rank(profit)")
+            .unwrap();
+        model_builder
+            .compute("profit_75th", "quantile(profit, 0.75)")
+            .unwrap();
+        model_builder
+            .compute("profit_ewm", "ewm_mean(profit, 0.2)")
+            .unwrap();
+        model_builder
+            // Margins
+            .compute("margin", "profit / revenue")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

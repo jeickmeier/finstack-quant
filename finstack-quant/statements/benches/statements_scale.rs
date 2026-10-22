@@ -40,23 +40,25 @@ fn build_mc_model() -> FinancialModelSpec {
     params.insert("std_dev".into(), serde_json::json!(0.02));
     params.insert("seed".into(), serde_json::json!(42));
 
-    ModelBuilder::new("mc-model")
-        .periods("2024Q4..2026Q4", Some("2024Q4"))
-        .unwrap()
-        .value("revenue", &[(actual_q, AmountOrScalar::scalar(100.0))])
-        .forecast(
+    {
+        let mut model_builder = ModelBuilder::new("mc-model");
+        model_builder
+            .periods("2024Q4..2026Q4", Some("2024Q4"))
+            .unwrap();
+        model_builder.value("revenue", &[(actual_q, AmountOrScalar::scalar(100.0))]);
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Normal,
                 params,
             },
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap()
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    }
 }
 
 fn bench_monte_carlo_scaling(c: &mut Criterion) {
@@ -105,14 +107,16 @@ fn build_rolling_model(n_rolling: usize, n_periods: usize) -> FinancialModelSpec
         ((n_periods - 1) % 4) + 1
     );
 
-    let mut builder = ModelBuilder::new("rolling")
-        .periods(&period_range, None)
-        .unwrap()
-        .value("revenue", &revenue_values);
+    let mut builder = {
+        let mut model_builder = ModelBuilder::new("rolling");
+        model_builder.periods(&period_range, None).unwrap();
+        model_builder.value("revenue", &revenue_values);
+        model_builder
+    };
 
     for i in 0..n_rolling {
         let window = (i % 6) + 2; // mix of window sizes 2..=7
-        builder = builder
+        builder
             .compute(
                 format!("rolling_{}", i),
                 format!("rolling_mean(revenue, {})", window),
@@ -165,15 +169,17 @@ fn build_large_lbo_model(n_nodes: usize, n_months: usize) -> FinancialModelSpec 
         })
         .collect();
 
-    let mut builder = ModelBuilder::new("lbo")
-        .periods(&period_range, None)
-        .unwrap()
-        .value("revenue", &revenue_values);
+    let mut builder = {
+        let mut model_builder = ModelBuilder::new("lbo");
+        model_builder.periods(&period_range, None).unwrap();
+        model_builder.value("revenue", &revenue_values);
+        model_builder
+    };
 
     // Three shared drivers + (n_nodes - 4) derived metrics that fan out from
     // the driver set. Mirrors the typical LBO shape: a handful of P&L drivers
     // feeding many ratio / margin / coverage outputs.
-    builder = builder
+    builder
         .compute("cogs", "revenue * 0.55")
         .unwrap()
         .compute("opex", "revenue * 0.20")
@@ -189,7 +195,7 @@ fn build_large_lbo_model(n_nodes: usize, n_months: usize) -> FinancialModelSpec 
             3 => format!("lag(ebitda, 1) * {}", 0.5 + 0.001 * i as f64),
             _ => format!("ebitda - cogs * {}", 0.001 * i as f64),
         };
-        builder = builder.compute(format!("derived_{}", i), formula).unwrap();
+        builder.compute(format!("derived_{}", i), formula).unwrap();
     }
 
     builder.build().unwrap()

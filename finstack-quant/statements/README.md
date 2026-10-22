@@ -77,19 +77,19 @@ use finstack_quant_statements::types::{AmountOrScalar, ForecastMethod, ForecastS
 use indexmap::indexmap;
 
 fn build_and_evaluate() -> Result<StatementResult> {
-    let model = ModelBuilder::new("acme")
-        .periods("2025Q1..Q4", Some("2025Q2"))?
-        .value("revenue", &[
-            (PeriodId::quarter(2025, 1)?, AmountOrScalar::scalar(10_000_000.0)),
-            (PeriodId::quarter(2025, 2)?, AmountOrScalar::scalar(11_000_000.0)),
-        ])
-        .forecast("revenue", ForecastSpec {
-            method: ForecastMethod::GrowthPct,
-            params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-        })
-        .compute("cogs", "revenue * 0.6")?
-        .compute("gross_profit", "revenue - cogs")?
-        .build()?;
+    let mut builder = ModelBuilder::new("acme");
+    builder.periods("2025Q1..Q4", Some("2025Q2"))?;
+    builder.value("revenue", &[
+        (PeriodId::quarter(2025, 1)?, AmountOrScalar::scalar(10_000_000.0)),
+        (PeriodId::quarter(2025, 2)?, AmountOrScalar::scalar(11_000_000.0)),
+    ]);
+    builder.forecast("revenue", ForecastSpec {
+        method: ForecastMethod::GrowthPct,
+        params: indexmap! { "rate".into() => serde_json::json!(0.05) },
+    });
+    builder.compute("cogs", "revenue * 0.6")?;
+    builder.compute("gross_profit", "revenue - cogs")?;
+    let model = builder.build()?;
 
     // Q1/Q2 come from explicit values; Q3/Q4 grow 5% off the last actual
     // (Q3 = 11_550_000.0).

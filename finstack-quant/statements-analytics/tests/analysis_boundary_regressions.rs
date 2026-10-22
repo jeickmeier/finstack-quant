@@ -9,10 +9,10 @@ use finstack_quant_statements_analytics::analysis::*;
 use finstack_quant_statements_analytics::extensions::*;
 
 fn monetary_model(currency: Currency) -> FinancialModelSpec {
-    ModelBuilder::new("money")
-        .periods("2025..2026", None)
-        .unwrap()
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("money");
+        model_builder.periods("2025..2026", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -24,11 +24,10 @@ fn monetary_model(currency: Currency) -> FinancialModelSpec {
                     AmountOrScalar::amount(110.0, currency).unwrap(),
                 ),
             ],
-        )
-        .compute("profit", "revenue * 0.5")
-        .unwrap()
-        .build()
-        .unwrap()
+        );
+        model_builder.compute("profit", "revenue * 0.5").unwrap();
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
@@ -48,7 +47,10 @@ fn monetary_goal_seek_preserves_round_trip_and_currency() {
     .unwrap();
     assert!((solved.solved_value - 120.0).abs() < 1e-8);
     let model = solved.model.expect("update_model=true returns the model");
-    let model = ModelBuilder::from_spec(model).unwrap().build().unwrap();
+    let model = {
+        let model_builder = ModelBuilder::from_spec(model).unwrap();
+        model_builder.build().unwrap()
+    };
     let results = Evaluator::new().evaluate(&model).unwrap();
     let revenue = results.get_money("revenue", &period).unwrap();
     assert_eq!(revenue.currency(), Currency::USD);
@@ -185,10 +187,10 @@ fn empty_scorecard_has_no_fabricated_rating() {
 fn dcf_model(debt_currency: Currency) -> FinancialModelSpec {
     let opening = PeriodId::annual(2024);
     let forecast = PeriodId::annual(2025);
-    ModelBuilder::new("dcf-currencies")
-        .periods("2024..2025", Some("2024"))
-        .unwrap()
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("dcf-currencies");
+        model_builder.periods("2024..2025", Some("2024")).unwrap();
+        model_builder.value(
             "ufcf",
             &[
                 (
@@ -200,8 +202,8 @@ fn dcf_model(debt_currency: Currency) -> FinancialModelSpec {
                     AmountOrScalar::amount(100.0, Currency::USD).unwrap(),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_debt",
             &[
                 (
@@ -213,8 +215,8 @@ fn dcf_model(debt_currency: Currency) -> FinancialModelSpec {
                     AmountOrScalar::amount(10.0, debt_currency).unwrap(),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cash",
             &[
                 (opening, AmountOrScalar::amount(0.0, Currency::USD).unwrap()),
@@ -223,10 +225,10 @@ fn dcf_model(debt_currency: Currency) -> FinancialModelSpec {
                     AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
             ],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .unwrap()
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
