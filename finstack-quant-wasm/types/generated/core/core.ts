@@ -1571,8 +1571,9 @@ export interface FxMatrixState {
 /**
  * A single node in the market data hierarchy tree.
  *
- * Nodes form a tree: each has a name, optional key-value tags for cross-cutting
- * queries, ordered children, and leaf `CurveId` references.
+ * Nodes form a tree: each is named by its key in the parent map, and carries
+ * optional key-value tags for cross-cutting queries, ordered children, and
+ * leaf `CurveId` references.
  */
 export interface HierarchyNode {
   /**
