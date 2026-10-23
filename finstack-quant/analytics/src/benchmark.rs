@@ -143,6 +143,7 @@ fn active_return_stats(returns: &[f64], benchmark: &[f64]) -> OnlineStats {
 /// # Returns
 ///
 /// Tracking error (non-negative). Returns `0.0` for empty or mismatched series.
+/// Returns [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
 ///
 /// # References
 ///
@@ -152,6 +153,9 @@ pub(crate) fn tracking_error(returns: &[f64], benchmark: &[f64], ann_factor: f64
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
+    }
+    if crate::risk_metrics::invalid_annualization_factor(ann_factor) {
+        return f64::NAN;
     }
     active_return_stats(returns, benchmark).std_dev() * ann_factor.sqrt()
 }
@@ -181,7 +185,8 @@ pub(crate) fn tracking_error(returns: &[f64], benchmark: &[f64], ann_factor: f64
 /// tracking error is zero and mean active return is also zero. When the
 /// tracking error is zero but mean active return is nonzero, returns
 /// `+∞` or `-∞` matching the sign of the excess (consistent with
-/// [`crate::risk_metrics::sharpe`]).
+/// [`crate::risk_metrics::sharpe`]). Returns [`f64::NAN`] if `ann_factor`
+/// is not finite or is `<= 0`.
 ///
 /// # References
 ///
@@ -191,6 +196,9 @@ pub(crate) fn information_ratio(returns: &[f64], benchmark: &[f64], ann_factor: 
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
+    }
+    if crate::risk_metrics::invalid_annualization_factor(ann_factor) {
+        return f64::NAN;
     }
     let active = active_return_stats(returns, benchmark);
     crate::risk_metrics::annualized_ratio_or_sign_infinity(
@@ -1034,11 +1042,28 @@ mod tests {
     }
 
     #[test]
+    fn tracking_error_nan_when_annualized_with_invalid_ann_factor() {
+        let r = [0.01, 0.02];
+        let b = [0.01, 0.01];
+        assert!(tracking_error(&r, &b, 0.0).is_nan());
+        assert!(tracking_error(&r, &b, -1.0).is_nan());
+        assert!(tracking_error(&r, &b, f64::NAN).is_nan());
+    }
+
+    #[test]
     fn information_ratio_basic() {
         let r = [0.02, 0.03, 0.01, 0.04];
         let b = [0.01, 0.01, 0.01, 0.01];
         let ir = information_ratio(&r, &b, 252.0);
         assert!(ir > 0.0);
+    }
+
+    #[test]
+    fn information_ratio_nan_when_annualized_with_invalid_ann_factor() {
+        let r = [0.02, 0.03, 0.01, 0.04];
+        let b = [0.01, 0.01, 0.01, 0.01];
+        assert!(information_ratio(&r, &b, 0.0).is_nan());
+        assert!(information_ratio(&r, &b, f64::INFINITY).is_nan());
     }
 
     #[test]

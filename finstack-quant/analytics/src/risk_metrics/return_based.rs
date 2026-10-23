@@ -15,9 +15,10 @@ use super::tail_risk::cornish_fisher_var;
 /// True when `ann_factor` is not a positive finite periods-per-year count
 /// (e.g. zero, negative, NaN, or infinity). Guards the caller-supplied
 /// `periods_per_year` of the public `sharpe` (via `mean_vol_annualized`),
-/// `sortino` and `volatility`.
+/// `sortino` and `volatility`, and the benchmark kernels `tracking_error`
+/// and `information_ratio`.
 #[inline]
-fn invalid_annualization_factor(ann_factor: f64) -> bool {
+pub(crate) fn invalid_annualization_factor(ann_factor: f64) -> bool {
     !ann_factor.is_finite() || ann_factor <= 0.0
 }
 
