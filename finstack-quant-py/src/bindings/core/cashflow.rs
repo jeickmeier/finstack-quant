@@ -108,7 +108,7 @@ impl PyCFKind {
     fn parse(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<CFKind>()
             .map(Self::from_inner)
-            .map_err(crate::errors::value_error)
+            .map_err(core_to_py)
     }
 
     /// Canonical snake_case label of this kind.
@@ -157,7 +157,7 @@ pub(crate) fn extract_cf_kind(obj: &Bound<'_, PyAny>) -> PyResult<CFKind> {
         return Ok(kind.inner);
     }
     if let Ok(name) = obj.extract::<String>() {
-        return name.parse::<CFKind>().map_err(crate::errors::value_error);
+        return name.parse::<CFKind>().map_err(core_to_py);
     }
     Err(PyTypeError::new_err("expected CFKind or str"))
 }
