@@ -302,8 +302,8 @@ def test_deal_builder_setters_land_in_the_wire_form_and_getters() -> None:
     assert spec["loss_allocation"] == "par_preserving"
     assert spec["principal_covers_senior_interest"] is True
 
-    assert deal.prepayment_spec.curve["cpr"] == 0.1
-    assert deal.default_spec.curve["cdr"] == 0.02
+    assert deal.prepayment_spec.to_dict()["cpr"] == 0.1
+    assert deal.default_spec.to_dict()["cdr"] == 0.02
     assert deal.recovery_spec.recovery_lag == 12
     assert deal.credit_model["recovery_spec"]["rate"] == 0.4
     assert deal.stochastic_prepay_spec is None
@@ -353,8 +353,8 @@ def test_credit_model_can_be_replaced_whole_and_then_refined() -> None:
         .delinquency({"roll_rates": [0.5, 0.6, 1.0], "cure_rates": [0.2, 0.1, 0.0], "advancing": {"policy": "none"}})
         .build()
     )
-    assert deal.prepayment_spec.curve["cpr"] == 0.05
-    assert deal.default_spec.curve["curve"] == "cumulative_loss"
+    assert deal.prepayment_spec.to_dict()["cpr"] == 0.05
+    assert deal.default_spec.to_dict()["curve"] == "cumulative_loss"
     assert deal.recovery_spec.recovery_lag == 6
     assert deal.delinquency["roll_rates"] == [0.5, 0.6, 1.0]
 
@@ -587,11 +587,11 @@ def test_attachment_points_are_derived_from_balances() -> None:
 
 
 def test_curve_shape_constructors_match_their_rust_shapes() -> None:
-    assert PrepaymentModelSpec.abs(0.015).curve == {"curve": "abs", "speed": 0.015}
-    assert PrepaymentModelSpec.vector([0.05, 0.1]).curve == {"curve": "vector", "monthly_cpr": [0.05, 0.1]}
-    assert DefaultModelSpec.vector([0.01]).curve == {"curve": "vector", "monthly_cdr": [0.01]}
+    assert PrepaymentModelSpec.abs(0.015).to_dict() == {"curve": "abs", "speed": 0.015}
+    assert PrepaymentModelSpec.vector([0.05, 0.1]).to_dict() == {"curve": "vector", "monthly_cpr": [0.05, 0.1]}
+    assert DefaultModelSpec.vector([0.01]).to_dict() == {"curve": "vector", "monthly_cdr": [0.01]}
     timing = DefaultModelSpec.timing(0.1, [20.0, 30.0, 50.0])
-    assert timing.curve["annual_pct"] == [20.0, 30.0, 50.0]
+    assert timing.to_dict()["annual_pct"] == [20.0, 30.0, 50.0]
     timing.validate()
     with pytest.raises(ValueError, match="100"):
         DefaultModelSpec.timing(0.1, [20.0, 30.0]).validate()
