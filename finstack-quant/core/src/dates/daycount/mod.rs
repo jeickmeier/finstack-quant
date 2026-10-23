@@ -641,24 +641,6 @@ impl DayCount {
             Ok(-self.year_fraction(end, start, ctx)?)
         }
     }
-
-    /// Canonical snake_case names accepted by [`FromStr`](std::str::FromStr),
-    /// in declaration order (the `FromStr` error lists them).
-    const NAMES: &'static [&'static str] = &[
-        "one_one",
-        "act_360",
-        "act_365f",
-        "act_365l",
-        "30_360",
-        "30e_360",
-        "30e_360_isda",
-        "30_360_it",
-        "nl_365",
-        "act_act",
-        "act_act_isma",
-        "act_act_afb",
-        "bus_252",
-    ];
 }
 
 impl std::fmt::Display for DayCount {
@@ -673,12 +655,10 @@ impl std::str::FromStr for DayCount {
 
     /// Parse the canonical wire label, ignoring surrounding whitespace and ASCII case.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        crate::wire::serde_parse(&s.trim().to_ascii_lowercase()).map_err(|_| {
-            crate::Error::Validation(format!(
-                "unknown day-count convention: '{s}'; expected one of {}",
-                Self::NAMES.join(", ")
-            ))
-        })
+        crate::wire::serde_parse_with_context(
+            "unknown day-count convention",
+            &s.trim().to_ascii_lowercase(),
+        )
     }
 }
 
@@ -686,9 +666,26 @@ impl std::str::FromStr for DayCount {
 mod parse_tests {
     use super::DayCount;
 
+    /// Every canonical label, in declaration order.
+    const NAMES: &[&str] = &[
+        "one_one",
+        "act_360",
+        "act_365f",
+        "act_365l",
+        "30_360",
+        "30e_360",
+        "30e_360_isda",
+        "30_360_it",
+        "nl_365",
+        "act_act",
+        "act_act_isma",
+        "act_act_afb",
+        "bus_252",
+    ];
+
     #[test]
     fn canonical_parse_normalizes_only_case_and_surrounding_whitespace() {
-        for name in DayCount::NAMES {
+        for name in NAMES {
             let normalized = format!("  {}  ", name.to_ascii_uppercase());
             assert_eq!(
                 normalized.parse::<DayCount>().expect(name).to_string(),
@@ -701,7 +698,7 @@ mod parse_tests {
     fn from_str_lists_names_for_unknown_spellings() {
         let err = "nope".parse::<DayCount>().expect_err("unknown").to_string();
         assert!(err.contains("'nope'") && err.contains("act_360") && err.contains("bus_252"));
-        for name in DayCount::NAMES {
+        for name in NAMES {
             assert_eq!(&name.parse::<DayCount>().expect(name).to_string(), name);
         }
     }
