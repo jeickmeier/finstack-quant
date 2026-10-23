@@ -64,7 +64,28 @@ allow = []
 deny = []
 
 # Skip duplicate version check for transitive dependencies we don't control.
-skip = []
+# Each entry below is a duplicate that exists only inside upstream crates;
+# no workspace crate selects either version directly, and `cargo update`
+# (checked 2026-10-23) does not unify any of them:
+# - getrandom 0.2: pulled by const-random-macro (ahash 0.8 `compile-time-rng`,
+#   the wasm32-only path noted above) and by rand_core 0.6 (rand 0.8, reached
+#   via regex-syntax / r-efi platform deps). getrandom 0.3 is the version the
+#   live graph uses (ahash `runtime-rng`, rand 0.9, wasm-bindgen). Unifying
+#   needs ahash / rand 0.8 upstreams to drop their old getrandom.
+# - hashbrown 0.16: pinned by arrow-array 57. hashbrown 0.17 comes from
+#   indexmap 2.14. Unifying needs an arrow release on hashbrown 0.17 (or
+#   indexmap to move back), both upstream decisions.
+# - syn 2.0: the legacy proc-macro ecosystem (pyo3 0.29, wasm-bindgen,
+#   strum_macros, tracing-attributes, icu derives). syn 3.0 is used by the
+#   migrated crates (serde_derive, schemars_derive, thiserror-impl,
+#   async-trait). Unifying needs the syn-2 proc-macros to migrate upstream.
+# Skip the older copy of each pair; a duplicate of any other crate, or a
+# third version of these, still warns.
+skip = [
+    { name = "getrandom", version = "0.2" },
+    { name = "hashbrown", version = "0.16" },
+    { name = "syn", version = "2.0" },
+]
 
 skip-tree = []
 
