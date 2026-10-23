@@ -2340,3 +2340,44 @@ mod fx_pinned_precedence {
         assert_eq!(other, 0.8);
     }
 }
+
+#[test]
+fn bumped_matrix_snapshot_states_are_pinned() {
+    let on = Date::from_ordinal_date(2025, 1).expect("date");
+    let provider = Arc::new(SimpleFxProvider::new());
+    provider
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
+        .expect("provider leg");
+    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
+    matrix
+        .set_quote_on(
+            Currency::USD,
+            Currency::GBP,
+            on,
+            FxConversionPolicy::CashflowDate,
+            0.8,
+        )
+        .expect("scoped leg");
+    let bumped = matrix
+        .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, on)
+        .expect("cross shock");
+    let state = serde_json::to_value(bumped.get_serializable_state().expect("stable FX state"))
+        .expect("snapshot serializes");
+    assert_eq!(
+        state,
+        serde_json::json!({
+            "config": {
+                "cache_capacity": 256,
+                "enable_triangulation": true,
+                "pivot_currency": "USD"
+            },
+            "pinned_quotes": [["USD", "GBP", "2025-01-01", "cashflow_date", 0.8]],
+            "provider_pinned_quotes": [
+                ["EUR", "GBP", "2025-01-01", "cashflow_date", 0.9680000000000002]
+            ],
+            "provider_quotes": [["EUR", "USD", 1.1]],
+            "quotes": []
+        }),
+        "{state}"
+    );
+}
