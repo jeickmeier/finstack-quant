@@ -638,7 +638,7 @@ export type DayCount =
  * - `FlatForward`: extend the boundary slope. Useful for forward-rate
  *   curves where extrapolated rates should track the local term-structure
  *   slope.
- * - `Nan`: refuse to extrapolate; return `NaN` and require the caller to
+ * - `None`: refuse to extrapolate; return `NaN` and require the caller to
  *   detect and handle out-of-range queries explicitly. Recommended for
  *   production risk systems.
  *

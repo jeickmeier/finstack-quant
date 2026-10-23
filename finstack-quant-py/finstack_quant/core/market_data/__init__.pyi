@@ -4969,8 +4969,7 @@ class ScalarTimeSeries:
         id : str
             Series identifier.
         observations : Sequence[tuple[datetime.date or str, float, int or Decimal]]
-            Dated values; a ``Decimal`` converts to ``float`` (Rust
-            ``decimal_to_f64``). Dates must be unique; any order is accepted.
+            Dated values; a ``Decimal`` converts to ``float``. Dates must be unique; any order is accepted.
         currency : Currency or str, optional
             Currency tag for monetary series; ``None`` for unitless values.
         interpolation : str, optional
@@ -5233,8 +5232,7 @@ class InflationIndex:
         id : str
             Index identifier (e.g. ``"US-CPI-U"``).
         observations : Sequence[tuple[datetime.date or str, float, int or Decimal]]
-            Dated index levels; a ``Decimal`` converts to ``float`` (Rust
-            ``decimal_to_f64``).
+            Dated index levels; a ``Decimal`` converts to ``float``.
         currency : Currency or str
             Currency of the index.
         interpolation : str, optional
@@ -5754,8 +5752,7 @@ class MarketContext:
             Identifier for the scalar.
         value : float, int or Decimal
             Price or unitless value. Monetary ``Decimal`` values keep full
-            precision; a unitless ``Decimal`` converts to ``float`` (Rust
-            ``decimal_to_f64``).
+            precision; a unitless ``Decimal`` converts to ``float``.
         currency : Currency or str, optional
             When given, the scalar is a monetary price in this currency;
             otherwise it is unitless.
@@ -6239,7 +6236,7 @@ class MarketContext:
         ----------
         id : str
             Identifier to look up across curves, surfaces, scalars, series,
-            indices, credit indices and collateral mappings.
+            indices and credit indices.
 
         Returns
         -------
@@ -6276,8 +6273,7 @@ class MarketContext:
         -------
         bool
             ``True`` when the context holds no curves, surfaces, scalars,
-            series, indices, dividend schedules, FX matrix or collateral
-            mappings (``len(ctx) == 0``).
+            series, indices, dividend schedules, FX matrix (``len(ctx) == 0``).
 
         Notes
         -----
@@ -6334,8 +6330,7 @@ class MarketContext:
         Number of stored market-data objects (Rust ``MarketContext::len``).
 
         Counts curves, surfaces, cubes, scalars, series, inflation and credit
-        indices, dividend schedules, FX delta-vol surfaces and collateral
-        mappings, plus one for an attached FX matrix.
+        indices, dividend schedules, FX delta-vol surfaces, plus one for an attached FX matrix.
 
         Returns
         -------
@@ -6348,7 +6343,7 @@ class MarketContext:
         """
         ``True`` when anything has been inserted (``not is_empty()``).
 
-        An FX-only or collateral-only context is truthy.
+        An FX-only context is truthy.
 
         Returns
         -------

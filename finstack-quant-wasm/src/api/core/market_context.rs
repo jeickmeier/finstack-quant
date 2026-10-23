@@ -597,7 +597,7 @@ impl JsMarketContext {
     /// * `id` - Identifier to look for.
     ///
     /// @returns `true` when a curve, surface, price, series, index, dividend
-    /// schedule or collateral mapping is registered under `id`.
+    /// schedule is registered under `id`.
     /// @throws `TypeError` if `id` is not a string.
     #[wasm_bindgen(js_name = contains)]
     pub fn contains(&self, id: JsValue) -> Result<bool, JsValue> {
@@ -619,8 +619,7 @@ impl JsMarketContext {
     /// Whether the context holds no market data at all (`len() === 0`).
     ///
     /// @returns `true` for a context with nothing inserted (no curves,
-    /// surfaces, scalars, series, indices, dividends, FX or collateral
-    /// mappings).
+    /// surfaces, scalars, series, indices, dividends or FX).
     #[wasm_bindgen(js_name = isEmpty)]
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
@@ -629,8 +628,7 @@ impl JsMarketContext {
     /// Number of stored market-data objects (Rust `MarketContext::len`).
     ///
     /// @returns The count of curves, surfaces, cubes, scalars, series,
-    /// inflation and credit indices, dividend schedules, FX delta-vol surfaces
-    /// and collateral mappings, plus one for an attached FX matrix.
+    /// inflation and credit indices, dividend schedules, FX delta-vol surfaces, plus one for an attached FX matrix.
     #[wasm_bindgen(js_name = len)]
     pub fn len(&self) -> usize {
         self.inner.len()

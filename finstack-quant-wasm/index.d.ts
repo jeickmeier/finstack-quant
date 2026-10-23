@@ -2464,9 +2464,6 @@ export interface BpsConstructor {
  * - `30_360_it` (Italian) → `DayCount.thirty360It`
  * - `bus_252` → `DayCount.bus252`
  *
- * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` are
- * accepted by `fromName`.
- *
  * @example
  * ```javascript
  * import init, { core } from "finstack-quant-wasm";
@@ -2543,9 +2540,6 @@ export interface DayCount extends WasmOwned {
  * - `act_act_afb` (AFB / Actual/Actual Euro) → `DayCount.actActAfb`
  * - `30_360_it` (Italian) → `DayCount.thirty360It`
  * - `bus_252` → `DayCount.bus252`
- *
- * Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` are
- * accepted by `fromName`.
  *
  * @example
  * ```javascript
@@ -4463,7 +4457,7 @@ export interface MarketContext extends WasmOwned {
    * Whether any market data is stored under an id (Rust `MarketContext::contains`).
    *
    * @param id - Identifier to look for.
-   * @returns `true` when a curve, surface, price, series, index, dividend schedule or collateral mapping is registered under `id`.
+   * @returns `true` when a curve, surface, price, series, index, dividend schedule is registered under `id`.
    * @throws `TypeError` if `id` is not a string.
    */
   contains(id: string): boolean;
@@ -4476,13 +4470,13 @@ export interface MarketContext extends WasmOwned {
   /**
    * Whether the context holds no market data at all (`len() === 0`).
    *
-   * @returns `true` for a context with nothing inserted (no curves, surfaces, scalars, series, indices, dividends, FX or collateral mappings).
+   * @returns `true` for a context with nothing inserted (no curves, surfaces, scalars, series, indices, dividends or FX).
    */
   isEmpty(): boolean;
   /**
    * Number of stored market-data objects (Rust `MarketContext::len`).
    *
-   * @returns The count of curves, surfaces, cubes, scalars, series, inflation and credit indices, dividend schedules, FX delta-vol surfaces and collateral mappings, plus one for an attached FX matrix.
+   * @returns The count of curves, surfaces, cubes, scalars, series, inflation and credit indices, dividend schedules, FX delta-vol surfaces, plus one for an attached FX matrix.
    */
   len(): number;
   /**
@@ -11058,7 +11052,7 @@ export interface CorrelationNamespace {
    * Cholesky factor of a correlation matrix.
    * @param matrix - Flat row-major `n * n` correlation matrix; symmetric with unit diagonal.
    * @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
-   * @returns The lower-triangular factor `L` with `L * L^T = matrix`, flat row-major.
+   * @returns A factor `F` in original variable order with `F * F^T = matrix`, flat row-major. It is generally not lower-triangular, so apply it with a full matrix product, not `applyLowerTriangular`.
    * @throws Error - Throws a `validation` error if the length is not `n * n` or the matrix is not a valid positive-semidefinite correlation matrix.
    */
   choleskyCorrelation(matrix: NumericArray, n: number): Float64Array;
