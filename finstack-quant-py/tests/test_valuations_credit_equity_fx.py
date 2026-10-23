@@ -400,6 +400,69 @@ class TestConvertibleBond:
         assert build(spec).to_json() == build(as_dict).to_json() == build(json.dumps(as_dict)).to_json()
         assert build(spec).conversion.anti_dilution == "full_ratchet"
 
+    @pytest.mark.parametrize("field", ["ratio", "price"])
+    @pytest.mark.parametrize(
+        "invalid", [math.nan, math.inf, -math.inf], ids=["nan", "positive_infinity", "negative_infinity"]
+    )
+    def test_typed_conversion_preserves_nonfinite_terms_for_rust_validation(self, field: str, invalid: float) -> None:
+        spec = ConversionSpec(
+            ratio=invalid if field == "ratio" else 20.0,
+            price=invalid if field == "price" else 50.0,
+            policy="voluntary",
+            anti_dilution="none",
+            dividend_adjustment="none",
+        )
+        assert not math.isfinite(getattr(spec, field))
+        # Typed terms must reach Rust unchanged: a JSON round-trip would turn
+        # the non-finite optional term into None and incorrectly derive it.
+        builder = (
+            ConvertibleBond
+            .builder()
+            .id("CONV-NONFINITE")
+            .notional(Money(1_000.0, USD))
+            .issue_date("2024-01-15")
+            .maturity("2029-01-15")
+            .discount_curve_id("USD-OIS")
+            .conversion(spec)
+            .cashflow_spec(ConvertibleBond.example().cashflow_spec)
+            .spot_id("ACME")
+            .vol_surface_id("ACME-VOL")
+        )
+        with pytest.raises(ValueError, match=f"conversion {field}"):
+            builder.build()
+
+    def test_conversion_policy_has_explicit_label_and_dict_forms(self) -> None:
+        terms = {"anti_dilution": "none", "dividend_adjustment": "none"}
+        assert ConversionSpec(ratio=20.0, policy="voluntary", **terms).policy == "voluntary"
+        tagged = {"mandatory_on": "2027-03-15"}
+        assert ConversionSpec(ratio=20.0, policy=tagged, **terms).policy == tagged
+        for policy in [json.dumps("voluntary"), json.dumps(tagged), "{", "unknown"]:
+            with pytest.raises(ValueError, match="conversion policy"):
+                ConversionSpec(ratio=20.0, policy=policy, **terms)
+        with pytest.raises(TypeError, match="policy"):
+            ConversionSpec(ratio=20.0, policy=[], **terms)  # type: ignore[arg-type]
+
+    def test_structured_inputs_require_strict_json_text(self) -> None:
+        events = [
+            {
+                "date": "2026-01-15",
+                "new_issue_price": 10.0,
+                "new_shares_issued": 100.0,
+                "shares_outstanding_before": 1000.0,
+            }
+        ]
+        terms = {"ratio": 20.0, "policy": "voluntary", "anti_dilution": "none", "dividend_adjustment": "none"}
+        typed = ConversionSpec(dilution_events=events, **terms)
+        from_json = ConversionSpec(dilution_events=json.dumps(events), **terms)
+        assert typed.to_json() == from_json.to_json()
+        for malformed in ["[", "voluntary", json.dumps("voluntary")]:
+            with pytest.raises(ValueError, match="conversion"):
+                ConvertibleBond.builder().conversion(malformed)
+            with pytest.raises(ValueError, match="calls"):
+                CallPutSchedule(calls=malformed)
+        with pytest.raises(ValueError, match="dilution_events"):
+            ConversionSpec(dilution_events="[", **terms)
+
     def test_call_put_schedule_pickles_and_round_trips(self) -> None:
         sched = CallPutSchedule(
             calls=[{"start": "2026-01-15", "end": "2029-01-15", "price_pct_of_par": 101.0}],

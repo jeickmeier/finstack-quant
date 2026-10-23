@@ -34655,7 +34655,7 @@ class ConversionSpec:
         policy: str | dict[str, object],
         anti_dilution: Literal["none", "full_ratchet", "weighted_average"],
         dividend_adjustment: Literal["none", "adjust_price", "adjust_ratio"],
-        dilution_events: list[dict[str, object]] | None = None,
+        dilution_events: list[dict[str, object]] | str | None = None,
     ) -> None:
         """
         Describe the conversion terms.
@@ -34667,7 +34667,8 @@ class ConversionSpec:
         price : float | None
             Conversion price per share; derived from ``ratio`` when ``None``.
         policy : str | dict[str, object]
-            Conversion policy (keyword-only, required as in Rust): ``"voluntary"``,
+            Conversion policy (keyword-only, required as in Rust): the bare label
+            ``"voluntary"`` (not JSON text),
             or a tagged dict such as ``{"mandatory_on": "2027-03-15"}``,
             ``{"window": {"start": "2025-01-15", "end": "2028-01-15"}}``,
             ``{"upon_event": "qualified_ipo"}`` or ``{"mandatory_variable":
@@ -34677,16 +34678,18 @@ class ConversionSpec:
             Anti-dilution protection (keyword-only, required as in Rust).
         dividend_adjustment : {"none", "adjust_price", "adjust_ratio"}
             Dividend protection (keyword-only, required as in Rust).
-        dilution_events : list[dict[str, object]] | None
+        dilution_events : list[dict[str, object]] | str | None
             Dilution events (``date``, ``new_issue_price``, ``new_shares_issued``,
             ``shares_outstanding_before``) in chronological order; pricing raises
-            ``ValueError`` for out-of-order events. Default empty.
+            ``ValueError`` for out-of-order events. A string must be a JSON array. Default empty.
 
         Raises
         ------
         ValueError
             If ``policy`` / ``anti_dilution`` / ``dividend_adjustment`` are not
-            recognized, or a dilution event does not match the schema.
+            recognized, a label is JSON-encoded, or a dilution event does not match the schema.
+        TypeError
+            If ``policy`` is neither a bare label string nor a tagged dict.
 
         Examples
         --------

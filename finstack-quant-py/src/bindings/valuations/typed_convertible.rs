@@ -2,11 +2,12 @@
 //! and the typed `ConversionSpec` / `CallPutSchedule` term classes.
 
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyString};
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
-use crate::bindings::module_utils::py_to_json_value;
+use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
@@ -23,16 +24,6 @@ use super::convert::{
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
 
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBondBuilder;
-
-/// Deserialize a serde value from `str | dict | list` Python input.
-fn serde_from_py<T: serde::de::DeserializeOwned>(
-    py: Python<'_>,
-    value: &Bound<'_, PyAny>,
-    what: &str,
-) -> PyResult<T> {
-    let json = py_to_json_value(py, value, what)?;
-    serde_json::from_value(json).map_err(|e| serde_json_to_py(e, &format!("invalid {what}")))
-}
 
 /// Conversion terms of a convertible bond (typed wrapper for Rust ``ConversionSpec``).
 ///
@@ -69,7 +60,8 @@ impl PyConversionSpec {
     /// price : float | None
     ///     Conversion price per share; derived from ``ratio`` when ``None``.
     /// policy : str | dict
-    ///     Conversion policy (keyword-only, required as in Rust): ``"voluntary"``, or a
+    ///     Conversion policy (keyword-only, required as in Rust): the bare label
+    ///     ``"voluntary"`` (not JSON text), or a
     ///     tagged dict such as ``{"mandatory_on": "2027-03-15"}``,
     ///     ``{"window": {"start": ..., "end": ...}}``,
     ///     ``{"upon_event": "qualified_ipo"}`` or
@@ -78,10 +70,10 @@ impl PyConversionSpec {
     ///     Anti-dilution protection (keyword-only, required as in Rust).
     /// dividend_adjustment : {"none", "adjust_price", "adjust_ratio"}
     ///     Dividend protection (keyword-only, required as in Rust).
-    /// dilution_events : list[dict] | None
+    /// dilution_events : list[dict] | str | None
     ///     Dilution events (``date``, ``new_issue_price``, ``new_shares_issued``,
     ///     ``shares_outstanding_before``) in chronological order; pricing raises
-    ///     ``ValueError`` for out-of-order events. Default empty.
+    ///     ``ValueError`` for out-of-order events. A string must be a JSON array. Default empty.
     ///
     /// Returns
     /// -------
@@ -92,7 +84,9 @@ impl PyConversionSpec {
     /// ------
     /// ValueError
     ///     If ``policy`` / ``anti_dilution`` / ``dividend_adjustment`` are not
-    ///     recognized, or a dilution event does not match the schema.
+    ///     recognized, a label is JSON-encoded, or a dilution event does not match the schema.
+    /// TypeError
+    ///     If ``policy`` is neither a bare label string nor a tagged dict.
     ///
     /// Examples
     /// --------
@@ -116,15 +110,21 @@ impl PyConversionSpec {
         dividend_adjustment: &str,
         dilution_events: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let policy: ConversionPolicy = serde_from_py(py, policy, "conversion policy")?;
+        let policy: ConversionPolicy = if let Ok(label) = policy.cast::<PyString>() {
+            super::convert::enum_from_str(label.to_str()?, "conversion policy")?
+        } else if policy.is_instance_of::<PyDict>() {
+            spec_from_py(py, policy, "conversion policy")?
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "policy: expected a bare conversion-policy label or a tagged dict",
+            ));
+        };
         let anti_dilution: AntiDilutionPolicy =
             super::convert::enum_from_str(anti_dilution, "anti_dilution")?;
         let dividend_adjustment: DividendAdjustment =
             super::convert::enum_from_str(dividend_adjustment, "dividend_adjustment")?;
-        let dilution_events: Vec<DilutionEvent> = match dilution_events {
-            Some(events) if !events.is_none() => serde_from_py(py, events, "dilution_events")?,
-            _ => Vec::new(),
-        };
+        let dilution_events: Vec<DilutionEvent> =
+            opt_spec_from_py(py, dilution_events, "dilution_events")?.unwrap_or_default();
         Ok(Self {
             inner: ConversionSpec {
                 ratio,
@@ -262,10 +262,7 @@ fn windows_from_py(
     value: Option<&Bound<'_, PyAny>>,
     what: &str,
 ) -> PyResult<Vec<CallPut>> {
-    match value {
-        Some(v) if !v.is_none() => serde_from_py(py, v, what),
-        _ => Ok(Vec::new()),
-    }
+    Ok(opt_spec_from_py(py, value, what)?.unwrap_or_default())
 }
 
 #[pymethods]
@@ -384,22 +381,6 @@ impl PyCallPutSchedule {
             self.inner.puts.len()
         )
     }
-}
-
-/// Coerce `ConversionSpec | dict | str` to the Rust spec.
-fn conversion_from_py(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<ConversionSpec> {
-    if let Ok(spec) = value.cast::<PyConversionSpec>() {
-        return Ok(spec.borrow().inner.clone());
-    }
-    serde_from_py(py, value, "conversion")
-}
-
-/// Coerce `CallPutSchedule | dict | str` to the Rust schedule.
-fn call_put_from_py(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<CallPutSchedule> {
-    if let Ok(sched) = value.cast::<PyCallPutSchedule>() {
-        return Ok(sched.borrow().inner.clone());
-    }
-    serde_from_py(py, value, "call_put")
 }
 
 /// Convertible bond (typed wrapper for Rust ``ConvertibleBond``).
@@ -895,7 +876,11 @@ impl PyConvertibleBondBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let conversion = conversion_from_py(py, value)?;
+        let conversion = if let Ok(spec) = value.cast::<PyConversionSpec>() {
+            spec.borrow().inner.clone()
+        } else {
+            spec_from_py(py, value, "conversion")?
+        };
         let shown = PyConversionSpec {
             inner: conversion.clone(),
         }
@@ -999,7 +984,11 @@ impl PyConvertibleBondBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let call_put = call_put_from_py(py, value)?;
+        let call_put = if let Ok(schedule) = value.cast::<PyCallPutSchedule>() {
+            schedule.borrow().inner.clone()
+        } else {
+            spec_from_py(py, value, "call_put")?
+        };
         let shown = format!(
             "CallPutSchedule(calls=<{}>, puts=<{}>)",
             call_put.calls.len(),
@@ -1033,7 +1022,7 @@ impl PyConvertibleBondBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let trigger: PriceTrigger = serde_from_py(py, value, "soft_call_trigger")?;
+        let trigger: PriceTrigger = spec_from_py(py, value, "soft_call_trigger")?;
         let shown = format!(
             "{{'threshold_pct': {}, 'observation_days': {}, 'required_days_above': {}}}",
             float_repr(trigger.threshold_pct),
@@ -1125,7 +1114,7 @@ impl PyConvertibleBondBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let claim = serde_from_py(py, value, "resolved_settlement")?;
+        let claim = spec_from_py(py, value, "resolved_settlement")?;
         builder_set!(
             slf,
             resolved_settlement,
@@ -1160,7 +1149,7 @@ impl PyConvertibleBondBuilder {
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec =
-            serde_from_py(py, value, "cashflow_spec")?;
+            spec_from_py(py, value, "cashflow_spec")?;
         builder_set!(
             slf,
             cashflow_spec,
