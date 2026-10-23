@@ -13,7 +13,8 @@ use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{CommodityUnderlyingParams, Instrument};
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
 use finstack_quant_valuations_test_support::date::date;
 use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
@@ -77,7 +78,7 @@ fn atm_asian_option(option_type: OptionType) -> (CommodityAsianOption, MarketCon
 /// delta, and any long option has positive vega.
 #[test]
 fn test_commodity_asian_option_delta_and_vega_signs() -> finstack_quant_core::Result<()> {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Call: positive delta, positive vega.
     let (call, market, as_of) = atm_asian_option(OptionType::Call);
@@ -128,7 +129,7 @@ fn test_commodity_asian_option_delta_and_vega_signs() -> finstack_quant_core::Re
 /// with the parallel DV01.
 #[test]
 fn test_commodity_asian_option_dv01_and_bucketed_dv01() -> finstack_quant_core::Result<()> {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let (call, market, as_of) = atm_asian_option(OptionType::Call);
     let pv = call.value(&market, as_of)?;
     let mut ctx = MetricContext::new(

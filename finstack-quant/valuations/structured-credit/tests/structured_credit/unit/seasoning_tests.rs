@@ -15,8 +15,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
-    TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -70,13 +69,17 @@ fn abs(rows: impl FnOnce(&mut PoolAsset, &mut PoolAsset)) -> StructuredCredit {
     )
     .expect("N")])
     .expect("structure");
-    let mut deal = StructuredCredit::new_abs(
-        "ABS-SEASONING",
-        pool,
-        tranches,
-        close(),
-        maturity(),
-        "USD-OIS",
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-SEASONING".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -87,7 +90,7 @@ fn abs(rows: impl FnOnce(&mut PoolAsset, &mut PoolAsset)) -> StructuredCredit {
 }
 
 fn first_period_principal(deal: &StructuredCredit) -> f64 {
-    run_simulation_with_diagnostics(deal, &market(), close())
+    deal.run_simulation(&market(), close())
         .expect("simulation")
         .diagnostics
         .periods[0]
@@ -96,7 +99,7 @@ fn first_period_principal(deal: &StructuredCredit) -> f64 {
 }
 
 fn first_period_defaults(deal: &StructuredCredit) -> f64 {
-    run_simulation_with_diagnostics(deal, &market(), close())
+    deal.run_simulation(&market(), close())
         .expect("simulation")
         .diagnostics
         .periods[0]

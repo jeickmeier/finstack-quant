@@ -103,7 +103,7 @@ Optional hooks with defaults worth knowing about:
 | `resolve_pricing_as_of()` | returns `requested` | The instrument derives its own valuation date (e.g. a fund anchored to its curve base date) |
 | `valuation_details()` | `None` | The result must carry typed details, e.g. the FX-triangulation flag |
 | `seed_metric_context()` | no-op | Cashflow generation is expensive and the metrics pipeline would redo it |
-| `metrics_equivalent()` / `has_custom_metrics_equivalent()` | `clone_box()` / `false` | Spread and yield metrics need a normalized cashflow basis (PIK → cash) |
+| `metrics_equivalent()` | `None` | Spread and yield metrics need a normalized cashflow basis (PIK → cash) |
 | `as_marginable()` | `None` | The type implements `finstack_quant_margin::Marginable` (the impl lives in the instrument's own `marginable.rs`; shared helpers in `margin.rs`) |
 | `model_params_snapshot()` / `with_model_params()` | `ModelParamsSnapshot::None` (the variant, not `Option::None`) / clone-or-error | Attribution must revalue the instrument with isolated model parameters |
 | `scenario_spread_shock_supported()` | `false` | The pricer consumes `scenario_spread_shock_bp` exactly, with no silent no-op |

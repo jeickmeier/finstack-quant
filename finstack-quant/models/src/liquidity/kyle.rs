@@ -49,6 +49,36 @@ impl TryFrom<RawKyleLambdaModel> for KyleLambdaModel {
     }
 }
 
+/// Estimate price-space lambda from observed volume/return series and a
+/// reference price.
+///
+/// ```text
+/// lambda ~= mean(|r_t| / V_t) * reference_price
+/// ```
+///
+/// Returns `None` when the inputs are empty, mismatched in length, otherwise
+/// invalid, or when `reference_price` is non-positive/non-finite.
+///
+/// Argument order matches [`super::amihud_illiquidity`]: returns first,
+/// then the aligned volumes.
+///
+/// # Arguments
+///
+/// * `returns` - Simple decimal returns aligned one-for-one with `volumes`.
+/// * `volumes` - Strictly positive volume observations in consistent share
+///   or contract units.
+/// * `reference_price` - Positive price per share or contract used to
+///   convert the return-space Amihud ratio into price-space lambda.
+pub fn kyle_lambda(returns: &[f64], volumes: &[f64], reference_price: f64) -> Option<f64> {
+    if returns.is_empty() || returns.len() != volumes.len() {
+        return None;
+    }
+    let illiq = super::amihud_illiquidity(returns, volumes)?;
+    KyleLambdaModel::from_amihud(illiq, reference_price)
+        .ok()
+        .map(|m| m.lambda())
+}
+
 impl KyleLambdaModel {
     /// Create a new Kyle model with a given lambda.
     ///
@@ -65,40 +95,6 @@ impl KyleLambdaModel {
             return Err(invalid_input("lambda must be finite and non-negative"));
         }
         Ok(Self { lambda })
-    }
-
-    /// Estimate price-space lambda from observed volume/return series and a
-    /// reference price.
-    ///
-    /// ```text
-    /// lambda ~= mean(|r_t| / V_t) * reference_price
-    /// ```
-    ///
-    /// Returns `None` when the inputs are empty, mismatched in length, otherwise
-    /// invalid, or when `reference_price` is non-positive/non-finite.
-    ///
-    /// Argument order matches [`super::amihud_illiquidity`]: returns first,
-    /// then the aligned volumes.
-    ///
-    /// # Arguments
-    ///
-    /// * `returns` - Simple decimal returns aligned one-for-one with `volumes`.
-    /// * `volumes` - Strictly positive volume observations in consistent share
-    ///   or contract units.
-    /// * `reference_price` - Positive price per share or contract used to
-    ///   convert the return-space Amihud ratio into price-space lambda.
-    pub fn lambda_from_series(
-        returns: &[f64],
-        volumes: &[f64],
-        reference_price: f64,
-    ) -> Option<f64> {
-        if returns.is_empty() || returns.len() != volumes.len() {
-            return None;
-        }
-        let illiq = super::amihud_illiquidity(returns, volumes)?;
-        Self::from_amihud(illiq, reference_price)
-            .ok()
-            .map(|m| m.lambda())
     }
 
     /// Estimate price-space lambda from an Amihud ratio and reference price.
@@ -298,14 +294,11 @@ mod tests {
     }
 
     #[test]
-    fn lambda_from_series_calibrates_price_space_lambda() {
-        let lambda = KyleLambdaModel::lambda_from_series(&[0.01, -0.02], &[100.0, 200.0], 50.0)
-            .expect("valid price-space inputs");
+    fn kyle_lambda_calibrates_price_space_lambda() {
+        let lambda =
+            kyle_lambda(&[0.01, -0.02], &[100.0, 200.0], 50.0).expect("valid price-space inputs");
         assert!((lambda - 0.005).abs() < 1e-15);
-        assert_eq!(
-            KyleLambdaModel::lambda_from_series(&[0.01], &[100.0], 0.0),
-            None
-        );
+        assert_eq!(kyle_lambda(&[0.01], &[100.0], 0.0), None);
     }
 
     #[test]

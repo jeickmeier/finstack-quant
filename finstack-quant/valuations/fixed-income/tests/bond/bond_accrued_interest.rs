@@ -469,12 +469,10 @@ fn test_accrual_method_serialization() {
         serde_json::from_str(&json).expect("Deserialization should succeed in test");
 
     // Verify accrual method survived roundtrip
-    match &deserialized.accrual_method {
-        AccrualMethod::Compounded => {
-            // Compounded accrual method has no additional fields
-        }
-        _ => panic!("Expected Compounded accrual method"),
-    }
+    assert!(
+        matches!(deserialized.accrual_method, AccrualMethod::Compounded),
+        "Expected Compounded accrual method"
+    );
 }
 
 #[test]

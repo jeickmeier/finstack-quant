@@ -547,27 +547,6 @@ fn test_par_spread_positive_and_side_invariant() {
     );
 }
 
-// ==================== Upfront Tests ====================
-
-#[test]
-fn test_upfront_equals_pv() {
-    // Arrange
-    let pricer = CdsTranchePricer::new();
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let upfront = tranche.model_upfront(&market, as_of).unwrap();
-    let pv = pricer
-        .price_tranche(&tranche, &market, as_of)
-        .unwrap()
-        .amount();
-
-    // Assert
-    approx_eq(upfront, pv, 1e-6, "Upfront should equal PV");
-}
-
 #[test]
 fn affine_coupon_matches_public_repricing_with_upfront_and_seasoned_losses() {
     let market = standard_market_context();

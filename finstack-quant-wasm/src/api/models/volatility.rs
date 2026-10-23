@@ -303,10 +303,6 @@ impl JsSabrParameters {
     pub(crate) fn from_inner(inner: SabrParameters) -> Self {
         Self { inner }
     }
-
-    fn clone_inner(&self) -> SabrParameters {
-        self.inner.clone()
-    }
 }
 
 /// Volatility smile generator for a fixed `(forward, t)` pair.
@@ -332,7 +328,7 @@ impl JsSabrSmile {
         let forward = js_f64(&forward, "forward")?;
         let t = js_f64(&t, "t")?;
         Ok(Self {
-            inner: SabrSmile::new(params.clone_inner(), forward, t),
+            inner: SabrSmile::new(params.inner.clone(), forward, t),
         })
     }
 
@@ -566,9 +562,10 @@ impl JsSabrCalibrator {
     /// Calibrate `(alpha, nu, rho)` to market vols with `beta` fixed.
     /// @param forward - Forward price or rate in the same quote convention as the strike.
     /// @param strikes - Option strikes aligned one-for-one with market_vols.
-    /// @param market_vols - Market-implied annualized volatilities aligned one-for-one with strikes.
-    /// @param t - Time from the curve base date in years.
-    /// @param beta - SABR CEV elasticity parameter held fixed during calibration.
+    /// @param market_vols - Positive quotes aligned with strikes: absolute decimal-rate normal volatilities for beta near zero, otherwise annual Black volatilities in relative decimals.
+    /// @param t - Positive time to expiry in years.
+    /// @param beta - SABR CEV elasticity in `[0, 1]`, held fixed during calibration.
+    /// @returns Calibrated parameters, signed model-minus-market quote errors, and deterministic solver diagnostics.
     ///
     /// # Errors
     ///
@@ -582,7 +579,7 @@ impl JsSabrCalibrator {
         market_vols: JsValue,
         t: JsValue,
         beta: JsValue,
-    ) -> Result<JsSabrParameters, JsValue> {
+    ) -> Result<JsValue, JsValue> {
         let forward = js_f64(&forward, "forward")?;
         let strikes = js_f64_seq(&strikes, "strikes")?;
         let market_vols = js_f64_seq(&market_vols, "marketVols")?;
@@ -590,8 +587,8 @@ impl JsSabrCalibrator {
         let beta = js_f64(&beta, "beta")?;
         self.inner
             .calibrate(forward, &strikes, &market_vols, t, beta)
-            .map(JsSabrParameters::from_inner)
             .map_err(to_js_err)
+            .and_then(|outcome| to_js_value(&outcome))
     }
 
     /// Return a copy of this calibrator with an overridden displacement
@@ -1570,7 +1567,8 @@ mod tests {
         let fitted = SabrCalibrator::new()
             .with_shift(policy)
             .calibrate(forward, &strikes, &vols, 1.0, 0.5)
-            .expect("auto-shift calibrate");
+            .expect("auto-shift calibrate")
+            .parameters;
         let shift = fitted
             .shift()
             .expect("negative-rate fit must carry a shift");

@@ -273,7 +273,7 @@ wire_methods!(
     PyFixedCouponSpec,
     FixedCouponSpec,
     "FixedCouponSpec",
-    stub = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder"
 );
 
 #[pymethods]
@@ -341,7 +341,7 @@ wire_methods!(
     PyFloatingRateSpec,
     FloatingRateSpec,
     "FloatingRateSpec",
-    stub = "finstack_quant.cashflows.builder",
+    module = "finstack_quant.cashflows.builder",
     validate
 );
 
@@ -557,7 +557,7 @@ wire_methods!(
     PyFloatingCouponSpec,
     FloatingCouponSpec,
     "FloatingCouponSpec",
-    stub = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder"
 );
 
 #[pymethods]
@@ -627,7 +627,7 @@ wire_methods!(
     PyStepUpCouponSpec,
     StepUpCouponSpec,
     "StepUpCouponSpec",
-    stub = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder"
 );
 
 #[pymethods]

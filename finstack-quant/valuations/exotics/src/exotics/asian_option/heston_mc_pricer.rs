@@ -84,7 +84,7 @@ impl AsianOptionHestonMcPricer {
             finstack_quant_valuations_core::instruments::pricing::heston_market::heston_params_from_market_strict(
                 market, r, q,
             )?;
-        let v0 = heston_params.v0;
+        let v0 = heston_params.model.v0;
         let process = HestonProcess::new(heston_params);
         let discretization = QeHeston::new();
 

@@ -38,7 +38,6 @@ fn test_complete_pricing_workflow() {
         MetricId::Theta,
         MetricId::BucketedDv01,
         MetricId::Inflation01,
-        MetricId::custom("breakeven"),
         MetricId::custom("fixed_leg_pv"),
         MetricId::custom("inflation_leg_pv"),
     ];
@@ -59,7 +58,6 @@ fn test_complete_pricing_workflow() {
     assert!(result.measures.contains_key("theta"));
     assert!(result.measures.contains_key("bucketed_dv01"));
     assert!(result.measures.contains_key("inflation01"));
-    assert!(result.measures.contains_key("breakeven"));
     assert!(result.measures.contains_key("fixed_leg_pv"));
     assert!(result.measures.contains_key("inflation_leg_pv"));
 

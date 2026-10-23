@@ -65,7 +65,7 @@ pub use lvar::{lvar_bangia, LvarBangiaScalar};
 
 pub use almgren_chriss::AlmgrenChrissModel;
 pub use impact::{ExecutionTrajectory, ImpactEstimate, TradeParams};
-pub use kyle::KyleLambdaModel;
+pub use kyle::{kyle_lambda, KyleLambdaModel};
 
 /// Build and evaluate a uniform Almgren-Chriss market-impact estimate.
 ///

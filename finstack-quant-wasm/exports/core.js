@@ -120,6 +120,7 @@ export const core = {
   days30e360Isda: wasm.days30e360Isda,
   Tenor: wasm.Tenor,
   TenorUnit: wasm.TenorUnit,
+  fxStandardSettlementDays: wasm.fxStandardSettlementDays,
   createDate: wasm.createDate,
   dateFromEpochDays: wasm.dateFromEpochDays,
   daysSinceEpoch: wasm.daysSinceEpoch,

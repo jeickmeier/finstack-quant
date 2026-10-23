@@ -150,9 +150,10 @@ impl MetricId {
 
     /// FX spot rate sensitivity per 1% (percentage point) move of the FX rate
     ///
-    /// The producer (`fx01.rs`) uses a ±1% relative spot bump (`BUMP_PCT = 1.0`)
-    /// and rescales the central difference to per percentage point — NOT per
-    /// basis point.
+    /// Measures reporting-currency PV change per 1% relative FX spot move.
+    /// Generic FX instruments bump the FX matrix; quanto options bump their
+    /// configured scalar FX spot using the configured relative bump size and
+    /// normalize the central difference to the same 1% move.
     pub const Fx01: Self = Self(Cow::Borrowed("fx01"));
 
     /// Running coupon sensitivity per basis point (CDS Tranche)
@@ -169,16 +170,6 @@ impl MetricId {
 
     /// FX volatility sensitivity per 1% change (quanto options)
     pub const FxVega: Self = Self(Cow::Borrowed("fx_vega"));
-
-    /// FX spot rate delta (sensitivity to FX rate move, typically per 1%).
-    ///
-    /// Distinct from `Delta` which measures sensitivity to the instrument's
-    /// primary underlying (equity spot, commodity price, etc.). `FxDelta`
-    /// measures sensitivity to the FX rate for FX spot, FX swap, and
-    /// quanto instruments.
-    ///
-    /// Units: currency per 1% FX rate move.
-    pub const FxDelta: Self = Self(Cow::Borrowed("fx_delta"));
 
     /// Volatility index delta (sensitivity to volatility index level).
     ///

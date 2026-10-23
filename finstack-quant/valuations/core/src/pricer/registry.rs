@@ -227,7 +227,7 @@ impl PricerRegistry {
     /// Create a new empty pricer registry.
     ///
     /// For pre-configured registries with all standard pricers, use the
-    /// umbrella crate's `pricer::standard_pricer_registry()`.
+    /// umbrella crate's `pricer::finstack_quant_valuations::pricer::STANDARD.pricers()`.
     pub fn new() -> Self {
         Self::default()
     }

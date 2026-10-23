@@ -2565,15 +2565,31 @@ export type PrepaymentModelSpec3 =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
+      /**
+       * Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress.
+       */
       factor_correlation: number;
+      /**
+       * Finite JSON number in the closed interval `[0, 1]`.
+       */
       mean_recovery: number;
+      /**
+       * Local shock scale in [0, 0.5], not realized recovery standard deviation.
+       */
       recovery_volatility: number;
       type: "market_correlated";
     };
+/**
+ * Finite JSON number in the closed interval `[0, 1]`.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "ClosedUnitIntervalF64Wire".
+ */
+export type ClosedUnitIntervalF64Wire = number;
 /**
  * Asset type classification for pool composition (flattened hierarchy)
  *
@@ -13925,13 +13941,6 @@ export type ClearingStatus =
  */
 export type CliquetPayoffType = "additive" | "multiplicative";
 /**
- * Finite JSON number in the closed interval `[0, 1]`.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "ClosedUnitIntervalF64Wire".
- */
-export type ClosedUnitIntervalF64Wire = number;
-/**
  * CMO tranche type enumeration.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -18067,16 +18076,6 @@ export interface D_8A837E6F142B34E8Cfd4 {
    */
   asset_vol: number;
   /**
-   * Equity holder discount rate applied to the nested-MC payoff.
-   *
-   * Note: the nested simulation drifts under the risk-neutral measure
-   * (`risk_free_rate`) but discounts here, so the intermediate equity
-   * figures are decision inputs, not measure-consistent prices. The
-   * rate cancels in the cash-vs-PIK comparison and does not bias the
-   * elected branch.
-   */
-  equity_discount_rate: number;
-  /**
    * Forward-looking horizon in years for the nested simulation (e.g. 1.0).
    */
   horizon: number;
@@ -18089,7 +18088,6 @@ export interface D_8A837E6F142B34E8Cfd4 {
    * Risk-free rate (continuous) used as drift in the nested simulation.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Metric-time pricing configuration.
@@ -35491,7 +35489,7 @@ export interface SabrParameters {
    */
   alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * Finite JSON number in the closed interval `[0, 1]`.
    */
   beta: number;
   /**
@@ -45028,6 +45026,8 @@ export interface ScenarioPricingOverrides48 {
  *
  * For American exercise, the model requires a spot price to build the binomial tree.
  * `spot_id` must identify an observed spot for early exercise and Monte Carlo.
+ * A numeric scalar is in the underlying currency; a Money scalar must carry
+ * that same currency.
  * The commodity forward is never substituted for the spot underlying.
  * The convenience yield (cost-of-carry) is implied from the forward/spot ratio:
  * `q = r - ln(F/S)/T`
@@ -45105,6 +45105,7 @@ export interface CommoditySpotOption {
   settlement: "physical" | "cash";
   /**
    * Optional spot price ID (for spot-based pricing and American options).
+   * Numeric prices use the underlying currency; Money prices must match it.
    */
   spot_id?: Id9 | null;
   /**

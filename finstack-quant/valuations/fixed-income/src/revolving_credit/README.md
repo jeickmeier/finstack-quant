@@ -359,7 +359,7 @@ string routes through the registry instead.
 For per-path detail use the pricer directly:
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer;
 
 // Requires DrawRepaySpec::Stochastic; a deterministic spec is a validation error.
 let enhanced = RevolvingCreditPricer::price_with_paths(&facility, &market, as_of)?;
@@ -417,7 +417,7 @@ Registered for `InstrumentType::RevolvingCredit` in `metrics/mod.rs`:
 | `custom("accrued_interest")` | Cash interest accrued to the settlement date, in the facility currency |
 | `custom("oid_eir_amortization")` | Total EIR amortization; stores `oid_eir_rate` and the dated amortization and carrying-value series |
 
-`Theta` is registered universally by `metrics::standard_registry()`.
+`Theta` is registered universally by `pricer::STANDARD.metrics()`.
 
 ## Bindings
 

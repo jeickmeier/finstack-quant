@@ -1,0 +1,140 @@
+{
+  "$defs": {
+    "ClosedUnitIntervalF64Wire": {
+      "description": "Finite JSON number in the closed interval `[0, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "CorrelationWire": {
+      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": -1.0,
+      "type": "number"
+    },
+    "NonNegativeF64Wire": {
+      "description": "Finite JSON number greater than or equal to zero.",
+      "format": "double",
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "PositiveF64Wire": {
+      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
+      "exclusiveMinimum": 0.0,
+      "format": "double",
+      "type": "number"
+    },
+    "SabrParameters": {
+      "additionalProperties": false,
+      "description": "SABR model parameters",
+      "properties": {
+        "alpha": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Initial volatility (alpha)"
+        },
+        "beta": {
+          "$ref": "#/$defs/ClosedUnitIntervalF64Wire",
+          "description": "CEV exponent (beta) - typically 0 to 1"
+        },
+        "nu": {
+          "$ref": "#/$defs/NonNegativeF64Wire",
+          "description": "Volatility of volatility (nu/volvol)"
+        },
+        "rho": {
+          "$ref": "#/$defs/CorrelationWire",
+          "description": "Correlation between asset and volatility (rho)"
+        },
+        "shift": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PositiveF64Wire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Shift parameter for handling negative rates (optional)"
+        }
+      },
+      "required": [
+        "alpha",
+        "beta",
+        "nu",
+        "rho"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/sabr_calibration_outcome.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Calibrated SABR parameters and deterministic solver diagnostics.",
+  "properties": {
+    "max_relative_quote_error": {
+      "description": "Largest absolute quote error divided by its positive market quote.",
+      "format": "double",
+      "type": "number"
+    },
+    "parameters": {
+      "$ref": "#/$defs/SabrParameters",
+      "description": "Calibrated model parameters."
+    },
+    "parameters_at_bounds": {
+      "description": "Parameter names whose calibrated values landed on configured bounds.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "quote_errors": {
+      "description": "Signed model-minus-market errors, in the original quote units: decimal\nabsolute rate volatility for normal quotes, relative decimals for Black.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "residual_evaluations": {
+      "description": "Total objective residual evaluations.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "total_iterations": {
+      "description": "Total iterations consumed across all attempted starts.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "winning_iterations": {
+      "description": "Iterations consumed by the selected start.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "winning_start": {
+      "description": "Initial alpha, nu, and rho values for the selected start.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    }
+  },
+  "required": [
+    "parameters",
+    "total_iterations",
+    "winning_iterations",
+    "residual_evaluations",
+    "winning_start",
+    "quote_errors",
+    "max_relative_quote_error",
+    "parameters_at_bounds"
+  ],
+  "title": "SabrCalibrationOutcome",
+  "type": "object"
+}

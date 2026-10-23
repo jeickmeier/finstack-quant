@@ -64,7 +64,7 @@ wire_methods!(
     PyPeriodAggregation,
     PeriodAggregation,
     "PeriodAggregation",
-    stub = "finstack_quant.cashflows.aggregation"
+    module = "finstack_quant.cashflows.aggregation"
 );
 
 #[pymethods]

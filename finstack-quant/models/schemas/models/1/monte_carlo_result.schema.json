@@ -1005,7 +1005,7 @@
       "type": "object"
     },
     "PathPoint": {
-      "description": "A single captured point along a Monte Carlo path.\n\nCaptures the process state at a specific time step, together with any\ncashflows emitted at that step and, optionally, a payoff snapshot.\n\n# State Vector Layout\n\nThe `state` vector contains the raw state variables in process-defined order.\nFor simple single-asset models, the crate's internal `state_indices`\nconstants provide common aliases.\nFor multi-asset or process-specific layouts, consult\n[`PathDataset::process_params.factor_names`](PathDataset::process_params) or\n[`PathDataset::state_var_keys`].",
+      "description": "A single captured point along a Monte Carlo path.\n\nCaptures the process state at a specific time step, together with any\ncashflows emitted at that step and, optionally, a payoff snapshot.\n\n# State Vector Layout\n\nThe `state` vector contains the raw state variables in process-defined order.\nInterpret every layout using\n[`PathDataset::process_params.factor_names`](PathDataset::process_params) or\n[`PathDataset::state_var_keys`].",
       "properties": {
         "cashflows": {
           "default": [],
@@ -1039,7 +1039,7 @@
           ]
         },
         "state": {
-          "description": "State variables at this point (spot, variance, rate, etc.)\nIndexed by position - see `state_indices` for standard layout",
+          "description": "State variables at this point (spot, variance, rate, etc.)\nPositions follow `PathDataset::process_params.factor_names`.",
           "items": {
             "format": "double",
             "type": "number"

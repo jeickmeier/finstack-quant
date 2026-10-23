@@ -11,7 +11,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use std::sync::Arc;
 use time::macros::date;
 
@@ -53,7 +54,7 @@ fn test_asw_par_tracks_coupon_minus_par_rate() {
     let disc = simple_discount_curve("USD-OIS", as_of);
     let market = MarketContext::new().insert(disc.clone());
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let mut ctx = MetricContext::new(
         Arc::new(bond.clone()),
         Arc::new(market),
@@ -123,7 +124,7 @@ fn test_asw_market_tightens_when_price_rises() {
     let disc = simple_discount_curve("USD-OIS", as_of);
     let market = MarketContext::new().insert(disc);
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     let mut ctx_rich = MetricContext::new(
         Arc::new(rich_bond),
@@ -197,7 +198,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         .expect("discount curve should build");
     let market = MarketContext::new().insert(disc.clone());
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let mut ctx = MetricContext::new(
         Arc::new(bond.clone()),
         Arc::new(market.clone()),
@@ -328,7 +329,7 @@ fn test_asw_par_metric_rejects_matured_schedule() {
 
     let disc = simple_discount_curve("USD-OIS", issue);
     let market = MarketContext::new().insert(disc);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     let mut ctx = MetricContext::new(
         Arc::new(bond),
@@ -368,7 +369,7 @@ fn test_asw_market_metric_rejects_matured_schedule() {
 
     let disc = simple_discount_curve("USD-OIS", issue);
     let market = MarketContext::new().insert(disc);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     let mut ctx = MetricContext::new(
         Arc::new(bond),

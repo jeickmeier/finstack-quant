@@ -2,6 +2,7 @@
 
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_core::wire::{serde_label, serde_parse};
 use finstack_quant_models::credit::liability_management::{
@@ -11,11 +12,7 @@ use finstack_quant_models::credit::liability_management::{
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
-/// Hold-versus-tender economics of a distressed exchange offer.
-///
-/// ``exchange_type`` is one of ``par_for_par``, ``discount``, ``uptier``,
-/// ``downtier``. Tendering is recommended when ``tender_total`` exceeds
-/// ``old_npv * TENDER_RECOMMENDATION_HURDLE``.
+#[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis")]
 #[pyclass(
     name = "ExchangeOfferAnalysis",
     module = "finstack_quant.models.credit.liability_management",
@@ -30,69 +27,61 @@ pub struct PyExchangeOfferAnalysis {
 
 #[pymethods]
 impl PyExchangeOfferAnalysis {
-    /// Which exchange structure this analyses.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.exchange_type")]
     #[getter]
     fn exchange_type(&self) -> PyResult<String> {
         serde_label(&self.inner.exchange_type).map_err(core_to_py)
     }
 
-    /// Net present value of the existing instrument.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.old_npv")]
     #[getter]
     fn old_npv(&self) -> f64 {
         self.inner.old_npv
     }
 
-    /// Net present value of the instrument offered in exchange.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.new_npv")]
     #[getter]
     fn new_npv(&self) -> f64 {
         self.inner.new_npv
     }
 
-    /// Fee paid to holders for consenting.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.consent_fee")]
     #[getter]
     fn consent_fee(&self) -> f64 {
         self.inner.consent_fee
     }
 
-    /// Value of any equity offered alongside the new instrument.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.equity_sweetener_value")]
     #[getter]
     fn equity_sweetener_value(&self) -> f64 {
         self.inner.equity_sweetener_value
     }
 
-    /// Total consideration offered per unit tendered.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.tender_total")]
     #[getter]
     fn tender_total(&self) -> f64 {
         self.inner.tender_total
     }
 
-    /// `new_npv - old_npv`; positive means the holder gains.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.delta_npv")]
     #[getter]
     fn delta_npv(&self) -> f64 {
         self.inner.delta_npv
     }
 
-    /// Recovery rate at which tendering and holding are worth the same.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.breakeven_recovery")]
     #[getter]
     fn breakeven_recovery(&self) -> f64 {
         self.inner.breakeven_recovery
     }
 
-    /// Whether `delta_npv` favours tendering.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.tender_recommended")]
     #[getter]
     fn tender_recommended(&self) -> bool {
         self.inner.tender_recommended
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``exchange_type``, ``old_npv``, ``new_npv``, ``consent_fee``,
-    /// ``equity_sweetener_value``, ``tender_total``, ``delta_npv``,
-    /// ``breakeven_recovery``, ``tender_recommended``.
-    ///
-    /// One offer is one flat record, so a one-row frame is the right shape:
-    /// ``pd.concat`` over several candidate offers gives a hold-versus-tender
-    /// comparison table directly.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         // Built explicitly so the column order is fixed; `exchange_type`
         // serializes to its snake_case label.
@@ -139,11 +128,12 @@ impl PyExchangeOfferAnalysis {
 wire_methods!(
     PyExchangeOfferAnalysis,
     ExchangeOfferAnalysis,
-    "ExchangeOfferAnalysis"
+    "ExchangeOfferAnalysis",
+    module = "finstack_quant.models.credit.liability_management"
 );
 impl_repr_html_via_dataframe!(PyExchangeOfferAnalysis);
 
-/// Gross-leverage impact of a liability management exercise.
+#[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact")]
 #[pyclass(
     name = "LeverageImpact",
     module = "finstack_quant.models.credit.liability_management",
@@ -158,40 +148,37 @@ pub struct PyLeverageImpact {
 
 #[pymethods]
 impl PyLeverageImpact {
-    /// Total debt before the transaction.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.pre_total_debt")]
     #[getter]
     fn pre_total_debt(&self) -> f64 {
         self.inner.pre_total_debt
     }
 
-    /// Total debt after the transaction.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.post_total_debt")]
     #[getter]
     fn post_total_debt(&self) -> f64 {
         self.inner.post_total_debt
     }
 
-    /// Leverage multiple before the transaction.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.pre_leverage")]
     #[getter]
     fn pre_leverage(&self) -> f64 {
         self.inner.pre_leverage
     }
 
-    /// Leverage multiple after the transaction.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.post_leverage")]
     #[getter]
     fn post_leverage(&self) -> f64 {
         self.inner.post_leverage
     }
 
-    /// `pre_leverage - post_leverage`; negative when the deal levers up.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.leverage_reduction")]
     #[getter]
     fn leverage_reduction(&self) -> f64 {
         self.inner.leverage_reduction
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``pre_total_debt``, ``post_total_debt``, ``pre_leverage``,
-    /// ``post_leverage``, ``leverage_reduction``.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe_with_schema(
             py,
@@ -214,12 +201,14 @@ impl PyLeverageImpact {
     }
 }
 
-wire_methods!(PyLeverageImpact, LeverageImpact, "LeverageImpact");
+wire_methods!(
+    PyLeverageImpact,
+    LeverageImpact,
+    "LeverageImpact",
+    module = "finstack_quant.models.credit.liability_management"
+);
 
-/// Issuer-side economics of a liability management exercise.
-///
-/// ``lme_type`` is one of ``open_market_repurchase``, ``tender_offer``,
-/// ``amend_and_extend``, ``dropdown``. Percentages are decimal fractions.
+#[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis")]
 #[pyclass(
     name = "LmeAnalysis",
     module = "finstack_quant.models.credit.liability_management",
@@ -234,44 +223,43 @@ pub struct PyLmeAnalysis {
 
 #[pymethods]
 impl PyLmeAnalysis {
-    /// Which liability-management exercise this analyses.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.lme_type")]
     #[getter]
     fn lme_type(&self) -> PyResult<String> {
         serde_label(&self.inner.lme_type).map_err(core_to_py)
     }
 
-    /// Cash cost of the exercise, including fees.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.cost")]
     #[getter]
     fn cost(&self) -> f64 {
         self.inner.cost
     }
 
-    /// Face amount retired by the exercise.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.notional_reduction")]
     #[getter]
     fn notional_reduction(&self) -> f64 {
         self.inner.notional_reduction
     }
 
-    /// Value captured by retiring debt below par.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.discount_capture")]
     #[getter]
     fn discount_capture(&self) -> f64 {
         self.inner.discount_capture
     }
 
-    /// Discount captured, as a decimal fraction (``0.1`` = 10%), not ×100.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.discount_capture_pct")]
     #[getter]
     fn discount_capture_pct(&self) -> f64 {
         self.inner.discount_capture_pct
     }
 
-    /// Impact on remaining holders, as a decimal fraction (``-0.05`` = −5%),
-    /// not ×100.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.remaining_holder_impact_pct")]
     #[getter]
     fn remaining_holder_impact_pct(&self) -> f64 {
         self.inner.remaining_holder_impact_pct
     }
 
-    /// Leverage before and after the exercise.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.leverage_impact")]
     #[getter]
     fn leverage_impact(&self) -> Option<PyLeverageImpact> {
         self.inner
@@ -280,22 +268,7 @@ impl PyLmeAnalysis {
             .map(|inner| PyLeverageImpact { inner })
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``lme_type``, ``cost``, ``notional_reduction``,
-    /// ``discount_capture``, ``discount_capture_pct``,
-    /// ``remaining_holder_impact_pct``, ``pre_total_debt``,
-    /// ``post_total_debt``, ``pre_leverage``, ``post_leverage``,
-    /// ``leverage_reduction``.
-    ///
-    /// One exercise is one flat record, so a one-row frame is the right shape:
-    /// ``pd.concat`` over several structures gives a discount-capture
-    /// comparison table directly.
-    ///
-    /// The five leverage columns come from :attr:`leverage_impact` and are
-    /// flattened onto the same row rather than nested. They are ``None`` (and
-    /// therefore ``object`` dtype) when no positive EBITDA was supplied;
-    /// coerce with ``pd.to_numeric`` before aggregating a mixed set.
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         // `LmeAnalysis` derives Serialize, but `leverage_impact` is a nested
         // struct that blind serde would drop into a single object-dtype cell,
@@ -344,34 +317,15 @@ impl PyLmeAnalysis {
     }
 }
 
-wire_methods!(PyLmeAnalysis, LmeAnalysis, "LmeAnalysis");
+wire_methods!(
+    PyLmeAnalysis,
+    LmeAnalysis,
+    "LmeAnalysis",
+    module = "finstack_quant.models.credit.liability_management"
+);
 impl_repr_html_via_dataframe!(PyLmeAnalysis);
 
-/// Compare hold-versus-tender economics for a distressed exchange offer.
-///
-/// Parameters
-/// ----------
-/// old_pv : float
-///     Present value of the existing claim if not tendered.
-/// new_pv : float
-///     Present value of the new instrument received on tendering, same units.
-/// consent_fee : float
-///     Cash consent / early-tender fee per unit tendered, same units; pass
-///     ``0.0`` when the offer carries none.
-/// equity_sweetener_value : float
-///     Value of equity or warrants attached to the new instrument, same units;
-///     pass ``0.0`` when there is none.
-/// exchange_type : str
-///     One of ``par_for_par``, ``discount``, ``uptier``, ``downtier``.
-///
-/// Every argument is required, as in Rust and WASM: the offer terms are
-/// deal-specific, so there is no default structure or fee.
-///
-/// Returns an ``ExchangeOfferAnalysis``; tendering is recommended only when
-/// ``tender_total > old_pv * TENDER_RECOMMENDATION_HURDLE``.
-///
-/// Raises ``ValueError`` for an unknown ``exchange_type`` or a negative /
-/// non-finite monetary input.
+#[doc = pydoc!("finstack_quant.models.credit.liability_management", "analyze_exchange_offer")]
 #[pyfunction]
 #[pyo3(text_signature = "(old_pv, new_pv, consent_fee, equity_sweetener_value, exchange_type)")]
 fn analyze_exchange_offer(
@@ -393,29 +347,7 @@ fn analyze_exchange_offer(
     .map_err(core_to_py)
 }
 
-/// Compute discount capture and leverage impact for an LME transaction.
-///
-/// Parameters
-/// ----------
-/// lme_type : str
-///     One of ``open_market_repurchase``, ``tender_offer``,
-///     ``amend_and_extend``, ``dropdown``.
-/// notional : float
-///     Outstanding face amount of the target instrument (> 0).
-/// repurchase_price_pct : float
-///     Price as a decimal fraction of par for repurchases and tenders
-///     (``(0, 1.5]``), the extension fee for amend-and-extend (``[0, 0.1]``),
-///     or the transferred-asset fraction for a dropdown (``[0, 1]``).
-/// opt_acceptance_pct : float
-///     Fraction of holders participating, in [0, 1]; required, as in Rust
-///     and WASM, because participation drives cost and notional reduction.
-/// ebitda : float | None, default None
-///     EBITDA in the same units as ``notional``; a positive value adds the
-///     ``leverage_impact`` block.
-///
-/// Returns an ``LmeAnalysis``.
-///
-/// Raises ``ValueError`` for an unknown ``lme_type`` or an out-of-range input.
+#[doc = pydoc!("finstack_quant.models.credit.liability_management", "analyze_lme")]
 #[pyfunction]
 #[pyo3(signature = (lme_type, notional, repurchase_price_pct, opt_acceptance_pct, ebitda=None))]
 #[pyo3(
@@ -445,7 +377,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "liability_management")?;
     m.setattr(
         "__doc__",
-        "Distressed-exchange hold-versus-tender economics and issuer LME analytics.",
+        pydoc!(
+            "finstack_quant.models.credit.liability_management",
+            "__module__"
+        ),
     )?;
 
     m.add("TENDER_RECOMMENDATION_HURDLE", TENDER_RECOMMENDATION_HURDLE)?;

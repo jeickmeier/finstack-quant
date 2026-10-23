@@ -141,7 +141,6 @@ pub struct Asian {
     num_fixings_seen: usize,
 
     initial_sum_spots: f64,
-    initial_kahan_comp: f64,
     initial_product_spots: f64,
     initial_count: usize,
 }
@@ -253,7 +252,6 @@ impl Asian {
             product_spots: initial_product_log,
             num_fixings_seen: initial_count,
             initial_sum_spots: initial_sum,
-            initial_kahan_comp: 0.0,
             initial_product_spots: initial_product_log,
             initial_count,
         })
@@ -357,7 +355,7 @@ impl Payoff for Asian {
 
     fn reset(&mut self) {
         self.sum_spots = self.initial_sum_spots;
-        self.kahan_comp = self.initial_kahan_comp;
+        self.kahan_comp = 0.0;
         self.product_spots = self.initial_product_spots;
         self.num_fixings_seen = self.initial_count;
     }

@@ -29,7 +29,8 @@ pub(crate) fn selected_equity_greek(
         .as_ref()
         .is_some_and(|exercise| exercise.date <= context.as_of)
     {
-        let g = option.greeks(&context.curves, context.as_of)?;
+        let g =
+            crate::equity_option::pricing::compute_greeks(option, &context.curves, context.as_of)?;
         return Ok(match kind {
             OptionGreekKind::Delta => g.delta,
             OptionGreekKind::Gamma => g.gamma,
@@ -242,9 +243,9 @@ mod tests {
             .expect("native Greeks");
         assert_eq!(
             native.measures[&MetricId::Delta],
-            option
-                .delta(&market, date!(2025 - 01 - 01))
+            crate::equity_option::pricing::compute_greeks(&option, &market, date!(2025 - 01 - 01))
                 .expect("native delta")
+                .delta
         );
         assert!((native.measures[&MetricId::Delta] - delta).abs() > 0.05);
     }

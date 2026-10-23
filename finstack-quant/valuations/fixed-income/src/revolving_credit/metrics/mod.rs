@@ -12,9 +12,9 @@ pub(crate) mod weighted_average_cost;
 
 pub(crate) use weighted_average_cost::ApproxWeightedAverageCostCalculator;
 
-use crate::revolving_credit::pricing::RevolvingCreditPricer;
 use crate::revolving_credit::types::DrawRepaySpec;
 use crate::revolving_credit::RevolvingCredit;
+use crate::revolving_credit::RevolvingCreditPricer;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::MetricCalculator;

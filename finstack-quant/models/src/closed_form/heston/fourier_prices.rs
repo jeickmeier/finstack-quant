@@ -13,12 +13,13 @@ fn resolve_heston_settings(
     if let Some(settings) = settings {
         return *settings;
     }
-    let mut settings = HestonFourierSettings::for_maturity(time, params.v0.min(params.theta));
+    let mut settings =
+        HestonFourierSettings::for_maturity(time, params.model.v0.min(params.model.theta));
     // Include the large-frequency Heston exponential tail alongside the
     // Gaussian short-time bound. Neither bound alone covers both regimes.
-    let c_inf = (1.0 - params.rho * params.rho).sqrt()
-        * (params.v0 + params.kappa * params.theta * time)
-        / params.sigma_v;
+    let c_inf = (1.0 - params.model.rho * params.model.rho).sqrt()
+        * (params.model.v0 + params.model.kappa * params.model.theta * time)
+        / params.model.sigma_v;
     settings.u_max = settings.u_max.max(HESTON_TAIL_LOG_TARGET / c_inf);
     settings.panels = settings.u_max.ceil() as usize;
     settings
@@ -89,10 +90,10 @@ pub(super) fn validate_heston_inputs(
 ) -> Result<()> {
     for (name, value) in [
         ("spot", spot),
-        ("v0", params.v0),
-        ("kappa", params.kappa),
-        ("theta", params.theta),
-        ("sigma_v", params.sigma_v),
+        ("v0", params.model.v0),
+        ("kappa", params.model.kappa),
+        ("theta", params.model.theta),
+        ("sigma_v", params.model.sigma_v),
     ] {
         if !value.is_finite() || value <= 0.0 {
             return Err(Error::Validation(format!(
@@ -104,13 +105,13 @@ pub(super) fn validate_heston_inputs(
         ("time", time),
         ("r", params.r),
         ("q", params.q),
-        ("rho", params.rho),
+        ("rho", params.model.rho),
     ] {
         if !value.is_finite() {
             return Err(Error::Validation(format!("Heston {name} must be finite")));
         }
     }
-    if params.rho <= -1.0 || params.rho >= 1.0 {
+    if params.model.rho <= -1.0 || params.model.rho >= 1.0 {
         return Err(Error::Validation(
             "Heston rho must be in (-1, 1)".to_string(),
         ));

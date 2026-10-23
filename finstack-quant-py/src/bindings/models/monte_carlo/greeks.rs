@@ -5,6 +5,7 @@
 
 use super::engine::extract_optional_currency;
 use super::results::PyEstimate;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{self, GbmEuropeanFdSpec};
 use finstack_quant_models::types::OptionType;
@@ -41,54 +42,7 @@ fn spec_from_args(
     })
 }
 
-/// Finite-difference delta for a vanilla European option under GBM.
-///
-/// Central difference in spot with common random numbers: the up and down
-/// valuations share each path's random draws, the estimate is the mean of
-/// the per-path differences, and ``stderr`` is the paired
-/// (common-random-number) standard error of those differences.
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Finite positive spot price. The absolute bump is
-///     ``max(abs(spot) * bump_size, 1e-8)`` and the symmetric down-bumped
-///     state must remain at least ``1e-12``.
-/// strike : float
-///     Strike price.
-/// rate : float
-///     Risk-free rate (continuously compounded decimal).
-/// div_yield : float
-///     Dividend yield (continuously compounded decimal).
-/// vol : float
-///     Annualized volatility (decimal); must be strictly positive.
-/// expiry : float
-///     Maturity in years.
-/// is_call : bool
-///     ``True`` for a call, ``False`` for a put.
-/// num_paths : int, optional
-///     Paths per evaluation; defaults to the registry value.
-/// seed : int, optional
-///     RNG seed; defaults to the registry value.
-/// num_steps : int, optional
-///     Time-grid steps; defaults to the registry value.
-/// bump_size : float, optional
-///     Relative Monte Carlo spot shock (registry default ``0.01`` = 1% of
-///     spot), not a closed-form local step.
-/// currency : Currency or str, optional
-///     Currency stamped on the simulated payoffs; defaults to the registry value.
-///
-/// Returns
-/// -------
-/// Estimate
-///     ``mean`` is the delta, ``stderr`` its paired (common-random-number)
-///     standard error, ``ci_lower`` / ``ci_upper`` the symmetric 95% band.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``vol`` is not strictly positive, the inputs cannot form a
-///     symmetric central stencil, or another pricing input is invalid.
+#[doc = pydoc!("finstack_quant.models.monte_carlo", "finite_diff_delta")]
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (
@@ -120,50 +74,7 @@ fn finite_diff_delta(
         .map_err(core_to_py)
 }
 
-/// Finite-difference gamma for a vanilla European option under GBM.
-///
-/// Second central difference in spot with common random numbers; the
-/// estimate is the mean of the per-path second differences and ``stderr``
-/// is their paired (common-random-number) standard error.
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Finite positive spot price; see ``finite_diff_delta`` for the bump rule.
-/// strike : float
-///     Strike price.
-/// rate : float
-///     Risk-free rate (continuously compounded decimal).
-/// div_yield : float
-///     Dividend yield (continuously compounded decimal).
-/// vol : float
-///     Annualized volatility (decimal); must be strictly positive.
-/// expiry : float
-///     Maturity in years.
-/// is_call : bool
-///     ``True`` for a call, ``False`` for a put.
-/// num_paths : int, optional
-///     Paths per evaluation; defaults to the registry value.
-/// seed : int, optional
-///     RNG seed; defaults to the registry value.
-/// num_steps : int, optional
-///     Time-grid steps; defaults to the registry value.
-/// bump_size : float, optional
-///     Relative Monte Carlo spot shock (registry default ``0.01``).
-/// currency : Currency or str, optional
-///     Currency stamped on the simulated payoffs; defaults to the registry value.
-///
-/// Returns
-/// -------
-/// Estimate
-///     ``mean`` is the gamma, ``stderr`` its paired (common-random-number)
-///     standard error.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``vol`` is not strictly positive, the inputs cannot form a
-///     symmetric central stencil, or another pricing input is invalid.
+#[doc = pydoc!("finstack_quant.models.monte_carlo", "finite_diff_gamma")]
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (

@@ -9,9 +9,7 @@
 mod black;
 pub(crate) mod inputs;
 
-pub(crate) use black::{
-    compute_greeks, compute_pv, EquityOptionGreeks, SimpleEquityOptionBlackPricer,
-};
+pub(crate) use black::{compute_greeks, compute_pv, SimpleEquityOptionBlackPricer};
 pub(crate) use inputs::{
     collect_inputs, has_future_discrete_dividends, model_error, model_inputs,
     stochastic_vol_inputs, ModelInputs,
@@ -119,6 +117,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionHestonFourie
 
 #[cfg(test)]
 mod tests {
+    use super::black::EquityOptionGreeks;
     use super::inputs::adjust_spot_for_discrete_dividends;
     use super::*;
     use crate::equity_option::types::{EquityOption, EquityOptionExercise};
@@ -547,19 +546,23 @@ mod tests {
             sigma,
             t_vol: t,
         } = collect_inputs(&european, &curves, as_of).expect("inputs");
-        let mut params = finstack_quant_models::types::OptionMarketParams::call(
+        let mut params = finstack_quant_models::types::OptionMarketParams {
             spot,
-            european.strike,
+            strike: european.strike,
             rate,
-            sigma,
-            t,
-        );
+            volatility: sigma,
+            time_to_expiry: t,
+            dividend_yield: 0.0,
+            option_type: finstack_quant_models::types::OptionType::Call,
+        };
         params.dividend_yield = q;
-        let tree_european =
-            finstack_quant_models::trees::binomial_tree::BinomialTree::leisen_reimer(51)
-                .price_european(&params)
-                .expect("European lattice")
-                * european.quantity;
+        let tree_european = finstack_quant_models::trees::binomial_tree::BinomialTree::new(
+            51,
+            finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer,
+        )
+        .price_european(&params)
+        .expect("European lattice")
+            * european.quantity;
         assert!(american_pv.amount() >= tree_european);
         assert!((tree_european - european_pv.amount()).abs() < 0.01 * european.quantity);
     }

@@ -423,3 +423,39 @@ def test_specific_documentation_is_not_rejected_as_boilerplate() -> None:
     """
 
     assert _MODULE.fabricated_doc_messages(docstring) == []
+
+
+_NATIVE_DELEGATE = "from finstack_quant.finstack_quant import models as _models\n__doc__ = _models.__doc__\n"
+_VALID_STUB_MODULE = '"""Reusable analytical pricing models.\n\nExamples\n--------\n>>> round(2.0)\n2\n"""\n'
+
+
+def test_native_module_doc_delegation_uses_matching_stub(tmp_path: Path) -> None:
+    """Binding shims validate their canonical stub module documentation."""
+    fixture = tmp_path / "models.py"
+    fixture.write_text(_NATIVE_DELEGATE)
+    fixture.with_suffix(".pyi").write_text(_VALID_STUB_MODULE)
+    assert _MODULE.public_callable_errors(fixture) == []
+
+
+def test_native_module_doc_delegation_requires_both_delegate_and_stub(tmp_path: Path) -> None:
+    """A nearby stub does not excuse an undocumented ordinary Python module."""
+    fixture = tmp_path / "models.py"
+    fixture.write_text(_NATIVE_DELEGATE)
+    assert any(error.message == "missing module docstring" for error in _MODULE.public_callable_errors(fixture))
+    fixture.with_suffix(".pyi").write_text(_VALID_STUB_MODULE)
+    fixture.write_text("from finstack_quant.finstack_quant import models as _models\n")
+    assert any(error.message == "missing module docstring" for error in _MODULE.public_callable_errors(fixture))
+    fixture.write_text("import unrelated as _models\n__doc__ = _models.__doc__\n")
+    assert any(error.message == "missing module docstring" for error in _MODULE.public_callable_errors(fixture))
+
+
+def test_delegated_module_docs_still_validate_content_and_local_functions(tmp_path: Path) -> None:
+    """Delegation preserves summary, example and callable checks."""
+    fixture = tmp_path / "models.py"
+    fixture.write_text(_NATIVE_DELEGATE)
+    fixture.with_suffix(".pyi").write_text('"""API."""\n')
+    assert _MODULE.public_callable_errors(fixture)
+    fixture.with_suffix(".pyi").write_text(_VALID_STUB_MODULE)
+    fixture.write_text(_NATIVE_DELEGATE + "def scale(value):\n    return value * 2\n")
+    errors = _MODULE.public_callable_errors(fixture)
+    assert any(error.symbol == "scale" and error.message == "missing callable docstring" for error in errors)

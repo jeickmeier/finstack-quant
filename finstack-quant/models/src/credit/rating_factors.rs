@@ -21,7 +21,7 @@ use super::registry::{embedded_registry, RatingFactorTableParts};
 /// use finstack_quant_core::types::CreditRating;
 /// use finstack_quant_models::credit::RatingFactorTable;
 ///
-/// let table = RatingFactorTable::moodys_standard().expect("embedded table");
+/// let table = RatingFactorTable::default_calibration().expect("embedded table");
 /// assert_eq!(table.get_factor(CreditRating::B).expect("B factor"), 2720.0);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,13 +34,13 @@ pub struct RatingFactorTable {
 }
 
 impl RatingFactorTable {
-    /// Load the embedded Moody's standard WARF table.
+    /// Load the registry-selected default rating-factor calibration.
     ///
     /// # Errors
     ///
     /// Returns an error if the embedded credit-assumptions registry is invalid
     /// or its configured default rating-factor table is missing.
-    pub fn moodys_standard() -> Result<Self> {
+    pub fn default_calibration() -> Result<Self> {
         Self::from_registry_id(embedded_registry()?.default_rating_factor_table_id())
     }
 
@@ -121,10 +121,10 @@ static MOODYS_WARF_TABLE: OnceLock<Result<RatingFactorTable>> = OnceLock::new();
 ///
 /// # Errors
 ///
-/// Returns an error if the embedded registry is invalid or the default table
-/// has no factor for `rating`.
+/// Returns an error if the embedded registry is invalid or the exact
+/// `moodys_standard` table has no factor for `rating`.
 pub fn moodys_warf_factor(rating: CreditRating) -> Result<f64> {
-    match MOODYS_WARF_TABLE.get_or_init(RatingFactorTable::moodys_standard) {
+    match MOODYS_WARF_TABLE.get_or_init(|| RatingFactorTable::from_registry_id("moodys_standard")) {
         Ok(table) => table.get_factor(rating),
         Err(err) => Err(err.clone()),
     }
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn published_moodys_factors_are_stable() {
-        let table = RatingFactorTable::moodys_standard().expect("registry table");
+        let table = RatingFactorTable::default_calibration().expect("registry table");
         assert_eq!(table.get_factor(CreditRating::AAA).expect("AAA"), 1.0);
         assert_eq!(table.get_factor(CreditRating::AAPlus).expect("AA+"), 10.0);
         assert_eq!(table.get_factor(CreditRating::A).expect("A"), 120.0);
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn metadata_and_serde_round_trip_are_stable() {
-        let table = RatingFactorTable::moodys_standard().expect("registry table");
+        let table = RatingFactorTable::default_calibration().expect("registry table");
         assert_eq!(table.agency(), "Moody's");
         assert_eq!(table.methodology(), "IDEALIZED DEFAULT RATES");
         assert_eq!(table.default_factor(), 3650.0);
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn convenience_lookup_matches_table() {
-        let table = RatingFactorTable::moodys_standard().expect("registry table");
+        let table = RatingFactorTable::default_calibration().expect("registry table");
         for rating in [
             CreditRating::AAA,
             CreditRating::AAMinus,

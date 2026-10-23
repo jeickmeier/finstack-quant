@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndexConstituent, CdsIndexParams, IndexPricing,
@@ -15,32 +15,20 @@ use finstack_quant_valuations::instruments::{CreditParams, Instrument};
 use finstack_quant_valuations::market::conventions::CdsConvention;
 use rust_decimal::prelude::ToPrimitive;
 
+use super::super::convert::enum_from_str;
 use super::super::convert::{
     attributes_from_py, bool_repr, date_repr, dated_money_from_py, enum_to_py_string, float_repr,
     money_from_py, money_repr, money_to_py, opt_repr, typed_list_from_py,
 };
-use super::super::instruments::enum_from_str;
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 use crate::bindings::extract::extract_basis_points;
 
-type CdsIndexBuilderInner =
-    finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexBuilder;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexBuilder;
 
-/// Preset descriptor for a standardized CDS index (typed wrapper for Rust ``CdsIndexParams``).
-///
-/// Captures only the index identity (name, series, version), the running
-/// coupon and the regional convention. Trade state — notional, side, dates,
-/// curves — lives on the ``CdsIndex`` built with ``CdsIndex.from_preset``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import CdsIndexParams
-/// >>> preset = CdsIndexParams.cdx_na_ig(42, 1, 100.0)
-/// >>> (preset.index_name, preset.convention, preset.num_constituents)
-/// ('CDX.NA.IG', 'isda_na', 125)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsIndexParams",
@@ -56,41 +44,7 @@ pub struct PyCdsIndexParams {
 
 #[pymethods]
 impl PyCdsIndexParams {
-    /// Describe a standardized CDS index.
-    ///
-    /// Parameters
-    /// ----------
-    /// index_name : str
-    ///     Index name, e.g. ``"CDX.NA.IG"`` or ``"iTraxx Europe"``.
-    /// series : int
-    ///     Series number (e.g. ``42``).
-    /// version : int
-    ///     Version within the series (e.g. ``1``).
-    /// coupon_bp : float | Bps
-    ///     Fixed running coupon in basis points (``100.0`` = 1%).
-    /// convention : {"isda_na", "isda_eu", "isda_as", "custom"}
-    ///     Regional ISDA convention; default ``"isda_na"`` (SNAC standard).
-    /// num_constituents : int | None
-    ///     Number of names in the pool, used by portfolio analytics when the
-    ///     constituent list is empty.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexParams
-    ///     The preset.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``convention`` is not an accepted string.
-    /// TypeError
-    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CdsIndexParams
-    /// >>> CdsIndexParams("CDX.NA.HY", 42, 1, 500.0).coupon_bp
-    /// 500.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.__init__")]
     #[new]
     #[pyo3(signature = (index_name, series, version, coupon_bp, convention="isda_na", num_constituents=None))]
     #[pyo3(
@@ -117,32 +71,7 @@ impl PyCdsIndexParams {
         Ok(Self { inner })
     }
 
-    /// CDX North American Investment Grade preset (125 names, ``isda_na``).
-    ///
-    /// Parameters
-    /// ----------
-    /// series : int
-    ///     Series number.
-    /// version : int
-    ///     Version within the series.
-    /// coupon_bp : float | Bps
-    ///     Fixed running coupon in basis points (``100.0`` for CDX.NA.IG).
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexParams
-    ///     The preset.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CdsIndexParams
-    /// >>> CdsIndexParams.cdx_na_ig(42, 1, 100.0).num_constituents
-    /// 125
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.cdx_na_ig")]
     #[staticmethod]
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn cdx_na_ig(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -155,32 +84,7 @@ impl PyCdsIndexParams {
         })
     }
 
-    /// CDX North American High Yield preset (100 names, ``isda_na``).
-    ///
-    /// Parameters
-    /// ----------
-    /// series : int
-    ///     Series number.
-    /// version : int
-    ///     Version within the series.
-    /// coupon_bp : float | Bps
-    ///     Fixed running coupon in basis points (``500.0`` for CDX.NA.HY).
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexParams
-    ///     The preset.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CdsIndexParams
-    /// >>> CdsIndexParams.cdx_na_hy(42, 1, 500.0).num_constituents
-    /// 100
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.cdx_na_hy")]
     #[staticmethod]
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn cdx_na_hy(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -193,32 +97,7 @@ impl PyCdsIndexParams {
         })
     }
 
-    /// iTraxx Europe Main preset (125 names, ``isda_eu``).
-    ///
-    /// Parameters
-    /// ----------
-    /// series : int
-    ///     Series number.
-    /// version : int
-    ///     Version within the series.
-    /// coupon_bp : float | Bps
-    ///     Fixed running coupon in basis points (``100.0`` for iTraxx Europe).
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexParams
-    ///     The preset.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CdsIndexParams
-    /// >>> CdsIndexParams.itraxx_europe(41, 1, 100.0).convention
-    /// 'isda_eu'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.itraxx_europe")]
     #[staticmethod]
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn itraxx_europe(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -246,33 +125,26 @@ impl PyCdsIndexParams {
 }
 
 crate::bindings::macros::py_getters!(PyCdsIndexParams |s| {
-    /// Index name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.index_name")]
     index_name -> String = s.inner.index_name.clone();
 
-    /// Series number.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.series")]
     series -> u16 = s.inner.series;
 
-    /// Version within the series.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.version")]
     version -> u16 = s.inner.version;
 
-    /// Fixed running coupon in basis points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.coupon_bp")]
     coupon_bp -> f64 = s.inner.coupon_bp;
 
-    /// Regional ISDA convention (serde name).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.convention")]
     convention -> PyResult<String> = enum_to_py_string(&s.inner.convention);
 
-    /// Number of names in the pool, if known.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.num_constituents")]
     num_constituents -> Option<u32> = s.inner.num_constituents;
 });
 
-/// One reference entity in a CDS index (typed wrapper for Rust ``CdsIndexConstituent``).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
-/// >>> row = CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 1 / 125)
-/// >>> (row.reference_entity, row.defaulted)
-/// ('ACME-CORP', False)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsIndexConstituent",
@@ -287,32 +159,7 @@ pub struct PyCdsIndexConstituent {
 
 #[pymethods]
 impl PyCdsIndexConstituent {
-    /// Describe one index constituent.
-    ///
-    /// Parameters
-    /// ----------
-    /// reference_entity : str
-    ///     Issuer / reference-entity name.
-    /// recovery_rate : float
-    ///     Assumed recovery as a fraction (``0.4`` = 40%).
-    /// credit_curve_id : str
-    ///     Hazard curve identifier for the issuer.
-    /// weight : float
-    ///     Weight of the issuer in the index notional (``1/125`` for CDX IG).
-    /// defaulted : bool
-    ///     Whether the name has defaulted; defaulted names drop out of the
-    ///     premium leg (their settlement is reflected in ``index_factor``).
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexConstituent
-    ///     The constituent row.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
-    /// >>> CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008).weight
-    /// 0.008
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.__init__")]
     #[new]
     #[pyo3(signature = (reference_entity, recovery_rate, credit_curve_id, weight, defaulted=false))]
     #[pyo3(
@@ -338,61 +185,6 @@ impl PyCdsIndexConstituent {
         }
     }
 
-    /// Deserialize from the canonical JSON shape.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON object with ``credit`` (``reference_entity``, ``recovery_rate``,
-    ///     ``credit_curve_id``), ``weight`` and optional ``defaulted``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexConstituent
-    ///     The parsed constituent.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
-    /// >>> row = CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008)
-    /// >>> CdsIndexConstituent.from_json(row.to_json()).credit_curve_id
-    /// 'ACME-HZD'
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| serde_json_to_py(e, "invalid CdsIndexConstituent JSON"))
-    }
-
-    /// Serialize to the canonical JSON shape.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON accepted by ``from_json`` and by ``CdsIndexBuilder.constituents``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CdsIndexConstituent"))
-    }
-
-    /// Support `pickle` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -407,40 +199,23 @@ impl PyCdsIndexConstituent {
 }
 
 crate::bindings::macros::py_getters!(PyCdsIndexConstituent |s| {
-    /// Issuer / reference-entity name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.reference_entity")]
     reference_entity -> String = s.inner.credit.reference_entity.clone();
 
-    /// Assumed recovery as a fraction.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.recovery_rate")]
     recovery_rate -> f64 = s.inner.credit.recovery_rate;
 
-    /// Hazard curve identifier for the issuer.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.credit_curve_id")]
     credit_curve_id -> String = s.inner.credit.credit_curve_id.to_string();
 
-    /// Weight of the issuer in the index notional.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.weight")]
     weight -> f64 = s.inner.weight;
 
-    /// Whether the name has defaulted.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.defaulted")]
     defaulted -> bool = s.inner.defaulted;
 });
 
-/// Credit index (CDX / iTraxx) trade (typed wrapper for Rust ``CdsIndex``).
-///
-/// Priced either against a single index hazard curve (``pricing="single_curve"``,
-/// a synthetic CDS) or by expanding into weighted constituents
-/// (``pricing="constituents"``). ``index_factor`` scales the surviving
-/// notional after defaults.
-///
-/// Build with ``CdsIndex.builder()`` or ``CdsIndex.from_preset(...)``; start
-/// from ``CdsIndex.example()``. Instances are accepted directly by
-/// ``price_instrument`` and expose ``price`` / ``metric`` / ``par_spread`` /
-/// ``risky_pv01`` / ``cs01`` themselves.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import CdsIndex
-/// >>> idx = CdsIndex.example()
-/// >>> (idx.index_name, idx.series, idx.pricing, idx.num_constituents)
-/// ('CDX.NA.IG', 42, 'single_curve', 125)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsIndex",
@@ -466,21 +241,7 @@ instrument_pricing_methods!(PyCdsIndex, "CdsIndex");
 
 #[pymethods]
 impl PyCdsIndex {
-    /// Canonical example: CDX.NA.IG series 42, USD 10,000,000 payer.
-    ///
-    /// Mirrors Rust ``CdsIndex::example()``: 60bp running coupon,
-    /// ``single_curve`` pricing off ``CDX.NA.IG.HAZARD`` discounted on
-    /// ``USD-OIS``, premium 2024-03-20 to 2029-12-20, 125 names.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndex
-    ///     The example index trade.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the example instrument fails validation.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -490,43 +251,7 @@ impl PyCdsIndex {
         })
     }
 
-    /// Build an index trade from a standardized preset.
-    ///
-    /// Mirrors Rust ``CdsIndex::from_preset``: the premium leg takes the
-    /// preset's fixed coupon and regional convention (day count, frequency,
-    /// business-day rule, calendar, stub), pricing is ``"single_curve"``,
-    /// ``index_factor`` is ``1.0`` and the constituent list is empty.
-    ///
-    /// Parameters
-    /// ----------
-    /// preset : CdsIndexParams
-    ///     Index identity, coupon and convention (e.g. ``CdsIndexParams.cdx_na_ig``).
-    /// id : str
-    ///     Unique instrument identifier for the trade.
-    /// notional : Money
-    ///     Index notional.
-    /// side : {"pay", "receive"}
-    ///     ``"pay"`` buys protection, ``"receive"`` sells protection.
-    /// start : datetime.date | str
-    ///     Premium accrual start (typically the last IMM roll).
-    /// end : datetime.date | str
-    ///     Scheduled maturity (an IMM date).
-    /// recovery_rate : float
-    ///     Assumed recovery as a fraction (``0.4`` = 40%).
-    /// discount_curve_id : str
-    ///     Discount curve identifier.
-    /// credit_curve_id : str
-    ///     Index hazard curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndex
-    ///     The index trade.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``side`` is unknown or the preset coupon is not representable.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.from_preset")]
     #[staticmethod]
     #[pyo3(
         text_signature = "(preset, id, notional, side, start, end, recovery_rate, discount_curve_id, credit_curve_id)"
@@ -559,29 +284,7 @@ impl PyCdsIndex {
         Ok(Self { inner })
     }
 
-    /// Par spread of the index in basis points.
-    ///
-    /// Mirrors Rust ``CdsIndex::par_spread`` (risky-annuity denominator in
-    /// ``single_curve`` mode; weighted constituents otherwise).
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market carrying the discount and hazard curves the index names.
-    /// as_of : datetime.date | str
-    ///     Valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Par spread in basis points.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If a curve is missing from ``market``.
-    /// ValueError
-    ///     If ``as_of`` or the market JSON is invalid.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.par_spread")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn par_spread(
         &self,
@@ -594,29 +297,7 @@ impl PyCdsIndex {
         self.inner.par_spread(&market, as_of).map_err(core_to_py)
     }
 
-    /// Risky PV01 (risky annuity) of the index premium leg.
-    ///
-    /// Mirrors Rust ``CdsIndex::risky_pv01``: PV of 1bp running on the
-    /// surviving notional.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market carrying the discount and hazard curves the index names.
-    /// as_of : datetime.date | str
-    ///     Valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Risky PV01 in notional currency units per basis point.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If a curve is missing from ``market``.
-    /// ValueError
-    ///     If ``as_of`` or the market JSON is invalid.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.risky_pv01")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn risky_pv01(
         &self,
@@ -629,33 +310,7 @@ impl PyCdsIndex {
         self.inner.risky_pv01(&market, as_of).map_err(core_to_py)
     }
 
-    /// Credit spread sensitivity (CS01) of the index.
-    ///
-    /// Mirrors Rust ``CdsIndex::cs01`` using the cached recalibration
-    /// provider: the hazard curve(s) are rebootstrapped after a 1bp parallel
-    /// spread bump. Hazard curves built by hand without a lossless calibration
-    /// recipe raise.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market carrying the discount and hazard curves the index names.
-    /// as_of : datetime.date | str
-    ///     Valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     PV change for a +1bp spread move, in notional currency units.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If a curve is missing from ``market``.
-    /// ValueError
-    ///     If the hazard curve carries no lossless calibration recipe.
-    /// RuntimeError
-    ///     If the recalibration fails.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.cs01")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn cs01(
         &self,
@@ -672,7 +327,7 @@ impl PyCdsIndex {
             .map_err(core_to_py)
     }
 
-    /// Constituent rows (empty in ``single_curve`` mode).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.constituents")]
     #[getter]
     fn constituents(&self) -> Vec<PyCdsIndexConstituent> {
         self.inner
@@ -682,9 +337,7 @@ impl PyCdsIndex {
             .collect()
     }
 
-    /// Contractual upfront payment as ``(payment_date, amount)``, or ``None``.
-    ///
-    /// Positive means the protection buyer pays the seller.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.upfront")]
     #[getter]
     fn upfront<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -693,7 +346,7 @@ impl PyCdsIndex {
             .transpose()
     }
 
-    /// OTC margin specification as a dict, or ``None`` for unmargined trades.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -703,7 +356,7 @@ impl PyCdsIndex {
             .transpose()
     }
 
-    /// Premium-leg end date (the pricer's notion of expiry), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         Instrument::expiry(&self.inner)
@@ -728,172 +381,98 @@ impl PyCdsIndex {
 }
 
 crate::bindings::macros::py_getters!(PyCdsIndex |s| {
-    /// Index name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.index_name")]
     index_name -> String = s.inner.index_name.clone();
 
-    /// Series number.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.series")]
     series -> u16 = s.inner.series;
 
-    /// Version within the series.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.version")]
     version -> u16 = s.inner.version;
 
-    /// Index notional.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    /// Fraction of surviving notional (``1.0`` = no defaults since inception).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.index_factor")]
     index_factor -> f64 = s.inner.index_factor;
 
-    /// ``"pay"`` (buy protection) or ``"receive"`` (sell protection).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.side")]
     side -> PyResult<String> = enum_to_py_string(&s.inner.side);
 
-    /// Regional ISDA convention (serde name).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.convention")]
     convention -> PyResult<String> = enum_to_py_string(&s.inner.convention);
 
-    /// Premium leg specification.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.premium_leg")]
     premium_leg -> PyPremiumLegSpec = PyPremiumLegSpec { inner: s.inner.premium_leg.clone() };
 
-    /// Protection leg specification.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.protection_leg")]
     protection_leg -> PyProtectionLegSpec =
         PyProtectionLegSpec { inner: s.inner.protection_leg.clone() };
 
-    /// Pricing mode: ``"single_curve"`` or ``"constituents"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.pricing")]
     pricing -> PyResult<String> = enum_to_py_string(&s.inner.pricing);
 
-    /// Number of names in the pool, if set.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.num_constituents")]
     num_constituents -> Option<u32> = s.inner.num_constituents;
 });
 
-/// Fluent builder for ``CdsIndex``; wraps the Rust
-/// ``FinancialBuilder``-generated builder (consuming setters).
-///
-/// The builder pre-seeds an empty ``constituents`` list so ``build()``
-/// succeeds without calling ``constituents`` in ``"single_curve"`` mode.
-/// Builders are consumed by ``build()``; create a new builder per instrument.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsIndexBuilder",
     skip_from_py_object
 )]
 pub struct PyCdsIndexBuilder {
-    inner: Option<CdsIndexBuilderInner>,
+    inner: Option<CdsIndexBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
 #[pymethods]
 impl PyCdsIndexBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the index trade.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: CdsIndexBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: CdsIndexBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    /// Set the index name.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Index name, e.g. ``"CDX.NA.IG"``, ``"CDX.NA.HY"``, ``"iTraxx Europe"``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.index_name")]
     #[pyo3(text_signature = "($self, value)")]
     fn index_name<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
             slf,
             index_name,
             format!("{value:?}"),
-            |b: CdsIndexBuilderInner| b.index_name(value.to_string())
+            |b: CdsIndexBuilder| b.index_name(value.to_string())
         )
     }
 
-    /// Set the series number.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : int
-    ///     Series number, e.g. ``42``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.series")]
     #[pyo3(text_signature = "($self, value)")]
     fn series<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, series, value.to_string(), |b: CdsIndexBuilderInner| b
+        builder_set!(slf, series, value.to_string(), |b: CdsIndexBuilder| b
             .series(value))
     }
 
-    /// Set the version number within the series.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : int
-    ///     Version number, e.g. ``1``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.version")]
     #[pyo3(text_signature = "($self, value)")]
     fn version<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            version,
-            value.to_string(),
-            |b: CdsIndexBuilderInner| b.version(value)
-        )
+        builder_set!(slf, version, value.to_string(), |b: CdsIndexBuilder| b
+            .version(value))
     }
 
-    /// Set the notional amount of the index.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money
-    ///     Notional amount of the index.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        builder_set!(
-            slf,
-            notional,
-            money_repr(money),
-            |b: CdsIndexBuilderInner| b.notional(money)
-        )
+        builder_set!(slf, notional, money_repr(money), |b: CdsIndexBuilder| b
+            .notional(money))
     }
 
-    /// Set the index factor (fraction of surviving notional).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Index factor in ``[0.0, 1.0]``. ``1.0`` means no constituent has
-    ///     defaulted since series inception.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.index_factor")]
     #[pyo3(text_signature = "($self, value)")]
     fn index_factor<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -903,56 +482,19 @@ impl PyCdsIndexBuilder {
             slf,
             index_factor,
             float_repr(value),
-            |b: CdsIndexBuilderInner| b.index_factor(value)
+            |b: CdsIndexBuilder| b.index_factor(value)
         )
     }
 
-    /// Set the protection buyer/seller perspective.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"pay", "receive"}
-    ///     ``"pay"`` to buy protection (pay premium), ``"receive"`` to sell
-    ///     protection (receive premium).
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized side.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.side")]
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
-        builder_set!(
-            slf,
-            side,
-            format!("{value:?}"),
-            |b: CdsIndexBuilderInner| b.side(side)
-        )
+        builder_set!(slf, side, format!("{value:?}"), |b: CdsIndexBuilder| b
+            .side(side))
     }
 
-    /// Set the ISDA regional convention.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"isda_na", "isda_eu", "isda_as", "custom"}
-    ///     ``"isda_na"`` is the SNAC / post-Big-Bang North American standard;
-    ///     ``"isda_eu"`` European; ``"isda_as"`` Asian; ``"custom"`` for a
-    ///     manually configured convention.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not one of the accepted strings; the message lists them.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn convention<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let convention = enum_from_str::<CdsConvention>(value, "convention")?;
@@ -960,21 +502,11 @@ impl PyCdsIndexBuilder {
             slf,
             convention,
             format!("{value:?}"),
-            |b: CdsIndexBuilderInner| b.convention(convention)
+            |b: CdsIndexBuilder| b.convention(convention)
         )
     }
 
-    /// Set the premium leg specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : PremiumLegSpec
-    ///     Premium leg specification (coupon schedule and discounting).
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.premium_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn premium_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -987,21 +519,11 @@ impl PyCdsIndexBuilder {
             date_repr(leg.start),
             date_repr(leg.end)
         );
-        builder_set!(slf, premium_leg, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, premium_leg, shown, |b: CdsIndexBuilder| b
             .premium_leg(leg))
     }
 
-    /// Set the protection leg specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : ProtectionLegSpec
-    ///     Protection leg specification (credit curve and settlement).
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.protection_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn protection_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1013,60 +535,19 @@ impl PyCdsIndexBuilder {
             leg.credit_curve_id.as_str(),
             leg.recovery_rate
         );
-        builder_set!(slf, protection_leg, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, protection_leg, shown, |b: CdsIndexBuilder| b
             .protection_leg(leg))
     }
 
-    /// Set the pricing aggregation mode.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"single_curve", "constituents"}
-    ///     ``"single_curve"`` prices the index against a single index hazard
-    ///     curve (synthetic CDS). ``"constituents"`` prices each issuer
-    ///     separately and aggregates by weight; requires ``constituents``
-    ///     to be set.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized pricing mode.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.pricing")]
     #[pyo3(text_signature = "($self, value)")]
     fn pricing<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let pricing: IndexPricing = enum_from_str(value, "pricing")?;
-        builder_set!(
-            slf,
-            pricing,
-            format!("{value:?}"),
-            |b: CdsIndexBuilderInner| b.pricing(pricing)
-        )
+        builder_set!(slf, pricing, format!("{value:?}"), |b: CdsIndexBuilder| b
+            .pricing(pricing))
     }
 
-    /// Set the index constituents.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[CdsIndexConstituent | dict] | str
-    ///     Constituent rows as typed ``CdsIndexConstituent`` objects, dicts
-    ///     with ``credit`` (``reference_entity``, ``recovery_rate``,
-    ///     ``credit_curve_id``), ``weight`` and optional ``defaulted``, or a
-    ///     JSON array of the same shape.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is neither a sequence nor a string, or a dict/JSON
-    ///     entry does not match the constituent shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.constituents")]
     #[pyo3(text_signature = "($self, value)")]
     fn constituents<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1078,23 +559,11 @@ impl PyCdsIndexBuilder {
                 row.inner.clone()
             })?;
         let shown = format!("<{} constituents>", constituents.len());
-        builder_set!(slf, constituents, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, constituents, shown, |b: CdsIndexBuilder| b
             .constituents(constituents))
     }
 
-    /// Set the number of reference entities in the index pool.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : int
-    ///     Number of names in the index pool, e.g. ``125`` for CDX.NA.IG.
-    ///     Required for portfolio-level analytics (e.g. jump-to-default)
-    ///     when ``constituents`` is empty.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.num_constituents")]
     #[pyo3(text_signature = "($self, value)")]
     fn num_constituents<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1104,29 +573,11 @@ impl PyCdsIndexBuilder {
             slf,
             num_constituents,
             value.to_string(),
-            |b: CdsIndexBuilderInner| b.num_constituents(value)
+            |b: CdsIndexBuilder| b.num_constituents(value)
         )
     }
 
-    /// Set the contractual upfront payment.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : tuple[datetime.date | str, Money]
-    ///     ``(payment_date, amount)`` on the index notional; positive means
-    ///     the protection buyer pays. The amount currency must match the
-    ///     index notional. Discounted from the payment date and dropped once
-    ///     that date is before the valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is not a ``(date, Money)`` pair.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.upfront")]
     #[pyo3(text_signature = "($self, value)")]
     fn upfront<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1134,27 +585,11 @@ impl PyCdsIndexBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let (date, money) = dated_money_from_py(value, None, "upfront")?;
         let shown = format!("({}, {})", date_repr(date), money_repr(money));
-        builder_set!(slf, upfront, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, upfront, shown, |b: CdsIndexBuilder| b
             .upfront((date, money)))
     }
 
-    /// Set the OTC margin specification for VM/IM.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``OtcMarginSpec`` as a dict or JSON string (cleared: CCP +
-    ///     currency; bilateral: SIMM with a credit classification).
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as an ``OtcMarginSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.margin_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn margin_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1163,30 +598,11 @@ impl PyCdsIndexBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec = crate::bindings::module_utils::py_to_serde(py, value, "margin_spec")?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, margin_spec, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, margin_spec, shown, |b: CdsIndexBuilder| b
             .margin_spec(spec))
     }
 
-    /// Set free-form instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1194,7 +610,7 @@ impl PyCdsIndexBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, attributes, shown, |b: CdsIndexBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: CdsIndexBuilder| b
             .attributes(attrs))
     }
 }
@@ -1205,3 +621,10 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCdsIndexConstituent>()?;
     Ok(())
 }
+
+crate::bindings::macros::wire_methods!(
+    PyCdsIndexConstituent,
+    CdsIndexConstituent,
+    "CdsIndexConstituent",
+    module = "finstack_quant.valuations.instruments"
+);

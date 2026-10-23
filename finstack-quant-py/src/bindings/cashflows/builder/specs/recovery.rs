@@ -25,7 +25,7 @@ wire_methods!(
     PyRecoveryModelSpec,
     RecoveryModelSpec,
     "RecoveryModelSpec",
-    stub = "finstack_quant.cashflows.builder",
+    module = "finstack_quant.cashflows.builder",
     validate
 );
 

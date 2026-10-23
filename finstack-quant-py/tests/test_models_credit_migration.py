@@ -57,8 +57,8 @@ def test_empirical_matrix_shape() -> None:
     matrix = sim.empirical_matrix(20, 7)
 
     assert matrix.n_states == 2
-    assert len(matrix.to_matrix()) == 2
-    assert all(len(row) == 2 for row in matrix.to_matrix())
+    assert len(matrix.to_rows()) == 2
+    assert all(len(row) == 2 for row in matrix.to_rows())
 
 
 def test_matrices_accept_nested_rows_and_export_labelled_frames() -> None:
@@ -67,7 +67,7 @@ def test_matrices_accept_nested_rows_and_export_labelled_frames() -> None:
     scale = migration.RatingScale.custom(["A", "D"])
     nested = migration.TransitionMatrix(scale, [[0.9, 0.1], [0.0, 1.0]], 1.0)
     flat = migration.TransitionMatrix(scale, [0.9, 0.1, 0.0, 1.0], 1.0)
-    assert nested.to_matrix() == flat.to_matrix()
+    assert nested.to_rows() == flat.to_rows()
     assert nested.probability_by_index(0, 1) == pytest.approx(0.1)
     assert nested.probability(from_="A", to="D") == pytest.approx(0.1)
     assert nested.scale == scale
@@ -76,25 +76,25 @@ def test_matrices_accept_nested_rows_and_export_labelled_frames() -> None:
     assert list(frame.index) == ["A", "D"] == list(frame.columns)
     assert frame.loc["A", "D"] == pytest.approx(0.1)
     rebuilt = migration.TransitionMatrix.from_dataframe(frame, 1.0)
-    assert rebuilt.to_matrix() == nested.to_matrix()
+    assert rebuilt.to_rows() == nested.to_rows()
 
     two_year = nested.compose(nested)
     assert two_year.horizon == pytest.approx(2.0)
     assert two_year.probability("A", "A") == pytest.approx(0.81)
 
-    assert migration.TransitionMatrix.from_json(nested.to_json()).to_matrix() == nested.to_matrix()
-    assert pickle.loads(pickle.dumps(nested)).to_matrix() == nested.to_matrix()  # noqa: S301 - trusted in-process round trip
+    assert migration.TransitionMatrix.from_json(nested.to_json()).to_rows() == nested.to_rows()
+    assert pickle.loads(pickle.dumps(nested)).to_rows() == nested.to_rows()  # noqa: S301 - trusted in-process round trip
 
     gen = migration.GeneratorMatrix(scale, [[-0.1, 0.1], [0.0, 0.0]])
     assert gen.intensity(from_="A", to="D") == pytest.approx(0.1)
     assert gen.scale == scale
     assert list(gen.to_dataframe().columns) == ["A", "D"]
-    assert pickle.loads(pickle.dumps(gen)).to_matrix() == gen.to_matrix()  # noqa: S301 - trusted in-process round trip
+    assert pickle.loads(pickle.dumps(gen)).to_rows() == gen.to_rows()  # noqa: S301 - trusted in-process round trip
     tol = migration.GeneratorMatrix.from_transition_matrix(nested, 1e-6)
     assert tol.round_trip_error <= 1e-6
 
     sim = migration.MigrationSimulator(gen, 2.0)
-    assert sim.generator.to_matrix() == gen.to_matrix()
+    assert sim.generator.to_rows() == gen.to_rows()
     assert migration.MigrationSimulator.from_json(sim.to_json()).horizon == pytest.approx(2.0)
 
 
@@ -119,3 +119,44 @@ def test_simulation_validation_maps_to_python_errors() -> None:
         sim.simulate(2, 1, 7)
     with pytest.raises(Exception, match=r"paths per state|positive"):
         sim.empirical_matrix(0, 7)
+
+
+def test_labeled_transition_matrix_validates_label_order_in_rust() -> None:
+    labels = ["A", "B", "D"]
+    rows = [[0.90, 0.08, 0.02], [0.10, 0.80, 0.10], [0.0, 0.0, 1.0]]
+    inferred = migration.TransitionMatrix.from_labeled(labels, labels, rows, 1.0)
+    scale = migration.RatingScale.custom(labels)
+    explicit = migration.TransitionMatrix.from_labeled(labels, labels, rows, 1.0, scale)
+    assert inferred.to_rows() == explicit.to_rows() == rows
+    assert inferred.probability("A", "B") == 0.08
+    assert inferred.scale.labels() == labels
+    assert inferred.scale.default_state() == 2
+    permuted = ["B", "A", "D"]
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_labeled(labels, permuted, rows, 1.0)
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_labeled(permuted, permuted, rows, 1.0, scale)
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_labeled(["A", "D"], ["A", "D"], [[0.9, 0.1], [0, 1]], 1.0, scale)
+    duplicate = ["A", "A", "D"]
+    with pytest.raises(ValueError, match="duplicate"):
+        migration.TransitionMatrix.from_labeled(duplicate, duplicate, rows, 1.0)
+
+
+def test_dataframe_transition_matrix_cannot_relabel_an_explicit_scale() -> None:
+    import pandas
+
+    labels = ["A", "B", "D"]
+    permuted = ["B", "A", "D"]
+    rows = [[0.90, 0.08, 0.02], [0.10, 0.80, 0.10], [0.0, 0.0, 1.0]]
+    frame = pandas.DataFrame(rows, index=permuted, columns=permuted)
+    scale = migration.RatingScale.custom(labels)
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_dataframe(frame, 1.0, scale)
+    inferred = migration.TransitionMatrix.from_dataframe(frame, 1.0)
+    assert inferred.scale.labels() == permuted
+    assert inferred.to_rows() == rows
+    assert inferred.probability("B", "A") == 0.08
+    frame.columns = labels
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_dataframe(frame, 1.0)

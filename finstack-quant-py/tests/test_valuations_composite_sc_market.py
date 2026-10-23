@@ -142,6 +142,42 @@ def test_composite_reprs_and_spec_getters() -> None:
     assert isinstance(CompositeInstrument.from_json(resolved.to_json()), CompositeInstrument)
 
 
+@pytest.mark.parametrize("kind", ["state", "rebalance", "exposure", "leg", "weighting", "rebalance_rule", "spec"])
+def test_composite_wire_methods_preserve_bytes_errors_and_pickle(kind: str) -> None:
+    spec = _fixed_spec()
+    market = MarketContext()
+    as_of = dt.date(2025, 1, 1)
+    result = spec.initialize(market, as_of)
+    values = {
+        "state": result.instrument.state,
+        "rebalance": result,
+        "exposure": result.instrument.primitive_exposures(market, as_of),
+        "leg": spec.legs[0],
+        "weighting": spec.weighting_method,
+        "rebalance_rule": spec.rebalance_rule,
+        "spec": spec,
+    }
+    value = values[kind]
+    cls = type(value)
+    wire = value.to_json()
+    assert cls.from_json(wire).to_json() == wire
+    assert pickle.loads(pickle.dumps(value)).to_json() == wire  # noqa: S301
+    with pytest.raises(ValueError, match=f"invalid {cls.__name__} JSON") as error:
+        cls.from_json("{")
+    assert str(error.value) == f"invalid {cls.__name__} JSON: EOF while parsing an object at line 1 column 1"
+    if kind == "weighting":
+        assert wire == '{"kind":"fixed_quantity"}'
+
+
+def test_validated_composite_wire_methods_reject_invalid_deserialized_values() -> None:
+    with pytest.raises(ValueError, match="composite rebalance dates must be strictly increasing"):
+        RebalanceRule.from_json('{"kind":"dates","dates":["2025-02-28","2025-01-31"]}')
+    wire = json.loads(_fixed_spec().to_json())
+    wire["legs"] = []
+    with pytest.raises(ValueError, match="requires at least two legs"):
+        CompositeSpec.from_json(json.dumps(wire))
+
+
 # --------------------------------------------------------------------------- structured credit
 
 

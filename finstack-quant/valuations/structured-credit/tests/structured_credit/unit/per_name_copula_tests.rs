@@ -107,20 +107,24 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
         .expect("equity"),
     ])
     .expect("structure");
-    let mut sc = StructuredCredit::new_abs(
-        "CLO-PER-NAME",
-        pool,
-        tranches,
-        close(),
-        maturity(),
-        "USD-OIS",
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO-PER-NAME".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
     let deterministic_prepay =
-        StochasticPrepaySpec::deterministic(sc.credit_model.prepayment_spec.clone());
+        StochasticPrepaySpec::Deterministic(sc.credit_model.prepayment_spec.clone());
     sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::gaussian_copula(
         base_cdr,
         correlation,

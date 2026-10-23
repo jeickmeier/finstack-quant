@@ -955,7 +955,7 @@ mod tests {
                 assert!((annuity / notional.amount() - total_fraction).abs() < 1e-14);
                 assert!(
                     (float_pv - expected_float).abs() < 1e-7,
-                    "{start} -> {end}, {compounding}: expected {expected_float}, got {float_pv}"
+                    "{start} -> {end}, {compounding:?}: expected {expected_float}, got {float_pv}"
                 );
                 assert!((total_pv.amount() - float_pv - 0.01 * annuity).abs() < 1e-7);
             }

@@ -13,10 +13,9 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{AmortizationEvent, AssetBackedFacility};
 use crate::structured_credit::{
-    run_simulation_with_diagnostics, CallAssumption, CoverageRules, CoverageTestSpec,
-    EarlyAmortizationSpec, LossAllocationPolicy, MarketConditions, Metadata, ReinvestmentCriteria,
-    ReinvestmentPeriod, SimulationDiagnostics, StructuredCredit, Tranche, TrancheCashflows,
-    TrancheStructure, WaterfallRules,
+    CallAssumption, CoverageRules, CoverageTestSpec, EarlyAmortizationSpec, LossAllocationPolicy,
+    MarketConditions, Metadata, ReinvestmentCriteria, ReinvestmentPeriod, SimulationDiagnostics,
+    StructuredCredit, Tranche, TrancheCashflows, TrancheStructure, WaterfallRules,
 };
 use crate::structured_credit::{TrancheDraw, TrancheReadvance};
 use finstack_quant_cashflows::builder::RateSpec;
@@ -276,7 +275,7 @@ impl AssetBackedFacility {
         as_of: Date,
     ) -> finstack_quant_core::Result<FacilityProjection> {
         let deal = self.synthesized_deal()?;
-        let mut run = run_simulation_with_diagnostics(&deal, market, as_of)?;
+        let mut run = deal.run_simulation(market, as_of)?;
         let facility = run.tranches.remove(FACILITY_TRANCHE_ID).ok_or_else(|| {
             finstack_quant_core::Error::Validation("engine reported no facility class".to_string())
         })?;

@@ -21,7 +21,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations::results::ValuationResult;
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -198,7 +199,7 @@ fn test_100_bond_portfolio_pricing() {
     assert_eq!(portfolio.len(), 100, "Portfolio should contain 100 bonds");
 
     // Step 3: Create metrics registry
-    let metrics_registry = standard_registry();
+    let metrics_registry = STANDARD.metrics();
 
     // Step 4: Price all bonds with full metrics (strict mode)
     let metric_ids = standard_bond_metrics();
@@ -310,7 +311,7 @@ fn test_dataframe_export_metric_keys() {
         pv,
         MetricContext::default_config(),
     );
-    let metrics_registry = standard_registry();
+    let metrics_registry = STANDARD.metrics();
     let computed_metrics = metrics_registry
         .compute(&metric_ids, &mut context)
         .expect("Metrics should compute");

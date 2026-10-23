@@ -251,7 +251,6 @@ impl RangeAccrualMcPricer {
             effective_upper,
             inst.terms.coupon_rate * inst.terms.accrual_year_fraction()?,
             inst.terms.notional.amount(),
-            inst.terms.notional.currency(),
             inst.terms.past_observations_in_range.unwrap_or(0),
             inst.terms.total_past_observations.unwrap_or(0),
         )?
@@ -352,21 +351,6 @@ impl Pricer for RangeAccrualStaticReplicationPricer {
     }
 }
 
-/// Present value using the default static-replication model.
-pub(crate) fn compute_pv(
-    inst: &RangeAccrual,
-    curves: &MarketContext,
-    as_of: Date,
-) -> Result<Money> {
-    if inst.terms.index_id.is_some() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Rate-linked RangeAccrual '{}' cannot use equity static replication",
-            inst.id
-        )));
-    }
-    npv_analytic(inst, curves, as_of)
-}
-
 /// Present value using Static Replication (Analytic).
 ///
 /// Replicates the range accrual as a sum of digital options (binary call spreads).
@@ -376,9 +360,20 @@ pub(crate) fn compute_pv(
 /// - Uses effective bounds based on `BoundsType` (absolute or relative to initial spot)
 /// - Projects in asset currency with quanto drift and discounts in payoff currency
 /// - Includes historical fixings in the accrual calculation for mid-life valuations
-pub fn npv_analytic(inst: &RangeAccrual, market: &MarketContext, as_of: Date) -> Result<Money> {
+pub(crate) fn compute_pv(
+    inst: &RangeAccrual,
+    market: &MarketContext,
+    as_of: Date,
+) -> Result<Money> {
     use finstack_quant_core::math::special_functions::norm_cdf;
     use finstack_quant_models::closed_form::d1_d2_black76;
+
+    if inst.terms.index_id.is_some() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Rate-linked RangeAccrual '{}' cannot use equity static replication",
+            inst.id
+        )));
+    }
 
     let final_date = inst.terms.payment_date.unwrap_or(
         inst.terms
@@ -609,7 +604,7 @@ mod tests {
         inst.terms.past_observations_in_range = None;
         inst.terms.total_past_observations = None;
 
-        let pv = npv_analytic(&inst, &market(as_of), as_of).expect("pv");
+        let pv = compute_pv(&inst, &market(as_of), as_of).expect("pv");
         assert_eq!(pv.amount(), 0.0);
     }
 
@@ -621,8 +616,8 @@ mod tests {
         delayed.terms.payment_date = Some(date(2025, 12, 31));
 
         let curves = market(as_of);
-        let base_pv = npv_analytic(&base, &curves, as_of).expect("base pv");
-        let delayed_pv = npv_analytic(&delayed, &curves, as_of).expect("delayed pv");
+        let base_pv = compute_pv(&base, &curves, as_of).expect("base pv");
+        let delayed_pv = compute_pv(&delayed, &curves, as_of).expect("delayed pv");
 
         assert!(base_pv.amount() > 0.0);
         assert!(delayed_pv.amount() > 0.0);
@@ -640,7 +635,7 @@ mod tests {
         inst.terms.total_past_observations = Some(2);
 
         let curves = market(as_of);
-        let pv = npv_analytic(&inst, &curves, as_of).expect("known unpaid pv");
+        let pv = compute_pv(&inst, &curves, as_of).expect("known unpaid pv");
         let df = curves
             .get_discount(&inst.terms.discount_curve_id)
             .expect("curve")
@@ -663,7 +658,7 @@ mod tests {
         inst.terms.past_observations_in_range = Some(1);
         inst.terms.total_past_observations = Some(1);
 
-        let pv = npv_analytic(&inst, &MarketContext::new(), as_of).expect("settled pv");
+        let pv = compute_pv(&inst, &MarketContext::new(), as_of).expect("settled pv");
         assert_eq!(pv.amount(), 0.0);
     }
 
@@ -698,11 +693,11 @@ mod tests {
             MarketScalar::Price(Money::from((2_i64, Currency::USD))),
         );
 
-        assert!(npv_analytic(&inst, &no_div_market, as_of).is_err());
-        assert!(npv_analytic(&inst, &price_div_market, as_of).is_err());
+        assert!(compute_pv(&inst, &no_div_market, as_of).is_err());
+        assert!(compute_pv(&inst, &price_div_market, as_of).is_err());
         let mut no_div_inst = inst;
         no_div_inst.terms.div_yield_id = None;
-        let pv_explicit_none = npv_analytic(&no_div_inst, &base_market, as_of)
+        let pv_explicit_none = compute_pv(&no_div_inst, &base_market, as_of)
             .expect("explicitly absent dividend yield is zero carry");
         assert!(pv_explicit_none.amount().is_finite());
     }
@@ -721,7 +716,7 @@ mod tests {
             .mc_seed_scenario = Some("stress".to_string());
 
         let direct_analytic =
-            npv_analytic(&without_seed, &curves, as_of).expect("direct static-replication price");
+            compute_pv(&without_seed, &curves, as_of).expect("direct static-replication price");
         let default_without_seed = without_seed
             .price_with_metrics(
                 &curves,
@@ -821,6 +816,9 @@ mod tests {
         let expected = "cannot use equity static replication";
         assert!(direct.to_string().contains(expected));
         assert!(registered.to_string().contains(expected));
+        let settled_kernel = compute_pv(&rate_linked, &MarketContext::new(), date(2100, 1, 1))
+            .expect_err("rate-linked guard must precede the settled-payment shortcut");
+        assert!(settled_kernel.to_string().contains(expected));
     }
 
     fn deterministic_range(as_of: Date) -> RangeAccrual {
@@ -860,7 +858,7 @@ mod tests {
                 .price_internal(&inst, &curves, as_of)
                 .expect("MC")
                 .amount();
-            let analytical = npv_analytic(&inst, &curves, as_of)
+            let analytical = compute_pv(&inst, &curves, as_of)
                 .expect("analytical")
                 .amount();
             assert!((mc - expected).abs() < 1e-8, "{mc} vs {expected}");
@@ -895,7 +893,7 @@ mod tests {
         ] {
             inst.terms.lower_bound = lower;
             inst.terms.upper_bound = upper;
-            let actual = npv_analytic(&inst, &curves, as_of)
+            let actual = compute_pv(&inst, &curves, as_of)
                 .expect("analytical")
                 .amount();
             assert!(
@@ -913,7 +911,7 @@ mod tests {
             .expect("surface");
         inst.terms.lower_bound = 100.0;
         inst.terms.upper_bound = 110.0;
-        let smile_price = npv_analytic(&inst, &curves.clone().insert_surface(smile), as_of)
+        let smile_price = compute_pv(&inst, &curves.clone().insert_surface(smile), as_of)
             .expect("smile price")
             .amount();
         assert!(
@@ -923,7 +921,7 @@ mod tests {
         inst.instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(1e-4);
-        let positive_vol_price = npv_analytic(&inst, &curves, as_of)
+        let positive_vol_price = compute_pv(&inst, &curves, as_of)
             .expect("small vol")
             .amount();
         assert!(positive_vol_price > full_coupon * 0.4 && positive_vol_price < full_coupon * 0.6);
@@ -957,7 +955,7 @@ mod tests {
             .price_internal(&inst, &curves, as_of)
             .expect("MC")
             .amount();
-        let analytical = npv_analytic(&inst, &curves, as_of)
+        let analytical = compute_pv(&inst, &curves, as_of)
             .expect("analytical")
             .amount();
         assert!((mc - expected).abs() < 1e-8, "{mc} vs {expected}");
@@ -1034,7 +1032,7 @@ mod tests {
             let probability = finstack_quant_core::math::special_functions::norm_cdf(z_upper)
                 - finstack_quant_core::math::special_functions::norm_cdf(z_lower);
             let expected = full_coupon * probability;
-            let analytical = npv_analytic(&inst, &curves, as_of)
+            let analytical = compute_pv(&inst, &curves, as_of)
                 .expect("quanto analytical")
                 .amount();
             assert!(
@@ -1075,7 +1073,7 @@ mod tests {
         for (lower, upper) in [(125.0, 135.0), (115.0, 125.0)] {
             inst.terms.lower_bound = lower;
             inst.terms.upper_bound = upper;
-            let actual = npv_analytic(&inst, &curves, as_of)
+            let actual = compute_pv(&inst, &curves, as_of)
                 .expect("dated boundary")
                 .amount();
             assert!(

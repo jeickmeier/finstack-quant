@@ -209,29 +209,12 @@ impl RiemannLiouvilleVolterra {
         self.dt
     }
 
-    /// Extract the per-step unit-variance driving Brownian normals `Z̃_k` from
-    /// an interleaved `normals` input.
-    ///
-    /// The driving Brownian increment over step `k` is `ΔW̃_k = √Δt·Z̃_k`, and
-    /// `Z̃_k` is exactly the first normal of each interleaved pair (the one
-    /// scaled by `l00 = √Δt` to form `ΔW̃_k`). The rBergomi discretization
-    /// correlates the spot Brownian motion against these normals.
-    ///
-    /// `normals` must have length `2·num_steps`; the returned vector has
-    /// length `num_steps`.
+    /// Write per-step unit-variance driving Brownian normals into `out`.
     ///
     /// # Arguments
     ///
-    /// * `normals` - Standard-normal innovations ordered as required by the Volterra kernel.
-    pub fn driving_normals(&self, normals: &[f64]) -> Vec<f64> {
-        debug_assert_eq!(normals.len(), 2 * self.num_steps);
-        (0..self.num_steps).map(|k| normals[2 * k]).collect()
-    }
-
-    /// Write the per-step driving Brownian normals into `out` (length
-    /// `num_steps`). Allocation-free variant of [`driving_normals`].
-    ///
-    /// [`driving_normals`]: Self::driving_normals
+    /// * `normals` - Interleaved standard-normal innovations with length `2 * num_steps`; the first normal of each pair drives the Brownian increment.
+    /// * `out` - Caller-owned output of length `num_steps`, filled in chronological step order without allocation.
     pub fn driving_normals_into(&self, normals: &[f64], out: &mut [f64]) {
         debug_assert_eq!(normals.len(), 2 * self.num_steps);
         debug_assert_eq!(out.len(), self.num_steps);

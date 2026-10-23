@@ -70,9 +70,6 @@ pub struct AutocallablePayoff {
     /// Seed for `min_spot_observed` from past (already observed) fixings of a
     /// seasoned trade. `f64::INFINITY` for a new trade.
     seed_min_spot: f64,
-    /// Seed for `max_spot_observed` from past fixings. `f64::NEG_INFINITY`
-    /// for a new trade.
-    seed_max_spot: f64,
     /// Seed memory-coupon balance from past missed observations.
     seed_memory_coupon_balance: f64,
     /// Seed discounted coupon payoff ratio already fixed but unpaid at `as_of`.
@@ -85,8 +82,6 @@ pub struct AutocallablePayoff {
     next_obs_idx: usize,
     /// Minimum spot observed (for knock-in barriers)
     min_spot_observed: f64,
-    /// Maximum spot observed (for knock-out barriers)
-    max_spot_observed: f64,
     /// Final spot price
     final_spot: f64,
     /// Current accrued memory-coupon balance.
@@ -184,13 +179,11 @@ impl AutocallablePayoff {
             initial_spot,
             payment_df_ratios,
             seed_min_spot: f64::INFINITY,
-            seed_max_spot: f64::NEG_INFINITY,
             seed_memory_coupon_balance: 0.0,
             seed_discounted_coupon_ratio: 0.0,
             autocalled_at: None,
             next_obs_idx: 0,
             min_spot_observed: f64::INFINITY,
-            max_spot_observed: f64::NEG_INFINITY,
             final_spot: 0.0, // Will be set when at maturity
             memory_coupon_balance: 0.0,
             discounted_coupon_ratio: 0.0,
@@ -199,7 +192,9 @@ impl AutocallablePayoff {
 
     /// Seed the payoff with the deterministic state of a seasoned trade.
     ///
-    /// * `prior_min_spot` / `prior_max_spot` — min/max of the observed past
+    /// # Arguments
+    ///
+    /// * `prior_min_spot` — minimum of the observed past
     ///   fixings (discrete knock-in monitoring carries across `as_of`).
     /// * `prior_memory_coupons` — missed coupon balance carried into simulation.
     /// * `discounted_coupon_ratio` — fixed unpaid coupons in expiry-value units.
@@ -207,16 +202,13 @@ impl AutocallablePayoff {
     pub fn with_seasoned_state(
         mut self,
         prior_min_spot: f64,
-        prior_max_spot: f64,
         prior_memory_coupons: f64,
         discounted_coupon_ratio: f64,
     ) -> Self {
         self.seed_min_spot = prior_min_spot;
-        self.seed_max_spot = prior_max_spot;
         self.seed_memory_coupon_balance = prior_memory_coupons;
         self.seed_discounted_coupon_ratio = discounted_coupon_ratio;
         self.min_spot_observed = prior_min_spot;
-        self.max_spot_observed = prior_max_spot;
         self.memory_coupon_balance = prior_memory_coupons;
         self.discounted_coupon_ratio = discounted_coupon_ratio;
         self
@@ -278,12 +270,12 @@ impl Payoff for AutocallablePayoff {
         // Check autocall — and monitor the knock-in barrier — at the discrete
         // observation dates only.
         //
-        // The knock-in barrier (`min_spot_observed` / `max_spot_observed`) is
+        // The knock-in barrier (`min_spot_observed`) is
         // contractually monitored *discretely* at the observation dates (see
         // the `Barrier Monitoring Convention` section of `types.rs`). Updating
         // it on every MC time step would amount to continuous monitoring on a
         // dense grid, which over-counts barrier breaches and mis-prices the
-        // knock-in. Min/max are therefore recorded inside the observation-date
+        // knock-in. The minimum is therefore recorded inside the observation-date
         // loop, one sample per observation date, not once per time step.
         if self.autocalled_at.is_none() {
             const EPS: f64 = 1e-6;
@@ -303,7 +295,6 @@ impl Payoff for AutocallablePayoff {
                 // Discrete knock-in monitoring: record the spot at this
                 // observation date for the final-barrier check.
                 self.min_spot_observed = self.min_spot_observed.min(spot);
-                self.max_spot_observed = self.max_spot_observed.max(spot);
                 let coupon_level = self.initial_spot * self.coupon_barriers[idx];
                 if spot >= coupon_level {
                     let coupon = self.coupons[idx]
@@ -367,7 +358,6 @@ impl Payoff for AutocallablePayoff {
         self.next_obs_idx = 0;
         // Restore deterministic seasoned state for every path.
         self.min_spot_observed = self.seed_min_spot;
-        self.max_spot_observed = self.seed_max_spot;
         self.memory_coupon_balance = self.seed_memory_coupon_balance;
         self.discounted_coupon_ratio = self.seed_discounted_coupon_ratio;
         self.final_spot = 0.0;

@@ -324,14 +324,16 @@ test('bootstrapHullWhiteSigmaScheduleToCapFloors matches the Python bootstrap', 
   const expected = HW.piecewise;
   assert.equal(report.success, expected.success);
   assert.equal(params.kappa, expected.params.kappa);
-  assert.deepEqual(Array.from(params.times), expected.params.volatility.times);
-  params.values.forEach((value, index) =>
-    close(value, expected.params.volatility.values[index], 1e-8, `sigma[${index}]`)
-  );
-  close(params.sigma(1.5), expected.sigma_at_1_5, 1e-8, 'sigma(1.5)');
-  close(params.sigma(0.5), expected.sigma_at_0_5, 1e-8, 'sigma(0.5)');
+  assert.deepEqual(Array.from(params.getTimes()), expected.params.volatility.times);
+  params
+    .getValues()
+    .forEach((value, index) =>
+      close(value, expected.params.volatility.values[index], 1e-8, `sigma[${index}]`)
+    );
+  close(params.getSigma(1.5), expected.sigma_at_1_5, 1e-8, 'sigma(1.5)');
+  close(params.getSigma(0.5), expected.sigma_at_0_5, 1e-8, 'sigma(0.5)');
   const exact = models.rates.hullWhite.HullWhiteParams.fromJson(expected.params);
-  assert.equal(exact.sigma(1.5), expected.sigma_at_1_5);
+  assert.equal(exact.getSigma(1.5), expected.sigma_at_1_5);
   const [explicit] = calibration.bootstrapHullWhiteSigmaScheduleToCapFloors(
     curve,
     JSON.stringify(HW.cap_floor_quotes),

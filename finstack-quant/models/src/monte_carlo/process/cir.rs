@@ -133,15 +133,6 @@ impl CirProcess {
         Self { params }
     }
 
-    /// Create with explicit parameters.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any parameter is invalid (see [`CirParams::new`]).
-    pub fn with_params(kappa: f64, theta: f64, sigma: f64) -> finstack_quant_core::Result<Self> {
-        Ok(Self::new(CirParams::new(kappa, theta, sigma)?))
-    }
-
     /// Get parameters.
     pub fn params(&self) -> &CirParams {
         &self.params
@@ -364,7 +355,9 @@ mod tests {
 
     #[test]
     fn test_cir_plus_plus_shift() {
-        let cir = CirProcess::with_params(0.1, 0.03, 0.05).unwrap();
+        let cir = crate::monte_carlo::process::cir::CirParams::new(0.1, 0.03, 0.05)
+            .map(CirProcess::new)
+            .unwrap();
         let shift_curve = vec![0.01, 0.02];
         let shift_times = vec![0.0, 1.0];
 
@@ -382,7 +375,9 @@ mod tests {
 
     #[test]
     fn test_cir_plus_plus_populates_shifted_short_rate() {
-        let cir = CirProcess::with_params(0.1, 0.03, 0.05).unwrap();
+        let cir = crate::monte_carlo::process::cir::CirParams::new(0.1, 0.03, 0.05)
+            .map(CirProcess::new)
+            .unwrap();
         let cir_pp = CirPlusPlusProcess::new(cir, vec![0.01, 0.02], vec![0.0, 1.0]).unwrap();
         let mut state = PathState::new(1, 1.5);
 
@@ -394,7 +389,9 @@ mod tests {
 
     #[test]
     fn test_cir_plus_plus_dynamics() {
-        let cir = CirProcess::with_params(0.1, 0.03, 0.05).unwrap();
+        let cir = crate::monte_carlo::process::cir::CirParams::new(0.1, 0.03, 0.05)
+            .map(CirProcess::new)
+            .unwrap();
         let cir_pp = CirPlusPlusProcess::with_constant_shift(cir, 0.02).unwrap();
 
         // The state x follows base CIR dynamics
@@ -408,7 +405,11 @@ mod tests {
 
     #[test]
     fn invalid_cir_plus_plus_shift_schedules_are_errors() {
-        let cir = || CirProcess::with_params(0.1, 0.03, 0.05).unwrap();
+        let cir = || {
+            crate::monte_carlo::process::cir::CirParams::new(0.1, 0.03, 0.05)
+                .map(CirProcess::new)
+                .unwrap()
+        };
         assert!(CirPlusPlusProcess::new(cir(), vec![], vec![]).is_err());
         assert!(CirPlusPlusProcess::new(cir(), vec![0.01], vec![0.0, 1.0]).is_err());
         assert!(CirPlusPlusProcess::new(cir(), vec![0.01, 0.02], vec![1.0, 1.0]).is_err());

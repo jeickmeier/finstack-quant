@@ -189,12 +189,13 @@ impl Discretization<CreditLineProcess> for CreditLineDiscretization {
                 // Floating rate: exact Hull-White transition, inlined.
                 //
                 // For HW1F:
-                // r_{t+dt} = r_t e^{-κdt} + θ(1 - e^{-κdt}) + σ√[(1-e^{-2κdt})/(2κ)] Z
-                let kappa = params.kappa;
-                let theta = params.theta_at_time(process.get_params().time_offset + t);
+                // Integrate the piecewise theta schedule across every knot in the step.
+                let kappa = params.model.kappa;
+                let theta_contribution =
+                    params.theta_mean_contribution(process.get_params().time_offset + t, dt);
 
                 let exp_kappa_dt = (-kappa * dt).exp();
-                let mean = x[1] * exp_kappa_dt + theta * (1.0 - exp_kappa_dt);
+                let mean = x[1] * exp_kappa_dt + theta_contribution;
 
                 let std_dev = params
                     .sigma_variance_for_step(process.get_params().time_offset + t, dt)
@@ -209,25 +210,9 @@ impl Discretization<CreditLineProcess> for CreditLineDiscretization {
                 // lengths, strictly increasing finite knots, finite rates), so
                 // interpolation is total and cannot produce non-finite values.
                 let t_total = process.get_params().time_offset + t + dt;
-                let n = times.len();
-                let r = if n == 0 {
-                    0.0
-                } else if t_total <= times[0] {
-                    rates[0]
-                } else if t_total >= times[n - 1] {
-                    rates[n - 1]
-                } else {
-                    let mut i = 1usize;
-                    while i < n && t_total > times[i] {
-                        i += 1;
-                    }
-                    let i1 = i - 1;
-                    let (t1, t2) = (times[i1], times[i]);
-                    let (r1, r2) = (rates[i1], rates[i]);
-                    let w = (t_total - t1) / (t2 - t1);
-                    r1 + w * (r2 - r1)
-                };
-                x[1] = r;
+                x[1] = crate::monte_carlo::process::credit_line::interpolate_rate(
+                    t_total, times, rates,
+                );
             }
         }
 
@@ -254,6 +239,45 @@ mod tests {
         UtilizationParams,
     };
     use crate::monte_carlo::process::ou::HullWhite1FParams;
+
+    #[test]
+    fn floating_rate_step_integrates_theta_knots_on_the_curve_clock() {
+        let kappa = 0.7_f64;
+        let hw = HullWhite1FParams::with_time_dependent_theta(
+            kappa,
+            0.01,
+            vec![0.02, 0.04, 0.03],
+            vec![0.0, 0.4, 0.7],
+        )
+        .expect("valid theta schedule");
+        let params = CreditLineProcessParams::new(
+            UtilizationParams::new(0.5, 0.6, 0.1).expect("utilization"),
+            InterestRateSpec::Floating {
+                params: hw,
+                initial: 0.015,
+            },
+            CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).expect("credit spread"),
+        )
+        .with_time_offset(0.2);
+        let process = CreditLineProcess::new(params);
+        let disc = CreditLineDiscretization::from_process(&process).expect("discretization");
+        let mut x = [0.5, 0.015, 0.015];
+        let mut work = vec![0.0; disc.work_size(&process)];
+        // Path time 0.1 maps to curve time 0.3; the half-year step crosses 0.4 and 0.7.
+        disc.step(&process, 0.1, 0.5, &mut x, &[0.0; 3], &mut work);
+        let weighted_segment = |level: f64, start: f64, end: f64| {
+            level * ((-kappa * (0.8 - end)).exp() - (-kappa * (0.8 - start)).exp())
+        };
+        let expected = 0.015 * (-kappa * 0.5).exp()
+            + weighted_segment(0.02, 0.3, 0.4)
+            + weighted_segment(0.04, 0.4, 0.7)
+            + weighted_segment(0.03, 0.7, 0.8);
+        assert!(
+            (x[1] - expected).abs() < 1e-14,
+            "actual={} expected={expected}",
+            x[1]
+        );
+    }
 
     #[test]
     fn test_discretization_creation() {
@@ -443,7 +467,8 @@ mod tests {
 
         disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
 
-        // Rate should drift toward mean (0.03)
-        assert!(x[1] < 0.04);
+        // A constant theta has the exact OU mean, without step-size bias.
+        let expected = 0.03 + (0.04 - 0.03) * (-0.1_f64 * 0.01).exp();
+        assert!((x[1] - expected).abs() < 1e-14);
     }
 }

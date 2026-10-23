@@ -30,10 +30,10 @@ pub(super) struct DealConfig {
 /// Inputs of [`StructuredCredit::new_standard`], the validated deal-type
 /// constructor the Python and WASM bindings call.
 ///
-/// The fields carry the same meaning as the arguments of
-/// [`StructuredCredit::new_abs`]; `calendar_id` is the optional payment
-/// calendar applied before validation.
-#[derive(Debug, Clone)]
+/// The optional payment calendar is applied before deal validation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct StandardDealParams {
     /// Stable deal identifier used for pricing results and risk labels.
     pub id: InstrumentId,
@@ -43,13 +43,21 @@ pub struct StandardDealParams {
     pub tranches: TrancheStructure,
     /// Contractual deal inception; the first accrual boundary is one registry
     /// payment period later (capped at maturity).
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub closing_date: Date,
     /// Legal final date, strictly after closing.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub maturity: Date,
     /// Market-context discount curve used for tranche PV.
     pub discount_curve_id: CurveId,
-    /// Holiday calendar for payment-date adjustment; `None` leaves payment
-    /// dates unadjusted.
+    /// Optional holiday calendar for payment-date adjustment. Construction accepts
+    /// `None`; simulation requires a calendar before generating payment dates.
     pub calendar_id: Option<CalendarId>,
 }
 
@@ -95,10 +103,19 @@ impl StructuredCredit {
             legal,
         )?;
         let tranches = TrancheStructure::new(vec![tranche])?;
-        Ok(
-            StructuredCredit::new_clo("CLO-EXAMPLE", pool, tranches, closing, legal, "USD-OIS")?
-                .with_calendar_id("nyse"),
-        )
+        Ok(StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-EXAMPLE".into(),
+                pool,
+                tranches,
+                closing_date: closing,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )?
+        .with_calendar_id("nyse"))
     }
 
     /// Internal helper to create structured credit with common fields
@@ -167,9 +184,9 @@ impl StructuredCredit {
     /// Create a validated deal of a standard deal type with its registry
     /// defaults and an optional payment calendar.
     ///
-    /// Dispatches to [`Self::new_abs`], [`Self::new_clo`], [`Self::new_cmbs`] or
-    /// [`Self::new_rmbs`], applies `params.calendar_id`, then runs
-    /// [`Instrument::validate_for_pricing`] so the returned deal is ready to price.
+    /// Selects the registry profile, constructs the deal once, applies
+    /// `params.calendar_id`, then runs [`Instrument::validate_for_pricing`].
+    /// A missing calendar is accepted here; simulation requires one.
     ///
     /// # Arguments
     ///
@@ -197,206 +214,32 @@ impl StructuredCredit {
             discount_curve_id,
             calendar_id,
         } = params;
-        let mut deal = match deal_type {
-            DealType::Abs => Self::new_abs(
-                id,
-                pool,
-                tranches,
-                closing_date,
-                maturity,
-                discount_curve_id,
-            ),
-            DealType::Clo => Self::new_clo(
-                id,
-                pool,
-                tranches,
-                closing_date,
-                maturity,
-                discount_curve_id,
-            ),
-            DealType::Cmbs => Self::new_cmbs(
-                id,
-                pool,
-                tranches,
-                closing_date,
-                maturity,
-                discount_curve_id,
-            ),
-            DealType::Rmbs => Self::new_rmbs(
-                id,
-                pool,
-                tranches,
-                closing_date,
-                maturity,
-                discount_curve_id,
-            ),
-            other => Err(finstack_quant_core::Error::Validation(format!(
+        let profile_id = match deal_type {
+            DealType::Abs => "abs_auto_standard",
+            DealType::Clo => "clo_standard",
+            DealType::Cmbs => "cmbs_standard",
+            DealType::Rmbs => "rmbs_standard",
+            other => {
+                return Err(finstack_quant_core::Error::Validation(format!(
                 "deal type {other:?} has no standard constructor; use the StructuredCredit builder"
-            ))),
-        }?;
+            )))
+            }
+        };
+        let mut deal = Self::new_with_deal_config(
+            id,
+            deal_type,
+            InstrumentParams {
+                pool,
+                tranches,
+                maturity,
+                discount_curve_id: discount_curve_id.as_str(),
+            },
+            deal_config_from_registry(profile_id, closing_date)?,
+            closing_date,
+        );
         deal.calendar_id = calendar_id;
         deal.validate_for_pricing()?;
         Ok(deal)
-    }
-
-    /// Create a new ABS instrument from its building blocks.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Stable deal identifier used for pricing results and risk labels.
-    /// * `pool` - Current collateral balances and contractual asset terms; supply
-    ///   either individual assets or representative lines, in the pool currency.
-    /// * `tranches` - Capital structure, current note balances and coupon terms.
-    /// * `closing_date` - Contractual deal inception; the first accrual boundary
-    ///   is one registry payment period later (capped at maturity). Payment dates
-    ///   are adjusted by the configured calendar during schedule generation.
-    /// * `maturity` - Legal final date, strictly after closing.
-    /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if the first registry payment period exceeds the supported calendar range.
-    pub fn new_abs(
-        id: impl Into<InstrumentId>,
-        pool: AssetPool,
-        tranches: TrancheStructure,
-        closing_date: Date,
-        maturity: Date,
-        discount_curve_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
-        let disc_id: CurveId = discount_curve_id.into();
-        Ok(Self::new_with_deal_config(
-            id,
-            DealType::Abs,
-            InstrumentParams {
-                pool,
-                tranches,
-                maturity,
-                discount_curve_id: disc_id.as_str(),
-            },
-            deal_config_from_registry("abs_auto_standard", closing_date)?,
-            closing_date,
-        ))
-    }
-
-    /// Create a new CLO instrument from its building blocks.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Stable deal identifier used for pricing results and risk labels.
-    /// * `pool` - Current collateral balances and contractual asset terms; supply
-    ///   either individual assets or representative lines, in the pool currency.
-    /// * `tranches` - Capital structure, current note balances and coupon terms.
-    /// * `closing_date` - Contractual deal inception; the first accrual boundary
-    ///   is one registry payment period later (capped at maturity). Payment dates
-    ///   are adjusted by the configured calendar during schedule generation.
-    /// * `maturity` - Legal final date, strictly after closing.
-    /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if the first registry payment period exceeds the supported calendar range.
-    pub fn new_clo(
-        id: impl Into<InstrumentId>,
-        pool: AssetPool,
-        tranches: TrancheStructure,
-        closing_date: Date,
-        maturity: Date,
-        discount_curve_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
-        let disc_id: CurveId = discount_curve_id.into();
-        Ok(Self::new_with_deal_config(
-            id,
-            DealType::Clo,
-            InstrumentParams {
-                pool,
-                tranches,
-                maturity,
-                discount_curve_id: disc_id.as_str(),
-            },
-            deal_config_from_registry("clo_standard", closing_date)?,
-            closing_date,
-        ))
-    }
-
-    /// Create a new CMBS instrument from its building blocks.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Stable deal identifier used for pricing results and risk labels.
-    /// * `pool` - Current collateral balances and contractual asset terms; supply
-    ///   either individual assets or representative lines, in the pool currency.
-    /// * `tranches` - Capital structure, current note balances and coupon terms.
-    /// * `closing_date` - Contractual deal inception; the first accrual boundary
-    ///   is one registry payment period later (capped at maturity). Payment dates
-    ///   are adjusted by the configured calendar during schedule generation.
-    /// * `maturity` - Legal final date, strictly after closing.
-    /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if the first registry payment period exceeds the supported calendar range.
-    pub fn new_cmbs(
-        id: impl Into<InstrumentId>,
-        pool: AssetPool,
-        tranches: TrancheStructure,
-        closing_date: Date,
-        maturity: Date,
-        discount_curve_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
-        let disc_id: CurveId = discount_curve_id.into();
-        Ok(Self::new_with_deal_config(
-            id,
-            DealType::Cmbs,
-            InstrumentParams {
-                pool,
-                tranches,
-                maturity,
-                discount_curve_id: disc_id.as_str(),
-            },
-            deal_config_from_registry("cmbs_standard", closing_date)?,
-            closing_date,
-        ))
-    }
-
-    /// Create a new RMBS instrument from its building blocks.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Stable deal identifier used for pricing results and risk labels.
-    /// * `pool` - Current collateral balances and contractual asset terms; supply
-    ///   either individual assets or representative lines, in the pool currency.
-    /// * `tranches` - Capital structure, current note balances and coupon terms.
-    /// * `closing_date` - Contractual deal inception; the first accrual boundary
-    ///   is one registry payment period later (capped at maturity). Payment dates
-    ///   are adjusted by the configured calendar during schedule generation.
-    /// * `maturity` - Legal final date, strictly after closing.
-    /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if the first registry payment period exceeds the supported calendar range.
-    pub fn new_rmbs(
-        id: impl Into<InstrumentId>,
-        pool: AssetPool,
-        tranches: TrancheStructure,
-        closing_date: Date,
-        maturity: Date,
-        discount_curve_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
-        let disc_id: CurveId = discount_curve_id.into();
-        Ok(Self::new_with_deal_config(
-            id,
-            DealType::Rmbs,
-            InstrumentParams {
-                pool,
-                tranches,
-                maturity,
-                discount_curve_id: disc_id.as_str(),
-            },
-            deal_config_from_registry("rmbs_standard", closing_date)?,
-            closing_date,
-        ))
     }
 }
 

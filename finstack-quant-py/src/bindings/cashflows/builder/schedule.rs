@@ -124,7 +124,7 @@ wire_methods!(
     PyCashFlowMeta,
     CashFlowMeta,
     "CashFlowMeta",
-    stub = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder"
 );
 
 #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule")]
@@ -151,7 +151,7 @@ wire_methods!(
     PyCashFlowSchedule,
     CashFlowSchedule,
     "CashFlowSchedule",
-    stub = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder"
 );
 
 /// Extract one string column of a DataFrame-like object as Python objects.

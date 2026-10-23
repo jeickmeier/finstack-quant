@@ -518,7 +518,11 @@ impl FutureOptionTerms {
                     option_type: self.option_type,
                 };
                 params.validate()?;
-                BinomialTree::leisen_reimer(steps).price_american(&params, &[])
+                BinomialTree::new(
+                    steps,
+                    finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer,
+                )
+                .price_american(&params, &[])
             }
             FutureOptionModel::Normal => {
                 self.additive_american_unit_price(futures_price, volatility, t, rate, steps)

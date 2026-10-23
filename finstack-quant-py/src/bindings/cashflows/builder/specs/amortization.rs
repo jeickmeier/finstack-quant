@@ -34,7 +34,7 @@ wire_methods!(
     PyAmortizationSpec,
     AmortizationSpec,
     "AmortizationSpec",
-    stub = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder"
 );
 
 #[pymethods]
@@ -199,7 +199,7 @@ wire_methods!(
     PyNotional,
     Notional,
     "Notional",
-    stub = "finstack_quant.cashflows.builder",
+    module = "finstack_quant.cashflows.builder",
     validate
 );
 

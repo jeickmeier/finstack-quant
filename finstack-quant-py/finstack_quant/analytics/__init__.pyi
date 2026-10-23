@@ -26,7 +26,7 @@ Examples
 from __future__ import annotations
 
 import datetime
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 import numpy.typing as npt
@@ -369,6 +369,21 @@ class PeriodStats:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class BetaResult:
     """
     Regression beta with confidence interval.
@@ -585,6 +600,21 @@ class BetaResult:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class GreeksResult:
     """
     Alpha, beta, and goodness-of-fit from a single-index regression.
@@ -781,6 +811,21 @@ class GreeksResult:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class RollingGreeks:
     """
     Rolling alpha and beta time series.
@@ -934,6 +979,21 @@ class RollingGreeks:
         Notes
         -----
         This method does not raise; failures degrade to ``None``.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 
@@ -1139,6 +1199,20 @@ class MultiFactorResult:
         ...
 
     def __repr__(self) -> str: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
 
 class DrawdownEpisode:
     """
@@ -1343,6 +1417,21 @@ class DrawdownEpisode:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class LookbackReturns:
     """
     Period-to-date returns for each ticker.
@@ -1519,6 +1608,21 @@ class LookbackReturns:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class DatedSeries:
     """
     Date-indexed numeric series returned by the rolling-window analytics.
@@ -1674,6 +1778,21 @@ class DatedSeries:
         Notes
         -----
         This method does not raise; failures degrade to ``None``.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 
@@ -3526,6 +3645,21 @@ class Performance:
         >>> perf = Performance.from_returns_arrays([date(2024, 1, 1), date(2024, 1, 2)], [[0.01, 0.02]], ["FUND"])
         >>> Performance.from_json(perf.to_json()).get_ticker_names()
         ['FUND']
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 

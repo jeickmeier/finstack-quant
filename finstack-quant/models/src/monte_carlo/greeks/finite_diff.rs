@@ -257,8 +257,7 @@ where
 {
     if inputs.process.dim() != 1 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "finite_diff_delta_from_inputs requires a 1D spot process (process.dim() == 1, got {}); \
-             use finite_diff_delta_state for multi-dimensional processes",
+            "finite_diff_delta_from_inputs requires a 1D spot process (process.dim() == 1, got {})",
             inputs.process.dim()
         )));
     }
@@ -321,8 +320,7 @@ where
 {
     if inputs.process.dim() != 1 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "finite_diff_gamma_from_inputs requires a 1D spot process (process.dim() == 1, got {}); \
-             use finite_diff_gamma_state for multi-dimensional processes",
+            "finite_diff_gamma_from_inputs requires a 1D spot process (process.dim() == 1, got {})",
             inputs.process.dim()
         )));
     }
@@ -581,7 +579,10 @@ mod tests {
     #[test]
     fn paired_greeks_preserve_engine_validation() {
         let rng = PhiloxRng::new(42);
-        let gbm = GbmProcess::with_params(RATE, DIVIDEND_YIELD, VOLATILITY).unwrap();
+        let gbm =
+            crate::monte_carlo::process::gbm::GbmParams::new(RATE, DIVIDEND_YIELD, VOLATILITY)
+                .map(GbmProcess::new)
+                .unwrap();
         let disc = ExactGbm::new();
         for (paths, maturity_step, discount_factor, message) in [
             (0, 1, 1.0, "num_paths"),
@@ -616,7 +617,9 @@ mod tests {
 
         let engine = test_engine(8);
         let rng = PhiloxRng::new(42);
-        let process = GbmWithDividends::with_params(RATE, 0.0, VOLATILITY, vec![]).unwrap();
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(RATE, 0.0, VOLATILITY)
+            .and_then(|params| GbmWithDividends::new(params, vec![]))
+            .unwrap();
         let disc = EulerMaruyama::new();
         let payoff = European::new(OptionType::Call, STRIKE, 1.0, 1);
         let inputs = FiniteDiffInputs {
@@ -643,7 +646,10 @@ mod tests {
                 .antithetic(true),
         );
         let rng = PhiloxRng::new(42);
-        let process = GbmProcess::with_params(RATE, DIVIDEND_YIELD, VOLATILITY).unwrap();
+        let process =
+            crate::monte_carlo::process::gbm::GbmParams::new(RATE, DIVIDEND_YIELD, VOLATILITY)
+                .map(GbmProcess::new)
+                .unwrap();
         let disc = ExactGbm::new();
         let payoff = European::new(OptionType::Call, STRIKE, 1.0, 1);
         let inputs = FiniteDiffInputs {

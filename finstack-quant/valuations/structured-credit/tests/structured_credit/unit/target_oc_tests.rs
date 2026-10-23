@@ -11,8 +11,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, AssetType, DealType, PoolAsset, SimulationRun,
-    StructuredCredit, TargetOcSpec, Tranche, TrancheStructure, WaterfallRules,
+    AssetPool, AssetType, DealType, PoolAsset, SimulationRun, StructuredCredit, TargetOcSpec,
+    Tranche, TrancheStructure, WaterfallRules,
 };
 use time::Month;
 
@@ -83,13 +83,17 @@ fn auto_abs(senior: f64) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal = StructuredCredit::new_abs(
-        "ABS-TARGET-OC",
-        pool,
-        tranches,
-        close(),
-        maturity(),
-        "USD-OIS",
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-TARGET-OC".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -107,7 +111,7 @@ fn auto_abs(senior: f64) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit) -> SimulationRun {
-    run_simulation_with_diagnostics(deal, &market(), close()).expect("simulation")
+    deal.run_simulation(&market(), close()).expect("simulation")
 }
 
 fn on(run: &SimulationRun, id: &str, date: Date) -> (f64, f64) {

@@ -155,7 +155,15 @@ fn b5_default_sabr_calibration_controls_relative_quote_error() {
         let max_relative = strikes
             .iter()
             .zip(&quotes)
-            .map(|(&k, &v)| (fitted.implied_vol(forward, k, 2.0).expect("fit quote") - v).abs() / v)
+            .map(|(&k, &v)| {
+                (fitted
+                    .parameters
+                    .implied_vol(forward, k, 2.0)
+                    .expect("fit quote")
+                    - v)
+                    .abs()
+                    / v
+            })
             .fold(0.0_f64, f64::max);
         assert!(
             max_relative <= 1e-4,

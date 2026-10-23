@@ -227,8 +227,7 @@ Decides cash versus PIK at each coupon date.
 
 Constructors `ToggleExerciseModel::threshold(variable, threshold, direction)`,
 `::stochastic(variable, intercept, sensitivity)` and
-`::optimal(nested_paths, equity_discount_rate, asset_vol, risk_free_rate,
-horizon)` return `Result` and reject non-finite parameters (and, for
+`::optimal(nested_paths, asset_vol, risk_free_rate, horizon)` return `Result` and reject non-finite parameters (and, for
 `optimal`, zero paths, a negative volatility or a non-positive horizon).
 `CreditState::new(...)` likewise rejects non-finite values.
 
@@ -254,10 +253,10 @@ The optimal model simulates `nested_paths` GBM paths over `horizon` at
 `NESTED_STEPS_PER_YEAR = 12` steps per year with first-passage barrier checks
 under both scenarios, and elects PIK when the estimated equity value under PIK
 exceeds that under cash. A liquidity early-exit guard forces PIK when paying
-cash would itself breach the default barrier. The nested simulation drifts
-under the risk-neutral measure but discounts at `equity_discount_rate`, so the
-intermediate equity figures are decision inputs, not measure-consistent prices;
-the rate cancels in the comparison and does not bias the elected branch.
+cash would itself breach the default barrier. The nested simulation uses the same risk-neutral GBM draws for both branches
+and compares undiscounted terminal payoff sums. The common discount factor
+and path-count normalization cancel in the comparison; omitting them avoids
+numerical underflow ties. The sums are decision inputs, not published equity prices.
 
 ## Market-anchored credit volatility (`market_anchored.rs`)
 
