@@ -725,7 +725,6 @@
       "days30360",
       "days30e360Isda",
       "daysSinceEpoch",
-      "diagonalTolerance",
       "embeddedRegistry",
       "endOfMonth",
       "erf",
@@ -747,7 +746,6 @@
       "lnGamma",
       "logNormCdf",
       "logReturns",
-      "longestPositiveRun",
       "mean",
       "meanOrNan",
       "meanVar",
@@ -780,12 +778,10 @@
       "schema",
       "scorecardScaleTryNew",
       "sifmaSettlementDate",
-      "singularThreshold",
       "standardNormalInvCdf",
       "studentTCdf",
       "studentTInvCdf",
       "symmetricEigen",
-      "symmetryTolerance",
       "thirdFriday",
       "thirdWednesday",
       "toleranceConfigNew",
@@ -1641,15 +1637,6 @@
   "core.ledoitWolfShrinkage": {
     "kind": "function"
   },
-  "core.singularThreshold": {
-    "kind": "function"
-  },
-  "core.diagonalTolerance": {
-    "kind": "function"
-  },
-  "core.symmetryTolerance": {
-    "kind": "function"
-  },
   "core.mean": {
     "kind": "function"
   },
@@ -1735,9 +1722,6 @@
     "kind": "function"
   },
   "core.neumaierSum": {
-    "kind": "function"
-  },
-  "core.longestPositiveRun": {
     "kind": "function"
   },
   "core.cashFlowGetBalanceDate": {

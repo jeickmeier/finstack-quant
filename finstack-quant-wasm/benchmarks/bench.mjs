@@ -843,10 +843,6 @@ async function main() {
     returnPerf.calmar();
   });
 
-  bench('core', 'longestPositiveRun', 8000, () => {
-    w.longestPositiveRun(statsArr);
-  });
-
   const gaussCop = w.CopulaSpec.gaussian().build();
   bench('correlation', 'Copula gaussian + conditionalDefaultProb', 15000, () => {
     gaussCop.conditionalDefaultProb(-0.5, [0.1], 0.25);

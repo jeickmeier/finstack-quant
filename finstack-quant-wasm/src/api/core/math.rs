@@ -309,14 +309,6 @@ pub fn neumaier_sum(values: JsValue) -> Result<f64, JsValue> {
     Ok(summation::neumaier_sum(values.iter().copied()))
 }
 
-/// Count the longest consecutive run of strictly positive values in a typed array.
-/// @param values - Finite numeric terms in summation or scan order.
-/// @returns Length of the longest run of strictly positive observations.
-#[wasm_bindgen(js_name = longestPositiveRun)]
-pub fn longest_positive_run(values: JsValue) -> Result<usize, JsValue> {
-    let values: &[f64] = &js_f64_seq(&values, "values")?;
-    Ok(stats::longest_positive_run(values))
-}
 /// Symmetric eigendecomposition of a flat row-major matrix (Rust `symmetric_eigen`).
 ///
 /// # Arguments
@@ -373,32 +365,6 @@ pub fn ledoit_wolf_shrinkage(
         &js_sys::Float64Array::from(result.covariance.as_slice()),
         &JsValue::from_f64(result.shrinkage),
     ))
-}
-
-/// Pivot threshold below which Cholesky treats a matrix as singular (Rust
-/// `linalg::SINGULAR_THRESHOLD`).
-///
-/// @returns The absolute pivot threshold.
-#[wasm_bindgen(js_name = singularThreshold)]
-pub fn singular_threshold() -> f64 {
-    linalg::SINGULAR_THRESHOLD
-}
-
-/// Tolerance on the unit diagonal of a correlation matrix (Rust
-/// `linalg::DIAGONAL_TOLERANCE`).
-///
-/// @returns The absolute tolerance on `|diagonal - 1|`.
-#[wasm_bindgen(js_name = diagonalTolerance)]
-pub fn diagonal_tolerance() -> f64 {
-    linalg::DIAGONAL_TOLERANCE
-}
-
-/// Tolerance on the symmetry of a matrix (Rust `linalg::SYMMETRY_TOLERANCE`).
-///
-/// @returns The absolute tolerance on `|a[i][j] - a[j][i]|`.
-#[wasm_bindgen(js_name = symmetryTolerance)]
-pub fn symmetry_tolerance() -> f64 {
-    linalg::SYMMETRY_TOLERANCE
 }
 
 /// Mean and sample variance in one pass (Rust `stats::mean_var`).

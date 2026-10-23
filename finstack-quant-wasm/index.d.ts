@@ -7969,12 +7969,6 @@ export interface CoreNamespace {
    */
   neumaierSum(values: NumericArray): number;
   /**
-   * Count the longest consecutive run of strictly positive values in a typed array.
-   * @param values - Finite numeric terms in summation or scan order.
-   * @returns Length of the longest run of strictly positive observations.
-   */
-  longestPositiveRun(values: NumericArray): number;
-  /**
    * Agency credit rating on the 23-step scale (`new core.CreditRating("BBB-")`).
    */
   CreditRating: CreditRatingConstructor;
@@ -8375,26 +8369,6 @@ export interface CoreNamespace {
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `t < 2`, `n == 0`, an entry is non-finite, or `observations` does not hold exactly `t * n` entries.
    */
   ledoitWolfShrinkage(observations: NumericArray, t: number, n: number): [Float64Array, number];
-  /**
-   * Pivot threshold below which Cholesky treats a matrix as singular (Rust
-   * `linalg::SINGULAR_THRESHOLD`).
-   *
-   * @returns The absolute pivot threshold.
-   */
-  singularThreshold(): number;
-  /**
-   * Tolerance on the unit diagonal of a correlation matrix (Rust
-   * `linalg::DIAGONAL_TOLERANCE`).
-   *
-   * @returns The absolute tolerance on `|diagonal - 1|`.
-   */
-  diagonalTolerance(): number;
-  /**
-   * Tolerance on the symmetry of a matrix (Rust `linalg::SYMMETRY_TOLERANCE`).
-   *
-   * @returns The absolute tolerance on `|a[i][j] - a[j][i]|`.
-   */
-  symmetryTolerance(): number;
   /**
    * Mean and sample variance in one pass (Rust `stats::mean_var`).
    *

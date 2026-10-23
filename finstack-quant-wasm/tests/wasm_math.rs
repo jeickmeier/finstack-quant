@@ -98,10 +98,6 @@ fn summation_and_positive_run() {
         (neumaier_sum(JsValue::from([1e16, 1.0, -1e16, 1.0].to_vec())).unwrap() - 2.0).abs()
             < 1e-10
     );
-    assert_eq!(
-        longest_positive_run(JsValue::from([1.0, 2.0, 3.0, -1.0, 2.0].to_vec())).unwrap(),
-        3
-    );
 }
 
 #[wasm_bindgen_test]

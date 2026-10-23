@@ -83,7 +83,7 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 
 | Path | What it is |
 |------|------------|
-| `math::stats` | `mean`, `variance`, `correlation`, `covariance`, `quantile`, NaN-tolerant `*_or_nan` variants, streaming `OnlineStats`/`OnlineCovariance`, realized-variance estimators, `longest_positive_run`. |
+| `math::stats` | `mean`, `variance`, `correlation`, `covariance`, `quantile`, NaN-tolerant `*_or_nan` variants, streaming `OnlineStats`/`OnlineCovariance`, realized-variance estimators. |
 | `math::summation` | `kahan_sum`, `neumaier_sum`, `NeumaierAccumulator`. |
 | `math::special_functions` | `norm_cdf`, `norm_pdf`, `erf`, `ln_gamma`, `standard_normal_inv_cdf`, Student-t CDF/inverse. |
 | `math::linalg` | Cholesky (`cholesky_decomposition`, `cholesky_correlation`), `symmetric_eigen`, correlation-matrix construction and validation. |

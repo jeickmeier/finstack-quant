@@ -353,24 +353,6 @@ fn realized_variance_ohlc(
     .map_err(core_to_py)
 }
 
-/// Length of the longest run of strictly positive values.
-///
-/// Zero, negative and NaN values reset the run; an empty series yields ``0``.
-///
-/// # Arguments
-///
-/// * `values` - Ordered one-dimensional numeric sequence or float64 NumPy array, including strided views.
-///
-/// # Errors
-///
-/// Raises `TypeError` when a series is not one-dimensional or contains non-numeric values.
-#[pyfunction]
-#[pyo3(text_signature = "(values)")]
-fn longest_positive_run(py: Python<'_>, values: &Bound<'_, PyAny>) -> PyResult<usize> {
-    let values = extract_series(values)?;
-    Ok(py.detach(|| stats::longest_positive_run(&values)))
-}
-
 /// Build the `finstack_quant.core.math.stats` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "stats")?;
@@ -385,7 +367,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(finite_max_or_nan, &m)?)?;
     m.add_function(wrap_pyfunction!(finite_min_or_nan, &m)?)?;
     m.add_function(wrap_pyfunction!(log_returns, &m)?)?;
-    m.add_function(wrap_pyfunction!(longest_positive_run, &m)?)?;
     m.add_function(wrap_pyfunction!(mean, &m)?)?;
     m.add_function(wrap_pyfunction!(mean_or_nan, &m)?)?;
     m.add_function(wrap_pyfunction!(mean_var, &m)?)?;
@@ -407,7 +388,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "finite_max_or_nan",
             "finite_min_or_nan",
             "log_returns",
-            "longest_positive_run",
             "mean",
             "mean_or_nan",
             "mean_var",
