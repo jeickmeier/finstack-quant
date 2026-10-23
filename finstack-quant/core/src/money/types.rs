@@ -64,13 +64,13 @@ fn group_thousands(int_str: &str, sep: char) -> String {
 pub struct FormatOpts {
     /// Number of fractional digits. `None` means "use currency default" (from
     /// [`Currency::decimals`]).
-    pub decimals: Option<usize>,
+    decimals: Option<usize>,
     /// Whether to prepend the ISO-4217 currency code.
-    pub show_currency: bool,
+    show_currency: bool,
     /// Optional thousands separator (e.g., `Some(',')`). `None` disables grouping.
-    pub group: Option<char>,
+    group: Option<char>,
     /// Rounding mode for the displayed value.
-    pub rounding: RoundingMode,
+    rounding: RoundingMode,
 }
 
 impl Default for FormatOpts {
@@ -122,8 +122,7 @@ impl FormatOpts {
     ///
     /// let opts = FormatOpts::new(Some(2), Some(true), Some(","), Some(RoundingMode::Bankers))
     ///     .expect("bounded precision");
-    /// assert_eq!(opts.decimals, Some(2));
-    /// assert_eq!(opts.group, Some(','));
+    /// # let _ = opts;
     /// assert!(FormatOpts::new(None, None, Some(", "), None).is_err());
     /// ```
     pub fn new(
