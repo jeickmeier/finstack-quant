@@ -131,7 +131,7 @@ pub use daycount::{
     Thirty360Convention,
 };
 
-pub(crate) use calendar::business_days::canonical_calendar_id;
+pub use calendar::business_days::canonical_calendar_id;
 pub use calendar::business_days::{
     adjust, available_calendars, calendar_by_id_strict, resolve_calendar, resolve_joint_calendar,
     BusinessDayConvention, CalendarMetadata, HolidayCalendar,

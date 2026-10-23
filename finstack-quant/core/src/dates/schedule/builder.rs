@@ -539,8 +539,8 @@ fn build_payment_and_fixing_dates(
         if let (Some(conv), Some(cal)) = (conv, cal) {
             pay = adjust(pay, conv, cal)?;
         }
-        if payment_lag != 0 {
-            let cal = cal.ok_or(InputError::ScheduleLagRequiresCalendar)?;
+        // `needs_calendar` above guarantees a calendar whenever a lag is set.
+        if let Some(cal) = cal.filter(|_| payment_lag != 0) {
             pay = pay.add_business_days(payment_lag, cal)?;
         }
         payment_dates.push(pay);
@@ -549,11 +549,9 @@ fn build_payment_and_fixing_dates(
     let fixing_dates = if let Some(lag) = fixing_lag {
         let mut out = Vec::with_capacity(n_periods);
         for start in dates.windows(2).map(|window| window[0]) {
-            let fix = if lag == 0 {
-                start
-            } else {
-                let cal = cal.ok_or(InputError::ScheduleLagRequiresCalendar)?;
-                start.add_business_days(-lag, cal)?
+            let fix = match cal {
+                Some(cal) if lag != 0 => start.add_business_days(-lag, cal)?,
+                _ => start,
             };
             out.push(fix);
         }
