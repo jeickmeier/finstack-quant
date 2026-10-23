@@ -98,7 +98,7 @@ impl ParsedInstrument {
         instrument: InstrumentJson,
         metric_pricing_overrides: Option<&str>,
     ) -> finstack_quant_core::Result<Self> {
-        Self::from_instrument(instrument.into_boxed_unchecked()?, metric_pricing_overrides)
+        Self::from_instrument(instrument.into_boxed_unchecked(), metric_pricing_overrides)
     }
 
     /// Borrow the validated instrument trait object.
@@ -470,12 +470,13 @@ pub fn parse_boxed_instruments_from_json(
 ) -> finstack_quant_core::Result<Vec<Box<dyn Instrument>>> {
     let limits = LoadLimits::default().with_max_bytes(MAX_JSON_BYTES);
     let value = parse_json_value(json.as_bytes(), &limits).map_err(instrument_load_error)?;
-    let values = value.as_array().ok_or_else(|| {
-        Error::Validation("invalid instrument envelope JSON: expected array".into())
-    })?;
+    let Value::Array(values) = value else {
+        return Err(Error::Validation(
+            "invalid instrument envelope JSON: expected array".into(),
+        ));
+    };
     values
-        .iter()
-        .cloned()
+        .into_iter()
         .map(|value| {
             InstrumentEnvelope::decode_value(value, &limits)
                 .map_err(instrument_load_error)?
