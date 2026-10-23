@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
@@ -594,10 +594,10 @@ class TestBuilderSpecs:
 
         psa = PrepaymentModelSpec.psa(1.0)
         assert psa.smm(30) > psa.smm(1)
-        assert PrepaymentModelSpec.constant_cpr(0.06).curve["cpr"] == pytest.approx(0.06)
+        assert PrepaymentModelSpec.constant_cpr(0.06).to_dict()["cpr"] == pytest.approx(0.06)
         sda = DefaultModelSpec.sda(1.0)
         assert sda.mdr(30) > sda.mdr(1)
-        assert DefaultModelSpec.constant_cdr(0.02).curve["cdr"] == pytest.approx(0.02)
+        assert DefaultModelSpec.constant_cdr(0.02).to_dict()["cdr"] == pytest.approx(0.02)
         rec = RecoveryModelSpec(rate=0.40, recovery_lag=12)
         rec.validate()
         assert rec.recovery_lag == 12
@@ -1673,3 +1673,49 @@ def test_floating_rate_valid_equal_bounds_preserve_json_and_pickle() -> None:
     assert FloatingRateSpec.from_json(spec.to_json()).to_json() == spec.to_json()
     restored = pickle.loads(pickle.dumps(spec))  # noqa: S301 - locally serialized test fixture
     assert restored.to_json() == spec.to_json()
+
+
+class _ListColumn:
+    def __init__(self, values: list) -> None:
+        self._values = values
+
+    def tolist(self) -> list:
+        return list(self._values)
+
+
+class _RaggedFrame:
+    """Duck-typed frame whose ``amount`` column is shorter than ``date``."""
+
+    columns: ClassVar[list[str]] = ["date", "amount", "currency", "kind", "accrual_factor"]
+
+    def __init__(self) -> None:
+        self._values = {
+            "date": [dt.date(2025, 6, 1), dt.date(2025, 12, 1)],
+            "amount": [1.0],
+            "currency": ["USD", "USD"],
+            "kind": ["fixed", "fixed"],
+            "accrual_factor": [0.5, 0.5],
+        }
+
+    def __getitem__(self, name: str) -> _ListColumn:
+        return _ListColumn(self._values[name])
+
+
+class TestValidationAndLabels:
+    def test_spec_constructors_reject_invalid_inputs(self) -> None:
+        from finstack_quant.cashflows.builder import Notional, RecoveryModelSpec
+
+        # Construction validates the same way unpickling does, so an invalid
+        # spec never reaches a pickle round trip.
+        with pytest.raises(ValueError, match="rate"):
+            RecoveryModelSpec(1.5, 0)
+        with pytest.raises(ValueError, match="notional"):
+            Notional.par(-1.0, "USD")
+
+    def test_ragged_dataframe_columns_raise_value_error(self) -> None:
+        from finstack_quant.cashflows.builder import CashFlowSchedule, Notional
+        from finstack_quant.core.dates import DayCount
+
+        frame = _RaggedFrame()
+        with pytest.raises(ValueError, match="column 'amount' has 1 rows, expected 2"):
+            CashFlowSchedule.from_flows(frame, Notional.par(1000.0, "USD"), DayCount.ACT_360)

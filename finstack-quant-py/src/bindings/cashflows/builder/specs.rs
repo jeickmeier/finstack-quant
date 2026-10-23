@@ -1350,18 +1350,8 @@ impl PyAmortizationSpec {
     /// ``"percent_of_remaining_per_period"``, ``"linear_between"`` or
     /// ``"custom_principal"``.
     #[getter]
-    fn kind(&self) -> &'static str {
-        match self.inner {
-            AmortizationSpec::None => "none",
-            AmortizationSpec::LinearTo { .. } => "linear_to",
-            AmortizationSpec::StepRemaining { .. } => "step_remaining",
-            AmortizationSpec::PercentOfOriginalPerPeriod { .. } => "percent_of_original_per_period",
-            AmortizationSpec::PercentOfRemainingPerPeriod { .. } => {
-                "percent_of_remaining_per_period"
-            }
-            AmortizationSpec::LinearBetween { .. } => "linear_between",
-            AmortizationSpec::CustomPrincipal { .. } => "custom_principal",
-        }
+    fn kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
     /// Target notional for ``linear_to``, else ``None``.
@@ -1466,13 +1456,13 @@ impl PyNotional {
     /// Construct a notional; see the class docstring for parameters.
     #[new]
     #[pyo3(signature = (initial, amort=None), text_signature = "(initial, amort=None)")]
-    fn new(initial: PyMoney, amort: Option<PyRef<'_, PyAmortizationSpec>>) -> Self {
-        Self {
-            inner: Notional {
-                initial: initial.inner,
-                amort: amort.map_or(AmortizationSpec::None, |a| a.inner.clone()),
-            },
-        }
+    fn new(initial: PyMoney, amort: Option<PyRef<'_, PyAmortizationSpec>>) -> PyResult<Self> {
+        let inner = Notional {
+            initial: initial.inner,
+            amort: amort.map_or(AmortizationSpec::None, |a| a.inner.clone()),
+        };
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Plain (non-amortising) notional helper.
@@ -1502,10 +1492,10 @@ impl PyNotional {
     #[staticmethod]
     #[pyo3(text_signature = "(amount, currency)")]
     fn par(amount: f64, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self {
-            inner: Notional::par(amount, extract_currency(currency)?)
-                .map_err(crate::errors::core_to_py)?,
-        })
+        let inner = Notional::par(amount, extract_currency(currency)?)
+            .map_err(crate::errors::core_to_py)?;
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Initial principal amount.
@@ -1608,11 +1598,8 @@ impl PyFeeBase {
 
     /// Variant label: ``"drawn"`` or ``"undrawn"``.
     #[getter]
-    fn kind(&self) -> &'static str {
-        match self.inner {
-            FeeBase::Drawn => "drawn",
-            FeeBase::Undrawn { .. } => "undrawn",
-        }
+    fn kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
     /// Facility limit for ``undrawn`` bases, else ``None``.
@@ -1730,11 +1717,8 @@ impl PyFeeSpec {
 
     /// Variant label: ``"fixed"`` or ``"periodic_bp"``.
     #[getter]
-    fn kind(&self) -> &'static str {
-        match self.inner {
-            FeeSpec::Fixed { .. } => "fixed",
-            FeeSpec::PeriodicBp { .. } => "periodic_bp",
-        }
+    fn kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
     /// Payment date of a fixed fee, else ``None``.
@@ -1871,28 +1855,28 @@ impl PyPrepaymentModelSpec {
     /// Constant CPR (no seasoning curve).
     #[staticmethod]
     #[pyo3(text_signature = "(cpr)")]
-    fn constant_cpr(cpr: f64) -> Self {
-        Self {
-            inner: PrepaymentModelSpec::constant_cpr(cpr),
-        }
+    fn constant_cpr(cpr: f64) -> PyResult<Self> {
+        let inner = PrepaymentModelSpec::constant_cpr(cpr);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// PSA curve with speed multiplier (1.0 = 100% PSA).
     #[staticmethod]
     #[pyo3(text_signature = "(speed_multiplier)")]
-    fn psa(speed_multiplier: f64) -> Self {
-        Self {
-            inner: PrepaymentModelSpec::psa(speed_multiplier),
-        }
+    fn psa(speed_multiplier: f64) -> PyResult<Self> {
+        let inner = PrepaymentModelSpec::psa(speed_multiplier);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// CMBS lockout: zero prepayment for ``lockout_months``, then constant CPR.
     #[staticmethod]
     #[pyo3(text_signature = "(lockout_months, post_lockout_cpr)")]
-    fn cmbs_with_lockout(lockout_months: u32, post_lockout_cpr: f64) -> Self {
-        Self {
-            inner: PrepaymentModelSpec::cmbs_with_lockout(lockout_months, post_lockout_cpr),
-        }
+    fn cmbs_with_lockout(lockout_months: u32, post_lockout_cpr: f64) -> PyResult<Self> {
+        let inner = PrepaymentModelSpec::cmbs_with_lockout(lockout_months, post_lockout_cpr);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// ABS convention: ``speed`` percent of the ORIGINAL balance prepays each
@@ -1900,20 +1884,20 @@ impl PyPrepaymentModelSpec {
     /// ABS).
     #[staticmethod]
     #[pyo3(text_signature = "(speed)")]
-    fn abs(speed: f64) -> Self {
-        Self {
-            inner: PrepaymentModelSpec::abs(speed),
-        }
+    fn abs(speed: f64) -> PyResult<Self> {
+        let inner = PrepaymentModelSpec::abs(speed);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Explicit monthly CPR vector (annual decimals, one entry per seasoning
     /// month); the last entry extends to maturity.
     #[staticmethod]
     #[pyo3(text_signature = "(monthly_cpr)")]
-    fn vector(monthly_cpr: Vec<f64>) -> Self {
-        Self {
-            inner: PrepaymentModelSpec::vector(monthly_cpr),
-        }
+    fn vector(monthly_cpr: Vec<f64>) -> PyResult<Self> {
+        let inner = PrepaymentModelSpec::vector(monthly_cpr);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Validate the curve shape (finite, non-negative rates in range).
@@ -1928,9 +1912,8 @@ impl PyPrepaymentModelSpec {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Active prepayment model and its parameters in the canonical JSON wire form.
-    #[getter]
-    fn curve<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Active prepayment model and its parameters as a dict in the canonical wire form.
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
@@ -1983,29 +1966,29 @@ impl PyDefaultModelSpec {
     /// Constant CDR (no seasoning curve).
     #[staticmethod]
     #[pyo3(text_signature = "(cdr)")]
-    fn constant_cdr(cdr: f64) -> Self {
-        Self {
-            inner: DefaultModelSpec::constant_cdr(cdr),
-        }
+    fn constant_cdr(cdr: f64) -> PyResult<Self> {
+        let inner = DefaultModelSpec::constant_cdr(cdr);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// SDA curve with speed multiplier (1.0 = 100% SDA).
     #[staticmethod]
     #[pyo3(text_signature = "(speed_multiplier)")]
-    fn sda(speed_multiplier: f64) -> Self {
-        Self {
-            inner: DefaultModelSpec::sda(speed_multiplier),
-        }
+    fn sda(speed_multiplier: f64) -> PyResult<Self> {
+        let inner = DefaultModelSpec::sda(speed_multiplier);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Explicit monthly CDR vector (annual decimals, one entry per seasoning
     /// month); the last entry extends to maturity.
     #[staticmethod]
     #[pyo3(text_signature = "(monthly_cdr)")]
-    fn vector(monthly_cdr: Vec<f64>) -> Self {
-        Self {
-            inner: DefaultModelSpec::vector(monthly_cdr),
-        }
+    fn vector(monthly_cdr: Vec<f64>) -> PyResult<Self> {
+        let inner = DefaultModelSpec::vector(monthly_cdr);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Cumulative net-loss curve: ``cumulative_net_loss_pct`` is the
@@ -2014,10 +1997,10 @@ impl PyDefaultModelSpec {
     /// decimal; defaults are the loss increments grossed up by severity.
     #[staticmethod]
     #[pyo3(text_signature = "(cumulative_net_loss_pct, severity)")]
-    fn cumulative_loss(cumulative_net_loss_pct: Vec<f64>, severity: f64) -> Self {
-        Self {
-            inner: DefaultModelSpec::cumulative_loss(cumulative_net_loss_pct, severity),
-        }
+    fn cumulative_loss(cumulative_net_loss_pct: Vec<f64>, severity: f64) -> PyResult<Self> {
+        let inner = DefaultModelSpec::cumulative_loss(cumulative_net_loss_pct, severity);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Default-timing curve: ``cumulative_default_rate`` is the lifetime
@@ -2025,10 +2008,10 @@ impl PyDefaultModelSpec {
     /// percent of it realized in each year of seasoning (sums to 100).
     #[staticmethod]
     #[pyo3(text_signature = "(cumulative_default_rate, annual_pct)")]
-    fn timing(cumulative_default_rate: f64, annual_pct: Vec<f64>) -> Self {
-        Self {
-            inner: DefaultModelSpec::timing(cumulative_default_rate, annual_pct),
-        }
+    fn timing(cumulative_default_rate: f64, annual_pct: Vec<f64>) -> PyResult<Self> {
+        let inner = DefaultModelSpec::timing(cumulative_default_rate, annual_pct);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Validate the curve shape.
@@ -2043,9 +2026,8 @@ impl PyDefaultModelSpec {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Active default model and its parameters in the canonical JSON wire form.
-    #[getter]
-    fn curve<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Active default model and its parameters as a dict in the canonical wire form.
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
@@ -2144,10 +2126,10 @@ impl PyRecoveryModelSpec {
     /// Construct a recovery model; see the class docstring for parameters.
     #[new]
     #[pyo3(text_signature = "(rate, recovery_lag)")]
-    fn new(rate: f64, recovery_lag: u32) -> Self {
-        Self {
-            inner: RecoveryModelSpec::with_lag(rate, recovery_lag),
-        }
+    fn new(rate: f64, recovery_lag: u32) -> PyResult<Self> {
+        let inner = RecoveryModelSpec::with_lag(rate, recovery_lag);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Recovery rate as a fraction.
@@ -2176,10 +2158,10 @@ impl PyRecoveryModelSpec {
     /// RecoveryModelSpec
     ///     A new spec with the vector attached.
     #[pyo3(text_signature = "(self, severity_vector)")]
-    fn with_severity_vector(&self, severity_vector: Vec<f64>) -> Self {
-        Self {
-            inner: self.inner.clone().with_severity_vector(severity_vector),
-        }
+    fn with_severity_vector(&self, severity_vector: Vec<f64>) -> PyResult<Self> {
+        let inner = self.inner.clone().with_severity_vector(severity_vector);
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Severity vector by seasoning month, or ``None`` when only ``rate``

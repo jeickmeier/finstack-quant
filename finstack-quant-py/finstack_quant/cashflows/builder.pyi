@@ -1812,7 +1812,7 @@ class DefaultModelSpec:
     Examples
     --------
     >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-    >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
+    >>> DefaultModelSpec.constant_cdr(0.02).to_dict()["cdr"]
     0.02
     """
 
@@ -1838,7 +1838,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
+        >>> DefaultModelSpec.constant_cdr(0.02).to_dict()["cdr"]
         0.02
         """
         ...
@@ -1894,7 +1894,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> DefaultModelSpec.vector([0.01, 0.02]).curve["monthly_cdr"]
+        >>> DefaultModelSpec.vector([0.01, 0.02]).to_dict()["monthly_cdr"]
         [0.01, 0.02]
         """
         ...
@@ -1926,7 +1926,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> DefaultModelSpec.cumulative_loss([1.0, 2.0], 0.5).curve["severity"]
+        >>> DefaultModelSpec.cumulative_loss([1.0, 2.0], 0.5).to_dict()["severity"]
         0.5
         """
         ...
@@ -1958,7 +1958,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> DefaultModelSpec.timing(0.10, [20.0, 30.0, 50.0]).curve["cumulative_default_rate"]
+        >>> DefaultModelSpec.timing(0.10, [20.0, 30.0, 50.0]).to_dict()["cumulative_default_rate"]
         0.1
         """
         ...
@@ -2074,19 +2074,24 @@ class DefaultModelSpec:
         """
         ...
 
-    @property
-    def curve(self) -> Any:
+    def to_dict(self) -> dict[str, Any]:
         """
-        Selected model and its active parameters in canonical JSON wire form.
+        Active default model and its parameters as a dict in the canonical wire form.
 
         Returns
         -------
-        Any
-            Selected model and its active parameters in canonical JSON wire form.
+        dict
+            The serde wire form, for example ``{"curve": "constant", "cdr": 0.02}``.
 
         Notes
         -----
-        This accessor does not raise.
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import DefaultModelSpec
+        >>> DefaultModelSpec.constant_cdr(0.02).to_dict()["cdr"]
+        0.02
         """
         ...
 
@@ -4049,7 +4054,7 @@ class PrepaymentModelSpec:
     Examples
     --------
     >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-    >>> PrepaymentModelSpec.constant_cpr(0.06).curve["cpr"]
+    >>> PrepaymentModelSpec.constant_cpr(0.06).to_dict()["cpr"]
     0.06
     """
 
@@ -4075,7 +4080,7 @@ class PrepaymentModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-        >>> PrepaymentModelSpec.constant_cpr(0.06).curve["cpr"]
+        >>> PrepaymentModelSpec.constant_cpr(0.06).to_dict()["cpr"]
         0.06
         """
         ...
@@ -4162,7 +4167,7 @@ class PrepaymentModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-        >>> PrepaymentModelSpec.abs(0.015).curve["speed"]
+        >>> PrepaymentModelSpec.abs(0.015).to_dict()["speed"]
         0.015
         """
         ...
@@ -4191,7 +4196,7 @@ class PrepaymentModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-        >>> PrepaymentModelSpec.vector([0.05, 0.10]).curve["monthly_cpr"]
+        >>> PrepaymentModelSpec.vector([0.05, 0.10]).to_dict()["monthly_cpr"]
         [0.05, 0.1]
         """
         ...
@@ -4231,19 +4236,24 @@ class PrepaymentModelSpec:
         """
         ...
 
-    @property
-    def curve(self) -> Any:
+    def to_dict(self) -> dict[str, Any]:
         """
-        Seasoning curve in its JSON wire form (``"constant"``, ``{"psa": ...}``, ``{"cmbs_lockout": ...}``) or ``None``.
+        Active prepayment model and its parameters as a dict in the canonical wire form.
 
         Returns
         -------
-        Any
-            Seasoning curve in its JSON wire form (``"constant"``, ``{"psa": ...}``, ``{"cmbs_lockout": ...}``) or ``None``.
+        dict
+            The serde wire form, for example ``{"curve": "constant", "cpr": 0.06}``.
 
         Notes
         -----
-        This accessor does not raise.
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
+        >>> PrepaymentModelSpec.constant_cpr(0.06).to_dict()["cpr"]
+        0.06
         """
         ...
 

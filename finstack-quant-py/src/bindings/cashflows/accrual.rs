@@ -59,7 +59,6 @@ impl PyAccrualMethod {
         match self.inner {
             AccrualMethod::Linear => "linear",
             AccrualMethod::Compounded => "compounded",
-            _ => "unknown",
         }
     }
 
@@ -68,7 +67,6 @@ impl PyAccrualMethod {
         match self.inner {
             AccrualMethod::Linear => "AccrualMethod.LINEAR".to_string(),
             AccrualMethod::Compounded => "AccrualMethod.COMPOUNDED".to_string(),
-            _ => "AccrualMethod(...)".to_string(),
         }
     }
 }

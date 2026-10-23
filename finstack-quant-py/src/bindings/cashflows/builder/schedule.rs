@@ -17,18 +17,13 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::extract::parse_label;
 use crate::bindings::macros::wire_methods;
 use crate::errors::core_to_py;
 
 use super::orchestrator::PyCashFlowBuilder;
 use super::specs::PyNotional;
 use crate::bindings::cashflows::fixings::PyProjectedFixing;
-
-/// Parse a schedule representation label (``"contractual"``, ``"projected"``,
-/// ``"placeholder"``, ``"no_residual"``).
-pub(crate) fn parse_representation(label: &str) -> PyResult<CashflowRepresentation> {
-    label.parse::<CashflowRepresentation>().map_err(core_to_py)
-}
 
 /// Schedule-level metadata: representation, calendars, facility limit, horizon.
 ///
@@ -92,7 +87,7 @@ impl PyCashFlowMeta {
                     .into_iter()
                     .map(|fixing| fixing.inner)
                     .collect(),
-                representation: parse_representation(representation)?,
+                representation: parse_label::<CashflowRepresentation>(representation)?,
                 calendar_ids: calendar_ids.unwrap_or_default(),
                 commitment: commitment.map(|m| m.inner),
                 issue_date: issue_date.map(py_to_date).transpose()?,
@@ -103,8 +98,8 @@ impl PyCashFlowMeta {
 
     /// Schedule representation label (``"contractual"``, ``"projected"``, …).
     #[getter]
-    fn representation(&self) -> &'static str {
-        self.inner.representation.as_str()
+    fn representation(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner.representation).map_err(core_to_py)
     }
 
     /// Holiday calendar identifiers used by the schedule.
@@ -254,7 +249,32 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
         let accruals = frame_column(obj, "accrual")?;
         let deltas = frame_column(obj, "principal_delta")?;
         let principal_dates = frame_column(obj, "principal_date")?;
-        let mut flows = Vec::with_capacity(dates.len());
+        let rows = dates.len();
+        let optional = [
+            ("reset_date", resets.as_ref().map(Vec::len)),
+            ("rate", rates.as_ref().map(Vec::len)),
+            ("accrual", accruals.as_ref().map(Vec::len)),
+            ("principal_delta", deltas.as_ref().map(Vec::len)),
+            ("principal_date", principal_dates.as_ref().map(Vec::len)),
+        ];
+        let required = [
+            ("amount", amounts.len()),
+            ("currency", currencies.len()),
+            ("kind", kinds.len()),
+            ("accrual_factor", factors.len()),
+        ];
+        for (name, len) in required.into_iter().chain(
+            optional
+                .into_iter()
+                .filter_map(|(name, len)| len.map(|len| (name, len))),
+        ) {
+            if len != rows {
+                return Err(crate::errors::value_error(format!(
+                    "cashflow DataFrame column '{name}' has {len} rows, expected {rows}"
+                )));
+            }
+        }
+        let mut flows = Vec::with_capacity(rows);
         for (i, date) in dates.iter().enumerate() {
             let amount: f64 = amounts[i].extract()?;
             let currency = extract_currency(&currencies[i])?;
@@ -385,7 +405,7 @@ impl PyCashFlowSchedule {
     #[pyo3(text_signature = "(self, representation)")]
     fn with_representation(&self, representation: &str) -> PyResult<Self> {
         Ok(Self::from_inner(self.inner.clone().with_representation(
-            parse_representation(representation)?,
+            parse_label::<CashflowRepresentation>(representation)?,
         )))
     }
 
@@ -711,7 +731,9 @@ impl PyCashFlowSchedule {
             notional.initial.amount(),
             notional.initial.currency(),
             self.inner.get_day_count(),
-            self.inner.get_meta().representation.as_str(),
+            // Unit-variant tags always serialize; the fallback only keeps repr infallible.
+            finstack_quant_core::wire::serde_tag(&self.inner.get_meta().representation)
+                .unwrap_or_default(),
         )
     }
 
