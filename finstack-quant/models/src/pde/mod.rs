@@ -49,9 +49,9 @@
 //!
 //! # Design
 //!
-//! Lives under `instruments/common/models/` alongside `trees/`, `closed_form/`,
-//! and `volatility/`. PDE solvers are numerical pricing models, tightly coupled
-//! to the valuations domain, and unlikely to be reused outside it.
+//! This module belongs to `finstack-quant-models`, alongside `trees`,
+//! `closed_form`, and `volatility`. Valuation pricers compose these reusable
+//! numerical solvers with instrument terms and market data.
 
 mod adi;
 mod boundary;

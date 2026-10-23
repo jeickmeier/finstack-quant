@@ -27,9 +27,7 @@ fn labelled_square_frame<'py>(
     dict_to_dataframe(py, &columns, Some(index.into_any()))
 }
 
-/// Ordinal rating scale (highest grade first) with an optional absorbing
-/// default state; the label universe shared by matrices, generators and
-/// simulated paths.
+#[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale")]
 #[pyclass(
     module = "finstack_quant.models.credit.migration",
     name = "RatingScale",
@@ -50,36 +48,28 @@ impl PyRatingScale {
 
 #[pymethods]
 impl PyRatingScale {
-    /// The standard whole-letter scale (AAA .. CCC, D), highest grade first.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.standard")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn standard() -> Self {
         Self::from_inner(RatingScale::standard())
     }
 
-    /// The standard scale with an explicit not-rated state appended.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.standard_with_nr")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn standard_with_nr() -> Self {
         Self::from_inner(RatingScale::standard_with_nr())
     }
 
-    /// A notched scale (AA+/AA/AA-, ...) rather than whole grades.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.notched")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn notched() -> Self {
         Self::from_inner(RatingScale::notched())
     }
 
-    /// A scale built from explicit labels, highest grade first; the last
-    /// label is taken as the absorbing default state.
-    ///
-    /// Parameters
-    /// ----------
-    /// labels : list[str]
-    ///     At least two distinct labels.
-    ///
-    /// Raises ``ValueError`` for fewer than two labels or duplicates.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.custom")]
     #[staticmethod]
     #[pyo3(text_signature = "(labels)")]
     fn custom(labels: Vec<String>) -> PyResult<Self> {
@@ -88,17 +78,7 @@ impl PyRatingScale {
             .map_err(kinded_to_py)
     }
 
-    /// A custom scale with an explicit default (absorbing) state label.
-    ///
-    /// Parameters
-    /// ----------
-    /// labels : list[str]
-    ///     At least two distinct labels, highest grade first.
-    /// default_label : str
-    ///     Label of the absorbing default state; must be in ``labels``.
-    ///
-    /// Raises ``ValueError`` for fewer than two labels or duplicates and
-    /// ``KeyError`` when ``default_label`` is not in ``labels``.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.custom_with_default")]
     #[staticmethod]
     #[pyo3(text_signature = "(labels, default_label)")]
     fn custom_with_default(labels: Vec<String>, default_label: String) -> PyResult<Self> {
@@ -107,53 +87,49 @@ impl PyRatingScale {
             .map_err(kinded_to_py)
     }
 
-    /// Number of rating states in the scale.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.n_states")]
     #[getter]
     fn n_states(&self) -> usize {
         self.inner.n_states()
     }
 
-    /// Index of a label in the scale, or ``None`` if absent.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.index_of")]
     #[pyo3(text_signature = "($self, label)")]
     fn index_of(&self, label: &str) -> Option<usize> {
         self.inner.index_of(label)
     }
 
-    /// Index of a label in the scale; raises ``KeyError`` if absent.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.index_of_required")]
     #[pyo3(text_signature = "($self, label)")]
     fn index_of_required(&self, label: &str) -> PyResult<usize> {
         self.inner.index_of_required(label).map_err(kinded_to_py)
     }
 
-    /// Label at a state index, or ``None`` when out of range.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.label_of")]
     #[pyo3(text_signature = "($self, index)")]
     fn label_of(&self, index: usize) -> Option<String> {
         self.inner.label_of(index).map(str::to_owned)
     }
 
-    /// Index of the default state, or ``None`` if the scale has none.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.default_state")]
     #[pyo3(text_signature = "($self)")]
     fn default_state(&self) -> Option<usize> {
         self.inner.default_state()
     }
 
-    /// Rating labels, highest grade first.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.labels")]
     #[pyo3(text_signature = "($self)")]
     fn labels(&self) -> Vec<String> {
         self.inner.labels().to_vec()
     }
 
-    /// Weighted-average rating factor for a label.
-    ///
-    /// Raises ``KeyError`` when the label is unknown or has no WARF factor.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.warf")]
     #[pyo3(text_signature = "($self, label)")]
     fn warf(&self, label: &str) -> PyResult<f64> {
         self.inner.warf(label).map_err(kinded_to_py)
     }
 
-    /// Nearest rating label for a weighted-average rating factor.
-    ///
-    /// Raises ``ValueError`` when ``warf`` is non-finite or negative.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.rating_from_warf")]
     #[pyo3(text_signature = "($self, warf)")]
     fn rating_from_warf(&self, warf: f64) -> PyResult<String> {
         self.inner
@@ -162,11 +138,12 @@ impl PyRatingScale {
             .map_err(kinded_to_py)
     }
 
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.__len__")]
     fn __len__(&self) -> usize {
         self.inner.n_states()
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale.__repr__")]
     fn __repr__(&self) -> String {
         let labels: Vec<String> = self
             .inner
@@ -185,12 +162,14 @@ impl PyRatingScale {
     }
 }
 
-wire_methods!(PyRatingScale, RatingScale, "RatingScale");
+wire_methods!(
+    PyRatingScale,
+    RatingScale,
+    "RatingScale",
+    module = "finstack_quant.models.credit.migration"
+);
 
-/// Row-stochastic rating transition matrix over a horizon in years.
-///
-/// Rows are origin states and columns destination states, both in
-/// ``scale`` order; entries are probabilities.
+#[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix")]
 #[pyclass(
     module = "finstack_quant.models.credit.migration",
     name = "TransitionMatrix",
@@ -210,21 +189,7 @@ impl PyTransitionMatrix {
 
 #[pymethods]
 impl PyTransitionMatrix {
-    /// Build a transition matrix.
-    ///
-    /// Parameters
-    /// ----------
-    /// scale : RatingScale
-    ///     Rating scale defining row/column order.
-    /// data : list[float] | list[list[float]] | numpy.ndarray
-    ///     Probabilities, row-major flat (``n * n`` values), nested rows, or a
-    ///     2-D array.
-    /// horizon : float
-    ///     Horizon the probabilities cover, in years (> 0).
-    ///
-    /// Raises ``ValueError`` when the dimension does not match the scale, a
-    /// row does not sum to one, an entry is outside [0, 1], the default
-    /// state is not absorbing, or the horizon is invalid.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.__init__")]
     #[new]
     #[pyo3(text_signature = "(scale, data, horizon)")]
     fn new(scale: &PyRatingScale, data: &Bound<'_, PyAny>, horizon: f64) -> PyResult<Self> {
@@ -239,21 +204,7 @@ impl PyTransitionMatrix {
             .map_err(kinded_to_py)
     }
 
-    /// Build a transition matrix from a labelled square ``pandas.DataFrame``.
-    ///
-    /// Parameters
-    /// ----------
-    /// df : pandas.DataFrame
-    ///     Square frame whose index (origins) and columns (destinations) carry
-    ///     the same labels in scale order.
-    /// horizon : float
-    ///     Horizon in years (> 0).
-    /// scale : RatingScale | None
-    ///     Scale to validate against; defaults to
-    ///     ``RatingScale.custom(list(df.index))`` (last label absorbing).
-    ///
-    /// Raises ``ValueError`` when index and columns differ, or the matrix is
-    /// invalid for the scale.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.from_dataframe")]
     #[staticmethod]
     #[pyo3(signature = (df, horizon, scale = None))]
     #[pyo3(text_signature = "(df, horizon, scale=None)")]
@@ -294,17 +245,14 @@ impl PyTransitionMatrix {
         .map_err(kinded_to_py)
     }
 
-    /// Transition probability from one labelled state to another.
-    ///
-    /// Raises ``KeyError`` for an unknown label.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.probability")]
     #[pyo3(signature = (from_, to))]
     #[pyo3(text_signature = "($self, from_, to)")]
     fn probability(&self, from_: &str, to: &str) -> PyResult<f64> {
         self.inner.probability(from_, to).map_err(kinded_to_py)
     }
 
-    /// Transition probability by state indices; raises ``ValueError`` when
-    /// either index is outside the scale.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.probability_by_index")]
     #[pyo3(signature = (from_, to))]
     #[pyo3(text_signature = "($self, from_, to)")]
     fn probability_by_index(&self, from_: usize, to: usize) -> PyResult<f64> {
@@ -313,18 +261,14 @@ impl PyTransitionMatrix {
             .map_err(kinded_to_py)
     }
 
-    /// One row of transition probabilities, indexed by destination state.
-    ///
-    /// Raises ``KeyError`` for an unknown label.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.row")]
     #[pyo3(signature = (from_))]
     #[pyo3(text_signature = "($self, from_)")]
     fn row(&self, from_: &str) -> PyResult<Vec<f64>> {
         self.inner.row(from_).map_err(kinded_to_py)
     }
 
-    /// Compose with another matrix on the same scale: ``P(s + t) = P(s) @ P(t)``.
-    ///
-    /// Raises ``ValueError`` when the scales differ.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.compose")]
     #[pyo3(text_signature = "($self, other)")]
     fn compose(&self, other: &PyTransitionMatrix) -> PyResult<Self> {
         self.inner
@@ -333,43 +277,42 @@ impl PyTransitionMatrix {
             .map_err(kinded_to_py)
     }
 
-    /// Row-major copy of the underlying matrix as nested lists.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.to_rows")]
     #[pyo3(text_signature = "($self)")]
     fn to_rows(&self) -> Vec<Vec<f64>> {
         self.inner.to_rows()
     }
 
-    /// Labelled square ``pandas.DataFrame`` (index = origin, columns = destination).
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         labelled_square_frame(py, self.inner.scale(), self.inner.as_matrix())
     }
 
-    /// Horizon this matrix covers, in years.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.horizon")]
     #[getter]
     fn horizon(&self) -> f64 {
         self.inner.horizon()
     }
 
-    /// Number of rating states in the scale.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.n_states")]
     #[getter]
     fn n_states(&self) -> usize {
         self.inner.n_states()
     }
 
-    /// The rating scale defining row/column order.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.scale")]
     #[getter]
     fn scale(&self) -> PyRatingScale {
         PyRatingScale::from_inner(self.inner.scale().clone())
     }
 
-    /// Probability of reaching the default state per origin state, or
-    /// ``None`` when the scale has no default state.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.default_probabilities")]
     #[pyo3(text_signature = "($self)")]
     fn default_probabilities(&self) -> Option<Vec<f64>> {
         self.inner.default_probabilities()
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.__repr__")]
     fn __repr__(&self) -> String {
         format!(
             "TransitionMatrix(n_states={}, horizon={}, labels=[<{} items>])",
@@ -380,11 +323,15 @@ impl PyTransitionMatrix {
     }
 }
 
-wire_methods!(PyTransitionMatrix, TransitionMatrix, "TransitionMatrix");
+wire_methods!(
+    PyTransitionMatrix,
+    TransitionMatrix,
+    "TransitionMatrix",
+    module = "finstack_quant.models.credit.migration"
+);
 impl_repr_html_via_dataframe!(PyTransitionMatrix);
 
-/// Annualized continuous-time Markov generator ``Q`` (rows sum to zero,
-/// non-negative off-diagonals) over a rating scale.
+#[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix")]
 #[pyclass(
     module = "finstack_quant.models.credit.migration",
     name = "GeneratorMatrix",
@@ -404,18 +351,7 @@ impl PyGeneratorMatrix {
 
 #[pymethods]
 impl PyGeneratorMatrix {
-    /// Build a generator matrix.
-    ///
-    /// Parameters
-    /// ----------
-    /// scale : RatingScale
-    ///     Rating scale defining row/column order.
-    /// data : list[float] | list[list[float]] | numpy.ndarray
-    ///     Intensities per year, row-major flat, nested rows, or a 2-D array.
-    ///
-    /// Raises ``ValueError`` when the dimension does not match the scale, a
-    /// row does not sum to zero, an off-diagonal is negative, or the default
-    /// state is not absorbing.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.__init__")]
     #[new]
     #[pyo3(text_signature = "(scale, data)")]
     fn new(scale: &PyRatingScale, data: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -430,20 +366,7 @@ impl PyGeneratorMatrix {
             .map_err(kinded_to_py)
     }
 
-    /// Embed a transition matrix as a generator via the matrix logarithm
-    /// (Israel-Rosenthal-Wei with Kreinin-Sidenius regularization).
-    ///
-    /// Parameters
-    /// ----------
-    /// p : TransitionMatrix
-    ///     Source matrix.
-    /// round_trip_tol : float, optional
-    ///     Non-negative infinity-norm tolerance on ``exp(Q * h) - P(h)``.
-    ///     ``None`` uses the default ``1e-2``.
-    ///
-    /// Raises ``RuntimeError`` when no valid generator exists (complex or
-    /// non-positive eigenvalues) or the round-trip error exceeds the
-    /// tolerance.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.from_transition_matrix")]
     #[staticmethod]
     #[pyo3(signature = (p, round_trip_tol = None))]
     #[pyo3(text_signature = "(p, round_trip_tol=None)")]
@@ -456,59 +379,55 @@ impl PyGeneratorMatrix {
             .map_err(kinded_to_py)
     }
 
-    /// Off-diagonal generator intensity (per year) from one state to another.
-    ///
-    /// Raises ``KeyError`` for an unknown label.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.intensity")]
     #[pyo3(signature = (from_, to))]
     #[pyo3(text_signature = "($self, from_, to)")]
     fn intensity(&self, from_: &str, to: &str) -> PyResult<f64> {
         self.inner.intensity(from_, to).map_err(kinded_to_py)
     }
 
-    /// Total intensity of leaving a state (the negated diagonal entry).
-    ///
-    /// Raises ``KeyError`` for an unknown label.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.exit_rate")]
     #[pyo3(text_signature = "($self, state)")]
     fn exit_rate(&self, state: &str) -> PyResult<f64> {
         self.inner.exit_rate(state).map_err(kinded_to_py)
     }
 
-    /// Row-major copy of the underlying matrix as nested lists.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.to_rows")]
     #[pyo3(text_signature = "($self)")]
     fn to_rows(&self) -> Vec<Vec<f64>> {
         self.inner.to_rows()
     }
 
-    /// Labelled square ``pandas.DataFrame`` (index = origin, columns = destination).
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         labelled_square_frame(py, self.inner.scale(), self.inner.as_matrix())
     }
 
-    /// Number of rating states in the scale.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.n_states")]
     #[getter]
     fn n_states(&self) -> usize {
         self.inner.n_states()
     }
 
-    /// The rating scale defining row/column order.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.scale")]
     #[getter]
     fn scale(&self) -> PyRatingScale {
         PyRatingScale::from_inner(self.inner.scale().clone())
     }
 
-    /// L1 mass clamped by Kreinin-Sidenius regularization during extraction.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.regularization_l1")]
     #[getter]
     fn regularization_l1(&self) -> f64 {
         self.inner.regularization_l1()
     }
 
-    /// Infinity-norm error from reconstructing the source transition matrix.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.round_trip_error")]
     #[getter]
     fn round_trip_error(&self) -> f64 {
         self.inner.round_trip_error()
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.__repr__")]
     fn __repr__(&self) -> String {
         format!(
             "GeneratorMatrix(n_states={}, regularization_l1={}, round_trip_error={})",
@@ -519,11 +438,15 @@ impl PyGeneratorMatrix {
     }
 }
 
-wire_methods!(PyGeneratorMatrix, GeneratorMatrix, "GeneratorMatrix");
+wire_methods!(
+    PyGeneratorMatrix,
+    GeneratorMatrix,
+    "GeneratorMatrix",
+    module = "finstack_quant.models.credit.migration"
+);
 impl_repr_html_via_dataframe!(PyGeneratorMatrix);
 
-/// One simulated rating trajectory: piecewise-constant state over
-/// ``[0, horizon]`` recorded as ``(time, new_state)`` transitions.
+#[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath")]
 #[pyclass(
     module = "finstack_quant.models.credit.migration",
     name = "RatingPath",
@@ -543,56 +466,55 @@ impl PyRatingPath {
 
 #[pymethods]
 impl PyRatingPath {
-    /// Rating state index occupied at time ``t`` (right-continuous at jumps).
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.state_at")]
     #[pyo3(text_signature = "($self, t)")]
     fn state_at(&self, t: f64) -> usize {
         self.inner.state_at(t)
     }
 
-    /// Rating label occupied at time ``t``.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.label_at")]
     #[pyo3(text_signature = "($self, t)")]
     fn label_at(&self, t: f64) -> String {
         self.inner.label_at(t).to_owned()
     }
 
-    /// Whether the path reached the default state.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.defaulted")]
     #[pyo3(text_signature = "($self)")]
     fn defaulted(&self) -> bool {
         self.inner.defaulted()
     }
 
-    /// Time of default in years, or ``None`` if the path never defaulted.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.default_time")]
     #[pyo3(text_signature = "($self)")]
     fn default_time(&self) -> Option<f64> {
         self.inner.default_time()
     }
 
-    /// Number of recorded transitions, including the initial ``(0.0, s0)`` entry.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.n_transitions")]
     #[pyo3(text_signature = "($self)")]
     fn n_transitions(&self) -> usize {
         self.inner.n_transitions()
     }
 
-    /// Every ``(time, new_state)`` event on the path; the first is always
-    /// ``(0.0, initial_state)``.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.transitions")]
     #[pyo3(text_signature = "($self)")]
     fn transitions(&self) -> Vec<(f64, usize)> {
         self.inner.transitions().to_vec()
     }
 
-    /// Simulation horizon in years.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.horizon")]
     #[getter]
     fn horizon(&self) -> f64 {
         self.inner.horizon()
     }
 
-    /// The rating scale the state indices refer to.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.scale")]
     #[getter]
     fn scale(&self) -> PyRatingScale {
         PyRatingScale::from_inner(self.inner.scale().clone())
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.__repr__")]
     fn __repr__(&self) -> String {
         let default_time = match self.inner.default_time() {
             Some(t) => t.to_string(),
@@ -607,12 +529,14 @@ impl PyRatingPath {
     }
 }
 
-wire_methods!(PyRatingPath, RatingPath, "RatingPath");
+wire_methods!(
+    PyRatingPath,
+    RatingPath,
+    "RatingPath",
+    module = "finstack_quant.models.credit.migration"
+);
 
-/// Collection of simulated rating paths from ``MigrationSimulator.simulate``.
-///
-/// Indexable and iterable like a list of ``RatingPath``; ``to_dataframe()``
-/// gives one long frame over all transitions.
+#[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths")]
 #[pyclass(
     module = "finstack_quant.models.credit.migration",
     name = "RatingPaths",
@@ -626,7 +550,7 @@ pub(crate) struct PyRatingPaths {
 
 #[pymethods]
 impl PyRatingPaths {
-    /// The paths as a list of ``RatingPath``.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.paths")]
     #[getter]
     fn paths(&self) -> Vec<PyRatingPath> {
         self.inner
@@ -636,17 +560,13 @@ impl PyRatingPaths {
             .collect()
     }
 
-    /// Fraction of paths that reached the default state.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.default_rate")]
     #[getter]
     fn default_rate(&self) -> f64 {
         migration::default_rate(&self.inner)
     }
 
-    /// Long-format ``pandas.DataFrame`` of every transition.
-    ///
-    /// Columns: ``path`` (int), ``time`` (float, years), ``state`` (int),
-    /// ``label`` (str); one row per recorded transition (including the
-    /// initial state at ``time = 0``), ordered by path then time.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let mut path_col: Vec<u64> = Vec::new();
         let mut time_col: Vec<f64> = Vec::new();
@@ -668,10 +588,12 @@ impl PyRatingPaths {
         dict_to_dataframe(py, &columns, None)
     }
 
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.__len__")]
     fn __len__(&self) -> usize {
         self.inner.len()
     }
 
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.__getitem__")]
     fn __getitem__(&self, index: isize) -> PyResult<PyRatingPath> {
         let len = self.inner.len() as isize;
         let resolved = if index < 0 { index + len } else { index };
@@ -685,7 +607,7 @@ impl PyRatingPaths {
         ))
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.__repr__")]
     fn __repr__(&self) -> String {
         format!(
             "RatingPaths(n_paths={}, default_rate={})",
@@ -695,9 +617,14 @@ impl PyRatingPaths {
     }
 }
 
-wire_methods!(PyRatingPaths, Vec<RatingPath>, "RatingPaths");
+wire_methods!(
+    PyRatingPaths,
+    Vec<RatingPath>,
+    "RatingPaths",
+    module = "finstack_quant.models.credit.migration"
+);
 
-/// Gillespie CTMC simulator over a generator matrix and horizon.
+#[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator")]
 #[pyclass(
     module = "finstack_quant.models.credit.migration",
     name = "MigrationSimulator",
@@ -717,16 +644,7 @@ impl PyMigrationSimulator {
 
 #[pymethods]
 impl PyMigrationSimulator {
-    /// Build a simulator.
-    ///
-    /// Parameters
-    /// ----------
-    /// generator : GeneratorMatrix
-    ///     Annualized generator to simulate under.
-    /// horizon : float
-    ///     Simulation horizon in years (> 0).
-    ///
-    /// Raises ``ValueError`` when ``horizon`` is non-positive or non-finite.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.__init__")]
     #[new]
     #[pyo3(text_signature = "(generator, horizon)")]
     fn new(generator: &PyGeneratorMatrix, horizon: f64) -> PyResult<Self> {
@@ -735,25 +653,7 @@ impl PyMigrationSimulator {
             .map_err(kinded_to_py)
     }
 
-    /// Simulate rating paths from ``initial_state``.
-    ///
-    /// Determinism: paths are generated with the canonical ``Pcg64`` RNG
-    /// seeded from ``seed``; identical seeds reproduce identical paths.
-    /// Releases the GIL during simulation.
-    ///
-    /// Parameters
-    /// ----------
-    /// initial_state : int
-    ///     Starting state index in the generator's scale.
-    /// n_paths : int
-    ///     Number of paths (> 0).
-    /// seed : int
-    ///     RNG seed.
-    ///
-    /// Returns a ``RatingPaths`` collection.
-    ///
-    /// Raises ``ValueError`` when the state index is out of range or
-    /// ``n_paths`` is zero.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.simulate")]
     #[pyo3(text_signature = "($self, initial_state, n_paths, seed)")]
     fn simulate(
         &self,
@@ -768,19 +668,7 @@ impl PyMigrationSimulator {
         Ok(PyRatingPaths { inner: paths })
     }
 
-    /// Build an empirical transition matrix by simulating from every state.
-    ///
-    /// Uses the canonical seeded ``Pcg64`` RNG (see ``simulate``) and
-    /// releases the GIL during simulation.
-    ///
-    /// Parameters
-    /// ----------
-    /// n_paths_per_state : int
-    ///     Paths simulated from each origin state (> 0).
-    /// seed : int
-    ///     RNG seed.
-    ///
-    /// Raises ``ValueError`` when ``n_paths_per_state`` is zero.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.empirical_matrix")]
     #[pyo3(text_signature = "($self, n_paths_per_state, seed)")]
     fn empirical_matrix(
         &self,
@@ -794,19 +682,19 @@ impl PyMigrationSimulator {
             .map_err(kinded_to_py)
     }
 
-    /// Simulation horizon in years.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.horizon")]
     #[getter]
     fn horizon(&self) -> f64 {
         self.inner.horizon()
     }
 
-    /// The generator matrix simulated under.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.generator")]
     #[getter]
     fn generator(&self) -> PyGeneratorMatrix {
         PyGeneratorMatrix::from_inner(self.inner.generator().clone())
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.__repr__")]
     fn __repr__(&self) -> String {
         format!(
             "MigrationSimulator(n_states={}, horizon={})",
@@ -819,40 +707,11 @@ impl PyMigrationSimulator {
 wire_methods!(
     PyMigrationSimulator,
     MigrationSimulator,
-    "MigrationSimulator"
+    "MigrationSimulator",
+    module = "finstack_quant.models.credit.migration"
 );
 
-/// Project a generator matrix to a transition matrix over a horizon.
-///
-/// Computes ``P(t) = exp(Q * t)`` — the matrix exponential of the continuous-time
-/// generator ``Q``. This is the standard way to obtain rating-migration
-/// probabilities for a non-annual horizon (e.g. quarterly, or a 5-year
-/// cumulative view) from an annual generator.
-///
-/// Parameters
-/// ----------
-/// generator : GeneratorMatrix
-///     Continuous-time generator with non-negative off-diagonals and rows
-///     summing to zero.
-/// t : float
-///     Horizon in years. Must be non-negative.
-///
-/// Returns
-/// -------
-/// TransitionMatrix
-///     Row-stochastic migration probabilities over ``t`` years.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``t`` is negative or the projection fails to produce a valid
-///     row-stochastic matrix.
-///
-/// References
-/// ----------
-/// Israel, R. B., Rosenthal, J. S., & Wei, J. Z. (2001). "Finding Generators
-/// for Markov Chains via Empirical Transition Matrices, with Applications to
-/// Credit Ratings." *Mathematical Finance*, 11(2), 245-265.
+#[doc = pydoc!("finstack_quant.models.credit.migration", "project")]
 #[pyfunction]
 #[pyo3(text_signature = "(generator, t)")]
 fn project(generator: &PyGeneratorMatrix, t: f64) -> PyResult<PyTransitionMatrix> {
@@ -865,7 +724,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "migration")?;
     m.setattr(
         "__doc__",
-        "Credit migration models: rating scales, transition matrices, CTMC generators, and seeded simulation.",
+        pydoc!("finstack_quant.models.credit.migration", "__module__"),
     )?;
 
     m.add_class::<PyRatingScale>()?;

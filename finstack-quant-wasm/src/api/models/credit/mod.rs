@@ -915,10 +915,10 @@ impl JsDynamicRecoverySpec {
         .map_err(to_js_err)
     }
 
-    /// Recovery that declines linearly in the notional ratio down to a floor.
+    /// Recovery `clamp(R0 * (1 - sensitivity * (N / N0 - 1)), floor, R0)`.
     /// @param base_recovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
     /// @param base_notional - Positive reference notional `N0` in the instrument's currency.
-    /// @param slope - Non-negative recovery lost per unit increase of `N / N0 - 1`.
+    /// @param sensitivity - Non-negative dimensionless relative recovery sensitivity per unit increase of `N / N0 - 1`.
     /// @param floor - Minimum recovery as a fraction in `[0, baseRecovery]`.
     /// @returns The linear-decline recovery specification.
     ///
@@ -929,13 +929,13 @@ impl JsDynamicRecoverySpec {
     pub fn linear_decline(
         base_recovery: JsValue,
         base_notional: JsValue,
-        slope: JsValue,
+        sensitivity: JsValue,
         floor: JsValue,
     ) -> Result<JsDynamicRecoverySpec, JsValue> {
         DynamicRecoverySpec::linear_decline(
             js_f64(&base_recovery, "baseRecovery")?,
             js_f64(&base_notional, "baseNotional")?,
-            js_f64(&slope, "slope")?,
+            js_f64(&sensitivity, "sensitivity")?,
             js_f64(&floor, "floor")?,
         )
         .map(|inner| Self { inner })
@@ -1042,14 +1042,14 @@ impl JsEndogenousHazardSpec {
     }
 
     /// Piecewise-linear leverage-to-hazard table.
-    /// @param leverage_points - Strictly increasing leverage ratios, at least two, as a `number[]` or `Float64Array`.
+    /// @param leverage_points - One or more finite non-negative leverage ratios, strictly increasing when multiple points are supplied; a single point gives constant hazard.
     /// @param hazard_points - Annualized hazard rates at those leverage points; same length, non-negative.
-    /// @returns The tabular hazard specification.
+    /// @returns The tabular hazard specification, with base leverage and hazard taken from the first pair.
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if the arrays differ in length, hold fewer
-    /// than two points, are not strictly increasing in leverage, or contain
+    /// Throws a `validation` error if the arrays differ in length, are empty,
+    /// are not strictly increasing in leverage, or contain
     /// non-finite or negative values.
     pub fn tabular(
         leverage_points: JsValue,
@@ -1188,7 +1188,6 @@ impl JsToggleExerciseModel {
 
     /// Nested-Monte-Carlo optimal exercise rule.
     /// @param nested_paths - Inner simulation paths per decision date; a positive safe integer.
-    /// @param equity_discount_rate - Continuously compounded equity discount rate, as a decimal.
     /// @param asset_vol - Annualized asset volatility as a decimal; non-negative.
     /// @param risk_free_rate - Continuously compounded risk-free rate, as a decimal.
     /// @param horizon - Inner simulation horizon in years; positive and finite.
@@ -1201,14 +1200,12 @@ impl JsToggleExerciseModel {
     /// is negative, or `horizon` is not positive and finite.
     pub fn optimal(
         nested_paths: JsValue,
-        equity_discount_rate: JsValue,
         asset_vol: JsValue,
         risk_free_rate: JsValue,
         horizon: JsValue,
     ) -> Result<JsToggleExerciseModel, JsValue> {
         ToggleExerciseModel::optimal(
             js_uint(&nested_paths, "nestedPaths")?,
-            js_f64(&equity_discount_rate, "equityDiscountRate")?,
             js_f64(&asset_vol, "assetVol")?,
             js_f64(&risk_free_rate, "riskFreeRate")?,
             js_f64(&horizon, "horizon")?,

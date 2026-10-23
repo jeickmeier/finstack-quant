@@ -365,6 +365,22 @@ class MertonBarrierType:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class AssetDynamics:
     """
     Asset return dynamics specification for structural credit models.
@@ -513,6 +529,22 @@ class AssetDynamics:
         ------
         ValueError
             If the value cannot be serialized to JSON.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...
 
@@ -1700,6 +1732,22 @@ class MertonModel:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class DynamicRecoverySpec:
     """
     Recovery specification with optional notional dependence.
@@ -1838,9 +1886,11 @@ class DynamicRecoverySpec:
         ...
 
     @staticmethod
-    def linear_decline(base_recovery: float, base_notional: float, slope: float, floor: float) -> DynamicRecoverySpec:
+    def linear_decline(
+        base_recovery: float, base_notional: float, sensitivity: float, floor: float
+    ) -> DynamicRecoverySpec:
         """
-        Recovery declining linearly with accretion: ``max(R_0 - slope * (N - N_0) / N_0, floor)``.
+        Recovery declining linearly with accretion: ``clamp(R_0 * (1 - sensitivity * (N / N_0 - 1)), floor, R_0)``.
 
         Parameters
         ----------
@@ -1848,8 +1898,8 @@ class DynamicRecoverySpec:
             Reference recovery ``R_0`` as a decimal in ``[0, 1]``.
         base_notional : float
             Reference notional ``N_0`` (strictly positive), in the instrument's currency.
-        slope : float
-            Non-negative recovery decline per unit of relative accretion.
+        sensitivity : float
+            Dimensionless, non-negative relative recovery sensitivity to ``N / N_0 - 1``.
         floor : float
             Minimum recovery as a decimal in ``[0, base_recovery]``.
 
@@ -1866,8 +1916,9 @@ class DynamicRecoverySpec:
         Examples
         --------
         >>> from finstack_quant.models.credit import DynamicRecoverySpec
-        >>> DynamicRecoverySpec.linear_decline(0.4, 100.0, 0.1, 0.2).kind
-        'linear_decline'
+        >>> spec = DynamicRecoverySpec.linear_decline(0.4, 100.0, sensitivity=0.5, floor=0.1)
+        >>> round(spec.recovery_at_notional(120.0), 2)
+        0.36
         """
         ...
 
@@ -2018,6 +2069,22 @@ class DynamicRecoverySpec:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class EndogenousHazardSpec:
     """
     Hazard-rate model driven by leverage or PIK-accreted notional.
@@ -2109,7 +2176,8 @@ class EndogenousHazardSpec:
         Parameters
         ----------
         leverage_points : list[float]
-            Strictly increasing leverage ratios (at least two).
+            One or more finite non-negative leverage ratios, strictly increasing
+            when multiple points are supplied; one point gives constant hazard.
         hazard_points : list[float]
             Non-negative annualized hazard rates, one per leverage point; the
             base leverage and base hazard are taken from the first point.
@@ -2122,7 +2190,7 @@ class EndogenousHazardSpec:
         Raises
         ------
         ValueError
-            If the lists differ in length, have fewer than two points, are not
+            If the lists differ in length, are empty, are not
             strictly increasing in leverage, or contain non-finite or negative
             values.
 
@@ -2131,6 +2199,8 @@ class EndogenousHazardSpec:
         >>> from finstack_quant.models.credit import EndogenousHazardSpec
         >>> EndogenousHazardSpec.tabular([2.0, 6.0], [0.01, 0.05]).hazard_at_leverage(4.0)
         0.03
+        >>> EndogenousHazardSpec.tabular([2.0], [0.01]).hazard_at_leverage(8.0)
+        0.01
         """
         ...
 
@@ -2303,6 +2373,22 @@ class EndogenousHazardSpec:
         ------
         ValueError
             If the result cannot be serialized into a pandas object.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...
 
@@ -2516,6 +2602,22 @@ class CreditState:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class ToggleExerciseModel:
     """
     Exercise model for PIK/cash toggle and similar embedded options.
@@ -2574,20 +2676,17 @@ class ToggleExerciseModel:
     @staticmethod
     def optimal(
         nested_paths: int,
-        equity_discount_rate: float,
         asset_vol: float,
         risk_free_rate: float,
         horizon: float,
     ) -> ToggleExerciseModel:
         """
-        Create an optimal exercise model from nested-path parameters.
+        Create an optimal exercise model comparing common-path undiscounted payoff sums.
 
         Parameters
         ----------
         nested_paths : int
             Number of nested Monte Carlo paths for the inner optimization.
-        equity_discount_rate : float
-            Equity-holder discount rate as a decimal.
         asset_vol : float
             Asset volatility as a decimal.
         risk_free_rate : float
@@ -2610,7 +2709,7 @@ class ToggleExerciseModel:
         --------
         >>> import json
         >>> from finstack_quant.models.credit import ToggleExerciseModel
-        >>> model = ToggleExerciseModel.optimal(100, 0.12, 0.3, 0.05, 1.0)
+        >>> model = ToggleExerciseModel.optimal(100, 0.3, 0.05, 1.0)
         >>> json.loads(model.to_json())["optimal_exercise"]["nested_paths"]
         100
         """
@@ -2759,5 +2858,21 @@ class ToggleExerciseModel:
         Notes
         -----
         This accessor does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...

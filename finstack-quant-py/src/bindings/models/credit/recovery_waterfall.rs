@@ -5,6 +5,7 @@ use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     ColumnSchema,
 };
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_models::credit::recovery_waterfall::{
     self as waterfall, RecoveryAllocation, RecoveryClaim, RecoveryWaterfallResult,
@@ -26,10 +27,7 @@ const ALLOCATION_COLUMNS: &[ColumnSchema<'static>] = &[
     ("deficiency", "float64"),
 ];
 
-/// A claim participating in an absolute-priority recovery waterfall.
-///
-/// Monetary fields share the estate's currency; ``collateral_haircut`` is a
-/// decimal fraction in [0, 1]. Validation happens in ``allocate_recovery``.
+#[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim")]
 #[pyclass(
     name = "RecoveryClaim",
     module = "finstack_quant.models.credit.recovery_waterfall",
@@ -44,29 +42,7 @@ pub struct PyRecoveryClaim {
 
 #[pymethods]
 impl PyRecoveryClaim {
-    /// Create a recovery claim.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Stable identifier, unique after trimming whitespace.
-    /// seniority : str
-    ///     Free-form seniority class label carried through to the allocation.
-    /// priority : int
-    ///     Absolute-priority rank; lower ranks are paid first.
-    /// principal : float
-    ///     Principal outstanding (>= 0).
-    /// accrued : float
-    ///     Accrued but unpaid interest included in the claim (``0.0`` when
-    ///     none accrued).
-    /// penalties : float
-    ///     Penalties and fees included in the claim (``0.0`` when none).
-    /// collateral_haircut : float
-    ///     Haircut applied to ``collateral_value`` as a decimal in [0, 1]
-    ///     (``0.0`` for an unsecured claim or full collateral credit).
-    /// collateral_value : float | None, default None
-    ///     Gross value of collateral pledged to this claim, or ``None`` for an
-    ///     unsecured claim (the Rust wire form also omits it).
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.__init__")]
     #[new]
     #[pyo3(signature = (id, seniority, priority, principal, accrued, penalties, collateral_haircut, collateral_value=None))]
     #[pyo3(
@@ -97,61 +73,60 @@ impl PyRecoveryClaim {
         }
     }
 
-    /// Stable identifier for this claim.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.id")]
     #[getter]
     fn id(&self) -> String {
         self.inner.id.clone()
     }
 
-    /// Seniority class the claim sits in.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.seniority")]
     #[getter]
     fn seniority(&self) -> String {
         self.inner.seniority.clone()
     }
 
-    /// Absolute-priority rank; lower ranks are paid first.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.priority")]
     #[getter]
     fn priority(&self) -> u32 {
         self.inner.priority
     }
 
-    /// Principal outstanding, before accrued interest and penalties.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.principal")]
     #[getter]
     fn principal(&self) -> f64 {
         self.inner.principal
     }
 
-    /// Accrued but unpaid interest included in the claim.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.accrued")]
     #[getter]
     fn accrued(&self) -> f64 {
         self.inner.accrued
     }
 
-    /// Penalties and fees included in the claim.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.penalties")]
     #[getter]
     fn penalties(&self) -> f64 {
         self.inner.penalties
     }
 
-    /// Gross value of collateral pledged to this claim.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.collateral_value")]
     #[getter]
     fn collateral_value(&self) -> Option<f64> {
         self.inner.collateral_value
     }
 
-    /// Haircut applied to `collateral_value`, as a fraction in [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.collateral_haircut")]
     #[getter]
     fn collateral_haircut(&self) -> f64 {
         self.inner.collateral_haircut
     }
 
-    /// Principal plus accrued interest and penalties.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.total_claim")]
     #[getter]
     fn total_claim(&self) -> f64 {
         self.inner.total_claim()
     }
 
-    /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         format!(
             "RecoveryClaim(id={:?}, seniority={:?}, priority={}, total_claim={})",
@@ -163,9 +138,14 @@ impl PyRecoveryClaim {
     }
 }
 
-wire_methods!(PyRecoveryClaim, RecoveryClaim, "RecoveryClaim");
+wire_methods!(
+    PyRecoveryClaim,
+    RecoveryClaim,
+    "RecoveryClaim",
+    module = "finstack_quant.models.credit.recovery_waterfall"
+);
 
-/// Recovery allocated to one claim.
+#[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation")]
 #[pyclass(
     name = "RecoveryAllocation",
     module = "finstack_quant.models.credit.recovery_waterfall",
@@ -180,72 +160,66 @@ pub struct PyRecoveryAllocation {
 
 #[pymethods]
 impl PyRecoveryAllocation {
-    /// Stable identifier for this claim.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.id")]
     #[getter]
     fn id(&self) -> String {
         self.inner.id.clone()
     }
 
-    /// Seniority class the claim sits in.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.seniority")]
     #[getter]
     fn seniority(&self) -> String {
         self.inner.seniority.clone()
     }
 
-    /// Absolute-priority rank; lower ranks are paid first.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.priority")]
     #[getter]
     fn priority(&self) -> u32 {
         self.inner.priority
     }
 
-    /// Principal plus accrued interest and penalties.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.total_claim")]
     #[getter]
     fn total_claim(&self) -> f64 {
         self.inner.total_claim
     }
 
-    /// Amount recovered from pledged collateral.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.collateral_recovery")]
     #[getter]
     fn collateral_recovery(&self) -> f64 {
         self.inner.collateral_recovery
     }
 
-    /// Amount recovered from the general estate.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.general_recovery")]
     #[getter]
     fn general_recovery(&self) -> f64 {
         self.inner.general_recovery
     }
 
-    /// Collateral plus general recovery.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.total_recovery")]
     #[getter]
     fn total_recovery(&self) -> f64 {
         self.inner.total_recovery
     }
 
-    /// `total_recovery / total_claim`, as a fraction in [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.recovery_rate")]
     #[getter]
     fn recovery_rate(&self) -> f64 {
         self.inner.recovery_rate
     }
 
-    /// Unrecovered claim: `total_claim - total_recovery`, floored at zero.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.deficiency")]
     #[getter]
     fn deficiency(&self) -> f64 {
         self.inner.deficiency
     }
 
-    /// Export as a single-row pandas ``DataFrame`` with the same columns as
-    /// ``RecoveryWaterfallResult.to_dataframe``.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let columns: Vec<&str> = ALLOCATION_COLUMNS.iter().map(|(name, _)| *name).collect();
         serde_object_to_single_row_dataframe_with_schema(py, &self.inner, &columns)
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RecoveryAllocation", &self.inner)
     }
@@ -254,10 +228,11 @@ impl PyRecoveryAllocation {
 wire_methods!(
     PyRecoveryAllocation,
     RecoveryAllocation,
-    "RecoveryAllocation"
+    "RecoveryAllocation",
+    module = "finstack_quant.models.credit.recovery_waterfall"
 );
 
-/// Result of allocating a distributable estate across claims.
+#[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult")]
 #[pyclass(
     name = "RecoveryWaterfallResult",
     module = "finstack_quant.models.credit.recovery_waterfall",
@@ -271,25 +246,25 @@ pub struct PyRecoveryWaterfallResult {
 
 #[pymethods]
 impl PyRecoveryWaterfallResult {
-    /// Sum of every claim's `total_recovery`.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.total_distributed")]
     #[getter]
     fn total_distributed(&self) -> f64 {
         self.inner.total_distributed
     }
 
-    /// Estate value left after all claims are satisfied.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.undistributed_estate")]
     #[getter]
     fn undistributed_estate(&self) -> f64 {
         self.inner.undistributed_estate
     }
 
-    /// Whether the run respected absolute priority end to end.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.apr_satisfied")]
     #[getter]
     fn apr_satisfied(&self) -> bool {
         self.inner.apr_satisfied
     }
 
-    /// Per-claim allocations, in absolute-priority order.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.allocations")]
     #[getter]
     fn allocations(&self) -> Vec<PyRecoveryAllocation> {
         self.inner
@@ -300,21 +275,7 @@ impl PyRecoveryWaterfallResult {
             .collect()
     }
 
-    /// Export the per-claim allocations as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``id``, ``seniority``, ``priority``, ``total_claim``,
-    /// ``collateral_recovery``, ``general_recovery``, ``total_recovery``,
-    /// ``recovery_rate``, ``deficiency``.
-    ///
-    /// One row per claim — the natural grain of a waterfall. Rows keep the
-    /// Rust ordering (ascending ``priority``, then original claim order), so
-    /// repeated exports of the same result are byte-identical. The
-    /// estate-level fields (:attr:`total_distributed`,
-    /// :attr:`undistributed_estate`, :attr:`apr_satisfied`) are deliberately
-    /// not repeated on every row; read them from the result object.
-    ///
-    /// A waterfall with no claims yields a zero-row frame that still carries
-    /// the columns above.
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         // `RecoveryAllocation` derives Serialize and is already a flat record
         // of `f64`/`String`/`u32` fields whose serde names match the columns
@@ -322,11 +283,6 @@ impl PyRecoveryWaterfallResult {
         serde_rows_to_dataframe_with_schema(py, &self.inner.allocations, ALLOCATION_COLUMNS)
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RecoveryWaterfallResult", &self.inner)
     }
@@ -335,24 +291,12 @@ impl PyRecoveryWaterfallResult {
 wire_methods!(
     PyRecoveryWaterfallResult,
     RecoveryWaterfallResult,
-    "RecoveryWaterfallResult"
+    "RecoveryWaterfallResult",
+    module = "finstack_quant.models.credit.recovery_waterfall"
 );
 impl_repr_html_via_dataframe!(PyRecoveryWaterfallResult);
 
-/// Allocate an estate, inclusive of collateral, across recovery claims.
-///
-/// Parameters
-/// ----------
-/// estate_value : float
-///     Total distributable estate including pledged collateral (>= 0).
-/// claims : list[RecoveryClaim]
-///     Claims to satisfy; collateral is applied first, then the remaining
-///     estate by ascending ``priority``.
-///
-/// Returns a ``RecoveryWaterfallResult``.
-///
-/// Raises ``ValueError`` for negative amounts, haircuts outside [0, 1], or
-/// duplicate claim ids after trimming.
+#[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "allocate_recovery")]
 #[pyfunction]
 #[pyo3(text_signature = "(estate_value, claims)")]
 fn allocate_recovery(
@@ -374,7 +318,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "recovery_waterfall")?;
     m.setattr(
         "__doc__",
-        "Absolute-priority recovery allocation with estate-inclusive collateral.",
+        pydoc!(
+            "finstack_quant.models.credit.recovery_waterfall",
+            "__module__"
+        ),
     )?;
 
     m.add_class::<PyRecoveryClaim>()?;

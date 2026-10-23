@@ -305,7 +305,21 @@ class CopulaSpec:
         ...
 
     def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
     def __repr__(self) -> str:
         """Python-style repr, e.g. ``CopulaSpec(type='student_t', degrees_of_freedom=5.0)``."""
         ...
@@ -624,6 +638,22 @@ class CreditExposure:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class PortfolioLossConfig:
     """
     Settings for deterministic portfolio credit-loss simulation.
@@ -776,6 +806,22 @@ class PortfolioLossConfig:
         ------
         ValueError
             If ``json`` is malformed or does not match the serialized schema.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...
 
@@ -1067,6 +1113,22 @@ class PortfolioLossResult:
             If ``json`` is malformed, does not match the serialized schema, has
             an invalid loss or confidence, or carries aggregates that disagree
             with its losses (deserialization reruns :meth:`from_losses`).
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...
 
@@ -1364,6 +1426,22 @@ class TrancheLossStatistics:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class RecoverySpec:
     """
     Recovery model specification for configuration and deferred construction.
@@ -1549,7 +1627,21 @@ class RecoverySpec:
         ...
 
     def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
     def __repr__(self) -> str:
         """Python-style repr, e.g. ``RecoverySpec(type='constant', rate=0.4)``."""
         ...

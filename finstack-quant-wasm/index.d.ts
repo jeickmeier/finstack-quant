@@ -25230,10 +25230,10 @@ export interface DynamicRecoverySpecConstructor {
    */
   inversePower(baseRecovery: number, baseNotional: number, exponent: number): DynamicRecoverySpec;
   /**
-   * Recovery that declines linearly in the notional ratio down to a floor.
+   * Recovery `clamp(R0 * (1 - sensitivity * (N / N0 - 1)), floor, R0)`.
    * @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
    * @param baseNotional - Positive reference notional `N0` in the instrument's currency.
-   * @param slope - Non-negative recovery lost per unit increase of `N / N0 - 1`.
+   * @param sensitivity - Non-negative dimensionless relative recovery sensitivity per unit increase of `N / N0 - 1`.
    * @param floor - Minimum recovery as a fraction in `[0, baseRecovery]`.
    * @returns The linear-decline recovery specification.
    * @throws Error - Throws a `validation` error on non-finite or out-of-range inputs.
@@ -25241,7 +25241,7 @@ export interface DynamicRecoverySpecConstructor {
   linearDecline(
     baseRecovery: number,
     baseNotional: number,
-    slope: number,
+    sensitivity: number,
     floor: number
   ): DynamicRecoverySpec;
 }
@@ -25424,10 +25424,10 @@ export interface EndogenousHazardSpecConstructor {
   powerLaw(baseHazard: number, baseLeverage: number, exponent: number): EndogenousHazardSpec;
   /**
    * Piecewise-linear leverage-to-hazard table.
-   * @param leveragePoints - Strictly increasing leverage ratios, at least two, as a `number[]` or `Float64Array`.
+   * @param leveragePoints - One or more finite non-negative leverage ratios, strictly increasing when multiple points are supplied; a single point gives constant hazard.
    * @param hazardPoints - Annualized hazard rates at those leverage points; same length, non-negative.
-   * @returns The tabular hazard specification.
-   * @throws Error - Throws a `validation` error if the arrays differ in length, hold fewer than two points, are not strictly increasing in leverage, or contain non-finite or negative values.
+   * @returns The tabular hazard specification, with base leverage and hazard taken from the first pair.
+   * @throws Error - Throws a `validation` error if the arrays differ in length, are empty, are not strictly increasing in leverage, or contain non-finite or negative values.
    */
   tabular(leveragePoints: NumericArray, hazardPoints: NumericArray): EndogenousHazardSpec;
 }
@@ -26563,7 +26563,6 @@ export interface ToggleExerciseModelConstructor {
   /**
    * Nested-Monte-Carlo optimal exercise rule.
    * @param nestedPaths - Inner simulation paths per decision date; a positive safe integer.
-   * @param equityDiscountRate - Continuously compounded equity discount rate, as a decimal.
    * @param assetVol - Annualized asset volatility as a decimal; non-negative.
    * @param riskFreeRate - Continuously compounded risk-free rate, as a decimal.
    * @param horizon - Inner simulation horizon in years; positive and finite.
@@ -26572,7 +26571,6 @@ export interface ToggleExerciseModelConstructor {
    */
   optimal(
     nestedPaths: number,
-    equityDiscountRate: number,
     assetVol: number,
     riskFreeRate: number,
     horizon: number

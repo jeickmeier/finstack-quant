@@ -82,10 +82,9 @@ in the engine loop and configured with `McEngineConfig::antithetic`.
 | `process::rough_heston` | `RoughHestonParams`, `RoughHestonProcess` |
 | `process::cheyette_rough` | `CheyetteRoughVolParams`, `CheyetteRoughVolProcess` |
 
-There is no `process::correlation` module. Correlation helpers live in
-`finstack_quant_core::math::linalg`; the prelude re-exports `apply_correlation`
-and `cholesky_decomposition`, while `cholesky_correlation` (the engine's own
-factoring entry point) must be imported from core directly. A process declares
+Correlation helpers `apply_correlation`, `cholesky_decomposition`, and
+`cholesky_correlation` live in `finstack_quant_core::math::linalg` and are
+imported from core directly. A process declares
 its factor correlation via
 `StochasticProcess::factor_correlation`; the engine Cholesky-factors it and
 applies it to the raw shocks unless the scheme reports
@@ -461,8 +460,8 @@ Default path counts, seeds, and parallel/antithetic flags are versioned JSON in
 [`data/defaults/pricer_defaults.v1.json`](data/defaults/pricer_defaults.v1.json),
 embedded at build time and read by `McEngineConfig::new`, `LsmcConfig::new`,
 `PathDependentPricerConfig`, and the convenience pricers.
-Overlays use the `FinstackConfig` extension key
-`monte_carlo.defaults.v1` (`registry::MONTE_CARLO_DEFAULTS_EXTENSION_KEY`).
+`registry::embedded_defaults()` validates and caches the embedded record;
+explicit pricer arguments control per-run overrides.
 
 ## Extending the crate
 
@@ -489,16 +488,16 @@ via `max_event_step()` so grid mismatches are caught up front.
 
 ## Bindings
 
-- **Python** — `finstack_quant.models.monte_carlo` exposes `McEngine`, `TimeGrid`,
-  `EuropeanPricer`, `PathDependentPricer`, `LsmcPricer`, `MoneyEstimate`,
-  `Estimate`, `PathSummary`, `simulate_paths`, `price_heston`,
-  `heston_satisfies_feller`, `black_scholes_call` /
-  `black_scholes_put`, and the four finite-difference Greek functions.
+- **Python** — `finstack_quant.models.monte_carlo` exposes `EuropeanPricer`,
+  `PathDependentPricer`, `LsmcPricer`, `MoneyEstimate`, `Estimate`, `LrmGreeks`,
+  `PathSummary`, `simulate_paths`, `price_heston`, `heston_satisfies_feller`,
+  `finite_diff_delta`, and `finite_diff_gamma`. Built-in process and time-grid
+  choices are plain-data simulation specifications.
 - **WASM** — the `models.monteCarlo` namespace in
   [`exports/models/monteCarlo.js`](../../finstack-quant-wasm/exports/models/monteCarlo.js)
-  exposes `simulatePaths` and the convenience pricers: `EuropeanPricer.priceGbm`,
-  `priceHeston`, `priceAsian`, `priceAmerican`,
-  `priceAmericanUnbiased`, and `blackScholesCall/Put`.
+  exposes `simulatePaths`, `priceHeston`, `hestonSatisfiesFeller`,
+  `finiteDiffDelta`, `finiteDiffGamma`, and `relativeStderr`, with convenience
+  pricing methods on `EuropeanPricer`, `PathDependentPricer`, and `LsmcPricer`.
 
 Neither binding exposes the generic trait surface: `simulate_paths` selects among
 the built-in processes and schemes by spec, and custom processes, schemes, and

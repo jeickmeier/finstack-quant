@@ -1049,9 +1049,14 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #     lgd::DownturnMethod (string / float / `method` + `params` on the host side)
 #   - credit::{ThresholdToggle, StochasticToggle, OptimalToggle}
 #     (reached through ToggleExerciseModel.kind / .params)
+# OptimalExercise uses undiscounted common-path payoff sums; optimal has
+# nested_paths, asset_vol, risk_free_rate and horizon in both hosts.
 #   - credit::{DynamicRecoveryModel, LeverageHazardMap}
 #     (reached through DynamicRecoverySpec.kind / .model and
 #     EndogenousHazardSpec.kind / .leverage_hazard_map)
+# DynamicRecoverySpec.linear_decline / linearDecline uses Rust's dimensionless
+# sensitivity in R0 * (1 - sensitivity * (N / N0 - 1)), bounded by floor and R0.
+# EndogenousHazardSpec.tabular accepts one or more points in both hosts.
 #   - MigrationSimulator::simulate / empirical_matrix with a caller-supplied
 #     RNG (hosts always use the seeded canonical Pcg64); RatingPaths is a
 #     host-side collection over Vec<RatingPath>, not a Rust type
@@ -2059,6 +2064,8 @@ js = "models.credit.migration"
 js = "models.credit.pd"
 types = { MasterScaleGrade = "MasterScaleGrade", MasterScaleResult = "MasterScaleResult" }
 
+# RecoveryWaterfallResult's Python to_json/from_json restore the stored Rust
+# aggregate and allocations; both existing wire methods are documented in stubs.
 [parity.modules."finstack_quant.models.credit.recovery_waterfall"]
 js = "models.credit.recoveryWaterfall"
 types = { RecoveryAllocation = "RecoveryAllocation", RecoveryClaim = "RecoveryClaim", RecoveryWaterfallResult = "RecoveryWaterfallResult" }
