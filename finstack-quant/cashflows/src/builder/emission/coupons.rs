@@ -587,18 +587,7 @@ pub(crate) fn emit_float_coupons_on(
                     constraints,
                 }
             } else {
-                FloatingRateObservation::Term {
-                    reset_date,
-                    tenor_years: resolved_curve.as_deref().map_or_else(
-                        || {
-                            spec.rate_spec
-                                .index_tenor
-                                .unwrap_or(spec.rate_spec.reset_frequency)
-                                .to_years()
-                        },
-                        ForwardCurve::tenor,
-                    ),
-                }
+                FloatingRateObservation::Term { reset_date }
             };
             let series_id = fixing_series_id(spec.rate_spec.forward_curve_id.as_str());
             match &observation {
