@@ -9,7 +9,7 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pandas_utils::serde_to_py;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::Instrument;
@@ -137,60 +137,6 @@ impl PyConversionSpec {
         })
     }
 
-    /// Deserialize from the canonical JSON shape.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON object with ``ratio``, ``price``, ``policy``, ``anti_dilution``,
-    ///     ``dividend_adjustment`` and optional ``dilution_events``.
-    ///
-    /// Returns
-    /// -------
-    /// ConversionSpec
-    ///     The parsed terms.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import ConversionSpec
-    /// >>> ConversionSpec.from_json(ConversionSpec(ratio=20.0, policy="voluntary", anti_dilution="none", dividend_adjustment="none").to_json()).ratio
-    /// 20.0
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| serde_json_to_py(e, "invalid ConversionSpec JSON"))
-    }
-
-    /// Serialize to the canonical JSON shape.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON accepted by ``from_json`` and ``ConvertibleBondBuilder.conversion``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize ConversionSpec"))
-    }
-
-    /// Support `pickle` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Conversion policy: ``"voluntary"`` or the tagged dict form.
     #[getter]
     fn policy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -306,59 +252,6 @@ impl PyCallPutSchedule {
                 puts: windows_from_py(py, puts, "puts")?,
             },
         })
-    }
-
-    /// Deserialize from the canonical JSON shape (``{"calls": [...], "puts": [...]}``).
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON object with ``calls`` and ``puts`` arrays.
-    ///
-    /// Returns
-    /// -------
-    /// CallPutSchedule
-    ///     The parsed schedule.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CallPutSchedule
-    /// >>> CallPutSchedule.from_json('{"calls": [], "puts": []}').puts
-    /// []
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| serde_json_to_py(e, "invalid CallPutSchedule JSON"))
-    }
-
-    /// Serialize to the canonical JSON shape.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON accepted by ``from_json`` and ``ConvertibleBondBuilder.call_put``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CallPutSchedule"))
-    }
-
-    /// Support `pickle` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     /// Issuer call windows as dicts.
@@ -1207,3 +1100,16 @@ pub(crate) const EXPORTS: &[&str] = &[
     "ConvertibleBond",
     "ConvertibleBondBuilder",
 ];
+
+crate::bindings::macros::wire_methods!(
+    PyConversionSpec,
+    ConversionSpec,
+    "ConversionSpec",
+    module = "finstack_quant.valuations.instruments"
+);
+crate::bindings::macros::wire_methods!(
+    PyCallPutSchedule,
+    CallPutSchedule,
+    "CallPutSchedule",
+    module = "finstack_quant.valuations.instruments"
+);
