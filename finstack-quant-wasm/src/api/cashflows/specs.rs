@@ -11,35 +11,10 @@ use crate::utils::input::{js_currency, js_f64, js_uint};
 use crate::utils::wire::{js_decimal, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::{
-    DefaultModelSpec, FeeSpec, FloatingLegCompounding, FloatingRateSpec, Notional,
+    DefaultModelSpec, FloatingLegCompounding, FloatingRateSpec, Notional,
     PrepaymentModelSpec, RecoveryModelSpec, ScheduleParams,
 };
 use wasm_bindgen::prelude::*;
-
-// --- FeeSpec -------------------------------------------------------------------
-
-/// Recurring fee quoted in basis points of a drawn or undrawn balance.
-///
-/// The argument is the `periodic_bp` payload of `FeeSpec`, parsed by the Rust
-/// serde contract: `business_day_convention` defaults to `"modified_following"`,
-/// `stub` to `"short_front"` and `accrual_basis` to `"point_in_time"`; every
-/// other field is required. (Python's
-/// `FeeSpec.periodic_bp` takes the same fields positionally.)
-///
-/// @param fields - `{ base, bp, frequency, day_count, business_day_convention?, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
-/// @returns Canonical `FeeSpec` wire value `{ periodic_bp: { ... } }` with defaults filled in.
-/// @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
-#[wasm_bindgen(js_name = feeSpecPeriodicBp)]
-pub fn fee_spec_periodic_bp(fields: JsValue) -> Result<JsValue, JsValue> {
-    let fields: serde_json::Value = js_wire(&fields, "fields")?;
-    let spec: FeeSpec = serde_json::from_value(serde_json::json!({ "periodic_bp": fields }))
-        .map_err(|error| {
-            to_js_err(finstack_quant_core::Error::Validation(format!(
-                "fields: {error}"
-            )))
-        })?;
-    to_js_value(&spec)
-}
 
 // --- Floating-rate conventions ----------------------------------------------
 
