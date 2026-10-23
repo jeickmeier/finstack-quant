@@ -118,24 +118,6 @@ impl PyCompositeLegSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeLegSpec.from_json")]
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        deserialize_json_with_context(json, "invalid CompositeLegSpec JSON")
-            .map(|inner| Self { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeLegSpec.to_json")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json_with_context(&self.inner, "failed to serialize CompositeLegSpec")
-    }
-
-    /// Support pickle through the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeLegSpec.instrument_dict")]
     fn instrument_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(
@@ -258,24 +240,6 @@ impl PyWeightingMethod {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.composite", "WeightingMethod.from_json")]
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        deserialize_json_with_context(json, "invalid WeightingMethod JSON")
-            .map(|inner| Self { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.composite", "WeightingMethod.to_json")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json_with_context(&self.inner, "failed to serialize WeightingMethod")
-    }
-
-    /// Support pickle through the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Return ``repr(self)`` (``WeightingMethod(kind='dv01_neutral', anchor_leg_id='A', ...)``).
     fn __repr__(&self) -> String {
         let fields = serde_json::to_value(&self.inner)
@@ -346,26 +310,6 @@ impl PyRebalanceRule {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.composite", "RebalanceRule.from_json")]
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: RebalanceRule =
-            deserialize_json_with_context(json, "invalid RebalanceRule JSON")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.composite", "RebalanceRule.to_json")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json_with_context(&self.inner, "failed to serialize RebalanceRule")
-    }
-
-    /// Support pickle through the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Return ``repr(self)`` (``RebalanceRule(kind='manual')``).
     fn __repr__(&self) -> String {
         let fields = serde_json::to_value(&self.inner)
@@ -408,26 +352,6 @@ impl PyCompositeSpec {
         );
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeSpec.from_json")]
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: CompositeSpec =
-            deserialize_json_with_context(json, "invalid CompositeSpec JSON")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeSpec.to_json")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json_with_context(&self.inner, "failed to serialize CompositeSpec")
-    }
-
-    /// Support pickle through the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeSpec.legs")]
@@ -515,24 +439,6 @@ pub struct PyCompositeState {
 
 #[pymethods]
 impl PyCompositeState {
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeState.from_json")]
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        deserialize_json_with_context(json, "invalid CompositeState JSON")
-            .map(|inner| Self { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeState.to_json")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json_with_context(&self.inner, "failed to serialize CompositeState")
-    }
-
-    /// Support pickle through the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -710,13 +616,6 @@ impl PyCompositeRebalanceResult {
 
 #[pymethods]
 impl PyCompositeRebalanceResult {
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeRebalanceResult.from_json")]
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        deserialize_json_with_context(json, "invalid CompositeRebalanceResult JSON")
-            .map(|inner| Self { inner })
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeRebalanceResult.trades")]
     #[getter]
     fn trades<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -726,17 +625,6 @@ impl PyCompositeRebalanceResult {
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeRebalanceResult.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_rows_to_dataframe_with_schema(py, &self.inner.trades, COMPOSITE_TRADE_COLUMNS)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeRebalanceResult.to_json")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json_with_context(&self.inner, "failed to serialize CompositeRebalanceResult")
-    }
-
-    /// Support pickle through the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     fn __repr__(&self) -> String {
@@ -774,13 +662,6 @@ impl PyCompositeExposureReport {
 
 #[pymethods]
 impl PyCompositeExposureReport {
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeExposureReport.from_json")]
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        deserialize_json_with_context(json, "invalid CompositeExposureReport JSON")
-            .map(|inner| Self { inner })
-    }
-
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeExposureReport.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = self
@@ -800,17 +681,6 @@ impl PyCompositeExposureReport {
             })
             .collect::<Vec<_>>();
         serde_rows_to_dataframe_with_schema(py, &rows, COMPOSITE_AGGREGATE_COLUMNS)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeExposureReport.to_json")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json_with_context(&self.inner, "failed to serialize CompositeExposureReport")
-    }
-
-    /// Support pickle through the canonical JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     fn __repr__(&self) -> String {
@@ -1039,3 +909,50 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
         crate::bindings::module_utils::Exposure::Compiled,
     )
 }
+
+crate::bindings::macros::wire_methods!(
+    PyCompositeState,
+    CompositeState,
+    "CompositeState",
+    module = "finstack_quant.valuations.composite"
+);
+crate::bindings::macros::wire_methods!(
+    PyCompositeRebalanceResult,
+    CompositeRebalanceResult,
+    "CompositeRebalanceResult",
+    module = "finstack_quant.valuations.composite"
+);
+crate::bindings::macros::wire_methods!(
+    PyCompositeExposureReport,
+    CompositeExposureReport,
+    "CompositeExposureReport",
+    module = "finstack_quant.valuations.composite"
+);
+crate::bindings::macros::wire_methods!(
+    PyCompositeLegSpec,
+    CompositeLegSpec,
+    "CompositeLegSpec",
+    module = "finstack_quant.valuations.composite"
+);
+crate::bindings::macros::wire_methods!(
+    PyWeightingMethod,
+    WeightingMethod,
+    "WeightingMethod",
+    module = "finstack_quant.valuations.composite"
+);
+
+crate::bindings::macros::wire_methods!(
+    PyRebalanceRule,
+    RebalanceRule,
+    "RebalanceRule",
+    module = "finstack_quant.valuations.composite",
+    validate
+);
+
+crate::bindings::macros::wire_methods!(
+    PyCompositeSpec,
+    CompositeSpec,
+    "CompositeSpec",
+    module = "finstack_quant.valuations.composite",
+    validate
+);

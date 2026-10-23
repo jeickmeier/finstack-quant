@@ -165,7 +165,15 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
     "finstack_quant.valuations.composite": None,
     "finstack_quant.valuations.market": None,
     "finstack_quant.valuations.schema": None,
-    "finstack_quant.valuations.instruments": ("__module__", *_INSTRUMENT_MACRO_OWNERS),
+    "finstack_quant.valuations.instruments": (
+        "__module__",
+        *_INSTRUMENT_MACRO_OWNERS,
+        *(
+            f"{cls}.{method}"
+            for cls in ("ConversionSpec", "CallPutSchedule", "CdsIndexConstituent")
+            for method in ("to_json", "from_json")
+        ),
+    ),
     # `schema_registry_functions!` documents index/get/validate from each stub.
     "finstack_quant.attribution.schema": _SCHEMA_REGISTRY,
     "finstack_quant.calibration.schema": _SCHEMA_REGISTRY,

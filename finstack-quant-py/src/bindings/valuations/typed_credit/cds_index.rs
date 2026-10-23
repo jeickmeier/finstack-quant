@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndexConstituent, CdsIndexParams, IndexPricing,
@@ -335,61 +335,6 @@ impl PyCdsIndexConstituent {
                 defaulted,
             },
         }
-    }
-
-    /// Deserialize from the canonical JSON shape.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON object with ``credit`` (``reference_entity``, ``recovery_rate``,
-    ///     ``credit_curve_id``), ``weight`` and optional ``defaulted``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndexConstituent
-    ///     The parsed constituent.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CdsIndexConstituent
-    /// >>> row = CdsIndexConstituent("ACME-CORP", 0.4, "ACME-HZD", 0.008)
-    /// >>> CdsIndexConstituent.from_json(row.to_json()).credit_curve_id
-    /// 'ACME-HZD'
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| serde_json_to_py(e, "invalid CdsIndexConstituent JSON"))
-    }
-
-    /// Serialize to the canonical JSON shape.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON accepted by ``from_json`` and by ``CdsIndexBuilder.constituents``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CdsIndexConstituent"))
-    }
-
-    /// Support `pickle` via the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     /// Return ``repr(self)``.
@@ -1188,3 +1133,10 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCdsIndexConstituent>()?;
     Ok(())
 }
+
+crate::bindings::macros::wire_methods!(
+    PyCdsIndexConstituent,
+    CdsIndexConstituent,
+    "CdsIndexConstituent",
+    module = "finstack_quant.valuations.instruments"
+);

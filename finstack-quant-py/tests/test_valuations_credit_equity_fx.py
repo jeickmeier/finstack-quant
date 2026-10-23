@@ -710,3 +710,22 @@ class TestFxOption:
             build({"meta": {"k": 1}})
         with pytest.raises(TypeError, match="attributes"):
             build(["fx"])
+
+
+@pytest.mark.parametrize("kind", ["conversion", "call_put", "constituent"])
+def test_plain_spec_wire_methods_preserve_bytes_errors_and_pickle(kind: str) -> None:
+    values = {
+        "conversion": ConversionSpec(ratio=20.0, policy="voluntary", anti_dilution="none", dividend_adjustment="none"),
+        "call_put": CallPutSchedule(calls=[], puts=[]),
+        "constituent": CdsIndexConstituent("ACME-CORP", 0.4, "CORP-HAZARD", 0.5),
+    }
+    value = values[kind]
+    cls = type(value)
+    wire = value.to_json()
+    assert cls.from_json(wire).to_json() == wire
+    assert pickle.loads(pickle.dumps(value)).to_json() == wire  # noqa: S301
+    with pytest.raises(ValueError, match=f"invalid {cls.__name__} JSON") as error:
+        cls.from_json("{")
+    assert str(error.value) == f"invalid {cls.__name__} JSON: EOF while parsing an object at line 1 column 1"
+    if kind == "call_put":
+        assert wire == '{"calls":[],"puts":[]}'
