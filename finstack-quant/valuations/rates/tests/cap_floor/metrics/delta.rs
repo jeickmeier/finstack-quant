@@ -475,9 +475,11 @@ fn compounded_sofr_delta_matches_parallel_forward_finite_difference() {
         spread_compounding: OvernightSpreadCompounding::Exclude,
     });
     let discount = build_flat_discount_curve(0.04, as_of, "USD_OIS");
-    let surface = build_flat_vol_surface(0.005, as_of, "USD_CAP_VOL")
-        .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
-        .expect("valid quote convention");
+    let surface = finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+        &build_flat_vol_surface(0.005, as_of, "USD_CAP_VOL"),
+        finstack_quant_core::market_data::surfaces::VolQuoteType::Normal,
+    )
+    .expect("valid quote convention");
     let forward = |shift: f64| {
         ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 360.0)
             .base_date(as_of)

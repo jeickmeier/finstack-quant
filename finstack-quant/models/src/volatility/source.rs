@@ -5,8 +5,8 @@ use std::sync::Arc;
 use finstack_quant_core::{
     market_data::context::MarketContext,
     market_data::surfaces::{
-        FxDeltaVolSurface, VolCube, VolCubeExpirySlice, VolInterpolationMode, VolQuoteType,
-        VolSurface, VolSurfaceAxis,
+        FxDeltaVolSurface, VolCube, VolCubeExpirySlice, VolGridOpts, VolInterpolationMode,
+        VolQuoteType, VolSurface, VolSurfaceAxis,
     },
     types::CurveId,
     Error, InputError, Result,
@@ -674,34 +674,49 @@ fn materialize_cube_tenor_slice_with_convention(
             });
         }
     }
-    let surface = VolSurface::from_grid(
+    let interpolation_mode = cube.interpolation_mode();
+    if normal {
+        return VolSurface::from_grid(
+            cube.id().as_str(),
+            cube.expiries(),
+            strikes,
+            &values,
+            VolGridOpts {
+                quote_type: VolQuoteType::Normal,
+                interpolation_mode,
+                ..VolGridOpts::default()
+            },
+            None,
+        );
+    }
+    let shifts: Vec<Option<f64>> = cube
+        .expiries()
+        .iter()
+        .map(|&expiry| cube_params(cube, expiry, tenor).0.shift)
+        .collect();
+    let displacements = shifts.iter().any(Option::is_some).then(|| {
+        shifts
+            .iter()
+            .map(|shift| shift.unwrap_or(0.0))
+            .collect::<Vec<_>>()
+    });
+    let quote_type = if displacements.is_some() {
+        VolQuoteType::ShiftedBlackLognormal
+    } else {
+        VolQuoteType::BlackLognormal
+    };
+    VolSurface::from_grid(
         cube.id().as_str(),
         cube.expiries(),
         strikes,
         &values,
-        Default::default(),
-        None,
-    )?
-    .with_interpolation_mode(cube.interpolation_mode());
-    Ok(if normal {
-        surface.with_quote_type(VolQuoteType::Normal)?
-    } else {
-        let shifts: Vec<Option<f64>> = cube
-            .expiries()
-            .iter()
-            .map(|&expiry| cube_params(cube, expiry, tenor).0.shift)
-            .collect();
-        if shifts.iter().any(Option::is_some) {
-            surface.with_displacements(
-                &shifts
-                    .into_iter()
-                    .map(|shift| shift.unwrap_or(0.0))
-                    .collect::<Vec<_>>(),
-            )?
-        } else {
-            surface
-        }
-    })
+        VolGridOpts {
+            quote_type,
+            interpolation_mode,
+            ..VolGridOpts::default()
+        },
+        displacements.as_deref(),
+    )
 }
 
 /// Materialize lognormal quotes on tenor and strike axes at one fixed expiry.

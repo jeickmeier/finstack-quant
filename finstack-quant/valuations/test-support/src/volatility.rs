@@ -1,4 +1,42 @@
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolQuoteType, VolSurface};
+
+/// Copy of `surface` under a different quote convention.
+///
+/// Rebuilds the surface through [`VolSurface::from_grid`], keeping its axes,
+/// grid, secondary axis and interpolation mode. Displacements carry over only
+/// for shifted Black quotes.
+///
+/// # Arguments
+///
+/// * `surface` - Surface to relabel; its grid and metadata are copied.
+/// * `quote_type` - Quote convention of the copy.
+///
+/// # Errors
+///
+/// Returns the validation error `VolSurface::from_grid` reports for an
+/// incompatible combination, such as shifted Black without displacements.
+pub fn relabel_quote_type(
+    surface: &VolSurface,
+    quote_type: VolQuoteType,
+) -> finstack_quant_core::Result<VolSurface> {
+    let displacements = if quote_type == VolQuoteType::ShiftedBlackLognormal {
+        surface.displacements()
+    } else {
+        None
+    };
+    VolSurface::from_grid(
+        surface.id().as_str(),
+        surface.expiries(),
+        surface.strikes(),
+        surface.vols(),
+        VolGridOpts {
+            secondary_axis: surface.secondary_axis(),
+            quote_type,
+            interpolation_mode: surface.interpolation_mode(),
+        },
+        displacements,
+    )
+}
 
 /// Build a constant vol surface using provided expiries/strikes grid.
 ///

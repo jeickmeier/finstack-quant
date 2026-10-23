@@ -473,10 +473,11 @@ mod tests {
             .expect("surface");
         for surface in [
             base.as_ref().clone().with_displacements(&[0.1; 2]).unwrap(),
-            base.as_ref()
-                .clone()
-                .with_quote_type(VolQuoteType::Normal)
-                .unwrap(),
+            finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+                base.as_ref(),
+                VolQuoteType::Normal,
+            )
+            .unwrap(),
             finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
                 base.id(),
                 base.expiries(),

@@ -556,7 +556,18 @@ mod tests {
     fn local_vol_rejects_unsupported_conventions_before_smoothing() {
         let (base, forwards) = test_surface();
         let shifted = base.clone().with_displacements(&[20.0; 4]).unwrap();
-        let normal = base.clone().with_quote_type(VolQuoteType::Normal).unwrap();
+        let normal = VolSurface::from_grid(
+            base.id(),
+            base.expiries(),
+            base.strikes(),
+            base.vols(),
+            VolGridOpts {
+                quote_type: VolQuoteType::Normal,
+                ..VolGridOpts::default()
+            },
+            None,
+        )
+        .expect("normal surface");
         let tenor_grid = VolSurface::from_grid(
             base.id(),
             base.expiries(),

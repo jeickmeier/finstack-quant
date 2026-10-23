@@ -273,9 +273,11 @@ fn normal_implied_vol_round_trips_non_positive_forward() {
         .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
         .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
         .insert_surface(
-            build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL")
-                .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
-                .expect("valid quote convention"),
+            finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+                &build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"),
+                finstack_quant_core::market_data::surfaces::VolQuoteType::Normal,
+            )
+            .expect("valid quote convention"),
         );
     let mut caplet = CapFloor::new(
         "NORMAL-IV-NEGATIVE",
@@ -405,9 +407,11 @@ fn auto_implied_vol_round_trips_negative_rate_normal_quote() {
         .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
         .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
         .insert_surface(
-            build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL")
-                .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
-                .expect("valid quote convention"),
+            finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+                &build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"),
+                finstack_quant_core::market_data::surfaces::VolQuoteType::Normal,
+            )
+            .expect("valid quote convention"),
         );
     let mut caplet = CapFloor::new(
         "AUTO-IV-NEGATIVE",
