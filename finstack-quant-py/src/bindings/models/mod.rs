@@ -11,16 +11,14 @@ pub mod rates;
 mod volatility;
 mod volatility_arbitrage;
 
+use crate::bindings::pydoc::pydoc;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
 /// Register the `finstack_quant.models` domain.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let module = crate::bindings::module_utils::new_submodule(parent, "models")?;
-    module.setattr(
-        "__doc__",
-        "Reusable analytical, Fourier, volatility, credit, correlation, rates, and Monte Carlo models.",
-    )?;
+    module.setattr("__doc__", pydoc!("finstack_quant.models", "__module__"))?;
 
     closed_form::register(py, &module)?;
     fourier::register(py, &module)?;

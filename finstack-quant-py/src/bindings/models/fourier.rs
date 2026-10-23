@@ -9,6 +9,7 @@
 //! removed because the underlying implementation was known-divergent
 //! off-ATM. Use `bs_cos_price` for all Black-Scholes Fourier pricing.
 
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_models::fourier::cos::{
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
@@ -17,43 +18,7 @@ use finstack_quant_models::fourier::cos::{
 use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
 
-/// Price a European option under the Black-Scholes model using the COS method.
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Current spot price of the underlying.
-/// strike : float
-///     Option strike.
-/// rate : float
-///     Continuously-compounded risk-free rate (annualized).
-/// div_yield : float
-///     Continuous dividend yield (annualized, decimal).
-/// vol : float
-///     Annualized volatility (decimal); must be strictly positive.
-/// expiry : float
-///     Time to expiry in years.
-/// is_call : bool
-///     ``True`` for a call, ``False`` for a put.
-/// n_terms : int, optional
-///     Positive number of cosine terms in the expansion; omit to use the pricer default.
-///
-/// Returns
-/// -------
-/// float
-///     Present-value option price in the underlying's currency units.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If spot, strike, expiry, or volatility is not finite and positive,
-///     rates/carry are non-finite, ``n_terms`` is zero, or the COS calculation
-///     has a degenerate truncation range or non-finite output.
-///
-/// Sources
-/// -------
-/// - Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008
-/// - Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973
+#[doc = pydoc!("finstack_quant.models", "bs_cos_price")]
 #[pyfunction]
 #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]
@@ -85,48 +50,7 @@ fn bs_cos_price(
     })
 }
 
-/// Price a European option under the Variance Gamma model using the COS method.
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Current spot price.
-/// strike : float
-///     Option strike.
-/// rate : float
-///     Continuously-compounded risk-free rate.
-/// div_yield : float
-///     Continuous dividend yield (decimal).
-/// sigma : float
-///     Volatility of the subordinated Brownian motion.
-/// theta : float
-///     Finite annual log-return drift of the subordinated Brownian motion;
-///     negative values skew left.
-/// nu : float
-///     Positive finite variance rate of the Gamma time change, in years.
-/// expiry : float
-///     Time to expiry in years.
-/// is_call : bool
-///     ``True`` for a call, ``False`` for a put.
-/// n_terms : int, optional
-///     Positive number of cosine terms; omit to use the pricer default (heavier tails may need more).
-///
-/// Returns
-/// -------
-/// float
-///     Present-value option price.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If spot, strike, expiry, sigma, or nu is not finite and positive,
-///     rates/carry/theta are non-finite, the VG martingale condition fails,
-///     ``n_terms`` is zero, or the COS calculation is invalid or non-finite.
-///
-/// Sources
-/// -------
-/// - Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008
-/// - Madan-Carr-Chang (1998): see docs/REFERENCES.md#madan-carr-chang-1998
+#[doc = pydoc!("finstack_quant.models", "vg_cos_price")]
 #[pyfunction]
 #[pyo3(signature = (spot, strike, rate, div_yield, sigma, theta, nu, expiry, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]
@@ -162,51 +86,7 @@ fn vg_cos_price(
     })
 }
 
-/// Price a European option under Merton (1976) jump-diffusion using the COS method.
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Current spot price.
-/// strike : float
-///     Option strike.
-/// rate : float
-///     Continuously-compounded risk-free rate.
-/// div_yield : float
-///     Continuous dividend yield (decimal).
-/// sigma : float
-///     Diffusion volatility.
-/// mu_jump : float
-///     Mean of log-jump size (negative for left-skewed crash risk).
-/// sigma_jump : float
-///     Standard deviation of log-jump size.
-/// lambda_ : float
-///     Jump intensity (expected number of jumps per year). Named ``lambda_``
-///     because ``lambda`` is a Python keyword.
-/// expiry : float
-///     Time to expiry in years.
-/// is_call : bool
-///     ``True`` for a call, ``False`` for a put.
-/// n_terms : int, optional
-///     Positive number of cosine terms; omit to use the pricer default.
-///
-/// Returns
-/// -------
-/// float
-///     Present-value option price.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If spot, strike, or expiry is not finite and positive, any rate/carry
-///     or log-jump mean is non-finite, volatility or jump intensity is negative
-///     or non-finite, the jump compensator overflows, ``n_terms`` is zero,
-///     or the COS calculation is invalid or non-finite.
-///
-/// Sources
-/// -------
-/// - Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008
-/// - Merton jump-diffusion (1976): see docs/REFERENCES.md#merton-1976-jump
+#[doc = pydoc!("finstack_quant.models", "merton_jump_cos_price")]
 #[pyfunction]
 #[pyo3(signature = (spot, strike, rate, div_yield, sigma, mu_jump, sigma_jump, lambda_, expiry, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]

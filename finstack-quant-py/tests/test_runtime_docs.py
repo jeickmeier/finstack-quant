@@ -39,6 +39,7 @@ PACKAGE_DIR = Path(finstack_quant.__file__).parent
 _SCHEMA_REGISTRY = ("get", "index", "validate")
 
 CONVERTED: dict[str, tuple[str, ...] | None] = {
+    "finstack_quant.models": None,
     "finstack_quant.calibration": (
         "validate_surface",
         "validate_calendar_spread",
@@ -223,7 +224,9 @@ def test_no_runtime_docstring_without_a_stub_source(module: str) -> None:
         if not inspect.isclass(member):
             continue
         for attr, value in vars(member).items():
-            documented_pickle = module.startswith("finstack_quant.valuations") and attr == "__reduce__"
+            documented_pickle = (
+                module.startswith(("finstack_quant.valuations", "finstack_quant.models")) and attr == "__reduce__"
+            )
             if (attr.startswith("_") and not documented_pickle) or not isinstance(value, _DOCUMENTED_MEMBERS):
                 continue
             if value.__doc__ and f"{name}.{attr}" not in stub:

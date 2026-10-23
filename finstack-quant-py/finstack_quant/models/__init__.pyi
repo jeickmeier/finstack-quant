@@ -241,7 +241,21 @@ class BsGreeks:
         ...
 
     def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
 
 class ForwardGreeks:
     """
@@ -376,7 +390,21 @@ class ForwardGreeks:
         ...
 
     def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
 
 def bs_price(
     spot: float,
