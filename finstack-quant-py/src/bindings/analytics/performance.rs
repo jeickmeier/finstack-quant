@@ -3,6 +3,7 @@
 
 use super::types::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
+use crate::bindings::core::dates::periods::PyFiscalConfig;
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;
@@ -14,7 +15,7 @@ use finstack_quant_analytics::{
     DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR, DEFAULT_PERIODIC_FREQUENCY,
     DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW,
 };
-use finstack_quant_core::dates::{FiscalConfig, HolidayCalendar, PeriodKind};
+use finstack_quant_core::dates::{HolidayCalendar, PeriodKind};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -923,38 +924,34 @@ impl PyPerformance {
     }
 
     #[doc = pydoc!("finstack_quant.analytics", "Performance.lookback_returns")]
-    #[pyo3(signature = (ref_date, fiscal_year_start_month = None, fiscal_year_start_day = None))]
+    #[pyo3(signature = (ref_date, fiscal_config = None))]
     fn lookback_returns(
         &self,
         ref_date: Bound<'_, PyAny>,
-        fiscal_year_start_month: Option<u8>,
-        fiscal_year_start_day: Option<u8>,
+        fiscal_config: Option<&PyFiscalConfig>,
     ) -> PyResult<PyLookbackReturns> {
         let d = py_to_date(&ref_date)?;
-        let fc = FiscalConfig::from_parts(fiscal_year_start_month, fiscal_year_start_day)
-            .map_err(analytics_to_py)?;
         Ok(PyLookbackReturns {
-            inner: self.inner.lookback_returns(d, fc),
+            inner: self
+                .inner
+                .lookback_returns(d, fiscal_config.map(|config| config.inner)),
         })
     }
 
     #[doc = pydoc!("finstack_quant.analytics", "Performance.period_stats")]
-    #[pyo3(signature = (ticker_idx, aggregation_frequency = None, fiscal_year_start_month = None, fiscal_year_start_day = None))]
+    #[pyo3(signature = (ticker_idx, aggregation_frequency = None, fiscal_config = None))]
     fn period_stats(
         &self,
         ticker_idx: &Bound<'_, PyAny>,
         aggregation_frequency: Option<&str>,
-        fiscal_year_start_month: Option<u8>,
-        fiscal_year_start_day: Option<u8>,
+        fiscal_config: Option<&PyFiscalConfig>,
     ) -> PyResult<PyPeriodStats> {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
         let pk = parse_frequency(aggregation_frequency, DEFAULT_PERIODIC_FREQUENCY)?;
-        let fc = FiscalConfig::from_parts(fiscal_year_start_month, fiscal_year_start_day)
-            .map_err(analytics_to_py)?;
         Ok(PyPeriodStats {
             inner: self
                 .inner
-                .period_stats(ticker_idx, pk, fc)
+                .period_stats(ticker_idx, pk, fiscal_config.map(|config| config.inner))
                 .map_err(analytics_to_py)?,
         })
     }

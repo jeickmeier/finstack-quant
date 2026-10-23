@@ -8,6 +8,7 @@
 //! arrive as `Float64Array`. Omitted arguments resolve to the Rust-owned
 //! `finstack_quant_analytics::DEFAULT_*` constants.
 
+use crate::api::core::periods::JsFiscalConfig;
 use crate::utils::input::{
     js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_opt_string, js_opt_uint, js_string,
     js_string_seq, js_uint, json_text,
@@ -21,9 +22,7 @@ use finstack_quant_analytics::{
     DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR,
     DEFAULT_PERIODIC_FREQUENCY, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW,
 };
-use finstack_quant_core::dates::{
-    calendar_by_id_strict, FiscalConfig, HolidayCalendar, PeriodKind,
-};
+use finstack_quant_core::dates::{calendar_by_id_strict, HolidayCalendar, PeriodKind};
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 
@@ -43,15 +42,22 @@ fn parse_frequency(frequency: Option<&str>, default: PeriodKind) -> Result<Perio
         .map(|kind| kind.unwrap_or(default))
 }
 
-/// Convert the two optional host numbers, then let Rust
-/// (`FiscalConfig::from_parts`) decide what an omitted half means.
-fn make_fiscal_config(
-    month: Option<&JsValue>,
-    day: Option<&JsValue>,
-) -> Result<Option<FiscalConfig>, JsValue> {
-    let month: Option<u8> = js_opt_uint(month, "fiscalYearStartMonth")?;
-    let day: Option<u8> = js_opt_uint(day, "fiscalYearStartDay")?;
-    FiscalConfig::from_parts(month, day).map_err(to_js_err)
+/// Body shared by the two `periodStats` exports; the only difference between
+/// them is whether a fiscal calendar is supplied.
+fn period_stats_js(
+    perf: &Performance,
+    ticker_idx: JsValue,
+    aggregation_frequency: Option<JsValue>,
+    fiscal_config: Option<&JsFiscalConfig>,
+) -> Result<JsValue, JsValue> {
+    let aggregation_frequency =
+        js_opt_string(aggregation_frequency.as_ref(), "aggregationFrequency")?;
+    let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+    let pk = parse_frequency(aggregation_frequency.as_deref(), DEFAULT_PERIODIC_FREQUENCY)?;
+    let stats = perf
+        .period_stats(ticker_idx, pk, fiscal_config.map(|config| config.inner))
+        .map_err(to_js_err)?;
+    to_js_value_numeric(&stats)
 }
 
 fn parse_cagr_day_count(day_count: Option<&str>) -> Result<CagrDayCount, JsValue> {
@@ -1224,78 +1230,104 @@ impl JsPerformance {
 
     /// Standard lookback-window returns (MTD, QTD, YTD, ...) per asset.
     ///
-    /// FYTD is the first observation on or after the fiscal calendar start
-    /// through `ref_date`. Holidays are not skipped. The first included
-    /// simple return still spans the prior close. The serialized result always
-    /// contains `{ mtd, qtd, ytd, fytd }`, with `fytd` as a numeric array.
+    /// MTD, QTD and YTD start on the first calendar day of `ref_date`'s month,
+    /// calendar quarter and year. FYTD is the first observation on or after the
+    /// fiscal calendar start of `fiscalConfig` through `ref_date`; the calendar
+    /// year applies when it is omitted. Holidays are not skipped. The first
+    /// included simple return still spans the prior close. The serialized result
+    /// always contains `{ mtd, qtd, ytd, fytd }`, with `fytd` as a numeric array.
     ///
     /// # Arguments
     ///
     /// * `ref_date` - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
-    /// * `fiscal_year_start_month` - Optional fiscal-year start month from 1
-    ///   through 12; defaults to January. With both parts omitted the fiscal
-    ///   year is the calendar year.
-    /// * `fiscal_year_start_day` - Optional fiscal-year start day; defaults to
-    ///   the first day of the month (Rust `FiscalConfig::from_parts`).
+    /// * `fiscal_config` - Optional `FiscalConfig` handle for FYTD. Omitted or
+    ///   `null` is the calendar year (`FiscalConfig::default`).
     ///
     /// # Errors
     ///
-    /// Rejects an invalid ISO `ref_date`, a fiscal month outside `1..=12`, a
-    /// fiscal day outside `1..=31`, or a result that cannot be serialized to
-    /// JavaScript.
+    /// Rejects an invalid ISO `ref_date` or a result that cannot be serialized
+    /// to JavaScript.
     /// @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
     #[wasm_bindgen(js_name = lookbackReturns)]
-    pub fn lookback_returns(
+    pub fn lookback_returns(&self, ref_date: JsValue) -> Result<JsValue, JsValue> {
+        let ref_date: &str = &js_string(&ref_date, "refDate")?;
+        let d = parse_iso_date(ref_date)?;
+        to_js_value(&self.inner.lookback_returns(d, None))
+    }
+
+    /// Lookback returns for an explicit fiscal calendar.
+    ///
+    /// The published `lookbackReturns(refDate, fiscalConfig)` calls this export
+    /// when a handle is supplied.
+    ///
+    /// # Errors
+    ///
+    /// Rejects an invalid ISO `ref_date` or a result that cannot be serialized
+    /// to JavaScript.
+    /// @param ref_date - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
+    /// @param fiscal_config - FiscalConfig handle whose start sets the FYTD window.
+    /// @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions.
+    #[wasm_bindgen(js_name = lookbackReturnsWithFiscalConfig)]
+    pub fn lookback_returns_with_fiscal_config(
         &self,
         ref_date: JsValue,
-        fiscal_year_start_month: Option<JsValue>,
-        fiscal_year_start_day: Option<JsValue>,
+        fiscal_config: &JsFiscalConfig,
     ) -> Result<JsValue, JsValue> {
         let ref_date: &str = &js_string(&ref_date, "refDate")?;
         let d = parse_iso_date(ref_date)?;
-        let fc = make_fiscal_config(
-            fiscal_year_start_month.as_ref(),
-            fiscal_year_start_day.as_ref(),
-        )?;
-        to_js_value(&self.inner.lookback_returns(d, fc))
+        to_js_value(&self.inner.lookback_returns(d, Some(fiscal_config.inner)))
     }
 
     /// Aggregated period statistics for one asset at the given frequency.
-    /// Supplying a fiscal start applies fiscal day, week, month, quarter,
-    /// half-year and year boundaries, including clamped month ends.
+    /// Without a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
     ///
     /// # Errors
     ///
-    /// Rejects an unsupported `aggregation_frequency`, a fiscal month outside
-    /// `1..=12`, a fiscal day outside `1..=31`, an out-of-range `ticker_idx`,
-    /// an unrepresentable period boundary, or period statistics that cannot
-    /// be serialized to JavaScript.
+    /// Rejects an unsupported `aggregation_frequency`, an out-of-range
+    /// `ticker_idx`, an unrepresentable period boundary, or period statistics
+    /// that cannot be serialized to JavaScript.
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param aggregation_frequency - Optional aggregation frequency token; defaults to monthly.
-    /// @param fiscal_year_start_month - Optional fiscal-year start month from 1 through 12; when only the day is given the month is January.
-    /// @param fiscal_year_start_day - Optional fiscal-year start day from 1 through 31, clamped to the selected month end; when only the month is given the day is the 1st.
+    /// @param fiscal_config - Optional FiscalConfig handle; omitted or null buckets Gregorian periods with ISO weeks.
     /// @returns Period statistics object for the selected ticker at the requested frequency.
     #[wasm_bindgen(js_name = periodStats)]
     pub fn period_stats(
         &self,
         ticker_idx: JsValue,
         aggregation_frequency: Option<JsValue>,
-        fiscal_year_start_month: Option<JsValue>,
-        fiscal_year_start_day: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let aggregation_frequency =
-            js_opt_string(aggregation_frequency.as_ref(), "aggregationFrequency")?;
-        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        let pk = parse_frequency(aggregation_frequency.as_deref(), DEFAULT_PERIODIC_FREQUENCY)?;
-        let fc = make_fiscal_config(
-            fiscal_year_start_month.as_ref(),
-            fiscal_year_start_day.as_ref(),
-        )?;
-        let stats = self
-            .inner
-            .period_stats(ticker_idx, pk, fc)
-            .map_err(to_js_err)?;
-        to_js_value_numeric(&stats)
+        period_stats_js(&self.inner, ticker_idx, aggregation_frequency, None)
+    }
+
+    /// Period statistics for an explicit fiscal calendar. A supplied fiscal
+    /// calendar applies fiscal day, week, month, quarter, half-year and year
+    /// boundaries, including clamped month ends.
+    ///
+    /// The published `periodStats(tickerIdx, aggregationFrequency, fiscalConfig)`
+    /// calls this export when a handle is supplied.
+    ///
+    /// # Errors
+    ///
+    /// Rejects an unsupported `aggregation_frequency`, an out-of-range
+    /// `ticker_idx`, an unrepresentable period boundary, or period statistics
+    /// that cannot be serialized to JavaScript.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order.
+    /// @param aggregation_frequency - Optional aggregation frequency token; defaults to monthly.
+    /// @param fiscal_config - FiscalConfig handle whose start sets the period boundaries.
+    /// @returns Period statistics object for the selected ticker at the requested frequency.
+    #[wasm_bindgen(js_name = periodStatsWithFiscalConfig)]
+    pub fn period_stats_with_fiscal_config(
+        &self,
+        ticker_idx: JsValue,
+        aggregation_frequency: Option<JsValue>,
+        fiscal_config: &JsFiscalConfig,
+    ) -> Result<JsValue, JsValue> {
+        period_stats_js(
+            &self.inner,
+            ticker_idx,
+            aggregation_frequency,
+            Some(fiscal_config),
+        )
     }
 
     /// Serialize the full panel state to compact JSON.

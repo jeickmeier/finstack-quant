@@ -9,6 +9,7 @@
 - Python and WASM: an unknown `benchmark_ticker` in the `Performance` constructors (Python `Performance()`, `from_arrays`, `from_returns`, `from_returns_arrays`; WASM `new Performance`, `fromReturns`) and in `reset_bench_ticker` / `resetBenchTicker` raises `KeyError` (WASM kind `not_found`), not `AnalyticsError` (kind `validation`). A failed `reset_bench_ticker` leaves the benchmark unchanged.
 - `gain_to_pain` and the `PeriodStats` payoff and profit ratios return `NaN` when a sum or a compounded bucket growth overflows `f64`; they previously returned `+inf` or `0.0`.
 - The `multi_factor_greeks` tracing span and events carry the target `finstack_quant_analytics::multi_factor` instead of `finstack_quant_analytics::benchmark`.
+- Python `Performance.lookback_returns` and `period_stats`, and WASM `lookbackReturns` and `periodStats`, take the core `FiscalConfig` handle (`fiscal_config` / `fiscalConfig`) instead of the `fiscal_year_start_month` / `fiscal_year_start_day` integers. An omitted config is Rust `None`: a calendar-year FYTD window, and Gregorian periods with ISO weeks for `period_stats`. An out-of-range fiscal start is now a `ValueError` from the `FiscalConfig` constructor, not an `AnalyticsError`.
 
 ### Valuations: one path per capability
 

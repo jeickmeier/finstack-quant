@@ -28,6 +28,7 @@ from finstack_quant.analytics import (
     PeriodStats,
     RollingGreeks,
 )
+from finstack_quant.core.dates import FiscalConfig
 
 # Fixtures
 
@@ -345,17 +346,19 @@ class TestPeriodicReturns:
         assert "fytd_len=2" in repr(lb)
         assert "has_fytd" not in repr(lb)
 
-    def test_lookback_with_fiscal_month(self, perf_prices: Performance) -> None:
-        lb = perf_prices.lookback_returns(date(2024, 2, 29), fiscal_year_start_month=4)
+    def test_lookback_with_fiscal_config(self, perf_prices: Performance) -> None:
+        lb = perf_prices.lookback_returns(date(2024, 2, 29), fiscal_config=FiscalConfig(4, 1))
         assert len(lb.fytd) == 2
 
     def test_lookback_rejects_null_fytd_json(self) -> None:
         with pytest.raises(ValueError, match="invalid type: null"):
             LookbackReturns.from_json('{"ticker_names":[],"mtd":[],"qtd":[],"ytd":[],"fytd":null}')
 
-    def test_lookback_rejects_invalid_fiscal_month(self, perf_prices: Performance) -> None:
-        with pytest.raises(AnalyticsError, match="start_month must be in"):
-            perf_prices.lookback_returns(date(2024, 2, 29), fiscal_year_start_month=13)
+    def test_lookback_rejects_non_fiscal_config(self, perf_prices: Performance) -> None:
+        with pytest.raises(TypeError, match="fiscal_config"):
+            perf_prices.lookback_returns(date(2024, 2, 29), fiscal_config=4)
+        with pytest.raises(ValueError, match="start_month"):
+            FiscalConfig(13, 1)
 
     def test_period_stats_monthly(self, perf_prices: Performance) -> None:
         stats = perf_prices.period_stats(0, aggregation_frequency="monthly")
