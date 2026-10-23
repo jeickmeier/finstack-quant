@@ -1301,47 +1301,24 @@ class DownturnLgd:
         ...
 
     @staticmethod
-    def basel_secured() -> DownturnLgd:
+    def default_calibration() -> DownturnLgd:
         """
-        Registry default secured-exposure floor (Basel).
+        Load the calibration selected by the embedded registry's default ID.
 
         Returns
         -------
         DownturnLgd
-            Secured regulatory-floor preset.
+            Validated calibration selected by the current registry data.
 
         Raises
         ------
         ValueError
-            If the embedded credit registry is invalid.
+            If the embedded registry or its configured default is malformed.
 
         Examples
         --------
-        >>> from finstack_quant.models.credit import lgd
-        >>> lgd.DownturnLgd.basel_secured().method
-        'regulatory_floor'
-        """
-        ...
-
-    @staticmethod
-    def basel_unsecured() -> DownturnLgd:
-        """
-        Registry ``basel_unsecured`` floor preset.
-
-        Returns
-        -------
-        DownturnLgd
-            Unsecured regulatory-floor preset.
-
-        Raises
-        ------
-        ValueError
-            If the embedded credit registry is invalid.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.credit import lgd
-        >>> lgd.DownturnLgd.basel_unsecured().adjust(0.0) > 0.0
+        >>> from finstack_quant.models.credit.lgd import DownturnLgd
+        >>> isinstance(DownturnLgd.default_calibration(), DownturnLgd)
         True
         """
         ...
@@ -1708,7 +1685,7 @@ class EadCalculator:
 
 def seniority_recovery_stats(
     seniority: str,
-    rating_agency: str | None = None,
+    calibration_id: str,
 ) -> BetaRecovery:
     """
     Historical Beta recovery distribution for a seniority class.
@@ -1719,9 +1696,9 @@ def seniority_recovery_stats(
         One of ``1st_lien_secured``, ``2nd_lien_secured``,
         ``senior_secured``, ``senior_unsecured``, ``subordinated``,
         ``junior_subordinated``.
-    rating_agency : str | None
-        ``"moodys"`` (canonical) or ``"sp"``. ``None`` selects the
-        registry default calibration (Moody's historical).
+    calibration_id : str
+        Exact registry methodology ID, such as ``"moodys_recovery_1982_2023"``
+        or ``"sp_recovery_historical"``. Aliases are rejected.
 
     Returns
     -------
@@ -1731,13 +1708,15 @@ def seniority_recovery_stats(
     Raises
     ------
     ValueError
-        If ``seniority`` or ``rating_agency`` is unknown, or the selected
+        If ``seniority`` is unknown, or the selected
         calibration has no entry for the class.
+    KeyError
+        If ``calibration_id`` is not registered.
 
     Examples
     --------
     >>> from finstack_quant.models.credit import lgd
-    >>> lgd.seniority_recovery_stats("senior_secured").mean
+    >>> lgd.seniority_recovery_stats("senior_secured", "moodys_recovery_1982_2023").mean
     0.52
 
     """

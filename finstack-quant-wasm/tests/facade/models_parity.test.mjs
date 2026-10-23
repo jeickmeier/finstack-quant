@@ -368,8 +368,8 @@ const CASES = {
   ],
   rating_factors: () => [
     credit.moodysWarfFactor('B2'),
-    credit.RatingFactorTable.moodysStandard().getFactor('Baa3'),
-    credit.RatingFactorTable.moodysStandard().defaultFactor,
+    credit.RatingFactorTable.defaultCalibration().getFactor('Baa3'),
+    credit.RatingFactorTable.defaultCalibration().defaultFactor,
   ],
   'liability_management.hurdle': () => credit.liabilityManagement.tenderRecommendationHurdle(),
 
@@ -389,9 +389,9 @@ const CASES = {
     list(new credit.lgd.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
   ],
   'lgd.seniority_recovery_stats': () => [
-    credit.lgd.seniorityRecoveryStats('senior_unsecured').mean,
-    credit.lgd.seniorityRecoveryStats('senior_unsecured').stdDev,
-    credit.lgd.seniorityRecoveryStats('senior_secured', 'sp').mean,
+    credit.lgd.seniorityRecoveryStats('senior_unsecured', 'moodys_recovery_1982_2023').mean,
+    credit.lgd.seniorityRecoveryStats('senior_unsecured', 'moodys_recovery_1982_2023').stdDev,
+    credit.lgd.seniorityRecoveryStats('senior_secured', 'sp_recovery_historical').mean,
   ],
   'lgd.workout': () => {
     const workout = credit.lgd.WorkoutLgd.builder()
@@ -413,8 +413,8 @@ const CASES = {
     credit.lgd.DownturnLgd.regulatoryFloor(0.08, 0.1).adjust(0.35),
     credit.lgd.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
     credit.lgd.DownturnLgd.regulatoryFloor(0.08, 0.1).adjust(0.35),
-    credit.lgd.DownturnLgd.baselSecured().adjust(0.2),
-    credit.lgd.DownturnLgd.baselUnsecured().adjust(0.2),
+    credit.lgd.DownturnLgd.defaultCalibration().adjust(0.2),
+    credit.lgd.DownturnLgd.fromRegistryId('basel_unsecured').adjust(0.2),
   ],
   'lgd.ead': () => {
     const ead = new credit.lgd.EadCalculator(600.0, 400.0, 0.75);
@@ -442,8 +442,8 @@ const CASES = {
       .mapPds([0.5, 0.001, 0.05])
       .map((row) => row.grade),
     masterScale().mapScore(credit.scoring.zmijewskiScore(0.05, 0.6, 1.5)).grade,
-    credit.pd.MasterScale.spAssumptions().nGrades,
-    credit.pd.MasterScale.moodysAssumptions().nGrades,
+    credit.pd.MasterScale.defaultCalibration().nGrades,
+    credit.pd.MasterScale.fromRegistryId('moodys_assumptions').nGrades,
   ],
   scoring: () => [
     credit.scoring.altmanZScore(0.1, 0.2, 0.15, 1.5, 1.1),

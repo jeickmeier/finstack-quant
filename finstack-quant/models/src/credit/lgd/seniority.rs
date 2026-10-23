@@ -255,56 +255,33 @@ pub struct SeniorityCalibration {
 }
 
 impl SeniorityCalibration {
-    /// Load a built-in rating-agency calibration by name.
-    ///
-    /// Accepted names are case-insensitive. Moody's accepts `moodys`,
-    /// `moody`, and `moody_s`; S&P accepts `sp`, `s_p`,
-    /// `standard_and_poors`, and `standardandpoors`.
-    ///
-    /// # Errors
-    /// Returns a validation error for unknown agencies.
+    /// Load a seniority recovery calibration from the credit assumptions registry.
     ///
     /// # Arguments
     ///
-    /// * `agency` - Agency used by the algorithm, subject to the enclosing type invariants and documented units.
-    pub fn from_agency(agency: &str) -> Result<Self> {
-        let norm = agency.trim().to_ascii_lowercase().replace(['&', '.'], "");
-        match norm.as_str() {
-            "moodys" | "moody" | "moody_s" => Self::moodys_historical(),
-            "sp" | "s_p" | "standard_and_poors" | "standardandpoors" => Self::sp_historical(),
-            _ => Err(finstack_quant_core::Error::Validation(format!(
-                "unknown rating agency: '{agency}' (expected 'moodys' or 'sp')"
-            ))),
-        }
-    }
-
-    /// Load a seniority recovery calibration from the credit assumptions registry.
+    /// * `id` - Exact methodology ID, such as `moodys_recovery_1982_2023` or
+    ///   `sp_recovery_historical`. Provider aliases, case changes and whitespace
+    ///   are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns a not-found error for an unknown ID or a validation error for
+    /// a malformed registry.
     pub fn from_registry_id(id: &str) -> Result<Self> {
         crate::credit::registry::embedded_registry()?.seniority_calibration(id)
     }
 
-    /// Moody's historical average recovery rates (1982-2023, issuer-weighted).
+    /// Load the registry-selected default seniority recovery calibration.
     ///
     /// Approximate long-run averages:
     /// - Senior Secured:       ~52%, std_dev ~25%
     /// - Senior Unsecured:     ~37%, std_dev ~24%
     /// - Subordinated:         ~28%, std_dev ~20%
     /// - Junior Subordinated:  ~17%, std_dev ~15%
-    pub fn moodys_historical() -> Result<Self> {
+    pub fn default_calibration() -> Result<Self> {
         Self::from_registry_id(
             crate::credit::registry::embedded_registry()?.default_seniority_calibration_id(),
         )
-    }
-
-    /// S&P historical average recovery rates (approximate long-run).
-    ///
-    /// Approximate long-run averages:
-    /// - Senior Secured:       ~53%, std_dev ~24%
-    /// - Senior Unsecured:     ~36%, std_dev ~23%
-    /// - Subordinated:         ~27%, std_dev ~20%
-    /// - Junior Subordinated:  ~15%, std_dev ~13%
-    pub fn sp_historical() -> Result<Self> {
-        Self::from_registry_id("sp")
     }
 
     /// Look up the BetaRecovery for a given seniority class.
@@ -472,7 +449,7 @@ mod tests {
 
     #[test]
     fn seniority_calibration_moodys_constructs() {
-        let cal = SeniorityCalibration::moodys_historical().expect("valid calibration");
+        let cal = SeniorityCalibration::default_calibration().expect("valid calibration");
         assert_eq!(cal.classes.len(), 6);
         assert!(cal.get(SeniorityClass::FirstLienSecured).is_some());
         assert!(cal.get(SeniorityClass::SecondLienSecured).is_some());
@@ -482,13 +459,14 @@ mod tests {
 
     #[test]
     fn seniority_calibration_sp_constructs() {
-        let cal = SeniorityCalibration::sp_historical().expect("valid calibration");
+        let cal = SeniorityCalibration::from_registry_id("sp_recovery_historical")
+            .expect("valid calibration");
         assert_eq!(cal.classes.len(), 4);
     }
 
     #[test]
     fn seniority_recovery_ordering() {
-        let cal = SeniorityCalibration::moodys_historical().expect("valid calibration");
+        let cal = SeniorityCalibration::default_calibration().expect("valid calibration");
 
         let secured = cal
             .get(SeniorityClass::SeniorSecured)

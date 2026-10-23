@@ -22,7 +22,7 @@ def test_credit_non_finite_inputs_raise_value_error(invalid: float) -> None:
 def test_lgd_typed_surface() -> None:
     import pickle
 
-    stats = credit.lgd.seniority_recovery_stats("senior_secured")
+    stats = credit.lgd.seniority_recovery_stats("senior_secured", "moodys_recovery_1982_2023")
     assert isinstance(stats, credit.lgd.BetaRecovery)
     assert stats.mean == pytest.approx(0.52)
     assert stats.mean_lgd == pytest.approx(1.0 - stats.mean)
@@ -56,7 +56,7 @@ def test_lgd_typed_surface() -> None:
     floor = credit.lgd.DownturnLgd.regulatory_floor(0.05, 0.25)
     assert floor.method == "regulatory_floor"
     assert floor.adjust(0.10) == pytest.approx(credit.lgd.DownturnLgd.regulatory_floor(0.05, 0.25).adjust(0.10))
-    assert credit.lgd.DownturnLgd.basel_unsecured().method == "regulatory_floor"
+    assert credit.lgd.DownturnLgd.from_registry_id("basel_unsecured").method == "regulatory_floor"
     assert pickle.loads(pickle.dumps(floor)).adjust(0.10) == pytest.approx(0.25)  # noqa: S301 - trusted in-process round trip
 
     revolver = credit.lgd.EadCalculator.revolver(60.0, 40.0)
@@ -108,7 +108,7 @@ def test_structural_spec_constructors_and_equality() -> None:
     assert list(frame.columns) == ["path", "time", "asset_value"]
     assert len(frame) == 15
 
-    table = credit.RatingFactorTable.moodys_standard()
+    table = credit.RatingFactorTable.default_calibration()
     assert table.get_factor("B") == credit.moodys_warf_factor("B") == 2720.0
     assert credit.RatingFactorTable.from_json(table.to_json()).default_factor == table.default_factor
 
@@ -125,3 +125,14 @@ def test_generator_matrix_exposes_extraction_diagnostics() -> None:
     assert math.isfinite(extracted.round_trip_error)
     assert extracted.regularization_l1 >= 0.0
     assert extracted.round_trip_error >= 0.0
+
+
+def test_credit_registry_ids_are_exact_and_recovery_calibration_is_explicit() -> None:
+    assert credit.RatingFactorTable.from_registry_id("moodys_standard").get_factor("B") == 2720.0
+    for rejected in ["moodys", "sp", "s_p", "SP_RECOVERY_HISTORICAL", "sp_recovery_historical "]:
+        with pytest.raises(KeyError):
+            credit.lgd.seniority_recovery_stats("senior_secured", rejected)
+    with pytest.raises(TypeError):
+        credit.lgd.seniority_recovery_stats("senior_secured")
+    with pytest.raises(KeyError):
+        credit.RatingFactorTable.from_registry_id("moodys_idealized_default_rates_2024_09")

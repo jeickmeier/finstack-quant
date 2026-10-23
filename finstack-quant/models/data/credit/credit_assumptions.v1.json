@@ -7,7 +7,7 @@
   "default_workout_lgd_id": "standard_workout",
   "rating_factor_tables": [
     {
-      "ids": ["moodys_standard", "moodys_idealized_default_rates_2024_09"],
+      "id": "moodys_standard",
       "agency": "Moody's",
       "methodology": "IDEALIZED DEFAULT RATES",
       "source": "Moody's Approach to Rating Collateralized Loan Obligations",
@@ -43,7 +43,7 @@
   ],
   "seniority_calibrations": [
     {
-      "ids": ["moodys_recovery_1982_2023", "moodys", "moody", "moody_s"],
+      "id": "moodys_recovery_1982_2023",
       "source": "Moody's 1982-2023 (approximate)",
       "study_period": { "start_year": 1982, "end_year": 2023 },
       "classes": [
@@ -56,7 +56,7 @@
       ]
     },
     {
-      "ids": ["sp_recovery_historical", "sp", "s_p", "standard_and_poors", "standardandpoors"],
+      "id": "sp_recovery_historical",
       "source": "S&P Historical (approximate)",
       "classes": [
         { "seniority": "senior_secured", "mean": 0.53, "std_dev": 0.24 },
@@ -68,7 +68,7 @@
   ],
   "pd_master_scales": [
     {
-      "ids": ["sp_assumptions"],
+      "id": "sp_assumptions",
       "source": "Finstack Quant library PD-band assumptions v1; agency-style labels only, not sourced empirical agency default rates",
       "grades": [
         { "label": "AAA", "upper_pd": 0.0001, "central_pd": 0.00004 },
@@ -82,7 +82,7 @@
       ]
     },
     {
-      "ids": ["moodys_assumptions"],
+      "id": "moodys_assumptions",
       "source": "Finstack Quant library PD-band assumptions v1; agency-style labels only, not sourced empirical agency default rates",
       "grades": [
         { "label": "Aaa", "upper_pd": 0.0001, "central_pd": 0.00003 },
@@ -97,12 +97,12 @@
     }
   ],
   "downturn_lgd_presets": [
-    { "ids": ["basel_secured"], "method": "regulatory_floor", "add_on": 0.08, "floor": 0.1 },
-    { "ids": ["basel_unsecured"], "method": "regulatory_floor", "add_on": 0.05, "floor": 0.25 }
+    { "id": "basel_secured", "method": "regulatory_floor", "add_on": 0.08, "floor": 0.1 },
+    { "id": "basel_unsecured", "method": "regulatory_floor", "add_on": 0.05, "floor": 0.25 }
   ],
   "workout_lgd_defaults": [
     {
-      "ids": ["standard_workout", "default"],
+      "id": "standard_workout",
       "workout_years": 2.0,
       "discount_rate": 0.05,
       "direct_cost_rate": 0.05,

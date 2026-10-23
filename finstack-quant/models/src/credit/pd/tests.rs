@@ -257,7 +257,7 @@ mod master_scale_tests {
 
     #[test]
     fn sp_assumptions_mapping() {
-        let scale = MasterScale::sp_assumptions().expect("registry scale");
+        let scale = MasterScale::default_calibration().expect("registry scale");
         assert_eq!(scale.n_grades(), 8);
 
         // AAA: PD <= 0.0001
@@ -283,7 +283,7 @@ mod master_scale_tests {
 
     #[test]
     fn moodys_assumptions_mapping() {
-        let scale = MasterScale::moodys_assumptions().expect("registry scale");
+        let scale = MasterScale::from_registry_id("moodys_assumptions").expect("registry scale");
         assert_eq!(scale.n_grades(), 8);
 
         let baa = scale.map_pd(0.003).unwrap();
@@ -292,7 +292,7 @@ mod master_scale_tests {
 
     #[test]
     fn pd_at_unit_maps_to_worst_grade() {
-        let scale = MasterScale::sp_assumptions().expect("registry scale");
+        let scale = MasterScale::default_calibration().expect("registry scale");
         let result = scale.map_pd(1.0).unwrap();
         assert_eq!(result.grade, "CC/C");
         assert_eq!(result.grade_index, 7);
@@ -300,7 +300,7 @@ mod master_scale_tests {
 
     #[test]
     fn pd_outside_unit_interval_is_rejected() {
-        let scale = MasterScale::sp_assumptions().expect("registry scale");
+        let scale = MasterScale::default_calibration().expect("registry scale");
         for bad in [-0.1, 1.5, 5.0] {
             assert!(matches!(
                 scale.map_pd(bad),
@@ -312,7 +312,7 @@ mod master_scale_tests {
 
     #[test]
     fn pd_at_boundary() {
-        let scale = MasterScale::sp_assumptions().expect("registry scale");
+        let scale = MasterScale::default_calibration().expect("registry scale");
         // Exactly at AAA upper boundary (0.0001)
         let result = scale.map_pd(0.0001).unwrap();
         assert_eq!(result.grade, "AAA");
@@ -387,7 +387,7 @@ mod master_scale_tests {
             market_equity_to_total_liabilities: 1.50,
             sales_to_total_assets: 1.80,
         };
-        let scale = MasterScale::sp_assumptions().expect("registry scale");
+        let scale = MasterScale::default_calibration().expect("registry scale");
         let uncalibrated = altman_z_score(&input).unwrap();
         assert!(matches!(
             scale.map_score(&uncalibrated),
@@ -397,7 +397,7 @@ mod master_scale_tests {
 
     #[test]
     fn grades_accessor() {
-        let scale = MasterScale::sp_assumptions().expect("registry scale");
+        let scale = MasterScale::default_calibration().expect("registry scale");
         let grades = scale.grades();
         assert_eq!(grades.len(), 8);
         assert_eq!(grades[0].label, "AAA");
@@ -409,7 +409,7 @@ mod master_scale_tests {
     /// be a validation error.
     #[test]
     fn map_pd_rejects_non_finite() {
-        let scale = MasterScale::sp_assumptions().expect("registry scale");
+        let scale = MasterScale::default_calibration().expect("registry scale");
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(matches!(
                 scale.map_pd(bad),

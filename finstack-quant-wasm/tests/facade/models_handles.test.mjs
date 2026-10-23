@@ -37,12 +37,12 @@ test('every serde handle round-trips its canonical JSON', () => {
     [credit.DynamicRecoverySpec, credit.DynamicRecoverySpec.linearDecline(0.4, 100, 0.1, 0.05)],
     [credit.EndogenousHazardSpec, credit.EndogenousHazardSpec.exponential(0.1, 1.5, 2)],
     [credit.ToggleExerciseModel, credit.ToggleExerciseModel.stochastic('leverage', -2, 4)],
-    [credit.RatingFactorTable, credit.RatingFactorTable.moodysStandard()],
+    [credit.RatingFactorTable, credit.RatingFactorTable.defaultCalibration()],
     [credit.lgd.BetaRecovery, new credit.lgd.BetaRecovery(0.4, 0.2)],
     [credit.lgd.WorkoutCosts, new credit.lgd.WorkoutCosts(0.05, 0.03)],
     [credit.lgd.DownturnLgd, credit.lgd.DownturnLgd.stressed(0.15, 0.3, 0.999)],
     [credit.lgd.EadCalculator, new credit.lgd.EadCalculator(600, 400, 0.75)],
-    [credit.pd.MasterScale, credit.pd.MasterScale.spAssumptions()],
+    [credit.pd.MasterScale, credit.pd.MasterScale.defaultCalibration()],
     [credit.migration.RatingScale, scale()],
     [credit.migration.TransitionMatrix, credit.migration.project(generator(), 1)],
     [credit.migration.GeneratorMatrix, generator()],
@@ -185,10 +185,13 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.throws(() => new credit.lgd.BetaRecovery(0.4, 2), kind('validation'));
   assert.throws(() => beta.quantile(2), kind('validation'));
   assert.throws(() => beta.sampleSeeded(1.5, 7), invalidType);
-  assert.throws(() => credit.lgd.seniorityRecoveryStats('nope'), kind('validation'));
+  assert.throws(
+    () => credit.lgd.seniorityRecoveryStats('nope', 'moodys_recovery_1982_2023'),
+    kind('validation')
+  );
   assert.throws(
     () => credit.lgd.seniorityRecoveryStats('senior_secured', 'nope'),
-    kind('validation')
+    kind('not_found')
   );
 
   const costs = new credit.lgd.WorkoutCosts(0.05, 0.03);
@@ -213,7 +216,7 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.throws(() => new credit.lgd.EadCalculator(600, 400, 1.5), kind('validation'));
   assert.throws(() => new credit.lgd.EadCalculator(-1, 0, 0.5), kind('validation'));
 
-  const scaleHandle = credit.pd.MasterScale.moodysAssumptions();
+  const scaleHandle = credit.pd.MasterScale.fromRegistryId('moodys_assumptions');
   assert.equal(scaleHandle.grades.length, scaleHandle.nGrades);
   assert.equal(typeof scaleHandle.grades[0].label, 'string');
   assert.throws(() => scaleHandle.mapPd(5), kind('validation'));
@@ -758,5 +761,26 @@ test('local volatility is a plain object with free-function twins', () => {
         seed: 5,
       }),
     message(/scheme 'milstein' is not available for process 'local_vol'/)
+  );
+});
+
+test('credit registry methods require exact IDs and an explicit recovery calibration', () => {
+  assert.equal(credit.RatingFactorTable.fromRegistryId('moodys_standard').getFactor('B'), 2720);
+  for (const rejected of [
+    'moodys',
+    'sp',
+    's_p',
+    'SP_RECOVERY_HISTORICAL',
+    'sp_recovery_historical ',
+  ]) {
+    assert.throws(
+      () => credit.lgd.seniorityRecoveryStats('senior_secured', rejected),
+      kind('not_found')
+    );
+  }
+  assert.throws(() => credit.lgd.seniorityRecoveryStats('senior_secured'), invalidType);
+  assert.throws(
+    () => credit.RatingFactorTable.fromRegistryId('moodys_idealized_default_rates_2024_09'),
+    kind('not_found')
   );
 });

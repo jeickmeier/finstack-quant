@@ -193,7 +193,7 @@ size_input = math.log(assets/1_000_000)
 ohlson = scoring.ohlson_o_score(size_input,liabilities/assets,working_capital/assets,current_liabilities_assumed/current_assets_assumed,
     float(liabilities>assets),annual_income/assets,ffo_proxy/liabilities,0.0,0.05)
 zmijewski = scoring.zmijewski_score(annual_income/assets,liabilities/assets,current_assets_assumed/current_liabilities_assumed)
-master = credit_pd.MasterScale.sp_assumptions()
+master = credit_pd.MasterScale.default_calibration()
 print("Native accounting scores:",[(x.model,x.score,x.zone,x.implied_pd) for x in [z_public,z_private,z_nonmanufacturing,ohlson,zmijewski]])
 print("Illustrative grade mappings:",master.map_score(ohlson).grade,master.map_score(zmijewski).grade)
 print("Accounting-score probability maps are not the borrower's calibrated underwriting PD; size normalization and sample applicability matter.")

@@ -58,7 +58,7 @@ fn moodys_warf_factor(rating: &Bound<'_, PyAny>) -> PyResult<f64> {
 /// Rating-factor table (Moody's WARF methodology) loaded from the embedded
 /// credit-assumptions registry.
 ///
-/// Use ``RatingFactorTable.moodys_standard()`` for the default table or
+/// Use ``RatingFactorTable.default_calibration()`` for the default table or
 /// ``RatingFactorTable.from_registry_id(id)`` for a named methodology. Exact
 /// rating notches map to factors via ``get_factor``; unrated or defaulted
 /// names take ``default_factor``.
@@ -75,14 +75,13 @@ pub(crate) struct PyRatingFactorTable {
 
 #[pymethods]
 impl PyRatingFactorTable {
-    /// Load the embedded Moody's standard WARF table.
+    /// Load the calibration selected by the embedded registry's default ID.
     ///
-    /// Raises ``ValueError`` if the embedded registry is invalid or its
-    /// configured default rating-factor table is missing.
+    /// Raises ``ValueError`` if the registry or its configured default is malformed.
     #[staticmethod]
     #[pyo3(text_signature = "()")]
-    fn moodys_standard() -> PyResult<Self> {
-        RatingFactorTable::moodys_standard()
+    fn default_calibration() -> PyResult<Self> {
+        RatingFactorTable::default_calibration()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }

@@ -25205,17 +25205,11 @@ export interface DownturnLgdConstructor {
    */
   readonly prototype: DownturnLgd;
   /**
-   * Basel downturn calibration for secured exposures.
-   * @returns The registry's Basel secured downturn adjustment.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the calibration.
+   * Load the calibration selected by the embedded registry's default ID.
+   * @returns The registry-selected calibration handle.
+   * @throws Error - Throws a `validation` error if the registry or its configured default is malformed.
    */
-  baselSecured(): DownturnLgd;
-  /**
-   * Basel downturn calibration for unsecured exposures.
-   * @returns The registry's Basel unsecured downturn adjustment.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the calibration.
-   */
-  baselUnsecured(): DownturnLgd;
+  defaultCalibration(): DownturnLgd;
   /**
    * Load a downturn adjustment from canonical JSON and validate its parameters.
    * @param json - Canonical JSON for this type, as JSON text or a plain object.
@@ -25739,17 +25733,11 @@ export interface MasterScaleConstructor {
    */
   fromRegistryId(scaleId: string): MasterScale;
   /**
-   * Moody's-style master scale from the embedded credit-assumption registry.
-   * @returns The Moody's assumptions master scale.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the scale.
+   * Load the calibration selected by the embedded registry's default ID.
+   * @returns The registry-selected calibration handle.
+   * @throws Error - Throws a `validation` error if the registry or its configured default is malformed.
    */
-  moodysAssumptions(): MasterScale;
-  /**
-   * S&P-style master scale from the embedded credit-assumption registry.
-   * @returns The S&P assumptions master scale.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the scale.
-   */
-  spAssumptions(): MasterScale;
+  defaultCalibration(): MasterScale;
 }
 
 /**
@@ -26233,7 +26221,7 @@ export interface RatingFactorTable extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const table = models.credit.RatingFactorTable.moodysStandard();
+ * const table = models.credit.RatingFactorTable.defaultCalibration();
  * console.log(table.agency, table.getFactor("B2"));
  * table.free();
  * ```
@@ -26262,11 +26250,11 @@ export interface RatingFactorTableConstructor {
    */
   fromRegistryId(id: string): RatingFactorTable;
   /**
-   * Moody's standard WARF table from the embedded credit-assumption registry.
-   * @returns The Moody's standard rating-factor table.
-   * @throws Error - Throws a `validation` error if the embedded registry cannot supply the table.
+   * Load the calibration selected by the embedded registry's default ID.
+   * @returns The registry-selected calibration handle.
+   * @throws Error - Throws a `validation` error if the registry or its configured default is malformed.
    */
-  moodysStandard(): RatingFactorTable;
+  defaultCalibration(): RatingFactorTable;
 }
 
 /**
@@ -27166,11 +27154,11 @@ export interface CreditLgdNamespace {
   /**
    * Historical Beta recovery distribution for a debt seniority class.
    * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
-   * @param ratingAgency - Agency whose calibration to use, such as `"moodys"` or `"sp"`; omitted uses the registry default.
+   * @param calibrationId - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.
    * @returns The calibrated `BetaRecovery` handle.
-   * @throws Error - Throws a `validation` error if the seniority or agency is not recognized.
+   * @throws Error - Throws a `validation` error for an unrecognized seniority and a `not_found` error for an unknown calibration ID.
    */
-  seniorityRecoveryStats(seniority: string, ratingAgency?: string): BetaRecovery;
+  seniorityRecoveryStats(seniority: string, calibrationId: string): BetaRecovery;
   /**
    * Direct and indirect workout cost rates.
    */

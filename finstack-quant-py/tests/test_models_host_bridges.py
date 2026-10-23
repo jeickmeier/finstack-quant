@@ -49,7 +49,7 @@ def test_seeded_migration_simulation_is_reproducible() -> None:
 
 
 def test_master_scale_batch_mapping_reports_the_first_bad_pd() -> None:
-    scale = pd_models.MasterScale.sp_assumptions()
+    scale = pd_models.MasterScale.default_calibration()
     frame = scale.map_pds([0.001, 0.2])
     assert list(frame["input_pd"]) == [0.001, 0.2]
     with pytest.raises(ValueError, match="outside"):
