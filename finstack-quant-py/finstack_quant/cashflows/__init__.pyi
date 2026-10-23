@@ -279,9 +279,11 @@ def schedule_from_classified_flows(
     CashFlowSchedule
         Canonical schedule holding the sorted rows.
 
-    Notes
-    -----
-    This function does not raise.
+    Raises
+    ------
+    ValueError
+        If a row has a non-finite or negative accrual factor, a non-finite rate,
+        or a reset date after its payment date.
 
     Examples
     --------

@@ -1370,7 +1370,7 @@ class CashFlowSchedule:
         """
         ...
 
-    def wal(self, as_of: datetime.date) -> float:
+    def wal(self, as_of: datetime.date | str) -> float:
         """
         Weighted Average Life (WAL) in years from ``as_of``.
 
@@ -1486,8 +1486,8 @@ class CashFlowSchedule:
         """
         ...
 
-    @classmethod
-    def from_json(cls, json: str) -> CashFlowSchedule:
+    @staticmethod
+    def from_json(json: str) -> CashFlowSchedule:
         """
         Deserialize a schedule from canonical JSON.
 
@@ -1735,7 +1735,7 @@ class CouponType:
     """100% capitalized into principal."""
 
     @staticmethod
-    def split(cash_fraction: Decimal | float, pik_fraction: Decimal | float) -> CouponType:
+    def split(cash_fraction: Decimal | float | str, pik_fraction: Decimal | float | str) -> CouponType:
         """
         Split settlement with explicit cash and PIK fractions.
 
@@ -1867,28 +1867,6 @@ class DefaultModelSpec:
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
         >>> DefaultModelSpec.sda(1.0) is not None
         True
-        """
-        ...
-
-    @staticmethod
-    def cdr_2pct() -> DefaultModelSpec:
-        """
-        2% constant CDR baseline.
-
-        Returns
-        -------
-        DefaultModelSpec
-            A default model with a flat 2% annual CDR.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
-        0.02
         """
         ...
 
@@ -2360,7 +2338,7 @@ class FeeSpec:
     """
 
     @staticmethod
-    def fixed(date: datetime.date, amount: Money) -> FeeSpec:
+    def fixed(date: datetime.date | str, amount: Money) -> FeeSpec:
         """
         Fixed fee paid once on a specified date.
 
@@ -3048,7 +3026,7 @@ class FloatingRateFallback:
     """Use a zero index when an absent fixing series or missing curve permits fallback."""
 
     @staticmethod
-    def fixed_rate(rate: Decimal | float) -> FloatingRateFallback:
+    def fixed_rate(rate: Decimal | float | str) -> FloatingRateFallback:
         """
         Supply a fixed index rate when missing market data permits fallback.
 
