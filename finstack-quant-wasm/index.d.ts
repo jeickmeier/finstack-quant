@@ -3307,6 +3307,21 @@ export interface HazardCurve extends WasmOwned {
    * @throws If `t2 < t1`.
    */
   defaultProb(t1: number, t2: number): number;
+
+  /**
+   * Default probability conditional on survival to the start date.
+   *
+   * Integrates the annual piecewise-constant hazard directly, preserving small
+   * probabilities even when unconditional survival has underflowed. It does
+   * not determine whether an issuer has actually defaulted.
+   *
+   * @param start - ISO-8601 conditioning date (`"YYYY-MM-DD"`), converted with the curve day count; dates before `baseDate` are clamped to time zero.
+   * @param end - ISO-8601 end date on or after `start`. Equal dates return zero; the final hazard rate extends beyond the last knot.
+   * @returns Conditional default probability as a decimal fraction in `[0, 1]`.
+   * @throws `TypeError` for non-string inputs; `FinstackError` (kind `validation`) for malformed or reversed dates, or a year fraction that cannot be computed.
+   */
+  conditionalDefaultProb(start: string, end: string): number;
+
   /**
    * Interpolated par CDS spread in basis points at year fraction `t`.
    *

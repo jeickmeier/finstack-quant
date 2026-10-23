@@ -290,6 +290,30 @@ impl JsHazardCurve {
         self.inner.default_prob(t1, t2).map_err(to_js_err)
     }
 
+    /// Default probability conditional on survival to the start date.
+    ///
+    /// Integrates the annual piecewise-constant hazard directly, preserving
+    /// small probabilities even when unconditional survival has underflowed.
+    /// It does not determine whether an issuer has actually defaulted.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - ISO-8601 conditioning date (`"YYYY-MM-DD"`), converted with
+    ///   the curve day count; dates before `baseDate` are clamped to time zero.
+    /// * `end` - ISO-8601 end date on or after `start`. Equal dates return zero;
+    ///   the final hazard rate extends beyond the last knot.
+    ///
+    /// @returns Conditional default probability as a decimal fraction in `[0, 1]`.
+    /// @throws `TypeError` for non-string inputs; `FinstackError` (kind
+    /// `validation`) for malformed or reversed dates, or a year fraction that
+    /// cannot be computed.
+    #[wasm_bindgen(js_name = conditionalDefaultProb)]
+    pub fn conditional_default_prob(&self, start: JsValue, end: JsValue) -> Result<f64, JsValue> {
+        self.inner
+            .conditional_default_prob(js_date(&start, "start")?, js_date(&end, "end")?)
+            .map_err(to_js_err)
+    }
+
     /// Interpolated par CDS spread in basis points at year fraction `t`.
     ///
     /// Uses the stored `parSpreads` quotes; with fewer than two quotes it

@@ -1371,6 +1371,7 @@
     "statics": ["flat", "fromJson", "fromSurvivalProbs"],
     "methods": [
       "cdsQuoteBp",
+      "conditionalDefaultProb",
       "defaultProb",
       "free",
       "hazardRate",
