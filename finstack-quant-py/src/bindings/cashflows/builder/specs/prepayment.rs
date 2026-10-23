@@ -26,6 +26,7 @@ wire_methods!(
     PyPrepaymentModelSpec,
     PrepaymentModelSpec,
     "PrepaymentModelSpec",
+    stub = "finstack_quant.cashflows.builder",
     validate
 );
 

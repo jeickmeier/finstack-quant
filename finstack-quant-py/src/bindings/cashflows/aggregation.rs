@@ -60,7 +60,12 @@ impl PyPeriodAggregation {
     }
 }
 
-wire_methods!(PyPeriodAggregation, PeriodAggregation, "PeriodAggregation");
+wire_methods!(
+    PyPeriodAggregation,
+    PeriodAggregation,
+    "PeriodAggregation",
+    stub = "finstack_quant.cashflows.aggregation"
+);
 
 #[pymethods]
 impl PyPeriodAggregation {
@@ -160,37 +165,7 @@ impl PyPeriodAggregation {
     }
 }
 
-/// Aggregate dated flows into reporting periods (half-open ``[start, end)``).
-///
-/// Parameters
-/// ----------
-/// flows : list[tuple[datetime.date, Money]]
-///     Dated cashflows; unsorted input is sorted internally.
-/// periods : list[Period]
-///     Sorted, disjoint reporting periods.
-///
-/// Returns
-/// -------
-/// PeriodAggregation
-///     Mapping-like ``{period_id_label: {currency_code: nominal_sum}}`` with
-///     ``to_dataframe()``; empty periods are omitted.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If periods are unsorted, overlapping, or contain duplicate ids, or
-///     if a per-currency total is non-finite or exceeds the Decimal range.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.cashflows.aggregation import aggregate_by_period
-/// >>> from finstack_quant.core.dates import build_periods
-/// >>> from finstack_quant.core.money import Money
-/// >>> flows = [(datetime.date(2025, 3, 15), Money(100.0, "USD"))]
-/// >>> periods = build_periods("2025Q1..Q4").periods
-/// >>> aggregate_by_period(flows, periods)["2025Q1"]["USD"].amount
-/// 100.0
+#[doc = pydoc!("finstack_quant.cashflows.aggregation", "aggregate_by_period")]
 #[pyfunction(name = "aggregate_by_period")]
 #[pyo3(text_signature = "(flows, periods)")]
 fn py_aggregate_by_period<'py>(
@@ -249,7 +224,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     let module = crate::bindings::module_utils::new_submodule(parent, "aggregation")?;
     module.setattr(
         "__doc__",
-        "Currency-preserving aggregation of dated cashflows into periods and totals.",
+        pydoc!("finstack_quant.cashflows.aggregation", "__module__"),
     )?;
     module.add_class::<PyPeriodAggregation>()?;
     module.add_function(wrap_pyfunction!(py_aggregate_by_period, &module)?)?;

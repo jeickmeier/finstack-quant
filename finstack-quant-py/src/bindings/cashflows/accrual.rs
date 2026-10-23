@@ -137,7 +137,12 @@ impl PyExCouponRule {
     }
 }
 
-wire_methods!(PyExCouponRule, ExCouponRule, "ExCouponRule");
+wire_methods!(
+    PyExCouponRule,
+    ExCouponRule,
+    "ExCouponRule",
+    stub = "finstack_quant.cashflows.accrual"
+);
 
 #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig")]
 #[pyclass(
@@ -214,7 +219,12 @@ impl PyAccrualConfig {
     }
 }
 
-wire_methods!(PyAccrualConfig, AccrualConfig, "AccrualConfig");
+wire_methods!(
+    PyAccrualConfig,
+    AccrualConfig,
+    "AccrualConfig",
+    stub = "finstack_quant.cashflows.accrual"
+);
 
 #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualIndex")]
 #[pyclass(
@@ -296,7 +306,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     let module = crate::bindings::module_utils::new_submodule(parent, "accrual")?;
     module.setattr(
         "__doc__",
-        "Schedule-driven accrued interest: methods, ex-coupon rules, accrual index.",
+        pydoc!("finstack_quant.cashflows.accrual", "__module__"),
     )?;
     module.add_class::<PyAccrualMethod>()?;
     module.add_class::<PyExCouponRule>()?;

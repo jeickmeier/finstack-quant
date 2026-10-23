@@ -109,11 +109,14 @@ impl PyScheduleParams {
 }
 
 macro_rules! schedule_params_presets {
-    ($( $(#[$doc:meta])* $name:ident ),+ $(,)?) => {
+    ($( $name:ident ),+ $(,)?) => {
         #[pymethods]
         impl PyScheduleParams {
             $(
-                $(#[$doc])*
+                #[doc = pydoc!(
+                    "finstack_quant.cashflows.builder",
+                    concat!("ScheduleParams.", stringify!($name))
+                )]
                 #[staticmethod]
                 #[pyo3(text_signature = "()")]
                 fn $name() -> Self {
@@ -125,29 +128,25 @@ macro_rules! schedule_params_presets {
 }
 
 schedule_params_presets! {
-    /// Quarterly, Act/360, Modified Following, weekends-only calendar.
     quarterly_act360,
-    /// Semi-annual, 30/360, Modified Following, weekends-only calendar.
     semiannual_30360,
-    /// Annual, Act/Act, Following, weekends-only calendar.
     annual_actact,
-    /// USD SOFR swap: quarterly, Act/360, MF, USNY, T+2 lag, adjusted accruals.
     usd_sofr_swap,
-    /// USD corporate bond: semi-annual, 30/360, Following, USNY.
     usd_corporate_bond,
-    /// USD Treasury: semi-annual, Act/Act ISMA, Following, USNY.
     usd_treasury,
-    /// EUR ESTR swap: annual, Act/360, MF, TARGET2, T+2 lag, adjusted accruals.
     eur_estr_swap,
-    /// EUR government bond: annual, Act/Act ISMA, Following, TARGET2.
     eur_gov_bond,
-    /// GBP SONIA swap: annual, Act/365F, MF, GBLO, no lag, adjusted accruals.
     gbp_sonia_swap,
-    /// JPY TONA swap: annual, Act/365F, MF, JPTO, T+2 lag, adjusted accruals.
     jpy_tona_swap,
 }
 
-wire_methods!(PyScheduleParams, ScheduleParams, "ScheduleParams", validate);
+wire_methods!(
+    PyScheduleParams,
+    ScheduleParams,
+    "ScheduleParams",
+    stub = "finstack_quant.cashflows.builder",
+    validate
+);
 
 #[pymethods]
 impl PyScheduleParams {

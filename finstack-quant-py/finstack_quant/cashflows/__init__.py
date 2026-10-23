@@ -1,4 +1,8 @@
-"""Cashflow schedules: typed builder, accrual, aggregation, JSON bridge.
+"""Cashflow schedule construction (typed and JSON), validation, and dated-flow extraction.
+
+Root bindings for ``finstack-quant-cashflows``. Build schedules from a
+``CashflowScheduleBuildSpec``, validate canonical payloads, extract dated flows,
+and compute accrued interest.
 
 Examples:
 >>> import datetime

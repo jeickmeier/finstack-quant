@@ -65,7 +65,12 @@ pub struct PyFeeBase {
     pub(crate) inner: FeeBase,
 }
 
-wire_methods!(PyFeeBase, FeeBase, "FeeBase");
+wire_methods!(
+    PyFeeBase,
+    FeeBase,
+    "FeeBase",
+    stub = "finstack_quant.cashflows.builder"
+);
 
 #[pymethods]
 impl PyFeeBase {
@@ -120,7 +125,12 @@ pub struct PyFeeSpec {
     pub(crate) inner: FeeSpec,
 }
 
-wire_methods!(PyFeeSpec, FeeSpec, "FeeSpec");
+wire_methods!(
+    PyFeeSpec,
+    FeeSpec,
+    "FeeSpec",
+    stub = "finstack_quant.cashflows.builder"
+);
 
 #[pymethods]
 impl PyFeeSpec {
