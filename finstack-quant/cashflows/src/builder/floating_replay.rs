@@ -60,8 +60,6 @@ pub enum FloatingRateObservation {
     Term {
         /// Business-day-adjusted fixing date, which can precede accrual start.
         reset_date: Date,
-        /// Authoritative index tenor in years from the resolved forward curve.
-        tenor_years: f64,
     },
     /// An overnight index aggregated over a compiled observation schedule.
     Overnight {
@@ -146,7 +144,7 @@ impl CompiledFloatingCoupon {
     /// # Errors
     ///
     /// Returns [`Error::Validation`] for invalid dates, accrual, split, rate
-    /// parameters, term tenor, or overnight accumulator configuration.
+    /// parameters, or overnight accumulator configuration.
     /// Propagates day-count errors when the supplied contractual context is
     /// incomplete; rejects an accrual factor inconsistent with that context.
     /// ACT/365L instead validates the stored factor's implied actual-day
@@ -203,13 +201,6 @@ impl CompiledFloatingCoupon {
             )));
         }
         match &observation {
-            FloatingRateObservation::Term { tenor_years, .. }
-                if !tenor_years.is_finite() || *tenor_years <= 0.0 =>
-            {
-                return Err(Error::Validation(format!(
-                    "floating term-index tenor must be positive and finite, got {tenor_years}"
-                )));
-            }
             FloatingRateObservation::Overnight {
                 schedule,
                 day_count_basis,
@@ -619,7 +610,6 @@ mod tests {
             economics(),
             FloatingRateObservation::Term {
                 reset_date: date!(2025 - 01 - 13),
-                tenor_years: 0.25,
             },
         )
         .expect("term coupon compiles");
@@ -659,7 +649,6 @@ mod tests {
             economics(),
             FloatingRateObservation::Term {
                 reset_date: date!(2024 - 01 - 29),
-                tenor_years: 2.0 / 12.0,
             },
         )
         .expect("business-day-adjusted payment compiles");
@@ -960,7 +949,6 @@ mod tests {
             economics(),
             FloatingRateObservation::Term {
                 reset_date: date!(2025 - 01 - 06),
-                tenor_years: 0.25,
             },
         )
         .expect("coupon");
@@ -999,7 +987,6 @@ mod tests {
         };
         let observation = FloatingRateObservation::Term {
             reset_date: period.accrual_start,
-            tenor_years: 0.25,
         };
         let coupon =
             CompiledFloatingCoupon::compile(period, economics.clone(), observation.clone())
@@ -1062,10 +1049,7 @@ mod tests {
                     pik_fraction: 0.0,
                     rate_params: Default::default(),
                 },
-                FloatingRateObservation::Term {
-                    reset_date: start,
-                    tenor_years: frequency.to_years(),
-                },
+                FloatingRateObservation::Term { reset_date: start },
             )
             .expect("coupon");
             let mut state = FloatingCouponReplayState::default();
@@ -1114,10 +1098,7 @@ mod tests {
                     pik_fraction: 0.0,
                     rate_params: Default::default(),
                 },
-                FloatingRateObservation::Term {
-                    reset_date: start,
-                    tenor_years: 0.25,
-                },
+                FloatingRateObservation::Term { reset_date: start },
             )
             .expect("coupon");
             let mut state = FloatingCouponReplayState::default();

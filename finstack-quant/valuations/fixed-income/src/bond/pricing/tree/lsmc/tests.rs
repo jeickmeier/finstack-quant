@@ -1117,9 +1117,10 @@ fn term_reset_base_forward_uses_discount_curve_date_axis() {
     let FloatingRateModel::Term(ObservedRateSource::Conditional(rate)) = &coupon.rate_model else {
         panic!("future reset should carry a conditional rate");
     };
-    let FloatingRateObservation::Term { tenor_years, .. } = coupon.compiled.observation() else {
-        panic!("expected term observation");
-    };
+    let tenor_years = market
+        .get_forward("USD-SOFR-3M")
+        .expect("3M term forward")
+        .tenor();
     let observation_end_step = nearest_step(
         &template.times,
         template.times[coupon.reset_step] + tenor_years,
@@ -1163,10 +1164,11 @@ fn lagged_term_reset_uses_curve_tenor_and_captures_post_pik_start_balance() {
         .find(|(_, coupon)| coupon.accrual_start_step > 0)
         .expect("future term coupon");
     assert!(coupon.reset_step < coupon.accrual_start_step);
-    let FloatingRateObservation::Term { tenor_years, .. } = coupon.compiled.observation() else {
-        panic!("expected term observation");
-    };
-    assert!((*tenor_years - 0.25).abs() < 1.0e-12);
+    let tenor_years = market
+        .get_forward("USD-SOFR-3M")
+        .expect("3M term forward")
+        .tenor();
+    assert!((tenor_years - 0.25).abs() < 1.0e-12);
     let times = tree.time_grid().expect("tree times");
     let observation_end = nearest_step(times, times[coupon.reset_step] + tenor_years);
     assert!(
