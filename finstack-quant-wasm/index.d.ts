@@ -14120,7 +14120,7 @@ export interface CashflowsNamespace {
   periodAggregationGetAmount(
     aggregation: generated.cashflows.PeriodAggregation,
     period: string,
-    currency: generated.core.Currency
+    currency: string
   ): MoneyValue | null;
 
   /**
@@ -14133,7 +14133,7 @@ export interface CashflowsNamespace {
    */
   aggregateCashflowsChecked(
     flows: readonly DatedFlowJson[],
-    target: generated.core.Currency
+    target: string
   ): MoneyValue;
 
   /**
@@ -14258,7 +14258,7 @@ export interface CashflowsNamespace {
    * @returns `Notional` wire object `{ initial, amort: "none" }`.
    * @throws If `amount` is not a finite number or `currency` is not an ISO-4217 code (kind `invalid_type` or `validation`).
    */
-  notionalPar(amount: number, currency: generated.core.Currency): generated.cashflows.Notional;
+  notionalPar(amount: number, currency: string): generated.cashflows.Notional;
 
   /**
    * Check a notional and its amortization rule for consistency.

@@ -1,7 +1,7 @@
 //! Currency-preserving aggregation of dated cashflows.
 
 use super::schedule::dated_flows_arg;
-use crate::utils::input::{js_f64_seq, js_string, js_string_seq};
+use crate::utils::input::{js_currency, js_f64_seq, js_string, js_string_seq};
 use crate::utils::wire::js_wire;
 use crate::utils::{parse_iso_dates, to_js_err, to_js_value};
 use finstack_quant_cashflows::aggregation::{
@@ -9,7 +9,6 @@ use finstack_quant_cashflows::aggregation::{
     aggregate_cashflows_checked as rust_aggregate_cashflows_checked,
     calendar_year_ladder as rust_calendar_year_ladder, PeriodAggregation,
 };
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Period;
 use wasm_bindgen::prelude::*;
 
@@ -57,7 +56,7 @@ pub fn period_aggregation_get_amount(
 ) -> Result<JsValue, JsValue> {
     let aggregation = js_wire::<PeriodAggregation>(&aggregation, "aggregation")?;
     let period = js_string(&period, "period")?;
-    let currency = js_wire::<Currency>(&currency, "currency")?;
+    let currency = js_currency(&currency, "currency")?;
     to_js_value(&aggregation.get_amount(&period, currency))
 }
 
@@ -70,7 +69,7 @@ pub fn period_aggregation_get_amount(
 #[wasm_bindgen(js_name = aggregateCashflowsChecked)]
 pub fn aggregate_cashflows_checked(flows: JsValue, target: JsValue) -> Result<JsValue, JsValue> {
     let flows = dated_flows_arg(&flows, "flows")?;
-    let target = js_wire::<Currency>(&target, "target")?;
+    let target = js_currency(&target, "target")?;
     to_js_value(&rust_aggregate_cashflows_checked(&flows, target).map_err(to_js_err)?)
 }
 

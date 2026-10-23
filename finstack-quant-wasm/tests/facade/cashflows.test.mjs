@@ -612,3 +612,9 @@ test('period lookups preserve exact labels, empty buckets, and currency validati
   assert.throws(() => cashflows.periodAggregationGetPeriod(bad, '2025Q1'));
   assert.throws(() => cashflows.periodAggregationGetAmount(bad, '2025Q1', 'USD'));
 });
+
+test('currency arguments accept any ASCII case, as the Rust parser does', () => {
+  assert.equal(cashflows.notionalPar(100, 'usd').initial.currency, 'USD');
+  assert.equal(cashflows.notionalPar(100, 'Usd').initial.currency, 'USD');
+  assert.throws(() => cashflows.notionalPar(100, 'us d'), /currency/);
+});

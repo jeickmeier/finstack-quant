@@ -7,14 +7,13 @@
 //! here: constructors return the canonical wire value, and methods take it as
 //! their first argument.
 
-use crate::utils::input::{js_f64, js_uint};
+use crate::utils::input::{js_currency, js_f64, js_uint};
 use crate::utils::wire::{js_decimal, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::{
     DefaultModelSpec, FeeSpec, FloatingLegCompounding, FloatingRateSpec, Notional,
     PrepaymentModelSpec, RecoveryModelSpec, ScheduleParams,
 };
-use finstack_quant_core::currency::Currency;
 use wasm_bindgen::prelude::*;
 
 // --- FeeSpec -------------------------------------------------------------------
@@ -128,7 +127,7 @@ pub fn floating_rate_spec_euribor_3m(spread_bp: JsValue) -> Result<JsValue, JsVa
 /// @throws If `amount` is not a finite number or `currency` is not an ISO-4217 code (kind `invalid_type` or `validation`).
 #[wasm_bindgen(js_name = notionalPar)]
 pub fn notional_par(amount: JsValue, currency: JsValue) -> Result<JsValue, JsValue> {
-    let currency: Currency = js_wire(&currency, "currency")?;
+    let currency = js_currency(&currency, "currency")?;
     let notional = Notional::par(js_f64(&amount, "amount")?, currency).map_err(to_js_err)?;
     to_js_value(&notional)
 }
