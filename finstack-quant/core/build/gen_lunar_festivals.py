@@ -27,7 +27,6 @@ Outputs (relative to the crate root ``finstack-quant/core``):
   - data/qing_ming.csv
   - data/vernal_equinox_jp.csv
   - data/autumnal_equinox_jp.csv
-  - src/generated/festivals_generated.rs
 """
 
 from __future__ import annotations
@@ -36,7 +35,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 
-from generate_reference_data import cache_year_range, render_festivals
+from generate_reference_data import cache_year_range
 from lunar_python import Lunar, Solar
 
 BASE_YEAR, END_YEAR = cache_year_range()
@@ -90,10 +89,9 @@ def solar_term_dates(name: str, utc8_offset: int) -> list[tuple[int, int, int]]:
 
 
 def main() -> None:
-    """Refresh festival/equinox CSV inputs and corresponding Rust tables."""
+    """Refresh the festival/equinox CSV inputs; ``generate_reference_data`` renders the Rust."""
     crate_root = Path(__file__).resolve().parents[1]
     data_dir = crate_root / "data"
-    gen_dir = crate_root / "src" / "generated"
 
     tables = {
         "dragon_boat": festival_dates(*DRAGON_BOAT),
@@ -106,7 +104,6 @@ def main() -> None:
     }
     for name, rows in tables.items():
         write_csv(data_dir / f"{name}.csv", rows)
-    (gen_dir / "festivals_generated.rs").write_text(render_festivals(tables))
     sys.stdout.write(f"Wrote seven festival/equinox tables for {BASE_YEAR}-{END_YEAR}.\n")
 
 
