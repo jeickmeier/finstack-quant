@@ -251,7 +251,6 @@ editing the input changes the next build:
 | Input | Generated into `OUT_DIR` | Included by |
 |-------|--------------------------|-------------|
 | `data/calendars/*.json` (28 calendars) | `calendars.rs` — per-calendar `Rule` tables and the registry, evaluated at runtime (there are no precomputed holiday bitsets) | `src/dates/calendar/mod.rs` |
-| `data/sifma_settlements.csv` | `sifma_settlements_generated.rs` | `src/dates/imm.rs` |
 
 **Committed under `src/generated/`.** `build.rs` does not derive these from the
 data files, so editing the CSV alone changes nothing:
@@ -261,9 +260,11 @@ data files, so editing the CSV alone changes nothing:
 | `currency_generated.rs` (`Currency` enum, decimal precision and numeric codes) | `build/generate_reference_data.py`; included directly by `src/currency.rs` | `data/iso_4217.csv` |
 | `cny_generated.rs` (Chinese New Year dates) | `build/generate_reference_data.py` | `data/chinese_new_year.csv` |
 | `festivals_generated.rs` (Chinese festivals and Japanese equinoxes) | `build/generate_reference_data.py` | `data/*` festival/equinox CSVs |
+| `sifma_settlements_generated.rs` (SIFMA MBS settlement days) | `build/generate_reference_data.py` | `data/sifma_settlements.csv` |
 
 `currency_generated.rs` is `include!`d from `src/currency.rs`. `cny_generated.rs`
 and `festivals_generated.rs` are `include!`d from `src/dates/calendar/algo.rs`.
+`sifma_settlements_generated.rs` is `include!`d from `src/dates/imm.rs`.
 Regenerate currency, Chinese New Year, festival and equinox tables with
 `uv run --no-project python finstack-quant/core/build/generate_reference_data.py`
 (add `--check` to verify); `mise run gen-write` and `mise run gen-check` include

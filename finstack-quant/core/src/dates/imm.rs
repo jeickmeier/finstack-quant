@@ -542,7 +542,7 @@ pub fn estimated_sifma_settlement_date(
 
 // Generated from `data/sifma_settlements.csv`. Rows may contain a subset of
 // classes where SIFMA has published only partial coverage.
-include!(concat!(env!("OUT_DIR"), "/sifma_settlements_generated.rs"));
+include!("../generated/sifma_settlements_generated.rs");
 
 /// Look up the published SIFMA TBA settlement date for a settlement class.
 ///

@@ -7,6 +7,7 @@ are authoritative; this tool never fetches or changes their financial data.
 from __future__ import annotations
 
 import argparse
+import calendar
 import csv
 import datetime as dt
 from pathlib import Path
@@ -98,6 +99,67 @@ def render_currency(rows: list[tuple[str, int, int, str]]) -> str:
         "    }",
         "}",
     ]
+    return "\n".join(lines) + "\n"
+
+
+SIFMA_HEADER = "year,month,class_a,class_b,class_c,class_d"
+
+SifmaRow = tuple[int, int, tuple[int | None, ...]]
+
+
+def parse_sifma_day(value: str, path: Path, line_number: int) -> int | None:
+    """Parse one class settlement day; an empty field means the class is unpublished."""
+    if value == "":
+        return None
+    try:
+        day = int(value)
+    except ValueError as error:
+        raise ValueError(f"{path}:{line_number}: invalid settlement day {value!r}") from error
+    if not 1 <= day <= 31:
+        raise ValueError(f"{path}:{line_number}: settlement day must be 1-31, got {day}")
+    return day
+
+
+def sifma_rows(path: Path) -> list[SifmaRow]:
+    """Load SIFMA settlement days per (year, month), sorted and checked for real dates."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0] != SIFMA_HEADER:
+        raise ValueError(f"{path}: expected header '{SIFMA_HEADER}'")
+    rows: list[SifmaRow] = []
+    for line_number, line in enumerate(lines[1:], start=2):
+        fields = line.split(",")
+        if len(fields) != 6:
+            raise ValueError(f"{path}:{line_number}: expected six comma-separated fields")
+        year, month = int(fields[0]), int(fields[1])
+        if not 1 <= month <= 12:
+            raise ValueError(f"{path}:{line_number}: month must be 1-12, got {month}")
+        days = tuple(parse_sifma_day(value, path, line_number) for value in fields[2:])
+        if all(day is None for day in days):
+            raise ValueError(f"{path}:{line_number}: row must publish at least one class")
+        last_day = calendar.monthrange(year, month)[1]
+        if any(day is not None and day > last_day for day in days):
+            raise ValueError(f"{path}:{line_number}: {year}-{month:02d} has only {last_day} days")
+        rows.append((year, month, days))
+    rows.sort(key=lambda row: (row[0], row[1]))
+    if len({(year, month) for year, month, _ in rows}) != len(rows):
+        raise ValueError(f"{path}: duplicate year/month row")
+    return rows
+
+
+def render_sifma(rows: list[SifmaRow]) -> str:
+    """Render the SIFMA settlement lookup as a checked-in Rust static."""
+
+    def render_day(day: int | None) -> str:
+        return "None" if day is None else f"Some({day})"
+
+    lines = [
+        "// Auto-generated from data/sifma_settlements.csv by build/generate_reference_data.py - DO NOT EDIT",
+        "// Each row: (year, month, [class A, class B, class C, class D] days).",
+        "pub(crate) static SIFMA_SETTLEMENTS: &[(i32, u8, [Option<u8>; 4])] = &[",
+    ]
+    for year, month, days in rows:
+        lines.append(f"    ({year}, {month}, [{', '.join(render_day(day) for day in days)}]),")
+    lines.append("];")
     return "\n".join(lines) + "\n"
 
 
@@ -280,6 +342,9 @@ def main() -> None:
         generated / "festivals_generated.rs": render_festivals({
             name: date_rows(crate_root / "data" / f"{name}.csv") for name in FESTIVAL_TABLES
         }),
+        generated / "sifma_settlements_generated.rs": render_sifma(
+            sifma_rows(crate_root / "data/sifma_settlements.csv")
+        ),
     }
     # Core can be generated without a sibling WASM checkout.
     wasm_directory = wasm_root / "src/api/core"

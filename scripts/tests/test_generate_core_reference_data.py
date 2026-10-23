@@ -29,6 +29,38 @@ def test_missing_calendar_year_rejected(tmp_path: Path) -> None:
         reference_data.date_rows(path)
 
 
+SIFMA_HEADER = "year,month,class_a,class_b,class_c,class_d\n"
+
+
+def test_sifma_rows_sort_and_render_unpublished_classes(tmp_path: Path) -> None:
+    """Sort settlement rows by month and render unpublished classes as None."""
+    path = tmp_path / "sifma.csv"
+    path.write_text(SIFMA_HEADER + "2025,2,13,,,\n2025,1,14,,,\n", encoding="utf-8")
+    rows = reference_data.sifma_rows(path)
+    assert [(year, month) for year, month, _ in rows] == [(2025, 1), (2025, 2)]
+    assert rows[1][2] == (13, None, None, None)
+    assert "    (2025, 2, [Some(13), None, None, None])," in reference_data.render_sifma(rows)
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("year,month,class_a\n", "expected header"),
+        (SIFMA_HEADER + "2025,2,30,,,\n", "has only 28 days"),
+        (SIFMA_HEADER + "2025,1,,,,\n", "at least one class"),
+        (SIFMA_HEADER + "2025,1,9,,,\n2025,1,10,,,\n", "duplicate year/month row"),
+        (SIFMA_HEADER + "2025,13,9,,,\n", "month must be 1-12"),
+        (SIFMA_HEADER + "2025,1,32,,,\n", "must be 1-31"),
+    ],
+)
+def test_sifma_rejects_invalid_rows(tmp_path: Path, text: str, message: str) -> None:
+    """Reject malformed or impossible settlement rows before any Rust is written."""
+    path = tmp_path / "sifma.csv"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        reference_data.sifma_rows(path)
+
+
 @pytest.fixture
 def generation_roots(tmp_path: Path) -> tuple[Path, Path]:
     """Copy authoritative inputs into isolated Rust and WASM output roots."""
@@ -39,6 +71,7 @@ def generation_roots(tmp_path: Path) -> tuple[Path, Path]:
     for filename in [
         "iso_4217.csv",
         "chinese_new_year.csv",
+        "sifma_settlements.csv",
         *[f"{name}.csv" for name in reference_data.FESTIVAL_TABLES],
     ]:
         (crate_root / "data" / filename).write_bytes((reference_data.CRATE_ROOT / "data" / filename).read_bytes())
@@ -56,7 +89,14 @@ def run_generator(roots: tuple[Path, Path], *, check: bool = False) -> None:
 
 
 @pytest.mark.parametrize(
-    "table", ["currency_generated.rs", "cny_generated.rs", "festivals_generated.rs", "currency_statics.rs"]
+    "table",
+    [
+        "currency_generated.rs",
+        "cny_generated.rs",
+        "festivals_generated.rs",
+        "sifma_settlements_generated.rs",
+        "currency_statics.rs",
+    ],
 )
 def test_check_detects_drift_without_overwriting_it(generation_roots: tuple[Path, Path], table: str) -> None:
     """Report stale Rust or WASM files without changing their bytes."""
@@ -79,7 +119,7 @@ def test_generation_is_isolated_and_idempotent(generation_roots: tuple[Path, Pat
         before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in outputs}
         run_generator(generation_roots)
         run_generator(generation_roots, check=True)
-    assert len(outputs) == 4
+    assert len(outputs) == 5
     assert before == {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in outputs}
     assert not (tmp_path / "unselected").exists()
 
