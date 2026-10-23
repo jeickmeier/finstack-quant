@@ -7,7 +7,6 @@ pub mod currency;
 pub mod currency_statics;
 pub(crate) mod curve_args;
 pub mod dates;
-pub mod identifiers;
 pub mod imm;
 pub mod market_context;
 pub mod market_curves;
