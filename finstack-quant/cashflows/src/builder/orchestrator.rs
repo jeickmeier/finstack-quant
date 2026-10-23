@@ -366,9 +366,7 @@ impl CompiledCashFlowPlan {
             .chain(self.float_schedules.iter().map(|s| s.periods.len()))
             .chain(self.periodic_fees.iter().map(|s| s.periods.len()))
             .sum();
-        let mut dates = Vec::with_capacity(
-            3 + estimated_periods * 3 + self.fixed_fees.len() + self.principal_events.len(),
-        );
+        let mut dates = Vec::with_capacity(3 + estimated_periods * 3 + self.principal_events.len());
         dates.extend([self.issue, self.maturity, self.redemption_date]);
         for entry in self
             .fixed_schedules
@@ -384,7 +382,6 @@ impl CompiledCashFlowPlan {
                 period.payment_date,
             ]);
         }
-        dates.extend(self.fixed_fees.iter().map(|(date, _)| *date));
         match &self.notional.amort {
             AmortizationSpec::CustomPrincipal { items } => {
                 dates.extend(items.iter().map(|(date, _)| *date))
@@ -686,9 +683,10 @@ impl CompiledCashFlowPlan {
             &self.principal_events,
             self.principal_exchange,
         )?;
-        // Pre- and at-issue fees emit here; the date loop only covers dates after issue.
+        // Fixed fees are emitted once, here. The final canonical sort places
+        // them by date, so they need no entries in the date grid.
         for (fee_date, amount) in &self.fixed_fees {
-            if *fee_date <= self.issue && amount.amount() != 0.0 {
+            if amount.amount() != 0.0 {
                 state.flows.push(CashFlow::new(
                     *fee_date,
                     None,

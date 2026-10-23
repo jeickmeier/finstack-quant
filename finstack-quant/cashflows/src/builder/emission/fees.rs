@@ -37,8 +37,8 @@ fn checked_fee_amount(
 
 /// Emit fee cashflows on a specific date.
 ///
-/// Processes both periodic fees (based on drawn/undrawn balances) and fixed
-/// fees (explicit amounts) that fall on the given date.
+/// Processes periodic fees (based on drawn/undrawn balances) that accrue on
+/// the given date. Fixed fees are emitted by the caller, not here.
 ///
 /// For periodic fees, computes the fee amount as `base * bp * year_fraction`
 /// where base is either the drawn balance or the undrawn balance (commitment - outstanding).
@@ -51,11 +51,10 @@ fn checked_fee_amount(
 /// intraperiod balance changes, and undrawn-limit clipping semantics.
 ///
 /// Any non-zero fee amount is emitted; negative fees (rebates) are preserved
-/// as negative cashflows for both periodic and fixed fees.
+/// as negative cashflows.
 pub(in crate::builder) fn emit_fees_on(
     d: Date,
     periodic_fees: &[PeriodicFee],
-    fixed_fees: &[(Date, Money)],
     outstanding: Decimal,
     outstanding_history: &[(Date, Decimal)],
     ccy: Currency,
@@ -148,11 +147,6 @@ pub(in crate::builder) fn emit_fees_on(
         }
     }
 
-    for (fd, amt) in fixed_fees {
-        if *fd == d && amt.amount() != 0.0 {
-            new_flows.push(CashFlow::new(d, None, *amt, CFKind::Fee, 0.0, None));
-        }
-    }
     Ok(())
 }
 
@@ -221,7 +215,6 @@ mod tests {
         emit_fees_on(
             end,
             &[fee],
-            &[],
             Decimal::ZERO,
             &[(start, dec!(1000000)), (event, Decimal::ZERO)],
             Currency::USD,
@@ -254,7 +247,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             outstanding,
             &history,
             Currency::USD,
@@ -294,7 +286,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf_pit],
-            &[],
             outstanding,
             &history,
             Currency::USD,
@@ -314,7 +305,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf_twa],
-            &[],
             outstanding,
             &history,
             Currency::USD,
@@ -354,7 +344,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             dec!(500000),
             &history,
             Currency::USD,
@@ -399,7 +388,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             dec!(500000),
             &history,
             Currency::USD,
@@ -444,7 +432,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             dec!(800000), // live balance after same-date amortization
             &history,
             Currency::USD,
@@ -482,7 +469,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             dec!(1000000),
             &history,
             Currency::USD,
