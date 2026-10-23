@@ -1,14 +1,8 @@
 //! Tests for free calendar resolution APIs.
 
-use finstack_quant_core::dates::{
-    available_calendars, calendar_by_id_strict, Date, HolidayCalendar,
-};
+use super::common::make_date;
+use finstack_quant_core::dates::{available_calendars, calendar_by_id_strict, HolidayCalendar};
 use finstack_quant_core::types::CalendarId;
-use time::Month;
-
-fn make_date(y: i32, m: u8, d: u8) -> Date {
-    Date::from_calendar_date(y, Month::try_from(m).expect("valid month"), d).expect("valid date")
-}
 
 #[test]
 fn resolves_all_built_in_calendars() {
