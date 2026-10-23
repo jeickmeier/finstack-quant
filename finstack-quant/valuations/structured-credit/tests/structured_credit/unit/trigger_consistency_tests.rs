@@ -16,11 +16,10 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    execute_waterfall, run_simulation_with_diagnostics, AssetPool, CoverageTestDiagnostic,
-    CoverageTestSpec, DealType, HedgeSwap, PaymentCalculation, PaymentType, PeriodDiagnostics,
-    PoolAsset, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, SwapNotional, Tranche, TrancheStructure, Waterfall, WaterfallContext,
-    WaterfallTier,
+    execute_waterfall, AssetPool, CoverageTestDiagnostic, CoverageTestSpec, DealType, HedgeSwap,
+    PaymentCalculation, PaymentType, PeriodDiagnostics, PoolAsset, Recipient, RecipientType,
+    ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, SwapNotional, Tranche,
+    TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
 };
 use time::macros::date;
 
@@ -94,9 +93,20 @@ fn clo(tests: Vec<CoverageTestSpec>) -> StructuredCredit {
     .expect("structure");
     let mut deal = StructuredCredit {
         coverage_triggers: tests,
-        ..StructuredCredit::new_clo("CLO-TRIGGERS", pool, tranches, CLOSE, MATURITY, "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse")
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-TRIGGERS".into(),
+                pool,
+                tranches,
+                closing_date: CLOSE,
+                maturity: MATURITY,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse")
     };
     deal.fees = None;
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
@@ -127,7 +137,7 @@ fn hedged(mut deal: StructuredCredit) -> StructuredCredit {
 }
 
 fn periods(deal: &StructuredCredit) -> Vec<PeriodDiagnostics> {
-    run_simulation_with_diagnostics(deal, &market(0.02), CLOSE)
+    deal.run_simulation(&market(0.02), CLOSE)
         .expect("simulation")
         .diagnostics
         .periods

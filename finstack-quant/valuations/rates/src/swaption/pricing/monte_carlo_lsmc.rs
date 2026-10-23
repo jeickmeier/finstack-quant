@@ -165,6 +165,32 @@ impl SwaptionLsmcPricer {
         }
     }
 
+    /// Step a short-rate path using one explicit innovation per grid interval.
+    /// The caller owns the discretization and reusable work buffer, including
+    /// reuse between the positive and negative legs of an antithetic pair.
+    fn rate_path_with_innovations(
+        &self,
+        initial_rate: f64,
+        time_grid: &TimeGrid,
+        innovations: impl Iterator<Item = f64>,
+        disc: &ExactHullWhite1F,
+        work: &mut [f64],
+    ) -> Vec<f64> {
+        let mut rate_path = Vec::with_capacity(time_grid.num_steps() + 1);
+        let mut state = vec![initial_rate];
+        let mut z_step = [0.0_f64];
+        rate_path.push(initial_rate);
+
+        for (step, innovation) in innovations.enumerate() {
+            let t = time_grid.time(step);
+            let dt = time_grid.dt(step);
+            z_step[0] = innovation;
+            disc.step(&self.hw_process, t, dt, &mut state, &z_step, work);
+            rate_path.push(state[0]);
+        }
+        rate_path
+    }
+
     /// Generate standard (non-antithetic) paths using a time grid.
     fn generate_standard_paths_with_grid(
         &self,
@@ -174,41 +200,29 @@ impl SwaptionLsmcPricer {
         let disc = ExactHullWhite1F::new();
         let rng = PhiloxRng::new(self.config.seed);
         let num_steps = time_grid.num_steps();
-
         let mut paths = Vec::with_capacity(self.config.num_paths);
 
         for path_id in 0..self.config.num_paths {
             let mut path_rng = rng.substream(path_id as u64);
-            let mut rate_path = Vec::with_capacity(num_steps + 1);
-            let mut state = vec![initial_rate];
             let mut z = vec![0.0];
             let mut work = vec![];
-
-            rate_path.push(initial_rate);
-
-            for step in 0..num_steps {
-                let t = time_grid.time(step);
-                let dt = time_grid.dt(step);
-
+            // Keep the standard stream's length-one fills in their original order.
+            let innovations = (0..num_steps).map(|_| {
                 path_rng.fill_std_normals(&mut z);
-                disc.step(&self.hw_process, t, dt, &mut state, &z, &mut work);
-
-                rate_path.push(state[0]);
-            }
-
-            paths.push(rate_path);
+                z[0]
+            });
+            paths.push(self.rate_path_with_innovations(
+                initial_rate,
+                time_grid,
+                innovations,
+                &disc,
+                &mut work,
+            ));
         }
-
         Ok(paths)
     }
 
-    /// Generate antithetic path pairs (Z, -Z) for variance reduction using a time grid.
-    ///
-    /// For each random draw Z, generates two paths:
-    /// - Original path using Z
-    /// - Antithetic path using -Z
-    ///
-    /// This exploits the negative correlation to reduce variance.
+    /// Generate adjacent antithetic path pairs (Z, -Z) using a time grid.
     fn generate_antithetic_paths_with_grid(
         &self,
         initial_rate: f64,
@@ -217,56 +231,29 @@ impl SwaptionLsmcPricer {
         let disc = ExactHullWhite1F::new();
         let rng = PhiloxRng::new(self.config.seed);
         let num_steps = time_grid.num_steps();
-
         let mut paths = Vec::with_capacity(self.config.simulated_path_count());
 
         for pair_id in 0..self.config.num_paths {
             let mut path_rng = rng.substream(pair_id as u64);
-
-            // Generate all random draws for this pair in a single call. The
-            // Box-Muller generator caches the second element of each pair in
-            // `spare_normal`, so one length-`num_steps` fill yields exactly the
-            // same sequence as `num_steps` length-1 fills did — but without the
-            // per-step heap allocation.
-            let mut z_draws: Vec<f64> = vec![0.0; num_steps];
+            // Preserve the original batched fill and Box-Muller spare-normal use.
+            let mut z_draws = vec![0.0; num_steps];
             path_rng.fill_std_normals(&mut z_draws);
-
-            // Reusable single-factor innovation buffer (HW1F: one factor).
-            let mut z_step = [0.0_f64];
-
-            // Original path using +Z
-            let mut state_orig = vec![initial_rate];
-            let mut rate_path_orig = Vec::with_capacity(num_steps + 1);
-            rate_path_orig.push(initial_rate);
-
             let mut work = vec![];
-            for (step, &z_val) in z_draws.iter().enumerate() {
-                let t = time_grid.time(step);
-                let dt = time_grid.dt(step);
-
-                z_step[0] = z_val;
-                disc.step(&self.hw_process, t, dt, &mut state_orig, &z_step, &mut work);
-                rate_path_orig.push(state_orig[0]);
-            }
-
-            // Antithetic path using -Z
-            let mut state_anti = vec![initial_rate];
-            let mut rate_path_anti = Vec::with_capacity(num_steps + 1);
-            rate_path_anti.push(initial_rate);
-
-            for (step, &z_val) in z_draws.iter().enumerate() {
-                let t = time_grid.time(step);
-                let dt = time_grid.dt(step);
-
-                z_step[0] = -z_val; // Negate the random draw
-                disc.step(&self.hw_process, t, dt, &mut state_anti, &z_step, &mut work);
-                rate_path_anti.push(state_anti[0]);
-            }
-
-            paths.push(rate_path_orig);
-            paths.push(rate_path_anti);
+            paths.push(self.rate_path_with_innovations(
+                initial_rate,
+                time_grid,
+                z_draws.iter().copied(),
+                &disc,
+                &mut work,
+            ));
+            paths.push(self.rate_path_with_innovations(
+                initial_rate,
+                time_grid,
+                z_draws.iter().map(|&z| -z),
+                &disc,
+                &mut work,
+            ));
         }
-
         Ok(paths)
     }
 
@@ -453,6 +440,173 @@ mod tests {
             },
             HullWhite1FProcess::new(HullWhite1FParams::new(0.03, 0.02, 0.03).expect("parameters")),
         )
+    }
+
+    // The pre-consolidation generators are intentionally retained only as
+    // fixed-seed regression oracles for stream consumption and path arithmetic.
+    fn reference_standard_paths(
+        pricer: &SwaptionLsmcPricer,
+        initial_rate: f64,
+        time_grid: &TimeGrid,
+    ) -> Result<Vec<Vec<f64>>> {
+        let disc = ExactHullWhite1F::new();
+        let rng = PhiloxRng::new(pricer.config.seed);
+        let num_steps = time_grid.num_steps();
+
+        let mut paths = Vec::with_capacity(pricer.config.num_paths);
+
+        for path_id in 0..pricer.config.num_paths {
+            let mut path_rng = rng.substream(path_id as u64);
+            let mut rate_path = Vec::with_capacity(num_steps + 1);
+            let mut state = vec![initial_rate];
+            let mut z = vec![0.0];
+            let mut work = vec![];
+
+            rate_path.push(initial_rate);
+
+            for step in 0..num_steps {
+                let t = time_grid.time(step);
+                let dt = time_grid.dt(step);
+
+                path_rng.fill_std_normals(&mut z);
+                disc.step(&pricer.hw_process, t, dt, &mut state, &z, &mut work);
+
+                rate_path.push(state[0]);
+            }
+
+            paths.push(rate_path);
+        }
+
+        Ok(paths)
+    }
+
+    /// Generate antithetic path pairs (Z, -Z) for variance reduction using a time grid.
+    ///
+    /// For each random draw Z, generates two paths:
+    /// - Original path using Z
+    /// - Antithetic path using -Z
+    ///
+    /// This exploits the negative correlation to reduce variance.
+    fn reference_antithetic_paths(
+        pricer: &SwaptionLsmcPricer,
+        initial_rate: f64,
+        time_grid: &TimeGrid,
+    ) -> Result<Vec<Vec<f64>>> {
+        let disc = ExactHullWhite1F::new();
+        let rng = PhiloxRng::new(pricer.config.seed);
+        let num_steps = time_grid.num_steps();
+
+        let mut paths = Vec::with_capacity(pricer.config.simulated_path_count());
+
+        for pair_id in 0..pricer.config.num_paths {
+            let mut path_rng = rng.substream(pair_id as u64);
+
+            // Generate all random draws for this pair in a single call. The
+            // Box-Muller generator caches the second element of each pair in
+            // `spare_normal`, so one length-`num_steps` fill yields exactly the
+            // same sequence as `num_steps` length-1 fills did — but without the
+            // per-step heap allocation.
+            let mut z_draws: Vec<f64> = vec![0.0; num_steps];
+            path_rng.fill_std_normals(&mut z_draws);
+
+            // Reusable single-factor innovation buffer (HW1F: one factor).
+            let mut z_step = [0.0_f64];
+
+            // Original path using +Z
+            let mut state_orig = vec![initial_rate];
+            let mut rate_path_orig = Vec::with_capacity(num_steps + 1);
+            rate_path_orig.push(initial_rate);
+
+            let mut work = vec![];
+            for (step, &z_val) in z_draws.iter().enumerate() {
+                let t = time_grid.time(step);
+                let dt = time_grid.dt(step);
+
+                z_step[0] = z_val;
+                disc.step(
+                    &pricer.hw_process,
+                    t,
+                    dt,
+                    &mut state_orig,
+                    &z_step,
+                    &mut work,
+                );
+                rate_path_orig.push(state_orig[0]);
+            }
+
+            // Antithetic path using -Z
+            let mut state_anti = vec![initial_rate];
+            let mut rate_path_anti = Vec::with_capacity(num_steps + 1);
+            rate_path_anti.push(initial_rate);
+
+            for (step, &z_val) in z_draws.iter().enumerate() {
+                let t = time_grid.time(step);
+                let dt = time_grid.dt(step);
+
+                z_step[0] = -z_val; // Negate the random draw
+                disc.step(
+                    &pricer.hw_process,
+                    t,
+                    dt,
+                    &mut state_anti,
+                    &z_step,
+                    &mut work,
+                );
+                rate_path_anti.push(state_anti[0]);
+            }
+
+            paths.push(rate_path_orig);
+            paths.push(rate_path_anti);
+        }
+
+        Ok(paths)
+    }
+
+    #[test]
+    fn shared_stepping_preserves_legacy_paths_bit_for_bit() {
+        // Odd and even interval counts exercise both Box-Muller spare states;
+        // nonuniform intervals catch grid indexing and dt reordering.
+        let grids = [
+            vec![0.0, 0.7],
+            vec![0.0, 0.01, 0.1, 0.6, 1.75],
+            vec![0.0, 0.01, 0.1, 0.6, 1.75, 2.0],
+        ];
+        for times in grids {
+            let grid = TimeGrid::from_times(times).expect("grid");
+            for seed in [0, 42, u64::MAX] {
+                for initial_rate in [-0.01, 0.03] {
+                    for antithetic in [false, true] {
+                        for oos_lsmc in [false, true] {
+                            let mut p = pricer(8, antithetic, oos_lsmc);
+                            p.config.seed = seed;
+                            let expected = if antithetic {
+                                reference_antithetic_paths(&p, initial_rate, &grid)
+                            } else {
+                                reference_standard_paths(&p, initial_rate, &grid)
+                            }
+                            .expect("legacy paths");
+                            let actual = p
+                                .generate_rate_paths_with_grid(initial_rate, &grid)
+                                .expect("shared-step paths");
+                            assert_eq!(actual.len(), p.config.simulated_path_count());
+                            assert_eq!(actual.len(), expected.len());
+                            for (path_id, (actual_path, expected_path)) in
+                                actual.iter().zip(&expected).enumerate()
+                            {
+                                let actual_bits: Vec<_> =
+                                    actual_path.iter().map(|v| v.to_bits()).collect();
+                                let expected_bits: Vec<_> =
+                                    expected_path.iter().map(|v| v.to_bits()).collect();
+                                assert_eq!(
+                                    actual_bits, expected_bits,
+                                    "seed={seed}, initial={initial_rate}, antithetic={antithetic}, oos={oos_lsmc}, path={path_id}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]

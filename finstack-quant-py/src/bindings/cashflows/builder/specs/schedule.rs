@@ -144,7 +144,7 @@ wire_methods!(
     PyScheduleParams,
     ScheduleParams,
     "ScheduleParams",
-    stub = "finstack_quant.cashflows.builder",
+    module = "finstack_quant.cashflows.builder",
     validate
 );
 

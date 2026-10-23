@@ -138,7 +138,7 @@ impl EuropeanPricer {
     ///     .expect("positive path count")
     ///     .with_seed(19)
     ///     .with_parallel(false);
-    /// let process = GbmProcess::with_params(0.03, 0.01, 0.20).unwrap();
+    /// let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).unwrap();
     /// let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
     /// let discount_factor = (-0.03_f64).exp();
     ///
@@ -235,7 +235,8 @@ impl EuropeanPricer {
                 .num_steps,
         );
         crate::monte_carlo::require_positive_vol(vol)?;
-        let process = GbmProcess::with_params(rate, div_yield, vol)?;
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
+            .map(GbmProcess::new)?;
         let discount_factor = (-rate * expiry).exp();
         let payoff = European::new(option_type, strike, 1.0, num_steps);
         self.price(

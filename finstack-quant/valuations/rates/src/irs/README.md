@@ -185,7 +185,7 @@ Registered for `InstrumentType::Irs` in `metrics/mod.rs`:
 | `FixedFirstPaymentDate`, `FixedLastPaymentDate`, `FloatingFirstPaymentDate`, `FloatingLastPaymentDate` | Schedule diagnostics |
 | `FixedFirstAccrualFactor`, `FloatingFirstAccrualFactor` | Schedule diagnostics |
 
-`Theta` is registered universally by `metrics::standard_registry()`.
+`Theta` is registered universally by `pricer::STANDARD.metrics()`.
 Request metrics via `Instrument::price_with_metrics(market, as_of, &[..], PricingOptions::default())`.
 
 ## Conventions

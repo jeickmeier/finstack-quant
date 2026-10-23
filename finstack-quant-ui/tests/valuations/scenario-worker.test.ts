@@ -33,30 +33,35 @@ it("preserves every native scenario cell and failure through the real worker", a
       trancheId: fixture.trancheId,
       gridJson: JSON.stringify(fixture.grid),
     };
-    expect(unwrap(await worker.proxy.scenarioTable(request))).toEqual(
-      native.trancheScenarioTable(
-        request.instrumentJson,
-        request.trancheId,
-        request.marketJson,
-        request.asOf,
-        request.gridJson,
-      ),
-    );
-    let error;
+    const deal = native.StructuredCredit.fromJson(request.instrumentJson);
     try {
-      native.trancheScenarioTable(
-        request.instrumentJson,
-        "missing",
-        request.marketJson,
-        request.asOf,
-        request.gridJson,
+      expect(unwrap(await worker.proxy.scenarioTable(request))).toEqual(
+        native.trancheScenarioTable(
+          deal,
+          request.trancheId,
+          request.marketJson,
+          request.asOf,
+          request.gridJson,
+        ),
       );
-    } catch (e) {
-      error = errorValue(e);
+      let error;
+      try {
+        native.trancheScenarioTable(
+          deal,
+          "missing",
+          request.marketJson,
+          request.asOf,
+          request.gridJson,
+        );
+      } catch (e) {
+        error = errorValue(e);
+      }
+      expect(
+        await worker.proxy.scenarioTable({ ...request, trancheId: "missing" }),
+      ).toEqual({ ok: false, error });
+    } finally {
+      deal.free();
     }
-    expect(
-      await worker.proxy.scenarioTable({ ...request, trancheId: "missing" }),
-    ).toEqual({ ok: false, error });
   }
 }, 30000);
 it("snapshots every request input and isolates worker sessions", async () => {

@@ -37,8 +37,6 @@ pub(crate) fn register_inflation_swap_metrics(
             (InflationConvexity, InflationGammaCalculator::<InflationSwap>::new()),
         ],
         custom: [
-            // Breakeven inflation is the par fixed rate of the zero-coupon swap.
-            ("breakeven", ParRateCalculator),
             ("fixed_leg_pv", FixedLegPvCalculator),
             ("inflation_leg_pv", InflationLegPvCalculator),
         ]

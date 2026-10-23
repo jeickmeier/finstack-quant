@@ -26,7 +26,7 @@ wire_methods!(
     PyDefaultModelSpec,
     DefaultModelSpec,
     "DefaultModelSpec",
-    stub = "finstack_quant.cashflows.builder",
+    module = "finstack_quant.cashflows.builder",
     validate
 );
 

@@ -30,8 +30,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
-    TrancheStructure,
+    AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -162,13 +161,17 @@ fn create_market() -> MarketContext {
 
 /// Build a CLO with specified behavioral parameters.
 fn build_clo(cpr: f64, cdr: f64, recovery: f64, recovery_lag: u32) -> StructuredCredit {
-    let mut clo = StructuredCredit::new_clo(
-        "SWEEP_CLO",
-        create_pool(),
-        create_tranches(),
-        closing(),
-        maturity(),
-        "USD_OIS",
+    let mut clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "SWEEP_CLO".into(),
+            pool: create_pool(),
+            tranches: create_tranches(),
+            closing_date: closing(),
+            maturity: maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -185,7 +188,10 @@ fn run_and_get_tranche_totals(
     market: &MarketContext,
     tranche_id: &str,
 ) -> (f64, f64) {
-    let results = run_simulation(clo, market, as_of()).expect("simulation should succeed");
+    let results = clo
+        .run_simulation(market, as_of())
+        .map(|run| run.tranches)
+        .expect("simulation should succeed");
 
     let tc = results.get(tranche_id).expect("tranche should exist");
     (tc.total_interest.amount(), tc.total_principal.amount())
@@ -196,7 +202,10 @@ fn run_full(
     clo: &StructuredCredit,
     market: &MarketContext,
 ) -> std::collections::HashMap<String, (f64, f64, f64)> {
-    let results = run_simulation(clo, market, as_of()).expect("simulation should succeed");
+    let results = clo
+        .run_simulation(market, as_of())
+        .map(|run| run.tranches)
+        .expect("simulation should succeed");
 
     results
         .into_iter()
@@ -537,7 +546,10 @@ fn stress_scenario_base_vs_stressed() {
 fn tranche_cashflows_returns_one_class_and_reports_unknown_ids() {
     let market = create_market();
     let clo = build_clo(0.10, 0.02, 0.40, 12);
-    let all = run_simulation(&clo, &market, as_of()).unwrap();
+    let all = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
     let senior = clo
         .tranche_cashflows("CLASS_A", &market, as_of())
         .expect("senior class");
@@ -563,7 +575,10 @@ fn pik_accretion_increases_tranche_balance_on_shortfall() {
 
     // High CDR + high CPR = less pool cash = tranche shortfalls
     let clo = build_clo(0.05, 0.15, 0.20, 12);
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     // Check mezzanine tranche for PIK flows
     let mezz = results.get("CLASS_B").unwrap();
@@ -609,7 +624,10 @@ fn full_simulation_total_distributed_consistent() {
     let market = create_market();
     let clo = build_clo(0.10, 0.02, 0.40, 12);
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     for (tranche_id, tc) in &results {
         // Total cashflows should equal interest + principal + PIK shortfalls reinvested
@@ -651,7 +669,10 @@ fn full_simulation_non_negative_flows() {
     let market = create_market();
     let clo = build_clo(0.10, 0.02, 0.40, 12);
 
-    let results = run_simulation(&clo, &market, as_of()).unwrap();
+    let results = clo
+        .run_simulation(&market, as_of())
+        .map(|run| run.tranches)
+        .unwrap();
 
     for (tranche_id, tc) in &results {
         for (date, amount) in &tc.cashflows {

@@ -13,6 +13,7 @@
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_core::math::linalg::rows_of;
 use finstack_quant_models::rates::dtsm::{
@@ -53,27 +54,7 @@ fn component_labels(count: usize) -> Vec<String> {
     (1..=count).map(|k| format!("PC{k}")).collect()
 }
 
-/// Panel of continuously compounded zero yields: rows are observation dates,
-/// columns are tenors in years.
-///
-/// Parameters
-/// ----------
-/// tenors : list[float]
-///     Tenor grid in years, strictly ascending and positive (length ``N``).
-/// yields : list[list[float]]
-///     ``yields[date_idx][tenor_idx]`` decimal zero rates (``T`` rows of
-///     ``N`` values, ``T >= 2``, all finite).
-/// dates : Sequence[date | datetime | str] | None, default ``None``
-///     Optional observation labels (length ``T``); any date-like value is
-///     accepted, including ISO strings and ``pandas.Timestamp``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the tenor grid is not strictly ascending and positive, the yield
-///     rows are empty/ragged/non-finite or do not match the tenor count,
-///     fewer than two observations are supplied, or ``dates`` has the wrong
-///     length.
+#[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel")]
 #[pyclass(
     name = "YieldPanel",
     module = "finstack_quant.models.rates.dtsm",
@@ -107,14 +88,7 @@ impl PyYieldPanel {
             .map_err(core_to_py)
     }
 
-    /// Build a panel from a ``pandas.DataFrame``.
-    ///
-    /// Column labels are parsed as tenors in years (``float(label)``), the
-    /// index supplies the observation dates when it is date-like (otherwise
-    /// the panel is unlabeled), and the values are decimal zero rates.
-    ///
-    /// Raises ``TypeError`` if ``df`` is not a DataFrame and ``ValueError``
-    /// if a column label is not numeric or the panel fails validation.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.from_dataframe")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, df)")]
     fn from_dataframe(_cls: &Bound<'_, PyType>, df: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -154,45 +128,42 @@ impl PyYieldPanel {
             .map_err(core_to_py)
     }
 
-    /// Tenor grid in years.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.tenors")]
     #[getter]
     fn tenors(&self) -> Vec<f64> {
         self.inner.tenors.clone()
     }
 
-    /// Observation dates as ``datetime.date`` values, or ``None`` when unlabeled.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.dates")]
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
         dates_to_py(py, self.inner.dates.as_deref())
     }
 
-    /// Yield matrix as row-major nested lists (``yields[date_idx][tenor_idx]``).
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.yields")]
     #[getter]
     fn yields(&self) -> Vec<Vec<f64>> {
         rows_of(&self.inner.yields)
     }
 
-    /// Number of observation dates.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.num_dates")]
     #[getter]
     fn num_dates(&self) -> usize {
         self.inner.num_dates()
     }
 
-    /// Number of tenors.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.num_tenors")]
     #[getter]
     fn num_tenors(&self) -> usize {
         self.inner.num_tenors()
     }
 
-    /// First differences of the yields as ``T-1`` row-major nested lists.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.yield_changes")]
     fn yield_changes(&self) -> Vec<Vec<f64>> {
         rows_of(&self.inner.yield_changes())
     }
 
-    /// The panel as a ``pandas.DataFrame`` (one column per tenor, in years).
-    ///
-    /// The index is a ``DatetimeIndex`` when the panel carries dates and a
-    /// ``RangeIndex`` otherwise.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         for (j, tenor) in self.inner.tenors.iter().enumerate() {
@@ -223,13 +194,14 @@ impl PyYieldPanel {
     }
 }
 
-wire_methods!(PyYieldPanel, YieldPanel, "YieldPanel");
+wire_methods!(
+    PyYieldPanel,
+    YieldPanel,
+    "YieldPanel",
+    module = "finstack_quant.models.rates.dtsm"
+);
 
-/// Time series of Nelson-Siegel factors extracted by ``DieboldLi``.
-///
-/// ``level`` (beta1), ``slope`` (beta2) and ``curvature`` (beta3) are in
-/// decimal yield units, one value per observation date; ``residuals`` is the
-/// ``T x N`` OLS residual matrix and ``r_squared`` the per-tenor fit quality.
+#[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries")]
 #[pyclass(
     name = "FactorTimeSeries",
     module = "finstack_quant.models.rates.dtsm",
@@ -255,66 +227,61 @@ impl PyFactorTimeSeries {
 
 #[pymethods]
 impl PyFactorTimeSeries {
-    /// Observation dates as ``datetime.date`` values, or ``None`` when the
-    /// source panel was unlabeled.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.dates")]
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
         dates_to_py(py, self.inner.dates.as_deref())
     }
 
-    /// Level factor (beta1) per date.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.level")]
     #[getter]
     fn level(&self) -> Vec<f64> {
         self.column(0)
     }
 
-    /// Slope factor (beta2) per date.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.slope")]
     #[getter]
     fn slope(&self) -> Vec<f64> {
         self.column(1)
     }
 
-    /// Curvature factor (beta3) per date.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.curvature")]
     #[getter]
     fn curvature(&self) -> Vec<f64> {
         self.column(2)
     }
 
-    /// Factor matrix as row-major nested lists ``factors[date_idx] = [level, slope, curvature]``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.factors")]
     #[getter]
     fn factors(&self) -> Vec<Vec<f64>> {
         rows_of(&self.inner.factors)
     }
 
-    /// OLS residual matrix as row-major nested lists (``residuals[date_idx][tenor_idx]``).
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.residuals")]
     #[getter]
     fn residuals(&self) -> Vec<Vec<f64>> {
         rows_of(&self.inner.residuals)
     }
 
-    /// Cross-sectional R-squared per tenor.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.r_squared")]
     #[getter]
     fn r_squared(&self) -> Vec<f64> {
         self.inner.r_squared.clone()
     }
 
-    /// Average R-squared across tenors.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.r_squared_avg")]
     #[getter]
     fn r_squared_avg(&self) -> f64 {
         self.inner.r_squared_avg
     }
 
-    /// Number of observation dates.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.num_dates")]
     #[getter]
     fn num_dates(&self) -> usize {
         self.inner.num_dates()
     }
 
-    /// Factors as a ``pandas.DataFrame`` with columns ``level``, ``slope``,
-    /// ``curvature``.
-    ///
-    /// The index is a ``DatetimeIndex`` when dates are available and a
-    /// ``RangeIndex`` otherwise.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("level", self.column(0))?;
@@ -337,22 +304,14 @@ impl PyFactorTimeSeries {
     }
 }
 
-wire_methods!(PyFactorTimeSeries, FactorTimeSeries, "FactorTimeSeries");
+wire_methods!(
+    PyFactorTimeSeries,
+    FactorTimeSeries,
+    "FactorTimeSeries",
+    module = "finstack_quant.models.rates.dtsm"
+);
 
-/// Diebold-Li (2006) dynamic Nelson-Siegel model.
-///
-/// Parameters
-/// ----------
-/// lambda_ : float | None, default ``None``
-///     Decay parameter for tenors **in years**; must be finite and positive.
-///     ``None`` uses the Rust default ``0.7308`` (years-equivalent of
-///     Diebold-Li's canonical ``0.0609`` months value, curvature peak near
-///     2.45 years). Named ``lambda_`` because ``lambda`` is a Python keyword.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``lambda_`` is supplied but non-finite or not strictly positive.
+#[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi")]
 #[pyclass(
     name = "DieboldLi",
     module = "finstack_quant.models.rates.dtsm",
@@ -381,19 +340,19 @@ impl PyDieboldLi {
             .map_err(core_to_py)
     }
 
-    /// Decay parameter in the years convention.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.lambda_")]
     #[getter]
     fn lambda_(&self) -> f64 {
         self.inner.lambda()
     }
 
-    /// Tenor grid recorded from the last extraction (empty before ``extract_factors``).
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.tenors")]
     #[getter]
     fn tenors(&self) -> Vec<f64> {
         self.inner.tenors().to_vec()
     }
 
-    /// Extracted factor time series, or ``None`` before ``extract_factors``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.factors")]
     #[getter]
     fn factors(&self) -> Option<PyFactorTimeSeries> {
         self.inner
@@ -402,36 +361,30 @@ impl PyDieboldLi {
             .map(PyFactorTimeSeries::from_inner)
     }
 
-    /// VAR(1) coefficient matrix ``Phi`` (3x3, row-major), or ``None`` before ``fit_var``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.phi")]
     #[getter]
     fn phi(&self) -> Option<Vec<Vec<f64>>> {
         self.inner.phi().map(rows_of)
     }
 
-    /// VAR(1) unconditional mean ``mu`` (length 3), or ``None`` before ``fit_var``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.mu")]
     #[getter]
     fn mu(&self) -> Option<Vec<f64>> {
         self.inner.mu().map(vector_values)
     }
 
-    /// VAR(1) residual covariance ``Q`` (3x3, row-major), or ``None`` before ``fit_var``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.q_cov")]
     #[getter]
     fn q_cov(&self) -> Option<Vec<Vec<f64>>> {
         self.inner.q_cov().map(rows_of)
     }
 
-    /// Nelson-Siegel loading matrix (``N x 3``, row-major) for the recorded tenors.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.loading_matrix")]
     fn loading_matrix(&self) -> Vec<Vec<f64>> {
         rows_of(&self.inner.loading_matrix())
     }
 
-    /// Extract level/slope/curvature factors from ``panel`` via OLS.
-    ///
-    /// Returns a new model with prior VAR state cleared; fit it again before
-    /// forecasting. The receiver is unchanged.
-    ///
-    /// Raises ``ValueError`` if the panel has fewer than three tenors or the
-    /// loading matrix is singular.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.extract_factors")]
     #[pyo3(text_signature = "(self, panel)")]
     fn extract_factors(&self, py: Python<'_>, panel: PyYieldPanel) -> PyResult<Self> {
         let model = self.inner.clone();
@@ -440,13 +393,7 @@ impl PyDieboldLi {
             .map_err(core_to_py)
     }
 
-    /// Fit VAR(1) dynamics to the extracted factors.
-    ///
-    /// Returns a new model; the receiver is unchanged.
-    ///
-    /// Raises ``ValueError`` if factors have not been extracted or fewer than
-    /// five observations are available, or ``I - Phi`` is singular and the
-    /// fitted dynamics have no finite unconditional mean.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.fit_var")]
     fn fit_var(&self, py: Python<'_>) -> PyResult<Self> {
         let model = self.inner.clone();
         py.detach(|| model.fit_var())
@@ -454,9 +401,7 @@ impl PyDieboldLi {
             .map_err(core_to_py)
     }
 
-    /// ``extract_factors(panel)`` followed by ``fit_var()``.
-    ///
-    /// Raises ``ValueError`` on any validation failure of either step.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.fit")]
     #[pyo3(text_signature = "(self, panel)")]
     fn fit(&self, py: Python<'_>, panel: PyYieldPanel) -> PyResult<Self> {
         let model = self.inner.clone();
@@ -465,9 +410,7 @@ impl PyDieboldLi {
             .map_err(core_to_py)
     }
 
-    /// Forecast the curve ``horizon`` observation periods ahead.
-    ///
-    /// Raises ``ValueError`` if the VAR has not been fitted or ``horizon`` is zero.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.forecast")]
     #[pyo3(text_signature = "(self, horizon)")]
     fn forecast(&self, py: Python<'_>, horizon: usize) -> PyResult<PyYieldForecast> {
         py.detach(|| self.inner.forecast(horizon))
@@ -493,9 +436,14 @@ impl PyDieboldLi {
     }
 }
 
-wire_methods!(PyDieboldLi, DieboldLi, "DieboldLi");
+wire_methods!(
+    PyDieboldLi,
+    DieboldLi,
+    "DieboldLi",
+    module = "finstack_quant.models.rates.dtsm"
+);
 
-/// h-step-ahead Diebold-Li yield-curve forecast with 95% Gaussian bands.
+#[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast")]
 #[pyclass(
     name = "YieldForecast",
     module = "finstack_quant.models.rates.dtsm",
@@ -515,25 +463,25 @@ impl PyYieldForecast {
 
 #[pymethods]
 impl PyYieldForecast {
-    /// Forecast horizon in observation periods.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.horizon")]
     #[getter]
     fn horizon(&self) -> usize {
         self.inner.horizon
     }
 
-    /// Point-forecast decimal zero rates, one per tenor.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.yields")]
     #[getter]
     fn yields(&self) -> Vec<f64> {
         self.inner.yields.clone()
     }
 
-    /// Tenor grid in years.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.tenors")]
     #[getter]
     fn tenors(&self) -> Vec<f64> {
         self.inner.tenors.clone()
     }
 
-    /// Forecast factor triple ``(level, slope, curvature)``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.factors")]
     #[getter]
     fn factors(&self) -> (f64, f64, f64) {
         (
@@ -543,20 +491,19 @@ impl PyYieldForecast {
         )
     }
 
-    /// Lower 95% band per tenor.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.lower_95")]
     #[getter]
     fn lower_95(&self) -> Vec<f64> {
         self.inner.lower_95.clone()
     }
 
-    /// Upper 95% band per tenor.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.upper_95")]
     #[getter]
     fn upper_95(&self) -> Vec<f64> {
         self.inner.upper_95.clone()
     }
 
-    /// Forecast as a ``pandas.DataFrame`` with columns ``tenor``, ``yield``,
-    /// ``lower_95``, ``upper_95`` (one row per tenor).
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("tenor", self.inner.tenors.clone())?;
@@ -571,11 +518,14 @@ impl PyYieldForecast {
     }
 }
 
-wire_methods!(PyYieldForecast, YieldForecast, "YieldForecast");
+wire_methods!(
+    PyYieldForecast,
+    YieldForecast,
+    "YieldForecast",
+    module = "finstack_quant.models.rates.dtsm"
+);
 
-/// PCA decomposition of yield-curve changes (Litterman-Scheinkman).
-///
-/// Construct with ``YieldPca.fit(panel)`` or ``YieldPca.fit_yield_changes``.
+#[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca")]
 #[pyclass(
     name = "YieldPca",
     module = "finstack_quant.models.rates.dtsm",
@@ -595,10 +545,7 @@ impl PyYieldPca {
 
 #[pymethods]
 impl PyYieldPca {
-    /// Fit PCA to the first differences of ``panel``.
-    ///
-    /// Raises ``ValueError`` for fewer than two tenors, fewer than three
-    /// observations, or a degenerate covariance matrix.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.fit")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, panel)")]
     fn fit(_cls: &Bound<'_, PyType>, py: Python<'_>, panel: PyYieldPanel) -> PyResult<Self> {
@@ -607,14 +554,7 @@ impl PyYieldPca {
             .map_err(core_to_py)
     }
 
-    /// Fit PCA to already-differenced yields (``yield_changes[t][tenor]``).
-    ///
-    /// The fitted object carries a synthetic tenor grid ``1.0, 2.0, ..., N``
-    /// because the changes do not identify the maturities; ``tenors`` on the
-    /// result are placeholders in loading-row order.
-    ///
-    /// Raises ``ValueError`` for empty/ragged rows, fewer than two rows or
-    /// tenors, or a degenerate covariance matrix.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.fit_yield_changes")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, yield_changes)")]
     fn fit_yield_changes(
@@ -627,57 +567,55 @@ impl PyYieldPca {
             .map_err(core_to_py)
     }
 
-    /// Number of extracted components (``min(T-1, N)``).
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.num_components")]
     #[getter]
     fn num_components(&self) -> usize {
         self.inner.num_components()
     }
 
-    /// Eigenvalues in descending order.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.eigenvalues")]
     #[getter]
     fn eigenvalues(&self) -> Vec<f64> {
         self.inner.eigenvalues().to_vec()
     }
 
-    /// Loadings as row-major nested lists ``loadings[tenor][k]``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.loadings")]
     #[getter]
     fn loadings(&self) -> Vec<Vec<f64>> {
         rows_of(self.inner.loadings())
     }
 
-    /// Scores as row-major nested lists ``scores[t][k]``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.scores")]
     #[getter]
     fn scores(&self) -> Vec<Vec<f64>> {
         rows_of(self.inner.scores())
     }
 
-    /// Tenor grid in years (synthetic ``1..N`` after ``fit_yield_changes``).
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.tenors")]
     #[getter]
     fn tenors(&self) -> Vec<f64> {
         self.inner.tenors().to_vec()
     }
 
-    /// Fraction of variance explained by each component.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.variance_explained")]
     #[getter]
     fn variance_explained(&self) -> Vec<f64> {
         self.inner.variance_explained().to_vec()
     }
 
-    /// Cumulative fraction of variance explained.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.cumulative_variance")]
     #[getter]
     fn cumulative_variance(&self) -> Vec<f64> {
         self.inner.cumulative_variance().to_vec()
     }
 
-    /// Mean yield change subtracted before PCA (one per tenor).
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.mean_change")]
     #[getter]
     fn mean_change(&self) -> Vec<f64> {
         vector_values(self.inner.mean_change())
     }
 
-    /// Loading vector of component ``k`` (0-based, length ``N``).
-    ///
-    /// Raises ``ValueError`` if ``k`` is out of range.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.loading")]
     #[pyo3(text_signature = "(self, k)")]
     fn loading(&self, k: usize) -> PyResult<Vec<f64>> {
         self.inner
@@ -686,24 +624,19 @@ impl PyYieldPca {
             .map_err(core_to_py)
     }
 
-    /// Number of leading components explaining at least ``threshold`` of variance.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.components_for_threshold")]
     #[pyo3(text_signature = "(self, threshold)")]
     fn components_for_threshold(&self, threshold: f64) -> usize {
         self.inner.components_for_threshold(threshold)
     }
 
-    /// Yield-change vector for standard-deviation ``shocks`` along the leading components.
-    ///
-    /// Raises ``ValueError`` if more shocks than components are given.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.scenario")]
     #[pyo3(text_signature = "(self, shocks)")]
     fn scenario(&self, shocks: Vec<f64>) -> PyResult<Vec<f64>> {
         self.inner.scenario(&shocks).map_err(core_to_py)
     }
 
-    /// ``base_yields`` shifted by ``scenario(shocks)``.
-    ///
-    /// Raises ``ValueError`` if ``base_yields`` does not match the tenor count
-    /// or more shocks than components are given.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.apply_scenario")]
     #[pyo3(text_signature = "(self, base_yields, shocks)")]
     fn apply_scenario(&self, base_yields: Vec<f64>, shocks: Vec<f64>) -> PyResult<Vec<f64>> {
         self.inner
@@ -711,10 +644,7 @@ impl PyYieldPca {
             .map_err(core_to_py)
     }
 
-    /// Reconstruct the yield changes from the leading ``num_components``
-    /// (row-major, mean added back).
-    ///
-    /// Raises ``ValueError`` if ``num_components`` is zero or too large.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.reconstruct")]
     #[pyo3(text_signature = "(self, num_components)")]
     fn reconstruct(&self, num_components: usize) -> PyResult<Vec<Vec<f64>>> {
         self.inner
@@ -723,9 +653,7 @@ impl PyYieldPca {
             .map_err(core_to_py)
     }
 
-    /// Serializable view of the leading ``n_components`` components.
-    ///
-    /// Raises ``ValueError`` if ``n_components`` is zero or exceeds ``num_components``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.truncated")]
     #[pyo3(text_signature = "(self, n_components)")]
     fn truncated(&self, n_components: usize) -> PyResult<PyYieldPcaView> {
         self.inner
@@ -734,8 +662,7 @@ impl PyYieldPca {
             .map_err(core_to_py)
     }
 
-    /// Loadings as a ``pandas.DataFrame`` indexed by tenor with columns
-    /// ``PC1, PC2, ...``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         loadings_dataframe(py, &rows_of(self.inner.loadings()), self.inner.tenors())
     }
@@ -750,7 +677,12 @@ impl PyYieldPca {
     }
 }
 
-wire_methods!(PyYieldPca, YieldPca, "YieldPca");
+wire_methods!(
+    PyYieldPca,
+    YieldPca,
+    "YieldPca",
+    module = "finstack_quant.models.rates.dtsm"
+);
 
 fn loadings_dataframe<'py>(
     py: Python<'py>,
@@ -767,12 +699,7 @@ fn loadings_dataframe<'py>(
     dict_to_dataframe(py, &data, Some(index.into_any()))
 }
 
-/// Leading components of a ``YieldPca`` fit in plain nested-list form.
-///
-/// ``explained_variance_ratio`` is the per-component variance share (the
-/// ``variance_explained`` accessor on ``YieldPca``); ``cumulative_variance``
-/// accumulates it. ``tenors`` are placeholders ``1..N`` when the fit came from
-/// ``fit_yield_changes``.
+#[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView")]
 #[pyclass(
     name = "YieldPcaView",
     module = "finstack_quant.models.rates.dtsm",
@@ -793,61 +720,60 @@ impl PyYieldPcaView {
 
 #[pymethods]
 impl PyYieldPcaView {
-    /// Row-major loadings ``loadings[tenor][k]``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.loadings")]
     #[getter]
     fn loadings(&self) -> Vec<Vec<f64>> {
         self.inner.loadings.clone()
     }
 
-    /// Row-major scores ``scores[t][k]``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.scores")]
     #[getter]
     fn scores(&self) -> Vec<Vec<f64>> {
         self.inner.scores.clone()
     }
 
-    /// Leading eigenvalues, descending.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.eigenvalues")]
     #[getter]
     fn eigenvalues(&self) -> Vec<f64> {
         self.inner.eigenvalues.clone()
     }
 
-    /// Fraction of total variance explained by each leading component.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.explained_variance_ratio")]
     #[getter]
     fn explained_variance_ratio(&self) -> Vec<f64> {
         self.inner.explained_variance_ratio.clone()
     }
 
-    /// Cumulative explained-variance fraction.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.cumulative_variance")]
     #[getter]
     fn cumulative_variance(&self) -> Vec<f64> {
         self.inner.cumulative_variance.clone()
     }
 
-    /// Column means subtracted before PCA (one per tenor).
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.mean_change")]
     #[getter]
     fn mean_change(&self) -> Vec<f64> {
         self.inner.mean_change.clone()
     }
 
-    /// Tenor grid in loading-row order.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.tenors")]
     #[getter]
     fn tenors(&self) -> Vec<f64> {
         self.inner.tenors.clone()
     }
 
-    /// Number of leading components in the view.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.num_components")]
     #[getter]
     fn num_components(&self) -> usize {
         self.inner.eigenvalues.len()
     }
 
-    /// Loadings as a ``pandas.DataFrame`` indexed by tenor with columns ``PC1, PC2, ...``.
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         loadings_dataframe(py, &self.inner.loadings, &self.inner.tenors)
     }
 
-    /// Scores as a ``pandas.DataFrame`` (one row per yield-change observation,
-    /// columns ``PC1, PC2, ...``).
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.to_scores_dataframe")]
     fn to_scores_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let n_components = self.inner.eigenvalues.len();
         let data = PyDict::new(py);
@@ -868,40 +794,14 @@ impl PyYieldPcaView {
     }
 }
 
-wire_methods!(PyYieldPcaView, YieldPcaView, "YieldPcaView");
+wire_methods!(
+    PyYieldPcaView,
+    YieldPcaView,
+    "YieldPcaView",
+    module = "finstack_quant.models.rates.dtsm"
+);
 
-/// Evaluate the static Nelson-Siegel (1987) yield curve for a given decay
-/// parameter, factor triple, and tenor grid.
-///
-/// This is the Diebold-Li cross-sectional equation evaluated for a single date:
-/// ``y(tau) = beta1 + beta2 * slope(tau) + beta3 * (slope(tau) - exp(-lambda*tau))``
-/// where ``slope(tau) = (1 - exp(-lambda*tau)) / (lambda*tau)``. Use it to
-/// reconstruct a fitted or forecast curve from factors returned by
-/// ``DieboldLi``.
-///
-/// Parameters
-/// ----------
-/// lambda_ : float
-///     Decay parameter for tenors **in years**; must be finite and > 0.
-///     ``0.7308`` is the years-equivalent of Diebold-Li's canonical
-///     ``0.0609`` months value.
-/// factors : tuple[float, float, float]
-///     ``(beta1, beta2, beta3)`` = ``(level, slope, curvature)`` in decimal
-///     yield units (``0.045`` = 4.5%). Exactly three finite values.
-/// tenors : list[float]
-///     Maturities in years, each finite and >= 0. Order is preserved in the
-///     output; no sorting or de-duplication is applied.
-///
-/// Returns
-/// -------
-/// list[float]
-///     Fitted yields in decimal units, one per input tenor.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``lambda_`` is non-positive/non-finite, a factor is non-finite, or
-///     a tenor is negative/non-finite.
+#[doc = pydoc!("finstack_quant.models.rates.dtsm", "nelson_siegel_yields")]
 #[pyfunction]
 #[pyo3(signature = (lambda_, factors, tenors))]
 #[pyo3(text_signature = "(lambda_, factors, tenors)")]
@@ -914,7 +814,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "dtsm")?;
     m.setattr(
         "__doc__",
-        "Dynamic term structure models: Diebold-Li dynamic Nelson-Siegel and yield-curve PCA.",
+        pydoc!("finstack_quant.models.rates.dtsm", "__module__"),
     )?;
 
     m.add_class::<PyDieboldLi>()?;

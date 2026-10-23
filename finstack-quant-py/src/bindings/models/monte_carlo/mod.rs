@@ -17,6 +17,7 @@ mod greeks;
 mod pricers;
 mod results;
 
+use crate::bindings::pydoc::pydoc;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
@@ -25,7 +26,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "monte_carlo")?;
     m.setattr(
         "__doc__",
-        "Monte Carlo convenience bindings (finstack-quant-models).",
+        pydoc!("finstack_quant.models.monte_carlo", "__module__"),
     )?;
 
     results::register(py, &m)?;

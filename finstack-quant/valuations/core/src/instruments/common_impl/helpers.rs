@@ -7,7 +7,7 @@ use crate::instruments::PricingOptions;
 use crate::metrics::{MetricContext, MetricId};
 use crate::pricer::PricingDispatch;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::market_data::{
     context::MarketContext,
@@ -154,21 +154,6 @@ pub fn zero_rate_from_df(df: f64, t: f64, context: &str) -> finstack_quant_core:
         )));
     }
     Ok(-df.ln() / t)
-}
-
-/// Compute year fraction between two dates using the given day-count convention.
-///
-/// This is the canonical helper for all instrument code that needs a plain
-/// `(start, end, day_count) → year_fraction` call without extra context.
-/// Avoids duplicating `day_count.year_fraction(start, end, DayCountContext::default())`
-/// in every pricer / calculator module.
-#[inline]
-pub fn year_fraction(
-    day_count: DayCount,
-    start: Date,
-    end: Date,
-) -> finstack_quant_core::Result<f64> {
-    day_count.year_fraction(start, end, DayCountContext::default())
 }
 
 /// Schedule → PV helper that uses the curve's own day count convention.
@@ -488,7 +473,7 @@ pub fn get_unitless_scalar_strict(
 /// Pricing options, dispatch and pricer-published measures handed from the
 /// registry to [`compute_metrics_dyn`].
 #[derive(Default)]
-pub struct MetricBuildOptions {
+pub(crate) struct MetricBuildOptions {
     /// Config, market history and recalibration provider for the metric context.
     pub pricing: PricingOptions,
     /// Pricer dispatch metric calculators use when they reprice bumped markets.
@@ -530,7 +515,7 @@ pub struct MetricBuildOptions {
 /// registered, `Error::MetricNotApplicable` when it is registered but has no
 /// calculator for this instrument type, and `Error::MetricCalculationFailed`
 /// when a calculator runs and fails (for example on a missing market input).
-pub fn compute_metrics_dyn(
+pub(crate) fn compute_metrics_dyn(
     instrument: Arc<dyn crate::instruments::Instrument>,
     curves: Arc<MarketContext>,
     as_of: Date,
@@ -657,7 +642,7 @@ pub fn compute_metrics_dyn(
 /// Production pricing enriches the model-produced result envelope in the
 /// registry and must not construct a parallel `ValuationResult` here.
 #[cfg(test)]
-pub fn build_with_metrics_dyn(
+pub(crate) fn build_with_metrics_dyn(
     instrument: Arc<dyn crate::instruments::Instrument>,
     curves: Arc<MarketContext>,
     as_of: Date,
@@ -695,7 +680,7 @@ mod tests {
     use finstack_quant_cashflows::{schedule_from_dated_flows, ScheduleBuildOpts};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;

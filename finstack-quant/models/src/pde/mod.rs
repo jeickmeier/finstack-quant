@@ -13,7 +13,7 @@
 //! ```text
 //! PdeProblem2D (2D coefficients + cross-derivative + 4-edge boundaries)
 //!   → Operators2D (directional tridiag per axis + explicit cross-derivative)
-//!     → CraigSneydStepper (Modified Craig-Sneyd ADI splitting)
+//!     → McsStepper (Modified Craig-Sneyd ADI splitting)
 //!       → PdeSolution2D (bilinear interpolation + Greeks)
 //! ```
 //!
@@ -49,9 +49,9 @@
 //!
 //! # Design
 //!
-//! Lives under `instruments/common/models/` alongside `trees/`, `closed_form/`,
-//! and `volatility/`. PDE solvers are numerical pricing models, tightly coupled
-//! to the valuations domain, and unlikely to be reused outside it.
+//! This module belongs to `finstack-quant-models`, alongside `trees`,
+//! `closed_form`, and `volatility`. Valuation pricers compose these reusable
+//! numerical solvers with instrument terms and market data.
 
 mod adi;
 mod boundary;
@@ -68,7 +68,7 @@ mod solver;
 mod solver2d;
 mod stepper;
 
-pub use adi::CraigSneydStepper;
+pub use adi::McsStepper;
 pub use boundary::BoundaryCondition;
 pub use bridge::BlackScholesPde;
 pub use bridge2d::HestonPde;

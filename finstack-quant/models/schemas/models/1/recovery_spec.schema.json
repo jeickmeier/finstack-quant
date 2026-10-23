@@ -1,4 +1,20 @@
 {
+  "$defs": {
+    "ClosedUnitIntervalF64Wire": {
+      "description": "Finite JSON number in the closed interval `[0, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "CorrelationWire": {
+      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": -1.0,
+      "type": "number"
+    }
+  },
   "$id": "https://finstack_quant.dev/schemas/models/1/recovery_spec.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Recovery model specification for configuration and serialization.",
@@ -7,8 +23,7 @@
       "additionalProperties": false,
       "properties": {
         "rate": {
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/ClosedUnitIntervalF64Wire"
         },
         "type": {
           "const": "constant",
@@ -25,15 +40,18 @@
       "additionalProperties": false,
       "properties": {
         "factor_correlation": {
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/CorrelationWire",
+          "description": "Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress."
         },
         "mean_recovery": {
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/ClosedUnitIntervalF64Wire",
+          "description": "Zero-total-shock recovery location in [0, 1], not the unconditional mean."
         },
         "recovery_volatility": {
+          "description": "Local shock scale in [0, 0.5], not realized recovery standard deviation.",
           "format": "double",
+          "maximum": 0.5,
+          "minimum": 0.0,
           "type": "number"
         },
         "type": {

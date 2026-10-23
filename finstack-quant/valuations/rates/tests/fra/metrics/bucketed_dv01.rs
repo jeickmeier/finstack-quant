@@ -8,6 +8,7 @@ use crate::fra::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_test_support::assertions::assert_finite;
 
 fn sum_bucketed_dv01(result: &finstack_quant_valuations_core::results::ValuationResult) -> f64 {
     result

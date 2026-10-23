@@ -12,8 +12,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, AssetType, DealType, PoolAsset, RepLine,
-    SimulationRun, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, AssetType, DealType, PoolAsset, RepLine, SimulationRun, StructuredCredit, Tranche,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -68,10 +68,20 @@ fn cmbs(pool: AssetPool, maturity: Date) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_cmbs("CMBS-TERM", pool, tranches, close(), maturity, "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CMBS-TERM".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     deal.fees = None;
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -80,7 +90,7 @@ fn cmbs(pool: AssetPool, maturity: Date) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit) -> SimulationRun {
-    run_simulation_with_diagnostics(deal, &market(), close()).expect("simulation")
+    deal.run_simulation(&market(), close()).expect("simulation")
 }
 
 /// Balance after `k` level payments of a schedule over `n` periods at
@@ -179,10 +189,11 @@ fn a_seasoned_rep_line_amortizes_over_the_remaining_term() {
     let mut loan =
         PoolAsset::fixed_rate_bond("L", usd(1_000_000.0), 0.06, maturity, DayCount::Thirty360);
     loan.asset_type = AssetType::CommercialMortgage { ltv: None };
-    loan.amortization_term_months = Some(60);
     short.assets.push(loan);
+    let mut short = cmbs(short, maturity);
+    short.pool.assets[0].amortization_term_months = Some(60);
     assert!(
-        run_simulation_with_diagnostics(&cmbs(short, maturity), &market(), close()).is_err(),
+        short.run_simulation(&market(), close()).is_err(),
         "an amortization term inside the loan's life is rejected"
     );
 }

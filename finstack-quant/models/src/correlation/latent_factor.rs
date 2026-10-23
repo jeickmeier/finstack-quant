@@ -178,15 +178,19 @@ impl LatentFactorKind {
 /// Factor model specification for configuration and serialization.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    try_from = "RawLatentFactorSpec"
+)]
 #[allow(clippy::enum_variant_names)]
 #[non_exhaustive]
 pub enum LatentFactorSpec {
     /// Single factor model (common market factor).
     SingleFactor {
-        /// Factor volatility (std dev of innovations)
+        /// Finite non-negative factor volatility (decimal).
         volatility: f64,
-        /// Mean reversion speed (0 = random walk)
+        /// Finite non-negative mean-reversion speed per year.
         mean_reversion: f64,
     },
 
@@ -211,6 +215,148 @@ pub enum LatentFactorSpec {
     },
 }
 
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+enum RawLatentFactorSpec {
+    #[serde(rename = "single_factor")]
+    Single {
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::NonNegativeF64Wire")
+        )]
+        /// Finite non-negative decimal factor volatility.
+        volatility: f64,
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::NonNegativeF64Wire")
+        )]
+        /// Finite non-negative mean-reversion speed per year.
+        mean_reversion: f64,
+    },
+    #[serde(rename = "two_factor")]
+    Two {
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::NonNegativeF64Wire")
+        )]
+        /// Finite non-negative decimal prepayment-factor volatility.
+        prepay_vol: f64,
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::NonNegativeF64Wire")
+        )]
+        /// Finite non-negative decimal credit-factor volatility.
+        credit_vol: f64,
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::CorrelationWire")
+        )]
+        /// Gaussian correlation in [-1, 1], including endpoints.
+        correlation: f64,
+    },
+    #[serde(rename = "multi_factor")]
+    Multi {
+        #[cfg_attr(feature = "json-schema", schemars(range(min = 1)))]
+        /// Positive number of factors.
+        num_factors: usize,
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "Vec<finstack_quant_core::wire::NonNegativeF64Wire>")
+        )]
+        /// One finite non-negative decimal volatility per factor.
+        volatilities: Vec<f64>,
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "Vec<finstack_quant_core::wire::CorrelationWire>")
+        )]
+        /// Row-major square Gaussian correlation matrix with entries in [-1, 1].
+        correlations: Vec<f64>,
+    },
+}
+
+impl TryFrom<RawLatentFactorSpec> for LatentFactorSpec {
+    type Error = Error;
+
+    fn try_from(raw: RawLatentFactorSpec) -> Result<Self> {
+        let spec = match raw {
+            RawLatentFactorSpec::Single {
+                volatility,
+                mean_reversion,
+            } => Self::SingleFactor {
+                volatility,
+                mean_reversion,
+            },
+            RawLatentFactorSpec::Two {
+                prepay_vol,
+                credit_vol,
+                correlation,
+            } => Self::TwoFactor {
+                prepay_vol,
+                credit_vol,
+                correlation,
+            },
+            RawLatentFactorSpec::Multi {
+                num_factors,
+                volatilities,
+                correlations,
+            } => Self::MultiFactor {
+                num_factors,
+                volatilities,
+                correlations,
+            },
+        };
+        spec.build()?;
+        Ok(spec)
+    }
+}
+
+fn validate_volatility(index: usize, value: f64) -> Result<()> {
+    finstack_quant_core::wire::NonNegativeF64Wire::try_from(value)
+        .map(|_| ())
+        .map_err(|_| Error::InvalidVolatility { index, value })
+}
+
+fn validate_single_factor(volatility: f64, mean_reversion: f64) -> Result<()> {
+    validate_volatility(0, volatility)?;
+    finstack_quant_core::wire::NonNegativeF64Wire::try_from(mean_reversion)
+        .map(|_| ())
+        .map_err(|_| Error::InvalidMeanReversion {
+            value: mean_reversion,
+        })
+}
+
+fn validate_two_factor(prepay_vol: f64, credit_vol: f64, correlation: f64) -> Result<()> {
+    validate_volatility(0, prepay_vol)?;
+    validate_volatility(1, credit_vol)?;
+    finstack_quant_core::wire::CorrelationWire::try_from(correlation)
+        .map(|_| ())
+        .map_err(|_| {
+            CorrelationError::OutOfBounds {
+                i: 0,
+                j: 1,
+                value: correlation,
+            }
+            .into()
+        })
+}
+
+fn validate_factor_volatilities(num_factors: usize, volatilities: &[f64]) -> Result<()> {
+    if num_factors == 0 {
+        return Err(Error::InvalidFactorCount { value: num_factors });
+    }
+    if volatilities.len() != num_factors {
+        return Err(Error::VolatilityLengthMismatch {
+            expected: num_factors,
+            actual: volatilities.len(),
+        });
+    }
+    for (index, value) in volatilities.iter().copied().enumerate() {
+        validate_volatility(index, value)?;
+    }
+    Ok(())
+}
+
 impl Default for LatentFactorSpec {
     fn default() -> Self {
         LatentFactorSpec::SingleFactor {
@@ -221,40 +367,45 @@ impl Default for LatentFactorSpec {
 }
 
 impl LatentFactorSpec {
-    /// Create a single factor specification.
+    /// Create a checked single-factor specification.
     ///
     /// # Arguments
-    /// * `volatility` - Factor volatility, clamped to [0.01, 2.0]
-    /// * `mean_reversion` - Mean reversion speed, clamped to [0.0, 10.0]
     ///
-    /// # Returns
+    /// * `volatility` - Finite, non-negative decimal factor volatility; zero
+    ///   disables innovations and no upper cap is applied.
+    /// * `mean_reversion` - Finite, non-negative speed per year; zero disables
+    ///   mean reversion and no upper cap is applied.
     ///
-    /// A [`LatentFactorSpec::SingleFactor`] configuration.
-    #[must_use]
-    pub fn single_factor(volatility: f64, mean_reversion: f64) -> Self {
-        LatentFactorSpec::SingleFactor {
-            volatility: volatility.clamp(0.01, 2.0),
-            mean_reversion: mean_reversion.clamp(0.0, 10.0),
-        }
+    /// # Errors
+    ///
+    /// Returns a validation error for a negative or non-finite input.
+    pub fn single_factor(volatility: f64, mean_reversion: f64) -> Result<Self> {
+        validate_single_factor(volatility, mean_reversion)?;
+        Ok(Self::SingleFactor {
+            volatility,
+            mean_reversion,
+        })
     }
 
-    /// Create a two-factor specification.
+    /// Create a checked two-factor specification.
     ///
     /// # Arguments
-    /// * `prepay_vol` - Prepayment factor volatility, clamped to [0.01, 2.0]
-    /// * `credit_vol` - Credit factor volatility, clamped to [0.01, 2.0]
-    /// * `correlation` - Correlation between factors, clamped to [-0.99, 0.99]
     ///
-    /// # Returns
+    /// * `prepay_vol` - Finite, non-negative decimal prepayment-factor volatility.
+    /// * `credit_vol` - Finite, non-negative decimal credit-factor volatility.
+    /// * `correlation` - Gaussian factor correlation in `[-1, 1]`; perfect
+    ///   correlation endpoints are accepted without altering them.
     ///
-    /// A [`LatentFactorSpec::TwoFactor`] configuration.
-    #[must_use]
-    pub fn two_factor(prepay_vol: f64, credit_vol: f64, correlation: f64) -> Self {
-        LatentFactorSpec::TwoFactor {
-            prepay_vol: prepay_vol.clamp(0.01, 2.0),
-            credit_vol: credit_vol.clamp(0.01, 2.0),
-            correlation: correlation.clamp(-0.99, 0.99),
-        }
+    /// # Errors
+    ///
+    /// Returns a validation error for an invalid volatility or correlation.
+    pub fn two_factor(prepay_vol: f64, credit_vol: f64, correlation: f64) -> Result<Self> {
+        validate_two_factor(prepay_vol, credit_vol, correlation)?;
+        Ok(Self::TwoFactor {
+            prepay_vol,
+            credit_vol,
+            correlation,
+        })
     }
 
     /// Build a factor model from this specification.
@@ -265,8 +416,9 @@ impl LatentFactorSpec {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::correlation::Error`] if a multi-factor specification
-    /// contains an invalid volatility vector or correlation matrix. Call
+    /// Returns [`crate::correlation::Error`] if any specification contains a
+    /// negative or non-finite volatility or mean-reversion speed, an invalid
+    /// correlation, a zero factor count, or inconsistent vector dimensions. Call
     /// [`finstack_quant_core::math::linalg::nearest_correlation`] explicitly before
     /// construction when projection is part of the caller's policy.
     pub fn build(&self) -> Result<LatentFactorKind> {
@@ -274,48 +426,16 @@ impl LatentFactorSpec {
             LatentFactorSpec::SingleFactor {
                 volatility,
                 mean_reversion,
-            } => {
-                if !volatility.is_finite() || *volatility < 0.0 {
-                    return Err(Error::InvalidVolatility {
-                        index: 0,
-                        value: *volatility,
-                    });
-                }
-                if !mean_reversion.is_finite() || *mean_reversion < 0.0 {
-                    return Err(Error::InvalidVolatility {
-                        index: 0,
-                        value: *mean_reversion,
-                    });
-                }
-                LatentFactorKind::Single(LatentSingleFactor::new(*volatility, *mean_reversion))
-            }
+            } => LatentFactorKind::Single(LatentSingleFactor::new(*volatility, *mean_reversion)?),
             LatentFactorSpec::TwoFactor {
                 prepay_vol,
                 credit_vol,
                 correlation,
-            } => {
-                if !prepay_vol.is_finite() || *prepay_vol < 0.0 {
-                    return Err(Error::InvalidVolatility {
-                        index: 0,
-                        value: *prepay_vol,
-                    });
-                }
-                if !credit_vol.is_finite() || *credit_vol < 0.0 {
-                    return Err(Error::InvalidVolatility {
-                        index: 1,
-                        value: *credit_vol,
-                    });
-                }
-                if !correlation.is_finite() || !(-1.0..=1.0).contains(correlation) {
-                    return Err(CorrelationError::OutOfBounds {
-                        i: 0,
-                        j: 1,
-                        value: *correlation,
-                    }
-                    .into());
-                }
-                LatentFactorKind::Two(LatentTwoFactor::new(*prepay_vol, *credit_vol, *correlation))
-            }
+            } => LatentFactorKind::Two(LatentTwoFactor::new(
+                *prepay_vol,
+                *credit_vol,
+                *correlation,
+            )?),
             LatentFactorSpec::MultiFactor {
                 num_factors,
                 volatilities,
@@ -358,40 +478,29 @@ impl LatentSingleFactor {
     /// Create a single-factor model.
     ///
     /// # Arguments
-    /// * `volatility` - Factor volatility, clamped to [0.01, 2.0]
-    /// * `mean_reversion` - Mean reversion speed (0 = random walk), clamped to [0.0, 10.0]
+    /// * `volatility` - Finite, non-negative decimal factor volatility; no upper cap.
+    /// * `mean_reversion` - Finite non-negative mean-reversion speed per year; no upper cap.
     ///
     /// # Returns
     ///
-    /// A single-factor model using the bounded volatility and mean-reversion
-    /// inputs.
+    /// A single-factor model preserving the validated inputs exactly.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use finstack_quant_models::correlation::LatentSingleFactor;
     ///
-    /// let model = LatentSingleFactor::new(0.25, 0.10);
+    /// let model = LatentSingleFactor::new(0.25, 0.10).expect("valid model inputs");
     /// assert!((model.volatility() - 0.25).abs() < 1e-10);
     /// ```
-    #[must_use]
-    pub fn new(volatility: f64, mean_reversion: f64) -> Self {
-        let vol = if volatility.is_finite() {
-            volatility.clamp(0.01, 2.0)
-        } else {
-            0.20
-        };
-        let mr = if mean_reversion.is_finite() {
-            mean_reversion.clamp(0.0, 10.0)
-        } else {
-            0.0
-        };
-        Self {
-            volatility: vol,
-            mean_reversion: mr,
+    pub fn new(volatility: f64, mean_reversion: f64) -> Result<Self> {
+        validate_single_factor(volatility, mean_reversion)?;
+        Ok(Self {
+            volatility,
+            mean_reversion,
             correlation_matrix: vec![1.0],
-            volatilities: vec![vol],
-        }
+            volatilities: vec![volatility],
+        })
     }
 
     /// Number of factors in the model (always 1).
@@ -443,45 +552,24 @@ impl LatentTwoFactor {
     /// Create a two-factor model.
     ///
     /// # Arguments
-    /// * `prepay_vol` - Prepayment factor volatility, clamped to [0.01, 2.0]
-    /// * `credit_vol` - Credit factor volatility, clamped to [0.01, 2.0]
-    /// * `correlation` - Correlation between factors (typically negative for RMBS), clamped to [-0.99, 0.99]
+    /// * `prepay_vol` - Finite, non-negative decimal prepayment-factor volatility.
+    /// * `credit_vol` - Finite, non-negative decimal credit-factor volatility.
+    /// * `correlation` - Gaussian factor correlation in [-1, 1], including degenerate endpoints.
     ///
     /// # Returns
     ///
     /// A two-factor prepayment/credit model.
-    #[must_use]
-    pub fn new(prepay_vol: f64, credit_vol: f64, correlation: f64) -> Self {
-        let corr = if correlation.is_finite() {
-            correlation.clamp(-0.99, 0.99)
-        } else {
-            0.0
-        };
-        let pv = if prepay_vol.is_finite() {
-            prepay_vol.clamp(0.01, 2.0)
-        } else {
-            0.20
-        };
-        let cv = if credit_vol.is_finite() {
-            credit_vol.clamp(0.01, 2.0)
-        } else {
-            0.25
-        };
-
-        // Cholesky decomposition of correlation matrix [[1, ρ], [ρ, 1]]
-        // L = [[1, 0], [ρ, √(1-ρ²)]]
-        let sqrt_1mr2 = (1.0 - corr * corr).sqrt();
-
-        Self {
-            prepay_vol: pv,
-            credit_vol: cv,
-            correlation: corr,
-            // Row-major: [ρ₁₁, ρ₁₂, ρ₂₁, ρ₂₂]
-            correlation_matrix: vec![1.0, corr, corr, 1.0],
-            volatilities: vec![pv, cv],
-            cholesky_l10: corr,
-            cholesky_l11: sqrt_1mr2,
-        }
+    pub fn new(prepay_vol: f64, credit_vol: f64, correlation: f64) -> Result<Self> {
+        validate_two_factor(prepay_vol, credit_vol, correlation)?;
+        Ok(Self {
+            prepay_vol,
+            credit_vol,
+            correlation,
+            correlation_matrix: vec![1.0, correlation, correlation, 1.0],
+            volatilities: vec![prepay_vol, credit_vol],
+            cholesky_l10: correlation,
+            cholesky_l11: (1.0 - correlation * correlation).sqrt(),
+        })
     }
 
     /// Standard RMBS calibration with negative prepay-credit correlation.
@@ -491,8 +579,7 @@ impl LatentTwoFactor {
     /// # Returns
     ///
     /// The crate's default RMBS-oriented two-factor calibration.
-    #[must_use]
-    pub fn rmbs_standard() -> Self {
+    pub fn rmbs_standard() -> Result<Self> {
         Self::new(0.20, 0.25, -0.30)
     }
 
@@ -503,8 +590,7 @@ impl LatentTwoFactor {
     /// # Returns
     ///
     /// The crate's default CLO-oriented two-factor calibration.
-    #[must_use]
-    pub fn clo_standard() -> Self {
+    pub fn clo_standard() -> Result<Self> {
         Self::new(0.15, 0.30, -0.20)
     }
 
@@ -608,39 +694,24 @@ impl LatentMultiFactor {
     ///
     /// A validated multi-factor model.
     pub fn new(num_factors: usize, volatilities: Vec<f64>, correlations: Vec<f64>) -> Result<Self> {
-        let n = num_factors.max(1);
-
-        // Validate volatilities length: previously a mismatch silently replaced
-        // the caller's vector with unit volatilities, which hid serious
-        // misconfiguration (wrong vol magnitudes flowing into pricing).
-        if volatilities.len() != n {
-            return Err(Error::VolatilityLengthMismatch {
-                expected: n,
-                actual: volatilities.len(),
-            });
-        }
-        // Reject negative or non-finite volatilities explicitly. Silent
-        // clamping of `-0.2` to `0.01` would mask sign-flip bugs upstream.
-        // The upper-bound clamp (10.0) and lower-bound clamp (0.01) below
-        // remain — defensive against vol-of-vol explosions and singular
-        // Cholesky on legitimately-zero entries — but only after the input
-        // has been verified non-negative and finite.
-        if let Some((index, value)) = volatilities
-            .iter()
-            .copied()
-            .enumerate()
-            .find(|(_, v)| !v.is_finite() || *v < 0.0)
-        {
-            return Err(Error::InvalidVolatility { index, value });
-        }
-        let vols: Vec<f64> = volatilities.iter().map(|v| v.clamp(0.01, 10.0)).collect();
-
-        if correlations.len() != n * n {
+        let n = num_factors;
+        validate_factor_volatilities(n, &volatilities)?;
+        if n.checked_mul(n) != Some(correlations.len()) {
             return Err(CorrelationError::InvalidSize {
                 expected: n,
                 actual: correlations.len(),
             }
             .into());
+        }
+        for (index, value) in correlations.iter().copied().enumerate() {
+            if finstack_quant_core::wire::CorrelationWire::try_from(value).is_err() {
+                return Err(CorrelationError::OutOfBounds {
+                    i: index / n,
+                    j: index % n,
+                    value,
+                }
+                .into());
+            }
         }
 
         validate_correlation_matrix(&correlations, n)?;
@@ -649,7 +720,7 @@ impl LatentMultiFactor {
 
         Ok(Self {
             num_factors: n,
-            volatilities: vols,
+            volatilities,
             correlation_matrix: correlations,
             cholesky_factor: cholesky,
         })
@@ -663,15 +734,27 @@ impl LatentMultiFactor {
     ///
     /// A multi-factor model with an identity correlation matrix.
     /// # Arguments
-    /// * `num_factors` - Number of factors; zero resolves to one as in `new`.
+    /// * `num_factors` - Positive number of factors; zero is rejected.
     /// * `volatilities` - One finite, non-negative decimal volatility per factor;
-    ///   validated values are clamped to `[0.01, 10.0]`.
+    ///   zero values and arbitrarily large finite values are preserved.
     ///
     /// # Errors
     /// Returns the same volatility-validation errors as [`Self::new`].
     pub fn uncorrelated(num_factors: usize, volatilities: Vec<f64>) -> Result<Self> {
-        let n = num_factors.max(1);
-        let mut correlations = vec![0.0; n * n];
+        let n = num_factors;
+        validate_factor_volatilities(n, &volatilities)?;
+        let size = n.checked_mul(n).ok_or_else(|| {
+            Error::Core(finstack_quant_core::Error::Validation(
+                "factor matrix dimension overflows usize".into(),
+            ))
+        })?;
+        let mut correlations = Vec::new();
+        correlations.try_reserve_exact(size).map_err(|error| {
+            Error::Core(finstack_quant_core::Error::Internal(format!(
+                "cannot allocate factor correlation matrix: {error}"
+            )))
+        })?;
+        correlations.resize(size, 0.0);
         for i in 0..n {
             correlations[i * n + i] = 1.0;
         }
@@ -762,8 +845,68 @@ mod tests {
     use finstack_quant_core::math::linalg::CholeskyError;
 
     #[test]
+    fn checked_constructors_preserve_zero_and_large_factor_inputs() {
+        for volatility in [0.0, 0.001, 3.0] {
+            let model = LatentSingleFactor::new(volatility, 20.0).expect("valid factors");
+            assert_eq!(model.volatility(), volatility);
+            assert_eq!(model.mean_reversion(), 20.0);
+            let spec = LatentFactorSpec::single_factor(volatility, 20.0).expect("valid spec");
+            let json = serde_json::to_value(&spec).expect("wire");
+            let restored: LatentFactorSpec = serde_json::from_value(json).expect("valid wire");
+            assert_eq!(restored, spec);
+            let model = LatentMultiFactor::uncorrelated(1, vec![volatility]).expect("valid multi");
+            assert_eq!(model.volatilities(), &[volatility]);
+        }
+        for correlation in [-1.0, 1.0] {
+            let model = LatentTwoFactor::new(0.0, 3.0, correlation).expect("perfect correlation");
+            assert_eq!(model.correlation(), correlation);
+            assert_eq!(model.prepay_vol(), 0.0);
+            assert_eq!(model.credit_vol(), 3.0);
+            let model = LatentFactorKind::Two(model);
+            assert_eq!(model.diagonal_factor_contribution(0, 2.0), 0.0);
+            assert_eq!(model.diagonal_factor_contribution(1, 9.0), 0.0);
+        }
+    }
+
+    #[test]
+    fn invalid_factor_inputs_fail_constructors_specs_and_wire() {
+        for bad in [-0.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(LatentSingleFactor::new(bad, 0.0).is_err());
+            assert!(LatentSingleFactor::new(0.0, bad).is_err());
+            assert!(LatentFactorSpec::single_factor(bad, 0.0).is_err());
+            assert!(LatentTwoFactor::new(bad, 0.2, 0.0).is_err());
+            assert!(LatentFactorSpec::two_factor(0.2, bad, 0.0).is_err());
+        }
+        for bad in [-1.1, 1.1, f64::NAN, f64::INFINITY] {
+            assert!(LatentTwoFactor::new(0.2, 0.3, bad).is_err());
+            assert!(LatentFactorSpec::two_factor(0.2, 0.3, bad).is_err());
+        }
+        for wire in [
+            serde_json::json!({"type":"single_factor", "volatility":-0.1,"mean_reversion":0.0}),
+            serde_json::json!({"type":"single_factor", "volatility":0.1,"mean_reversion":-1.0}),
+            serde_json::json!({"type":"two_factor", "prepay_vol":0.1,"credit_vol":0.2,"correlation":1.1}),
+            serde_json::json!({"type":"multi_factor", "num_factors":0,"volatilities":[],"correlations":[]}),
+        ] {
+            assert!(serde_json::from_value::<LatentFactorSpec>(wire).is_err());
+        }
+        assert!(LatentMultiFactor::uncorrelated(0, vec![]).is_err());
+        assert!(LatentMultiFactor::new(
+            2,
+            vec![0.1, 0.2],
+            vec![1.0, 1.0000000001, 1.0000000001, 1.0]
+        )
+        .is_err());
+        assert!(LatentFactorSpec::SingleFactor {
+            volatility: -0.1,
+            mean_reversion: 0.0
+        }
+        .build()
+        .is_err());
+    }
+
+    #[test]
     fn test_single_factor_creation() {
-        let model = LatentSingleFactor::new(0.25, 0.1);
+        let model = LatentSingleFactor::new(0.25, 0.1).expect("valid model inputs");
         let kind = LatentFactorKind::Single(model.clone());
         assert_eq!(kind.num_factors(), 1);
         assert!((model.volatility() - 0.25).abs() < 1e-10);
@@ -772,7 +915,7 @@ mod tests {
 
     #[test]
     fn test_two_factor_creation() {
-        let model = LatentTwoFactor::new(0.20, 0.30, -0.30);
+        let model = LatentTwoFactor::new(0.20, 0.30, -0.30).expect("valid model inputs");
         assert_eq!(LatentFactorKind::Two(model.clone()).num_factors(), 2);
         assert!((model.prepay_vol() - 0.20).abs() < 1e-10);
         assert!((model.credit_vol() - 0.30).abs() < 1e-10);
@@ -781,7 +924,9 @@ mod tests {
 
     #[test]
     fn test_diagonal_factor_contribution_single_factor() {
-        let kind = LatentFactorKind::Single(LatentSingleFactor::new(1.0, 0.0));
+        let kind = LatentFactorKind::Single(
+            LatentSingleFactor::new(1.0, 0.0).expect("valid model inputs"),
+        );
 
         let factor = kind.diagonal_factor_contribution(0, 1.5);
         assert!((factor - 1.5).abs() < 1e-10);
@@ -795,7 +940,9 @@ mod tests {
         // correlated draw path.
         let rho: f64 = -0.30;
         let credit_vol: f64 = 0.30;
-        let kind = LatentFactorKind::Two(LatentTwoFactor::new(0.20, credit_vol, rho));
+        let kind = LatentFactorKind::Two(
+            LatentTwoFactor::new(0.20, credit_vol, rho).expect("valid model inputs"),
+        );
 
         let z = 2.0;
         let expected = z * credit_vol * (1.0 - rho * rho).sqrt();
@@ -809,14 +956,18 @@ mod tests {
     #[test]
     fn test_diagonal_factor_contribution_two_factor_prepay_unchanged() {
         // Prepayment is factor 0; L[0,0] = 1 so the contribution is z · vol.
-        let kind = LatentFactorKind::Two(LatentTwoFactor::new(0.20, 0.30, -0.30));
+        let kind = LatentFactorKind::Two(
+            LatentTwoFactor::new(0.20, 0.30, -0.30).expect("valid model inputs"),
+        );
         let factor = kind.diagonal_factor_contribution(0, 1.5);
         assert!((factor - 0.30).abs() < 1e-10);
     }
 
     #[test]
     fn test_two_factor_correlation_matrix() {
-        let kind = LatentFactorKind::Two(LatentTwoFactor::new(0.20, 0.30, -0.30));
+        let kind = LatentFactorKind::Two(
+            LatentTwoFactor::new(0.20, 0.30, -0.30).expect("valid model inputs"),
+        );
         let corr = kind.correlation_matrix();
 
         assert!((corr[0] - 1.0).abs() < 1e-10);
@@ -828,12 +979,12 @@ mod tests {
 
     #[test]
     fn test_factor_spec_build() {
-        let spec = LatentFactorSpec::single_factor(0.25, 0.1);
+        let spec = LatentFactorSpec::single_factor(0.25, 0.1).expect("valid model inputs");
         let model = spec.build().expect("single-factor spec should build");
         assert_eq!(model.num_factors(), 1);
         assert!(matches!(model, LatentFactorKind::Single(_)));
 
-        let spec = LatentFactorSpec::two_factor(0.20, 0.30, -0.30);
+        let spec = LatentFactorSpec::two_factor(0.20, 0.30, -0.30).expect("valid model inputs");
         let model = spec.build().expect("two-factor spec should build");
         assert_eq!(model.num_factors(), 2);
         assert!(matches!(model, LatentFactorKind::Two(_)));
@@ -841,18 +992,20 @@ mod tests {
 
     #[test]
     fn test_standard_calibrations() {
-        let rmbs = LatentTwoFactor::rmbs_standard();
+        let rmbs = LatentTwoFactor::rmbs_standard().expect("valid model inputs");
         assert_eq!(LatentFactorKind::Two(rmbs.clone()).num_factors(), 2);
         assert!(rmbs.correlation() < 0.0); // Negative correlation
 
-        let clo = LatentTwoFactor::clo_standard();
+        let clo = LatentTwoFactor::clo_standard().expect("valid model inputs");
         assert_eq!(LatentFactorKind::Two(clo.clone()).num_factors(), 2);
         assert!(clo.correlation() < 0.0);
     }
 
     #[test]
     fn test_volatilities() {
-        let kind = LatentFactorKind::Two(LatentTwoFactor::new(0.20, 0.30, -0.30));
+        let kind = LatentFactorKind::Two(
+            LatentTwoFactor::new(0.20, 0.30, -0.30).expect("valid model inputs"),
+        );
         let vols = kind.volatilities();
         assert_eq!(vols.len(), 2);
         assert!((vols[0] - 0.20).abs() < 1e-10);

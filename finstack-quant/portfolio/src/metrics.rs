@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 /// positions is standard desk practice: `dv01`, `cs01`, `pv01` and their
 /// bucketed series all measure a change per basis point of the *same* kind of
 /// risk factor, and their sum is a portfolio-level number a risk manager can
-/// hedge with (Tuckman & Serrat, *Fixed Income Securities*). `fx_delta` and
+/// hedge with (Tuckman & Serrat, *Fixed Income Securities*). `fx01` and
 /// `index_delta` are likewise currency-denominated and linear in size.
 ///
 /// Unqualified scalar Greeks (`delta`, `gamma`, `vega`, `vanna`, `volga`)
@@ -262,7 +262,7 @@ pub struct SkippedMetric {
 ///
 /// # Warning: scalar spot and vol Greeks are not summed
 ///
-/// `dv01` / `cs01` / `pv01` / `fx_delta` / `index_delta` totals are
+/// `dv01` / `cs01` / `pv01` / `fx01` / `index_delta` totals are
 /// portfolio-level numbers. Scalar `delta`, `gamma` and `vega` are excluded
 /// from those totals because they mix unrelated underlyings and volatility
 /// surfaces; read them per position or via the bucketed series. See
@@ -554,7 +554,7 @@ mod tests {
     fn test_is_summable() {
         assert!(is_additive("dv01"));
         assert!(is_additive("cs01"));
-        assert!(is_additive("fx_delta"));
+        assert!(is_additive("fx01"));
         assert!(is_additive("index_delta"));
         assert!(!is_additive("delta"));
         assert!(!is_additive("gamma"));
@@ -825,7 +825,7 @@ mod tests {
             let mut metrics = indexmap::IndexMap::new();
             metrics.insert(MetricId::Dv01, 100.0);
             metrics.insert(MetricId::Cs01, 50.0);
-            metrics.insert(MetricId::FxDelta, 25.0);
+            metrics.insert(MetricId::Fx01, 25.0);
             PositionMetricData {
                 position_id: PositionId::from(name.to_string()),
                 entity_id: EntityId::from(entity.to_string()),

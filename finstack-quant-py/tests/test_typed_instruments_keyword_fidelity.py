@@ -41,6 +41,7 @@ from finstack_quant.valuations.instruments import (
     ProtectionLegSpec,
     RepLine,
     ScenarioTable,
+    StandardDealParams,
     StructuredCredit,
     Swaption,
     Tranche,
@@ -355,13 +356,16 @@ def test_structured_credit_builder_setters_accept_keyword_value() -> None:
 def test_structured_credit_new_abs_accepts_keyword_arguments() -> None:
     pool = AssetPool("POOL-ABS-KW", "abs", Currency("USD")).with_rep_lines([_single_rep_line()])
     tranches = TrancheStructure([_single_tranche()])
-    deal = StructuredCredit.new_abs(
-        id="ABS-KW",
-        pool=pool,
-        tranches=tranches,
-        closing_date=datetime.date(2024, 1, 15),
-        maturity=datetime.date(2031, 1, 15),
-        discount_curve_id="USD-SOFR-DISC",
+    deal = StructuredCredit.new_standard(
+        "abs",
+        StandardDealParams(
+            id="ABS-KW",
+            pool=pool,
+            tranches=tranches,
+            closing_date=datetime.date(2024, 1, 15),
+            maturity=datetime.date(2031, 1, 15),
+            discount_curve_id="USD-SOFR-DISC",
+        ),
     )
     assert deal.id == "ABS-KW"
 

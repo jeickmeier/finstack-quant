@@ -249,9 +249,9 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
     .expect("bootstrap");
 
     assert!(report.success);
-    assert_eq!(bootstrapped.volatility.times(), &[0.0, 0.75]);
-    assert!((bootstrapped.volatility.values()[0] - 0.01).abs() < 1.0e-10);
-    assert!((bootstrapped.volatility.values()[1] - 0.02).abs() < 1.0e-10);
+    assert_eq!(bootstrapped.get_times(), &[0.0, 0.75]);
+    assert!((bootstrapped.get_values()[0] - 0.01).abs() < 1.0e-10);
+    assert!((bootstrapped.get_values()[1] - 0.02).abs() < 1.0e-10);
 }
 
 #[test]
@@ -299,7 +299,8 @@ fn bond_option_vol_positive() {
 #[test]
 fn swaption_price_positive() {
     let df_fn = flat_df(0.03);
-    let price = hw1f_swaption_price(0.05, 0.01, &df_fn, 1.0, 5.0, 0.03, 2);
+    let price = hw1f_swaption_price(0.05, 0.01, &df_fn, 1.0, 5.0, 0.03, 2)
+        .expect("valid synthetic swaption");
     assert!(price > 0.0, "Swaption price should be positive: {price:.6}");
 }
 
@@ -310,8 +311,10 @@ fn swaption_price_monotone_in_sigma() {
         let (_, r) = compute_swap_annuity_and_rate(&df_fn, 1.0, 5.0, 2, None);
         r
     };
-    let p_low = hw1f_swaption_price(0.05, 0.005, &df_fn, 1.0, 5.0, fwd, 2);
-    let p_high = hw1f_swaption_price(0.05, 0.015, &df_fn, 1.0, 5.0, fwd, 2);
+    let p_low = hw1f_swaption_price(0.05, 0.005, &df_fn, 1.0, 5.0, fwd, 2)
+        .expect("valid synthetic swaption");
+    let p_high = hw1f_swaption_price(0.05, 0.015, &df_fn, 1.0, 5.0, fwd, 2)
+        .expect("valid synthetic swaption");
     assert!(
         p_high > p_low,
         "Higher sigma should give higher swaption price: {p_high:.6} vs {p_low:.6}"
@@ -335,7 +338,8 @@ fn item5_hw1f_r_star_extreme_kappa_does_not_explode() {
     let (annuity, fwd) = compute_swap_annuity_and_rate(&df_fn, 1.0, 5.0, 2, None);
 
     for kappa in [1.0e6_f64, 1.0e8, 1.0e10] {
-        let price = hw1f_swaption_price(kappa, 0.01, &df_fn, 1.0, 5.0, fwd, 2);
+        let price = hw1f_swaption_price(kappa, 0.01, &df_fn, 1.0, 5.0, fwd, 2)
+            .expect("valid synthetic swaption");
         assert!(
             price.is_finite(),
             "swaption price must stay finite under extreme kappa={kappa:e}; \
@@ -379,7 +383,8 @@ fn calibrate_hw1f_round_trip() {
             let (annuity, fwd_rate) =
                 compute_swap_annuity_and_rate(&df_fn, expiry, tenor, ppy, None);
             let model_price =
-                hw1f_swaption_price(true_kappa, true_sigma, &df_fn, expiry, tenor, fwd_rate, ppy);
+                hw1f_swaption_price(true_kappa, true_sigma, &df_fn, expiry, tenor, fwd_rate, ppy)
+                    .expect("valid synthetic swaption");
 
             let normal_vol = if annuity > 1e-15 && expiry > 0.0 {
                 let approx_vol =
@@ -484,7 +489,8 @@ fn test_hw1f_brent_fallback_extreme_params() {
     let sigma = 0.03;
     let df = flat_df(0.03);
 
-    let price = hw1f_swaption_price(kappa, sigma, &df, 1.0, 5.0, 0.03, 2);
+    let price = hw1f_swaption_price(kappa, sigma, &df, 1.0, 5.0, 0.03, 2)
+        .expect("valid synthetic swaption");
     assert!(
         price.is_finite(),
         "Swaption price should be finite with Brent fallback"
@@ -557,7 +563,8 @@ fn hw1f_calibration_recovers_kappa_on_wide_round_trip_grid() {
             let (annuity, fwd_rate) =
                 compute_swap_annuity_and_rate(&df_fn, expiry, tenor, ppy, None);
             let model_price =
-                hw1f_swaption_price(true_kappa, true_sigma, &df_fn, expiry, tenor, fwd_rate, ppy);
+                hw1f_swaption_price(true_kappa, true_sigma, &df_fn, expiry, tenor, fwd_rate, ppy)
+                    .expect("valid synthetic swaption");
             let vol = model_price / (annuity * (expiry / (2.0 * std::f64::consts::PI)).sqrt());
             SwaptionQuote {
                 expiry,
@@ -890,9 +897,9 @@ fn cap_floor_hw1f_calibration_recovers_two_parameters_on_synthetic_grid() {
 /// step. Post-fix the buffer is left untouched and the solver applies
 /// proper infeasibility handling.
 #[test]
-fn hw1f_residuals_signal_err_on_non_finite_price_no_magic_literal() {
-    // A discount factor closure that returns NaN forces the swaption
-    // pricer to produce a non-finite price deterministically.
+fn hw1f_residuals_preserve_quote_context_on_curve_failure() {
+    // Invalid curve samples must fail directly, with the offending quote
+    // retained in the diagnostic and without writing a penalty residual.
     let nan_df = |_t: f64| f64::NAN;
 
     let quotes = vec![
@@ -944,7 +951,7 @@ fn hw1f_residuals_signal_err_on_non_finite_price_no_magic_literal() {
     let err = result.expect_err("non-finite price must yield Err, not a 1e6 residual");
     let msg = format!("{err}");
     assert!(
-        msg.contains("non-finite") && msg.contains("1Yx5Y"),
+        msg.contains("discount factor") && msg.contains("1Yx5Y"),
         "error must name the offending quote and the failure mode: {msg}"
     );
     // No entry was overwritten with a magic penalty literal: the marker

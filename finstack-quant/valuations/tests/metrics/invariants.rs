@@ -15,7 +15,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+
 use proptest::prelude::*;
 use serde_json::json;
 use std::sync::Arc;
@@ -68,7 +69,8 @@ fn bucketed_dv01_uses_configured_bucket_grid() {
 
     let mut context =
         MetricContext::new(Arc::new(bond), Arc::new(market), as_of, pv, Arc::new(cfg));
-    standard_registry()
+    finstack_quant_valuations::pricer::STANDARD
+        .metrics()
         .compute(&[MetricId::BucketedDv01], &mut context)
         .expect("bucketed dv01");
 
@@ -124,7 +126,7 @@ proptest! {
 
         // Compute metrics
         let metrics = vec![MetricId::Dv01, MetricId::BucketedDv01];
-        let registry = standard_registry();
+        let registry = finstack_quant_valuations::pricer::STANDARD.metrics();
         let pv = bond.value(&market, as_of).expect("Bond valuation should succeed");
 
         let mut context = MetricContext::new(
@@ -198,7 +200,7 @@ proptest! {
         let market = MarketContext::new().insert(disc);
 
         let metrics = vec![MetricId::Dv01];
-        let registry = standard_registry();
+        let registry = finstack_quant_valuations::pricer::STANDARD.metrics();
         let pv = bond.value(&market, as_of).expect("Bond valuation should succeed");
 
         let mut context = MetricContext::new(
@@ -663,7 +665,7 @@ mod cs_gamma_consistency {
     use finstack_quant_core::money::Money;
 
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+    use finstack_quant_valuations::metrics::{MetricContext, MetricId};
     use std::sync::Arc;
     use time::macros::date;
 
@@ -715,7 +717,7 @@ mod cs_gamma_consistency {
         let pv = cds
             .value(market, as_of)
             .expect("CDS valuation should succeed");
-        let registry = standard_registry();
+        let registry = finstack_quant_valuations::pricer::STANDARD.metrics();
         let mut context = MetricContext::new(
             Arc::new(cds.clone()),
             Arc::new(market.clone()),
@@ -928,7 +930,7 @@ mod additional_invariants {
         let as_of = date!(2025 - 01 - 01);
         let disc = build_discount_curve(0.04);
         let market = MarketContext::new().insert(disc);
-        let registry = standard_registry();
+        let registry = finstack_quant_valuations::pricer::STANDARD.metrics();
 
         for years in [2, 5, 10, 15, 20] {
             let maturity = as_of.saturating_add(time::Duration::days(i64::from(years) * 365));

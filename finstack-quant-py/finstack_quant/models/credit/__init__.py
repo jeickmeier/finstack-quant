@@ -1,14 +1,5 @@
-"""Structural credit model bindings.
-
-Mirrors ``finstack_quant_models::credit``.
-
-Examples:
---------
->>> from finstack_quant.models.credit import MertonModel
->>> round(MertonModel(100.0, 0.25, 80.0, 0.05).default_probability(1.0), 6)
-0.166629
-
-"""
+# ruff: noqa: D104
+# Module help is compiled from the matching stub and delegated below.
 
 from finstack_quant.finstack_quant import models as _models
 
@@ -47,3 +38,5 @@ __all__ = [
     "recovery_waterfall",
     "scoring",
 ]
+
+__doc__ = _models.credit.__doc__

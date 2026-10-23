@@ -319,3 +319,25 @@ test('Currency has one alphabetic string surface', () => {
   assert.equal('code' in currency, false);
   currency.free();
 });
+
+test('HazardCurve conditionalDefaultProb preserves tiny PD and survival underflow', () => {
+  for (const rate of [0, 1e-18, 0.02, 10]) {
+    const curve = new core.HazardCurve({
+      id: 'CONDITIONAL',
+      baseDate: '1900-01-01',
+      knots: [100, 7, 101, rate],
+      recoveryRate: 0.4,
+    });
+    assert.ok(curve.sp('2025-01-01') < 1e-12);
+    if (rate === 10) assert.equal(curve.sp('2025-01-01'), 0);
+    const actual = curve.conditionalDefaultProb('2025-01-01', '2026-01-01');
+    const expected = -Math.expm1(-rate);
+    assert.ok(Math.abs(actual - expected) <= Math.abs(expected) * 1e-12);
+    assert.equal(curve.conditionalDefaultProb('2025-01-01', '2025-01-01'), 0);
+    assert.equal(curve.conditionalDefaultProb('1899-01-01', '1900-01-01'), 0);
+    assert.throws(() => curve.conditionalDefaultProb('2026-01-01', '2025-01-01'), /end >= start/);
+    assert.throws(() => curve.conditionalDefaultProb('bad', '2026-01-01'));
+    assert.throws(() => curve.conditionalDefaultProb(1, '2026-01-01'), TypeError);
+    curve.free();
+  }
+});

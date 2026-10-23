@@ -44,7 +44,7 @@ pub(crate) fn load_registry() -> Result<FxHashMap<SwaptionConventionId, Swaption
         json,
         "Swaption",
         SwaptionConventionId::new,
-        |rec: &SwaptionConventionRecord| rec.clone().into_conventions(),
+        SwaptionConventionRecord::into_conventions,
     )
 }
 

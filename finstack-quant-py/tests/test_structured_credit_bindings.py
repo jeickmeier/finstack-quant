@@ -197,7 +197,7 @@ def test_tranche_scenario_table_returns_typed_wrapper() -> None:
     assert isinstance(table, instruments.ScenarioTable)
     assert not isinstance(table, str)
     assert table.tranche_id == "CLONOTES-A"
-    assert len(table.cells()) == 1
+    assert len(table.cells) == 1
 
     wire = table.to_json()
     payload = json.loads(wire)

@@ -73,10 +73,10 @@ mod tests {
             .insert_price("HESTON_V0", MarketScalar::Unitless(0.05));
         let params = heston_params_from_market_strict(&market, 0.03, 0.01)
             .expect("complete Heston inputs must resolve");
-        assert_eq!(params.kappa, 1.5);
-        assert_eq!(params.theta, 0.06);
-        assert_eq!(params.sigma_v, 0.4);
-        assert_eq!(params.rho, -0.5);
-        assert_eq!(params.v0, 0.05);
+        assert_eq!(params.model.kappa, 1.5);
+        assert_eq!(params.model.theta, 0.06);
+        assert_eq!(params.model.sigma_v, 0.4);
+        assert_eq!(params.model.rho, -0.5);
+        assert_eq!(params.model.v0, 0.05);
     }
 }

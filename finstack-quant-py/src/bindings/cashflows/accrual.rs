@@ -141,7 +141,7 @@ wire_methods!(
     PyExCouponRule,
     ExCouponRule,
     "ExCouponRule",
-    stub = "finstack_quant.cashflows.accrual"
+    module = "finstack_quant.cashflows.accrual"
 );
 
 #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig")]
@@ -223,7 +223,7 @@ wire_methods!(
     PyAccrualConfig,
     AccrualConfig,
     "AccrualConfig",
-    stub = "finstack_quant.cashflows.accrual"
+    module = "finstack_quant.cashflows.accrual"
 );
 
 #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualIndex")]

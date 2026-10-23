@@ -83,32 +83,32 @@ setters!(JsInterestRateSwapBuilder, "InterestRateSwapBuilder", {
         /// @param value - Swap direction for the fixed leg (serde string). `"pay"` pays fixed / receives floating.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        side as side => en,
+        side as side => js_wire,
         /// Set the fixed leg specification.
         /// @param value - Fixed leg specification.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        fixed_leg as fixedLeg => json,
+        fixed_leg as fixedLeg => from_js_json,
         /// Set the floating leg specification.
         /// @param value - Floating leg specification.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        float_leg as floatLeg => json,
+        float_leg as floatLeg => from_js_json,
         /// Select fixed accrual-date adjustment independently of payment dates.
         /// @param value - True applies the fixed leg's calendar and business-day convention; false (default) retains contractual accrual boundaries.
         /// @returns The builder for chaining.
         /// @throws Error - Throws for a non-boolean value or an already consumed builder.
-        adjust_fixed_accrual_dates as adjustFixedAccrualDates => flag,
+        adjust_fixed_accrual_dates as adjustFixedAccrualDates => js_bool,
         /// Select floating accrual-date adjustment independently of payment dates.
         /// @param value - True applies the floating leg's calendar and business-day convention; false (default) retains contractual accrual boundaries.
         /// @returns The builder for chaining.
         /// @throws Error - Throws for a non-boolean value or an already consumed builder.
-        adjust_float_accrual_dates as adjustFloatAccrualDates => flag,
+        adjust_float_accrual_dates as adjustFloatAccrualDates => js_bool,
         /// Set the OTC margin (CSA / initial-margin) specification.
         /// @param value - Rust `OtcMarginSpec` in serde form (plain object or JSON string), e.g. the `margin_spec` value of a margined swap's `toDict()`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        margin_spec as marginSpec => json,
+        margin_spec as marginSpec => from_js_json,
 });
 
 common_setters!(JsInterestRateSwapBuilder, "InterestRateSwapBuilder");
@@ -218,27 +218,27 @@ setters!(JsSwaptionBuilder, "SwaptionBuilder", {
         /// @param value - Option type (serde string). `"call"` is a payer, `"put"` a receiver swaption.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        option_type as optionType => en,
+        option_type as optionType => js_wire,
         /// Set the option expiry date.
         /// @param value - Option expiry date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        expiry as expiry => date,
+        expiry as expiry => js_date,
         /// Set the settlement method.
         /// @param value - Settlement method (serde string).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        settlement as settlement => en,
+        settlement as settlement => js_wire,
         /// Set the cash settlement annuity method (only used when `settlement` is `"cash"`).
         /// @param value - Cash settlement annuity method (only used when `settlement` is `"cash"`) (serde string). `"collateralized_cash_price"` discounts the physical fixed-leg annuity.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        cash_settlement_method as cashSettlementMethod => en,
+        cash_settlement_method as cashSettlementMethod => js_wire,
         /// Set the volatility model used for pricing.
         /// @param value - Volatility model used for pricing (serde string).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        vol_model as volModel => en,
+        vol_model as volModel => js_wire,
         /// Set the volatility surface identifier.
         /// @param value - Volatility surface identifier.
         /// @returns The builder, for chaining.
@@ -248,17 +248,17 @@ setters!(JsSwaptionBuilder, "SwaptionBuilder", {
         /// @param value - Fixed leg of the underlying swap.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        underlying_fixed_leg as underlyingFixedLeg => json,
+        underlying_fixed_leg as underlyingFixedLeg => from_js_json,
         /// Set the complete floating leg of the underlying swap.
         /// @param value - Floating leg of the underlying swap.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        underlying_float_leg as underlyingFloatLeg => json,
+        underlying_float_leg as underlyingFloatLeg => from_js_json,
         /// Set the SABR volatility model parameters.
         /// @param value - Rust `SabrParameters` in serde form (plain object or JSON string), e.g. `{"alpha": 0.025, "beta": 0.5, "nu": 0.4, "rho": -0.3, "shift": `null`}`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        sabr_params as sabrParams => json,
+        sabr_params as sabrParams => from_js_json,
 });
 
 common_setters!(JsSwaptionBuilder, "SwaptionBuilder");
@@ -380,7 +380,7 @@ setters!(JsCapFloorBuilder, "CapFloorBuilder", {
         /// @param value - Option type (serde string). `"cap"`/`"floor"` price a series of caplets/floorlets, `"caplet"`/`"floorlet"` a single period.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        rate_option_type as rateOptionType => en,
+        rate_option_type as rateOptionType => js_wire,
         /// Set the strike rate of every caplet/floorlet.
         /// @param value - Strike rate as a decimal (`0.05` = 5%).
         /// @returns The builder, for chaining.
@@ -395,22 +395,22 @@ setters!(JsCapFloorBuilder, "CapFloorBuilder", {
         /// @param value - Start date of the underlying period as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        start_date as startDate => date,
+        start_date as startDate => js_date,
         /// Set the end date of the underlying period.
         /// @param value - End date of the underlying period as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => date,
+        maturity as maturity => js_date,
         /// Set the stub rule.
         /// @param value - Stub rule (serde string). Default `"short_front"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        stub as stub => en,
+        stub as stub => js_wire,
         /// Set the business day convention.
         /// @param value - Business day convention (serde string). Default `"modified_following"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        business_day_convention as businessDayConvention => en,
+        business_day_convention as businessDayConvention => js_wire,
         /// Set the holiday calendar identifier for schedule and roll conventions.
         /// @param value - Holiday calendar identifier for schedule and roll conventions.
         /// @returns The builder, for chaining.
@@ -420,12 +420,12 @@ setters!(JsCapFloorBuilder, "CapFloorBuilder", {
         /// @param value - Exercise style (serde string). Default `"european"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        exercise_style as exerciseStyle => en,
+        exercise_style as exerciseStyle => js_wire,
         /// Set the settlement type.
         /// @param value - Settlement type (serde string). Default `"cash"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        settlement as settlement => en,
+        settlement as settlement => js_wire,
         /// Set the discount curve identifier.
         /// @param value - Discount curve identifier.
         /// @returns The builder, for chaining.
@@ -445,17 +445,17 @@ setters!(JsCapFloorBuilder, "CapFloorBuilder", {
         /// @param value - Volatility type convention (serde string). Must match the configured surface; `"auto"` (the default when unset) follows source convention and displacement metadata. Normal quotes use decimal rate units; Black quotes use dimensionless annual volatility. Incompatible model/source conventions raise `ValueError`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        vol_type as volType => en,
+        vol_type as volType => js_wire,
         /// Set the displacement shift used for shifted-lognormal pricing.
         /// @param value - Displacement added to forward and strike; must be non-negative.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        vol_shift as volShift => num,
+        vol_shift as volShift => js_f64,
         /// Set the overnight (RFR) coupon convention for compounded caplets.
         /// @param value - Rust `OvernightCouponConvention` in serde form (plain object or JSON string), e.g. `{"compounding": {"compounded_in_arrears": {"lookback_days": 0}}, "payment_lag_days": 2}`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        overnight_coupon as overnightCoupon => json,
+        overnight_coupon as overnightCoupon => from_js_json,
 });
 
 common_setters!(JsCapFloorBuilder, "CapFloorBuilder");

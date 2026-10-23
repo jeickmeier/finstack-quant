@@ -130,13 +130,17 @@ fn create_test_market() -> MarketContext {
 }
 
 fn create_test_deal() -> StructuredCredit {
-    StructuredCredit::new_clo(
-        "TEST_CLO_CUSTOM_WF",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_CLO_CUSTOM_WF".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse")

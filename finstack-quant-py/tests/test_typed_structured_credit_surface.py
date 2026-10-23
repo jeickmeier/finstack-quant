@@ -30,6 +30,7 @@ from finstack_quant.valuations.instruments import (
     HedgeSwap,
     InterestRateSwap,
     PoolAsset,
+    StandardDealParams,
     StructuredCredit,
     Tranche,
     TrancheCashflows,
@@ -230,17 +231,20 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
         "modified_rate": 0.04,
     }
     pool = AssetPool("P", "rmbs", USD).with_assets([npl])
-    deal = StructuredCredit.new_rmbs(
-        "NPL-1",
-        pool,
-        TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
-        CLOSE,
-        MATURITY,
-        "USD-OIS",
-        calendar_id="nyse",
+    deal = StructuredCredit.new_standard(
+        "rmbs",
+        StandardDealParams(
+            "NPL-1",
+            pool,
+            TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
+            CLOSE,
+            MATURITY,
+            "USD-OIS",
+            calendar_id="nyse",
+        ),
     )
     assert deal.pool.assets[0].liquidation["modified_rate"] == 0.04
-    periods = deal.run_simulation_with_diagnostics(_market(), CLOSE).periods
+    periods = deal.run_simulation(_market(), CLOSE).diagnostics.periods
     resolved = next(period for period in periods if period["payment_date"] >= "2026-01-01")
     assert float(resolved["defaults"]["amount"]) == pytest.approx(80_000_000.0)
 
@@ -248,14 +252,17 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
     npl["default_date"] = "2023-06-01"
     npl["recovery_amount"] = {"amount": "40000000", "currency": "USD"}
     with pytest.raises(ValueError, match="liquidation"):
-        StructuredCredit.new_rmbs(
-            "NPL-2",
-            AssetPool("P", "rmbs", USD).with_assets([npl]),
-            TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
-            CLOSE,
-            MATURITY,
-            "USD-OIS",
-            calendar_id="nyse",
+        StructuredCredit.new_standard(
+            "rmbs",
+            StandardDealParams(
+                "NPL-2",
+                AssetPool("P", "rmbs", USD).with_assets([npl]),
+                TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
+                CLOSE,
+                MATURITY,
+                "USD-OIS",
+                calendar_id="nyse",
+            ),
         )
 
 
@@ -361,7 +368,7 @@ def test_credit_model_can_be_replaced_whole_and_then_refined() -> None:
 
 def test_diagnostics_carry_the_period_record_and_coverage_tests() -> None:
     deal = _clo()
-    diagnostics = deal.run_simulation_with_diagnostics(_market(), CLOSE)
+    diagnostics = deal.run_simulation(_market(), CLOSE).diagnostics
     periods = diagnostics.periods
     assert periods
     assert periods[0]["coverage_tests"][0]["test_id"] == "OC_A"
@@ -490,14 +497,17 @@ def test_hedge_swaps_and_call_assumptions_are_typed_and_round_trip() -> None:
 
 def test_typed_constructors_accept_the_payment_calendar() -> None:
     pool = AssetPool("P", "clo", USD).with_assets(_loans())
-    deal = StructuredCredit.new_clo(
-        "CLO-CAL",
-        pool,
-        TrancheStructure([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
-        CLOSE,
-        MATURITY,
-        "USD-OIS",
-        calendar_id="nyse",
+    deal = StructuredCredit.new_standard(
+        "clo",
+        StandardDealParams(
+            "CLO-CAL",
+            pool,
+            TrancheStructure([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
+            CLOSE,
+            MATURITY,
+            "USD-OIS",
+            calendar_id="nyse",
+        ),
     )
     assert deal.calendar_id == "nyse"
     flows = deal.tranche_cashflows("A", _market(), CLOSE)
@@ -827,3 +837,29 @@ def test_cashflow_frame_rejects_mixed_currency_components() -> None:
     mixed = TrancheCashflows.from_json(json.dumps(document))
     with pytest.raises(ValueError, match="Currency mismatch"):
         mixed.to_dataframe()
+
+
+@pytest.mark.parametrize(
+    "recovery",
+    [
+        {"type": "constant", "rate": 0.4},
+        {"type": "market_correlated", "mean_recovery": 0.4, "recovery_volatility": 0.25, "factor_correlation": 0.4},
+    ],
+)
+def test_recovery_only_configuration_is_reported_and_fully_disabled(recovery: dict[str, object]) -> None:
+    document = json.loads(StructuredCredit.example().to_json())
+    document["instrument"]["spec"]["stochastic_recovery_spec"] = recovery
+    deal = StructuredCredit.from_json(json.dumps(document))
+    assert deal.is_stochastic
+    assert deal.stochastic_recovery_spec == recovery
+    disabled = deal.disable_stochastic()
+    for _ in range(2):
+        assert not disabled.is_stochastic
+        assert disabled.stochastic_recovery_spec is None
+        assert disabled.stochastic_prepay_spec is None
+        assert disabled.stochastic_default_spec is None
+        assert disabled.correlation_structure is None
+        assert disabled.recovery_spec.to_json() == deal.recovery_spec.to_json()
+        disabled = disabled.disable_stochastic()
+    assert deal.is_stochastic
+    assert deal.stochastic_recovery_spec == recovery

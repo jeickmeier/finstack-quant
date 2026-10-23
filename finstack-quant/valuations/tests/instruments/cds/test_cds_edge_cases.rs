@@ -9,6 +9,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::STANDARD;
 use time::macros::date;
 
 fn build_curves(as_of: Date) -> (DiscountCurve, HazardCurve) {
@@ -229,7 +230,7 @@ fn test_full_recovery_rate_is_rejected() {
     cds.protection_leg.recovery_rate = 1.0;
 
     // Pricing must surface a structured error rather than silently degenerate.
-    let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let err = registry
         .price_with_metrics(
             &cds,

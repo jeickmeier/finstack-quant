@@ -245,6 +245,105 @@ pub struct SimulationDiagnostics {
     pub tranche_draws: Vec<(String, Date, Money)>,
 }
 
+impl SimulationDiagnostics {
+    /// Project the stored period record into nineteen ordered table columns.
+    ///
+    /// Columns are `date`, `pool_balance`, `pool_factor`, `wac`,
+    /// `weighted_avg_spread_bp`, `warf`, `interest_collections`,
+    /// `principal_collections`, `defaults`, `recoveries`, `reinvested_par`,
+    /// `fees_paid`, `reserve_balance`, `reserve_interest`, `spread_account`,
+    /// `funding_account`, `delinquent_balance`, `servicer_advances_outstanding`
+    /// and `excess_spread`. Dates are ISO 8601 strings; all other columns are
+    /// Float64, including on an empty table.
+    ///
+    /// Rows retain `periods` order and duplicate payment dates. Reserve interest
+    /// is the first entry in `reserve_interest_paid` with the same date, or zero
+    /// when absent; entries without a matching period create no rows. Monetary
+    /// values retain their stored currency-unit magnitudes without currency
+    /// conversion or aggregation. WAC and excess spread are annual decimals,
+    /// weighted-average spread is in basis points, pool factor is a ratio and
+    /// WARF is the weighted-average rating factor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the projected columns fail table-envelope validation.
+    pub fn to_table(
+        &self,
+    ) -> finstack_quant_core::Result<finstack_quant_core::table::TableEnvelope> {
+        use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
+
+        let rows: Vec<[f64; 18]> = self
+            .periods
+            .iter()
+            .map(|period| {
+                let reserve_interest = self
+                    .reserve_interest_paid
+                    .iter()
+                    .find(|(date, _)| *date == period.payment_date)
+                    .map_or(0.0, |(_, amount)| amount.amount());
+                [
+                    period.pool_balance.amount(),
+                    period.pool_factor,
+                    period.wac,
+                    period.weighted_avg_spread_bp,
+                    period.warf,
+                    period.interest_collections.amount(),
+                    period.principal_collections.amount(),
+                    period.defaults.amount(),
+                    period.recoveries.amount(),
+                    period.reinvested_par.amount(),
+                    period.fees_paid.amount(),
+                    period.reserve_balance.amount(),
+                    reserve_interest,
+                    period.spread_account.amount(),
+                    period.funding_account.amount(),
+                    period.delinquent_balance.amount(),
+                    period.servicer_advances_outstanding.amount(),
+                    period.excess_spread,
+                ]
+            })
+            .collect();
+        let mut columns = vec![TableColumn::new(
+            "date",
+            TableColumnData::String(
+                self.periods
+                    .iter()
+                    .map(|period| period.payment_date.to_string())
+                    .collect(),
+            ),
+        )];
+        for (index, name) in [
+            "pool_balance",
+            "pool_factor",
+            "wac",
+            "weighted_avg_spread_bp",
+            "warf",
+            "interest_collections",
+            "principal_collections",
+            "defaults",
+            "recoveries",
+            "reinvested_par",
+            "fees_paid",
+            "reserve_balance",
+            "reserve_interest",
+            "spread_account",
+            "funding_account",
+            "delinquent_balance",
+            "servicer_advances_outstanding",
+            "excess_spread",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            columns.push(TableColumn::new(
+                name,
+                TableColumnData::Float64(rows.iter().map(|row| row[index]).collect()),
+            ));
+        }
+        TableEnvelope::new(columns, Default::default())
+    }
+}
+
 /// Deal-health metrics for this period's step-down trigger evaluation.
 ///
 /// Computes, on current balances: cumulative loss (fraction of the *original*

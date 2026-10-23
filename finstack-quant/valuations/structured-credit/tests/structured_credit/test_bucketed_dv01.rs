@@ -60,13 +60,17 @@ fn test_structured_credit_bucketed_dv01_computed() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::December, 31).unwrap();
 
-    let sc = StructuredCredit::new_abs(
-        "TEST_ABS",
-        create_simple_pool(),
-        create_simple_tranches(),
-        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-        maturity,
-        "USD-OIS",
+    let sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_ABS".into(),
+            pool: create_simple_pool(),
+            tranches: create_simple_tranches(),
+            closing_date: Date::from_calendar_date(2024, Month::January, 1).unwrap(),
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -107,13 +111,17 @@ fn test_structured_credit_bucketed_cs01_reconciles_to_parallel() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::December, 31).unwrap();
 
-    let mut sc = StructuredCredit::new_abs(
-        "TEST_ABS",
-        create_simple_pool(),
-        create_simple_tranches(),
-        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-        maturity,
-        "USD-OIS",
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_ABS".into(),
+            pool: create_simple_pool(),
+            tranches: create_simple_tranches(),
+            closing_date: Date::from_calendar_date(2024, Month::January, 1).unwrap(),
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");

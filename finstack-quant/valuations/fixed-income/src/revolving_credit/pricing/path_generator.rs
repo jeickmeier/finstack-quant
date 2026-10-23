@@ -69,7 +69,7 @@ use finstack_quant_cashflows::builder::RateSpec;
 ///
 /// Vector of `ThreeFactorPathData`, one per simulated path (`2 × run.num_paths`
 /// when antithetic, with each pair adjacent)
-pub fn generate_three_factor_paths(
+pub(crate) fn generate_three_factor_paths(
     stoch_spec: &StochasticUtilizationSpec,
     run: &RevolvingCreditMcRun,
     mc_config: &McConfig,

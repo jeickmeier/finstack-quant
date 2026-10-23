@@ -40,8 +40,6 @@
 //!   Ch. 15-16, Atlantic Financial Press. `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
 
 use super::super::paths::ProcessParams;
-#[cfg(test)]
-use super::super::traits::state_keys;
 use super::super::traits::StochasticProcess;
 use crate::monte_carlo::traits::ProcessMetadata;
 
@@ -532,9 +530,9 @@ mod tests {
         let mut state = PathState::new(0, 0.0);
         process.populate_path_state(&x, &mut state);
 
-        assert!((state.get(state_keys::indexed_spot(0)).expect("set") - 0.03).abs() < 1e-12);
-        assert!((state.get(state_keys::indexed_spot(1)).expect("set") - 0.035).abs() < 1e-12);
-        assert!((state.get(state_keys::indexed_spot(2)).expect("set") - 0.04).abs() < 1e-12);
+        assert!((state.get("spot_0").expect("set") - 0.03).abs() < 1e-12);
+        assert!((state.get("spot_1").expect("set") - 0.035).abs() < 1e-12);
+        assert!((state.get("spot_2").expect("set") - 0.04).abs() < 1e-12);
 
         // Numeraire should be product of discount factors
         let num = state.get("lmm_numeraire").expect("set");

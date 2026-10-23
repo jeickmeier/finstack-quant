@@ -12,37 +12,16 @@ use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOptionMarketData, EquityOptionParams,
 };
 
+use super::convert::enum_from_str;
 use super::convert::{
     attributes_from_py, bool_repr, date_repr, day_count_from_py, enum_to_py_string, float_repr,
 };
-use super::instruments::enum_from_str;
-use super::typed_fx::typed_option_greeks;
-use super::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_greek_methods, instrument_pricing_methods,
-};
+use super::pricing::typed_option_greeks;
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
 
-type EquityOptionBuilderInner =
-    finstack_quant_valuations::instruments::equity::equity_option::EquityOptionBuilder;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionBuilder;
 
-/// Vanilla equity option (typed wrapper for Rust ``EquityOption``).
-///
-/// European options price with Black–Scholes–Merton (``"black76"`` on the
-/// forward); American and Bermudan styles use the tree pricer. The
-/// ``quantity`` is the number of underlying units (contract size) the per-share
-/// value scales by, and ``currency`` is the premium/PV currency; discrete dividends and a continuous ``div_yield_id`` are both
-/// supported.
-///
-/// Build with ``EquityOption.builder()`` or ``EquityOption.european(...)``;
-/// start from ``EquityOption.example()``. Instances are accepted directly by
-/// ``price_instrument`` and expose ``price`` / ``metric`` / ``greeks`` /
-/// ``implied_vol`` themselves.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import EquityOption
-/// >>> opt = EquityOption.example()
-/// >>> (opt.underlying_ticker, opt.strike, opt.option_type, opt.exercise_style)
-/// ('SPX', 4500.0, 'call', 'european')
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "EquityOption",
@@ -65,21 +44,7 @@ instrument_pricing_methods!(PyEquityOption, "EquityOption");
 
 #[pymethods]
 impl PyEquityOption {
-    /// Canonical example: SPX 4500 European call expiring 2024-06-21.
-    ///
-    /// Mirrors Rust ``EquityOption::example()``: 100 units in USD, curve
-    /// ``USD-OIS``, spot ``EQUITY-SPOT``, surface ``EQUITY-VOL``, dividend
-    /// yield ``EQUITY-DIVYIELD``.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOption
-    ///     The validated example option.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the canonical example fails validation (never for a released build).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -88,49 +53,7 @@ impl PyEquityOption {
             .map_err(core_to_py)
     }
 
-    /// Build a cash-settled European call or put.
-    ///
-    /// Mirrors Rust ``EquityOption::european`` /
-    /// ``european_with_market_data``: the market-data identifiers default
-    /// to the same generic ids the Rust constructor uses (``"USD-OIS"``,
-    /// ``"EQUITY-SPOT"``, ``"EQUITY-VOL"``, ``"EQUITY-DIVYIELD"``); pass your
-    /// own to bind the option to real market objects.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// ticker : str
-    ///     Underlying equity ticker.
-    /// strike : float
-    ///     Strike price; must be finite and positive.
-    /// expiry : datetime.date | str
-    ///     Expiry date.
-    /// quantity : float
-    ///     Number of underlying units; PV and Greeks scale linearly with it.
-    /// currency : Currency | str
-    ///     Currency of the strike, premium and present value (``"USD"``).
-    /// option_type : str
-    ///     ``"call"`` or ``"put"``.
-    /// discount_curve_id : str
-    ///     Discount curve identifier.
-    /// spot_id : str
-    ///     Equity spot price identifier.
-    /// vol_surface_id : str
-    ///     Volatility surface identifier.
-    /// div_yield_id : str | None
-    ///     Continuous dividend yield identifier; ``None`` for no yield.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOption
-    ///     The validated option.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``strike`` is not positive or ``quantity`` is zero, ``currency`` is not a recognized
-    ///     code, or ``option_type`` is not ``"call"`` or ``"put"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.european")]
     #[staticmethod]
     #[pyo3(signature = (id, ticker, strike, expiry, quantity, currency, option_type, *, discount_curve_id="USD-OIS",
                         spot_id="EQUITY-SPOT", vol_surface_id="EQUITY-VOL",
@@ -177,34 +100,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         Ok(Self { inner })
     }
 
-    /// Implied volatility that reproduces ``target_price``.
-    ///
-    /// Uses the configured exercise engine, dividend schedule and model day count;
-    /// trial volatility replaces the active surface or override.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market carrying the discount curve, spot and (optional) dividend yield.
-    /// as_of : datetime.date | str
-    ///     Valuation date strictly before expiry and observed exercise.
-    /// target_price : float
-    ///     Observed option premium: finite non-negative total trade PV in the
-    ///     option currency, including the contract multiplier.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Annualized lognormal volatility as a decimal (``0.20`` = 20%).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If PV or ``quantity`` is invalid, exercise has occurred, or volatility is unidentifiable.
-    /// KeyError
-    ///     If required market data is missing from ``market``.
-    /// RuntimeError
-    ///     If the root search does not converge.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.implied_vol")]
     #[pyo3(text_signature = "($self, market, as_of, target_price)")]
     fn implied_vol(
         &self,
@@ -220,22 +116,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
             .map_err(core_to_py)
     }
 
-    /// Compute the standard option Greek set as a dict.
-    ///
-    /// Mirrors ``FxOption.greeks`` and the WASM ``greeks`` method: Greeks the
-    /// selected model cannot produce are omitted, and any non-finite Greek
-    /// raises rather than being returned.
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, float]
-    ///     Mapping of Greek name to value for every Greek the model produced.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or a returned Greek is non-finite.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.greeks")]
     #[pyo3(signature = (market, as_of, model="default"))]
     fn greeks<'py>(
         &self,
@@ -247,13 +128,13 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         typed_option_greeks(py, Box::new(self.inner.clone()), market, as_of, model)
     }
 
-    /// Expiry date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.expiry)
     }
 
-    /// Observed exercise state as ``{"date", "spot", "settlement_date", "exercised"}``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.exercise")]
     #[getter]
     fn exercise<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
         let Some(exercise) = self.inner.exercise else {
@@ -267,7 +148,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         Ok(Some(out))
     }
 
-    /// Discrete dividends as ``(ex_date, amount)`` pairs.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.discrete_dividends")]
     #[getter]
     fn discrete_dividends<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
         self.inner
@@ -277,7 +158,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
             .collect()
     }
 
-    /// Bermudan exercise dates, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.exercise_dates")]
     #[getter]
     fn exercise_dates<'py>(&self, py: Python<'py>) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
         self.inner
@@ -304,94 +185,65 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
 }
 
 crate::bindings::macros::py_getters!(PyEquityOption |s| {
-    /// Underlying equity ticker.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.underlying_ticker")]
     underlying_ticker -> String = s.inner.underlying_ticker.clone();
 
-    /// Strike price.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.strike")]
     strike -> f64 = s.inner.strike;
 
-    /// ``"call"`` or ``"put"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.option_type")]
     option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
 
-    /// ``"european"``, ``"american"`` or ``"bermudan"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.exercise_style")]
     exercise_style -> PyResult<String> = enum_to_py_string(&s.inner.exercise_style);
 
-    /// Number of underlying units; PV and Greeks scale linearly with it.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.quantity")]
     quantity -> f64 = s.inner.quantity;
 
-    /// Currency of the strike, premium and present value (ISO-4217 code).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    /// Accrual day-count convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.day_count")]
     day_count -> crate::bindings::core::dates::daycount::PyDayCount =
         crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
 
-    /// ``"physical"`` or ``"cash"`` settlement.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.settlement")]
     settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Equity spot price identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.spot_id")]
     spot_id -> String = s.inner.spot_id.to_string();
 
-    /// Volatility surface identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
-    /// Continuous dividend yield identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.div_yield_id")]
     div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(|id| id.to_string());
 });
 
-instrument_greek_methods!(PyEquityOption("EquityOption") { delta, gamma, vega, theta, rho });
-
-/// Fluent builder for ``EquityOption``; wraps the Rust
-/// ``FinancialBuilder``-generated builder (consuming setters).
-///
-/// Builders are consumed by ``build()``; create a new builder per instrument.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "EquityOptionBuilder",
     skip_from_py_object
 )]
 pub struct PyEquityOptionBuilder {
-    inner: Option<EquityOptionBuilderInner>,
+    inner: Option<EquityOptionBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
 #[pymethods]
 impl PyEquityOptionBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the equity option.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            id,
-            format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.id(InstrumentId::new(value.to_string()))
-        )
+        builder_set!(slf, id, format!("{value:?}"), |b: EquityOptionBuilder| b
+            .id(InstrumentId::new(value.to_string())))
     }
 
-    /// Set the underlying equity ticker symbol.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Underlying equity ticker symbol.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.underlying_ticker")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_ticker<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -401,47 +253,18 @@ impl PyEquityOptionBuilder {
             slf,
             underlying_ticker,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.underlying_ticker(value.to_string())
+            |b: EquityOptionBuilder| b.underlying_ticker(value.to_string())
         )
     }
 
-    /// Set the strike price.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Strike price. Must be finite and positive.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.strike")]
     #[pyo3(text_signature = "($self, value)")]
     fn strike<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            strike,
-            float_repr(value),
-            |b: EquityOptionBuilderInner| b.strike(value)
-        )
+        builder_set!(slf, strike, float_repr(value), |b: EquityOptionBuilder| b
+            .strike(value))
     }
 
-    /// Set the option type.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"call", "put"}
-    ///     Option type of the equity option.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized option type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.option_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn option_type<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -452,27 +275,11 @@ impl PyEquityOptionBuilder {
             slf,
             option_type,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.option_type(option_type)
+            |b: EquityOptionBuilder| b.option_type(option_type)
         )
     }
 
-    /// Set the exercise style.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"european", "american", "bermudan"}
-    ///     Exercise style of the equity option. Defaults to ``"european"``
-    ///     when never set.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized exercise style.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.exercise_style")]
     #[pyo3(text_signature = "($self, value)")]
     fn exercise_style<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -483,51 +290,22 @@ impl PyEquityOptionBuilder {
             slf,
             exercise_style,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.exercise_style(exercise_style)
+            |b: EquityOptionBuilder| b.exercise_style(exercise_style)
         )
     }
 
-    /// Set the option expiry date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     Option expiry date (date-like or ISO 8601 string).
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.expiry")]
     #[pyo3(text_signature = "($self, value)")]
     fn expiry<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let expiry = py_to_date(value)?;
-        builder_set!(
-            slf,
-            expiry,
-            date_repr(expiry),
-            |b: EquityOptionBuilderInner| b.expiry(expiry)
-        )
+        builder_set!(slf, expiry, date_repr(expiry), |b: EquityOptionBuilder| b
+            .expiry(expiry))
     }
 
-    /// Set the day count for the time-to-expiry year fraction.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : DayCount | str
-    ///     Day count convention; defaults to ``ACT/365F`` when never set.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a string name is not a recognized day count.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -538,26 +316,11 @@ impl PyEquityOptionBuilder {
             slf,
             day_count,
             format!("DayCount('{day_count}')"),
-            |b: EquityOptionBuilderInner| b.day_count(day_count)
+            |b: EquityOptionBuilder| b.day_count(day_count)
         )
     }
 
-    /// Set the settlement method.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"physical", "cash"}
-    ///     Physical delivery or fixed cash settlement.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized settlement method.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.settlement")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
@@ -565,27 +328,11 @@ impl PyEquityOptionBuilder {
             slf,
             settlement,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.settlement(settlement)
+            |b: EquityOptionBuilder| b.settlement(settlement)
         )
     }
 
-    /// Set the observed exercise or expiry lifecycle state.
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date | str
-    ///     Exercise date, or expiry date for an unexercised observation.
-    /// spot : float
-    ///     Positive observed underlying level in strike-price units.
-    /// settlement_date : datetime.date | str
-    ///     Contractual cash-payment or physical-delivery date.
-    /// exercised : bool
-    ///     Whether exercise or assignment occurred.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.exercise")]
     #[pyo3(text_signature = "($self, date, spot, settlement_date, exercised)")]
     fn exercise<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -607,47 +354,22 @@ impl PyEquityOptionBuilder {
             date_repr(exercise.settlement_date),
             bool_repr(exercise.exercised)
         );
-        builder_set!(slf, exercise, shown, |b: EquityOptionBuilderInner| b
+        builder_set!(slf, exercise, shown, |b: EquityOptionBuilder| b
             .exercise(exercise))
     }
 
-    /// Set the number of underlying units the option is written on.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Number of underlying units; PV and Greeks scale linearly with it.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.quantity")]
     #[pyo3(text_signature = "($self, value)")]
     fn quantity<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
             slf,
             quantity,
             float_repr(value),
-            |b: EquityOptionBuilderInner| b.quantity(value)
+            |b: EquityOptionBuilder| b.quantity(value)
         )
     }
 
-    /// Set the currency of the strike, premium and present value.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Currency | str
-    ///     ISO-4217 currency code (e.g. ``"USD"``) or ``Currency``.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized currency code.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.currency")]
     #[pyo3(text_signature = "($self, value)")]
     fn currency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -658,21 +380,11 @@ impl PyEquityOptionBuilder {
             slf,
             currency,
             format!("{:?}", ccy.to_string()),
-            |b: EquityOptionBuilderInner| b.currency(ccy)
+            |b: EquityOptionBuilder| b.currency(ccy)
         )
     }
 
-    /// Set the discount curve identifier for present value calculations.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -682,42 +394,22 @@ impl PyEquityOptionBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: EquityOptionBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the equity spot price identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Equity spot price identifier.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.spot_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn spot_id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
             slf,
             spot_id,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.spot_id(PriceId::new(value.to_string()))
+            |b: EquityOptionBuilder| b.spot_id(PriceId::new(value.to_string()))
         )
     }
 
-    /// Set the equity volatility surface identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Equity volatility surface identifier.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -727,22 +419,11 @@ impl PyEquityOptionBuilder {
             slf,
             vol_surface_id,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.vol_surface_id(CurveId::new(value.to_string()))
+            |b: EquityOptionBuilder| b.vol_surface_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the continuous dividend yield identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Continuous dividend yield identifier. If never set, the pricer
-    ///     treats the underlying as having zero continuous dividend yield.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.div_yield_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn div_yield_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -752,24 +433,11 @@ impl PyEquityOptionBuilder {
             slf,
             div_yield_id,
             format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.div_yield_id(PriceId::new(value.to_string()))
+            |b: EquityOptionBuilder| b.div_yield_id(PriceId::new(value.to_string()))
         )
     }
 
-    /// Set the discrete dividend schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[tuple[datetime.date | str, float]]
-    ///     Positive ``(ex_date, dividend_amount)`` pairs in strictly increasing
-    ///     date order. European pricing uses escrowed spot adjustment;
-    ///     American/Bermudan tree pricing restores remaining dividend value at
-    ///     exercise nodes to model ex-date jumps.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.discrete_dividends")]
     #[pyo3(text_signature = "($self, value)")]
     fn discrete_dividends<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -787,26 +455,11 @@ impl PyEquityOptionBuilder {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-        builder_set!(
-            slf,
-            discrete_dividends,
-            shown,
-            |b: EquityOptionBuilderInner| b.discrete_dividends(dividends)
-        )
+        builder_set!(slf, discrete_dividends, shown, |b: EquityOptionBuilder| b
+            .discrete_dividends(dividends))
     }
 
-    /// Set the exercise schedule for Bermudan options.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[datetime.date | str]
-    ///     Dates on which early exercise is permitted. Required when
-    ///     ``exercise_style`` is ``"bermudan"``.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.exercise_dates")]
     #[pyo3(text_signature = "($self, value)")]
     fn exercise_dates<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -821,30 +474,11 @@ impl PyEquityOptionBuilder {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-        builder_set!(slf, exercise_dates, shown, |b: EquityOptionBuilderInner| b
+        builder_set!(slf, exercise_dates, shown, |b: EquityOptionBuilder| b
             .exercise_dates(dates))
     }
 
-    /// Set free-form instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -852,7 +486,7 @@ impl PyEquityOptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, attributes, shown, |b: EquityOptionBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: EquityOptionBuilder| b
             .attributes(attrs))
     }
 }

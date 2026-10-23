@@ -324,13 +324,29 @@ test('RevolvingCredit exposes isStochastic and the expected cashflow schedule', 
 
 // --------------------------------------------------------------------- FX
 
+test('core FX spot lags preserve pair symmetry and currency validation', () => {
+  for (const other of ['CAD', 'TRY', 'PHP', 'RUB']) {
+    assert.equal(core.fxStandardSettlementDays('usd', other), 1);
+    assert.equal(core.fxStandardSettlementDays(other, 'USD'), 1);
+  }
+  for (const [base, quote] of [
+    ['EUR', 'USD'],
+    ['USD', 'MXN'],
+    ['EUR', 'CAD'],
+  ]) {
+    assert.equal(core.fxStandardSettlementDays(base, quote), 2);
+  }
+  assert.throws(() => core.fxStandardSettlementDays('INVALID', 'USD'), { kind: 'validation' });
+  assert.throws(() => core.fxStandardSettlementDays('USD', ' CAD '), { kind: 'validation' });
+  assert.throws(() => core.fxStandardSettlementDays(1, 'USD'), { kind: 'invalid_type' });
+  assert.throws(() => core.fxStandardSettlementDays('USD', null), { kind: 'invalid_type' });
+});
+
 test('FxForward presets and the CIP market forward match Python', () => {
   const { FxForward } = valuations.instruments;
   const forward = FxForward.example();
   close(forward.marketForwardRate(FX_MARKET, '2025-01-15'), 1.109139126165159, 1e-12, 'fwd');
   close(forward.metric(FX_MARKET, '2025-01-15', 'dv01'), 0.44193883896969055, 1e-9, 'dv01');
-  assert.equal(FxForward.standardSettlementDays('EUR', 'USD'), 2);
-  assert.equal(FxForward.standardSettlementDays('USD', 'CAD'), 1);
   const traded = FxForward.fromTradeDate(
     'EURUSD-3M',
     'EUR',

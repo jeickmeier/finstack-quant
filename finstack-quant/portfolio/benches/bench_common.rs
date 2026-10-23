@@ -1096,14 +1096,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         )
         .unwrap();
         let tranches = TrancheStructure::new(vec![senior]).unwrap();
-        let mut sc = StructuredCredit::new_clo(
-            sc_id.clone(),
-            pool,
-            tranches,
-            base,
-            maturity_5y(),
-            "USD-OIS",
-        )
+        let mut sc = StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: sc_id.clone().into(), pool, tranches, closing_date: base, maturity: maturity_5y(), discount_curve_id: "USD-OIS".into(), calendar_id: None })
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
         // Spread metrics require an external quote; using model dirty price

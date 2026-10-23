@@ -173,21 +173,6 @@ pub fn build_smile_market(as_of: Date, spot: f64, rate: f64, div_yield: f64) -> 
         .insert_price(DIV_ID, MarketScalar::Unitless(div_yield))
 }
 
-/// Assert value is positive
-pub fn assert_positive(value: f64, label: &str) {
-    assert!(value > 0.0, "{}: expected positive, got {}", label, value);
-}
-
-/// Assert value is non-negative
-pub fn assert_non_negative(value: f64, label: &str) {
-    assert!(
-        value >= 0.0,
-        "{}: expected non-negative, got {}",
-        label,
-        value
-    );
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

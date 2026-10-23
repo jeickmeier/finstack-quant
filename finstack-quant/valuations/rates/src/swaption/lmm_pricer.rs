@@ -9,12 +9,11 @@ use crate::swaption::pricing::lmm_bermudan::price_bermudan_lmm;
 use crate::swaption::BermudanSwaption;
 use crate::swaption::BermudanType;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
-use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::monte_carlo::process::lmm::LmmParams;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::pricer::{
@@ -195,7 +194,7 @@ impl BermudanSwaptionLmmPricer {
 
         let tenors: Vec<f64> = tenor_dates
             .iter()
-            .map(|&date| year_fraction(DayCount::Act365F, as_of, date))
+            .map(|&date| DayCount::Act365F.year_fraction(as_of, date, DayCountContext::default()))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         let num_forwards = tenors.len() - 1;
@@ -530,7 +529,8 @@ mod tests {
                 periods.partition_point(|period| period.accrual_start < future_exercises[0]);
             assert_eq!(
                 params.tenors[0],
-                year_fraction(DayCount::Act365F, as_of, future_exercises[0])
+                DayCount::Act365F
+                    .year_fraction(as_of, future_exercises[0], DayCountContext::default())
                     .expect("next exercise time")
             );
             assert_eq!(params.num_forwards, periods.len() - first_live);

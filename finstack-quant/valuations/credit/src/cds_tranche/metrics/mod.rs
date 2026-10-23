@@ -5,7 +5,6 @@
 //! registered via `register_cds_tranche_metrics`.
 //!
 //! Exposed metrics:
-//! - Upfront (currency units)
 //! - Spread DV01 (per 1bp change in running coupon)
 //! - Expected loss (currency units)
 //! - Jump-to-default (currency units)
@@ -16,7 +15,7 @@
 mod cs01;
 mod recovery01;
 
-use crate::cds_tranche::CdsTranche;
+use crate::cds_tranche::{CdsTranche, CdsTranchePricer};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -42,9 +41,6 @@ pub(crate) fn register_cds_tranche_metrics(
             (JumpToDefault, JumpToDefaultCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-        ],
-        custom: [
-            ("model_upfront", ModelUpfrontCalculator),
         ]
     }
     Ok(())
@@ -60,7 +56,7 @@ pub(crate) struct Correlation01Calculator;
 impl MetricCalculator for Correlation01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let tranche: &CdsTranche = context.instrument_as()?;
-        tranche.correlation_delta(&context.curves, context.as_of)
+        CdsTranchePricer::new().calculate_correlation_delta(tranche, &context.curves, context.as_of)
     }
 }
 
@@ -74,7 +70,7 @@ impl MetricCalculator for ExpectedLossCalculator {
         let tranche: &CdsTranche = context.instrument_as()?;
         // Propagate error when credit index data is missing rather than silently
         // returning zero, which would mask missing market data in risk reports.
-        tranche.expected_loss(&context.curves)
+        CdsTranchePricer::new().calculate_expected_loss(tranche, &context.curves)
     }
 }
 
@@ -88,21 +84,7 @@ impl MetricCalculator for JumpToDefaultCalculator {
         let tranche: &CdsTranche = context.instrument_as()?;
         // Propagate error when credit index data is missing rather than silently
         // returning zero, which would mask missing market data in risk reports.
-        tranche.jump_to_default(&context.curves, context.as_of)
-    }
-}
-
-/// Model-upfront calculator for CDS Tranche
-///
-/// Computes the model upfront (net present value at the contractual running
-/// coupon) using the Gaussian Copula pricing engine; a missing credit index
-/// is a `NotFound` error. Distinct from the contractual `upfront` field.
-pub(crate) struct ModelUpfrontCalculator;
-
-impl MetricCalculator for ModelUpfrontCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let tranche: &CdsTranche = context.instrument_as()?;
-        tranche.model_upfront(&context.curves, context.as_of)
+        CdsTranchePricer::new().calculate_jump_to_default(tranche, &context.curves, context.as_of)
     }
 }
 
@@ -115,7 +97,7 @@ pub(crate) struct ParSpreadCalculator;
 impl MetricCalculator for ParSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let tranche: &CdsTranche = context.instrument_as()?;
-        tranche.par_spread(&context.curves, context.as_of)
+        CdsTranchePricer::new().calculate_par_spread(tranche, &context.curves, context.as_of)
     }
 }
 
@@ -129,6 +111,6 @@ impl MetricCalculator for SpreadDv01Calculator {
         let tranche: &CdsTranche = context.instrument_as()?;
         // Propagate error when credit index data is missing rather than silently
         // returning zero, which would mask missing market data in risk reports.
-        tranche.spread_dv01(&context.curves, context.as_of)
+        CdsTranchePricer::new().calculate_spread_dv01(tranche, &context.curves, context.as_of)
     }
 }

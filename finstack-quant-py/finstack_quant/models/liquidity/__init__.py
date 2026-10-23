@@ -1,11 +1,5 @@
-"""Product-independent liquidity risk and market-impact models.
-
-Examples:
---------
->>> from finstack_quant.models.liquidity import days_to_liquidate
->>> days_to_liquidate(1_000_000, 250_000, 0.20)
-20.0
-"""
+# ruff: noqa: D104
+# Module help is compiled from the matching stub and delegated below.
 
 from finstack_quant.finstack_quant import models as _models
 
@@ -40,3 +34,5 @@ __all__: list[str] = [
     "lvar_bangia",
     "roll_effective_spread",
 ]
+
+__doc__ = _models.liquidity.__doc__

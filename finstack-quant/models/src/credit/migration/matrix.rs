@@ -105,6 +105,48 @@ impl TransitionMatrix {
         })
     }
 
+    /// Construct a transition matrix with explicit ordered row and column labels.
+    ///
+    /// Labels are compared exactly; this method never reorders probabilities.
+    ///
+    /// # Arguments
+    ///
+    /// * `row_labels` - Ordered origin-state labels, one per matrix row.
+    /// * `column_labels` - Ordered destination-state labels; must equal `row_labels`.
+    /// * `data` - Flat row-major transition probabilities, one square entry per
+    ///   label pair; entries are decimal probabilities and each row sums to one.
+    /// * `horizon` - Positive finite time horizon in years covered by `data`.
+    /// * `scale` - Optional canonical state ordering. When supplied, its labels
+    ///   must equal both label vectors in order. When absent, constructs a custom
+    ///   scale from `row_labels` with the last state absorbing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MigrationError::ScaleMismatch`] if the label orders differ,
+    /// a custom-scale validation error for invalid inferred labels, or the
+    /// probability, dimension, horizon and absorbing-state errors of [`Self::new`].
+    pub fn from_labeled(
+        row_labels: &[String],
+        column_labels: &[String],
+        data: &[f64],
+        horizon: f64,
+        scale: Option<RatingScale>,
+    ) -> Result<Self, MigrationError> {
+        if row_labels != column_labels {
+            return Err(MigrationError::ScaleMismatch);
+        }
+        let scale = match scale {
+            Some(scale) => {
+                if row_labels != scale.labels() {
+                    return Err(MigrationError::ScaleMismatch);
+                }
+                scale
+            }
+            None => RatingScale::custom(row_labels.to_vec())?,
+        };
+        Self::new(scale, data, horizon)
+    }
+
     /// Transition probability P(from → to) looked up by label.
     ///
     /// # Errors

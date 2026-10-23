@@ -11,15 +11,57 @@ use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
 use finstack_quant_models::rates::clock::model_time;
+use finstack_quant_models::rates::hw1f::CouponEvent;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_models::rates::hw1f::Hw1fMcPricer;
 use finstack_quant_models::rates::hw1f::{
     initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
 };
-use finstack_quant_models::rates::hw1f::{CouponEvent, CumulativeCouponTracker};
 use finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig;
 use finstack_quant_valuations_core::pricer::InstrumentType;
 use std::sync::Arc;
+
+/// TARN coupon accumulation in fractions of notional, capped at its target.
+#[derive(Debug, Clone)]
+struct TargetTracker {
+    cumulative_coupon: f64,
+    target: f64,
+    knocked_out: bool,
+}
+
+impl TargetTracker {
+    fn new(target: f64) -> Self {
+        Self {
+            cumulative_coupon: 0.0,
+            target,
+            knocked_out: false,
+        }
+    }
+
+    fn add_coupon(&mut self, coupon: f64) -> f64 {
+        if self.knocked_out {
+            return 0.0;
+        }
+        let remaining = self.target - self.cumulative_coupon;
+        let actual = if coupon >= remaining {
+            self.knocked_out = true;
+            remaining.max(0.0)
+        } else {
+            coupon
+        };
+        self.cumulative_coupon += actual;
+        actual
+    }
+
+    fn is_knocked_out(&self) -> bool {
+        self.knocked_out
+    }
+
+    fn reset(&mut self) {
+        self.cumulative_coupon = 0.0;
+        self.knocked_out = false;
+    }
+}
 
 /// Path-local TARN payoff accumulator.
 ///
@@ -32,7 +74,7 @@ struct TarnPayoff {
     coupon_floor: f64,
     notional: f64,
     events: Arc<[CouponEvent]>,
-    tracker: CumulativeCouponTracker,
+    tracker: TargetTracker,
     discounted_pv: f64,
     next_event: usize,
     redeemed: bool,
@@ -63,7 +105,7 @@ impl TarnPayoff {
             coupon_floor,
             notional,
             events,
-            tracker: CumulativeCouponTracker::with_target(target_coupon),
+            tracker: TargetTracker::new(target_coupon),
             discounted_pv: 0.0,
             next_event: 0,
             redeemed: false,
@@ -315,8 +357,8 @@ impl Hw1fNote for Tarn {
                 }
                 event_times.push(fixing_time);
                 let tenor = inst.index_tenor.to_years();
-                let coeffs = term_forward.period_coeffs(fixing_time, tenor);
-                let discount_forward = term_forward.curve_forward(fixing_time, tenor);
+                let coeffs = term_forward.period_coeffs(fixing_time, tenor)?;
+                let discount_forward = term_forward.curve_forward(fixing_time, tenor)?;
                 let basis = finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_on_date(
                     forward_curve.as_ref(),
                     start,
@@ -573,7 +615,7 @@ mod tests {
             .expect("projection");
         let day_count = tarn.day_count;
         let ctx = DayCountContext::default();
-        let mut tracker = CumulativeCouponTracker::with_target(tarn.target_coupon);
+        let mut tracker = TargetTracker::new(tarn.target_coupon);
         let mut pv = 0.0;
         let mut redeemed = false;
 
@@ -957,5 +999,58 @@ mod tests {
                 "missing discount curve must stay NotFound, got {err:?}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod target_tracker_tests {
+    use super::*;
+
+    #[test]
+    fn tarn_knockout_exact_target() {
+        let mut tracker = TargetTracker::new(0.10);
+        let c1 = tracker.add_coupon(0.05);
+        assert!((c1 - 0.05).abs() < 1e-12);
+        assert!(!tracker.is_knocked_out());
+
+        let c2 = tracker.add_coupon(0.05);
+        assert!((c2 - 0.05).abs() < 1e-12);
+        assert!(tracker.is_knocked_out());
+    }
+
+    #[test]
+    fn tarn_knockout_mid_period() {
+        let mut tracker = TargetTracker::new(0.10);
+        let c1 = tracker.add_coupon(0.06);
+        assert!((c1 - 0.06).abs() < 1e-12);
+        assert!(!tracker.is_knocked_out());
+
+        // Next coupon would overshoot: 0.06 + 0.07 = 0.13 > 0.10
+        let c2 = tracker.add_coupon(0.07);
+        assert!((c2 - 0.04).abs() < 1e-12); // capped to remaining
+        assert!(tracker.is_knocked_out());
+    }
+
+    #[test]
+    fn tarn_no_coupon_after_knockout() {
+        let mut tracker = TargetTracker::new(0.05);
+        tracker.add_coupon(0.05);
+        assert!(tracker.is_knocked_out());
+
+        let c = tracker.add_coupon(0.03);
+        assert!((c).abs() < 1e-12);
+    }
+
+    #[test]
+    fn reset_clears_state() {
+        let mut tracker = TargetTracker::new(0.10);
+        tracker.add_coupon(0.10);
+        assert!(tracker.is_knocked_out());
+
+        tracker.reset();
+        assert!(!tracker.is_knocked_out());
+        assert!((tracker.add_coupon(0.06) - 0.06).abs() < 1e-12);
+        assert!((tracker.add_coupon(0.06) - 0.04).abs() < 1e-12);
+        assert!(tracker.is_knocked_out());
     }
 }

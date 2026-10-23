@@ -549,7 +549,8 @@ pub(crate) fn prepare_deal_simulation(
 }
 
 /// Tranche cashflows plus the deal-level accounting of one simulation run.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SimulationRun {
     /// Detailed cashflow results per tranche id.
     pub tranches: FxHashMap<String, TrancheCashflows>,

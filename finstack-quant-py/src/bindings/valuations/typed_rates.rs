@@ -23,33 +23,24 @@ use super::convert::{attributes_from_py, enum_to_py_string, money_from_py, money
 use super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
 use crate::bindings::extract::extract_rate_decimal;
 use crate::bindings::valuations::convert::money_repr;
-use crate::bindings::valuations::instruments::{
+use crate::bindings::valuations::convert::{
     decimal_from_f64, enum_from_str, instrument_expiry, opt_serde_to_py, stub_kind_from_py,
 };
 use crate::bindings::valuations::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 
-type IrsBuilder = finstack_quant_valuations::instruments::rates::irs::InterestRateSwapBuilder;
-type SwaptionBuilderInner =
-    finstack_quant_valuations::instruments::rates::swaption::SwaptionBuilder;
-type CapFloorBuilderInner =
-    finstack_quant_valuations::instruments::rates::cap_floor::CapFloorBuilder;
-type OtcMarginSpec = finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_valuations::instruments::rates::cap_floor::CapFloorBuilder;
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwapBuilder;
+use finstack_quant_valuations::instruments::rates::swaption::SwaptionBuilder;
 
 /// Render a `Decimal` as a Python float literal for reprs.
 fn decimal_f64(value: rust_decimal::Decimal) -> f64 {
     value.to_f64().unwrap_or(f64::NAN)
 }
 
-/// Typed wrapper for the Rust `InterestRateSwap` instrument.
-///
-/// Construct via ``InterestRateSwap.from_conventions`` (market conventions
-/// resolved from the rate-index registry), ``InterestRateSwap.builder()``
-/// with explicit ``FixedLegSpec`` / ``FloatLegSpec`` legs,
-/// ``InterestRateSwap.example()`` or ``InterestRateSwap.from_json``.
-/// Every public Rust field is readable as a property; ``price`` / ``metric``
-/// run the same pricer as ``price_instrument``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "InterestRateSwap",
@@ -72,60 +63,7 @@ instrument_pricing_methods!(PyInterestRateSwap, "InterestRateSwap");
 
 #[pymethods]
 impl PyInterestRateSwap {
-    /// Create a vanilla swap from registered rate-index conventions.
-    ///
-    /// Mirrors Rust ``InterestRateSwap::from_conventions`` (QuantLib
-    /// ``MakeVanillaSwap`` ergonomics): day counts, frequencies, calendars,
-    /// reset/payment lags and overnight compounding are resolved from the
-    /// convention registry entry for ``index_id``.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money | float
-    ///     Notional shared by both legs; a bare number needs ``currency``.
-    /// side : {"pay", "receive"}
-    ///     ``"pay"`` pays fixed / receives floating.
-    /// fixed_rate : float | Rate
-    ///     Fixed coupon as a decimal (``0.03`` = 3%) or a ``Rate``.
-    /// start_date : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Effective date.
-    /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Maturity date.
-    /// index_id : str
-    ///     Registered rate index (e.g. ``"USD-SOFR"``, ``"USD-SOFR-3M"``,
-    ///     ``"EUR-EURIBOR-6M"``).
-    /// discount_curve_id : str
-    ///     Discount curve identifier for both legs.
-    /// forward_curve_id : str
-    ///     Projection curve identifier for the floating leg.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``notional`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwap
-    ///     The validated swap.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``side`` is unknown, ``index_id`` is not registered, a bare
-    ///     ``notional`` has no ``currency``, or validation fails.
-    /// TypeError
-    ///     If ``fixed_rate``/``notional`` has an unsupported type or a date
-    ///     cannot be interpreted.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import InterestRateSwap
-    /// >>> swap = InterestRateSwap.from_conventions(
-    /// ...     "IRS-5Y", 10_000_000.0, "pay", 0.035, "2025-01-15", "2030-01-15",
-    /// ...     "USD-SOFR", "USD-OIS", "USD-SOFR", currency="USD",
-    /// ... )
-    /// >>> swap.float_leg.reset_lag_days
-    /// 0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.from_conventions")]
     #[staticmethod]
     #[pyo3(signature = (id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency = None))]
     #[pyo3(
@@ -164,25 +102,7 @@ impl PyInterestRateSwap {
         Ok(Self { inner })
     }
 
-    /// Canonical 5-year USD pay-fixed swap (mirrors Rust
-    /// ``InterestRateSwap::example``).
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwap
-    ///     Semi-annual 30/360 fixed vs quarterly ACT/360 ``USD-SOFR-3M`` with
-    ///     a T-2 reset lag and ``usny`` calendar.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import InterestRateSwap
-    /// >>> InterestRateSwap.example().side
-    /// 'pay'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -191,13 +111,13 @@ impl PyInterestRateSwap {
             .map_err(core_to_py)
     }
 
-    /// OTC margin (CSA / initial-margin) specification in serde form, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.margin_spec.as_ref())
     }
 
-    /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
@@ -219,76 +139,50 @@ impl PyInterestRateSwap {
 }
 
 crate::bindings::macros::py_getters!(PyInterestRateSwap |s| {
-    /// Notional shared by both legs.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    /// Swap direction for the fixed leg: ``"pay"`` or ``"receive"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.side")]
     side -> PyResult<String> = enum_to_py_string(&s.inner.side);
 
-    /// Fixed leg specification.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.fixed_leg")]
     fixed_leg -> PyFixedLegSpec = PyFixedLegSpec::from_inner(s.inner.fixed_leg.clone());
 
-    /// Floating leg specification.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.float_leg")]
     float_leg -> PyFloatLegSpec = PyFloatLegSpec::from_inner(s.inner.float_leg.clone());
 
-    /// Whether fixed coupon accrual dates use that leg's calendar and business-day convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.adjust_fixed_accrual_dates")]
     adjust_fixed_accrual_dates -> bool = s.inner.adjust_fixed_accrual_dates;
 
-    /// Whether floating coupon accrual dates use that leg's calendar and business-day convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.adjust_float_accrual_dates")]
     adjust_float_accrual_dates -> bool = s.inner.adjust_float_accrual_dates;
 });
 
-/// Fluent builder for ``InterestRateSwap``; wraps the Rust
-/// `FinancialBuilder`-generated builder (consuming setters).
-///
-/// Builders are consumed by build(); create a new builder per instrument.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "InterestRateSwapBuilder",
     skip_from_py_object
 )]
 pub struct PyInterestRateSwapBuilder {
-    inner: Option<IrsBuilder>,
+    inner: Option<InterestRateSwapBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
 #[pymethods]
 impl PyInterestRateSwapBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the swap.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwapBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: IrsBuilder| b
-            .id(InstrumentId::new(value.to_string())))
+        builder_set!(
+            slf,
+            id,
+            format!("{value:?}"),
+            |b: InterestRateSwapBuilder| b.id(InstrumentId::new(value.to_string()))
+        )
     }
 
-    /// Set the notional (both legs).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float
-    ///     Notional amount shared by both legs; a bare number needs ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``value`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwapBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a bare number is given without ``currency``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.notional")]
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn notional<'py>(
@@ -297,78 +191,55 @@ impl PyInterestRateSwapBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        builder_set!(slf, notional, money_repr(money), |b: IrsBuilder| b
-            .notional(money))
+        builder_set!(
+            slf,
+            notional,
+            money_repr(money),
+            |b: InterestRateSwapBuilder| b.notional(money)
+        )
     }
 
-    /// Set the swap direction: ``"pay"`` or ``"receive"`` (fixed leg).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     ``"pay"`` to pay fixed/receive floating, ``"receive"`` for the
-    ///     opposite.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwapBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized side.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.side")]
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
-        builder_set!(slf, side, format!("{value:?}"), |b: IrsBuilder| b
-            .side(side))
+        builder_set!(
+            slf,
+            side,
+            format!("{value:?}"),
+            |b: InterestRateSwapBuilder| b.side(side)
+        )
     }
 
-    /// Set the fixed leg specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : FixedLegSpec
-    ///     Fixed leg specification.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwapBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.fixed_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn fixed_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFixedLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, fixed_leg, value.__repr__(), |b: IrsBuilder| b
-            .fixed_leg(value.inner.clone()))
+        builder_set!(
+            slf,
+            fixed_leg,
+            value.__repr__(),
+            |b: InterestRateSwapBuilder| b.fixed_leg(value.inner.clone())
+        )
     }
 
-    /// Set the floating leg specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : FloatLegSpec
-    ///     Floating leg specification.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwapBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.float_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn float_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFloatLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, float_leg, value.__repr__(), |b: IrsBuilder| b
-            .float_leg(value.inner.clone()))
+        builder_set!(
+            slf,
+            float_leg,
+            value.__repr__(),
+            |b: InterestRateSwapBuilder| b.float_leg(value.inner.clone())
+        )
     }
 
-    /// Select adjustment of fixed coupon accrual dates independently of payment dates.
-    ///
-    /// # Arguments
-    /// * `value` - True applies the fixed leg's calendar and business-day convention to accrual boundaries; false (default) retains contractual dates.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.adjust_fixed_accrual_dates")]
     #[pyo3(text_signature = "($self, value)")]
     fn adjust_fixed_accrual_dates<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -378,14 +249,11 @@ impl PyInterestRateSwapBuilder {
             slf,
             adjust_fixed_accrual_dates,
             value.to_string(),
-            |b: IrsBuilder| b.adjust_fixed_accrual_dates(value)
+            |b: InterestRateSwapBuilder| b.adjust_fixed_accrual_dates(value)
         )
     }
 
-    /// Select adjustment of floating coupon accrual dates independently of payment dates.
-    ///
-    /// # Arguments
-    /// * `value` - True applies the floating leg's calendar and business-day convention to accrual boundaries; false (default) retains contractual dates.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.adjust_float_accrual_dates")]
     #[pyo3(text_signature = "($self, value)")]
     fn adjust_float_accrual_dates<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -395,26 +263,11 @@ impl PyInterestRateSwapBuilder {
             slf,
             adjust_float_accrual_dates,
             value.to_string(),
-            |b: IrsBuilder| b.adjust_float_accrual_dates(value)
+            |b: InterestRateSwapBuilder| b.adjust_float_accrual_dates(value)
         )
     }
 
-    /// Set the OTC margin (CSA / initial-margin) specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``OtcMarginSpec`` in serde form (dict or JSON string).
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwapBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as an ``OtcMarginSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.margin_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn margin_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -422,30 +275,15 @@ impl PyInterestRateSwapBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: OtcMarginSpec = spec_from_py(py, value, "margin_spec")?;
-        builder_set!(slf, margin_spec, "{...}".to_string(), |b: IrsBuilder| b
-            .margin_spec(spec))
+        builder_set!(
+            slf,
+            margin_spec,
+            "{...}".to_string(),
+            |b: InterestRateSwapBuilder| b.margin_spec(spec)
+        )
     }
 
-    /// Set instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwapBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -456,18 +294,12 @@ impl PyInterestRateSwapBuilder {
             slf,
             attributes,
             "Attributes(...)".to_string(),
-            |b: IrsBuilder| b.attributes(attrs)
+            |b: InterestRateSwapBuilder| b.attributes(attrs)
         )
     }
 }
 
-/// Typed wrapper for the Rust `Swaption` instrument.
-///
-/// Construct via ``Swaption.builder()``, ``Swaption.example()`` /
-/// ``Swaption.example()`` or ``Swaption.from_json``. Every public
-/// Rust field is readable as a property; ``get_strike`` / ``get_underlying_start_date``
-/// / ``get_underlying_maturity`` / ``forward_swap_rate`` mirror the Rust accessors and
-/// ``price`` / ``metric`` run the same pricer as ``price_instrument``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "Swaption",
@@ -490,24 +322,7 @@ instrument_pricing_methods!(PySwaption, "Swaption");
 
 #[pymethods]
 impl PySwaption {
-    /// Canonical European 1Yx5Y USD payer swaption (mirrors Rust ``Swaption::example``).
-    ///
-    /// Returns
-    /// -------
-    /// Swaption
-    ///     Cash-settled Black-vol swaption on a 3% 5-year swap, vol surface
-    ///     ``USD-SWPNVOL``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the example instrument fails validation.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Swaption
-    /// >>> Swaption.example().get_strike()
-    /// 0.03
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -517,26 +332,7 @@ impl PySwaption {
         })
     }
 
-    /// Forward swap rate of the underlying (mirrors Rust ``Swaption::forward_swap_rate``).
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context holding the discount and forward curves.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Par swap rate of the underlying as a decimal.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If a required curve is missing.
-    /// RuntimeError
-    ///     If the annuity or floating PV cannot be computed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.forward_swap_rate")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn forward_swap_rate(
         &self,
@@ -551,31 +347,31 @@ impl PySwaption {
             .map_err(core_to_py)
     }
 
-    /// Fixed strike of the underlying swap as a decimal (mirrors Rust ``get_strike``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.get_strike")]
     #[pyo3(text_signature = "($self)")]
     fn get_strike(&self) -> f64 {
         decimal_f64(self.inner.get_strike())
     }
 
-    /// Effective date of the underlying swap (mirrors Rust ``get_underlying_start_date``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.get_underlying_start_date")]
     #[pyo3(text_signature = "($self)")]
     fn get_underlying_start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.get_underlying_start_date())
     }
 
-    /// Maturity of the underlying swap (mirrors Rust ``get_underlying_maturity``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.get_underlying_maturity")]
     #[pyo3(text_signature = "($self)")]
     fn get_underlying_maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.get_underlying_maturity())
     }
 
-    /// Option expiry date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.expiry)
     }
 
-    /// SABR parameters (``alpha``, ``beta``, ``nu``, ``rho``, ``shift``) as a dict, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.sabr_params")]
     #[getter]
     fn sabr_params<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.sabr_params.as_ref())
@@ -598,82 +394,54 @@ impl PySwaption {
 }
 
 crate::bindings::macros::py_getters!(PySwaption |s| {
-    /// Option type: ``"call"`` (payer) or ``"put"`` (receiver).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.option_type")]
     option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
 
-    /// Notional of the underlying swap.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    /// Settlement method: ``"physical"`` or ``"cash"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.settlement")]
     settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
 
-    /// Cash settlement annuity method (serde string).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.cash_settlement_method")]
     cash_settlement_method -> PyResult<String> = enum_to_py_string(&s.inner.cash_settlement_method);
 
-    /// Volatility model: ``"black"`` or ``"normal"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.vol_model")]
     vol_model -> PyResult<String> = enum_to_py_string(&s.inner.vol_model);
 
-    /// Volatility surface identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
-    /// Fixed leg of the underlying swap.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.underlying_fixed_leg")]
     underlying_fixed_leg -> PyFixedLegSpec =
         PyFixedLegSpec::from_inner(s.inner.underlying_fixed_leg.clone());
 
-    /// Floating leg of the underlying swap.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.underlying_float_leg")]
     underlying_float_leg -> PyFloatLegSpec =
         PyFloatLegSpec::from_inner(s.inner.underlying_float_leg.clone());
 });
 
-/// Fluent builder for ``Swaption``; wraps the Rust
-/// `FinancialBuilder`-generated builder (consuming setters).
-///
-/// Builders are consumed by build(); create a new builder per instrument.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "SwaptionBuilder",
     skip_from_py_object
 )]
 pub struct PySwaptionBuilder {
-    inner: Option<SwaptionBuilderInner>,
+    inner: Option<SwaptionBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
 #[pymethods]
 impl PySwaptionBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the swaption.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: SwaptionBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: SwaptionBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    /// Set the option type: ``"call"`` (payer) or ``"put"`` (receiver).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"call", "put"}
-    ///     Option type of the swaption.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized option type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.option_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn option_type<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -684,28 +452,11 @@ impl PySwaptionBuilder {
             slf,
             option_type,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.option_type(option_type)
+            |b: SwaptionBuilder| b.option_type(option_type)
         )
     }
 
-    /// Set the notional amount of the underlying swap.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float
-    ///     Notional amount; a bare number needs ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``value`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a bare number is given without ``currency``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.notional")]
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn notional<'py>(
@@ -714,55 +465,22 @@ impl PySwaptionBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        builder_set!(
-            slf,
-            notional,
-            money_repr(money),
-            |b: SwaptionBuilderInner| b.notional(money)
-        )
+        builder_set!(slf, notional, money_repr(money), |b: SwaptionBuilder| b
+            .notional(money))
     }
 
-    /// Set the option expiry date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Option expiry date.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.expiry")]
     #[pyo3(text_signature = "($self, value)")]
     fn expiry<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let expiry = py_to_date(value)?;
-        builder_set!(
-            slf,
-            expiry,
-            expiry.to_string(),
-            |b: SwaptionBuilderInner| b.expiry(expiry)
-        )
+        builder_set!(slf, expiry, expiry.to_string(), |b: SwaptionBuilder| b
+            .expiry(expiry))
     }
 
-    /// Set the settlement method.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"physical", "cash"}
-    ///     Settlement method of the swaption.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized settlement method.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.settlement")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
@@ -770,29 +488,11 @@ impl PySwaptionBuilder {
             slf,
             settlement,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.settlement(settlement)
+            |b: SwaptionBuilder| b.settlement(settlement)
         )
     }
 
-    /// Set the cash settlement annuity method.
-    ///
-    /// Only affects pricing when ``settlement`` is ``"cash"``.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"collateralized_cash_price", "par_yield", "isda_par_par", "zero_coupon"}
-    ///     Cash settlement annuity method. ``"collateralized_cash_price"`` is
-    ///     the default and discounts the physical fixed-leg annuity.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized cash settlement method.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.cash_settlement_method")]
     #[pyo3(text_signature = "($self, value)")]
     fn cash_settlement_method<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -803,26 +503,11 @@ impl PySwaptionBuilder {
             slf,
             cash_settlement_method,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.cash_settlement_method(method)
+            |b: SwaptionBuilder| b.cash_settlement_method(method)
         )
     }
 
-    /// Set the volatility model.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"black", "normal"}
-    ///     Volatility model used for pricing.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized volatility model.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.vol_model")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_model<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let vol_model = enum_from_str(value, "vol_model")?;
@@ -830,21 +515,11 @@ impl PySwaptionBuilder {
             slf,
             vol_model,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.vol_model(vol_model)
+            |b: SwaptionBuilder| b.vol_model(vol_model)
         )
     }
 
-    /// Set the volatility surface identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Volatility surface identifier for option pricing.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -854,21 +529,11 @@ impl PySwaptionBuilder {
             slf,
             vol_surface_id,
             format!("{value:?}"),
-            |b: SwaptionBuilderInner| b.vol_surface_id(CurveId::new(value.to_string()))
+            |b: SwaptionBuilder| b.vol_surface_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the complete fixed leg of the underlying swap.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : FixedLegSpec
-    ///     Fixed leg of the underlying swap.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.underlying_fixed_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_fixed_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -878,21 +543,11 @@ impl PySwaptionBuilder {
             slf,
             underlying_fixed_leg,
             value.__repr__(),
-            |b: SwaptionBuilderInner| b.underlying_fixed_leg(value.inner.clone())
+            |b: SwaptionBuilder| b.underlying_fixed_leg(value.inner.clone())
         )
     }
 
-    /// Set the complete floating leg of the underlying swap.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : FloatLegSpec
-    ///     Floating leg of the underlying swap.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.underlying_float_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_float_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -902,27 +557,11 @@ impl PySwaptionBuilder {
             slf,
             underlying_float_leg,
             value.__repr__(),
-            |b: SwaptionBuilderInner| b.underlying_float_leg(value.inner.clone())
+            |b: SwaptionBuilder| b.underlying_float_leg(value.inner.clone())
         )
     }
 
-    /// Set the SABR volatility model parameters.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     SABR parameters with fields ``alpha``, ``beta``, ``nu``, ``rho``
-    ///     and optional ``shift`` (dict or JSON string).
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as SABR parameters.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.sabr_params")]
     #[pyo3(text_signature = "($self, value)")]
     fn sabr_params<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -935,30 +574,11 @@ impl PySwaptionBuilder {
             slf,
             sabr_params,
             "{...}".to_string(),
-            |b: SwaptionBuilderInner| b.sabr_params(sabr_params)
+            |b: SwaptionBuilder| b.sabr_params(sabr_params)
         )
     }
 
-    /// Set instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -969,16 +589,12 @@ impl PySwaptionBuilder {
             slf,
             attributes,
             "Attributes(...)".to_string(),
-            |b: SwaptionBuilderInner| b.attributes(attrs)
+            |b: SwaptionBuilder| b.attributes(attrs)
         )
     }
 }
 
-/// Typed wrapper for the Rust `CapFloor` instrument.
-///
-/// Construct via ``CapFloor.builder()``, ``CapFloor.example()`` or
-/// ``CapFloor.from_json``. Every public Rust field is readable as a property;
-/// ``price`` / ``metric`` run the same pricer as ``price_instrument``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CapFloor",
@@ -1001,24 +617,7 @@ instrument_pricing_methods!(PyCapFloor, "CapFloor");
 
 #[pymethods]
 impl PyCapFloor {
-    /// Canonical 5-year USD 3% cap (mirrors Rust ``CapFloor::example``).
-    ///
-    /// Returns
-    /// -------
-    /// CapFloor
-    ///     Quarterly ACT/360 cap on ``USD-SOFR-3M`` discounted on ``USD-OIS``
-    ///     with vol surface ``USD-CAPFLOOR-VOL``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CapFloor
-    /// >>> CapFloor.example().strike
-    /// 0.03
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -1027,25 +626,25 @@ impl PyCapFloor {
             .map_err(core_to_py)
     }
 
-    /// Start date of the underlying period.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.start_date")]
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start_date)
     }
 
-    /// End date of the underlying period.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Overnight coupon convention in serde form, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.overnight_coupon")]
     #[getter]
     fn overnight_coupon<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.overnight_coupon.as_ref())
     }
 
-    /// Dated premium ``(payment_date, Money)`` or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.premium")]
     #[getter]
     fn premium<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -1054,7 +653,7 @@ impl PyCapFloor {
             .transpose()
     }
 
-    /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
@@ -1077,107 +676,77 @@ impl PyCapFloor {
 }
 
 crate::bindings::macros::py_getters!(PyCapFloor |s| {
-    /// Option type: ``"cap"``, ``"floor"``, ``"caplet"`` or ``"floorlet"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.rate_option_type")]
     rate_option_type -> PyResult<String> = enum_to_py_string(&s.inner.rate_option_type);
 
-    /// Notional amount.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    /// Strike as a decimal rate.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.strike")]
     strike -> f64 = decimal_f64(s.inner.strike);
 
-    /// Contractual margin added to the index, in basis points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.spread_bp")]
     spread_bp -> f64 = decimal_f64(s.inner.spread_bp);
 
-    /// Payment frequency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    /// Accrual day-count convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    /// Stub rule.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    /// Business day convention (serde string).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    /// Holiday calendar identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    /// Exercise style (serde string, e.g. ``"european"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.exercise_style")]
     exercise_style -> PyResult<String> = enum_to_py_string(&s.inner.exercise_style);
 
-    /// Settlement type (serde string, e.g. ``"cash"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.settlement")]
     settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Forward curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.forward_curve_id")]
     forward_curve_id -> String = s.inner.forward_curve_id.to_string();
 
-    /// Volatility surface identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
-    /// Volatility convention: ``"lognormal"``, ``"shifted_lognormal"``, ``"normal"`` or ``"auto"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.vol_type")]
     vol_type -> PyResult<String> = enum_to_py_string(&s.inner.vol_type);
 
-    /// Displacement shift for shifted-lognormal pricing.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.vol_shift")]
     vol_shift -> f64 = s.inner.vol_shift;
 });
 
-/// Fluent builder for ``CapFloor``; wraps the Rust
-/// `FinancialBuilder`-generated builder (consuming setters).
-///
-/// Builders are consumed by build(); create a new builder per instrument.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CapFloorBuilder",
     skip_from_py_object
 )]
 pub struct PyCapFloorBuilder {
-    inner: Option<CapFloorBuilderInner>,
+    inner: Option<CapFloorBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
 #[pymethods]
 impl PyCapFloorBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the cap/floor.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: CapFloorBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: CapFloorBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    /// Set the option type.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"cap", "floor", "caplet", "floorlet"}
-    ///     Option type of the instrument: ``"cap"``/``"floor"`` for a series
-    ///     of caplets/floorlets, or ``"caplet"``/``"floorlet"`` for a single
-    ///     period.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized option type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.rate_option_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn rate_option_type<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1188,28 +757,11 @@ impl PyCapFloorBuilder {
             slf,
             rate_option_type,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.rate_option_type(rate_option_type)
+            |b: CapFloorBuilder| b.rate_option_type(rate_option_type)
         )
     }
 
-    /// Set the notional amount.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float
-    ///     Notional amount; a bare number needs ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``value`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a bare number is given without ``currency``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.notional")]
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn notional<'py>(
@@ -1218,32 +770,11 @@ impl PyCapFloorBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        builder_set!(
-            slf,
-            notional,
-            money_repr(money),
-            |b: CapFloorBuilderInner| b.notional(money)
-        )
+        builder_set!(slf, notional, money_repr(money), |b: CapFloorBuilder| b
+            .notional(money))
     }
 
-    /// Set the strike.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float | Rate
-    ///     Strike as a decimal (``0.05`` = 5%) or a ``Rate``.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not finite.
-    /// TypeError
-    ///     If ``value`` is neither a number nor a ``Rate``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.strike")]
     #[pyo3(text_signature = "($self, value)")]
     fn strike<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1251,33 +782,11 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let strike = extract_rate_decimal(value, "strike")?;
         let strike = decimal_from_f64(strike, "strike")?;
-        builder_set!(
-            slf,
-            strike,
-            strike.to_string(),
-            |b: CapFloorBuilderInner| b.strike(strike)
-        )
+        builder_set!(slf, strike, strike.to_string(), |b: CapFloorBuilder| b
+            .strike(strike))
     }
 
-    /// Set the contractual margin added to the referenced rate.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float | Bps
-    ///     Margin in basis points (``10`` = 10bp) or a ``Bps``, added after
-    ///     projecting the index.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not finite.
-    /// TypeError
-    ///     If ``value`` is neither a number nor a ``Bps``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.spread_bp")]
     #[pyo3(text_signature = "($self, value)")]
     fn spread_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1289,34 +798,11 @@ impl PyCapFloorBuilder {
             slf,
             spread_bp,
             spread_bp.to_string(),
-            |b: CapFloorBuilderInner| b.spread_bp(spread_bp)
+            |b: CapFloorBuilder| b.spread_bp(spread_bp)
         )
     }
 
-    /// Set the dated premium paid by the cap/floor holder.
-    ///
-    /// Parameters
-    /// ----------
-    /// payment_date : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Contractual premium payment date. Payments on or before the valuation
-    ///     date are treated as settled and excluded from NPV.
-    /// amount : Money | float
-    ///     Non-negative premium outflow in the notional currency; a bare
-    ///     number needs ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``amount`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``payment_date`` cannot be converted to a date, a bare amount
-    ///     has no ``currency``, or the builder was already consumed. Premium
-    ///     amount and currency validation occurs in ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.premium")]
     #[pyo3(signature = (payment_date, amount, currency = None))]
     #[pyo3(text_signature = "($self, payment_date, amount, currency=None)")]
     fn premium<'py>(
@@ -1331,21 +817,11 @@ impl PyCapFloorBuilder {
             slf,
             premium,
             format!("({payment_date}, {})", money_repr(amount)),
-            |b: CapFloorBuilderInner| b.premium((payment_date, amount))
+            |b: CapFloorBuilder| b.premium((payment_date, amount))
         )
     }
 
-    /// Set the start date of the underlying period.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Start date of the underlying period.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.start_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn start_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1356,81 +832,33 @@ impl PyCapFloorBuilder {
             slf,
             start_date,
             start_date.to_string(),
-            |b: CapFloorBuilderInner| b.start_date(start_date)
+            |b: CapFloorBuilder| b.start_date(start_date)
         )
     }
 
-    /// Set the end date of the underlying period.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     End date of the underlying period.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let maturity = py_to_date(value)?;
-        builder_set!(
-            slf,
-            maturity,
-            maturity.to_string(),
-            |b: CapFloorBuilderInner| b.maturity(maturity)
-        )
+        builder_set!(slf, maturity, maturity.to_string(), |b: CapFloorBuilder| b
+            .maturity(maturity))
     }
 
-    /// Set the payment frequency.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Tenor | str
-    ///     Payment frequency for caps/floors.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a string ``value`` is not a recognized tenor string.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let tenor = crate::bindings::core::dates::tenor::extract_tenor(value)?;
-        builder_set!(
-            slf,
-            frequency,
-            tenor.to_string(),
-            |b: CapFloorBuilderInner| b.frequency(tenor)
-        )
+        builder_set!(slf, frequency, tenor.to_string(), |b: CapFloorBuilder| b
+            .frequency(tenor))
     }
 
-    /// Set the day count convention.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : DayCount | str
-    ///     Day count convention.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a string ``value`` is not a recognized day-count name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1442,26 +870,11 @@ impl PyCapFloorBuilder {
             slf,
             day_count,
             day_count.to_string(),
-            |b: CapFloorBuilderInner| b.day_count(day_count)
+            |b: CapFloorBuilder| b.day_count(day_count)
         )
     }
 
-    /// Set the stub rule (default ``"short_front"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : StubKind | str
-    ///     Stub rule.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized stub name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.stub")]
     #[pyo3(text_signature = "($self, value)")]
     fn stub<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1472,26 +885,11 @@ impl PyCapFloorBuilder {
             slf,
             stub,
             format!("{:?}", enum_to_py_string(&stub).unwrap_or_default()),
-            |b: CapFloorBuilderInner| b.stub(stub)
+            |b: CapFloorBuilder| b.stub(stub)
         )
     }
 
-    /// Set the business day convention (default ``"modified_following"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Serde name of the Rust ``BusinessDayConvention``.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.business_day_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1502,21 +900,11 @@ impl PyCapFloorBuilder {
             slf,
             business_day_convention,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.business_day_convention(convention)
+            |b: CapFloorBuilder| b.business_day_convention(convention)
         )
     }
 
-    /// Set the holiday calendar identifier for schedule and roll conventions.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Holiday calendar identifier.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1526,26 +914,11 @@ impl PyCapFloorBuilder {
             slf,
             calendar_id,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.calendar_id(CalendarId::new(value.to_string()))
+            |b: CapFloorBuilder| b.calendar_id(CalendarId::new(value.to_string()))
         )
     }
 
-    /// Set the exercise style (default ``"european"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Serde name of the Rust ``ExerciseStyle``.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized exercise style.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.exercise_style")]
     #[pyo3(text_signature = "($self, value)")]
     fn exercise_style<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1556,26 +929,11 @@ impl PyCapFloorBuilder {
             slf,
             exercise_style,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.exercise_style(style)
+            |b: CapFloorBuilder| b.exercise_style(style)
         )
     }
 
-    /// Set the settlement type (default ``"cash"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Serde name of the Rust ``SettlementType``.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized settlement type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.settlement")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
@@ -1583,21 +941,11 @@ impl PyCapFloorBuilder {
             slf,
             settlement,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.settlement(settlement)
+            |b: CapFloorBuilder| b.settlement(settlement)
         )
     }
 
-    /// Set the discount curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1607,21 +955,11 @@ impl PyCapFloorBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: CapFloorBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the forward curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Forward curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.forward_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn forward_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1631,21 +969,11 @@ impl PyCapFloorBuilder {
             slf,
             forward_curve_id,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.forward_curve_id(CurveId::new(value.to_string()))
+            |b: CapFloorBuilder| b.forward_curve_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the volatility surface identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Volatility surface identifier.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1655,81 +983,26 @@ impl PyCapFloorBuilder {
             slf,
             vol_surface_id,
             format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.vol_surface_id(CurveId::new(value.to_string()))
+            |b: CapFloorBuilder| b.vol_surface_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the volatility type convention.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"lognormal", "shifted_lognormal", "normal", "auto"}
-    ///     Volatility convention. Must match the convention of the
-    ///     configured volatility surface. ``"auto"`` (the default when unset)
-    ///     resolves to ``"lognormal"``, pricing each caplet with Black-76
-    ///     where well-defined and falling back to an equivalent Bachelier
-    ///     price otherwise (e.g. a cap whose schedule crosses a zero forward
-    ///     rate).
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized volatility type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.vol_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_type<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let vol_type = enum_from_str(value, "vol_type")?;
-        builder_set!(
-            slf,
-            vol_type,
-            format!("{value:?}"),
-            |b: CapFloorBuilderInner| b.vol_type(vol_type)
-        )
+        builder_set!(slf, vol_type, format!("{value:?}"), |b: CapFloorBuilder| b
+            .vol_type(vol_type))
     }
 
-    /// Set the displacement shift used for shifted-lognormal pricing.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Displacement added to forward and strike. Must be non-negative.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.vol_shift")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_shift<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            vol_shift,
-            value.to_string(),
-            |b: CapFloorBuilderInner| b.vol_shift(value)
-        )
+        builder_set!(slf, vol_shift, value.to_string(), |b: CapFloorBuilder| b
+            .vol_shift(value))
     }
 
-    /// Set the overnight (RFR) coupon convention for compounded caplets.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``OvernightCouponConvention`` in serde form, e.g.
-    ///     ``{"compounding": {"compounded_in_arrears": {"lookback_days": 0}},
-    ///     "payment_lag_days": 2}``.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as an ``OvernightCouponConvention``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.overnight_coupon")]
     #[pyo3(text_signature = "($self, value)")]
     fn overnight_coupon<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1742,30 +1015,11 @@ impl PyCapFloorBuilder {
             slf,
             overnight_coupon,
             "{...}".to_string(),
-            |b: CapFloorBuilderInner| b.overnight_coupon(convention)
+            |b: CapFloorBuilder| b.overnight_coupon(convention)
         )
     }
 
-    /// Set instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloorBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1776,7 +1030,7 @@ impl PyCapFloorBuilder {
             slf,
             attributes,
             "Attributes(...)".to_string(),
-            |b: CapFloorBuilderInner| b.attributes(attrs)
+            |b: CapFloorBuilder| b.attributes(attrs)
         )
     }
 }

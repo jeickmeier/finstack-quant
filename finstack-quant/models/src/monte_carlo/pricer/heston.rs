@@ -119,7 +119,10 @@ pub fn price_heston(
     let time_grid = TimeGrid::uniform(expiry, num_steps)?;
     let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid).parallel(use_parallel));
     let rng = PhiloxRng::new(seed);
-    let process = HestonProcess::with_params(rate, div_yield, kappa, theta, vol_of_vol, rho, v0)?;
+    let process = crate::closed_form::HestonPricingParams::new(
+        rate, div_yield, kappa, theta, vol_of_vol, rho, v0,
+    )
+    .map(HestonProcess::new)?;
     let disc = QeHeston::new();
     let initial_state = [spot, v0];
     let discount_factor = flat_discount_factor(rate, expiry)?;

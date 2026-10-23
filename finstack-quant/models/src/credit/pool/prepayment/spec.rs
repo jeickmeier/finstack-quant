@@ -6,7 +6,6 @@
 use super::{
     FactorCorrelatedPrepay, RegimeSwitchingPrepay, RichardRollPrepay, StochasticPrepayment,
 };
-use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
 /// Stochastic prepayment model specification.
@@ -93,11 +92,6 @@ impl Default for StochasticPrepaySpec {
 }
 
 impl StochasticPrepaySpec {
-    /// Create a deterministic (non-stochastic) prepayment spec.
-    pub fn deterministic(spec: PrepaymentModelSpec) -> Self {
-        StochasticPrepaySpec::Deterministic(spec)
-    }
-
     /// Create a factor-correlated prepayment spec.
     pub fn factor_correlated(
         base_spec: PrepaymentModelSpec,
@@ -225,26 +219,6 @@ impl StochasticPrepaySpec {
             | StochasticPrepaySpec::RegimeSwitching { factor_loading, .. } => Some(*factor_loading),
         }
     }
-
-    /// Get the base SMM (single monthly mortality rate) for this specification.
-    ///
-    /// Returns the first-month baseline SMM before factor shocks are applied. A
-    /// regime-switching model starts in its low regime at origination; use
-    /// [`StochasticPrepayment::expected_smm`] for its seasoning-dependent mean.
-    pub fn base_smm(&self) -> f64 {
-        match self {
-            StochasticPrepaySpec::Deterministic(spec)
-            | StochasticPrepaySpec::FactorCorrelated {
-                base_spec: spec, ..
-            } => spec.smm(1).unwrap_or(0.0),
-            StochasticPrepaySpec::RichardRoll { base_cpr, .. } => {
-                annual_to_monthly_clamped(*base_cpr)
-            }
-            StochasticPrepaySpec::RegimeSwitching { low_cpr, .. } => {
-                annual_to_monthly_clamped(*low_cpr)
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -297,7 +271,7 @@ mod tests {
 
     #[test]
     fn test_deterministic_build_returns_none() {
-        let spec = StochasticPrepaySpec::deterministic(PrepaymentModelSpec::psa(1.0));
+        let spec = StochasticPrepaySpec::Deterministic(PrepaymentModelSpec::psa(1.0));
 
         assert!(!spec.is_stochastic());
         assert!(spec.build().is_none());

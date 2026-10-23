@@ -69,7 +69,7 @@ wire_methods!(
     PyFeeBase,
     FeeBase,
     "FeeBase",
-    stub = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder"
 );
 
 #[pymethods]
@@ -129,7 +129,7 @@ wire_methods!(
     PyFeeSpec,
     FeeSpec,
     "FeeSpec",
-    stub = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder"
 );
 
 #[pymethods]

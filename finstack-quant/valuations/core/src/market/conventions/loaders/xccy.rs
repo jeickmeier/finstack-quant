@@ -68,7 +68,7 @@ pub(crate) fn load_registry() -> Result<FxHashMap<XccyConventionId, XccyConventi
         json,
         "XCCY",
         XccyConventionId::new,
-        |rec: &XccyConventionRecord| rec.clone().into_conventions(),
+        XccyConventionRecord::into_conventions,
     )
 }
 

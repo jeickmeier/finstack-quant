@@ -1371,7 +1371,9 @@ fn test_engine_antithetic_records_simulated_path_count() {
     let requested = 1024usize;
     let grid = TimeGrid::uniform(0.5, 16).expect("valid grid");
     let payoff = European::new(OptionType::Call, 100.0, 0.5, 16);
-    let process = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid gbm");
+    let process = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2)
+        .map(GbmProcess::new)
+        .expect("valid gbm");
     let disc = ExactGbm::new();
     let discount = (-0.05_f64 * 0.5).exp();
 
@@ -1456,9 +1458,13 @@ mod correlation_regression {
         let discount = (-0.03_f64).exp();
 
         let h_neg =
-            HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+            crate::closed_form::HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04)
+                .map(HestonProcess::new)
+                .expect("valid");
         let h_pos =
-            HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, 0.7, 0.04).expect("valid");
+            crate::closed_form::HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, 0.7, 0.04)
+                .map(HestonProcess::new)
+                .expect("valid");
 
         let est_neg = engine
             .price(
@@ -1508,7 +1514,9 @@ mod correlation_regression {
         let payoff = European::new(OptionType::Call, 100.0, 1.0, 100);
         let discount = (-0.03_f64).exp();
 
-        let h0 = HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, 0.0, 0.04).expect("valid");
+        let h0 = crate::closed_form::HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, 0.0, 0.04)
+            .map(HestonProcess::new)
+            .expect("valid");
 
         let euler = config
             .price(
@@ -1552,7 +1560,6 @@ mod correlation_regression {
     /// cheaper spread call.
     #[test]
     fn multi_gbm_spread_responds_to_rho_under_engine_cholesky() {
-        use crate::monte_carlo::traits::state_keys;
         use finstack_quant_core::money::Money;
 
         #[derive(Clone, Default)]
@@ -1565,8 +1572,8 @@ mod correlation_regression {
         impl crate::monte_carlo::traits::Payoff for SpreadCall {
             fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
                 if state.step == self.maturity_idx {
-                    self.s0 = state.get(state_keys::indexed_spot(0)).unwrap_or(0.0);
-                    self.s1 = state.get(state_keys::indexed_spot(1)).unwrap_or(0.0);
+                    self.s0 = state.get("spot_0").unwrap_or(0.0);
+                    self.s1 = state.get("spot_1").unwrap_or(0.0);
                 }
                 Ok(())
             }
@@ -1664,5 +1671,49 @@ mod correlation_regression {
             v_exact_low.mean.amount(),
             tol
         );
+    }
+}
+
+#[test]
+fn hull_white_capture_uses_metadata_for_rate_slot_zero() {
+    use crate::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
+    use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
+    use crate::monte_carlo::rng::philox::PhiloxRng;
+    use crate::monte_carlo::traits::ProcessMetadata;
+
+    let process =
+        HullWhite1FProcess::new(HullWhite1FParams::new(0.1, 0.01, 0.03).expect("valid rates"));
+    let engine = McEngine::new(
+        McEngineConfig::uniform(2, 1.0, 2)
+            .expect("grid")
+            .parallel(false)
+            .path_capture(PathCaptureConfig::all()),
+    );
+    let result = engine
+        .price_with_capture(
+            &PhiloxRng::new(42),
+            &process,
+            &ExactHullWhite1F::new(),
+            &[0.03],
+            &DummyPayoff,
+            Currency::USD,
+            1.0,
+            process.metadata(),
+        )
+        .expect("captured rates");
+    let dataset = result.paths.expect("capture enabled");
+    let rate_index = dataset
+        .process_params
+        .factor_names
+        .iter()
+        .position(|name| name == "short_rate")
+        .expect("rate metadata");
+    assert_eq!(rate_index, 0);
+    for path in &dataset.paths {
+        assert_eq!(path.points[0].state[rate_index], 0.03);
+        for point in &path.points {
+            assert_eq!(point.state.len(), 1);
+            assert!(point.state[rate_index].is_finite());
+        }
     }
 }

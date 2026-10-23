@@ -31,13 +31,10 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_models::monte_carlo::process::cir::CirProcess;
 use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
-use finstack_quant_valuations_fixed_income::revolving_credit::pricing::path_generator::build_credit_spread_params;
-use finstack_quant_valuations_fixed_income::revolving_credit::pricing::unified::{
-    DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR,
-};
 use finstack_quant_valuations_fixed_income::revolving_credit::{
-    CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, StochasticUtilizationSpec,
-    UtilizationProcess,
+    build_credit_spread_params, CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit,
+    StochasticUtilizationSpec, UtilizationProcess, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL,
+    DEFAULT_UTIL_CREDIT_CORR,
 };
 use rust_decimal::prelude::ToPrimitive;
 

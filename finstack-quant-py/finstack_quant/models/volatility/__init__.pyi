@@ -25,6 +25,7 @@ __all__ = [
     "ArbitrageReport",
     "LocalVolSurface",
     "SabrCalibrator",
+    "SabrCalibrationOutcome",
     "SabrParameters",
     "SabrSmile",
     "SviParams",
@@ -524,7 +525,21 @@ class SabrParameters:
         ...
 
     def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
 
 class SabrSmile:
     """
@@ -836,6 +851,143 @@ class SabrSmile:
         """
         ...
 
+class SabrCalibrationOutcome:
+    """Calibrated SABR parameters and deterministic solver diagnostics.
+
+    Produced by :meth:`SabrCalibrator.calibrate`; it has no public constructor.
+    Property access returns Rust-owned fit results and does not raise domain errors.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.volatility import SabrCalibrator, SabrParameters
+    >>> params = SabrParameters(0.02, 0.5, 0.4, -0.3)
+    >>> strikes = [0.02, 0.03, 0.04]
+    >>> quotes = [params.implied_vol(0.03, k, 2.0) for k in strikes]
+    >>> fit = SabrCalibrator().calibrate(0.03, strikes, quotes, 2.0, 0.5)
+    >>> isinstance(fit, SabrCalibrationOutcome) and fit.max_relative_quote_error <= 1e-4
+    True
+    """
+
+    @property
+    def parameters(self) -> SabrParameters:
+        """Calibrated parameters with the requested beta and resolved shift.
+
+        Returns
+        -------
+        SabrParameters
+            Calibrated parameters with the requested beta and resolved shift.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored calibration result.
+        """
+        ...
+
+    @property
+    def total_iterations(self) -> int:
+        """Total solver iterations across all attempted starts.
+
+        Returns
+        -------
+        int
+            Total solver iterations across all attempted starts.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored calibration result.
+        """
+        ...
+
+    @property
+    def winning_iterations(self) -> int:
+        """Solver iterations consumed by the selected start.
+
+        Returns
+        -------
+        int
+            Solver iterations consumed by the selected start.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored calibration result.
+        """
+        ...
+
+    @property
+    def residual_evaluations(self) -> int:
+        """Total objective residual evaluations across attempted starts.
+
+        Returns
+        -------
+        int
+            Total objective residual evaluations across attempted starts.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored calibration result.
+        """
+        ...
+
+    @property
+    def winning_start(self) -> list[float]:
+        """Initial alpha, nu, and rho for the selected start, in that order.
+
+        Returns
+        -------
+        list[float]
+            Initial alpha, nu, and rho for the selected start, in that order.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored calibration result.
+        """
+        ...
+
+    @property
+    def quote_errors(self) -> list[float]:
+        """Signed model minus market quote errors in decimal normal or Black volatility units.
+
+        Returns
+        -------
+        list[float]
+            Signed model minus market quote errors in decimal normal or Black volatility units.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored calibration result.
+        """
+        ...
+
+    @property
+    def max_relative_quote_error(self) -> float:
+        """Maximum absolute quote error divided by its positive market quote.
+
+        Returns
+        -------
+        float
+            Maximum absolute quote error divided by its positive market quote.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored calibration result.
+        """
+        ...
+
+    @property
+    def parameters_at_bounds(self) -> list[str]:
+        """Names of calibrated parameters on their configured solver bounds.
+
+        Returns
+        -------
+        list[str]
+            Names of calibrated parameters on their configured solver bounds.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored calibration result.
+        """
+        ...
+
 class SabrCalibrator:
     """
     SABR calibrator (Levenberg-Marquardt with beta fixed).
@@ -942,7 +1094,7 @@ class SabrCalibrator:
         market_vols: list[float],
         t: float,
         beta: float,
-    ) -> SabrParameters:
+    ) -> SabrCalibrationOutcome:
         """
         Fit ``(alpha, nu, rho)`` to market vols with ``beta`` fixed.
 
@@ -962,15 +1114,14 @@ class SabrCalibrator:
 
         Returns
         -------
-        SabrParameters
-            Calibrated :class:`SabrParameters`.
+        SabrCalibrationOutcome
+            Calibrated parameters, signed quote errors and deterministic solver diagnostics.
 
         Raises
         ------
         ValueError
-            If inputs or settings are invalid.
-        RuntimeError
-            If no fitted candidate satisfies the per-quote error budget.
+            If inputs or settings are invalid, or no fitted candidate satisfies
+            the configured per-quote error budget.
         """
         ...
 
@@ -1933,7 +2084,21 @@ class ArbitrageReport:
         """
         ...
 
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
 
 def check_butterfly_grid(
     strikes: list[float],
@@ -2508,6 +2673,22 @@ class LocalVolSurface:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class SviParams:
     """
     Gatheral SVI total-variance smile parameters.
@@ -2736,7 +2917,21 @@ class SviParams:
         """
         ...
 
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
 
 def calibrate_svi(
     strikes: list[float],

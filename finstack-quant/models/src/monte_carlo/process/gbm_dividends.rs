@@ -122,21 +122,6 @@ impl GbmWithDividends {
         Ok(Self { params, dividends })
     }
 
-    /// Create with explicit parameters and dividends.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any parameter is invalid (see [`GbmParams::new`]) or
-    /// if dividend times are non-finite or not strictly increasing.
-    pub fn with_params(
-        r: f64,
-        q: f64,
-        sigma: f64,
-        dividends: Vec<(f64, Dividend)>,
-    ) -> finstack_quant_core::Result<Self> {
-        Self::new(GbmParams::new(r, q, sigma)?, dividends)
-    }
-
     /// Get the base GBM parameters.
     pub fn params(&self) -> &GbmParams {
         &self.params

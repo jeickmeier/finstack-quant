@@ -54,7 +54,6 @@ use num_complex::Complex64;
 use std::f64::consts::PI;
 
 use finstack_quant_core::math::special_functions::ln_gamma;
-use std::ops::Deref;
 
 use super::heston::HestonParams;
 
@@ -290,14 +289,6 @@ pub struct RoughHestonFourierParams {
     pub hurst: f64,
 }
 
-impl Deref for RoughHestonFourierParams {
-    type Target = HestonParams;
-
-    fn deref(&self) -> &Self::Target {
-        &self.model
-    }
-}
-
 /// Raw deserialization state of [`RoughHestonFourierParams`].
 ///
 /// Mirrors the serialized (flat) field layout exactly; conversion runs
@@ -451,9 +442,9 @@ impl RoughHestonFourierParams {
         solver: &FractionalRiccatiSolver,
         u: Complex64,
     ) -> Option<Complex64> {
-        let trajectory = solver.solve_d(u, self.kappa, self.sigma_v, self.rho);
-        let exponent = solver.solve_c(&trajectory, self.kappa, self.theta)
-            + solver.fractional_integral_d(&trajectory) * self.v0;
+        let trajectory = solver.solve_d(u, self.model.kappa, self.model.sigma_v, self.model.rho);
+        let exponent = solver.solve_c(&trajectory, self.model.kappa, self.model.theta)
+            + solver.fractional_integral_d(&trajectory) * self.model.v0;
         if !exponent.is_finite() || exponent.re > EXPONENT_REAL_LIMIT {
             return None;
         }

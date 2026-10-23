@@ -1,14 +1,5 @@
-"""Correlation infrastructure: copulas, factor models, recovery models.
-
-Bindings for the ``finstack_quant_models::correlation`` Rust module.
-
-Examples:
---------
->>> from finstack_quant.models.correlation import correlation_bounds
->>> tuple(round(value, 3) for value in correlation_bounds(0.05, 0.03))
-(-0.04, 0.767)
-
-"""
+# ruff: noqa: D104
+# Module help is compiled from the matching stub and delegated below.
 
 from finstack_quant.finstack_quant import models as _models
 
@@ -57,3 +48,5 @@ __all__: list[str] = [
     "simulate_portfolio_loss",
     "validate_correlation_matrix",
 ]
+
+__doc__ = _models.correlation.__doc__

@@ -1897,15 +1897,32 @@ export type StochasticPrepaySpec =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
-      factor_correlation: number;
-      mean_recovery: number;
+      /**
+       * Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress.
+       */
+      factor_correlation: CorrelationWire;
+      /**
+       * Zero-total-shock recovery location in [0, 1], not the unconditional mean.
+       */
+      mean_recovery: ClosedUnitIntervalF64Wire;
+      /**
+       * Local shock scale in [0, 0.5], not realized recovery standard deviation.
+       */
       recovery_volatility: number;
       type: "market_correlated";
     };
+/**
+ * Finite JSON number in the closed interval `[0, 1]`.
+ */
+export type ClosedUnitIntervalF64Wire = number;
+/**
+ * Finite correlation coefficient in the closed interval `[-1, 1]`.
+ */
+export type CorrelationWire = number;
 /**
  * Final payoff type for autocallable products.
  */
@@ -2583,17 +2600,9 @@ export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "
  */
 export type PositiveF64Wire = number;
 /**
- * Finite JSON number in the closed interval `[0, 1]`.
- */
-export type ClosedUnitIntervalF64Wire = number;
-/**
  * Finite JSON number greater than or equal to zero.
  */
 export type NonNegativeF64Wire = number;
-/**
- * Finite correlation coefficient in the closed interval `[-1, 1]`.
- */
-export type CorrelationWire = number;
 /**
  * Settlement type for options
  */
@@ -5084,16 +5093,6 @@ export interface OptimalToggle {
    */
   asset_vol: number;
   /**
-   * Equity holder discount rate applied to the nested-MC payoff.
-   *
-   * Note: the nested simulation drifts under the risk-neutral measure
-   * (`risk_free_rate`) but discounts here, so the intermediate equity
-   * figures are decision inputs, not measure-consistent prices. The
-   * rate cancels in the cash-vs-PIK comparison and does not bias the
-   * elected branch.
-   */
-  equity_discount_rate: number;
-  /**
    * Forward-looking horizon in years for the nested simulation (e.g. 1.0).
    */
   horizon: number;
@@ -5106,7 +5105,6 @@ export interface OptimalToggle {
    * Risk-free rate (continuous) used as drift in the nested simulation.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Metric-time pricing and finite-difference configuration.
@@ -13721,6 +13719,8 @@ export interface QuantoOption {
  *
  * For American exercise, the model requires a spot price to build the binomial tree.
  * `spot_id` must identify an observed spot for early exercise and Monte Carlo.
+ * A numeric scalar is in the underlying currency; a Money scalar must carry
+ * that same currency.
  * The commodity forward is never substituted for the spot underlying.
  * The convenience yield (cost-of-carry) is implied from the forward/spot ratio:
  * `q = r - ln(F/S)/T`
@@ -13820,6 +13820,7 @@ export interface CommoditySpotOption {
   settlement: SettlementType;
   /**
    * Optional spot price ID (for spot-based pricing and American options).
+   * Numeric prices use the underlying currency; Money prices must match it.
    */
   spot_id?: Id | null;
   /**
@@ -19055,9 +19056,7 @@ export interface SimulatedPath {
  * # State Vector Layout
  *
  * The `state` vector contains the raw state variables in process-defined order.
- * For simple single-asset models, the crate's internal `state_indices`
- * constants provide common aliases.
- * For multi-asset or process-specific layouts, consult
+ * Interpret every layout using
  * [`PathDataset::process_params.factor_names`](PathDataset::process_params) or
  * [`PathDataset::state_var_keys`].
  */
@@ -19079,7 +19078,7 @@ export interface PathPoint {
   payoff_value?: number | null;
   /**
    * State variables at this point (spot, variance, rate, etc.)
-   * Indexed by position - see `state_indices` for standard layout
+   * Positions follow `PathDataset::process_params.factor_names`.
    */
   state: number[];
   /**
@@ -20041,6 +20040,57 @@ export interface ScenarioTable {
    * Identifier of the tranche evaluated.
    */
   tranche_id: string;
+}
+/**
+ * Tranche cashflows and deal accounting from one deterministic simulation.
+ */
+export interface SimulationRun {
+  /**
+   * Reserve, draw-funding and reserve-interest accounting.
+   */
+  diagnostics: SimulationDiagnostics;
+  /**
+   * Detailed cashflow results per tranche id.
+   */
+  tranches: {
+    [k: string]: TrancheCashflows;
+  };
+  [k: string]: unknown;
+}
+/**
+ * Inputs for the standard structured-credit registry constructor.
+ */
+export interface StandardDealParams {
+  /**
+   * Optional holiday calendar for payment-date adjustment. Construction accepts
+   * `None`; simulation requires a calendar before generating payment dates.
+   */
+  calendar_id?: Id | null;
+  /**
+   * Contractual deal inception; the first accrual boundary is one registry
+   * payment period later (capped at maturity).
+   */
+  closing_date: DateWire;
+  /**
+   * Market-context discount curve used for tranche PV.
+   */
+  discount_curve_id: Id;
+  /**
+   * Stable deal identifier used for pricing results and risk labels.
+   */
+  id: Id;
+  /**
+   * Legal final date, strictly after closing.
+   */
+  maturity: DateWire;
+  /**
+   * Current collateral balances and contractual asset terms, in the pool currency.
+   */
+  pool: AssetPool;
+  /**
+   * Capital structure, current note balances and coupon terms.
+   */
+  tranches: TrancheStructure;
 }
 /**
  * Market conventions of one swaption market.
