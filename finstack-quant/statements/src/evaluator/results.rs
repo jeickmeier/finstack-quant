@@ -187,8 +187,6 @@ impl Default for EvalStats {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-// Distinct from `finstack_quant_core::config::NumericMode`, which carries a
-// different value set.
 #[cfg_attr(feature = "json-schema", schemars(rename = "StatementNumericMode"))]
 pub enum NumericMode {
     /// f64 floating-point mode (current default)

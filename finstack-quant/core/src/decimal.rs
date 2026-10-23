@@ -1,9 +1,10 @@
 //! Decimal conversion utilities.
 //!
-//! Canonical `f64 ↔ Decimal` helpers that propagate errors on non-finite or
-//! unrepresentable values rather than silently collapsing to zero. All
-//! production code that converts raw `f64` user input to `Decimal` (or back)
-//! should use these helpers; trusted literals in tests and examples can use
+//! Decimal-text parsing and the `f64 -> Decimal` conversion. Both propagate
+//! errors on non-finite or unrepresentable values rather than silently
+//! collapsing to zero. All production code that converts raw `f64` user input
+//! or decimal text to `Decimal` should use these helpers; trusted literals in
+//! tests and examples can use
 //! `Decimal::from_f64_retain(...)` or the `dec!` macro.
 
 use crate::{Error, InputError, NonFiniteKind, Result};

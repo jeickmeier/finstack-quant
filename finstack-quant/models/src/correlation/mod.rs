@@ -12,8 +12,8 @@
 //! - [`LatentFactorSpec`]: Factor models for correlated behavior
 //! - [`simulate_portfolio_loss`]: Monte Carlo portfolio loss distribution
 //!
-//! Joint probability utilities (`CorrelatedBernoulli`, `correlation_bounds`,
-//! `joint_probabilities`) live in [`finstack_quant_core::math::probability`];
+//! Joint probability utilities (`CorrelatedBernoulli`, `correlation_bounds`)
+//! live in [`finstack_quant_core::math::probability`];
 //! matrix helpers (`validate_correlation_matrix`, `nearest_correlation`,
 //! `cholesky_correlation`) live in [`finstack_quant_core::math::linalg`].
 //! [`Error`] / [`Result`] are models-owned: they wrap core matrix failures and

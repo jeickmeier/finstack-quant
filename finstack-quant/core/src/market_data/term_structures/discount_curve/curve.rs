@@ -347,7 +347,7 @@ impl DiscountCurve {
     ///
     /// # Arguments
     /// * `date` - Target date for the zero rate
-    /// * `compounding` - Compounding convention (Continuous, Annual, Periodic(n), Simple)
+    /// * `compounding` - Compounding convention (Continuous, Periodic(n), Simple)
     ///
     /// # Mathematical Formulas
     ///
@@ -356,7 +356,7 @@ impl DiscountCurve {
     /// | Compounding | Formula | Use Case |
     /// |-------------|---------|----------|
     /// | Continuous | r = -ln(df) / t | Internal calculations, curve building |
-    /// | Annual | r = df^(-1/t) - 1 | Bond markets (UK, Europe) |
+    /// | Periodic(1) | r = df^(-1/t) - 1 | Annual: bond markets (UK, Europe) |
     /// | Periodic(n) | r = n × (df^(-1/(n×t)) - 1) | US Treasuries (n=2), corporates |
     /// | Simple | r = (1/df - 1) / t | Money market (< 1Y) |
     ///
@@ -391,7 +391,9 @@ impl DiscountCurve {
     /// ```
     ///
     /// # Errors
-    /// Returns an error if the date is before the anchor.
+    /// Propagates a failure while computing the curve day-count fraction from
+    /// the base date to `date`. A date before the base date is not an error: it
+    /// maps to a negative year fraction and the curve extrapolates.
     #[inline]
     #[must_use = "computed zero rate should not be discarded"]
     pub fn zero_rate_on_date(
@@ -411,7 +413,7 @@ impl DiscountCurve {
     /// | Convention      | Formula                          | Typical use                              |
     /// |-----------------|----------------------------------|------------------------------------------|
     /// | `Continuous`    | `r = -ln(DF) / t`                | Curve internals                          |
-    /// | `Annual`        | `r = DF^(-1/t) - 1`              | Bond-equivalent yields (Bloomberg zeros) |
+    /// | `Periodic(1)`   | `r = DF^(-1/t) - 1`              | Bond-equivalent yields (Bloomberg zeros) |
     /// | `Periodic(n)`   | `r = n · (DF^(-1/(n·t)) - 1)`    | `n = 2` US Treasury, `n = 12` monthly    |
     /// | `Simple`        | `r = (1/DF - 1) / t`             | Money markets < 1Y (SOFR, €STR, SONIA,   |
     /// |                 |                                  | deposits, T-bills); no compounding       |
@@ -423,7 +425,7 @@ impl DiscountCurve {
     ///
     /// # Arguments
     /// * `t` - Year fraction from the anchor date
-    /// * `compounding` - Compounding convention (Continuous, Annual, Periodic(n), Simple)
+    /// * `compounding` - Compounding convention (Continuous, Periodic(n), Simple)
     ///
     /// # Edge Cases
     /// - For t = 0, all compounding conventions return 0.0 (instantaneous rate is undefined)
@@ -446,9 +448,6 @@ impl DiscountCurve {
     /// assert!((curve.zero_rate(1.0, Compounding::Periodic(std::num::NonZeroU32::MIN)) - 0.0526).abs() < 0.001);
     /// // At 3M, DF = 0.99, so the simple rate = (1/0.99 - 1) / 0.25 ≈ 4.04%
     /// assert!((curve.zero_rate(0.25, Compounding::Simple) - 0.0404).abs() < 0.001);
-    /// // Periodic(1) is the annual convention
-    /// let annual = curve.zero_rate(1.0, Compounding::Periodic(1.try_into().unwrap()));
-    /// assert!((curve.zero_rate(1.0, Compounding::Periodic(std::num::NonZeroU32::MIN)) - annual).abs() < 1e-12);
     /// ```
     #[inline]
     #[must_use]

@@ -39,11 +39,11 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 |------|------------|
 | `currency::Currency` | ISO 4217 deliverable currencies, generated from `data/iso_4217.csv`; 2 bytes, numeric discriminants, case-insensitive parsing. `XXX`, `XAU`/`XAG`/`XPT`/`XPD`, and `XDR` are deliberately excluded. |
 | `money::Money` | Decimal-backed, currency-tagged amount. `checked_add`/`checked_sub` refuse to mix currencies. |
-| `money::FormatOpts` | Formatting options behind `Money::format` / `format_with`. |
+| `money::FormatOpts` | Formatting options behind `Money::format_with`. |
 | `money::fx::FxProvider` | Conversion interface. |
 | `money::fx::{FxMatrix, SimpleFxProvider}` | Concrete providers; `FxMatrix` also carries `FxMatrixState` for serialization. |
 | `money::fx::{FxConfig, FxConversionPolicy, FxPolicyMeta, FxQuery, FxRateResult}` | Policy selection and the stamped result of a conversion. |
-| `decimal::{f64_to_decimal, decimal_to_f64}` | The only sanctioned `f64 ↔ Decimal` bridge; both return `Result` instead of collapsing non-finite input to zero. |
+| `decimal::{parse_decimal, f64_to_decimal}` | Exact decimal-text parsing and the sanctioned `f64 -> Decimal` bridge; both return `Result` instead of collapsing non-finite or unrepresentable input to zero. |
 
 ### Dates, calendars, and schedules
 
@@ -89,11 +89,11 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 | `math::linalg` | Cholesky (`cholesky_decomposition`, `cholesky_correlation`), `symmetric_eigen`, correlation-matrix construction and validation. |
 | `math::interp` | `Interpolator`, `InterpStyle`, `ExtrapolationPolicy`, `ValidationPolicy` and the strategies (`LinearStrategy`, `LogLinearStrategy`, `CubicHermiteStrategy`, `MonotoneConvexStrategy`, `PiecewiseQuadraticForwardStrategy`). |
 | `math::solver` / `math::solver_multi` | `BrentSolver`; `LevenbergMarquardtSolver` and `AnalyticalDerivatives` for systems. |
-| `math::integration` | Gauss-Legendre (fixed, composite, adaptive), Gauss-Hermite, Gauss-Laguerre. |
+| `math::integration` | Gauss-Legendre (fixed, composite, adaptive), Gauss-Hermite. |
 | `math::random` | `Pcg64Rng`, `RandomNumberGenerator`, `SobolRng` (up to `MAX_SOBOL_DIMENSION` = 40), `BrownianBridge`, Poisson inversion, `box_muller_transform`. |
 | `math::distributions` / `math::probability` | Binomial and chi-squared helpers, `CorrelatedBernoulli`, `correlation_bounds`. |
 | `math::Compounding` | `Compounding` conversions between simple, periodic, and continuous rates. |
-| `math::{time_grid, piecewise, fractional}` | `TimeGrid` with `map_date_to_step`/`map_exercise_dates_to_steps`; validated left-continuous piecewise-constant curves; fractional Brownian motion kernels, fBM covariance, and Mittag-Leffler for rough-vol models. |
+| `math::{time_grid, piecewise, fractional}` | `TimeGrid` with `map_date_to_step`/`map_exercise_dates_to_steps`; validated left-continuous piecewise-constant curves; `HurstExponent` and fractional-Brownian-motion increment covariances (scalar and matrix). |
 
 ### Types, errors, and configuration
 
@@ -103,10 +103,10 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 | `types::{Id, CurveId, InstrumentId, IssuerId, IndexId, DealId, PoolId, PriceId, CalendarId, UnderlyingId}` | Phantom-typed identifiers; `#[serde(transparent)]`, so they stay plain strings on the wire. |
 | `types::CreditRating` | Neutral rating enum, parsing, ordering, and stable labels. Rating-factor calculations live in `finstack-quant-models`. |
 | `types::{Attributes, BarrierType}` | Attribute bags for matching/metadata; barrier taxonomy. |
-| `error::{Error, InputError, NonFiniteKind, Result}` | The unified error type, re-exported at the crate root. `Error` and `InputError` are `#[non_exhaustive]`; match with a wildcard arm. |
+| `{Error, ErrorKind, InputError, NonFiniteKind, Result, format_chain}` (crate root) | The unified error type, re-exported at the crate root. `Error` and `InputError` are `#[non_exhaustive]`; match with a wildcard arm. |
 | `config::{FinstackConfig, RoundingMode, RoundingPolicy, CurrencyScalePolicy, ToleranceConfig, ConfigExtensions}` | Explicit, caller-supplied configuration — there is no global state. |
-| `config::{RoundingContext, ResultsMeta, NumericMode, results_meta, rounding_context_from}` | Policy stamps attached to result envelopes. |
-| `validation::{require, require_or, require_with}` | Convention-agnostic invariant checks returning `Result`. |
+| `config::{RoundingContext, ZeroKind, ResultsMeta, NUMERIC_MODE_F64, results_meta}` | Policy stamps attached to result envelopes. |
+| `validation::{require_or, require_with, validate_*}` | Convention-agnostic invariant checks returning `Result`. |
 | `explain::{ExplainOpts, ExplanationTrace, TraceEntry}` | Opt-in computation tracing, off and zero-cost by default. |
 
 `rating_scales` holds the neutral shared scorecard-scale registry
@@ -140,8 +140,8 @@ Note that `finstack_quant::schema` (on the umbrella crate) is a different,
 higher-level module that indexes artifacts across all domains;
 `finstack_quant_core::schema` is the assembly machinery those generators use.
 
-`HashMap`/`HashSet` are re-exported at the crate root as `rustc_hash` aliases
-with deterministic hashing. Use sorted maps or explicit sorting for canonical
+`FxHashMap`/`FxHashSet` are re-exported at the crate root from `rustc_hash`
+(deterministic hashing). Use sorted maps or explicit sorting for canonical
 serialization; hash-map iteration is not a canonical ordering.
 
 ## Example
@@ -217,12 +217,13 @@ the actual enclosing coupon period, including for partial accrual, while
 missing required context returns an error. Split ACT/365L spans at coupon
 boundaries so each slice retains its own coupon's denominator.
 
-**Determinism.** Core introduces no parallelism of its own — it has no `rayon`
-dependency, so there is no parallel/serial split to reconcile here. (Its types
-are still `Send + Sync`; the FX providers guard their caches with `std::sync`
-locks.) Randomness is explicitly seeded: `Pcg64Rng` and `SobolRng` are
+**Determinism.** `parallel::try_map_ordered` is core's only parallel path: native
+builds run it on Rayon (a native-only dependency) and return outputs in input
+order with the lowest-index error; wasm32 runs the same map serially, so both
+targets agree. (Its types are still `Send + Sync`; the FX providers guard their
+caches with `std::sync` locks.) Randomness is explicitly seeded: `Pcg64Rng` and `SobolRng` are
 constructed with a seed and never read the system clock or a thread-local
-generator. Hash containers use `rustc_hash` aliases for deterministic hashing.
+generator. Hash containers use the `FxHashMap`/`FxHashSet` aliases.
 Canonical JSON sorts keys recursively and rejects non-finite floats instead of
 emitting `null`.
 
@@ -283,6 +284,7 @@ produced by the `gen_core_schemas` binary. Regenerate with
 | Feature | Default | Effect |
 |---------|---------|--------|
 | `json-schema` | on | Optional `schemars` derives and the `schema` generation module. WASM builds this crate with `default-features = false` so the schema stack stays off that graph. |
+| `jsonschema-validate` | on | Implies `json-schema`; adds the `jsonschema` validator behind `schema::diagnostics`. |
 
 Serde and tracing hooks compile unconditionally; there is no `std`/`no_std`
 split (the crate uses the standard library). Golden-test helpers live in
