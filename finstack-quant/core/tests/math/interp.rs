@@ -384,6 +384,48 @@ no_extrapolation_tests!(
     Interpolator<PiecewiseQuadraticForwardStrategy>
 );
 
+macro_rules! non_finite_query_tests {
+    ($mod_name:ident, $ty:ty) => {
+        mod $mod_name {
+            use super::*;
+
+            #[test]
+            fn non_finite_queries_are_nan_under_every_policy() {
+                for policy in [
+                    ExtrapolationPolicy::FlatZero,
+                    ExtrapolationPolicy::FlatForward,
+                    ExtrapolationPolicy::None,
+                ] {
+                    let interp =
+                        new_strict!($ty, standard_knots(), standard_dfs(), policy).unwrap();
+                    for x in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                        assert!(
+                            interp.interp(x).is_nan(),
+                            "value at {x} under {policy:?} should be NaN"
+                        );
+                        assert!(
+                            interp.interp_prime(x).is_nan(),
+                            "derivative at {x} under {policy:?} should be NaN"
+                        );
+                    }
+                }
+            }
+        }
+    };
+}
+
+non_finite_query_tests!(non_finite_linear, Interpolator<LinearStrategy>);
+non_finite_query_tests!(non_finite_log_linear, Interpolator<LogLinearStrategy>);
+non_finite_query_tests!(non_finite_cubic_hermite, Interpolator<CubicHermiteStrategy>);
+non_finite_query_tests!(
+    non_finite_monotone_convex,
+    Interpolator<MonotoneConvexStrategy>
+);
+non_finite_query_tests!(
+    non_finite_piecewise_quadratic_forward,
+    Interpolator<PiecewiseQuadraticForwardStrategy>
+);
+
 // Derivative (interp_prime) Tests
 
 macro_rules! derivative_tests {
