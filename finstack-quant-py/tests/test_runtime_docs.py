@@ -39,6 +39,7 @@ PACKAGE_DIR = Path(finstack_quant.__file__).parent
 _SCHEMA_REGISTRY = ("get", "index", "validate")
 
 CONVERTED: dict[str, tuple[str, ...] | None] = {
+    "finstack_quant.models.credit": None,
     "finstack_quant.models.correlation": None,
     "finstack_quant.models.monte_carlo": None,
     "finstack_quant.models.rates.dtsm": None,
@@ -180,6 +181,19 @@ def _stub_docstrings(module: str) -> dict[str, str]:
                     docs.setdefault(prefix + node.name, doc)
                 if isinstance(node, ast.ClassDef):
                     walk(node.body, f"{prefix}{node.name}.")
+            elif (
+                not prefix
+                and isinstance(node, ast.ImportFrom)
+                and node.module is not None
+                and node.module.startswith(module + ".")
+                and node.module.rsplit(".", 1)[-1].startswith("_")
+            ):
+                private_docs = _stub_docstrings(node.module)
+                for alias in node.names:
+                    exported = alias.asname or alias.name
+                    for name, doc in private_docs.items():
+                        if name == alias.name or name.startswith(alias.name + "."):
+                            docs.setdefault(exported + name[len(alias.name) :], doc)
             elif isinstance(node, ast.If):
                 walk(node.body, prefix)
                 walk(node.orelse, prefix)
@@ -296,4 +310,29 @@ def test_private_stub_helpers_are_not_runtime_owners(tmp_path: Path, monkeypatch
         "__module__": "Public models namespace.",
         "Public": "Public model guidance.",
         "Public.__reduce__": "Reconstruct the public model.",
+    }
+
+
+def test_private_stub_reexports_keep_public_runtime_owners(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Imported private definitions retain class and member docs under public aliases."""
+    package = tmp_path / "models" / "credit"
+    package.mkdir(parents=True)
+    (package / "__init__.pyi").write_text(
+        '"""Public credit namespace."""\n'
+        "from finstack_quant.models.credit._impl import Internal as Public\n"
+        "from finstack_quant.models.credit.other import Ignore\n"
+    )
+    (package / "_impl.pyi").write_text(
+        '"""Private implementation."""\n'
+        "class Internal:\n"
+        '    """Shared class guidance."""\n'
+        "    def value(self) -> float:\n"
+        '        """Return the selected value."""\n'
+        "        ...\n"
+    )
+    monkeypatch.setattr(importlib.import_module(__name__), "PACKAGE_DIR", tmp_path)
+    assert _stub_docstrings("finstack_quant.models.credit") == {
+        "__module__": "Public credit namespace.",
+        "Public": "Shared class guidance.",
+        "Public.value": "Return the selected value.",
     }
