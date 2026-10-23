@@ -8,9 +8,10 @@ cost at one size) and `analytics_scaling` (how cost grows with series length
 or matrix dimension).
 
 Most cases are driven through [`Performance`](../src/performance/mod.rs), the crate's
-canonical public entry point. The scaling target also directly benchmarks the
-intentionally public `correlation::nearest_correlation` repair helper and
-`regression::constrained_least_squares`. Almost every per-metric building block remains
+canonical public entry point. The scaling target also directly benchmarks
+`regression::constrained_least_squares` and core's
+`math::linalg::nearest_correlation` repair helper, which
+`Performance::correlation_matrix` calls. Almost every per-metric building block remains
 `pub(crate)` and is not a benchmark surface.
 
 ## Cases

@@ -638,7 +638,14 @@ impl DayCount {
         } else if end > start {
             self.year_fraction(start, end, ctx)
         } else {
-            Ok(-self.year_fraction(end, start, ctx)?)
+            Ok(-self.year_fraction(
+                end,
+                start,
+                DayCountContext {
+                    end_is_termination_date: false,
+                    ..ctx
+                },
+            )?)
         }
     }
 }

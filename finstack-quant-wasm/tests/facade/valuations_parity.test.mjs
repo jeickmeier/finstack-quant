@@ -328,14 +328,14 @@ test('credit instruments match Python', () => {
     instruments.cdsIndexParamsItraxxEurope(40, 1, 100).index_name,
     golden.data.itraxx_index_name
   );
-  // Without the credit index data both loss methods are lookup misses, as in Python.
+  // Without the credit index data both loss metrics are lookup misses, as in Python.
   const example = instruments.CdsTranche.example();
   assert.throws(
-    () => example.expectedLoss(golden.equity.market),
+    () => example.metric(golden.equity.market, '2024-06-20', 'expected_loss'),
     (e) => e.kind === 'not_found'
   );
   assert.throws(
-    () => example.jumpToDefault(golden.equity.market, '2024-06-20'),
+    () => example.metric(golden.equity.market, '2024-06-20', 'jump_to_default'),
     (e) => e.kind === 'not_found'
   );
 });
@@ -346,7 +346,7 @@ test('equity option and convertible analytics match Python', () => {
   const price = Number(option.price(equity.market, '2024-01-15').value.amount);
   close(price, equity.price, TIGHT, 'price');
   same(plain(option.greeks(equity.market, '2024-01-15')), equity.greeks, 'greeks', LOOSE);
-  close(option.delta(equity.market, '2024-01-15'), equity.delta, LOOSE, 'delta');
+  close(option.metric(equity.market, '2024-01-15', 'delta'), equity.delta, LOOSE, 'delta');
   close(
     option.impliedVol(equity.market, '2024-01-15', equity.price),
     equity.implied_vol,
@@ -389,12 +389,9 @@ test('structured-credit deal analytics match Python', () => {
     LOOSE
   );
   same(plain(deal.equityMetrics(sc.market, sc.as_of)), sc.equity_metrics, 'equity', LOOSE);
-  same(
-    plain(deal.runSimulationWithDiagnostics(sc.market, sc.as_of)),
-    sc.diagnostics,
-    'diag',
-    LOOSE
-  );
+  const simulation = deal.runSimulation(sc.market, sc.as_of);
+  same(plain(simulation.tranches.A), sc.tranche_cashflows, 'simulation flows', LOOSE);
+  same(plain(simulation.diagnostics), sc.diagnostics, 'diag', LOOSE);
   const waterfall = deal.createWaterfall();
   same(plain(waterfall), sc.create_waterfall, 'waterfall');
   same(plain(instruments.waterfallCoverageTests(waterfall)), sc.coverage_tests, 'coverage tests');
@@ -579,11 +576,7 @@ test('instrument data-type constructors match Python', () => {
     data.pool_with_reinvestment_period,
     'reinvestment period'
   );
-  same(
-    plain(instruments.scenarioTableCells(data.scenario_table)),
-    data.scenario_table_cells,
-    'scenario cells'
-  );
+  same(plain(data.scenario_table.cells), data.scenario_table_cells, 'scenario cells');
   same(
     plain(instruments.assetPoolWithReserve(data.pool, usd(500_000), 0.02, usd(750_000))),
     data.pool_with_reserve,
@@ -803,4 +796,65 @@ test('commodity spot cash claim survives JSON replay without an optionality mark
     instruments.priceInstrument(encoded, JSON.stringify(market), date, 'black76');
   assert.ok(Math.abs(Number(price('2024-01-15').value.amount) - 10000) < 1e-8);
   assert.equal(Number(price('2024-01-21').value.amount), 0);
+});
+
+test('structured credit recovery-only specifications are reported and fully disabled', () => {
+  for (const recovery of [
+    { type: 'constant', rate: 0.4 },
+    {
+      type: 'market_correlated',
+      mean_recovery: 0.4,
+      recovery_volatility: 0.25,
+      factor_correlation: 0.4,
+    },
+  ]) {
+    const document = JSON.parse(instruments.StructuredCredit.example().toJson());
+    document.instrument.spec.stochastic_recovery_spec = recovery;
+    const deal = instruments.StructuredCredit.fromJson(JSON.stringify(document));
+    assert.equal(deal.isStochastic, true);
+    assert.deepEqual(deal.stochasticRecoverySpec, recovery);
+    let disabled = deal.disableStochastic();
+    for (let i = 0; i < 2; i++) {
+      assert.equal(disabled.isStochastic, false);
+      assert.equal(disabled.stochasticRecoverySpec, null);
+      assert.equal(disabled.stochasticPrepaySpec, null);
+      assert.equal(disabled.stochasticDefaultSpec, null);
+      assert.equal(disabled.correlationStructure, null);
+      assert.deepEqual(disabled.recoverySpec, deal.recoverySpec);
+      disabled = disabled.disableStochastic();
+    }
+    assert.equal(deal.isStochastic, true);
+    assert.deepEqual(deal.stochasticRecoverySpec, recovery);
+  }
+});
+
+test('commodity spot money currency is checked at expiry and in Monte Carlo', () => {
+  const fixtures = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant/valuations/tests/fixtures/valuation_binding_regressions.json',
+        import.meta.url
+      )
+    )
+  );
+  for (const [model, asOf] of [
+    ['black76', '2025-06-15'],
+    ['monte_carlo_schwartz_smith', '2025-01-02'],
+  ]) {
+    const instrument = structuredClone(fixtures.commodity);
+    instrument.instrument.spec.instrument_pricing_overrides.model_config.mc_paths = 64;
+    const market = structuredClone(fixtures.market);
+    const price = () =>
+      instruments.priceInstrument(JSON.stringify(instrument), JSON.stringify(market), asOf, model);
+    const numeric = price().value;
+    market.prices['WTI-SPOT'] = { price: { amount: '80', currency: 'USD' } };
+    assert.deepEqual(price().value, numeric);
+    market.prices['WTI-SPOT'].price.currency = 'EUR';
+    assert.throws(
+      price,
+      (error) =>
+        error.kind === 'validation' &&
+        /Currency mismatch: expected USD, got EUR/.test(error.message)
+    );
+  }
 });

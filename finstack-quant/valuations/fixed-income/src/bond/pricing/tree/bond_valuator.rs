@@ -716,7 +716,7 @@ impl BondValuator {
         }
 
         // Source recovery rate from the bond's explicit credit_curve_id,
-        // consistent with HazardBondEngine.
+        // consistent with the hazard-rate pricing kernel.
         let recovery_rate = Self::resolve_recovery_rate(&bond, market_context);
         let call_friction_cents = bond
             .instrument_pricing_overrides
@@ -1145,7 +1145,7 @@ impl BondValuator {
     }
 
     /// Resolve the recovery rate from the bond's explicit `credit_curve_id`
-    /// opt-in, consistent with `HazardBondEngine` and `TreePricer`.
+    /// opt-in, consistent with the hazard-rate and tree pricing kernels.
     ///
     /// Returns `None` when the bond has no `credit_curve_id` or the named
     /// hazard curve is absent from the market context.
@@ -1178,8 +1178,8 @@ impl TreeValuator for BondValuator {
         let risky_continuation = if let Some(hazard) = state.hazard_rate {
             let hazard = hazard.max(0.0);
             let survival = (-hazard * dt).exp();
-            let interval_df = state.discount_factor().unwrap_or_else(|| {
-                let rate = state.interest_rate().unwrap_or(0.0) + oas_rate;
+            let interval_df = state.df.unwrap_or_else(|| {
+                let rate = state.interest_rate.unwrap_or(0.0) + oas_rate;
                 (-rate * dt).exp()
             });
             let recovery_weight = continuous_frp_weight(interval_df, survival)?;

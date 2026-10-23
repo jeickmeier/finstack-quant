@@ -1,7 +1,7 @@
 //! DV01 metric tests for FX Spot.
 //!
 //! FX spot has no discount or forward curve dependency. Rate DV01 metrics are
-//! intentionally not registered; FX risk is exposed through FxDelta and Fx01.
+//! intentionally not registered; FX risk is exposed through Fx01.
 //! Requesting one is therefore rejected rather than silently omitted — see the
 //! requested-metric contract in `src/pricer/README.md`.
 

@@ -1,5 +1,6 @@
 //! Python bindings for `finstack_quant_cashflows::aggregation`.
 
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::aggregation::{
     aggregate_by_period, aggregate_cashflows_checked as rust_aggregate_cashflows_checked,
     calendar_year_ladder as rust_calendar_year_ladder, PeriodAggregation,
@@ -13,7 +14,6 @@ use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 
 /// Convert Python ``[(date, Money), ...]`` into Rust dated flows.
@@ -60,7 +60,12 @@ impl PyPeriodAggregation {
     }
 }
 
-wire_methods!(PyPeriodAggregation, PeriodAggregation, "PeriodAggregation");
+wire_methods!(
+    PyPeriodAggregation,
+    PeriodAggregation,
+    "PeriodAggregation",
+    module = "finstack_quant.cashflows.aggregation"
+);
 
 #[pymethods]
 impl PyPeriodAggregation {
@@ -93,7 +98,7 @@ impl PyPeriodAggregation {
             .map(PyMoney::from_inner))
     }
 
-    /// Nested ``{period_id_label: {currency_code: Money}}`` dictionary.
+    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.to_dict")]
     #[pyo3(text_signature = "(self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let out = PyDict::new(py);
@@ -125,10 +130,7 @@ impl PyPeriodAggregation {
         self.inner.len()
     }
 
-    /// Tidy ``pandas.DataFrame`` with columns ``period, currency, amount``.
-    ///
-    /// ``amount`` is a float in ``currency`` units; one row per non-empty
-    /// ``(period, currency)`` cell, in reporting-period order.
+    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.to_dataframe")]
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "(self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -163,37 +165,7 @@ impl PyPeriodAggregation {
     }
 }
 
-/// Aggregate dated flows into reporting periods (half-open ``[start, end)``).
-///
-/// Parameters
-/// ----------
-/// flows : list[tuple[datetime.date, Money]]
-///     Dated cashflows; unsorted input is sorted internally.
-/// periods : list[Period]
-///     Sorted, disjoint reporting periods.
-///
-/// Returns
-/// -------
-/// PeriodAggregation
-///     Mapping-like ``{period_id_label: {currency_code: nominal_sum}}`` with
-///     ``to_dataframe()``; empty periods are omitted.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If periods are unsorted, overlapping, or contain duplicate ids, or
-///     if a per-currency total is non-finite or exceeds the Decimal range.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.cashflows.aggregation import aggregate_by_period
-/// >>> from finstack_quant.core.dates import build_periods
-/// >>> from finstack_quant.core.money import Money
-/// >>> flows = [(datetime.date(2025, 3, 15), Money(100.0, "USD"))]
-/// >>> periods = build_periods("2025Q1..Q4").periods
-/// >>> aggregate_by_period(flows, periods)["2025Q1"]["USD"].amount
-/// 100.0
+#[doc = pydoc!("finstack_quant.cashflows.aggregation", "aggregate_by_period")]
 #[pyfunction(name = "aggregate_by_period")]
 #[pyo3(text_signature = "(flows, periods)")]
 fn py_aggregate_by_period<'py>(
@@ -209,35 +181,7 @@ fn py_aggregate_by_period<'py>(
         .map_err(core_to_py)
 }
 
-/// Currency-checked single-currency aggregation with an explicit target currency.
-///
-/// Parameters
-/// ----------
-/// flows : list[tuple[datetime.date, Money]]
-///     Dated cashflows; every flow must be in ``target`` currency.
-/// target : Currency or str
-///     Required currency for every flow and the returned total.
-///
-/// Returns
-/// -------
-/// Money
-///     Single total in ``target`` currency. Empty ``flows`` returns a zero
-///     total.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If any flow currency differs from ``target`` (currency mismatch is
-///     rejected, never silently converted).
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.cashflows.aggregation import aggregate_cashflows_checked
-/// >>> from finstack_quant.core.money import Money
-/// >>> flows = [(datetime.date(2025, 1, 15), Money(50_000.0, "USD"))]
-/// >>> aggregate_cashflows_checked(flows, "USD").amount
-/// 50000.0
+#[doc = pydoc!("finstack_quant.cashflows.aggregation", "aggregate_cashflows_checked")]
 #[pyfunction]
 #[pyo3(text_signature = "(flows, target)")]
 fn aggregate_cashflows_checked(
@@ -252,48 +196,7 @@ fn aggregate_cashflows_checked(
         .map_err(core_to_py)
 }
 
-/// Group dated cashflows into a calendar-year non-principal / principal / PV ladder.
-///
-/// Returns raw ``(year, non_principal, principal, pv)`` tuples over parallel
-/// array inputs; use ``CashFlowSchedule.calendar_year_ladder`` for a
-/// ``pandas.DataFrame`` view of a built schedule.
-///
-/// Parameters
-/// ----------
-/// dates : list[datetime.date]
-///     Payment dates; the Gregorian year of each date is the bucket.
-/// kinds : list[str]
-///     Canonical cashflow kind labels (``"fixed"``, ``"notional"``,
-///     ``"pre_payment"``). Surrounding whitespace and ASCII case are ignored.
-///     Unknown labels raise ``ValueError``.
-/// amounts : list[float]
-///     Signed finite cashflow amounts, one per date, in native currency units.
-/// pvs : list[float]
-///     Finite present values, one per date, in the same units as ``amounts``.
-///
-/// Returns
-/// -------
-/// list[tuple[int, float, float, float]]
-///     One ``(year, non_principal, principal, pv)`` row per calendar year,
-///     sorted by year.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the four lists have different lengths, a kind label is unknown, or
-///     an amount or PV is non-finite.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.cashflows.aggregation import calendar_year_ladder
-/// >>> calendar_year_ladder(
-/// ...     [datetime.date(2027, 3, 15), datetime.date(2034, 3, 15)],
-/// ...     ["fixed", "notional"],
-/// ...     [100.0, 1000.0],
-/// ...     [90.0, 700.0],
-/// ... )
-/// [(2027, 100.0, 0.0, 90.0), (2034, 0.0, 1000.0, 700.0)]
+#[doc = pydoc!("finstack_quant.cashflows.aggregation", "calendar_year_ladder")]
 #[pyfunction]
 #[pyo3(text_signature = "(dates, kinds, amounts, pvs)")]
 fn calendar_year_ladder(
@@ -321,7 +224,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     let module = crate::bindings::module_utils::new_submodule(parent, "aggregation")?;
     module.setattr(
         "__doc__",
-        "Currency-preserving aggregation of dated cashflows into periods and totals.",
+        pydoc!("finstack_quant.cashflows.aggregation", "__module__"),
     )?;
     module.add_class::<PyPeriodAggregation>()?;
     module.add_function(wrap_pyfunction!(py_aggregate_by_period, &module)?)?;

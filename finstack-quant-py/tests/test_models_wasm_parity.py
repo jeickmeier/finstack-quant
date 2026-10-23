@@ -369,12 +369,12 @@ def _merton_cases() -> dict[str, Callable[[], Any]]:
             ToggleExerciseModel.threshold("leverage", 0.7, "above").should_pik(_state(), 0.5),
             ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik(_state(), 0.5),
             ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik(_state(), 0.9),
-            ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).should_pik(_state(), 0.5),
+            ToggleExerciseModel.optimal(100, 0.2, 0.03, 1.0).should_pik(_state(), 0.5),
         ],
         "rating_factors": lambda: [
             moodys_warf_factor("B2"),
-            RatingFactorTable.moodys_standard().get_factor("Baa3"),
-            RatingFactorTable.moodys_standard().default_factor,
+            RatingFactorTable.default_calibration().get_factor("Baa3"),
+            RatingFactorTable.default_calibration().default_factor,
         ],
         "liability_management.hurdle": lambda: liability_management.TENDER_RECOMMENDATION_HURDLE,
     }
@@ -408,9 +408,9 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             list(lgd.BetaRecovery(0.4, 0.2).sample_seeded(4, 42)),
         ],
         "lgd.seniority_recovery_stats": lambda: [
-            lgd.seniority_recovery_stats("senior_unsecured").mean,
-            lgd.seniority_recovery_stats("senior_unsecured").std_dev,
-            lgd.seniority_recovery_stats("senior_secured", "sp").mean,
+            lgd.seniority_recovery_stats("senior_unsecured", "moodys_recovery_1982_2023").mean,
+            lgd.seniority_recovery_stats("senior_unsecured", "moodys_recovery_1982_2023").std_dev,
+            lgd.seniority_recovery_stats("senior_secured", "sp_recovery_historical").mean,
         ],
         "lgd.workout": lambda: [
             _json(workout().evaluate(1_000_000.0)),
@@ -423,8 +423,8 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             lgd.DownturnLgd.regulatory_floor(0.08, 0.1).adjust(0.35),
             lgd.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
             lgd.DownturnLgd.regulatory_floor(0.08, 0.1).adjust(0.35),
-            lgd.DownturnLgd.basel_secured().adjust(0.2),
-            lgd.DownturnLgd.basel_unsecured().adjust(0.2),
+            lgd.DownturnLgd.default_calibration().adjust(0.2),
+            lgd.DownturnLgd.from_registry_id("basel_unsecured").adjust(0.2),
         ],
         "lgd.ead": lambda: [
             lgd.EadCalculator(600.0, 400.0, 0.75).ead,
@@ -447,8 +447,8 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             _json(_master_scale().map_pd(0.02)),
             list(_master_scale().map_pds([0.5, 0.001, 0.05])["grade"]),
             _master_scale().map_score(scoring.zmijewski_score(0.05, 0.6, 1.5)).grade,
-            pd_models.MasterScale.sp_assumptions().n_grades,
-            pd_models.MasterScale.moodys_assumptions().n_grades,
+            pd_models.MasterScale.default_calibration().n_grades,
+            pd_models.MasterScale.from_registry_id("moodys_assumptions").n_grades,
         ],
         "scoring": lambda: [
             _json(scoring.altman_z_score(0.1, 0.2, 0.15, 1.5, 1.1)),
@@ -474,21 +474,21 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             matrix().probability("A", "D"),
             matrix().probability_by_index(1, 2),
             list(matrix().row("B")),
-            matrix().compose(matrix()).to_matrix(),
+            matrix().compose(matrix()).to_rows(),
             list(matrix().default_probabilities()),
         ],
         "migration.generator": lambda: [
             _generator().exit_rate("A"),
             _generator().intensity("A", "B"),
-            migration.project(_generator(), 2.0).to_matrix(),
-            migration.GeneratorMatrix.from_transition_matrix(matrix()).to_matrix(),
+            migration.project(_generator(), 2.0).to_rows(),
+            migration.GeneratorMatrix.from_transition_matrix(matrix()).to_rows(),
         ],
         "migration.simulate": lambda: [
             simulator().simulate(0, 50, 7).default_rate,
             len(simulator().simulate(0, 50, 7)),
             [list(event) for event in simulator().simulate(0, 50, 7).paths[0].transitions()],
             simulator().simulate(0, 50, 7).paths[3].label_at(5.0),
-            simulator().empirical_matrix(200, 7).to_matrix(),
+            simulator().empirical_matrix(200, 7).to_rows(),
         ],
     }
 
@@ -499,6 +499,19 @@ def _correlation_cases() -> dict[str, Callable[[], Any]]:
     loss = lambda result: [result.expected_loss, result.var, result.expected_shortfall]  # noqa: E731
     pair = lambda: correlation.CorrelatedBernoulli(0.1, 0.2, 0.3)  # noqa: E731
     return {
+        "correlation.recovery": lambda: [
+            correlation.RecoverySpec.market_correlated(0.4, 0.25, 0.4).build().expected_recovery,
+            *[
+                correlation.RecoverySpec.market_correlated(0.4, 0.25, 0.4).build().conditional_recovery(z)
+                for z in [-2.0, 0.0, 2.0]
+            ],
+            *[
+                correlation.RecoverySpec.market_correlated(0.4, 0.25, 0.4).build().sample_recovery(z, e)
+                for z, e in [(-2.0, 1.0), (0.0, 0.0), (2.0, -0.5)]
+            ],
+            correlation.RecoverySpec.market_correlated(0.4, 0.25, 0.0).build().has_idiosyncratic_dispersion,
+            correlation.RecoverySpec.market_correlated(0.4, 0.25, 1.0).build().has_idiosyncratic_dispersion,
+        ],
         "correlation.bernoulli": lambda: [
             list(pair().joint_probabilities()),
             pair().conditional_p2_given_x1(),
@@ -661,7 +674,7 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
     pca = lambda: dtsm.YieldPca.fit(_panel())  # noqa: E731
     return {
         "hull_white.params": lambda: [
-            params().sigma(3.0),
+            params().get_sigma(3.0),
             params().state_variance(2.0),
             params().state_covariance(1.0, 2.0),
             params().bond_vol(0.0, 1.0, 5.0),
@@ -672,7 +685,7 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
             hull_white.hw_bond_vol(0.05, 0.01, 0.0, 1.0, 5.0),
             hull_white.hw1f_zcb_option_price(0.95, 0.80, 0.84, 0.02, True),
             hull_white.hw1f_caplet_forward_rate_normal_vol(0.05, 0.01, 1.0, 0.25),
-            hull_white.hw1f_cap_floor_price(0.05, 0.01, CAP_PERIODS, 0.03, True, curve(0.03)),
+            hull_white.hw1f_cap_floor_price(0.05, 0.01, CAP_PERIODS, 0.03, True, curve(0.03), curve(0.03)),
             hull_white.hw1f_cap_floor_price(0.05, 0.01, CAP_PERIODS, 0.03, False, curve(0.03), curve(0.035)),
         ],
         "dtsm.yield_panel": lambda: [

@@ -13,30 +13,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 use pyo3::wrap_pyfunction;
 
-/// Convert an ABS speed to the single-month mortality for a seasoning month.
-///
-/// The ABS convention (auto-loan and consumer ABS) prepays a constant share
-/// ``speed`` of the *original* balance each month, so
-/// ``SMM_t = speed / (1 - speed * (t - 1))``. Month 0 is treated as month 1;
-/// once the original balance is exhausted the result is capped at ``1.0``.
-///
-/// Parameters
-/// ----------
-/// speed : float
-///     Monthly prepayment as a decimal fraction of the original balance
-///     (``0.015`` = 1.5% ABS), in ``[0, 1]``.
-/// month : int
-///     Seasoning month counted from origination (non-negative).
-///
-/// Returns
-/// -------
-/// float
-///     Single-month mortality as a decimal in ``[0, 1]``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``speed`` is non-finite or outside ``[0, 1]``.
+#[doc = pydoc!("finstack_quant.cashflows.builder", "abs_to_smm")]
 #[pyfunction]
 #[pyo3(text_signature = "(speed, month)")]
 pub(crate) fn abs_to_smm(speed: f64, month: u32) -> PyResult<f64> {
@@ -62,7 +39,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     let module = crate::bindings::module_utils::new_submodule(parent, "builder")?;
     module.setattr(
         "__doc__",
-        "Composable cashflow builder: coupon/fee/amortization specs, CashFlowBuilder, CashFlowSchedule.",
+        pydoc!("finstack_quant.cashflows.builder", "__module__"),
     )?;
 
     specs::add_classes(&module)?;

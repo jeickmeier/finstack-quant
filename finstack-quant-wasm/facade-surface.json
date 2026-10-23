@@ -403,7 +403,6 @@
       "defaultModelSpecValidate",
       "exCouponRuleExDate",
       "exCouponRuleIsExCoupon",
-      "feeSpecPeriodicBp",
       "floatingLegCompoundingIsOvernight",
       "floatingLegCompoundingSofrObservationShift",
       "floatingLegCompoundingSoniaObservationShift",
@@ -541,9 +540,6 @@
     "kind": "function"
   },
   "cashflows.exCouponRuleIsExCoupon": {
-    "kind": "function"
-  },
-  "cashflows.feeSpecPeriodicBp": {
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingIsOvernight": {
@@ -734,6 +730,7 @@
       "finiteMinOrNan",
       "fiscalYear",
       "fxPairConvention",
+      "fxStandardSettlementDays",
       "immOptionExpiry",
       "invertFxRate",
       "isCdsDate",
@@ -1186,6 +1183,9 @@
     "methods": ["free", "toString"],
     "getters": []
   },
+  "core.fxStandardSettlementDays": {
+    "kind": "function"
+  },
   "core.createDate": {
     "kind": "function"
   },
@@ -1361,6 +1361,7 @@
     "statics": ["flat", "fromJson", "fromSurvivalProbs"],
     "methods": [
       "cdsQuoteBp",
+      "conditionalDefaultProb",
       "defaultProb",
       "free",
       "hazardRate",
@@ -2467,14 +2468,21 @@
     "constructor": false,
     "statics": ["constant", "fromJson", "marketCorrelated", "marketStandardStochastic"],
     "methods": ["build", "free", "toJson"],
-    "getters": ["expectedRecovery"]
+    "getters": []
   },
   "models.correlation.RecoveryModel": {
     "kind": "class",
     "constructor": false,
     "statics": [],
-    "methods": ["conditionalLgd", "conditionalRecovery", "free"],
-    "getters": ["expectedRecovery", "isStochastic", "lgd", "modelName", "recoveryVolatility"]
+    "methods": ["conditionalLgd", "conditionalRecovery", "free", "sampleRecovery"],
+    "getters": [
+      "expectedRecovery",
+      "hasIdiosyncraticDispersion",
+      "isStochastic",
+      "lgd",
+      "modelName",
+      "recoveryVolatility"
+    ]
   },
   "models.correlation.PortfolioLossResult": {
     "kind": "class",
@@ -2667,7 +2675,7 @@
   "models.credit.RatingFactorTable": {
     "kind": "class",
     "constructor": false,
-    "statics": ["fromJson", "fromRegistryId", "moodysStandard"],
+    "statics": ["defaultCalibration", "fromJson", "fromRegistryId"],
     "methods": ["free", "getFactor", "toJson"],
     "getters": ["agency", "defaultFactor", "methodology"]
   },
@@ -2727,14 +2735,7 @@
   "models.credit.lgd.DownturnLgd": {
     "kind": "class",
     "constructor": false,
-    "statics": [
-      "baselSecured",
-      "baselUnsecured",
-      "fromJson",
-      "fromRegistryId",
-      "regulatoryFloor",
-      "stressed"
-    ],
+    "statics": ["defaultCalibration", "fromJson", "fromRegistryId", "regulatoryFloor", "stressed"],
     "methods": ["adjust", "free", "toJson"],
     "getters": ["method", "params"]
   },
@@ -2799,7 +2800,7 @@
   "models.credit.migration.TransitionMatrix": {
     "kind": "class",
     "constructor": true,
-    "statics": ["fromJson"],
+    "statics": ["fromJson", "fromLabeled"],
     "methods": [
       "compose",
       "defaultProbabilities",
@@ -2808,7 +2809,7 @@
       "probabilityByIndex",
       "row",
       "toJson",
-      "toMatrix"
+      "toRows"
     ],
     "getters": ["horizon", "nStates", "scale"]
   },
@@ -2816,7 +2817,7 @@
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson", "fromTransitionMatrix"],
-    "methods": ["exitRate", "free", "intensity", "toJson", "toMatrix"],
+    "methods": ["exitRate", "free", "intensity", "toJson", "toRows"],
     "getters": ["nStates", "regularizationL1", "roundTripError", "scale"]
   },
   "models.credit.migration.RatingPath": {
@@ -2866,7 +2867,7 @@
   "models.credit.pd.MasterScale": {
     "kind": "class",
     "constructor": true,
-    "statics": ["fromJson", "fromRegistryId", "moodysAssumptions", "spAssumptions"],
+    "statics": ["defaultCalibration", "fromJson", "fromRegistryId"],
     "methods": ["free", "mapPd", "mapPds", "mapScore", "toJson"],
     "getters": ["grades", "nGrades"]
   },
@@ -3260,8 +3261,17 @@
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson", "piecewise"],
-    "methods": ["bondVol", "free", "sigma", "stateCovariance", "stateVariance", "toJson"],
-    "getters": ["kappa", "times", "values"]
+    "methods": [
+      "bondVol",
+      "free",
+      "getSigma",
+      "getTimes",
+      "getValues",
+      "stateCovariance",
+      "stateVariance",
+      "toJson"
+    ],
+    "getters": ["kappa"]
   },
   "models.rates.hullWhite.hw1fConvexityAdjustment": {
     "kind": "function"
@@ -4540,7 +4550,6 @@
       "prettyInstrumentJson",
       "priceInstrument",
       "priceInstrumentWithMarket",
-      "scenarioTableCells",
       "trancheBreakevenCdr",
       "trancheBuilder",
       "trancheDiscountMargin",
@@ -4953,16 +4962,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson", "standard"],
-    "methods": [
-      "expectedLoss",
-      "free",
-      "jumpToDefault",
-      "marketDependencies",
-      "metric",
-      "price",
-      "toDict",
-      "toJson"
-    ],
+    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
     "getters": [
       "attachPct",
       "attributes",
@@ -5073,19 +5073,14 @@
     "constructor": false,
     "statics": ["builder", "european", "example", "fromJson"],
     "methods": [
-      "delta",
       "free",
-      "gamma",
       "greeks",
       "impliedVol",
       "marketDependencies",
       "metric",
       "price",
-      "rho",
-      "theta",
       "toDict",
-      "toJson",
-      "vega"
+      "toJson"
     ],
     "getters": [
       "attributes",
@@ -5115,7 +5110,7 @@
   "valuations.instruments.StructuredCredit": {
     "kind": "class",
     "constructor": false,
-    "statics": ["builder", "example", "fromJson", "newAbs", "newClo", "newCmbs", "newRmbs"],
+    "statics": ["builder", "example", "fromJson", "newStandard"],
     "methods": [
       "createWaterfall",
       "disableStochastic",
@@ -5126,7 +5121,7 @@
       "metric",
       "price",
       "priceStochastic",
-      "runSimulationWithDiagnostics",
+      "runSimulation",
       "toDict",
       "toJson",
       "trancheCashflows",
@@ -5193,7 +5188,7 @@
   "valuations.instruments.FxForward": {
     "kind": "class",
     "constructor": false,
-    "statics": ["builder", "example", "fromJson", "fromTradeDate", "standardSettlementDays"],
+    "statics": ["builder", "example", "fromJson", "fromTradeDate"],
     "methods": [
       "free",
       "marketDependencies",
@@ -5244,22 +5239,14 @@
     "constructor": false,
     "statics": ["builder", "european", "example", "fromJson"],
     "methods": [
-      "delta",
-      "foreignRho",
       "free",
-      "gamma",
       "greeks",
       "impliedVol",
       "marketDependencies",
       "metric",
       "price",
-      "rho",
-      "theta",
       "toDict",
-      "toJson",
-      "vanna",
-      "vega",
-      "volga"
+      "toJson"
     ],
     "getters": [
       "attributes",
@@ -5984,9 +5971,6 @@
     "kind": "function"
   },
   "valuations.instruments.waterfallCoverageTests": {
-    "kind": "function"
-  },
-  "valuations.instruments.scenarioTableCells": {
     "kind": "function"
   },
   "valuations.instruments.amortizationEventDate": {

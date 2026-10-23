@@ -395,14 +395,17 @@ const cases = {
     { split: { cash_fraction: '0.6', pik_fraction: '0.4' } },
     { undrawn: { commitment: usd('5000000') } },
     { fixed: { date: '2025-03-01', amount: usd('25000') } },
-    cashflows.feeSpecPeriodicBp({
-      base: { undrawn: { commitment: usd('5000000') } },
-      bp: '37.5',
-      frequency: { count: 3, unit: 'months' },
-      day_count: 'act_360',
-      business_day_convention: 'modified_following',
-      calendar_id: 'usny',
-    }),
+    {
+      periodic_bp: {
+        base: { undrawn: { commitment: usd('5000000') } },
+        bp: '37.5',
+        frequency: { count: 3, unit: 'months' },
+        day_count: 'act_360',
+        business_day_convention: 'modified_following',
+        calendar_id: 'usny',
+        stub: 'short_front',
+      },
+    },
     { fixed_rate: '0.03' },
     { compounded_in_arrears: { lookback_days: 5 } },
     { compounded_with_observation_shift: { shift_days: 2 } },
@@ -532,15 +535,16 @@ test('typed and JSON schedule builders agree', () => {
   });
 });
 
-test('a builder setter consumes its receiver; build does not', () => {
-  const start = cashflows.CashFlowSchedule.builder();
-  const next = start.principal(usd('1000'), ISSUE, MATURITY);
-  // The consumed receiver no longer owns a builder.
-  assert.throws(() => start.fixedCf(fixedSpec));
-  const first = next.build();
-  const second = next.build();
+test('builder setters update the receiver in place; build does not consume it', () => {
+  const builder = cashflows.CashFlowSchedule.builder();
+  assert.equal(builder.principal(usd('1000'), ISSUE, MATURITY), builder);
+  // A rejected argument throws and leaves the builder usable.
+  assert.throws(() => builder.fixedCf({ ...fixedSpec, bogus: 1 }));
+  assert.equal(builder.fixedCf(fixedSpec), builder);
+  const first = builder.build();
+  const second = builder.build();
   assert.equal(first.toJson(), second.toJson());
-  for (const handle of [first, second, next]) handle.free();
+  for (const handle of [first, second, builder]) handle.free();
 });
 
 test('builder and schedule errors are structured and Rust-owned', () => {
@@ -694,12 +698,12 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     kind('invalid_type', /^seasoningMonths: /)
   );
   assert.throws(
-    () => cashflows.feeSpecPeriodicBp({ bp: '10' }),
-    kind('validation', /fields: missing field `base`/)
+    () => cashflows.CashFlowSchedule.builder().fee({ periodic_bp: { bp: '10' } }),
+    kind('validation', /missing field `base`/)
   );
   assert.throws(
     () => cashflows.notionalPar(100, 'usd!'),
-    kind('validation', /currency: unknown variant `usd!`/)
+    kind('validation', /Invalid currency code "usd!"/)
   );
   assert.throws(
     () =>

@@ -1,11 +1,5 @@
-"""Dynamic term-structure models: Diebold-Li and yield-curve PCA.
-
-Examples:
---------
->>> from finstack_quant.models.rates.dtsm import nelson_siegel_yields
->>> len(nelson_siegel_yields(0.7308, (0.03, -0.01, 0.005), [1.0, 5.0, 10.0]))
-3
-"""
+# ruff: noqa: D100
+# Module help is compiled from the matching stub and delegated below.
 
 from finstack_quant.finstack_quant import models as _models
 
@@ -28,3 +22,5 @@ __all__: list[str] = [
     "YieldPcaView",
     "nelson_siegel_yields",
 ]
+
+__doc__ = _models.rates.dtsm.__doc__

@@ -170,7 +170,12 @@ impl Compounding {
             // full precision for small rates.
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
-                (-n * t * (rate / n).ln_1p()).exp()
+                let x = rate / n;
+                if x <= -1.0 || !x.is_finite() || !t.is_finite() {
+                    f64::NAN
+                } else {
+                    (-n * t * x.ln_1p()).exp()
+                }
             }
             Compounding::Simple => {
                 let denominator = 1.0 + rate * t;
@@ -240,7 +245,12 @@ impl Compounding {
             Compounding::Continuous | Compounding::Simple => rate,
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
-                n * (rate / n).ln_1p()
+                let x = rate / n;
+                if x <= -1.0 || !x.is_finite() {
+                    f64::NAN
+                } else {
+                    n * x.ln_1p()
+                }
             }
         }
     }
@@ -423,14 +433,19 @@ pub fn z_spread_discount_factor(
     z: f64,
     compounds_per_year: f64,
 ) -> crate::Result<f64> {
-    if t <= 0.0 {
-        return Ok(df_base);
-    }
     if !df_base.is_finite() || df_base <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "z_spread_discount_factor: non-positive or non-finite base discount factor ({df_base}); \
              this is a curve-data error"
         )));
+    }
+    if !t.is_finite() || !z.is_finite() || !compounds_per_year.is_finite() {
+        return Err(crate::Error::Validation(format!(
+            "z_spread_discount_factor: non-finite input (t={t}, z={z}, compounds_per_year={compounds_per_year})"
+        )));
+    }
+    if t <= 0.0 {
+        return Ok(df_base);
     }
     let periods = NonZeroU32::new(compounds_per_year.max(1.0) as u32).unwrap_or(NonZeroU32::MIN);
     let compounding = Compounding::Periodic(periods);

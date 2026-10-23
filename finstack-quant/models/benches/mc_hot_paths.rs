@@ -24,7 +24,7 @@ use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
-use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanExercise, LsmcConfig, LsmcPricer};
+use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanExercise, LsmcConfig, LsmcEngine};
 use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
@@ -42,7 +42,10 @@ use std::hint::black_box;
 
 fn bench_european_pricer(c: &mut Criterion) {
     let mut group = c.benchmark_group("european_pricer");
-    let process = GbmProcess::with_params(0.05, 0.02, 0.20).unwrap();
+    let process =
+        finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.05, 0.02, 0.20)
+            .map(GbmProcess::new)
+            .unwrap();
     let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
     let df = (-0.05_f64).exp();
 
@@ -67,7 +70,10 @@ fn bench_european_pricer(c: &mut Criterion) {
 
 fn bench_lsmc_pricer(c: &mut Criterion) {
     let mut group = c.benchmark_group("lsmc_pricer");
-    let process = GbmProcess::with_params(0.05, 0.02, 0.20).unwrap();
+    let process =
+        finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.05, 0.02, 0.20)
+            .map(GbmProcess::new)
+            .unwrap();
     let exercise = AmericanExercise::new(OptionType::Put, 100.0).expect("valid strike");
     let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
@@ -81,7 +87,7 @@ fn bench_lsmc_pricer(c: &mut Criterion) {
             let config = LsmcConfig::new(n, exercise_dates.clone(), num_steps)
                 .expect("valid LSMC config")
                 .with_seed(42);
-            let pricer = LsmcPricer::new(config);
+            let pricer = LsmcEngine::new(config);
             b.iter(|| {
                 pricer
                     .price(
@@ -132,8 +138,11 @@ fn bench_lsq_regression(c: &mut Criterion) {
 
 fn bench_heston_qe_pricer(c: &mut Criterion) {
     let mut group = c.benchmark_group("heston_qe_pricer");
-    let process =
-        HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid Heston");
+    let process = finstack_quant_models::closed_form::HestonPricingParams::new(
+        0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04,
+    )
+    .map(HestonProcess::new)
+    .expect("valid Heston");
     let disc = QeHeston::new();
     let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
     let rng = PhiloxRng::new(42);

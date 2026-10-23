@@ -124,42 +124,42 @@ setters!(JsCreditDefaultSwapBuilder, "CreditDefaultSwapBuilder", {
         /// @param value - `"pay"` to buy protection (pay premium), `"receive"` to sell protection (receive premium).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        side as side => en,
+        side as side => js_wire,
         /// Set the ISDA regional convention.
         /// @param value - `"isda_na"` is the SNAC / post-Big-Bang North American standard (ACT/360, quarterly IMM, T+3); `"isda_eu"` the European standard (T+1, TARGET2); `"isda_as"` Asian (ACT/365F, Tokyo); `"custom"` for a manually configured convention.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        convention as convention => en,
+        convention as convention => js_wire,
         /// Set the premium leg specification.
         /// @param value - Premium leg specification.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        premium_leg as premiumLeg => json,
+        premium_leg as premiumLeg => from_js_json,
         /// Set the protection leg specification.
         /// @param value - Protection leg specification.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        protection_leg as protectionLeg => json,
+        protection_leg as protectionLeg => from_js_json,
         /// Set the valuation presentation convention.
         /// @param value - `"bloomberg_cdsw_clean"` (default) reports Bloomberg CDSW clean principal; `"isda_dirty"` the academic ISDA dirty PV; `"quant_lib_isda_parity"` reproduces QuantLib `IsdaCdsEngine`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        valuation_convention as valuationConvention => en,
+        valuation_convention as valuationConvention => js_wire,
         /// Set the ISDA documentation clause for restructuring credit events.
         /// @param value - One of the four 2014 ISDA restructuring elections, a regional ISDA corporate default, or `"custom"`. If never set, the effective clause is derived from the CDS convention (see `CreditDefaultSwap.doc_clause_effective`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        doc_clause as docClause => en,
+        doc_clause as docClause => js_wire,
         /// Set the protection effective date for a forward-starting CDS.
         /// @param value - Date on which credit protection begins; must satisfy `premium.start <= value <= premium.end` as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        protection_effective_date as protectionEffectiveDate => date,
+        protection_effective_date as protectionEffectiveDate => js_date,
         /// Set the OTC margin (CSA / initial-margin) specification.
         /// @param value - Rust `OtcMarginSpec` in serde form (plain object or JSON string); cleared CDS use the `cleared` form, bilateral CDS need a SIMM credit classification.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        margin_spec as marginSpec => json,
+        margin_spec as marginSpec => from_js_json,
 });
 
 common_setters!(JsCreditDefaultSwapBuilder, "CreditDefaultSwapBuilder");
@@ -283,57 +283,57 @@ setters!(JsCdsIndexBuilder, "CdsIndexBuilder", {
         /// @param value - Series number, e.g. `42`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        series as series => uint,
+        series as series => js_uint,
         /// Set the version number within the series.
         /// @param value - Version number, e.g. `1`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        version as version => uint,
+        version as version => js_uint,
         /// Set the index factor (fraction of surviving notional).
         /// @param value - Index factor in `[0.0, 1.0]`; `1.0` means no constituent has defaulted since series inception.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        index_factor as indexFactor => num,
+        index_factor as indexFactor => js_f64,
         /// Set the protection buyer/seller perspective.
         /// @param value - `"pay"` to buy protection (pay premium), `"receive"` to sell protection (receive premium).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        side as side => en,
+        side as side => js_wire,
         /// Set the ISDA regional convention.
         /// @param value - `"isda_na"` is the SNAC / post-Big-Bang North American standard; `"isda_eu"` European; `"isda_as"` Asian; `"custom"` for a manually configured convention.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        convention as convention => en,
+        convention as convention => js_wire,
         /// Set the premium leg specification.
         /// @param value - Premium leg specification (coupon schedule and discounting).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        premium_leg as premiumLeg => json,
+        premium_leg as premiumLeg => from_js_json,
         /// Set the protection leg specification.
         /// @param value - Protection leg specification (credit curve and settlement).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        protection_leg as protectionLeg => json,
+        protection_leg as protectionLeg => from_js_json,
         /// Set the pricing aggregation mode.
         /// @param value - `"single_curve"` prices the index against a single index hazard curve (synthetic CDS). `"constituents"` prices each issuer separately and aggregates by weight; requires `CdsIndexBuilder.constituents` to be set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        pricing as pricing => en,
+        pricing as pricing => js_wire,
         /// Set the index constituents.
         /// @param value - Constituent rows as typed `CdsIndexConstituent` objects, plain objects with `credit` (`reference_entity`, `recovery_rate`, `credit_curve_id`), `weight` and optional `defaulted`, or a JSON array of the same shape.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        constituents as constituents => json,
+        constituents as constituents => from_js_json,
         /// Set the number of reference entities in the index pool.
         /// @param value - Number of names in the index pool, e.g. `125` for CDX.NA.IG; required for portfolio-level analytics (e.g. jump-to-default) when `constituents` is empty.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        num_constituents as numConstituents => uint,
+        num_constituents as numConstituents => js_uint,
         /// Set the OTC margin (CSA / initial-margin) specification.
         /// @param value - Rust `OtcMarginSpec` in serde form (plain object or JSON string).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        margin_spec as marginSpec => json,
+        margin_spec as marginSpec => from_js_json,
 });
 
 common_setters!(JsCdsIndexBuilder, "CdsIndexBuilder");
@@ -430,15 +430,6 @@ factories!(JsCdsTranche, "CdsTranche", finstack_quant_valuations::instruments::c
         example as example,
 });
 
-market_metrics!(JsCdsTranche, "CdsTranche", {
-        /// Jump-to-default exposure (mirrors Rust `CdsTranche::jump_to_default`): PV impact of one constituent defaulting immediately.
-        /// @param market_json - Canonical market-context JSON (string or plain object) supplying the curves and quotes this instrument needs.
-        /// @param as_of - ISO-8601 valuation date.
-        /// @returns Jump-to-default PV change in notional currency units.
-        /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the calculation fails.
-        jump_to_default as jumpToDefault,
-});
-
 builder_class!(
     /// Fluent builder for `CdsTranche`; one setter per Rust `FinancialBuilder` setter.
     ///
@@ -466,32 +457,32 @@ setters!(JsCdsTrancheBuilder, "CdsTrancheBuilder", {
         /// @param value - Series number, e.g. `42`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        series as series => uint,
+        series as series => js_uint,
         /// Set the attachment point.
         /// @param value - Attachment point quoted in percent (`0.0` for equity; `3.0` for a tranche attaching at 3%).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attach_pct as attachPct => num,
+        attach_pct as attachPct => js_f64,
         /// Set the detachment point.
         /// @param value - Detachment point quoted in percent (`3.0` for a 0-3% tranche).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        detach_pct as detachPct => num,
+        detach_pct as detachPct => js_f64,
         /// Set the maturity date of the tranche.
         /// @param value - Maturity date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => date,
+        maturity as maturity => js_date,
         /// Set the running coupon.
         /// @param value - Running coupon in basis points (`100.0` = 1.00%).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        coupon_bp as couponBp => num,
+        coupon_bp as couponBp => js_f64,
         /// Set the business day convention for coupon dates.
         /// @param value - Roll rule (`"modified_following"` when never set).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        business_day_convention as businessDayConvention => en,
+        business_day_convention as businessDayConvention => js_wire,
         /// Set the holiday calendar identifier.
         /// @param value - Holiday calendar identifier.
         /// @returns The builder, for chaining.
@@ -511,27 +502,27 @@ setters!(JsCdsTrancheBuilder, "CdsTrancheBuilder", {
         /// @param value - Tranche side.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        side as side => en,
+        side as side => js_wire,
         /// Set the contract start (effective) date for schedule anchoring.
         /// @param value - Effective date; if never set, uses the as-of date (or the prior CDS roll date when `roll_rule` is `"cds_imm"`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        start_date as startDate => date,
+        start_date as startDate => js_date,
         /// Set the realized (settled) loss.
         /// @param value - Realized loss as a fraction of the original portfolio notional; `0.0` when never set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        realized_loss as realizedLoss => num,
+        realized_loss as realizedLoss => js_f64,
         /// Set the coupon roll-date grid.
         /// @param value - `"cds_imm"` for the CDS roll dates (20th of Mar, Jun, Sep, Dec) or `"none"` (the default) for a schedule from `frequency` and `stub`; `"imm"` is rejected by `build()`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        roll_rule as rollRule => en,
+        roll_rule as rollRule => js_wire,
         /// Set the stub convention for a bespoke coupon schedule.
         /// @param value - Stub rule used when `roll_rule` is `"none"`; `"short_front"` when never set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        stub as stub => en,
+        stub as stub => js_wire,
 });
 
 common_setters!(JsCdsTrancheBuilder, "CdsTrancheBuilder");
@@ -662,12 +653,12 @@ setters!(JsConvertibleBondBuilder, "ConvertibleBondBuilder", {
         /// @param value - Issue date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        issue_date as issueDate => date,
+        issue_date as issueDate => js_date,
         /// Set the maturity date.
         /// @param value - Maturity date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => date,
+        maturity as maturity => js_date,
         /// Set the discount curve identifier for the debt component.
         /// @param value - Discount curve identifier (risk-free or funding).
         /// @returns The builder, for chaining.
@@ -682,7 +673,7 @@ setters!(JsConvertibleBondBuilder, "ConvertibleBondBuilder", {
         /// @param value - Typed `ConversionSpec`, a plain object, or a JSON object string with `ratio`, `price`, `policy`, `anti_dilution`, `dividend_adjustment` and `dilution_events`; at least one of `ratio` / `price` must be set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        conversion as conversion => json,
+        conversion as conversion => from_js_json,
         /// Set the market-scalar id of the underlying share price (required).
         /// @param value - `MarketContext` price id holding the share price in the bond's currency, or a unitless level.
         /// @returns The builder, for chaining.
@@ -702,32 +693,32 @@ setters!(JsConvertibleBondBuilder, "ConvertibleBondBuilder", {
         /// @param value - Typed `CallPutSchedule`, a plain object, or a JSON object string with `calls` and `puts` arrays of windows.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        call_put as callPut => json,
+        call_put as callPut => from_js_json,
         /// Set the soft-call trigger condition.
         /// @param value - `PriceTrigger` as a plain object or JSON object string with `threshold_pct` (percent of conversion price, e.g. `130.0`), `observation_days` and `required_days_above`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        soft_call_trigger as softCallTrigger => json,
+        soft_call_trigger as softCallTrigger => from_js_json,
         /// Set the settlement lag.
         /// @param value - Business days from trade date to settlement (e.g. `2` for US corporate convertibles); same-day when never set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        settlement_days as settlementDays => uint,
+        settlement_days as settlementDays => js_uint,
         /// Set the assumed recovery rate on default.
         /// @param value - Recovery rate as a fraction (`0.40` = 40%); only relevant when `credit_curve_id` is set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        recovery_rate as recoveryRate => num,
+        recovery_rate as recoveryRate => js_f64,
         /// Record the claim remaining after exercise extinguishes the debt.
         /// @param value - Canonical `ConvertibleSettlement` object or JSON string with ISO `exercise_date` and `delivery_date`, nonnegative `shares`, and currency-tagged `cash` and `recovery_basis`. Cash includes retained coupons; recovery basis excludes uncapitalized accrual. Omission leaves debt unresolved.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws for malformed input or a consumed builder; `build()` validates dates, currencies and amounts.
-        resolved_settlement as resolvedSettlement => json,
+        resolved_settlement as resolvedSettlement => from_js_json,
         /// Set the coupon/cashflow specification.
         /// @param value - Rust `CashflowSpec` as a plain object or JSON object string (the same shape as `Bond.cashflow_spec`, e.g. `{"fixed": {"coupon_type": "cash", "rate": "0.05", ...schedule}}`); a zero-coupon convertible uses a fixed spec with rate `"0"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        cashflow_spec as cashflowSpec => json,
+        cashflow_spec as cashflowSpec => from_js_json,
 });
 
 common_setters!(JsConvertibleBondBuilder, "ConvertibleBondBuilder");
@@ -841,16 +832,6 @@ impl JsCdsTranche {
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
-    }
-
-    /// Expected tranche loss at maturity (mirrors Rust `CdsTranche::expected_loss`).
-    /// @param market_json - Canonical market-context JSON (string or plain object) supplying the credit index data.
-    /// @returns Expected loss of the tranche in the notional currency.
-    /// @throws Error - Throws with kind `not_found` if the credit index data is missing, kind `validation` if the market JSON is malformed, and kind `computation` if the loss model fails.
-    #[wasm_bindgen(js_name = expectedLoss)]
-    pub fn expected_loss(&self, market_json: JsValue) -> Result<f64, JsValue> {
-        let market = parse_market(&market_json)?;
-        self.inner.expected_loss(&market).map_err(to_js_err)
     }
 }
 

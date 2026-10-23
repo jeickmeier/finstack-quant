@@ -187,7 +187,7 @@ class ExCouponRule:
         """
         ...
 
-    def ex_date(self, payment_date: datetime.date) -> datetime.date:
+    def ex_date(self, payment_date: datetime.date | str) -> datetime.date:
         """
         Compute the coupon record date for a coupon paid on *payment_date*.
 

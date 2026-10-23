@@ -19,11 +19,11 @@
 //!   lagged redemption date into the complete build-date grid.
 //!
 //! Determinism and validation follow the project invariants: windows must be
-//! within `[issue, maturity]`, coverage must be unique (no overlapping coupon
-//! pieces without containment), and every produced schedule must contain at
-//! least two dates.
+//! within `[issue, maturity]`. Coupon pieces must not overlap at all. Payment
+//! pieces may nest (the innermost wins) but must not partially overlap. Every
+//! produced schedule must contain at least two dates.
 
-use finstack_quant_core::dates::{Date, DayCount, HolidayCalendar, Tenor};
+use finstack_quant_core::dates::{Date, HolidayCalendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
@@ -197,12 +197,10 @@ pub(crate) struct FloatSchedule {
 /// Periodic fee schedule compiled from a fee spec.
 #[derive(Clone)]
 pub(super) struct PeriodicFee {
-    pub(super) calendar_id: String,
+    /// Accrual conventions shared with the coupon paths.
+    pub(super) schedule: ScheduleParams,
     pub(super) base: FeeBase,
     pub(super) bp: Decimal,
-    pub(super) day_count: DayCount,
-    pub(super) frequency: Tenor,
-    pub(super) stub: finstack_quant_core::dates::StubKind,
     pub(super) calendar: &'static dyn HolidayCalendar,
     pub(super) periods: Vec<CompiledPeriod>,
     pub(super) accrual_basis: FeeAccrualBasis,
@@ -269,13 +267,10 @@ pub(super) fn build_fee_schedules(
                 let calendar = calendar_by_id_strict(calendar_id)?;
                 let terminal = terminal_accrual_end(&periods, maturity);
                 periodic_fees.push(PeriodicFee {
-                    calendar_id: calendar_id.clone(),
+                    schedule,
                     base: base.clone(),
                     bp: *bp,
-                    day_count: *day_count,
-                    frequency: *frequency,
                     calendar,
-                    stub: *stub,
                     periods,
                     accrual_basis: accrual_basis.clone(),
                     terminal_accrual_end: terminal,

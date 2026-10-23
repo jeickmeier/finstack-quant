@@ -898,7 +898,7 @@ def bootstrap_hull_white_sigma_schedule_to_cap_floors(
     ...     [CapFloorQuote(2.0, 0.03, 0.009, True, True), CapFloorQuote(5.0, 0.03, 0.010, True, True)],
     ...     PiecewiseSigmaCalibrationConfig(0.03, 1e-4, 0.05, 1e-4),
     ... )
-    >>> len(params.values)
+    >>> len(params.get_values())
     2
 
     """

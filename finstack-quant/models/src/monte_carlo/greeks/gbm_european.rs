@@ -135,7 +135,8 @@ fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
             .antithetic(defaults.antithetic),
     );
     let rng = PhiloxRng::new(seed);
-    let gbm = GbmProcess::with_params(spec.rate, spec.div_yield, spec.vol)?;
+    let gbm = crate::monte_carlo::process::gbm::GbmParams::new(spec.rate, spec.div_yield, spec.vol)
+        .map(GbmProcess::new)?;
     let disc = ExactGbm::new();
     let discount_factor = flat_discount_factor(spec.rate, spec.expiry)?;
 

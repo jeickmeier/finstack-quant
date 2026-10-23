@@ -1006,7 +1006,7 @@ export default [
   {
     "path": "#/$defs/d_6990e6c5e63d5457943c",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption",
-    "description": "Option on spot commodity. Options on a specified futures contract use\n[`crate::commodity::commodity_future_option::CommodityFutureOption`], including futures delivery.\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\n`spot_id` must identify an observed spot for early exercise and Monte Carlo.\nThe commodity forward is never substituted for the spot underlying.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup."
+    "description": "Option on spot commodity. Options on a specified futures contract use\n[`crate::commodity::commodity_future_option::CommodityFutureOption`], including futures delivery.\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\n`spot_id` must identify an observed spot for early exercise and Monte Carlo.\nA numeric scalar is in the underlying currency; a Money scalar must carry\nthat same currency.\nThe commodity forward is never substituted for the spot underlying.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup."
   },
   {
     "path": "#/$defs/d_6990e6c5e63d5457943c/properties/attributes",
@@ -1156,7 +1156,7 @@ export default [
   {
     "path": "#/$defs/d_6990e6c5e63d5457943c/properties/spot_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/spot_id",
-    "description": "Optional spot price ID (for spot-based pricing and American options)."
+    "description": "Optional spot price ID (for spot-based pricing and American options).\nNumeric prices use the underlying currency; Money prices must match it."
   },
   {
     "path": "#/$defs/d_6990e6c5e63d5457943c/properties/spot_id/anyOf/0",
@@ -1298,12 +1298,6 @@ export default [
     "path": "#/$defs/d_8a837e6f142b34e8cfd4/properties/asset_vol",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/asset_vol",
     "description": "Annualised asset volatility for the nested GBM simulation.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_8a837e6f142b34e8cfd4/properties/equity_discount_rate",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/equity_discount_rate",
-    "description": "Equity holder discount rate applied to the nested-MC payoff.\n\nNote: the nested simulation drifts under the risk-neutral measure\n(`risk_free_rate`) but discounts here, so the intermediate equity\nfigures are decision inputs, not measure-consistent prices. The\nrate cancels in the cash-vs-PIK comparison and does not bias the\nelected branch.",
     "format": "double"
   },
   {

@@ -398,48 +398,30 @@ impl PricingError {
     ///   pricing error for diagnostics.
     pub fn from_core(err: finstack_quant_core::Error, context: PricingErrorContext) -> Self {
         match err {
-            finstack_quant_core::Error::Input(input) => match input {
-                finstack_quant_core::InputError::NotFound { id } => {
-                    PricingError::MissingMarketData {
-                        missing_id: id,
-                        context,
-                    }
+            finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound { id }) => {
+                PricingError::MissingMarketData {
+                    missing_id: id,
+                    context,
                 }
-                finstack_quant_core::InputError::MissingCurve { requested, .. } => {
-                    PricingError::MissingMarketData {
-                        missing_id: requested,
-                        context,
-                    }
-                }
+            }
+            finstack_quant_core::Error::Input(finstack_quant_core::InputError::MissingCurve {
+                requested,
+                ..
+            }) => PricingError::MissingMarketData {
+                missing_id: requested,
+                context,
+            },
+            finstack_quant_core::Error::Input(
                 finstack_quant_core::InputError::WrongCurveType {
                     id,
                     expected,
                     actual,
-                } => PricingError::InvalidInput {
-                    message: format!(
-                        "Curve type mismatch for '{id}': expected '{expected}', got '{actual}'"
-                    ),
-                    context,
                 },
-                other => {
-                    let error = finstack_quant_core::Error::Input(other);
-                    match error.kind() {
-                        finstack_quant_core::ErrorKind::NotFound => {
-                            PricingError::MissingMarketData {
-                                missing_id: error.to_string(),
-                                context,
-                            }
-                        }
-                        finstack_quant_core::ErrorKind::Validation => PricingError::InvalidInput {
-                            message: error.to_string(),
-                            context,
-                        },
-                        finstack_quant_core::ErrorKind::Computation => PricingError::ModelFailure {
-                            message: error.to_string(),
-                            context,
-                        },
-                    }
-                }
+            ) => PricingError::InvalidInput {
+                message: format!(
+                    "Curve type mismatch for '{id}': expected '{expected}', got '{actual}'"
+                ),
+                context,
             },
             finstack_quant_core::Error::Validation(msg) => PricingError::InvalidInput {
                 message: msg,

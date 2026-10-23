@@ -12,8 +12,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
-use super::compiler::{FixedSchedule, FloatSchedule};
-
 /// Stable ordering rank used for deterministic sorting of same-date cashflows.
 ///
 /// All known `CFKind` variants are explicitly ranked so that same-date ordering
@@ -57,10 +55,10 @@ fn kind_rank(kind: CFKind) -> u8 {
 /// 5. **Reset and principal dates** — `Option<Date>` ordering, with `None` first.
 /// 6. **Accrual factor** — `f64::total_cmp`.
 /// 7. **Rate** — `Option<f64>` ordering, with `None` first, then `total_cmp`.
-/// 8. **Accrual metadata** — period, day-count rank, then projected index rate.
+/// 8. **Accrual metadata** — period, day count, then projected index rate.
 /// 9. **Principal delta** — currency, then exact Decimal value.
-/// 10. **Representation ties** — actual kind, day-count variant, and Decimal
-///     encodings distinguish rows whose preceding comparison keys are equal.
+/// 10. **Representation ties** — actual kind and Decimal encodings distinguish
+///     rows whose preceding comparison keys are equal.
 ///
 /// This is the canonical order downstream consumers
 /// (`outstanding_by_date`, `pv_by_period`, accrual, dataframe export, etc.)
@@ -101,12 +99,6 @@ fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
         })
         // Retain the existing economic precedence before resolving representation ties.
         .then_with(|| (a.kind as usize).cmp(&(b.kind as usize)))
-        .then_with(|| {
-            a.accrual
-                .as_ref()
-                .map(|value| value.day_count as usize)
-                .cmp(&b.accrual.as_ref().map(|value| value.day_count as usize))
-        })
         .then_with(|| {
             a.amount
                 .amount_decimal()
@@ -153,6 +145,10 @@ fn compare_accrual(
     }
 }
 
+/// Stable day-count rank for accrual tie-breaks.
+///
+/// Explicit, so the canonical schedule order does not depend on the
+/// declaration order of `DayCount` variants.
 fn day_count_rank(day_count: DayCount) -> u8 {
     match day_count {
         DayCount::Act360 => 0,
@@ -167,47 +163,9 @@ fn day_count_rank(day_count: DayCount) -> u8 {
         DayCount::Bus252 => 9,
         DayCount::ActActAfb => 10,
         DayCount::Thirty360It => 11,
-        _ => 12,
+        DayCount::OneOne => 12,
+        _ => 13,
     }
-}
-
-pub(crate) fn finalize_flows(
-    fixed: &[FixedSchedule],
-    floating: &[FloatSchedule],
-    issue_date: Option<Date>,
-    maturity_date: Option<Date>,
-    mut projected_fixings: Vec<crate::fixings::ProjectedFixing>,
-) -> (CashFlowMeta, DayCount) {
-    crate::fixings::normalize_projected_fixings(&mut projected_fixings);
-
-    let mut cals: Vec<String> = fixed
-        .iter()
-        .map(|schedule| schedule.spec.schedule.calendar_id.to_string())
-        .chain(
-            floating
-                .iter()
-                .map(|schedule| schedule.spec.schedule.calendar_id.to_string()),
-        )
-        .collect();
-    cals.sort_unstable();
-    cals.dedup();
-    let meta = CashFlowMeta {
-        projected_fixings,
-        calendar_ids: cals,
-        commitment: None,
-        issue_date,
-        maturity: maturity_date,
-        representation: CashflowRepresentation::default(),
-    };
-
-    let out_day_count = if let Some(schedule) = fixed.first() {
-        schedule.spec.schedule.day_count
-    } else if let Some(schedule) = floating.first() {
-        schedule.spec.schedule.day_count
-    } else {
-        DayCount::Act365F
-    };
-    (meta, out_day_count)
 }
 
 /// Meaning of the emitted schedule relative to pricing and waterfall policy.
@@ -224,47 +182,6 @@ pub enum CashflowRepresentation {
     Placeholder,
     /// Intentionally empty because no future dated cashflows remain.
     NoResidual,
-}
-
-impl CashflowRepresentation {
-    /// Serde `snake_case` wire label for this representation.
-    ///
-    /// Returns `contractual`, `projected`, `placeholder`, or `no_residual`.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Contractual => "contractual",
-            Self::Projected => "projected",
-            Self::Placeholder => "placeholder",
-            Self::NoResidual => "no_residual",
-        }
-    }
-}
-
-impl std::fmt::Display for CashflowRepresentation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl std::str::FromStr for CashflowRepresentation {
-    type Err = finstack_quant_core::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        [
-            Self::Contractual,
-            Self::Projected,
-            Self::Placeholder,
-            Self::NoResidual,
-        ]
-        .into_iter()
-        .find(|representation| representation.as_str() == s)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "invalid cashflow representation {s:?}; expected contractual, projected, placeholder, or no_residual"
-            ))
-        })
-    }
 }
 
 /// Metadata shared by an entire cashflow schedule.
@@ -661,14 +578,9 @@ impl CashFlowSchedule {
     fn validate_principal_balance(&self) -> finstack_quant_core::Result<()> {
         let initial = self.notional.initial;
         if let Some(anchor) = self.funding_anchor() {
-            let replay = self.replay_balances(anchor)?;
             let epsilon = (initial.amount().abs() * 1e-8).max(1e-6);
-            for (position, (index, _, balance)) in replay.iter().enumerate() {
-                let date = self.flows[*index].get_balance_date();
-                let date_finished = replay
-                    .get(position + 1)
-                    .is_none_or(|(next, _, _)| self.flows[*next].get_balance_date() != date);
-                if date_finished && initial.amount() >= 0.0 && balance.amount() < -epsilon {
+            for (date, balance) in self.replay_balances(anchor)? {
+                if initial.amount() >= 0.0 && balance.amount() < -epsilon {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "principal repayments exceed outstanding on {date}: {}",
                         balance.amount()
@@ -835,9 +747,7 @@ impl CashFlowSchedule {
         weighted_average_life_from_principal(
             self.flows
                 .iter()
-                .filter(|cf| {
-                    cf.kind.is_principal_repayment() && cf.date > as_of && cf.amount.amount() > 0.0
-                })
+                .filter(|cf| cf.kind.is_principal_repayment())
                 .map(|cf| (cf.date, cf.amount)),
             as_of,
         )
@@ -873,19 +783,7 @@ impl CashFlowSchedule {
                     .into(),
             )
         })?;
-        let replay = self.replay_balances(issue)?;
-        let mut result = Vec::with_capacity(replay.len());
-        for (idx, _, after) in replay {
-            let date = self.flows[idx].get_balance_date();
-            if let Some((last_date, last_balance)) = result.last_mut() {
-                if *last_date == date {
-                    *last_balance = after;
-                    continue;
-                }
-            }
-            result.push((date, after));
-        }
-        Ok(result)
+        self.replay_balances(issue)
     }
 
     /// Extract currency-tagged settlement cashflows `(Date, Money)` from this schedule.
@@ -980,19 +878,25 @@ impl CashFlowSchedule {
         Ok(balances)
     }
 
+    /// Closing balance after each balance date, in replay order.
     fn replay_balances(
         &self,
         funding_anchor: Date,
-    ) -> finstack_quant_core::Result<Vec<(usize, Money, Money)>> {
+    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let order = self.balance_replay_order(funding_anchor, |_| true);
         let mut outstanding = self.notional.initial;
-        let mut replay = Vec::with_capacity(order.len());
+        let mut closing: Vec<(Date, Money)> = Vec::new();
         for (idx, is_initial_funding) in order {
-            let before = outstanding;
             apply_flow_to_outstanding(&mut outstanding, &self.flows[idx], is_initial_funding)?;
-            replay.push((idx, before, outstanding));
+            let date = self.flows[idx].get_balance_date();
+            match closing.last_mut() {
+                Some((last_date, last_balance)) if *last_date == date => {
+                    *last_balance = outstanding;
+                }
+                _ => closing.push((date, outstanding)),
+            }
         }
-        Ok(replay)
+        Ok(closing)
     }
 
     /// Issue date, else the first flow date: where the issue funding row sits.

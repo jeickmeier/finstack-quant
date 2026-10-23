@@ -640,39 +640,6 @@ impl FiscalConfig {
         })
     }
 
-    /// Resolve an optionally specified fiscal-year start.
-    ///
-    /// Hosts expose the start as two optional arguments; this is the one place
-    /// that decides what an omitted half means.
-    ///
-    /// # Arguments
-    ///
-    /// * `start_month` - Fiscal-year start month (1-12). When only
-    ///   `start_day` is supplied, the month defaults to January.
-    /// * `start_day` - Fiscal-year start day of month (1-31). When only
-    ///   `start_month` is supplied, the day defaults to the 1st.
-    ///
-    /// # Returns
-    ///
-    /// `None` when both parts are omitted, so the caller's own default applies
-    /// (for example [`FiscalConfig::default`], the calendar year). Otherwise
-    /// the validated configuration: a month of 10 alone means October 1, and a
-    /// day of 6 alone means January 6.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Error::Validation` under the same range rules as
-    /// [`FiscalConfig::new`].
-    pub fn from_parts(
-        start_month: Option<u8>,
-        start_day: Option<u8>,
-    ) -> crate::Result<Option<Self>> {
-        if start_month.is_none() && start_day.is_none() {
-            return Ok(None);
-        }
-        Self::new(start_month.unwrap_or(1), start_day.unwrap_or(1)).map(Some)
-    }
-
     /// Month the fiscal year starts in (1 = January … 12).
     pub fn start_month(&self) -> u8 {
         self.start_month as u8

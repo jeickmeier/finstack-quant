@@ -11,22 +11,18 @@
 //!
 //! # Stochastic Recovery Models
 //!
-//! ## Market-Correlated (Andersen-Sidenius)
+//! ## Market-correlated logistic-normal recovery
 //!
-//! Recovery is driven by a bounded transformation of a latent factor shock:
 //! ```text
-//! shock(Z) = ρ_R · σ_R · Z
-//! R(Z) = bounded_transform(μ_R, shock(Z), min_R, max_R)
+//! R(z,e) = sigmoid(logit(m) + sigma/[m(1-m)] * (rho*z + sqrt(1-rho²)*e))
 //! ```
-//! where:
-//! - `μ_R` is the target mean recovery at `Z = 0`
-//! - `σ_R` is the recovery-volatility scale
-//! - `ρ_R` controls the sign and magnitude of factor sensitivity
-//! - the bounded transform maps the shocked recovery smoothly into
-//!   `[min_R, max_R]`
 //!
-//! Low `Z` is the canonical stress state. Preset calibrations use positive
-//! `ρ_R`, so negative factor realizations decrease recovery.
+//! `m` is the zero-total-shock recovery location, not the unconditional mean.
+//! `sigma` is a local shock scale, not the realized recovery standard deviation.
+//! Both Gaussian factors are independent standard normals. Conditional recovery
+//! integrates over `e`; expected recovery integrates over both factors. Locations
+//! zero and one and a zero shock scale give exact constant recoveries. Low `z`
+//! is stress, so positive `rho` lowers recovery during stress.
 //!
 //! # References
 //!
@@ -73,8 +69,32 @@ pub trait RecoveryModel: Send + Sync + std::fmt::Debug {
     ///
     /// # Returns
     ///
-    /// The conditional recovery rate in decimal form.
-    fn conditional_recovery(&self, market_factor: f64) -> f64;
+    /// The conditional expected recovery in decimal form.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a non-finite factor, or a core computation
+    /// error if conditional integration fails.
+    fn conditional_recovery(&self, market_factor: f64) -> Result<f64>;
+
+    /// Sample the canonical bounded recovery law for one obligor.
+    ///
+    /// # Arguments
+    ///
+    /// * `market_factor` - Finite systematic standard-normal realization shared
+    ///   across obligors in the period; low values represent credit stress.
+    /// * `idiosyncratic_normal` - Finite independent standard-normal realization
+    ///   for this obligor. Constant and perfectly systematic models ignore it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if either factor is non-finite.
+    fn sample_recovery(&self, market_factor: f64, idiosyncratic_normal: f64) -> Result<f64>;
+
+    /// Whether sampling needs an independent obligor recovery draw.
+    ///
+    /// False for constant distributions and perfect systematic correlation.
+    fn has_idiosyncratic_dispersion(&self) -> bool;
 
     /// Loss given default = 1 - recovery.
     ///
@@ -93,9 +113,13 @@ pub trait RecoveryModel: Send + Sync + std::fmt::Debug {
     ///
     /// # Returns
     ///
-    /// The conditional LGD in decimal form.
-    fn conditional_lgd(&self, market_factor: f64) -> f64 {
-        1.0 - self.conditional_recovery(market_factor)
+    /// The conditional expected LGD in decimal form.
+    ///
+    /// # Errors
+    ///
+    /// Propagates validation and computation errors from conditional recovery.
+    fn conditional_lgd(&self, market_factor: f64) -> Result<f64> {
+        Ok(1.0 - self.conditional_recovery(market_factor)?)
     }
 
     /// Recovery-rate volatility scale used by the model.
@@ -114,11 +138,12 @@ pub trait RecoveryModel: Send + Sync + std::fmt::Debug {
     /// A static human-readable model name.
     fn model_name(&self) -> &'static str;
 
-    /// Whether this model is stochastic (varies with market factor).
+    /// Whether the recovery distribution is nonconstant.
     ///
     /// # Returns
     ///
-    /// `true` if the model reports a non-zero recovery-volatility scale.
+    /// Constant models return false; correlated endpoint locations and zero
+    /// scales are constant even if configured with a non-zero local scale.
     fn is_stochastic(&self) -> bool {
         self.recovery_volatility() > 0.0
     }
@@ -137,15 +162,13 @@ pub enum RecoverySpec {
         rate: f64,
     },
 
-    /// Recovery correlated with market factor (Andersen-Sidenius model).
+    /// Logistic-normal recovery with independent systematic and obligor shocks.
     ///
-    /// Uses the same bounded latent-factor shock as [`CorrelatedRecovery`]:
-    /// the affine shock `correlation * volatility * Z` is passed through a
-    /// smooth logistic transform so recovery stays inside the configured bounds.
+    /// Uses the canonical law documented by [`CorrelatedRecovery`].
     MarketCorrelated {
-        /// Mean recovery rate
+        /// Zero-total-shock recovery location in [0, 1], not the unconditional mean.
         mean_recovery: f64,
-        /// Recovery volatility (standard deviation)
+        /// Local recovery shock scale in [0, 0.5], not the realized standard deviation.
         recovery_volatility: f64,
         /// Correlation with the systematic factor. Under the canonical
         /// low-factor-stress convention this is typically POSITIVE: recovery
@@ -160,11 +183,27 @@ pub enum RecoverySpec {
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum RawRecoverySpec {
     Constant {
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::ClosedUnitIntervalF64Wire")
+        )]
         rate: f64,
     },
     MarketCorrelated {
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::ClosedUnitIntervalF64Wire")
+        )]
+        /// Zero-total-shock recovery location in [0, 1], not the unconditional mean.
         mean_recovery: f64,
+        #[cfg_attr(feature = "json-schema", schemars(range(min = 0.0, max = 0.5)))]
+        /// Local shock scale in [0, 0.5], not realized recovery standard deviation.
         recovery_volatility: f64,
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::CorrelationWire")
+        )]
+        /// Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress.
         factor_correlation: f64,
     },
 }
@@ -218,10 +257,10 @@ impl RecoverySpec {
     /// Create market-correlated recovery specification.
     ///
     /// # Arguments
-    /// * `mean` - Recovery at zero factor in [0.0, 1.0]. Endpoints produce
+    /// * `mean` - Recovery at zero total shock in [0.0, 1.0]. Endpoints produce
     ///   constant zero or full recovery. Typical: 0.40.
-    /// * `vol` - Recovery volatility, clamped to [0.0, 0.5]. Typical: 0.20-0.30
-    /// * `corr` - Correlation with factor, clamped to [-1.0, 1.0]. Typical: +0.30 to +0.50
+    /// * `vol` - Local recovery shock scale (not realized standard deviation), finite and in [0.0, 0.5]. Typical: 0.20-0.30
+    /// * `corr` - Correlation with factor, finite and in [-1.0, 1.0]. Typical: +0.30 to +0.50
     ///   (positive under the canonical low-factor-stress convention)
     ///
     /// # Returns
@@ -231,15 +270,14 @@ impl RecoverySpec {
     /// # Errors
     ///
     /// Returns [`crate::correlation::Error`] if `mean` is not finite or lies
-    /// outside `[0.0, 1.0]`, or if `vol` / `corr` are not finite.
+    /// outside `[0.0, 1.0]`, or if `vol` is outside `[0, 0.5]`, `corr` is outside `[-1, 1]`,
+    /// or either is non-finite.
     pub fn market_correlated(mean: f64, vol: f64, corr: f64) -> Result<Self> {
-        validate_recovery_input("mean_recovery", mean, 0.0, 1.0)?;
-        validate_finite_recovery_input("recovery_volatility", vol)?;
-        validate_finite_recovery_input("factor_correlation", corr)?;
+        validate_correlated_inputs(mean, vol, corr)?;
         Ok(RecoverySpec::MarketCorrelated {
-            mean_recovery: mean.clamp(0.0, 1.0),
-            recovery_volatility: vol.clamp(0.0, 0.5),
-            factor_correlation: corr.clamp(-1.0, 1.0),
+            mean_recovery: mean,
+            recovery_volatility: vol,
+            factor_correlation: corr,
         })
     }
 
@@ -254,13 +292,8 @@ impl RecoverySpec {
     /// # Returns
     ///
     /// The default stochastic-recovery specification used by this crate.
-    #[must_use]
-    pub fn market_standard_stochastic() -> Self {
-        RecoverySpec::MarketCorrelated {
-            mean_recovery: 0.40,
-            recovery_volatility: 0.25,
-            factor_correlation: 0.40,
-        }
+    pub fn market_standard_stochastic() -> Result<Self> {
+        Self::market_correlated(0.40, 0.25, 0.40)
     }
 
     /// Validate the recovery specification without constructing a model.
@@ -276,11 +309,11 @@ impl RecoverySpec {
                 mean_recovery,
                 recovery_volatility,
                 factor_correlation,
-            } => {
-                validate_recovery_input("mean_recovery", *mean_recovery, 0.0, 1.0)?;
-                validate_recovery_input("recovery_volatility", *recovery_volatility, 0.0, 0.5)?;
-                validate_recovery_input("factor_correlation", *factor_correlation, -1.0, 1.0)
-            }
+            } => validate_correlated_inputs(
+                *mean_recovery,
+                *recovery_volatility,
+                *factor_correlation,
+            ),
         }
     }
 
@@ -290,19 +323,25 @@ impl RecoverySpec {
     ///
     /// A boxed [`RecoveryModel`] implementation matching the specification.
     ///
+    /// # Errors
+    ///
+    /// Returns a validation error for invalid inputs, or a core computation
+    /// error if expected-recovery integration fails.
+    ///
     /// # Examples
     ///
     /// ```rust
     /// use finstack_quant_models::correlation::{RecoveryModel, RecoverySpec};
     ///
-    /// let model = RecoverySpec::constant(0.40)?.build();
+    /// let model = RecoverySpec::constant(0.40)?.build()?;
     /// assert_eq!(model.expected_recovery(), 0.40);
     /// # Ok::<(), finstack_quant_models::correlation::Error>(())
     /// ```
-    #[must_use]
-    pub fn build(&self) -> Box<dyn RecoveryModel> {
-        match self {
-            RecoverySpec::Constant { rate } => Box::new(ConstantRecovery::new(*rate)),
+    pub fn build(&self) -> Result<Box<dyn RecoveryModel>> {
+        Ok(match self {
+            RecoverySpec::Constant { rate } => {
+                Box::new(ConstantRecovery::new(*rate)?) as Box<dyn RecoveryModel>
+            }
             RecoverySpec::MarketCorrelated {
                 mean_recovery,
                 recovery_volatility,
@@ -311,29 +350,15 @@ impl RecoverySpec {
                 *mean_recovery,
                 *recovery_volatility,
                 *factor_correlation,
-            )),
-        }
+            )?),
+        })
     }
+}
 
-    /// Get the location-parameter recovery rate from the specification.
-    ///
-    /// For [`RecoverySpec::Constant`], this is the constant recovery rate.
-    /// For [`RecoverySpec::MarketCorrelated`], this returns the `mean_recovery`
-    /// input (the target recovery at `Z = 0`), which differs from the
-    /// Jensen-corrected unconditional mean `E_Z[R(Z)]` whenever the factor
-    /// sensitivity is non-zero. To obtain the true expected recovery, call
-    /// [`Self::build`] and then [`RecoveryModel::expected_recovery`].
-    ///
-    /// # Returns
-    ///
-    /// The location-parameter recovery in decimal form.
-    #[must_use]
-    pub fn expected_recovery(&self) -> f64 {
-        match self {
-            RecoverySpec::Constant { rate } => *rate,
-            RecoverySpec::MarketCorrelated { mean_recovery, .. } => *mean_recovery,
-        }
-    }
+fn validate_correlated_inputs(mean: f64, vol: f64, corr: f64) -> Result<()> {
+    validate_recovery_input("mean_recovery", mean, 0.0, 1.0)?;
+    validate_recovery_input("recovery_volatility", vol, 0.0, 0.5)?;
+    validate_recovery_input("factor_correlation", corr, -1.0, 1.0)
 }
 
 fn validate_finite_recovery_input(field: &str, value: f64) -> Result<()> {
@@ -366,11 +391,45 @@ mod tests {
     use super::*;
 
     #[test]
+    fn invalid_recovery_inputs_fail_every_construction_path() {
+        for (mean, vol, corr) in [
+            (-0.1, 0.2, 0.4),
+            (1.1, 0.2, 0.4),
+            (0.4, -0.1, 0.4),
+            (0.4, 0.6, 0.4),
+            (0.4, 0.2, -1.1),
+            (0.4, 0.2, 1.1),
+        ] {
+            assert!(CorrelatedRecovery::new(mean, vol, corr).is_err());
+            assert!(RecoverySpec::market_correlated(mean, vol, corr).is_err());
+            let spec = RecoverySpec::MarketCorrelated {
+                mean_recovery: mean,
+                recovery_volatility: vol,
+                factor_correlation: corr,
+            };
+            assert!(spec.build().is_err());
+            let wire = serde_json::to_value(spec).expect("wire");
+            assert!(serde_json::from_value::<RecoverySpec>(wire).is_err());
+        }
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(CorrelatedRecovery::new(bad, 0.2, 0.4).is_err());
+            assert!(CorrelatedRecovery::new(0.4, bad, 0.4).is_err());
+            assert!(CorrelatedRecovery::new(0.4, 0.2, bad).is_err());
+        }
+        for corr in [-1.0, 1.0] {
+            let model = CorrelatedRecovery::new(0.4, 0.5, corr).expect("boundary inputs");
+            assert!(model.expected_recovery().is_finite());
+        }
+    }
+
+    #[test]
     fn building_preserves_every_accepted_recovery_location() {
         for mean in [0.0, 0.01, 0.03, 0.40, 0.98, 1.0] {
             let spec = RecoverySpec::market_correlated(mean, 0.0, 0.4).expect("valid recovery");
-            let model = spec.build();
-            assert!((model.conditional_recovery(0.0) - mean).abs() < 1e-12);
+            let model = spec.build().expect("valid recovery model");
+            assert!(
+                (model.conditional_recovery(0.0).expect("conditional mean") - mean).abs() < 1e-12
+            );
             assert!((model.expected_recovery() - mean).abs() < 1e-12);
         }
     }
@@ -384,14 +443,14 @@ mod tests {
     #[test]
     fn test_recovery_spec_builders() {
         let constant = RecoverySpec::constant(0.35).expect("valid recovery rate");
-        assert!((constant.expected_recovery() - 0.35).abs() < 1e-10);
+        assert!((constant.build().expect("model").expected_recovery() - 0.35).abs() < 1e-10);
 
         let correlated =
             RecoverySpec::market_correlated(0.40, 0.25, 0.40).expect("valid recovery inputs");
-        assert!((correlated.expected_recovery() - 0.40).abs() < 1e-10);
+        assert!((correlated.build().expect("model").expected_recovery() - 0.40).abs() < 0.05);
 
-        let market_std = RecoverySpec::market_standard_stochastic();
-        assert!((market_std.expected_recovery() - 0.40).abs() < 1e-10);
+        let market_std = RecoverySpec::market_standard_stochastic().expect("valid model inputs");
+        assert!((market_std.build().expect("model").expected_recovery() - 0.40).abs() < 0.05);
     }
 
     #[test]
@@ -414,7 +473,7 @@ mod tests {
         ];
 
         for spec in specs {
-            let model = spec.build();
+            let model = spec.build().expect("valid recovery model");
             assert!(model.expected_recovery() >= 0.0);
             assert!(model.expected_recovery() <= 1.0);
             assert!(!model.model_name().is_empty());
@@ -444,7 +503,7 @@ mod tests {
 
     #[test]
     fn test_lgd_calculation() {
-        let model = ConstantRecovery::new(0.40);
+        let model = ConstantRecovery::new(0.40).expect("valid model inputs");
         assert!((model.lgd() - 0.60).abs() < 1e-10);
     }
 }

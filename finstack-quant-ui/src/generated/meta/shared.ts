@@ -6958,7 +6958,7 @@ export default [
   {
     "path": "#/$defs/CommoditySpotOption",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption",
-    "description": "Option on spot commodity. Options on a specified futures contract use\n[`crate::commodity::commodity_future_option::CommodityFutureOption`], including futures delivery.\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\n`spot_id` must identify an observed spot for early exercise and Monte Carlo.\nThe commodity forward is never substituted for the spot underlying.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup."
+    "description": "Option on spot commodity. Options on a specified futures contract use\n[`crate::commodity::commodity_future_option::CommodityFutureOption`], including futures delivery.\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\n`spot_id` must identify an observed spot for early exercise and Monte Carlo.\nA numeric scalar is in the underlying currency; a Money scalar must carry\nthat same currency.\nThe commodity forward is never substituted for the spot underlying.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup."
   },
   {
     "path": "#/$defs/CommoditySpotOption/properties/attributes",
@@ -7108,7 +7108,7 @@ export default [
   {
     "path": "#/$defs/CommoditySpotOption/properties/spot_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/spot_id",
-    "description": "Optional spot price ID (for spot-based pricing and American options)."
+    "description": "Optional spot price ID (for spot-based pricing and American options).\nNumeric prices use the underlying currency; Money prices must match it."
   },
   {
     "path": "#/$defs/CommoditySpotOption/properties/spot_id/anyOf/0",
@@ -10619,12 +10619,6 @@ export default [
     "path": "#/$defs/d_8a837e6f142b34e8cfd4/properties/asset_vol",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/asset_vol",
     "description": "Annualised asset volatility for the nested GBM simulation.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_8a837e6f142b34e8cfd4/properties/equity_discount_rate",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/equity_discount_rate",
-    "description": "Equity holder discount rate applied to the nested-MC payoff.\n\nNote: the nested simulation drifts under the risk-neutral measure\n(`risk_free_rate`) but discounts here, so the intermediate equity\nfigures are decision inputs, not measure-consistent prices. The\nrate cancels in the cash-vs-PIK comparison and does not bias the\nelected branch.",
     "format": "double"
   },
   {
@@ -17268,7 +17262,7 @@ export default [
   {
     "path": "#/$defs/FloatingRateSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingRateSpec",
-    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
+    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the valuation cutoff then\nresolve from that series instead of the curve. The cutoff is the forward\ncurve base date under `build` and the valuation date under `build_as_of`:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the cutoff prefers a published same-day fixing\nwhen the series has one, otherwise projects on the curve clock.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
   },
   {
     "path": "#/$defs/FloatingRateSpec/properties/all_in_cap_bp",
@@ -26567,7 +26561,8 @@ export default [
   {
     "path": "#/$defs/RecoverySpec/oneOf/0/properties/rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/0/properties/rate",
-    "format": "double"
+    "ref": "#/$defs/ClosedUnitIntervalF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClosedUnitIntervalF64Wire"
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/0/properties/type",
@@ -26581,17 +26576,24 @@ export default [
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/factor_correlation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/1/properties/factor_correlation",
-    "format": "double"
+    "description": "Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress.",
+    "ref": "#/$defs/CorrelationWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CorrelationWire"
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/mean_recovery",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/1/properties/mean_recovery",
-    "format": "double"
+    "description": "Zero-total-shock recovery location in [0, 1], not the unconditional mean.",
+    "ref": "#/$defs/ClosedUnitIntervalF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClosedUnitIntervalF64Wire"
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
-    "format": "double"
+    "description": "Local shock scale in [0, 0.5], not realized recovery standard deviation.",
+    "format": "double",
+    "maximum": 0.5,
+    "minimum": 0
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/type",

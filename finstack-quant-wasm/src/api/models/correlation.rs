@@ -211,15 +211,14 @@ impl JsRecoverySpec {
     }
 
     /// Market-correlated (Andersen-Sidenius) stochastic recovery.
-    /// @param mean - Mean recovery rate expressed as a fraction from 0 through 1.
-    /// @param vol - Recovery-rate volatility; finite values are clamped to `[0, 0.5]`.
-    /// @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are clamped.
+    /// @param mean - Zero-total-shock recovery location in `[0, 1]`; this is not the unconditional mean.
+    /// @param vol - Local shock scale, finite in `[0, 0.5]`; this is not the realized recovery standard deviation.
+    /// @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are rejected.
     ///
     /// # Errors
     ///
     /// Throws a JavaScript exception if `mean` is not finite or lies outside
-    /// `[0, 1]`, or if `vol` or `correlation` is non-finite. Finite volatility
-    /// and correlation inputs are clamped to their supported ranges.
+    /// `[0, 1]`, or if `vol` or `correlation` is non-finite or outside its supported range.
     #[wasm_bindgen(js_name = marketCorrelated)]
     pub fn market_correlated(
         mean: JsValue,
@@ -238,31 +237,25 @@ impl JsRecoverySpec {
     /// recovery falls in stress under the canonical low-factor-stress
     /// convention).
     #[wasm_bindgen(js_name = marketStandardStochastic)]
-    pub fn market_standard_stochastic() -> Self {
-        Self {
-            inner: corr::RecoverySpec::market_standard_stochastic(),
-        }
-    }
-
-    /// Location-parameter recovery rate of this spec.
-    ///
-    /// For a constant spec this is the constant rate. For a
-    /// market-correlated spec this returns the `mean` input — the target
-    /// recovery at factor `Z = 0` — which differs from the Jensen-corrected
-    /// unconditional mean `E_Z[R(Z)]` whenever the factor sensitivity is
-    /// non-zero. For the true unconditional mean call
-    /// `build().expectedRecovery`.
-    #[wasm_bindgen(getter, js_name = expectedRecovery)]
-    pub fn expected_recovery(&self) -> f64 {
-        self.inner.expected_recovery()
+    pub fn market_standard_stochastic() -> Result<Self, JsValue> {
+        corr::RecoverySpec::market_standard_stochastic()
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
     }
 
     /// Build a concrete recovery model from this specification.
+    /// @returns The validated recovery-model handle.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error for invalid recovery inputs, or a
+    /// `computation` error if expected-recovery integration fails.
     #[wasm_bindgen(js_name = build)]
-    pub fn build(&self) -> JsRecoveryModel {
-        JsRecoveryModel {
-            inner: self.inner.build(),
-        }
+    pub fn build(&self) -> Result<JsRecoveryModel, JsValue> {
+        self.inner
+            .build()
+            .map(|inner| JsRecoveryModel { inner })
+            .map_err(to_js_err)
     }
 }
 
@@ -280,12 +273,16 @@ impl JsRecoveryModel {
         self.inner.expected_recovery()
     }
 
-    /// Recovery conditional on the systematic market factor.
+    /// Expected recovery conditional on the systematic market factor, integrating the independent obligor shock.
+    /// @returns Conditional mean recovery in `[0, 1]`.
+    /// @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
     /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
     #[wasm_bindgen(js_name = conditionalRecovery)]
     pub fn conditional_recovery(&self, market_factor: JsValue) -> Result<f64, JsValue> {
         let market_factor = js_f64(&market_factor, "marketFactor")?;
-        Ok(self.inner.conditional_recovery(market_factor))
+        self.inner
+            .conditional_recovery(market_factor)
+            .map_err(to_js_err)
     }
 
     /// Loss given default (1 − recovery).
@@ -294,21 +291,47 @@ impl JsRecoveryModel {
         self.inner.lgd()
     }
 
-    /// Conditional LGD given market factor.
+    /// Conditional expected LGD given the systematic market factor.
+    /// @returns One minus conditional mean recovery.
+    /// @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
     /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
     #[wasm_bindgen(js_name = conditionalLgd)]
     pub fn conditional_lgd(&self, market_factor: JsValue) -> Result<f64, JsValue> {
         let market_factor = js_f64(&market_factor, "marketFactor")?;
-        Ok(self.inner.conditional_lgd(market_factor))
+        self.inner.conditional_lgd(market_factor).map_err(to_js_err)
     }
 
-    /// Recovery-rate volatility scale (0 for constant models).
+    /// Sample bounded recovery from the canonical logistic-normal law.
+    /// @param market_factor - Finite systematic standard-normal shock; low values represent credit stress.
+    /// @param idiosyncratic_normal - Finite independent obligor standard-normal shock; ignored for constant or perfectly systematic models.
+    /// @returns Sampled recovery as a decimal fraction of notional in `[0, 1]`.
+    /// @throws Throws a `validation` error if either shock is non-finite.
+    #[wasm_bindgen(js_name = sampleRecovery)]
+    pub fn sample_recovery(
+        &self,
+        market_factor: JsValue,
+        idiosyncratic_normal: JsValue,
+    ) -> Result<f64, JsValue> {
+        let market_factor = js_f64(&market_factor, "marketFactor")?;
+        let idiosyncratic_normal = js_f64(&idiosyncratic_normal, "idiosyncraticNormal")?;
+        self.inner
+            .sample_recovery(market_factor, idiosyncratic_normal)
+            .map_err(to_js_err)
+    }
+
+    /// Whether sampling needs an independent obligor recovery draw.
+    #[wasm_bindgen(getter, js_name = hasIdiosyncraticDispersion)]
+    pub fn has_idiosyncratic_dispersion(&self) -> bool {
+        self.inner.has_idiosyncratic_dispersion()
+    }
+
+    /// Local recovery shock scale in decimals, not realized recovery standard deviation.
     #[wasm_bindgen(getter, js_name = recoveryVolatility)]
     pub fn recovery_volatility(&self) -> f64 {
         self.inner.recovery_volatility()
     }
 
-    /// Whether recovery varies with the market factor.
+    /// Whether the recovery distribution is nonconstant, including obligor-only variation.
     #[wasm_bindgen(getter, js_name = isStochastic)]
     pub fn is_stochastic(&self) -> bool {
         self.inner.is_stochastic()
@@ -663,7 +686,8 @@ impl JsLatentFactorSpec {
     ///
     /// # Errors
     ///
-    /// Throws a `TypeError` if an argument is not a number.
+    /// Throws a `TypeError` if an argument is not a number, or a `validation`
+    /// error if a model input is non-finite or outside its documented range.
     #[wasm_bindgen(js_name = singleFactor)]
     pub fn single_factor(
         volatility: JsValue,
@@ -673,7 +697,8 @@ impl JsLatentFactorSpec {
             inner: LatentFactorSpec::single_factor(
                 js_f64(&volatility, "volatility")?,
                 js_f64(&mean_reversion, "meanReversion")?,
-            ),
+            )
+            .map_err(to_js_err)?,
         })
     }
 
@@ -685,7 +710,8 @@ impl JsLatentFactorSpec {
     ///
     /// # Errors
     ///
-    /// Throws a `TypeError` if an argument is not a number.
+    /// Throws a `TypeError` if an argument is not a number, or a `validation`
+    /// error if a model input is non-finite or outside its documented range.
     #[wasm_bindgen(js_name = twoFactor)]
     pub fn two_factor(
         prepay_vol: JsValue,
@@ -697,7 +723,8 @@ impl JsLatentFactorSpec {
                 js_f64(&prepay_vol, "prepayVol")?,
                 js_f64(&credit_vol, "creditVol")?,
                 js_f64(&correlation, "correlation")?,
-            ),
+            )
+            .map_err(to_js_err)?,
         })
     }
 
@@ -712,8 +739,8 @@ impl JsLatentFactorSpec {
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if a multi-factor specification has an
-    /// invalid correlation matrix or volatility vector.
+    /// Throws a `validation` error if the specification contains an invalid
+    /// volatility, mean-reversion speed, correlation, count or matrix.
     pub fn build(&self) -> Result<JsLatentFactorKind, JsValue> {
         self.inner
             .build()
@@ -793,13 +820,14 @@ pub struct JsLatentSingleFactor {
 
 #[wasm_bindgen(js_class = LatentSingleFactor)]
 impl JsLatentSingleFactor {
-    /// Single-factor model; out-of-range inputs are clamped by Rust.
+    /// Single-factor model; inputs are validated by Rust.
     /// @param volatility - Annualized factor volatility as a decimal; non-negative.
     /// @param mean_reversion - Mean-reversion speed per year; non-negative.
     ///
     /// # Errors
     ///
-    /// Throws a `TypeError` if an argument is not a number.
+    /// Throws a `TypeError` if an argument is not a number, or a `validation`
+    /// error if a model input is non-finite or outside its documented range.
     #[wasm_bindgen(constructor)]
     pub fn new(
         volatility: JsValue,
@@ -809,7 +837,8 @@ impl JsLatentSingleFactor {
             inner: LatentSingleFactor::new(
                 js_f64(&volatility, "volatility")?,
                 js_f64(&mean_reversion, "meanReversion")?,
-            ),
+            )
+            .map_err(to_js_err)?,
         })
     }
 
@@ -840,14 +869,15 @@ pub struct JsLatentTwoFactor {
 
 #[wasm_bindgen(js_class = LatentTwoFactor)]
 impl JsLatentTwoFactor {
-    /// Two-factor model; out-of-range inputs are clamped by Rust.
+    /// Two-factor model; inputs are validated by Rust.
     /// @param prepay_vol - Annualized prepayment-factor volatility as a decimal; non-negative.
     /// @param credit_vol - Annualized credit-factor volatility as a decimal; non-negative.
     /// @param correlation - Correlation between the two factors, from -1 through 1.
     ///
     /// # Errors
     ///
-    /// Throws a `TypeError` if an argument is not a number.
+    /// Throws a `TypeError` if an argument is not a number, or a `validation`
+    /// error if a model input is non-finite or outside its documented range.
     #[wasm_bindgen(constructor)]
     pub fn new(
         prepay_vol: JsValue,
@@ -859,26 +889,27 @@ impl JsLatentTwoFactor {
                 js_f64(&prepay_vol, "prepayVol")?,
                 js_f64(&credit_vol, "creditVol")?,
                 js_f64(&correlation, "correlation")?,
-            ),
+            )
+            .map_err(to_js_err)?,
         })
     }
 
     /// Standard RMBS calibration of the two-factor model.
     /// @returns The RMBS-standard prepayment/credit factor model.
     #[wasm_bindgen(js_name = rmbsStandard)]
-    pub fn rmbs_standard() -> JsLatentTwoFactor {
-        Self {
-            inner: LatentTwoFactor::rmbs_standard(),
-        }
+    pub fn rmbs_standard() -> Result<JsLatentTwoFactor, JsValue> {
+        LatentTwoFactor::rmbs_standard()
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
     }
 
     /// Standard CLO calibration of the two-factor model.
     /// @returns The CLO-standard prepayment/credit factor model.
     #[wasm_bindgen(js_name = cloStandard)]
-    pub fn clo_standard() -> JsLatentTwoFactor {
-        Self {
-            inner: LatentTwoFactor::clo_standard(),
-        }
+    pub fn clo_standard() -> Result<JsLatentTwoFactor, JsValue> {
+        LatentTwoFactor::clo_standard()
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
     }
 
     /// Annualized prepayment-factor volatility, as a decimal.
@@ -952,14 +983,14 @@ impl JsLatentMultiFactor {
     }
 
     /// Model with independent factors (identity correlation).
-    /// @param num_factors - Number of systematic factors; a non-negative safe integer, with zero resolving to one.
+    /// @param num_factors - Positive number of systematic factors; zero is rejected.
     /// @param volatilities - Annualized factor volatilities, one per factor; must be finite, non-negative and match the factor count.
     /// @returns The uncorrelated multi-factor model.
     ///
     /// # Errors
     ///
     /// Throws a `TypeError` if `numFactors` is not a safe non-negative integer
-    /// or `volatilities` is not an array of numbers. Throws a validation error for a length mismatch, negative or non-finite volatility.
+    /// or `volatilities` is not an array of numbers. Throws a validation error for a zero factor count, a length mismatch, or negative or non-finite volatility.
     pub fn uncorrelated(
         num_factors: JsValue,
         volatilities: JsValue,

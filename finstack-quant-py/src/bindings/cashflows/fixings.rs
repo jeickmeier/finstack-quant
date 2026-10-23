@@ -1,5 +1,6 @@
 //! Raw fixing observations and atomic realized-forward materialization.
 
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::fixings::ProjectedFixing;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -9,7 +10,7 @@ use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 
-/// Raw rate or FX observation retained by canonical coupon projection.
+#[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing")]
 #[pyclass(
     name = "ProjectedFixing",
     module = "finstack_quant.cashflows.fixings",
@@ -23,7 +24,7 @@ pub struct PyProjectedFixing {
 
 #[pymethods]
 impl PyProjectedFixing {
-    /// Construct a raw observation; index rates exclude coupon spread and gearing.
+    #[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing.__init__")]
     #[new]
     #[pyo3(signature = (series_id, date, value=None))]
     fn new(series_id: String, date: &Bound<'_, PyAny>, value: Option<f64>) -> PyResult<Self> {
@@ -36,26 +37,26 @@ impl PyProjectedFixing {
         })
     }
 
-    /// Canonical FIXING-prefixed series identifier, including FX quote orientation.
+    #[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing.series_id")]
     #[getter]
     fn series_id(&self) -> &str {
         &self.inner.series_id
     }
 
-    /// Contractual observation date after fixing-calendar adjustments.
+    #[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing.date")]
     #[getter]
     fn date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.date)
     }
 
-    /// Raw annualized decimal rate or oriented FX rate; None means unavailable.
+    #[doc = pydoc!("finstack_quant.cashflows.fixings", "ProjectedFixing.value")]
     #[getter]
     fn value(&self) -> Option<f64> {
         self.inner.value
     }
 }
 
-/// Materialize crossed observations in a new market, preserving existing fixings.
+#[doc = pydoc!("finstack_quant.cashflows.fixings", "materialize_fixings")]
 #[pyfunction]
 fn materialize_fixings(
     market: &PyMarketContext,
@@ -77,7 +78,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     let module = crate::bindings::module_utils::new_submodule(parent, "fixings")?;
     module.setattr(
         "__doc__",
-        "Projected index fixings recorded on schedules and their materialization on a market roll.",
+        pydoc!("finstack_quant.cashflows.fixings", "__module__"),
     )?;
     module.add_class::<PyProjectedFixing>()?;
     module.add_function(wrap_pyfunction!(materialize_fixings, &module)?)?;

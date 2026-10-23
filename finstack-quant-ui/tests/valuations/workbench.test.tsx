@@ -76,14 +76,20 @@ beforeEach(() => {
         return native.dryRun(request);
       case "calibrate":
         return native.calibrate(request);
-      case "scenarioTable":
-        return native.trancheScenarioTable(
-          request.instrumentJson,
-          request.trancheId,
-          request.marketJson,
-          request.asOf,
-          request.gridJson,
-        );
+      case "scenarioTable": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          return native.trancheScenarioTable(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.gridJson,
+          );
+        } finally {
+          deal.free();
+        }
+      }
       case "formatMoney":
         return formatMoney(request.value, request.rounding, native);
       case "cashflows":

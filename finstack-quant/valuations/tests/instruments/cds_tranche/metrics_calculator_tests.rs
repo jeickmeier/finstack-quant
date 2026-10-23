@@ -19,28 +19,65 @@ fn sum_bucketed_cs01(result: &finstack_quant_valuations::results::ValuationResul
 // ==================== Individual Metric Calculation Tests ====================
 
 #[test]
-fn test_upfront_metric_via_price_with_metrics() {
-    // Arrange
+fn valuation_value_preserves_selected_pricer() {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::pricer::{
+        InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+    };
+    use finstack_quant_valuations::results::ValuationResult;
+    use std::sync::Arc;
+
+    // A distinct result makes an accidental default-model recomputation observable.
+    struct SelectedTranchePricer;
+    impl Pricer for SelectedTranchePricer {
+        fn key(&self) -> PricerKey {
+            PricerKey::new(InstrumentType::CdsTranche, ModelKey::HazardRate)
+        }
+
+        fn price_dyn(
+            &self,
+            instrument: &dyn Instrument,
+            _market: &MarketContext,
+            as_of: Date,
+        ) -> Result<ValuationResult, PricingError> {
+            Ok(ValuationResult::stamped(
+                instrument.id(),
+                as_of,
+                Money::from((12_345_i64, Currency::USD)),
+            ))
+        }
+    }
+
     let tranche = mezzanine_tranche();
     let market = standard_market_context();
     let as_of = base_date();
+    let ordinary = tranche
+        .price_with_metrics(&market, as_of, &[], PricingOptions::default())
+        .expect("default contractual-coupon PV");
+    assert!(ordinary.value.amount().is_finite());
+    assert!(!ordinary.measures.contains_key("model_upfront"));
 
-    // Act
-    let result = tranche.price_with_metrics(
-        &market,
-        as_of,
-        &[MetricId::custom("model_upfront")],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
-    );
-
-    // Assert
-    assert!(result.is_ok(), "Upfront calculation should succeed");
-    let valuation = result.unwrap();
-    let upfront = *valuation
-        .measures
-        .get("model_upfront")
-        .expect("upfront should be in measures");
-    assert!(upfront.is_finite(), "Upfront should be finite");
+    let mut registry = PricerRegistry::new();
+    registry
+        .register(SelectedTranchePricer)
+        .expect("selected pricer");
+    let selected = tranche
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[],
+            PricingOptions::default()
+                .with_model(ModelKey::HazardRate)
+                .with_registry(Arc::new(registry)),
+        )
+        .expect("selected contractual-coupon PV");
+    assert_eq!(selected.value.amount(), 12_345.0);
+    assert_ne!(selected.value, ordinary.value);
+    assert!(!selected.measures.contains_key("model_upfront"));
 }
 
 #[test]
@@ -374,7 +411,6 @@ fn test_all_standard_metrics_calculable() {
     let as_of = base_date();
 
     let all_metrics = vec![
-        MetricId::custom("model_upfront"),
         MetricId::SpreadDv01,
         MetricId::Correlation01,
         MetricId::Cs01,
@@ -425,7 +461,6 @@ fn test_metrics_with_missing_credit_index() {
 
     // Metrics that should fallback to zero when credit index is missing
     let fallback_metrics = vec![
-        MetricId::custom("model_upfront"),
         MetricId::custom("spread_dv01"),
         MetricId::ExpectedLoss,
         MetricId::JumpToDefault,

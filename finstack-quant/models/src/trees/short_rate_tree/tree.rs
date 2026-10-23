@@ -8,23 +8,19 @@ use super::{ShortRateModel, ShortRateTreeConfig};
 ///
 /// Provides diagnostic information about calibration quality, allowing
 /// users to assess whether the tree is suitable for their use case.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TreeCalibrationResult {
     /// Maximum calibration error in basis points.
     pub max_error_bp: f64,
     /// Step at which maximum error occurred.
     pub max_error_step: usize,
-    /// Number of steps where the solver failed and fallback was used.
-    pub fallback_count: usize,
-    /// Whether calibration completed successfully.
-    pub converged: bool,
 }
 
 impl TreeCalibrationResult {
-    /// Returns true if calibration quality is acceptable (max error < 1bp, no fallbacks).
+    /// Returns true when the maximum fitted-curve error is below one basis point.
     #[must_use]
     pub fn is_acceptable(&self) -> bool {
-        self.converged && self.max_error_bp < 1.0 && self.fallback_count == 0
+        self.max_error_bp < 1.0
     }
 }
 

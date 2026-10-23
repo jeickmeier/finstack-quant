@@ -1,11 +1,11 @@
 //! Top-level 2D PDE solver.
 //!
-//! Combines a [`Grid2D`] and a [`CraigSneydStepper`] to solve a backward 2D
+//! Combines a [`Grid2D`] and a [`McsStepper`] to solve a backward 2D
 //! PDE from terminal condition to `t = 0`.
 //! Returns a [`PdeSolution2D`] with bilinear interpolation and finite-difference
 //! Greeks.
 
-use super::adi::{fill_boundaries, AdiWorkBuffers, CraigSneydStepper};
+use super::adi::{fill_boundaries, AdiWorkBuffers, McsStepper};
 use super::grid::find_nearest;
 use super::grid2d::Grid2D;
 use super::problem2d::PdeProblem2D;
@@ -16,7 +16,7 @@ pub struct Solver2D {
     /// Tensor-product grid.
     grid: Grid2D,
     /// ADI time-stepper.
-    stepper: CraigSneydStepper,
+    stepper: McsStepper,
 }
 
 impl Solver2D {
@@ -26,10 +26,10 @@ impl Solver2D {
     ///
     /// * `grid` - Tensor-product spatial grid for the solve
     /// * `stepper` - Modified Craig-Sneyd ADI time-stepper (see
-    ///   [`CraigSneydStepper::new`] and
-    ///   [`CraigSneydStepper::with_damping`])
+    ///   [`McsStepper::new`] and
+    ///   [`McsStepper::with_damping`])
     #[must_use]
-    pub fn new(grid: Grid2D, stepper: CraigSneydStepper) -> Self {
+    pub fn new(grid: Grid2D, stepper: McsStepper) -> Self {
         Self { grid, stepper }
     }
 
@@ -241,7 +241,7 @@ mod tests {
                 Grid1D::uniform(0.0, 1.0, 5).expect("x grid"),
                 Grid1D::uniform(0.0, 1.0, 5).expect("y grid"),
             );
-            let solution = Solver2D::new(grid, CraigSneydStepper::with_damping(damping, 10))
+            let solution = Solver2D::new(grid, McsStepper::with_damping(damping, 10))
                 .solve(&ConstantSource, 0.5)
                 .expect("constant source solve");
             for value in solution.values {
@@ -296,7 +296,7 @@ mod tests {
         let gx = Grid1D::from_points(vec![0.0, 0.1, 0.4, 0.65, 1.0]).expect("x grid");
         let gy = Grid1D::from_points(vec![0.0, 0.2, 0.3, 0.7, 1.0]).expect("y grid");
         let grid = Grid2D::new(gx, gy);
-        let solver = Solver2D::new(grid.clone(), CraigSneydStepper::new(100));
+        let solver = Solver2D::new(grid.clone(), McsStepper::new(100));
         let solution = solver.solve(&AffineHeat2D, 0.1).expect("solve");
         for (i, &x) in grid.x().points().iter().enumerate() {
             for (j, &y) in grid.y().points().iter().enumerate() {
@@ -385,7 +385,7 @@ mod tests {
         let gy = Grid1D::uniform(0.0, pi, 41).expect("valid");
         let grid = Grid2D::new(gx, gy);
 
-        let solver = Solver2D::new(grid, CraigSneydStepper::new(200));
+        let solver = Solver2D::new(grid, McsStepper::new(200));
 
         let solution = solver
             .solve(&Heat2D, t_mat)
@@ -464,7 +464,7 @@ mod tests {
         let pi = std::f64::consts::PI;
         let gx = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
         let gy = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
-        let solver = Solver2D::new(Grid2D::new(gx, gy), CraigSneydStepper::new(100));
+        let solver = Solver2D::new(Grid2D::new(gx, gy), McsStepper::new(100));
 
         let solution = solver
             .solve(&ConvectionDominated2D, 0.25)
@@ -489,10 +489,7 @@ mod tests {
         let gx = Grid1D::uniform(0.0, pi, 21).expect("valid grid");
         let gy = Grid1D::uniform(0.0, pi, 21).expect("valid grid");
 
-        let solver = Solver2D::new(
-            Grid2D::new(gx.clone(), gy.clone()),
-            CraigSneydStepper::new(50),
-        );
+        let solver = Solver2D::new(Grid2D::new(gx.clone(), gy.clone()), McsStepper::new(50));
         assert!(
             matches!(
                 solver.solve(&Heat2D, 0.0),
@@ -508,7 +505,7 @@ mod tests {
             "negative maturity must be rejected"
         );
 
-        let zero_step_solver = Solver2D::new(Grid2D::new(gx, gy), CraigSneydStepper::new(0));
+        let zero_step_solver = Solver2D::new(Grid2D::new(gx, gy), McsStepper::new(0));
         assert!(
             matches!(
                 zero_step_solver.solve(&Heat2D, 1.0),

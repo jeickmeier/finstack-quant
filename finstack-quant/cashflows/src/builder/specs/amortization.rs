@@ -289,3 +289,14 @@ impl Notional {
         }
     }
 }
+
+impl AmortizationSpec {
+    /// Dated amounts of the `StepRemaining` and `CustomPrincipal` rules; empty for other rules.
+    pub(crate) fn dated_amounts(&self) -> &[(Date, Money)] {
+        match self {
+            Self::StepRemaining { schedule } => schedule,
+            Self::CustomPrincipal { items } => items,
+            _ => &[],
+        }
+    }
+}

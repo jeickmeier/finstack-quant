@@ -2561,16 +2561,6 @@ export interface D_8A837E6F142B34E8Cfd4 {
    */
   asset_vol: number;
   /**
-   * Equity holder discount rate applied to the nested-MC payoff.
-   *
-   * Note: the nested simulation drifts under the risk-neutral measure
-   * (`risk_free_rate`) but discounts here, so the intermediate equity
-   * figures are decision inputs, not measure-consistent prices. The
-   * rate cancels in the cash-vs-PIK comparison and does not bias the
-   * elected branch.
-   */
-  equity_discount_rate: number;
-  /**
    * Forward-looking horizon in years for the nested simulation (e.g. 1.0).
    */
   horizon: number;
@@ -2583,7 +2573,6 @@ export interface D_8A837E6F142B34E8Cfd4 {
    * Risk-free rate (continuous) used as drift in the nested simulation.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Letter-of-credit sub-facility of a revolving credit facility.
@@ -3373,8 +3362,9 @@ export interface D_2E0Bc1103181D92528Ce {
  * Historical fixings **are supported** via the `MarketContext`: store a
  * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
- * observations. Observation dates strictly before the forward curve base
- * date then resolve from that series instead of the curve:
+ * observations. Observation dates strictly before the valuation cutoff then
+ * resolve from that series instead of the curve. The cutoff is the forward
+ * curve base date under `build` and the valuation date under `build_as_of`:
  *
  * - **Overnight observations** (compounded/averaged paths) use exact-date
  *   lookup on the index's fixing business days. Weekend and holiday carry
@@ -3387,8 +3377,8 @@ export interface D_2E0Bc1103181D92528Ce {
  *   The fixing is the index rate only; gearing/spread/floors/caps apply on
  *   top exactly as for projected rates.
  *
- * An observation exactly on the curve base date prefers a published
- * same-day fixing when the series has one, otherwise projects from `t = 0`.
+ * An observation exactly on the cutoff prefers a published same-day fixing
+ * when the series has one, otherwise projects on the curve clock.
  *
  * The [`FloatingRateFallback`] policy applies only when **no** fixing
  * series is provided: `Error` (the default) fails the build with a

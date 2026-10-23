@@ -116,7 +116,7 @@ impl HazardCurve {
                 }
                 .into());
             }
-            if target == HazardBumpTarget::HazardRate && shifted > self.max_hazard_rate {
+            if shifted > self.max_hazard_rate {
                 return Err(crate::Error::Validation(format!(
                     "Hazard rate {shifted:.4} at t={t:.4}y exceeds maximum {:.4} after bump",
                     self.max_hazard_rate

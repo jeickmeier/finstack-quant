@@ -43,7 +43,7 @@ use std::borrow::Cow;
 /// deterministic, and overnight observation conventions are replayed through
 /// mid-period exercise. The legacy rates-only tree rejects stochastic floating
 /// coupons because its valuator carries a projected scalar cashflow schedule.
-pub struct TreePricer {
+pub(crate) struct TreePricer {
     /// Pricer configuration (tree steps, volatility, convergence settings)
     config: TreePricerConfig,
     /// Explicit rates-only or joint rates-credit family.
@@ -306,18 +306,7 @@ impl TreePricer {
     ///
     /// A `TreePricer` with the specified configuration.
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations_fixed_income::bond::pricing::tree::{TreePricer, TreePricerConfig};
-    ///
-    /// let config = TreePricerConfig {
-    ///     tree_steps: 400,
-    ///     ..TreePricerConfig::default()
-    /// };
-    /// let pricer = TreePricer::with_config(config);
-    /// ```
-    pub fn with_config(config: TreePricerConfig) -> Self {
+    pub(crate) fn with_config(config: TreePricerConfig) -> Self {
         Self {
             config,
             model: BondTreeModel::RatesOnly,
@@ -335,7 +324,7 @@ impl TreePricer {
     ///
     /// A pricer that requires the bond to identify a hazard curve through
     /// `credit_curve_id` and values embedded rights in the joint model.
-    pub fn rates_credit(config: TreePricerConfig) -> Self {
+    pub(crate) fn rates_credit(config: TreePricerConfig) -> Self {
         Self {
             config,
             model: BondTreeModel::RatesCredit,
@@ -635,7 +624,7 @@ impl OasPricer<'_> {
                 valuator.price_with_hw_tree(tree, oas_bp, compounding)?
             }
             PreparedTree::ShortRate { tree, valuator } => {
-                tree.price_with_oas_compounding(oas_bp, compounding, valuator)?
+                tree.price(oas_bp, compounding, valuator)?
             }
         };
         Ok(TreePriceOutcome::deterministic(amount))
@@ -660,8 +649,8 @@ fn validate_calibration_quality(
     }
 
     Err(Error::Validation(format!(
-        "{model} calibration quality is unacceptable: max_error_bp={:.6}, max_error_step={}, fallback_count={}, converged={}",
-        quality.max_error_bp, quality.max_error_step, quality.fallback_count, quality.converged
+        "{model} calibration quality is unacceptable: max_error_bp={:.6}, max_error_step={}",
+        quality.max_error_bp, quality.max_error_step
     )))
 }
 
@@ -679,12 +668,10 @@ mod tests {
     use finstack_quant_models::trees::short_rate_tree::TreeCalibrationResult;
 
     #[test]
-    fn bdt_calibration_quality_rejects_fallbacks_and_large_error() {
+    fn bdt_calibration_quality_rejects_large_error() {
         let poor = TreeCalibrationResult {
             max_error_bp: 1.25,
             max_error_step: 4,
-            fallback_count: 1,
-            converged: true,
         };
 
         let err = validate_calibration_quality("BDT", Some(&poor))

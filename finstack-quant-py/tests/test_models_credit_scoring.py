@@ -27,7 +27,7 @@ def test_scoring_result_round_trips_and_exports() -> None:
 
 
 def test_master_scale_maps_scoring_results_with_implied_pd() -> None:
-    scale = pd.MasterScale.sp_assumptions()
+    scale = pd.MasterScale.default_calibration()
     probit = scoring.zmijewski_score(0.05, 0.5, 1.5)
     assert scale.map_score(probit).grade == scale.map_pd(probit.implied_pd).grade
     with pytest.raises(ValueError, match="implied PD"):

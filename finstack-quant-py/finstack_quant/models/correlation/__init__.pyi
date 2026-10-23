@@ -305,7 +305,21 @@ class CopulaSpec:
         ...
 
     def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
     def __repr__(self) -> str:
         """Python-style repr, e.g. ``CopulaSpec(type='student_t', degrees_of_freedom=5.0)``."""
         ...
@@ -624,6 +638,22 @@ class CreditExposure:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class PortfolioLossConfig:
     """
     Settings for deterministic portfolio credit-loss simulation.
@@ -776,6 +806,22 @@ class PortfolioLossConfig:
         ------
         ValueError
             If ``json`` is malformed or does not match the serialized schema.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...
 
@@ -965,28 +1011,6 @@ class PortfolioLossResult:
 
     def to_dataframe(self) -> pd.DataFrame:
         """
-        Primary table: the simulated loss distribution.
-
-        Alias of :meth:`to_distribution_dataframe`. Every tabular result type in the library
-        answers ``to_dataframe()``; the one-row aggregate view stays on :meth:`to_summary_dataframe`.
-
-        Returns
-        -------
-        pd.DataFrame
-            The same frame :meth:`to_distribution_dataframe` returns.
-
-        Examples
-        --------
-        >>> frame = result.to_dataframe()  # doctest: +SKIP
-
-        Notes
-        -----
-        This alias does not raise; it delegates to the method named above.
-        """
-        ...
-
-    def to_distribution_dataframe(self) -> pd.DataFrame:
-        """
         Export the simulated loss distribution as a pandas DataFrame.
 
         Columns: ``loss``.
@@ -1089,6 +1113,22 @@ class PortfolioLossResult:
             If ``json`` is malformed, does not match the serialized schema, has
             an invalid loss or confidence, or carries aggregates that disagree
             with its losses (deserialization reruns :meth:`from_losses`).
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...
 
@@ -1386,6 +1426,22 @@ class TrancheLossStatistics:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class RecoverySpec:
     """
     Recovery model specification for configuration and deferred construction.
@@ -1402,7 +1458,7 @@ class RecoverySpec:
     --------
     >>> from finstack_quant.models.correlation import RecoverySpec
     >>> spec = RecoverySpec.constant(0.4)
-    >>> (spec.expected_recovery, spec.build().lgd)
+    >>> (spec.build().expected_recovery, spec.build().lgd)
     (0.4, 0.6)
 
     """
@@ -1431,7 +1487,7 @@ class RecoverySpec:
         --------
         >>> from finstack_quant.models.correlation import RecoverySpec
         >>> spec = RecoverySpec.constant(0.4)
-        >>> (spec.expected_recovery, spec.build().conditional_recovery(0.0))
+        >>> (spec.build().expected_recovery, spec.build().conditional_recovery(0.0))
         (0.4, 0.4)
 
         """
@@ -1445,11 +1501,11 @@ class RecoverySpec:
         Parameters
         ----------
         mean : float
-            Expected recovery rate.
+            Finite zero-total-shock recovery location (not the unconditional mean) in ``[0, 1]``; endpoints are constant.
         vol : float
-            Recovery rate volatility.
+            Finite local shock scale (not realized recovery standard deviation) in ``[0, 0.5]``.
         correlation : float
-            Correlation with market factor.
+            Finite Gaussian correlation with the market factor in ``[-1, 1]``.
 
         Returns
         -------
@@ -1460,8 +1516,8 @@ class RecoverySpec:
         ------
         ValueError
             If ``mean`` is non-finite or outside ``[0, 1]``, or if ``vol`` or
-            ``correlation`` is non-finite. Finite volatility and correlation
-            values are clamped to their supported ranges.
+            ``correlation`` is non-finite, ``vol`` lies outside ``[0, 0.5]``,
+            or ``correlation`` lies outside ``[-1, 1]``.
 
         Examples
         --------
@@ -1495,29 +1551,7 @@ class RecoverySpec:
         >>> from finstack_quant.models.correlation import RecoverySpec
         >>> model = RecoverySpec.market_standard_stochastic().build()
         >>> (model.model_name, round(model.expected_recovery, 3))
-        ('Market-Correlated Stochastic Recovery', 0.404)
-        """
-        ...
-
-    @property
-    def expected_recovery(self) -> float:
-        """
-        Location-parameter recovery rate of this spec.
-        For a constant spec this is the constant rate. For a
-        market-correlated spec this returns the ``mean`` input — the target
-        recovery at factor ``Z = 0`` — which differs from the
-        Jensen-corrected unconditional mean ``E_Z[R(Z)]`` whenever the
-        factor sensitivity is non-zero. For the true unconditional mean call
-        ``build().expected_recovery``.
-
-        Returns
-        -------
-        float
-            Location-parameter recovery rate of this spec.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        ('Market-Correlated Stochastic Recovery', 0.418)
         """
         ...
 
@@ -1530,9 +1564,12 @@ class RecoverySpec:
         RecoveryModel
             Concrete recovery model.
 
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If a recovery parameter is non-finite or outside its documented range.
+        RuntimeError
+            If numerical integration of expected recovery fails to converge.
         """
         ...
 
@@ -1583,14 +1620,28 @@ class RecoverySpec:
         Examples
         --------
         >>> from finstack_quant.models.correlation import RecoverySpec
-        >>> RecoverySpec.from_json('{"type":"constant","rate":0.4}').expected_recovery
+        >>> RecoverySpec.from_json('{"type":"constant","rate":0.4}').build().expected_recovery
         0.4
 
         """
         ...
 
     def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
     def __repr__(self) -> str:
         """Python-style repr, e.g. ``RecoverySpec(type='constant', rate=0.4)``."""
         ...
@@ -1599,7 +1650,12 @@ class RecoveryModel:
     """
     Concrete recovery model for credit portfolio pricing.
 
-    Obtain an instance via :meth:`RecoverySpec.build`.
+    Obtain an instance via :meth:`RecoverySpec.build`. The stochastic law is
+    ``sigmoid(logit(m) + sigma/(m*(1-m)) * (rho*z + sqrt(1-rho**2)*e))``
+    for independent standard normals ``z`` and ``e``. The location ``m`` is
+    recovery at zero total shock, not the unconditional mean; ``sigma`` is a
+    local scale, not realized standard deviation. Conditional recovery averages
+    over ``e``. Endpoint locations and zero scale give exact constants.
 
     Examples
     --------
@@ -1628,21 +1684,24 @@ class RecoveryModel:
 
     def conditional_recovery(self, market_factor: float) -> float:
         """
-        Recovery conditional on the systematic market factor.
+        Expected recovery conditional on the systematic factor, averaging over the independent obligor shock.
 
         Parameters
         ----------
         market_factor : float
-            Realization of the market factor.
+            Finite systematic standard-normal realization; low values represent stress.
 
         Returns
         -------
         float
             Conditional recovery rate.
 
-        Notes
-        -----
-        This method does not raise; out-of-domain or non-finite inputs yield ``NaN`` or ``inf`` rather than an exception.
+        Raises
+        ------
+        ValueError
+            If the systematic factor is non-finite.
+        RuntimeError
+            If numerical integration of conditional recovery fails.
         """
         ...
 
@@ -1669,28 +1728,69 @@ class RecoveryModel:
         Parameters
         ----------
         market_factor : float
-            Realization of the market factor.
+            Finite systematic standard-normal realization; low values represent stress.
 
         Returns
         -------
         float
             Conditional LGD.
 
+        Raises
+        ------
+        ValueError
+            If the systematic factor is non-finite.
+        RuntimeError
+            If numerical integration of conditional recovery fails.
+        """
+        ...
+
+    def sample_recovery(self, market_factor: float, idiosyncratic_normal: float) -> float:
+        """Sample bounded recovery from the canonical logistic-normal law.
+
+        Parameters
+        ----------
+        market_factor : float
+            Finite systematic standard-normal shock; low values represent stress.
+        idiosyncratic_normal : float
+            Finite independent obligor standard-normal shock; ignored for constant
+            distributions and perfect systematic correlation.
+
+        Returns
+        -------
+        float
+            Sampled recovery in ``[0, 1]`` as a decimal fraction of notional.
+
+        Raises
+        ------
+        ValueError
+            If either shock is non-finite.
+        """
+        ...
+
+    @property
+    def has_idiosyncratic_dispersion(self) -> bool:
+        """Whether sampling needs an independent obligor recovery draw.
+
+        Returns
+        -------
+        bool
+            False for constant distributions and perfect systematic correlation.
+
         Notes
         -----
-        This method does not raise; out-of-domain or non-finite inputs yield ``NaN`` or ``inf`` rather than an exception.
+        This accessor does not raise.
         """
         ...
 
     @property
     def recovery_volatility(self) -> float:
         """
-        Recovery-rate volatility scale (0 for constant models).
+        Local recovery shock scale in decimals, not realized recovery standard deviation.
 
         Returns
         -------
         float
-            Recovery-rate volatility scale (0 for constant models).
+            Local recovery shock scale in decimals, not realized recovery standard deviation.
 
         Notes
         -----
@@ -1701,7 +1801,7 @@ class RecoveryModel:
     @property
     def is_stochastic(self) -> bool:
         """
-        Whether recovery varies with the market factor.
+        Whether the recovery distribution is nonconstant, including obligor-only variation.
 
         Returns
         -------
@@ -1759,18 +1859,19 @@ class LatentFactorSpec:
         Parameters
         ----------
         volatility : float
-            Annualized volatility of the single latent factor.
+            Finite, non-negative decimal volatility of the single latent factor; no upper cap.
         mean_reversion : float
-            Mean-reversion speed of the single latent factor, per year.
+            Finite, non-negative mean-reversion speed per year; no upper cap.
 
         Returns
         -------
         LatentFactorSpec
             Single-factor specification.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If the volatility or mean-reversion speed is negative or non-finite.
 
         Examples
         --------
@@ -1789,20 +1890,22 @@ class LatentFactorSpec:
         Parameters
         ----------
         prepay_vol : float
-            Prepayment factor volatility.
+            Finite, non-negative decimal prepayment-factor volatility.
         credit_vol : float
-            Credit factor volatility.
+            Finite, non-negative decimal credit-factor volatility.
         correlation : float
-            Inter-factor correlation.
+            Finite Gaussian inter-factor correlation in ``[-1, 1]``, including endpoints.
 
         Returns
         -------
         LatentFactorSpec
             Two-factor specification.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If either volatility is negative or non-finite, or the correlation is
+            non-finite or outside ``[-1, 1]``.
 
         Examples
         --------
@@ -1990,25 +2093,26 @@ class LatentSingleFactor:
         Parameters
         ----------
         volatility : float
-            Annualized volatility of the single latent factor.
+            Finite, non-negative decimal volatility of the single latent factor; no upper cap.
         mean_reversion : float
-            Mean-reversion speed of the single latent factor, per year.
+            Finite, non-negative mean-reversion speed per year; no upper cap.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        ValueError
+            If a volatility or mean-reversion speed is negative or non-finite.
         """
         ...
 
     @property
     def volatility(self) -> float:
         """
-        Annualized volatility of the single latent factor.
+        Finite, non-negative decimal volatility of the single latent factor; no upper cap.
 
         Returns
         -------
         float
-            Annualized volatility of the single latent factor.
+            Finite, non-negative decimal volatility of the single latent factor; no upper cap.
 
         Notes
         -----
@@ -2019,12 +2123,12 @@ class LatentSingleFactor:
     @property
     def mean_reversion(self) -> float:
         """
-        Mean-reversion speed of the single latent factor, per year.
+        Finite, non-negative mean-reversion speed per year; no upper cap.
 
         Returns
         -------
         float
-            Mean-reversion speed of the single latent factor, per year.
+            Finite, non-negative mean-reversion speed per year; no upper cap.
 
         Notes
         -----
@@ -2075,15 +2179,17 @@ class LatentTwoFactor:
         Parameters
         ----------
         prepay_vol : float
-            Prepayment factor volatility.
+            Finite, non-negative decimal prepayment-factor volatility.
         credit_vol : float
-            Credit factor volatility.
+            Finite, non-negative decimal credit-factor volatility.
         correlation : float
-            Inter-factor correlation.
+            Finite Gaussian inter-factor correlation in ``[-1, 1]``, including endpoints.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        ValueError
+            If either volatility is negative or non-finite, or correlation is
+            non-finite or outside ``[-1, 1]``.
         """
         ...
 
@@ -2136,12 +2242,12 @@ class LatentTwoFactor:
     @property
     def prepay_vol(self) -> float:
         """
-        Prepayment factor volatility.
+        Finite, non-negative decimal prepayment-factor volatility.
 
         Returns
         -------
         float
-            Prepayment factor volatility.
+            Finite, non-negative decimal prepayment-factor volatility.
 
         Notes
         -----
@@ -2152,12 +2258,12 @@ class LatentTwoFactor:
     @property
     def credit_vol(self) -> float:
         """
-        Credit factor volatility.
+        Finite, non-negative decimal credit-factor volatility.
 
         Returns
         -------
         float
-            Credit factor volatility.
+            Finite, non-negative decimal credit-factor volatility.
 
         Notes
         -----
@@ -2286,10 +2392,10 @@ class LatentMultiFactor:
         Parameters
         ----------
         num_factors : int
-            Count of latent factors; zero resolves to one.
+            Positive count of latent factors; zero is rejected.
         volatilities : list[float]
-            One finite, non-negative decimal volatility per factor; valid values
-            are clamped to ``[0.01, 10.0]``.
+            One finite, non-negative decimal volatility per factor; zero and large
+            finite values are preserved without an upper cap.
 
         Returns
         -------

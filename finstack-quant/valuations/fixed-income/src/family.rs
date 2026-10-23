@@ -40,14 +40,12 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     );
 
     // Loans and facilities.
-    registry.register(
-        crate::revolving_credit::pricing::RevolvingCreditPricer::new(ModelKey::Discounting),
-    )?;
-    registry.register(
-        crate::revolving_credit::pricing::RevolvingCreditPricer::new(
-            ModelKey::MonteCarloThreeFactor,
-        ),
-    )?;
+    registry.register(crate::revolving_credit::RevolvingCreditPricer::new(
+        ModelKey::Discounting,
+    ))?;
+    registry.register(crate::revolving_credit::RevolvingCreditPricer::new(
+        ModelKey::MonteCarloThreeFactor,
+    ))?;
     registry.register(crate::term_loan::pricing::TermLoanDiscountingPricer)?;
     registry.register(crate::term_loan::pricing::TermLoanTreePricer)?;
 

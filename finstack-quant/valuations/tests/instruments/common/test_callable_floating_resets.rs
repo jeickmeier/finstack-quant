@@ -146,7 +146,8 @@ fn price_estimate(
         .model_config
         .rate_credit_correlation = rho;
     bond.instrument_pricing_overrides.model_config.mc_paths = Some(512);
-    let result = finstack_quant_valuations::pricer::standard_pricer_registry()
+    let result = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             &bond,
             ModelKey::RatesCredit,

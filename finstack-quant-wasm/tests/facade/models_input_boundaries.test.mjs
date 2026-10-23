@@ -94,7 +94,7 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
       assert.throws(() => model.simulatePaths(count, 1, 1, 42n, false), invalidCount('numPaths'));
       assert.throws(() => model.simulatePaths(2, count, 1, 42n, false), invalidCount('numSteps'));
       assert.throws(
-        () => models.credit.ToggleExerciseModel.optimal(count, 0.1, 0.25, 0.04, 5),
+        () => models.credit.ToggleExerciseModel.optimal(count, 0.25, 0.04, 5),
         invalidCount('nestedPaths')
       );
       assert.throws(() => calibrator.withMaxIterations(count), invalidCount('maxIterations'));

@@ -173,52 +173,10 @@ where
 }
 
 impl McEngine {
-    /// Simulate a single Monte Carlo path.
-    ///
-    /// Visibility is `pub(crate)` so pricer modules (e.g. the Sobol loop in
-    /// [`crate::monte_carlo::pricer::path_dependent`]) can drive one path at a time with a
-    /// custom RNG while still reusing the engine's canonical stepping logic.
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn simulate_path<R, P, D, F>(
-        &self,
-        rng: &mut R,
-        process: &P,
-        disc: &D,
-        initial_state: &[f64],
-        payoff: &mut F,
-        state: &mut [f64],
-        z: &mut [f64],
-        z_raw: &mut [f64],
-        work: &mut [f64],
-        correlation: Option<&CorrelationFactor>,
-        currency: Currency,
-    ) -> Result<f64>
-    where
-        R: RandomStream,
-        P: StochasticProcess,
-        D: Discretization<P>,
-        F: Payoff,
-    {
-        run_path_loop(
-            rng,
-            &self.config.time_grid,
-            process,
-            disc,
-            initial_state,
-            payoff,
-            state,
-            z,
-            z_raw,
-            work,
-            NoiseHook::Correlation(correlation),
-            currency,
-        )
-    }
-
     /// Simulate a single Monte Carlo path with full capture.
     ///
     /// Returns the payoff value and the captured path data. Visibility is
-    /// `pub(crate)` for the same reason as [`Self::simulate_path`]: specialised
+    /// `pub(crate)` so specialised
     /// pricer loops (e.g. Sobol path-dependent pricing) drive per-path RNGs
     /// themselves while reusing the engine's capture bookkeeping.
     #[allow(clippy::too_many_arguments)]

@@ -175,18 +175,14 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
 
     fn metrics_equivalent(
         &self,
-    ) -> Box<dyn finstack_quant_valuations_core::instruments::Instrument> {
+    ) -> Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>> {
         let mut clone = self.clone();
         clone.cashflow_spec.make_cash_pay();
         clone
             .instrument_pricing_overrides
             .model_config
             .merton_mc_config = None;
-        Box::new(clone)
-    }
-
-    fn has_custom_metrics_equivalent(&self) -> bool {
-        true
+        Some(Box::new(clone))
     }
 }
 
@@ -435,12 +431,59 @@ mod metrics_equivalent_tests {
         let mut bond = Bond::example().expect("bond example");
         bond.cashflow_spec = spec;
         assert_eq!(coupon_type_of(&bond.cashflow_spec), CouponType::Pik);
-        let equivalent = bond.metrics_equivalent();
+        let equivalent = bond.metrics_equivalent().expect("bond equivalent");
         let equivalent = equivalent
             .as_any()
             .downcast_ref::<Bond>()
             .expect("metrics equivalent of a bond is a bond");
         coupon_type_of(&equivalent.cashflow_spec)
+    }
+
+    #[test]
+    fn metrics_equivalent_preserves_all_other_bond_state() {
+        use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType, MertonModel};
+        use finstack_quant_valuations_core::instruments::MertonMcConfig;
+
+        let mut bond = Bond::example().expect("bond example");
+        bond.cashflow_spec = pik_step_up_spec();
+        let merton = MertonModel::new_with_dynamics(
+            200.0,
+            0.25,
+            100.0,
+            0.04,
+            0.0,
+            MertonBarrierType::Terminal,
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("Merton model");
+        bond.instrument_pricing_overrides = bond
+            .instrument_pricing_overrides
+            .with_merton_mc_config(MertonMcConfig::new(merton, 0.4).expect("Merton config"))
+            .with_implied_volatility(0.3);
+        bond.instrument_pricing_overrides.model_config.tree_steps = Some(71);
+        bond.metric_pricing_overrides.theta_period = Some(Tenor::semi_annual());
+        bond.scenario_pricing_overrides.scenario_price_shock_decimal = Some(0.1);
+        let original = serde_json::to_value(&bond).expect("original bond");
+        let equivalent = bond.metrics_equivalent().expect("bond equivalent");
+        let equivalent = equivalent.as_any().downcast_ref::<Bond>().expect("bond");
+        assert_eq!(coupon_type_of(&equivalent.cashflow_spec), CouponType::Cash);
+        assert!(equivalent
+            .instrument_pricing_overrides
+            .model_config
+            .merton_mc_config
+            .is_none());
+        assert_eq!(
+            serde_json::to_value(&bond).expect("original unchanged"),
+            original
+        );
+        let mut expected = original;
+        let actual = serde_json::to_value(equivalent).expect("equivalent bond");
+        expected["cashflow_spec"] = actual["cashflow_spec"].clone();
+        expected["instrument_pricing_overrides"]["model_config"]
+            .as_object_mut()
+            .expect("model config")
+            .remove("merton_mc_config");
+        assert_eq!(actual, expected);
     }
 
     #[test]

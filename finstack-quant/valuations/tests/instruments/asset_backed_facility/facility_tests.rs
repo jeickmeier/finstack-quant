@@ -25,7 +25,8 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
+use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations::pricer::STANDARD;
 use time::Month;
 
 fn d(y: i32, m: u8, day: u8) -> Date {
@@ -396,7 +397,7 @@ fn facility_prices_and_reports_metrics_through_the_registry() {
         value.amount()
     );
 
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let result = registry
         .price_with_metrics(
             &facility,

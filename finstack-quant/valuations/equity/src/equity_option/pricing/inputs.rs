@@ -1,14 +1,13 @@
 //! Equity-option market inputs, lifecycle, and discrete-dividend helpers.
 
 use crate::equity_option::types::EquityOption;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_models::types::{OptionMarketParams, OptionType};
-use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::pricer::{ModelKey, PricingError, PricingErrorContext};
 
@@ -65,7 +64,11 @@ pub(crate) fn resolve_lifecycle_value(
                 market.get_price(&inst.spot_id)?,
                 currency,
             )?;
-            let t = year_fraction(inst.day_count, as_of, exercise.settlement_date)?;
+            let t = inst.day_count.year_fraction(
+                as_of,
+                exercise.settlement_date,
+                DayCountContext::default(),
+            )?;
             let future_dividends = inst
                 .discrete_dividends
                 .iter()
@@ -255,7 +258,9 @@ pub(crate) fn future_dividends(
 ) -> Result<Vec<(f64, f64)>> {
     let divs = future_discrete_dividends(inst, as_of)
         .map(|(ex_date, amount)| {
-            let t_div = year_fraction(inst.day_count, as_of, *ex_date)?;
+            let t_div =
+                inst.day_count
+                    .year_fraction(as_of, *ex_date, DayCountContext::default())?;
             let df = disc_curve.df_between_dates(as_of, *ex_date)?;
             Ok((t_div, *amount * df))
         })
@@ -291,7 +296,9 @@ pub(crate) fn collect_inputs(
     let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
 
     // The instrument declares the annualization basis of its volatility quotes.
-    let t_vol = year_fraction(inst.day_count, as_of, inst.expiry)?;
+    let t_vol = inst
+        .day_count
+        .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
     // Effective BSM rate on the vol clock — see the two-clock note above.
     // A non-positive/non-finite df means a corrupted curve; error rather than
     // derive an infinite rate that would poison the Black–Scholes price.
@@ -348,7 +355,13 @@ pub(crate) fn collect_inputs(
 
 fn future_dividend_amounts(inst: &EquityOption, as_of: Date) -> Result<Vec<(f64, f64)>> {
     future_discrete_dividends(inst, as_of)
-        .map(|(date, amount)| Ok((year_fraction(inst.day_count, as_of, *date)?, *amount)))
+        .map(|(date, amount)| {
+            Ok((
+                inst.day_count
+                    .year_fraction(as_of, *date, DayCountContext::default())?,
+                *amount,
+            ))
+        })
         .collect()
 }
 

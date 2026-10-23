@@ -5,7 +5,7 @@ use super::inputs::{
     future_dividends, resolve_lifecycle_value,
 };
 use crate::equity_option::types::EquityOption;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -14,7 +14,6 @@ use finstack_quant_models::closed_form::{bs_greeks_unchecked, bs_price_unchecked
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_models::types::{OptionMarketParams, OptionType};
-use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::pricer::expect_inst;
 
@@ -122,7 +121,11 @@ pub(crate) fn compute_greeks(
                     } else {
                         0.0
                     };
-                    let t = year_fraction(inst.day_count, as_of, exercise.settlement_date)?;
+                    let t = inst.day_count.year_fraction(
+                        as_of,
+                        exercise.settlement_date,
+                        DayCountContext::default(),
+                    )?;
                     (-q * t).exp()
                 };
                 let direction = match inst.option_type {
@@ -140,7 +143,11 @@ pub(crate) fn compute_greeks(
             .filter(|e| e.exercised && as_of < e.settlement_date)
         {
             let disc = curves.get_discount(inst.discount_curve_id.as_str())?;
-            let t = year_fraction(inst.day_count, as_of, exercise.settlement_date)?;
+            let t = inst.day_count.year_fraction(
+                as_of,
+                exercise.settlement_date,
+                DayCountContext::default(),
+            )?;
             let df = disc.df_between_dates(as_of, exercise.settlement_date)?;
             let r = -df.ln() / t;
             let days = inst.metric_pricing_overrides.theta_days_per_year();
@@ -174,7 +181,11 @@ pub(crate) fn compute_greeks(
                         time_exposure -= q * prepaid;
                     } else {
                         for (date, amount) in dividends {
-                            let dt = year_fraction(inst.day_count, as_of, *date)?;
+                            let dt = inst.day_count.year_fraction(
+                                as_of,
+                                *date,
+                                DayCountContext::default(),
+                            )?;
                             let dividend_df = disc.df_between_dates(as_of, *date)?;
                             let pv = amount * dividend_df;
                             rate_exposure += dt * pv;
@@ -268,7 +279,11 @@ pub(crate) fn compute_greeks(
                     // -r * PV(D) for a flat curve, with no ex-date jump included.
                     let mut dividend_carry = 0.0;
                     for &(ex_date, amount) in future_discrete_dividends(inst, as_of) {
-                        let t_div = year_fraction(inst.day_count, as_of, ex_date)?;
+                        let t_div = inst.day_count.year_fraction(
+                            as_of,
+                            ex_date,
+                            DayCountContext::default(),
+                        )?;
                         if t_div > 0.0 {
                             let df = disc_curve.df_between_dates(as_of, ex_date)?;
                             let zero_yield = -df.ln() / t_div;
@@ -341,7 +356,10 @@ fn leisen_reimer_tree(inst: &EquityOption) -> BinomialTree {
         .model_config
         .tree_steps
         .unwrap_or(201);
-    BinomialTree::leisen_reimer(steps)
+    BinomialTree::new(
+        steps,
+        finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer,
+    )
 }
 
 /// Contractual Bermudan exercise dates.

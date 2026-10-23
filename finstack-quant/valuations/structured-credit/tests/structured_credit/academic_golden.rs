@@ -533,13 +533,17 @@ fn test_recovery_rate_golden_industry_standards() {
     // recovery data for senior secured loans averages 60-70%; the CLO
     // registry used 40% until 2026-09-17, the senior unsecured bond figure).
     assert_eq!(
-        registry_recovery(StructuredCredit::new_clo(
-            "TEST-CLO",
-            pool.clone(),
-            tranches.clone(),
-            closing,
-            maturity,
-            "USD-OIS",
+        registry_recovery(StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "TEST-CLO".into(),
+                pool: pool.clone(),
+                tranches: tranches.clone(),
+                closing_date: closing,
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None
+            }
         )),
         0.60,
         "CLO standard recovery should be 60%"
@@ -548,13 +552,17 @@ fn test_recovery_rate_golden_industry_standards() {
     // RMBS (Residential Mortgages): ~60% recovery
     // Source: S&P RMBS methodology
     assert_eq!(
-        registry_recovery(StructuredCredit::new_rmbs(
-            "TEST-RMBS",
-            pool.clone(),
-            tranches.clone(),
-            closing,
-            maturity,
-            "USD-OIS",
+        registry_recovery(StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "TEST-RMBS".into(),
+                pool: pool.clone(),
+                tranches: tranches.clone(),
+                closing_date: closing,
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None
+            }
         )),
         0.60,
         "RMBS standard recovery should be 60%"
@@ -563,13 +571,17 @@ fn test_recovery_rate_golden_industry_standards() {
     // Auto ABS: ~45% recovery
     // Source: S&P Auto ABS methodology
     assert_eq!(
-        registry_recovery(StructuredCredit::new_abs(
-            "TEST-ABS",
-            pool.clone(),
-            tranches.clone(),
-            closing,
-            maturity,
-            "USD-OIS",
+        registry_recovery(StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "TEST-ABS".into(),
+                pool: pool.clone(),
+                tranches: tranches.clone(),
+                closing_date: closing,
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None
+            }
         )),
         0.45,
         "Auto ABS standard recovery should be 45%"
@@ -578,13 +590,17 @@ fn test_recovery_rate_golden_industry_standards() {
     // CMBS (Commercial Mortgages): ~65% recovery
     // Source: Moody's CMBS methodology
     assert_eq!(
-        registry_recovery(StructuredCredit::new_cmbs(
-            "TEST-CMBS",
-            pool.clone(),
-            tranches,
-            closing,
-            maturity,
-            "USD-OIS",
+        registry_recovery(StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "TEST-CMBS".into(),
+                pool: pool.clone(),
+                tranches,
+                closing_date: closing,
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None
+            }
         )),
         0.65,
         "CMBS standard recovery should be 65%"

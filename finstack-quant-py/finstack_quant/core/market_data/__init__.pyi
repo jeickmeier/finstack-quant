@@ -1126,6 +1126,8 @@ class HazardCurve:
     >>> curve = HazardCurve("ACME-HZD", "2025-01-01", [(1.0, 0.02), (5.0, 0.03)], recovery_rate=0.4)
     >>> round(curve.sp(1.0), 6)
     0.980199
+    >>> round(curve.conditional_default_prob("2025-01-01", "2026-01-01"), 6)
+    0.019801
     >>> curve.knot_points
     [(1.0, 0.02), (5.0, 0.03)]
 
@@ -1406,6 +1408,38 @@ class HazardCurve:
         ------
         ValueError
             If ``t2 < t1``.
+        """
+        ...
+
+    def conditional_default_prob(self, start: DateLike, end: DateLike) -> float:
+        """Default probability conditional on survival to the start date.
+
+        Integrates the piecewise-constant annual hazard directly, preserving
+        small probabilities even when unconditional survival has underflowed.
+        This query assumes survival to ``start``; it does not determine whether
+        an issuer has actually defaulted.
+
+        Parameters
+        ----------
+        start : datetime.date or str
+            Conditioning date, converted with the curve day count. Dates before
+            ``base_date`` are clamped to time zero.
+        end : datetime.date or str
+            End date on or after ``start``. Equal dates give zero; the final
+            hazard rate extends beyond the last knot.
+
+        Returns
+        -------
+        float
+            Conditional default probability as a decimal fraction in [0, 1].
+
+        Raises
+        ------
+        ValueError
+            If a date is malformed, ``end`` precedes ``start``, or the curve
+            day count cannot compute either date's year fraction.
+        TypeError
+            If either argument is not a supported date or ISO date string.
         """
         ...
 

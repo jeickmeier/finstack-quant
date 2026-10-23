@@ -252,20 +252,6 @@ impl FloatingLegCompounding {
     }
 }
 
-impl std::fmt::Display for FloatingLegCompounding {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Simple => write!(f, "simple"),
-            Self::SimpleAverage => write!(f, "simple_average"),
-            Self::CompoundedInArrears { .. } => write!(f, "compounded_in_arrears"),
-            Self::CompoundedWithObservationShift { .. } => {
-                write!(f, "compounded_with_observation_shift")
-            }
-            Self::CompoundedWithRateCutoff { .. } => write!(f, "compounded_with_rate_cutoff"),
-        }
-    }
-}
-
 fn default_gearing() -> Decimal {
     FloatingRateSpec::DEFAULT_GEARING
 }
@@ -405,8 +391,9 @@ impl OvernightIndexConstraintApplication {
 /// Historical fixings **are supported** via the `MarketContext`: store a
 /// `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
 /// `finstack_quant_core::market_data::fixings`) containing realized index
-/// observations. Observation dates strictly before the forward curve base
-/// date then resolve from that series instead of the curve:
+/// observations. Observation dates strictly before the valuation cutoff then
+/// resolve from that series instead of the curve. The cutoff is the forward
+/// curve base date under `build` and the valuation date under `build_as_of`:
 ///
 /// - **Overnight observations** (compounded/averaged paths) use exact-date
 ///   lookup on the index's fixing business days. Weekend and holiday carry
@@ -419,8 +406,8 @@ impl OvernightIndexConstraintApplication {
 ///   The fixing is the index rate only; gearing/spread/floors/caps apply on
 ///   top exactly as for projected rates.
 ///
-/// An observation exactly on the curve base date prefers a published
-/// same-day fixing when the series has one, otherwise projects from `t = 0`.
+/// An observation exactly on the cutoff prefers a published same-day fixing
+/// when the series has one, otherwise projects on the curve clock.
 ///
 /// The [`FloatingRateFallback`] policy applies only when **no** fixing
 /// series is provided: `Error` (the default) fails the build with a

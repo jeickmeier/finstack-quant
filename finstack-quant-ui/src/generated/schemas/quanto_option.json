@@ -1165,15 +1165,11 @@
       ]
     },
     "d_8a837e6f142b34e8cfd4": {
+      "additionalProperties": false,
       "description": "Optimal toggle configuration using nested Monte Carlo simulation.\n\nAt each coupon date the toggle runs a small nested MC to estimate the\nequity value (call-option payoff on the firm's assets) under two\nscenarios:\n\n1. **Cash** – the firm pays out the coupon, reducing asset value by\n   the coupon amount while notional stays unchanged.\n2. **PIK** – the coupon accretes to notional (no cash outflow), so\n   asset value is preserved but the default barrier rises.\n\nPIK is elected when the estimated equity value under PIK exceeds\nthat under cash.  The nested simulation uses a simple GBM forward\nevolution of asset value with a first-passage barrier check.",
       "properties": {
         "asset_vol": {
           "description": "Annualised asset volatility for the nested GBM simulation.",
-          "format": "double",
-          "type": "number"
-        },
-        "equity_discount_rate": {
-          "description": "Equity holder discount rate applied to the nested-MC payoff.\n\nNote: the nested simulation drifts under the risk-neutral measure\n(`risk_free_rate`) but discounts here, so the intermediate equity\nfigures are decision inputs, not measure-consistent prices. The\nrate cancels in the cash-vs-PIK comparison and does not bias the\nelected branch.",
           "format": "double",
           "type": "number"
         },
@@ -1196,7 +1192,6 @@
       },
       "required": [
         "nested_paths",
-        "equity_discount_rate",
         "asset_vol",
         "risk_free_rate",
         "horizon"

@@ -1614,8 +1614,8 @@ mod tests {
 
         let model = resolve_capfloor_hw1f_model_params(&caplet, &market).expect("model");
 
-        assert_eq!(model.volatility.times()[0], 0.0);
-        assert_eq!(model.volatility.values(), &[0.01, 0.02]);
+        assert_eq!(model.get_times()[0], 0.0);
+        assert_eq!(model.get_values(), &[0.01, 0.02]);
     }
     #[test]
     fn selected_hw_greeks_reprice_the_selected_model_without_black_surface() {

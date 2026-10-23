@@ -459,7 +459,7 @@ impl_repr_html_via_dataframe!(PyFxDeltaVolSurface);
 /// Example
 /// -------
 /// >>> from finstack_quant.core.market_data import SabrParameterData
-/// >>> p = SabrParameterData(0.02, 0.5, -0.2, 0.3)
+/// >>> p = SabrParameterData(0.02, 0.5, 0.3, -0.2)
 /// >>> (p.alpha, p.shift)
 /// (0.02, None)
 #[pyclass(
@@ -611,7 +611,7 @@ fn extract_sabr_node(obj: &Bound<'_, PyAny>, idx: usize) -> PyResult<SabrParamet
 /// Example
 /// -------
 /// >>> from finstack_quant.core.market_data import SabrParameterData, VolCube
-/// >>> p = SabrParameterData(0.02, 0.5, -0.2, 0.3)
+/// >>> p = SabrParameterData(0.02, 0.5, 0.3, -0.2)
 /// >>> cube = VolCube("USD-SWPT", [1.0, 2.0], [5.0], [p, p], [0.03, 0.032])
 /// >>> cube.forward_at(1, 0)
 /// 0.032

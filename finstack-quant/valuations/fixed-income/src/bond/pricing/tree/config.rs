@@ -15,7 +15,7 @@ use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
 /// For production callable bond OAS, use `HullWhite` with parameters fitted
 /// before pricing.
 #[derive(Debug, Clone)]
-pub enum TreeModelChoice {
+pub(crate) enum TreeModelChoice {
     /// Ho-Lee model with normal short-rate volatility.
     HoLee {
         /// Annualized absolute rate volatility; `0.01` means 100 basis points.
@@ -136,25 +136,8 @@ impl Default for TreeModelChoice {
 /// | 200 | < 0.5 bp | Risk reports |
 /// | 500 | < 0.2 bp | Regulatory/audit |
 ///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_valuations_fixed_income::bond::pricing::tree::TreePricerConfig;
-///
-/// use finstack_quant_valuations_fixed_income::bond::pricing::tree::TreeModelChoice;
-///
-/// // Default configuration using Ho-Lee with 100 bp normal vol
-/// let default = TreePricerConfig::default();
-///
-/// // Hull-White model (production recommended for callable bonds)
-/// let hw = TreePricerConfig {
-///     tree_steps: 100,
-///     tree_model: TreeModelChoice::HullWhite { kappa: 0.03, sigma: 0.01 },
-///     ..Default::default()
-/// };
-/// ```
 #[derive(Debug, Clone)]
-pub struct TreePricerConfig {
+pub(crate) struct TreePricerConfig {
     /// Number of time steps in the interest rate tree.
     ///
     /// Higher values improve accuracy but increase computation time quadratically.
@@ -273,22 +256,7 @@ pub(crate) fn bond_tree_settings(bond: &Bond) -> TreePricerConfig {
 /// - the Hull-White parameters are missing, partial, non-positive (other than
 ///   an explicit zero `hw1f_sigma`) or given as a `hw1f_sigma_schedule`.
 ///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_core::market_data::context::MarketContext;
-/// use finstack_quant_valuations_fixed_income::bond::Bond;
-/// use finstack_quant_valuations_fixed_income::bond::pricing::tree::bond_tree_config;
-///
-/// # fn main() -> finstack_quant_core::Result<()> {
-/// let mut bond = Bond::example()?;
-/// bond.instrument_pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
-/// bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
-/// let config = bond_tree_config(&bond, &MarketContext::new())?;
-/// # Ok(())
-/// # }
-/// ```
-pub fn bond_tree_config(
+pub(crate) fn bond_tree_config(
     bond: &Bond,
     market: &MarketContext,
 ) -> finstack_quant_core::Result<TreePricerConfig> {

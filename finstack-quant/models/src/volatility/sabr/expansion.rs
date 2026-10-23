@@ -124,109 +124,7 @@ impl SabrParameters {
             };
         }
 
-        self.lognormal_expansion(forward, strike, time_to_expiry)
-    }
-
-    /// Hagan et al. (2002) lognormal (Black-76) expansion with Obloj (2008) z/χ
-    /// correction and optional displacement shift for any `β ∈ [0, 1]`.
-    #[inline]
-    pub(super) fn lognormal_expansion(
-        &self,
-        forward: f64,
-        strike: f64,
-        time_to_expiry: f64,
-    ) -> Result<f64> {
-        let (effective_forward, effective_strike) = match self.shift {
-            Some(shift) => (forward + shift, strike + shift),
-            None => (forward, strike),
-        };
-
-        if !effective_forward.is_finite()
-            || !effective_strike.is_finite()
-            || !time_to_expiry.is_finite()
-            || effective_forward <= 0.0
-            || effective_strike <= 0.0
-            || time_to_expiry <= 0.0
-        {
-            return Err(Error::Validation(format!(
-                "SABR lognormal expansion requires positive effective forward/strike and expiry; \
-                 got forward={forward:.6}, strike={strike:.6}, T={time_to_expiry:.4}"
-            )));
-        }
-
-        let alpha = self.alpha;
-        let nu = self.nu;
-        let rho = self.rho;
-
-        // Snap β to 0 or 1 with the same `BETA_SNAP_TOL` used by
-        // `implied_vol` / `quote_convention`, so smile and ATM paths take
-        // the same branch for a given raw β.
-        let raw_beta = self.beta;
-        let beta_is_zero = raw_beta < BETA_SNAP_TOL;
-        let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
-        let beta = if beta_is_zero {
-            0.0
-        } else if beta_is_one {
-            1.0
-        } else {
-            raw_beta
-        };
-
-        let f_mid = (effective_forward * effective_strike).sqrt();
-        let f_mid_beta = f_mid.powf(1.0 - beta);
-
-        // ATM detection uses relative moneyness only. The previous
-        // `z.abs() < 1e-8` clause was small both for genuine ATM (F≈K) AND
-        // whenever ν→0, so it short-circuited every strike to the flat ATM vol
-        // in the pure-CEV limit. The ν→0 limit is handled by the general
-        // formula (z/χ(z)→1).
-        let relative_diff = (effective_forward - effective_strike).abs()
-            / effective_forward.abs().max(effective_strike.abs());
-        if relative_diff < 1e-8 {
-            return self.atm_lognormal(effective_forward, time_to_expiry, beta);
-        }
-
-        let log_moneyness = (effective_forward / effective_strike).ln();
-
-        // Obloj (2008) correction: use geometric-mean-based z for the z/χ(z)
-        // ratio: z = (ν/α) * f_mid^{1-β} * ln(F/K).
-        let z_corrected = if beta_is_one {
-            (nu / alpha) * log_moneyness
-        } else {
-            (nu / alpha) * f_mid_beta * log_moneyness
-        };
-
-        let x = self.calculate_chi_robust(z_corrected)?;
-
-        let factor1 = if f_mid_beta.abs() < 1e-14 {
-            alpha
-        } else {
-            let correction_term = 1.0
-                + (1.0 - beta).powi(2) / 24.0 * log_moneyness.powi(2)
-                + (1.0 - beta).powi(4) / 1920.0 * log_moneyness.powi(4);
-            alpha / (f_mid_beta * correction_term)
-        };
-
-        let factor2 = self.z_over_chi(z_corrected, x)?;
-
-        let time_correction = (1.0 - beta).powi(2) / 24.0 * alpha.powi(2)
-            / f_mid.powf(2.0 * (1.0 - beta))
-            + 0.25 * rho * beta * nu * alpha / f_mid_beta
-            + (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
-
-        let factor3 = 1.0 + time_to_expiry * time_correction;
-
-        let volatility = factor1 * factor2 * factor3;
-
-        if volatility <= 0.0 || !volatility.is_finite() {
-            return Err(Error::Validation(format!(
-                "SABR produced invalid volatility={:.6} for forward={:.6}, strike={:.6}, T={:.4}. \
-                 Check parameter values.",
-                volatility, forward, strike, time_to_expiry
-            )));
-        }
-
-        Ok(volatility)
+        self.implied_vol_lognormal(forward, strike, time_to_expiry)
     }
 
     /// Lognormal ATM implied volatility (Hagan et al. (2002) eq. 2.18).
@@ -264,22 +162,11 @@ impl SabrParameters {
         Ok(vol)
     }
 
-    /// χ(z) for the SABR formula, blending a fourth-order series near z = 0
-    /// with the exact logarithm so Greeks stay continuous near ATM.
-    ///
-    /// - Series: χ(z) ≈ z + (ρ/2)z² + ((3ρ² - 1)/6)z³ + (ρ(5ρ² - 3)/8)z⁴ + O(z⁵)
-    /// - Smoothstep blend on `|z| ∈ [1e-5, 1e-3]`
-    /// - Closed-form limits at ρ → ±1
-    #[inline]
-    pub(crate) fn calculate_chi_robust(&self, z: f64) -> Result<f64> {
-        chi(z, self.rho)
-    }
-
     /// `z / χ(z)` correction using a Taylor ratio for small `|z|`.
     ///
-    /// `chi` must already be `χ(z)` from [`Self::calculate_chi_robust`].
+    /// `chi` must already be `χ(z)` from [`chi`].
     ///
-    /// - For `|z| < 1e-5` (the series region of `calculate_chi_robust`):
+    /// - For `|z| < 1e-5` (the series region of `chi`):
     ///   `z/χ(z) = 1 − (ρ/2)z + ((2−3ρ²)/12)z² + (ρ(5−6ρ²)/24)z³ + O(z⁴)`,
     ///   which avoids 0/0 cancellation.
     /// - Otherwise exact division `z/χ(z)`.
@@ -589,7 +476,97 @@ impl SabrParameters {
         k: f64,
         t: f64,
     ) -> finstack_quant_core::Result<f64> {
-        self.lognormal_expansion(f, k, t)
+        let (effective_f, effective_k) = match self.shift {
+            Some(shift) => (f + shift, k + shift),
+            None => (f, k),
+        };
+
+        if !effective_f.is_finite()
+            || !effective_k.is_finite()
+            || !t.is_finite()
+            || effective_f <= 0.0
+            || effective_k <= 0.0
+            || t <= 0.0
+        {
+            return Err(Error::Validation(format!(
+                "SABR lognormal expansion requires positive effective forward/strike and expiry; \
+                 got forward={f:.6}, strike={k:.6}, T={t:.4}"
+            )));
+        }
+
+        let alpha = self.alpha;
+        let nu = self.nu;
+        let rho = self.rho;
+
+        // Snap β to 0 or 1 with the same `BETA_SNAP_TOL` used by
+        // `implied_vol` / `quote_convention`, so smile and ATM paths take
+        // the same branch for a given raw β.
+        let raw_beta = self.beta;
+        let beta_is_zero = raw_beta < BETA_SNAP_TOL;
+        let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
+        let beta = if beta_is_zero {
+            0.0
+        } else if beta_is_one {
+            1.0
+        } else {
+            raw_beta
+        };
+
+        let f_mid = (effective_f * effective_k).sqrt();
+        let f_mid_beta = f_mid.powf(1.0 - beta);
+
+        // ATM detection uses relative moneyness only. The previous
+        // `z.abs() < 1e-8` clause was small both for genuine ATM (F≈K) AND
+        // whenever ν→0, so it short-circuited every strike to the flat ATM vol
+        // in the pure-CEV limit. The ν→0 limit is handled by the general
+        // formula (z/χ(z)→1).
+        let relative_diff =
+            (effective_f - effective_k).abs() / effective_f.abs().max(effective_k.abs());
+        if relative_diff < 1e-8 {
+            return self.atm_lognormal(effective_f, t, beta);
+        }
+
+        let log_moneyness = (effective_f / effective_k).ln();
+
+        // Obloj (2008) correction: use geometric-mean-based z for the z/χ(z)
+        // ratio: z = (ν/α) * f_mid^{1-β} * ln(F/K).
+        let z_corrected = if beta_is_one {
+            (nu / alpha) * log_moneyness
+        } else {
+            (nu / alpha) * f_mid_beta * log_moneyness
+        };
+
+        let x = chi(z_corrected, self.rho)?;
+
+        let factor1 = if f_mid_beta.abs() < 1e-14 {
+            alpha
+        } else {
+            let correction_term = 1.0
+                + (1.0 - beta).powi(2) / 24.0 * log_moneyness.powi(2)
+                + (1.0 - beta).powi(4) / 1920.0 * log_moneyness.powi(4);
+            alpha / (f_mid_beta * correction_term)
+        };
+
+        let factor2 = self.z_over_chi(z_corrected, x)?;
+
+        let time_correction = (1.0 - beta).powi(2) / 24.0 * alpha.powi(2)
+            / f_mid.powf(2.0 * (1.0 - beta))
+            + 0.25 * rho * beta * nu * alpha / f_mid_beta
+            + (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
+
+        let factor3 = 1.0 + t * time_correction;
+
+        let volatility = factor1 * factor2 * factor3;
+
+        if volatility <= 0.0 || !volatility.is_finite() {
+            return Err(Error::Validation(format!(
+                "SABR produced invalid volatility={:.6} for forward={:.6}, strike={:.6}, T={:.4}. \
+                 Check parameter values.",
+                volatility, f, k, t
+            )));
+        }
+
+        Ok(volatility)
     }
 
     /// Normal SABR implied volatility with checked error semantics.

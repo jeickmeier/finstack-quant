@@ -737,6 +737,11 @@ impl InflationCurveBuilder {
         }
         let knots = kvec.into_boxed_slice();
         let cpi_levels = cvec.into_boxed_slice();
+        if self.style == InterpStyle::MonotoneConvex {
+            return Err(crate::Error::Validation(
+                "MonotoneConvex interpolation is only supported on DiscountCurve".to_string(),
+            ));
+        }
         let interp = InterpRollState::build_source(
             self.roll_transform.as_ref(),
             self.style,

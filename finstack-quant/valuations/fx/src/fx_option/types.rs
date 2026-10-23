@@ -318,15 +318,6 @@ impl FxOption {
             .build()
     }
 
-    /// Compute present value using Garman–Kohlhagen model.
-    pub fn base_value(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        pricer::compute_pv(self, market, as_of)
-    }
-
     /// Solve for implied volatility.
     pub fn implied_vol(
         &self,

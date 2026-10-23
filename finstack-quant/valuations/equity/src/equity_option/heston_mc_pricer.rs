@@ -102,7 +102,7 @@ impl EquityOptionHestonMcPricer {
         let discount_factor = (-r * t).exp();
 
         // Initial state: [spot, v0]
-        let initial_state = [spot, params.v0];
+        let initial_state = [spot, params.model.v0];
 
         let payoff = European::new(inst.option_type, inst.strike, inst.quantity, maturity_step);
         let result = engine.price(

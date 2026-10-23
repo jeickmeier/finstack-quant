@@ -418,6 +418,11 @@ impl LevenbergMarquardtSolver {
 
         residuals_func(&params, &mut resid_vec);
         let mut resid_norm: f64 = resid_vec.iter().map(|r| r * r).sum::<f64>().sqrt();
+        if !resid_norm.is_finite() {
+            return Err(crate::Error::Validation(
+                "LM initial residuals must be finite".to_string(),
+            ));
+        }
         let mut residual_evals = 1usize;
         let mut jacobian_evals = 0usize;
         let mut iterations = 0usize;
@@ -451,14 +456,14 @@ impl LevenbergMarquardtSolver {
         let raise = |lambda: f64| (lambda * LM_LAMBDA_FACTOR).min(LAMBDA_MAX);
 
         for _iter in 0..self.max_iterations {
-            jacobian_evals += 1;
-            jacobian_func(&params, &mut residual_evals, &mut jacobian);
-
             if resid_norm < self.tolerance {
                 let reason = LmTerminationReason::ConvergedResidualNorm;
                 tracing::debug!(iterations, resid_norm, ?reason, "lm: converged");
                 return Ok(finish!(reason));
             }
+
+            jacobian_evals += 1;
+            jacobian_func(&params, &mut residual_evals, &mut jacobian);
 
             match self.solve_normal_equations_into(
                 &jacobian,

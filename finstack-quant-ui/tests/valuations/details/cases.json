@@ -11,7 +11,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "9c88720101020a5ecbdf10d1fc4fd7d66d7485bfb8b3b34879da26367105c3a5"
+      "sha256": "00097ad3f67daa576167d30f2e82efeb25353f506214028099c9cacbee78a35d"
     },
     {
       "path": "finstack-quant-wasm/tests/facade/covenants.test.mjs",
@@ -19,7 +19,7 @@
     },
     {
       "path": "finstack-quant-wasm/index.d.ts",
-      "sha256": "d2493758982180b01044cbb07ee0e6e5cdacceef700268ab04a93640587aa29d"
+      "sha256": "979d06de029a59f864fd189197e6ac85396b36bb56f00bbae413fcb73e37485a"
     },
     {
       "path": "finstack-quant-wasm/src/utils/mod.rs",

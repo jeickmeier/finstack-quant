@@ -159,6 +159,7 @@ import type {
 } from './types/generated/margin/index.js';
 import type {
   ArbitrageValidationResult,
+  SabrCalibrationOutcome,
   BsGreeks,
   BumpSizeConfig,
   ExchangeOfferAnalysis,
@@ -390,6 +391,7 @@ export type {
 };
 export type {
   ArbitrageValidationResult,
+  SabrCalibrationOutcome,
   BsGreeks,
   BumpSizeConfig,
   ExchangeOfferAnalysis,
@@ -3301,6 +3303,21 @@ export interface HazardCurve extends WasmOwned {
    * @throws If `t2 < t1`.
    */
   defaultProb(t1: number, t2: number): number;
+
+  /**
+   * Default probability conditional on survival to the start date.
+   *
+   * Integrates the annual piecewise-constant hazard directly, preserving small
+   * probabilities even when unconditional survival has underflowed. It does
+   * not determine whether an issuer has actually defaulted.
+   *
+   * @param start - ISO-8601 conditioning date (`"YYYY-MM-DD"`), converted with the curve day count; dates before `baseDate` are clamped to time zero.
+   * @param end - ISO-8601 end date on or after `start`. Equal dates return zero; the final hazard rate extends beyond the last knot.
+   * @returns Conditional default probability as a decimal fraction in `[0, 1]`.
+   * @throws `TypeError` for non-string inputs; `FinstackError` (kind `validation`) for malformed or reversed dates, or a year fraction that cannot be computed.
+   */
+  conditionalDefaultProb(start: string, end: string): number;
+
   /**
    * Interpolated par CDS spread in basis points at year fraction `t`.
    *
@@ -7685,6 +7702,23 @@ export interface CoreNamespace {
    */
   Tenor: TenorConstructor;
   /**
+   * Return the market-standard FX spot lag in business days for a currency pair.
+   * No holiday calendars or instrument-specific settlement overrides apply.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * console.log(core.fxStandardSettlementDays("USD", "CAD")); // 1
+   * console.log(core.fxStandardSettlementDays("EUR", "USD")); // 2
+   * ```
+   * @param base - Base (foreign) currency ISO-4217 code; case-insensitive, with no surrounding whitespace.
+   * @param quote - Quote (domestic) currency ISO-4217 code; reversing the pair preserves the lag.
+   * @returns One business day for USD/CAD, USD/TRY, USD/PHP and USD/RUB in either order; two otherwise, including USD/MXN and EUR/CAD.
+   * @throws TypeError - With kind `invalid_type` if either currency is not a string.
+   * @throws Error - With kind `validation` if either code is not a recognized ISO-4217 currency.
+   */
+  fxStandardSettlementDays(base: string, quote: string): number;
+  /**
    * Create a date and return it as epoch days (days since 1970-01-01).
    * @returns Days since 1970-01-01 (Unix epoch).
    * @param year - Integral calendar year supported by the Rust date type.
@@ -8593,7 +8627,7 @@ declare class Performance {
    * @param tickerNames - Ticker labels aligned with the outer elements of `prices`.
    * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
    * @param frequency - Optional observation frequency token; defaults to daily.
-   * @throws Error - Rejects malformed dates or matrices, invalid prices, unsupported frequencies, and an unknown benchmark ticker.
+   * @throws Error - Rejects malformed dates or matrices, invalid prices, unsupported frequencies, a non-string benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker (kind `not_found`).
    */
   constructor(
     dates: string[],
@@ -8611,7 +8645,7 @@ declare class Performance {
    * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
    * @param frequency - Optional observation frequency token; defaults to daily.
    * @returns A `Performance` handle over the supplied return panel.
-   * @throws Error - Rejects malformed dates or matrices and invalid benchmark or frequency inputs.
+   * @throws Error - Rejects malformed dates or matrices, unsupported frequencies, a non-string benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker (kind `not_found`).
    */
   static fromReturns(
     dates: string[],
@@ -8649,7 +8683,7 @@ declare class Performance {
   /**
    * Change the benchmark ticker.
    * @param ticker - Existing ticker label to use as the benchmark return series.
-   * @throws Error - Rejects `ticker` when it does not match a loaded ticker name.
+   * @throws Error - Rejects a non-string `ticker` (kind `invalid_type`) or one that does not match a loaded ticker name (kind `not_found`).
    */
   resetBenchTicker(ticker: string): void;
   /**
@@ -8662,7 +8696,7 @@ declare class Performance {
    * Resolve an exact, case-sensitive ticker label.
    * @param ticker - Case-sensitive ticker label supplied when the panel was constructed.
    * @returns Zero-based column index for the loaded ticker.
-   * @throws Error - Rejects a non-string value or a name absent from the panel.
+   * @throws Error - Rejects a non-string value (kind `invalid_type`) or a name absent from the panel (kind `not_found`).
    */
   getTickerIndex(ticker: string): number;
   /**
@@ -9125,34 +9159,29 @@ declare class Performance {
   /**
    * Period-to-date lookback returns.
    *
-   * FYTD is the first observation on or after the fiscal calendar start
-   * through `refDate`. Holidays are not skipped. The first included
-   * simple return still spans the prior close.
+   * MTD, QTD and YTD start on the first calendar day of `refDate`'s month,
+   * calendar quarter and year. FYTD is the first observation on or after the
+   * fiscal calendar start of `fiscalConfig` through `refDate`. Holidays are not
+   * skipped. The first included simple return still spans the prior close.
    * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
-   * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; defaults to January. With both parts omitted the fiscal year is the calendar year.
-   * @param fiscalYearStartDay - Optional fiscal-year start day; defaults to the first day of the month (Rust `FiscalConfig::from_parts`).
+   * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` is the calendar year (`FiscalConfig::default`).
    * @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
-   * @throws Error - Rejects an invalid ISO `ref_date`, a fiscal month outside `1..=12`, a fiscal day outside `1..=31`, or a result that cannot be serialized to JavaScript.
+   * @throws Error - Rejects an invalid ISO `ref_date` or a result that cannot be serialized to JavaScript.
    */
-  lookbackReturns(
-    refDate: string,
-    fiscalYearStartMonth?: number,
-    fiscalYearStartDay?: number
-  ): LookbackReturns;
+  lookbackReturns(refDate: string, fiscalConfig?: FiscalConfig | null): LookbackReturns;
   /**
-   * Aggregated period statistics for one asset at the given frequency.
+   * Aggregated period statistics for one asset at the given frequency. Without
+   * a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param aggregationFrequency - Optional aggregation frequency token; defaults to monthly.
-   * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; when only the day is given the month is January.
-   * @param fiscalYearStartDay - Optional fiscal-year start day from 1 through 31, clamped to the selected month end; when only the month is given the day is the 1st.
+   * @param fiscalConfig - Optional FiscalConfig handle; omitted or null buckets Gregorian periods with ISO weeks.
    * @returns Period statistics object for the selected ticker at the requested frequency.
-   * @throws Error - Rejects an unsupported `aggregation_frequency`, a fiscal month outside `1..=12`, a fiscal day outside `1..=31`, an out-of-range `ticker_idx`, an unrepresentable period boundary, or period statistics that cannot be serialized to JavaScript.
+   * @throws Error - Rejects an unsupported `aggregation_frequency`, an out-of-range `ticker_idx`, an unrepresentable period boundary, or period statistics that cannot be serialized to JavaScript.
    */
   periodStats(
     tickerIdx: number,
     aggregationFrequency?: string,
-    fiscalYearStartMonth?: number,
-    fiscalYearStartDay?: number
+    fiscalConfig?: FiscalConfig | null
   ): PeriodStats;
   /**
    * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
@@ -10327,11 +10356,11 @@ export interface RecoveryModel extends WasmOwned {
    */
   readonly lgd: number;
   /**
-   * Recovery-rate volatility scale (0 for constant models).
+   * Local recovery shock scale in decimals, not realized recovery standard deviation.
    */
   readonly recoveryVolatility: number;
   /**
-   * Whether recovery varies with the market factor.
+   * Whether the recovery distribution is nonconstant, including obligor-only variation.
    */
   readonly isStochastic: boolean;
   /**
@@ -10340,16 +10369,30 @@ export interface RecoveryModel extends WasmOwned {
   readonly modelName: string;
   /**
    * Recovery conditional on the systematic market factor.
-   * @returns Conditional recovery rate as a fraction of par in `[0, 1]`.
    * @param marketFactor - Realized standardized market factor used to condition recovery or loss given default.
+   * @returns Conditional mean recovery in `[0, 1]`.
+   * @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
    */
   conditionalRecovery(marketFactor: number): number;
   /**
    * Conditional LGD given market factor.
-   * @returns Conditional loss-given-default as a fraction of par in `[0, 1]`.
    * @param marketFactor - Realized standardized market factor used to condition recovery or loss given default.
+   * @returns One minus conditional mean recovery.
+   * @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
    */
   conditionalLgd(marketFactor: number): number;
+  /**
+   * Whether sampling needs an independent obligor recovery draw.
+   */
+  readonly hasIdiosyncraticDispersion: boolean;
+  /**
+   * Sample bounded recovery from the canonical logistic-normal law.
+   * @param marketFactor - Finite systematic standard-normal shock; low values represent credit stress.
+   * @param idiosyncraticNormal - Finite independent obligor standard-normal shock; ignored for constant or perfectly systematic models.
+   * @returns Sampled recovery as a decimal fraction of notional in `[0, 1]`.
+   * @throws Throws a `validation` error if either shock is non-finite.
+   */
+  sampleRecovery(marketFactor: number, idiosyncraticNormal: number): number;
 }
 
 /**
@@ -10357,19 +10400,9 @@ export interface RecoveryModel extends WasmOwned {
  */
 export interface RecoverySpec extends WasmOwned {
   /**
-   * Location-parameter recovery rate of this spec.
-   *
-   * For a constant spec this is the constant rate. For a
-   * market-correlated spec this returns the `mean` input — the target
-   * recovery at factor `Z = 0` — which differs from the Jensen-corrected
-   * unconditional mean `E_Z[R(Z)]` whenever the factor sensitivity is
-   * non-zero. For the true unconditional mean call
-   * `build().expectedRecovery`.
-   */
-  readonly expectedRecovery: number;
-  /**
    * Build a concrete recovery model from this specification.
-   * @returns A concrete `RecoveryModel` handle.
+   * @returns The validated recovery-model handle.
+   * @throws Error - Throws a `validation` error for invalid recovery inputs, or a `computation` error if expected-recovery integration fails.
    */
   build(): RecoveryModel;
   /**
@@ -10411,10 +10444,10 @@ export interface RecoverySpecConstructor {
    * Throws if `mean` is not finite or lies outside `[0, 1]`, or if `vol` /
    * `correlation` are not finite.
    * @returns A `RecoverySpec` handle for deferred construction.
-   * @param mean - Mean recovery rate expressed as a fraction from 0 through 1.
-   * @param vol - Recovery-rate volatility; finite values are clamped to `[0, 0.5]`.
-   * @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are clamped.
-   * @throws Error - Throws a JavaScript exception if `mean` is not finite or lies outside `[0, 1]`, or if `vol` or `correlation` is non-finite. Finite volatility and correlation inputs are clamped to their supported ranges.
+   * @param mean - Zero-total-shock recovery location in `[0, 1]`; this is not the unconditional mean.
+   * @param vol - Local shock scale, finite in `[0, 0.5]`; this is not the realized recovery standard deviation.
+   * @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are rejected.
+   * @throws Error - Throws a JavaScript exception if `mean` is not finite or lies outside `[0, 1]`, or if `vol` or `correlation` is non-finite or outside its supported range.
    */
   marketCorrelated(mean: number, vol: number, correlation: number): RecoverySpec;
   /**
@@ -10689,7 +10722,7 @@ export interface LatentFactorSpec extends WasmOwned {
   /**
    * Build the concrete latent-factor model.
    * @returns The `LatentFactorKind` handle.
-   * @throws Error - Throws a `validation` error if a multi-factor specification has an invalid correlation matrix or volatility vector.
+   * @throws Error - Throws a `validation` error if the specification contains an invalid volatility, mean-reversion speed, correlation, count or matrix.
    */
   build(): LatentFactorKind;
   /**
@@ -10719,7 +10752,7 @@ export interface LatentFactorSpecConstructor {
    * @param volatility - Annualized factor volatility as a decimal; non-negative.
    * @param meanReversion - Mean-reversion speed per year; non-negative.
    * @returns The single-factor specification.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   singleFactor(volatility: number, meanReversion: number): LatentFactorSpec;
   /**
@@ -10728,7 +10761,7 @@ export interface LatentFactorSpecConstructor {
    * @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
    * @param correlation - Correlation between the two factors, from -1 through 1.
    * @returns The two-factor specification.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   twoFactor(prepayVol: number, creditVol: number, correlation: number): LatentFactorSpec;
 }
@@ -10789,10 +10822,10 @@ export interface LatentMultiFactorConstructor {
   ): LatentMultiFactor;
   /**
    * Model with independent factors (identity correlation).
-   * @param numFactors - Number of systematic factors; a non-negative safe integer, with zero resolving to one.
+   * @param numFactors - Positive number of systematic factors; zero is rejected.
    * @param volatilities - Annualized factor volatilities, one per factor; must be finite, non-negative and match the factor count.
    * @returns The uncorrelated multi-factor model.
-   * @throws Error - Throws a `TypeError` if `numFactors` is not a safe non-negative integer or `volatilities` is not an array of numbers. Throws a validation error for a length mismatch, negative or non-finite volatility.
+   * @throws Error - Throws a `TypeError` if `numFactors` is not a safe non-negative integer or `volatilities` is not an array of numbers. Throws a validation error for a zero factor count, a length mismatch, or negative or non-finite volatility.
    */
   uncorrelated(numFactors: number, volatilities: NumericArray): LatentMultiFactor;
 }
@@ -10836,7 +10869,7 @@ export interface LatentSingleFactorConstructor {
    * @returns Returns a `LatentSingleFactor` handle.
    * @param volatility - Annualized factor volatility as a decimal; non-negative.
    * @param meanReversion - Mean-reversion speed per year; non-negative.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   new (volatility: number, meanReversion: number): LatentSingleFactor;
 }
@@ -10893,7 +10926,7 @@ export interface LatentTwoFactorConstructor {
    * @param prepayVol - Annualized prepayment-factor volatility as a decimal; non-negative.
    * @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
    * @param correlation - Correlation between the two factors, from -1 through 1.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   new (prepayVol: number, creditVol: number, correlation: number): LatentTwoFactor;
   /**
@@ -13516,9 +13549,10 @@ export interface CashFlowScheduleConstructor {
 /**
  * Fluent builder for a `CashFlowSchedule`.
  *
- * Created by `CashFlowSchedule.builder()`. Every setter consumes the builder
- * and returns it, so calls chain; a call on a builder that was already
- * consumed throws. Setter errors are recorded and reported by `build`.
+ * Created by `CashFlowSchedule.builder()`. Every setter updates the builder
+ * in place and returns it, so calls chain. A setter whose argument is
+ * rejected throws and leaves the builder unchanged. Setter errors are
+ * recorded and reported by `build`.
  */
 export interface CashFlowBuilder extends WasmOwned {
   /**
@@ -14066,7 +14100,7 @@ export interface CashflowsNamespace {
   periodAggregationGetAmount(
     aggregation: generated.cashflows.PeriodAggregation,
     period: string,
-    currency: generated.core.Currency
+    currency: generated.core.Currency | Lowercase<generated.core.Currency>
   ): MoneyValue | null;
 
   /**
@@ -14079,7 +14113,7 @@ export interface CashflowsNamespace {
    */
   aggregateCashflowsChecked(
     flows: readonly DatedFlowJson[],
-    target: generated.core.Currency
+    target: generated.core.Currency | Lowercase<generated.core.Currency>
   ): MoneyValue;
 
   /**
@@ -14121,21 +14155,6 @@ export interface CashflowsNamespace {
     oldDate: string,
     newDate: string
   ): MarketContext;
-
-  /**
-   * Recurring fee quoted in basis points of a drawn or undrawn balance.
-   *
-   * The argument is the `periodic_bp` payload of `FeeSpec`, parsed by the Rust
-   * serde contract: `business_day_convention` defaults to `"modified_following"`,
-   * `stub` to `"short_front"` and `accrual_basis` to `"point_in_time"`; every
-   * other field is required. (Python's
-   * `FeeSpec.periodic_bp` takes the same fields positionally.)
-   *
-   * @param fields - `{ base, bp, frequency, day_count, business_day_convention?, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
-   * @returns Canonical `FeeSpec` wire value `{ periodic_bp: { ... } }` with defaults filled in.
-   * @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
-   */
-  feeSpecPeriodicBp(fields: Record<string, unknown>): generated.cashflows.FeeSpec;
 
   /**
    * USD SOFR FRN compounding convention: ISDA 2021 observation shift of 2 business days (Rust `FloatingLegCompounding::sofr_observation_shift`).
@@ -14204,7 +14223,10 @@ export interface CashflowsNamespace {
    * @returns `Notional` wire object `{ initial, amort: "none" }`.
    * @throws If `amount` is not a finite number or `currency` is not an ISO-4217 code (kind `invalid_type` or `validation`).
    */
-  notionalPar(amount: number, currency: generated.core.Currency): generated.cashflows.Notional;
+  notionalPar(
+    amount: number,
+    currency: generated.core.Currency | Lowercase<generated.core.Currency>
+  ): generated.cashflows.Notional;
 
   /**
    * Check a notional and its amortization rule for consistency.
@@ -19686,14 +19708,6 @@ export interface CdsTranche extends WasmOwned {
    */
   readonly attributes: generated.valuations.CdsTranche['attributes'];
   /**
-   * Jump-to-default exposure (mirrors Rust `CdsTranche::jump_to_default`): PV impact of one constituent defaulting immediately.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the curves and quotes this instrument needs.
-   * @param asOf - ISO-8601 valuation date.
-   * @returns Jump-to-default PV change in notional currency units.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the calculation fails.
-   */
-  jumpToDefault(marketJson: JsonInput, asOf: string): number;
-  /**
    * Underlying index name.
    * @returns The index name.
    */
@@ -19842,13 +19856,6 @@ export interface CdsTranche extends WasmOwned {
    * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
    */
   metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
-  /**
-   * Expected tranche loss at maturity (mirrors Rust `CdsTranche::expected_loss`).
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the credit index data.
-   * @returns Expected loss of the tranche in the notional currency.
-   * @throws Error - Throws with kind `not_found` if the credit index data is missing, kind `validation` if the market JSON is malformed, and kind `computation` if the loss model fails.
-   */
-  expectedLoss(marketJson: JsonInput): number;
 }
 
 /**
@@ -21100,51 +21107,6 @@ export interface EquityOption extends WasmOwned {
    */
   readonly attributes: generated.valuations.EquityOption['attributes'];
   /**
-   * Spot delta of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Spot delta produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Gamma of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Gamma produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Vega (per 1% vol) of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Vega (per 1% vol) produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Theta (per day on `metric_pricing_overrides.theta_day_basis`, calendar days by default) of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Theta (per day on `metric_pricing_overrides.theta_day_basis`, calendar days by default) produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
-   * Rho of the option under the selected model.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-   * @param asOf - ISO-8601 valuation date.
-   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Rho produced by the selected model.
-   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-   */
-  rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
-  /**
    * Identifier of the underlying equity referenced by the option.
    * @returns Ticker string exactly as supplied at construction; it is the key used to look up the spot price and volatility surface in the market context, so it must match the market-data identifier.
    */
@@ -21579,7 +21541,7 @@ export interface StructuredCredit extends WasmOwned {
    */
   readonly expiry: string | null;
   /**
-   * Whether a stochastic prepayment, default or correlation spec is set (mirrors Rust `StructuredCredit::is_stochastic`).
+   * Whether a stochastic prepayment, default, recovery or correlation spec is set (mirrors Rust `StructuredCredit::is_stochastic`).
    * @returns `true` when `priceStochastic` has specs to simulate.
    */
   readonly isStochastic: boolean;
@@ -21644,7 +21606,7 @@ export interface StructuredCredit extends WasmOwned {
   /**
    * Return a copy of this deal with every stochastic specification cleared.
    *
-   * Mirrors Rust `StructuredCredit::disable_stochastic`, the inverse of `enableStochastic`: clears the stochastic prepayment, default and correlation specs (the stochastic recovery spec is kept). The receiver is not modified.
+   * Mirrors Rust `StructuredCredit::disable_stochastic`, the inverse of `enableStochastic`: clears the stochastic prepayment, default, recovery and correlation specs. The receiver is not modified.
    * @returns A new deal priced deterministically.
    */
   disableStochastic(): StructuredCredit;
@@ -21976,16 +21938,13 @@ export interface StructuredCredit extends WasmOwned {
   /**
    * Run the deterministic simulation and return the deal-level accounting.
    *
-   * Mirrors Rust `run_simulation_with_diagnostics`.
-   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
-   * @param asOf - ISO-8601 valuation date.
-   * @returns `SimulationDiagnostics` plain object with per-period pool, account and coverage-test records.
-   * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed, and kind `computation` if the simulation fails.
+   * Mirrors Rust `StructuredCredit::run_simulation`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying discount and forward curves.
+   * @param asOf - Requested ISO-8601 valuation date; lifecycle policy resolves the effective date.
+   * @returns `SimulationRun` with `tranches` keyed by tranche identifier and complete `diagnostics`.
+   * @throws Error - Throws with kind `not_found` if a curve is missing, `validation` if the deal or dates are invalid, and `computation` if simulation fails.
    */
-  runSimulationWithDiagnostics(
-    marketJson: JsonInput,
-    asOf: string
-  ): generated.valuations.SimulationDiagnostics;
+  runSimulation(marketJson: JsonInput, asOf: string): generated.valuations.SimulationRun;
 }
 
 /**
@@ -22005,29 +21964,8 @@ export interface StructuredCredit extends WasmOwned {
  *   .maturity("2029-01-01")
  *   .build();
  * const zero = { amount: "0", currency: "USD" as const };
- * const structuredCredit = valuations.instruments.StructuredCredit.newClo(
- *   "DEAL-1",
- *   {
- *     id: "POOL-1",
- *     deal_type: "clo",
- *     currency: "USD",
- *     assets: [],
- *     cumulative_defaults: zero,
- *     cumulative_recoveries: zero,
- *     cumulative_prepayments: zero,
- *     cumulative_scheduled_amortization: zero,
- *     collection_account: zero,
- *     reserve_account: zero,
- *     excess_spread_account: zero,
- *     reserve_account_rate: 0,
- *     reserve_interest_destination: { kind: "waterfall" },
- *   },
- *   valuations.instruments.trancheStructureFromBalances([tranche]),
- *   "2024-01-01",
- *   "2029-01-01",
- *   "USD-OIS"
- * );
- * console.log(structuredCredit.id, structuredCredit.dealType); // "DEAL-1", "clo"
+ * const structuredCredit = valuations.instruments.StructuredCredit.example();
+ * console.log(structuredCredit.id, structuredCredit.dealType); // "CLO-EXAMPLE", "clo"
  * structuredCredit.free();
  * ```
  */
@@ -22059,88 +21997,28 @@ export interface StructuredCreditConstructor {
    */
   example(): StructuredCredit;
   /**
-   * Create an asset-backed security deal (mirrors Rust `StructuredCredit::new_abs`).
-   * @param id - Unique instrument identifier.
-   * @param pool - Collateral `AssetPool` (plain object or JSON string).
-   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
-   * @param closingDate - Deal closing date as an ISO-8601 string.
-   * @param maturity - Legal final maturity as an ISO-8601 string.
-   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
-   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
-   * @returns The validated deal with the deal type's standard waterfall and assumptions.
-   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
+   * Construct a validated standard structured-credit deal from registry assumptions.
+   * @example
+   * ```typescript
+   * import init, { valuations } from "finstack-quant-wasm";
+   * await init();
+   * const example = valuations.instruments.StructuredCredit.example();
+   * const { id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id } = example.toDict();
+   * const deal = valuations.instruments.StructuredCredit.newStandard("clo", {
+   *   id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id,
+   * });
+   * console.log(deal.dealType); // "clo"
+   * deal.free();
+   * example.free();
+   * ```
+   * @param dealType - Registry family: `abs`, `clo`, `cmbs` or `rmbs`; other deal types are rejected.
+   * @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar.
+   * @returns The deal with its selected registry assumptions and validated structure.
+   * @throws Error - Throws with kind `validation` for an unsupported profile, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
    */
-  newAbs(
-    id: string,
-    pool: generated.valuations.AssetPool | string,
-    tranches: generated.valuations.TrancheStructure | string,
-    closingDate: string,
-    maturity: string,
-    discountCurveId: string,
-    calendarId?: string | null
-  ): StructuredCredit;
-  /**
-   * Create a collateralized loan obligation (mirrors Rust `StructuredCredit::new_clo`).
-   * @param id - Unique instrument identifier.
-   * @param pool - Collateral `AssetPool` (plain object or JSON string).
-   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
-   * @param closingDate - Deal closing date as an ISO-8601 string.
-   * @param maturity - Legal final maturity as an ISO-8601 string.
-   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
-   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
-   * @returns The validated deal with the deal type's standard waterfall and assumptions.
-   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
-   */
-  newClo(
-    id: string,
-    pool: generated.valuations.AssetPool | string,
-    tranches: generated.valuations.TrancheStructure | string,
-    closingDate: string,
-    maturity: string,
-    discountCurveId: string,
-    calendarId?: string | null
-  ): StructuredCredit;
-  /**
-   * Create a commercial mortgage-backed security deal (mirrors Rust `StructuredCredit::new_cmbs`).
-   * @param id - Unique instrument identifier.
-   * @param pool - Collateral `AssetPool` (plain object or JSON string).
-   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
-   * @param closingDate - Deal closing date as an ISO-8601 string.
-   * @param maturity - Legal final maturity as an ISO-8601 string.
-   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
-   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
-   * @returns The validated deal with the deal type's standard waterfall and assumptions.
-   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
-   */
-  newCmbs(
-    id: string,
-    pool: generated.valuations.AssetPool | string,
-    tranches: generated.valuations.TrancheStructure | string,
-    closingDate: string,
-    maturity: string,
-    discountCurveId: string,
-    calendarId?: string | null
-  ): StructuredCredit;
-  /**
-   * Create a residential mortgage-backed security deal (mirrors Rust `StructuredCredit::new_rmbs`).
-   * @param id - Unique instrument identifier.
-   * @param pool - Collateral `AssetPool` (plain object or JSON string).
-   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
-   * @param closingDate - Deal closing date as an ISO-8601 string.
-   * @param maturity - Legal final maturity as an ISO-8601 string.
-   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
-   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
-   * @returns The validated deal with the deal type's standard waterfall and assumptions.
-   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
-   */
-  newRmbs(
-    id: string,
-    pool: generated.valuations.AssetPool | string,
-    tranches: generated.valuations.TrancheStructure | string,
-    closingDate: string,
-    maturity: string,
-    discountCurveId: string,
-    calendarId?: string | null
+  newStandard(
+    dealType: 'abs' | 'clo' | 'cmbs' | 'rmbs',
+    params: generated.valuations.StandardDealParams | string
   ): StructuredCredit;
 }
 
@@ -23233,7 +23111,7 @@ export interface ValuationInstrumentsNamespace {
    * is zero at the model price, negative for a richer (higher)
    * `marketPricePct`, and positive for a cheaper (lower) `marketPricePct`; it is
    * not the contractual quoted margin.
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
    * @param marketJson - Canonical market-context JSON supplying the discount curve and any forward curves or historical fixings required for cashflow projection.
    * @param asOf - ISO-8601 valuation date used for projection and discounting.
@@ -23242,7 +23120,7 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, market_price_pct is not finite and positive, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
    */
   trancheDiscountMargin(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string,
@@ -23252,14 +23130,14 @@ export interface ValuationInstrumentsNamespace {
    * Break-even constant default rate (CDR, decimal) for a tranche — the highest
    * CDR at which the tranche takes no principal writedown.
    * @returns Break-even constant default rate as a decimal, such as `0.02` for 2% CDR.
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; the instrument fails pricing validation or is not a structured-credit deal; `as_of` is invalid; the tranche or required market data is missing; or the break-even calculation fails.
+   * @throws Error - Throws a JavaScript exception if the market JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; or the break-even calculation fails.
    */
   trancheBreakevenCdr(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string
@@ -23274,16 +23152,16 @@ export interface ValuationInstrumentsNamespace {
    * `marketPricePct` is the clean settlement quote as a percentage of CURRENT balance.
    * `config`, when present, is a JSON `OasConfig`; the default is used otherwise.
    * @returns Typed `OasResult` object for the tranche.
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param marketPricePct - Clean settlement quote as a percentage of CURRENT balance; accrued interest is added once.
    * @param config - Optional OasConfig JSON; omit to use the default OAS solver configuration.
-   * @throws Error - Throws a JavaScript exception if the instrument, market, or optional configuration JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; the OAS solve fails or produces a non-finite result; or the result cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if the market or optional configuration JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; the OAS solve fails or produces a non-finite result; or the result cannot be converted to a JavaScript value.
    */
   trancheOas(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string,
@@ -23299,15 +23177,15 @@ export interface ValuationInstrumentsNamespace {
    * Python exposes through its typed `ScenarioTable` wrapper. Pass it to
    * `JSON.stringify` if a wire string is needed.
    * @returns Typed `ScenarioTable` object over the CPR/CDR/severity grid.
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
-   * @throws Error - Throws a JavaScript exception if the instrument, market, or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if the market or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.
    */
   trancheScenarioTable(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string,
@@ -23326,16 +23204,16 @@ export interface ValuationInstrumentsNamespace {
    * Python exposes through its typed `TrancheMetrics` wrapper. Pass it to
    * `JSON.stringify` if a wire string is needed.
    * @returns Typed `TrancheMetrics` object (PV, clean/dirty price, accrued, WAL, yield, z-spread, CS01, effective duration and convexity, requested registry metrics).
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param marketPricePct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.
    * @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; a metric id is unknown; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if the market JSON is malformed; a metric id is unknown; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
    */
   trancheMetrics(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string,
@@ -23672,13 +23550,6 @@ export interface ValuationInstrumentsNamespace {
   waterfallCoverageTests(
     waterfall: generated.valuations.Waterfall | string
   ): generated.valuations.CoverageTestSpec[];
-  /**
-   * The grid cells of a structured-credit scenario table.
-   * @param table - `ScenarioTable` plain object or JSON string, as returned by `trancheScenarioTable`.
-   * @returns `ScenarioCell` plain objects: `cpr`, `cdr`, `severity`, `price`, `wal` and `writedown` per grid point.
-   * @throws Error - Throws with kind `validation` if `table` does not match the `ScenarioTable` schema.
-   */
-  scenarioTableCells(table: ScenarioTable | string): ScenarioCell[];
   /**
    * `AmortizationEvent::Date`: revolving stops on a scheduled date.
    * @param date - Date revolving stops, as an ISO-8601 string.
@@ -24086,7 +23957,17 @@ export interface FxForwardFromTradeDateOptions {
 /**
  * Vanilla FX option handle: the option Greeks plus implied volatility.
  */
-export interface FxOption extends FxOptionGreeks {
+export interface FxOption extends FxHandle {
+  /**
+   * Named first-order greeks produced by the selected model.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Map of Greek name to value, with keys in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; a returned Greek is non-finite; or the result cannot be converted to a JavaScript value.
+   */
+  greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
+
   /**
    * Implied volatility that reproduces `targetPrice` (mirrors Rust `FxOption::implied_vol`, Garman–Kohlhagen inversion).
    * @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot.
@@ -24486,7 +24367,7 @@ export interface FxConstructor<T extends FxHandle> {
  * import init, { valuations } from "finstack-quant-wasm";
  * await init();
  * const forward = valuations.instruments.FxForward.example().withForwardPoints(1.1, 0.002);
- * console.log(valuations.instruments.FxForward.standardSettlementDays("EUR", "USD"), forward.id);
+ * console.log(forward.id);
  * forward.free();
  * ```
  */
@@ -24497,14 +24378,6 @@ export interface FxForwardConstructor extends FxConstructor<FxForward> {
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
   example(): FxForward;
-  /**
-   * Market-standard spot lag in business days for a currency pair (mirrors Rust `FxForward::standard_settlement_days`).
-   * @param base - Base (foreign) currency ISO code.
-   * @param quote - Quote (domestic) currency ISO code.
-   * @returns Spot lag in business days (1 or 2).
-   * @throws Error - Throws with kind `validation` if a currency code is not ISO-4217.
-   */
-  standardSettlementDays(base: string, quote: string): number;
   /**
    * Build an at-market forward from a trade date and a standard FX tenor (mirrors Rust `FxForward::from_trade_date`).
    * @param id - Unique instrument identifier.
@@ -24870,12 +24743,12 @@ export interface SabrCalibrator extends WasmOwned {
   withMaxIterations(maxIterations: number): SabrCalibrator;
   /**
    * Calibrate `(alpha, nu, rho)` to market vols with `beta` fixed.
-   * @returns A `SabrParameters` handle.
    * @param forward - Forward price or rate in the same quote convention as the strike.
    * @param strikes - Option strikes aligned one-for-one with market_vols.
-   * @param marketVols - Market-implied annualized volatilities aligned one-for-one with strikes.
-   * @param t - Time from the curve base date in years.
-   * @param beta - SABR CEV elasticity parameter held fixed during calibration.
+   * @param marketVols - Positive quotes aligned with strikes: absolute decimal-rate normal volatilities for beta near zero, otherwise annual Black volatilities in relative decimals.
+   * @param t - Positive time to expiry in years.
+   * @param beta - SABR CEV elasticity in `[0, 1]`, held fixed during calibration.
+   * @returns Calibrated parameters, signed model-minus-market quote errors, and deterministic solver diagnostics.
    * @throws Error - Throws a JavaScript exception if the strike and volatility lengths differ, the quote arrays are empty, the SABR inputs or fitted parameters are invalid, or the calibration solver does not converge.
    */
   calibrate(
@@ -24884,7 +24757,7 @@ export interface SabrCalibrator extends WasmOwned {
     marketVols: number[],
     t: number,
     beta: number
-  ): SabrParameters;
+  ): SabrCalibrationOutcome;
   /**
    * Return a copy of this calibrator with an overridden displacement policy,
    * preserving all other settings.
@@ -25149,17 +25022,11 @@ export interface DownturnLgdConstructor {
    */
   readonly prototype: DownturnLgd;
   /**
-   * Basel downturn calibration for secured exposures.
-   * @returns The registry's Basel secured downturn adjustment.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the calibration.
+   * Load the calibration selected by the embedded registry's default ID.
+   * @returns The registry-selected calibration handle.
+   * @throws Error - Throws a `validation` error if the registry or its configured default is malformed.
    */
-  baselSecured(): DownturnLgd;
-  /**
-   * Basel downturn calibration for unsecured exposures.
-   * @returns The registry's Basel unsecured downturn adjustment.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the calibration.
-   */
-  baselUnsecured(): DownturnLgd;
+  defaultCalibration(): DownturnLgd;
   /**
    * Load a downturn adjustment from canonical JSON and validate its parameters.
    * @param json - Canonical JSON for this type, as JSON text or a plain object.
@@ -25293,10 +25160,10 @@ export interface DynamicRecoverySpecConstructor {
    */
   inversePower(baseRecovery: number, baseNotional: number, exponent: number): DynamicRecoverySpec;
   /**
-   * Recovery that declines linearly in the notional ratio down to a floor.
+   * Recovery `clamp(R0 * (1 - sensitivity * (N / N0 - 1)), floor, R0)`.
    * @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
    * @param baseNotional - Positive reference notional `N0` in the instrument's currency.
-   * @param slope - Non-negative recovery lost per unit increase of `N / N0 - 1`.
+   * @param sensitivity - Non-negative dimensionless relative recovery sensitivity per unit increase of `N / N0 - 1`.
    * @param floor - Minimum recovery as a fraction in `[0, baseRecovery]`.
    * @returns The linear-decline recovery specification.
    * @throws Error - Throws a `validation` error on non-finite or out-of-range inputs.
@@ -25304,7 +25171,7 @@ export interface DynamicRecoverySpecConstructor {
   linearDecline(
     baseRecovery: number,
     baseNotional: number,
-    slope: number,
+    sensitivity: number,
     floor: number
   ): DynamicRecoverySpec;
 }
@@ -25487,10 +25354,10 @@ export interface EndogenousHazardSpecConstructor {
   powerLaw(baseHazard: number, baseLeverage: number, exponent: number): EndogenousHazardSpec;
   /**
    * Piecewise-linear leverage-to-hazard table.
-   * @param leveragePoints - Strictly increasing leverage ratios, at least two, as a `number[]` or `Float64Array`.
+   * @param leveragePoints - One or more finite non-negative leverage ratios, strictly increasing when multiple points are supplied; a single point gives constant hazard.
    * @param hazardPoints - Annualized hazard rates at those leverage points; same length, non-negative.
-   * @returns The tabular hazard specification.
-   * @throws Error - Throws a `validation` error if the arrays differ in length, hold fewer than two points, are not strictly increasing in leverage, or contain non-finite or negative values.
+   * @returns The tabular hazard specification, with base leverage and hazard taken from the first pair.
+   * @throws Error - Throws a `validation` error if the arrays differ in length, are empty, are not strictly increasing in leverage, or contain non-finite or negative values.
    */
   tabular(leveragePoints: NumericArray, hazardPoints: NumericArray): EndogenousHazardSpec;
 }
@@ -25526,7 +25393,7 @@ export interface GeneratorMatrix extends WasmOwned {
    * @returns An array of `number[]` rows in scale order.
    * @throws Error - Throws a `validation` error if the rows cannot be converted.
    */
-  toMatrix(): number[][];
+  toRows(): number[][];
   /**
    * Number of states in the scale.
    */
@@ -25683,17 +25550,11 @@ export interface MasterScaleConstructor {
    */
   fromRegistryId(scaleId: string): MasterScale;
   /**
-   * Moody's-style master scale from the embedded credit-assumption registry.
-   * @returns The Moody's assumptions master scale.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the scale.
+   * Load the calibration selected by the embedded registry's default ID.
+   * @returns The registry-selected calibration handle.
+   * @throws Error - Throws a `validation` error if the registry or its configured default is malformed.
    */
-  moodysAssumptions(): MasterScale;
-  /**
-   * S&P-style master scale from the embedded credit-assumption registry.
-   * @returns The S&P assumptions master scale.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the scale.
-   */
-  spAssumptions(): MasterScale;
+  defaultCalibration(): MasterScale;
 }
 
 /**
@@ -26177,7 +26038,7 @@ export interface RatingFactorTable extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const table = models.credit.RatingFactorTable.moodysStandard();
+ * const table = models.credit.RatingFactorTable.defaultCalibration();
  * console.log(table.agency, table.getFactor("B2"));
  * table.free();
  * ```
@@ -26206,11 +26067,11 @@ export interface RatingFactorTableConstructor {
    */
   fromRegistryId(id: string): RatingFactorTable;
   /**
-   * Moody's standard WARF table from the embedded credit-assumption registry.
-   * @returns The Moody's standard rating-factor table.
-   * @throws Error - Throws a `validation` error if the embedded registry cannot supply the table.
+   * Load the calibration selected by the embedded registry's default ID.
+   * @returns The registry-selected calibration handle.
+   * @throws Error - Throws a `validation` error if the registry or its configured default is malformed.
    */
-  moodysStandard(): RatingFactorTable;
+  defaultCalibration(): RatingFactorTable;
 }
 
 /**
@@ -26632,7 +26493,6 @@ export interface ToggleExerciseModelConstructor {
   /**
    * Nested-Monte-Carlo optimal exercise rule.
    * @param nestedPaths - Inner simulation paths per decision date; a positive safe integer.
-   * @param equityDiscountRate - Continuously compounded equity discount rate, as a decimal.
    * @param assetVol - Annualized asset volatility as a decimal; non-negative.
    * @param riskFreeRate - Continuously compounded risk-free rate, as a decimal.
    * @param horizon - Inner simulation horizon in years; positive and finite.
@@ -26641,7 +26501,6 @@ export interface ToggleExerciseModelConstructor {
    */
   optimal(
     nestedPaths: number,
-    equityDiscountRate: number,
     assetVol: number,
     riskFreeRate: number,
     horizon: number
@@ -26717,7 +26576,7 @@ export interface TransitionMatrix extends WasmOwned {
    * @returns An array of `number[]` rows in scale order.
    * @throws Error - Throws a `validation` error if the rows cannot be converted.
    */
-  toMatrix(): number[][];
+  toRows(): number[][];
   /**
    * Horizon the probabilities apply to, in years.
    */
@@ -26761,6 +26620,26 @@ export interface TransitionMatrixConstructor {
    * @throws Error - Throws a `validation` error if the dimensions do not match the scale, an entry is outside `[0, 1]`, a row does not sum to one, the default state is not absorbing, or `horizon` is not positive.
    */
   new (scale: RatingScale, data: NumericArray | NumericArray[], horizon: number): TransitionMatrix;
+  /**
+   * Build a transition matrix whose row, column and optional scale labels agree in order.
+   * @example
+   * const matrix = models.credit.migration.TransitionMatrix.fromLabeled(['A', 'D'], ['A', 'D'], [[0.9, 0.1], [0, 1]], 1);
+   * console.log(matrix.probability('A', 'D')); // 0.1
+   * @param rowLabels - Ordered origin labels, one per row.
+   * @param columnLabels - Ordered destination labels; must equal `rowLabels` exactly.
+   * @param data - Flat row-major probabilities or square nested rows; each row sums to one.
+   * @param horizon - Positive finite horizon in years covered by the probabilities.
+   * @param scale - Optional `RatingScale` JSON text or plain object, such as `scale.toJson()`; its labels must match both vectors in order. Omit to infer a custom scale with the last label absorbing.
+   * @returns The validated transition-matrix handle; no entries are reordered.
+   * @throws Error - Throws a `TypeError` for invalid host input types, or a `validation` error for differing label orders, invalid labels, matrix dimensions, probabilities, horizon or absorbing default row.
+   */
+  fromLabeled(
+    rowLabels: readonly string[],
+    columnLabels: readonly string[],
+    data: NumericArray | readonly NumericArray[],
+    horizon: number,
+    scale?: JsonInput
+  ): TransitionMatrix;
   /**
    * Load a handle from its canonical JSON wire form, the same form
    * Python `from_json` reads.
@@ -27110,11 +26989,11 @@ export interface CreditLgdNamespace {
   /**
    * Historical Beta recovery distribution for a debt seniority class.
    * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
-   * @param ratingAgency - Agency whose calibration to use, such as `"moodys"` or `"sp"`; omitted uses the registry default.
+   * @param calibrationId - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.
    * @returns The calibrated `BetaRecovery` handle.
-   * @throws Error - Throws a `validation` error if the seniority or agency is not recognized.
+   * @throws Error - Throws a `validation` error for an unrecognized seniority and a `not_found` error for an unknown calibration ID.
    */
-  seniorityRecoveryStats(seniority: string, ratingAgency?: string): BetaRecovery;
+  seniorityRecoveryStats(seniority: string, calibrationId: string): BetaRecovery;
   /**
    * Direct and indirect workout cost rates.
    */
@@ -28141,7 +28020,7 @@ export interface HullWhiteParams extends WasmOwned {
    * @returns The volatility of the segment containing `t`.
    * @throws Error - Throws a `TypeError` if `t` is not a number.
    */
-  sigma(t: number): number;
+  getSigma(t: number): number;
   /**
    * Covariance of the short-rate state variable at two times.
    * @param leftTime - First time in years; non-negative.
@@ -28169,13 +28048,17 @@ export interface HullWhiteParams extends WasmOwned {
    */
   readonly kappa: number;
   /**
-   * Segment end times of the volatility schedule, in years.
+   * Segment start times of the volatility schedule, in years.
+   * @returns A copy of the strictly increasing knots, starting at zero.
+   * @throws Never throws; reads the validated schedule.
    */
-  readonly times: Float64Array;
+  getTimes(): Float64Array;
   /**
-   * Volatility on each schedule segment, as decimals.
+   * Volatility on each schedule segment, in absolute rate units per square-root year.
+   * @returns A copy of the non-negative volatility values aligned with `getTimes()`.
+   * @throws Never throws; reads the validated schedule.
    */
-  readonly values: Float64Array;
+  getValues(): Float64Array;
 }
 
 /**
@@ -28185,7 +28068,7 @@ export interface HullWhiteParams extends WasmOwned {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const params = models.rates.hullWhite.HullWhiteParams.piecewise(0.05, [0, 2.5], [0.01, 0.012]);
- * console.log(params.sigma(3), params.stateVariance(2), params.bondVol(0, 1, 5));
+ * console.log(params.getSigma(3), params.stateVariance(2), params.bondVol(0, 1, 5));
  * params.free();
  * ```
  */
@@ -28244,17 +28127,15 @@ export interface HullWhiteNamespace {
   /**
    * Price of a cap or floor under Hull-White one-factor, per unit notional.
    *
-   * The facade makes `forwardCurve` optional and passes the discount curve when
-   * it is omitted, as Python does.
    * @param kappa - Mean-reversion speed per year; positive.
    * @param sigma - Short-rate volatility per square-root year, as a decimal; positive.
    * @param periods - Array of `[tFix, tPay, accrual]` triples in years, one per caplet or floorlet.
    * @param strike - Cap or floor strike rate, as a decimal.
    * @param isCap - `true` for a cap, `false` for a floor.
    * @param discountCurve - `core.DiscountCurve` handle used to discount the payoffs.
-   * @param forwardCurve - `core.DiscountCurve` handle that projects the forward rates.
+   * @param forwardCurve - `core.DiscountCurve` handle projecting forward rates; pass the discount curve explicitly for single-curve pricing.
    * @returns The cap or floor price per unit notional.
-   * @throws Error - Throws a `validation` error if `kappa` or `sigma` is out of range or `periods` is malformed.
+   * @throws Error - Throws an error if either required curve handle is missing or has the wrong type. Throws a `validation` error if `kappa` or `sigma` is out of range or `periods` is malformed.
    */
   hw1fCapFloorPrice(
     kappa: number,
@@ -28263,7 +28144,7 @@ export interface HullWhiteNamespace {
     strike: number,
     isCap: boolean,
     discountCurve: DiscountCurve,
-    forwardCurve?: DiscountCurve
+    forwardCurve: DiscountCurve
   ): number;
   /**
    * Normal volatility of a caplet's forward rate implied by Hull-White one-factor.

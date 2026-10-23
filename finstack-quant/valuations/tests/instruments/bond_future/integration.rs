@@ -19,7 +19,8 @@ use finstack_quant_valuations::instruments::fixed_income::bond_future::{
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
-use finstack_quant_valuations::pricer::{standard_pricer_registry, InstrumentType, ModelKey};
+use finstack_quant_valuations::pricer::STANDARD;
+use finstack_quant_valuations::pricer::{InstrumentType, ModelKey};
 use time::macros::date;
 
 /// Create a realistic market context with a UST discount curve.
@@ -455,7 +456,7 @@ fn test_bond_future_pricer_registry_ctd_npv() {
         ctd_bond.clone(),
     );
 
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let result = registry
         .price_with_metrics(
             &future,
@@ -897,7 +898,7 @@ fn test_conversion_factor_calculation_accuracy() {
 #[test]
 fn test_bond_future_dv01_calculation() {
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+    use finstack_quant_valuations::metrics::{MetricContext, MetricId};
     use std::sync::Arc;
 
     // Setup market and instruments
@@ -968,7 +969,7 @@ fn test_bond_future_dv01_calculation() {
     );
 
     // Get metrics registry
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Compute DV01
     let metrics_to_compute = vec![MetricId::Dv01, MetricId::BucketedDv01];
@@ -1057,7 +1058,7 @@ fn test_bond_future_dv01_calculation() {
 #[test]
 fn test_bond_future_dv01_sign_convention() {
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+    use finstack_quant_valuations::metrics::{MetricContext, MetricId};
     use std::sync::Arc;
 
     let as_of = date!(2025 - 01 - 15);
@@ -1133,7 +1134,7 @@ fn test_bond_future_dv01_sign_convention() {
         MetricContext::default_config(),
     );
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results_long = registry
         .compute(&[MetricId::Dv01], &mut context_long)
         .expect("Failed to compute DV01 for long position");
@@ -1184,9 +1185,9 @@ fn test_bucketed_dv01_registration() {
     // Full bucketed DV01 calculation requires BondFuture::value() to resolve the CTD
     // bond from the MarketContext instrument registry.
 
-    use finstack_quant_valuations::metrics::{standard_registry, MetricId};
+    use finstack_quant_valuations::metrics::MetricId;
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Verify BondFuture has metrics registered
     let bond_future_metrics = registry.metrics_for_instrument(InstrumentType::BondFuture);
@@ -1220,7 +1221,7 @@ fn test_bucketed_dv01_registration() {
 #[test]
 fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+    use finstack_quant_valuations::metrics::{MetricContext, MetricId};
     use std::sync::Arc;
 
     let market = create_realistic_market();
@@ -1265,7 +1266,7 @@ fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
         pv,
         MetricContext::default_config(),
     );
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(
             &[MetricId::FuturesPrice, MetricId::ConversionFactor],

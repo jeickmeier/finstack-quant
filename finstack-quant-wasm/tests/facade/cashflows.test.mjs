@@ -93,7 +93,6 @@ const EXPORTED_KEYS = [
   'defaultModelSpecValidate',
   'exCouponRuleExDate',
   'exCouponRuleIsExCoupon',
-  'feeSpecPeriodicBp',
   'floatingLegCompoundingIsOvernight',
   'floatingLegCompoundingSofrObservationShift',
   'floatingLegCompoundingSoniaObservationShift',
@@ -611,4 +610,18 @@ test('period lookups preserve exact labels, empty buckets, and currency validati
   const bad = { '2025Q1': { USD: { amount: '1', currency: 'EUR' } } };
   assert.throws(() => cashflows.periodAggregationGetPeriod(bad, '2025Q1'));
   assert.throws(() => cashflows.periodAggregationGetAmount(bad, '2025Q1', 'USD'));
+});
+
+test('CashFlowBuilder setters update the builder in place and chain', () => {
+  const builder = cashflows.CashFlowSchedule.builder();
+  const money = { amount: '1000000', currency: 'USD' };
+  assert.equal(builder.principal(money, '2025-01-15', '2027-01-15'), builder);
+  assert.throws(() => builder.principal('bad', '2025-01-15', '2027-01-15'));
+  assert.equal(builder.principalExchange('none'), builder);
+});
+
+test('currency arguments accept any ASCII case, as the Rust parser does', () => {
+  assert.equal(cashflows.notionalPar(100, 'usd').initial.currency, 'USD');
+  assert.equal(cashflows.notionalPar(100, 'Usd').initial.currency, 'USD');
+  assert.throws(() => cashflows.notionalPar(100, 'us d'), /currency/);
 });

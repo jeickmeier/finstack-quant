@@ -1,11 +1,5 @@
-"""Hull-White one-factor parameters and closed-form pricing kernels.
-
-Examples:
---------
->>> from finstack_quant.models.rates.hull_white import hw_bond_vol
->>> round(hw_bond_vol(0.05, 0.01, 0.0, 1.0, 2.0), 6)
-0.009515
-"""
+# ruff: noqa: D100
+# Module help is compiled from the matching stub and delegated below.
 
 from finstack_quant.finstack_quant import models as _models
 
@@ -26,3 +20,5 @@ __all__: list[str] = [
     "hw1f_zcb_option_price",
     "hw_bond_vol",
 ]
+
+__doc__ = _models.rates.hull_white.__doc__

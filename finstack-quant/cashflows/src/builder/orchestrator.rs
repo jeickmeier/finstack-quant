@@ -3,25 +3,22 @@
 //!
 //! Fluent builder methods live in `coupon_api`.
 
-use super::schedule::{finalize_flows, CashFlowSchedule};
+use super::pipeline::CompiledCashFlowPlan;
+use super::schedule::CashFlowSchedule;
 use super::specs::PrincipalEventSpec;
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::f64_to_decimal;
-use finstack_quant_core::market_data::fixings::fixing_series_id;
-use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
-use std::sync::Arc;
 
 use super::compiler::{
     build_fee_schedules, compute_coupon_schedules, CompiledSchedules, CouponProgramPiece,
-    FeeSchedules, FixedSchedule, FloatSchedule, PaymentProgramPiece, PeriodicFee,
+    FeeSchedules, FixedSchedule, FloatSchedule, PaymentProgramPiece,
 };
-use super::emission::ResolvedFloatMarket;
+use super::date_generation::CompiledPeriod;
 use super::specs::FeeSpec;
 use tracing::debug;
 
@@ -45,7 +42,6 @@ pub(super) struct BuildState {
 
 #[derive(Debug)]
 pub(super) struct AmortizationSetup {
-    pub(super) amort_dates: finstack_quant_core::FxHashSet<Date>,
     pub(super) final_amortization_date: Option<Date>,
     pub(super) payment_dates: finstack_quant_core::FxHashMap<Date, Date>,
     pub(super) rule: PreparedAmortization,
@@ -143,17 +139,12 @@ fn validate_core_inputs(
 
     notional.validate()?;
 
-    let out_of_range = match &notional.amort {
-        AmortizationSpec::StepRemaining { schedule } => schedule
-            .iter()
-            .find(|(date, _)| *date < issue || *date > maturity)
-            .map(|(date, _)| *date),
-        AmortizationSpec::CustomPrincipal { items } => items
-            .iter()
-            .find(|(date, _)| *date < issue || *date > maturity)
-            .map(|(date, _)| *date),
-        _ => None,
-    };
+    let out_of_range = notional
+        .amort
+        .dated_amounts()
+        .iter()
+        .find(|(date, _)| *date < issue || *date > maturity)
+        .map(|(date, _)| *date);
     if let Some(date) = out_of_range {
         return Err(InputError::DateOutOfRange {
             date,
@@ -172,15 +163,7 @@ fn derive_amortization_setup(
 ) -> finstack_quant_core::Result<AmortizationSetup> {
     // Rate groups and fixed/float switches partition coupon windows, not amortization cadence.
     let mut payment_dates = finstack_quant_core::FxHashMap::default();
-    for period in fixed_schedules
-        .iter()
-        .flat_map(|s| s.periods.iter().map(|entry| &entry.period))
-        .chain(
-            float_schedules
-                .iter()
-                .flat_map(|s| s.periods.iter().map(|entry| &entry.period)),
-        )
-    {
+    for period in coupon_periods(fixed_schedules, float_schedules).map(|entry| &entry.period) {
         if let Some(previous) = payment_dates.insert(period.accrual_end, period.payment_date) {
             if previous != period.payment_date {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -190,10 +173,7 @@ fn derive_amortization_setup(
             }
         }
     }
-    let mut amort_base: Vec<Date> = payment_dates.keys().copied().collect();
-    amort_base.sort_unstable();
-    amort_base.dedup();
-    if amort_base.is_empty()
+    if payment_dates.is_empty()
         && matches!(
             notional.amort,
             AmortizationSpec::LinearTo { .. }
@@ -224,8 +204,9 @@ fn derive_amortization_setup(
         AmortizationSpec::LinearTo { final_notional } => {
             let initial = f64_to_decimal(notional.initial.amount())?;
             let final_notional = f64_to_decimal(final_notional.amount())?;
-            let installment = ((initial - final_notional) / Decimal::from(amort_base.len() as u64))
-                .max(Decimal::ZERO);
+            let installment = ((initial - final_notional)
+                / Decimal::from(payment_dates.len() as u64))
+            .max(Decimal::ZERO);
             PreparedAmortization::LinearTo {
                 installment,
                 final_notional,
@@ -242,13 +223,13 @@ fn derive_amortization_setup(
             }
         }
         AmortizationSpec::LinearBetween { start, end } => {
-            if !amort_base.contains(end) {
+            if !payment_dates.contains_key(end) {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "LinearBetween end {end} must be a coupon accrual boundary"
                 )));
             }
-            let count = amort_base
-                .iter()
+            let count = payment_dates
+                .keys()
                 .filter(|date| **date > *start && **date <= *end)
                 .count();
             if count == 0 {
@@ -264,18 +245,16 @@ fn derive_amortization_setup(
         }
     };
 
-    let final_amortization_date = amort_base.last().copied();
-    let amort_dates: finstack_quant_core::FxHashSet<Date> = amort_base.into_iter().collect();
+    let final_amortization_date = payment_dates.keys().max().copied();
 
     Ok(AmortizationSetup {
-        amort_dates,
         final_amortization_date,
         payment_dates,
         rule,
     })
 }
 
-fn initialize_build_state(
+pub(super) fn initialize_build_state(
     issue: Date,
     accrual_start: Date,
     notional: &Notional,
@@ -335,6 +314,17 @@ fn initialize_build_state(
     })
 }
 
+/// Every fixed and floating coupon period, in schedule order.
+pub(super) fn coupon_periods<'a>(
+    fixed: &'a [FixedSchedule],
+    float: &'a [FloatSchedule],
+) -> impl Iterator<Item = &'a CompiledPeriod> {
+    fixed
+        .iter()
+        .flat_map(|s| &s.periods)
+        .chain(float.iter().flat_map(|s| &s.periods))
+}
+
 /// Redemption follows the payment date of the coupon ending at maturity.
 /// With no coupon leg, principal is paid on the raw maturity date.
 fn compute_redemption_dates(
@@ -342,71 +332,12 @@ fn compute_redemption_dates(
     fixed_schedules: &[FixedSchedule],
     float_schedules: &[FloatSchedule],
 ) -> (Date, Date) {
-    let fixed_periods = fixed_schedules
-        .iter()
-        .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period));
-    let float_periods = float_schedules
-        .iter()
-        .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period));
-    fixed_periods
-        .chain(float_periods)
+    coupon_periods(fixed_schedules, float_schedules)
+        .map(|entry| &entry.period)
         .filter(|period| period.unadjusted_end == maturity)
         .map(|period| (period.payment_date, period.accrual_end))
         .reduce(|previous, dates| (previous.0.max(dates.0), previous.1.max(dates.1)))
         .unwrap_or((maturity, maturity))
-}
-
-impl CompiledCashFlowPlan {
-    /// Every date the build loop visits, sorted and deduplicated.
-    fn collect_all_dates(&self) -> finstack_quant_core::Result<Vec<Date>> {
-        let estimated_periods: usize = self
-            .fixed_schedules
-            .iter()
-            .map(|s| s.periods.len())
-            .chain(self.float_schedules.iter().map(|s| s.periods.len()))
-            .chain(self.periodic_fees.iter().map(|s| s.periods.len()))
-            .sum();
-        let mut dates = Vec::with_capacity(
-            3 + estimated_periods * 3 + self.fixed_fees.len() + self.principal_events.len(),
-        );
-        dates.extend([self.issue, self.maturity, self.redemption_date]);
-        for entry in self
-            .fixed_schedules
-            .iter()
-            .flat_map(|s| &s.periods)
-            .chain(self.float_schedules.iter().flat_map(|s| &s.periods))
-            .chain(self.periodic_fees.iter().flat_map(|s| &s.periods))
-        {
-            let period = &entry.period;
-            dates.extend([
-                period.accrual_start,
-                period.accrual_end,
-                period.payment_date,
-            ]);
-        }
-        dates.extend(self.fixed_fees.iter().map(|(date, _)| *date));
-        match &self.notional.amort {
-            AmortizationSpec::CustomPrincipal { items } => {
-                dates.extend(items.iter().map(|(date, _)| *date))
-            }
-            AmortizationSpec::StepRemaining { schedule } => {
-                dates.extend(schedule.iter().map(|(date, _)| *date))
-            }
-            _ => {}
-        }
-        for ev in &self.principal_events {
-            dates.push(ev.date);
-        }
-        if let AmortizationSpec::LinearBetween { start, .. } = &self.notional.amort {
-            dates.push(*start);
-        }
-        dates.sort_unstable();
-        dates.dedup();
-        if dates.len() < 2 {
-            return Err(InputError::TooFewPoints.into());
-        }
-        Ok(dates)
-    }
 }
 
 /// Builder for constructing cashflow schedules with validation.
@@ -449,22 +380,6 @@ impl std::fmt::Display for CashFlowBuilder {
             self.principal_events.len()
         )
     }
-}
-
-pub(super) struct CompiledCashFlowPlan {
-    pub(super) notional: Notional,
-    pub(super) issue: Date,
-    pub(super) maturity: Date,
-    pub(super) fixed_schedules: Vec<FixedSchedule>,
-    pub(super) float_schedules: Vec<FloatSchedule>,
-    pub(super) periodic_fees: Vec<PeriodicFee>,
-    pub(super) fixed_fees: Vec<(Date, Money)>,
-    pub(super) principal_events: Vec<PrincipalEventSpec>,
-    pub(super) dates: Vec<Date>,
-    pub(super) amort_setup: AmortizationSetup,
-    pub(super) redemption_date: Date,
-    pub(super) redemption_effective_date: Date,
-    pub(super) principal_exchange: PrincipalExchange,
 }
 
 impl CashFlowBuilder {
@@ -548,21 +463,14 @@ impl CashFlowBuilder {
         }
         let (notional, issue, maturity) = validate_core_inputs(self)?;
 
-        let (
-            CompiledSchedules {
-                fixed_schedules,
-                float_schedules,
-            },
+        let CompiledSchedules {
+            fixed_schedules,
+            float_schedules,
+        } = compute_coupon_schedules(self, issue, maturity)?;
+        let FeeSchedules {
             periodic_fees,
             fixed_fees,
-        ) = {
-            let compiled = compute_coupon_schedules(self, issue, maturity)?;
-            let FeeSchedules {
-                periodic_fees,
-                fixed_fees,
-            } = build_fee_schedules(issue, maturity, &self.fees)?;
-            (compiled, periodic_fees, fixed_fees)
-        };
+        } = build_fee_schedules(issue, maturity, &self.fees)?;
 
         let mut principal_events = self.principal_events.clone();
         principal_events.sort_by_key(|ev| ev.date);
@@ -589,14 +497,6 @@ impl CashFlowBuilder {
         let (redemption_date, redemption_effective_date) =
             compute_redemption_dates(maturity, &fixed_schedules, &float_schedules);
         let late_amortization = match &notional.amort {
-            AmortizationSpec::StepRemaining { schedule } => schedule
-                .iter()
-                .find(|(date, _)| *date > redemption_effective_date)
-                .map(|(date, _)| *date),
-            AmortizationSpec::CustomPrincipal { items } => items
-                .iter()
-                .find(|(date, _)| *date > redemption_effective_date)
-                .map(|(date, _)| *date),
             AmortizationSpec::LinearBetween { start, end } => {
                 if *start < issue {
                     return Err(InputError::DateOutOfRange {
@@ -607,7 +507,12 @@ impl CashFlowBuilder {
                 }
                 (*end > redemption_effective_date).then_some(*end)
             }
-            _ => None,
+            _ => notional
+                .amort
+                .dated_amounts()
+                .iter()
+                .find(|(date, _)| *date > redemption_effective_date)
+                .map(|(date, _)| *date),
         };
         if let Some(date) = late_amortization {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -652,168 +557,5 @@ impl CashFlowBuilder {
             "cashflow schedule: dates collected"
         );
         Ok(plan)
-    }
-}
-
-impl CompiledCashFlowPlan {
-    fn project(
-        &self,
-        curves: Option<&finstack_quant_core::market_data::context::MarketContext>,
-        observation_date: Option<Date>,
-    ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let accrual_start = self
-            .fixed_schedules
-            .iter()
-            .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period))
-            .chain(
-                self.float_schedules
-                    .iter()
-                    .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period)),
-            )
-            .chain(
-                self.periodic_fees
-                    .iter()
-                    .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period)),
-            )
-            .map(|period| period.accrual_start)
-            .min()
-            .unwrap_or(self.issue);
-        let mut state = initialize_build_state(
-            self.issue,
-            accrual_start,
-            &self.notional,
-            self.dates.len(),
-            &self.principal_events,
-            self.principal_exchange,
-        )?;
-        // Pre- and at-issue fees emit here; the date loop only covers dates after issue.
-        for (fee_date, amount) in &self.fixed_fees {
-            if *fee_date <= self.issue && amount.amount() != 0.0 {
-                state.flows.push(CashFlow::new(
-                    *fee_date,
-                    None,
-                    *amount,
-                    CFKind::Fee,
-                    0.0,
-                    None,
-                ));
-            }
-        }
-
-        let (resolved_curves, resolved_fixings): (
-            Vec<Option<Arc<ForwardCurve>>>,
-            Vec<Option<ScalarTimeSeries>>,
-        ) = if let Some(mkt) = curves {
-            self.float_schedules
-                .iter()
-                .map(|schedule| {
-                    let forward_curve_id = schedule.spec.rate_spec.forward_curve_id.as_str();
-                    (
-                        mkt.get_forward(forward_curve_id).ok(),
-                        mkt.get_series(fixing_series_id(forward_curve_id))
-                            .ok()
-                            .cloned(),
-                    )
-                })
-                .unzip()
-        } else {
-            (
-                vec![None; self.float_schedules.len()],
-                vec![None; self.float_schedules.len()],
-            )
-        };
-
-        for (schedule, resolved_curve) in self.float_schedules.iter().zip(&resolved_curves) {
-            let (Some(spec_tenor), Some(curve)) = (
-                schedule.spec.rate_spec.index_tenor,
-                resolved_curve.as_deref(),
-            ) else {
-                continue;
-            };
-            if schedule
-                .spec
-                .rate_spec
-                .compounding
-                .is_some_and(|c| c.is_overnight())
-            {
-                continue;
-            }
-            let spec_years = spec_tenor.to_years();
-            let curve_years = curve.tenor();
-            if curve_years > 0.0
-                && spec_years > 0.0
-                && (spec_years - curve_years).abs() / curve_years > 0.1
-            {
-                tracing::warn!(
-                    forward_curve_id = %schedule.spec.rate_spec.forward_curve_id,
-                    spec_index_tenor_years = spec_years,
-                    curve_tenor_years = curve_years,
-                    "floating leg index_tenor disagrees with the resolved forward curve's \
-                     tenor; projection uses the curve's embedded tenor — check the curve id"
-                );
-            }
-        }
-
-        self.process_issue_amortization(&mut state)?;
-        for &d in self.dates.iter().filter(|&&d| d > self.issue) {
-            self.process_date(
-                d,
-                &mut state,
-                ResolvedFloatMarket {
-                    curves: &resolved_curves,
-                    observation_date,
-                    fixings: &resolved_fixings,
-                },
-            )?;
-        }
-
-        let threshold = Decimal::new(1, 4); // 1e-4 = 1 bp relative
-        let initial_amount = self.notional.initial.amount();
-        if initial_amount.abs() > 0.0 {
-            let initial_dec = f64_to_decimal(initial_amount)?;
-            if initial_dec != Decimal::ZERO {
-                let abs_outstanding = if state.outstanding < Decimal::ZERO {
-                    -state.outstanding
-                } else {
-                    state.outstanding
-                };
-                let abs_initial = if initial_dec < Decimal::ZERO {
-                    -initial_dec
-                } else {
-                    initial_dec
-                };
-                let relative_residual = abs_outstanding / abs_initial;
-                if relative_residual > threshold {
-                    let final_outstanding = state.outstanding.as_f64();
-                    let relative_residual_f64 = relative_residual.as_f64();
-                    tracing::warn!(
-                        initial = initial_amount,
-                        final_outstanding,
-                        relative_residual = relative_residual_f64,
-                        threshold_bp = 1.0,
-                        "cashflow schedule: final outstanding balance deviates from zero; \
-                         check amortization schedule or instrument terminal flow"
-                    );
-                }
-            }
-        }
-
-        let flows = state.flows;
-        let (meta, out_day_count) = finalize_flows(
-            &self.fixed_schedules,
-            &self.float_schedules,
-            Some(self.issue),
-            Some(self.maturity),
-            state.projected_fixings,
-        );
-        debug!(flows = flows.len(), "cashflow schedule: project complete");
-        let schedule = CashFlowSchedule::from_flows_unchecked(
-            flows,
-            self.notional.clone(),
-            out_day_count,
-            meta,
-        );
-        schedule.validate()?;
-        Ok(schedule)
     }
 }

@@ -13,7 +13,7 @@ use finstack_quant_core::{
 pub use finstack_quant_test_utils::assert::approx_eq;
 use finstack_quant_valuations::{
     instruments::fx::fx_spot::FxSpot,
-    metrics::{standard_registry, MetricContext, MetricId},
+    metrics::{MetricContext, MetricId},
 };
 use std::sync::Arc;
 use time::Month;
@@ -174,7 +174,8 @@ pub fn calculate_metric(
     context: &mut MetricContext,
     metric: MetricId,
 ) -> finstack_quant_core::Result<f64> {
-    standard_registry()
+    finstack_quant_valuations::pricer::STANDARD
+        .metrics()
         .compute(std::slice::from_ref(&metric), context)?
         .get(&metric)
         .copied()

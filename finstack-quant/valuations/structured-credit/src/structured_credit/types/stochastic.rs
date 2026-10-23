@@ -1,7 +1,7 @@
 //! Stochastic configuration helpers for StructuredCredit.
 //!
 //! This module provides methods to enable and configure stochastic
-//! prepayment and default modeling for structured credit instruments.
+//! prepayment, default and recovery modeling for structured credit instruments.
 
 use super::{DealType, StructuredCredit};
 use crate::structured_credit::pricing::stochastic::calibrations::{
@@ -18,10 +18,12 @@ impl StructuredCredit {
 
     /// Check if stochastic modeling is enabled.
     ///
-    /// Returns true if any stochastic specification is set.
+    /// Returns true if a stochastic prepayment, default, recovery or correlation
+    /// specification is set, including a recovery-only configuration.
     pub fn is_stochastic(&self) -> bool {
         self.credit_model.stochastic_prepay_spec.is_some()
             || self.credit_model.stochastic_default_spec.is_some()
+            || self.credit_model.stochastic_recovery_spec.is_some()
             || self.credit_model.correlation_structure.is_some()
     }
 
@@ -54,7 +56,7 @@ impl StructuredCredit {
             ),
             DealType::Cmbs => (
                 // CMBS has minimal prepayment due to lockout/defeasance
-                StochasticPrepaySpec::deterministic(PrepaymentModelSpec::constant_cpr(0.02)),
+                StochasticPrepaySpec::Deterministic(PrepaymentModelSpec::constant_cpr(0.02)),
                 StochasticDefaultSpec::gaussian_copula(0.02, 0.20),
                 cmbs_correlation_structure()?,
             ),
@@ -80,10 +82,12 @@ impl StructuredCredit {
         Ok(self)
     }
 
-    /// Clear stochastic specifications, reverting to deterministic pricing.
+    /// Clear prepayment, default, recovery and correlation specifications,
+    /// reverting to deterministic pricing. Repeated calls have no further effect.
     pub fn disable_stochastic(&mut self) -> &mut Self {
         self.credit_model.stochastic_prepay_spec = None;
         self.credit_model.stochastic_default_spec = None;
+        self.credit_model.stochastic_recovery_spec = None;
         self.credit_model.correlation_structure = None;
         self
     }

@@ -770,78 +770,72 @@ impl ReplayTemplate {
                 )
             } else {
                 let forward = market.get_forward(&spec.rate_spec.forward_curve_id).ok();
-                let tenor_years = forward.as_ref().map_or_else(
-                    || {
-                        spec.rate_spec
-                            .index_tenor
-                            .unwrap_or(spec.rate_spec.reset_frequency)
-                            .to_years()
-                    },
-                    |curve| curve.tenor(),
-                );
                 let fixing_id = fixing_series_id(spec.rate_spec.forward_curve_id.as_str());
-                let published_same_day = reset == as_of
-                    && market
-                        .get_series(&fixing_id)
-                        .ok()
-                        .is_some_and(|series| series.value_on_exact(reset).is_ok());
-                let known_reset = reset < as_of || published_same_day;
-                let source = if known_reset || forward.is_none() {
-                    ObservedRateSource::Fixed(base_index_rate)
-                } else {
-                    let observation_end_time = reset_time + tenor_years;
-                    if observation_end_time > times[terminal_step] + 1.0e-12 {
-                        return Err(Error::Validation(format!(
+                let fixings = market.get_series(&fixing_id).ok();
+                let known_reset = !matches!(
+                    observed_index_fixing(
+                        reset,
+                        fixings,
+                        spec.rate_spec.forward_curve_id.as_str(),
+                        as_of,
+                    ),
+                    Ok(None)
+                );
+                let source = match forward.as_ref() {
+                    Some(curve) if !known_reset => {
+                        let tenor_years = curve.tenor();
+                        let observation_end_time = reset_time + tenor_years;
+                        if observation_end_time > times[terminal_step] + 1.0e-12 {
+                            return Err(Error::Validation(format!(
                                 "Bond '{}' term-index observation at {} with tenor {:.12}y ends beyond the calibrated rates-credit horizon {:.12}y",
                                 bond.id.as_str(), reset, tenor_years, times[terminal_step]
                             )));
-                    }
-                    let observation_end_step = nearest_step(times, observation_end_time);
-                    if observation_end_step <= reset_step {
-                        return Err(Error::Validation(format!(
+                        }
+                        let observation_end_step = nearest_step(times, observation_end_time);
+                        if observation_end_step <= reset_step {
+                            return Err(Error::Validation(format!(
                                 "Bond '{}' term-index observation at {} with tenor {:.12}y maps to no positive rates-credit interval",
                                 bond.id.as_str(), reset, tenor_years
                             )));
-                    }
-                    let index_accrual = times[observation_end_step] - times[reset_step];
-                    let reset_grid_date = step_dates[reset_step].ok_or_else(|| {
-                        Error::Validation(format!(
-                            "Bond '{}' term-index reset step {} has no calendar date",
-                            bond.id.as_str(),
-                            reset_step
-                        ))
-                    })?;
-                    let observation_end_date =
-                        step_dates[observation_end_step].ok_or_else(|| {
+                        }
+                        let index_accrual = times[observation_end_step] - times[reset_step];
+                        let reset_grid_date = step_dates[reset_step].ok_or_else(|| {
                             Error::Validation(format!(
+                                "Bond '{}' term-index reset step {} has no calendar date",
+                                bond.id.as_str(),
+                                reset_step
+                            ))
+                        })?;
+                        let observation_end_date =
+                            step_dates[observation_end_step].ok_or_else(|| {
+                                Error::Validation(format!(
                                 "Bond '{}' term-index observation-end step {} has no calendar date",
                                 bond.id.as_str(),
                                 observation_end_step
                             ))
-                        })?;
-                    let base_df =
-                        discount.df_between_dates(reset_grid_date, observation_end_date)?;
-                    if !base_df.is_finite() || base_df <= 0.0 {
-                        return Err(Error::Validation(format!(
+                            })?;
+                        let base_df =
+                            discount.df_between_dates(reset_grid_date, observation_end_date)?;
+                        if !base_df.is_finite() || base_df <= 0.0 {
+                            return Err(Error::Validation(format!(
                                 "Bond '{}' has an invalid reference discount factor over the term-index observation [{:.12}, {:.12}]",
                                 bond.id.as_str(), times[reset_step], times[observation_end_step]
                             )));
+                        }
+                        ObservedRateSource::Conditional(ConditionalRate {
+                            observation_step: reset_step,
+                            accrual: index_accrual,
+                            base_index_rate,
+                            base_discount_forward: (1.0 / base_df - 1.0) / index_accrual,
+                            conditional_discount_factors: tree
+                                .conditional_discount_factors(reset_step, observation_end_step)?,
+                        })
                     }
-                    ObservedRateSource::Conditional(ConditionalRate {
-                        observation_step: reset_step,
-                        accrual: index_accrual,
-                        base_index_rate,
-                        base_discount_forward: (1.0 / base_df - 1.0) / index_accrual,
-                        conditional_discount_factors: tree
-                            .conditional_discount_factors(reset_step, observation_end_step)?,
-                    })
+                    _ => ObservedRateSource::Fixed(base_index_rate),
                 };
                 (
                     FloatingRateModel::Term(source),
-                    FloatingRateObservation::Term {
-                        reset_date: reset,
-                        tenor_years,
-                    },
+                    FloatingRateObservation::Term { reset_date: reset },
                 )
             };
             let compiled = CompiledFloatingCoupon::compile(

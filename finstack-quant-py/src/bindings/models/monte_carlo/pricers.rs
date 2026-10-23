@@ -2,11 +2,13 @@
 
 use super::engine::extract_optional_currency;
 use super::results::{PyLrmGreeks, PyMoneyEstimate};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
-use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
+use finstack_quant_models::monte_carlo::convenience;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
+use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
-use finstack_quant_models::types::OptionType;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use pyo3::prelude::*;
 
 /// Render a bool the way Python's `repr` does.
@@ -18,7 +20,7 @@ fn py_bool(value: bool) -> &'static str {
     }
 }
 
-/// Convenience pricer for European options under GBM dynamics.
+#[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer")]
 #[pyclass(
     name = "EuropeanPricer",
     module = "finstack_quant.models.monte_carlo",
@@ -30,22 +32,7 @@ pub struct PyEuropeanPricer {
 
 #[pymethods]
 impl PyEuropeanPricer {
-    /// Create a European pricer with at least two independent path estimators.
-    ///
-    /// Parameters
-    /// ----------
-    /// num_paths : int, optional
-    ///     Independent path estimators in ``[2, 10_000_000]``. ``None`` uses
-    ///     the registry default; the upper limit is checked when pricing.
-    /// seed : int, optional
-    ///     Deterministic Philox seed; ``None`` uses the registry default.
-    /// use_parallel : bool, optional
-    ///     Whether to use the rayon pool; ``None`` uses the registry default.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the path count is less than two or embedded defaults cannot be loaded.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.__init__")]
     #[new]
     #[pyo3(signature = (num_paths=None, seed=None, use_parallel=None))]
     fn new(
@@ -58,39 +45,23 @@ impl PyEuropeanPricer {
             .map_err(core_to_py)
     }
 
-    /// Independent Monte Carlo path count used by this pricer.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths()
     }
-    /// Seed value used for path generation.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.seed")]
     #[getter]
     fn seed(&self) -> u64 {
         self.inner.seed()
     }
-    /// Whether path generation runs on the rayon pool.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.use_parallel")]
     #[getter]
     fn use_parallel(&self) -> bool {
         self.inner.use_parallel()
     }
 
-    /// Price a European option under GBM.
-    ///
-    /// Releases the GIL during the Monte Carlo run so other Python threads
-    /// can make progress.
-    ///
-    /// Parameters
-    /// ----------
-    /// spot, strike, rate, div_yield, vol, expiry : float
-    ///     GBM market inputs; ``rate`` / ``div_yield`` are continuously
-    ///     compounded decimals, ``vol`` is a positive decimal, ``expiry`` is in
-    ///     years.
-    /// is_call : bool
-    ///     ``True`` for a call payoff, ``False`` for a put.
-    /// num_steps : int, optional
-    ///     Uniform time steps to expiry; defaults to the registry value.
-    /// currency : Currency or str, optional
-    ///     Currency stamped on the estimate; defaults to the registry value.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.price_gbm")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
     fn price_gbm(
@@ -135,7 +106,7 @@ impl PyEuropeanPricer {
     }
 }
 
-/// Path-dependent Monte Carlo pricer for exotic payoffs (Asian, barrier, etc.).
+#[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer")]
 #[pyclass(
     name = "PathDependentPricer",
     module = "finstack_quant.models.monte_carlo",
@@ -147,37 +118,7 @@ pub struct PyPathDependentPricer {
 
 #[pymethods]
 impl PyPathDependentPricer {
-    /// Create a path-dependent pricer.
-    ///
-    /// Parameters
-    /// ----------
-    /// num_paths : int, optional
-    ///     Path budget of at least two. Without Sobol, counts independent
-    ///     estimators, with each antithetic pair counted once; with Sobol,
-    ///     counts points across independent scrambles. Defaults to the registry value.
-    /// seed : int, optional
-    ///     Root Philox seed. Defaults to the registry value.
-    /// use_parallel : bool, optional
-    ///     Run path generation on the rayon pool. Defaults to the registry
-    ///     value. Incompatible with ``use_sobol=True``.
-    /// antithetic : bool, optional
-    ///     Pair each path with its sign-flipped counterpart. Defaults to the
-    ///     registry value.
-    /// use_sobol : bool, optional
-    ///     Drive paths from a Sobol quasi-random sequence instead of Philox.
-    ///     Enabling Sobol also switches on the Brownian bridge unless
-    ///     ``use_brownian_bridge`` is passed explicitly. Defaults to the
-    ///     registry value.
-    /// use_brownian_bridge : bool, optional
-    ///     Brownian-bridge path construction (only meaningful with Sobol).
-    ///     Defaults to the registry value, or ``True`` when ``use_sobol`` is
-    ///     enabled here.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the path budget is less than two, embedded defaults cannot be loaded, or the
-    ///     configuration is inconsistent (``use_sobol`` with ``use_parallel``).
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.__init__")]
     #[new]
     #[pyo3(signature = (
         num_paths=None, seed=None, use_parallel=None,
@@ -203,22 +144,7 @@ impl PyPathDependentPricer {
         .map_err(core_to_py)
     }
 
-    /// Price an arithmetic Asian option under GBM dynamics.
-    ///
-    /// Releases the GIL during the Monte Carlo run.
-    ///
-    /// Parameters
-    /// ----------
-    /// spot, strike, rate, div_yield, vol, expiry : float
-    ///     GBM market inputs; ``rate`` / ``div_yield`` are continuously
-    ///     compounded decimals, ``vol`` is a positive decimal, ``expiry`` is in
-    ///     years.
-    /// is_call : bool
-    ///     ``True`` for a call on the arithmetic average, ``False`` for a put.
-    /// num_steps : int, optional
-    ///     Averaging steps ``1..=num_steps``; defaults to the registry value.
-    /// currency : Currency or str, optional
-    ///     Currency stamped on the estimate; defaults to the registry value.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.price_asian")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
     fn price_asian(
@@ -253,42 +179,7 @@ impl PyPathDependentPricer {
         .map_err(core_to_py)
     }
 
-    /// Price an arithmetic Asian option under GBM with likelihood-ratio delta
-    /// and vega from the same paths.
-    ///
-    /// Releases the GIL during the Monte Carlo run.
-    ///
-    /// Parameters
-    /// ----------
-    /// spot : float
-    ///     Finite, strictly positive spot level at time zero.
-    /// strike : float
-    ///     Exercise price in the same units as ``spot``.
-    /// rate, div_yield : float
-    ///     Continuously compounded risk-free rate and dividend yield, as
-    ///     annualized decimals.
-    /// vol : float
-    ///     Annualized GBM volatility as a strictly positive decimal.
-    /// expiry : float
-    ///     Time to expiry in years.
-    /// is_call : bool
-    ///     ``True`` for a call on the arithmetic average, ``False`` for a put.
-    /// num_steps : int, optional
-    ///     Time-grid steps, each an averaging date. Defaults to the registry
-    ///     value ``convenience.greeks.lrm_num_steps`` (32), not the 252 steps
-    ///     of ``price_asian``: every path is kept in memory, so
-    ///     ``num_paths * (num_steps + 1)`` may not exceed ``4_000_000``.
-    /// currency : Currency or str, optional
-    ///     Currency stamped on the price estimate; defaults to the registry
-    ///     value.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``spot``, ``vol`` or ``expiry`` is not finite and strictly
-    ///     positive, ``num_steps`` is zero, the pricer uses Sobol or
-    ///     antithetic sampling, ``num_paths`` exceeds ``100_000``, or
-    ///     ``num_paths * (num_steps + 1)`` exceeds ``4_000_000``.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.price_with_lrm_greeks")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
     fn price_with_lrm_greeks(
@@ -323,32 +214,32 @@ impl PyPathDependentPricer {
         .map_err(core_to_py)
     }
 
-    /// Independent Monte Carlo path count used by this pricer.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.config().num_paths
     }
-    /// Seed value used for path generation.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.seed")]
     #[getter]
     fn seed(&self) -> u64 {
         self.inner.config().seed
     }
-    /// Whether path generation runs on the rayon pool.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.use_parallel")]
     #[getter]
     fn use_parallel(&self) -> bool {
         self.inner.config().use_parallel
     }
-    /// Whether each path is paired with its sign-flipped counterpart.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.antithetic")]
     #[getter]
     fn antithetic(&self) -> bool {
         self.inner.config().antithetic
     }
-    /// Whether paths are driven by a Sobol quasi-random sequence.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.use_sobol")]
     #[getter]
     fn use_sobol(&self) -> bool {
         self.inner.config().use_sobol
     }
-    /// Whether Brownian-bridge construction is enabled (Sobol only).
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.use_brownian_bridge")]
     #[getter]
     fn use_brownian_bridge(&self) -> bool {
         self.inner.config().use_brownian_bridge
@@ -368,56 +259,19 @@ impl PyPathDependentPricer {
     }
 }
 
-/// Longstaff-Schwartz Monte Carlo pricer for American options.
-///
-/// Independent paths must be in ``[1, 10_000_000]`` and time steps in
-/// ``[1, 100_000]``. Each pricing pass retains at most ``64_000_000`` spot
-/// values: ``num_paths * (2 if antithetic else 1) * (num_steps + 1)``,
-/// including time zero and both rows of each antithetic pair. Construction
-/// checks storage without partners; pricing checks the selected pairing
-/// before allocating paths.
+#[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer")]
 #[pyclass(
     name = "LsmcPricer",
     module = "finstack_quant.models.monte_carlo",
     frozen
 )]
 pub struct PyLsmcPricer {
-    inner: LsmcConvenience,
+    inner: LsmcPricer,
 }
 
 #[pymethods]
 impl PyLsmcPricer {
-    /// Configure the path generation and regression basis for early exercise.
-    ///
-    /// Parameters
-    /// ----------
-    /// num_paths : int, optional
-    ///     Independent path count in ``[2, 10_000_000]``. ``None`` uses the
-    ///     registry default; subject to the retained-storage limit above.
-    /// seed : int, optional
-    ///     Deterministic Philox seed; ``None`` uses the registry default.
-    /// use_parallel : bool, optional
-    ///     Whether path generation uses the rayon pool; ``None`` uses the
-    ///     registry default.
-    /// num_steps : int, optional
-    ///     Time-grid steps and exercise dates in ``[1, 100_000]``. ``None``
-    ///     uses the registry default; subject to the retained-storage limit.
-    /// basis : str, optional
-    ///     ``"laguerre"``, ``"polynomial"``, or ``"normalized_polynomial"``;
-    ///     ``None`` selects the registry default.
-    /// basis_degree : int, optional
-    ///     Positive regression degree, validated when pricing; Laguerre
-    ///     supports degrees one through four. ``None`` uses the registry default.
-    /// antithetic : bool, optional
-    ///     Pair each path with its sign-flipped shocks. ``None`` uses the
-    ///     registry default; both rows count toward retained storage at pricing.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the basis family is unknown, the path or step count is outside
-    ///     the documented range, or paths without antithetic partners exceed
-    ///     ``64_000_000`` retained spot values including time zero.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.__init__")]
     #[new]
     #[pyo3(signature = (
         num_paths=None,
@@ -437,7 +291,7 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
         antithetic: Option<bool>,
     ) -> PyResult<Self> {
-        LsmcConvenience::new(
+        LsmcPricer::new(
             num_paths,
             seed,
             use_parallel,
@@ -450,66 +304,38 @@ impl PyLsmcPricer {
         .map_err(core_to_py)
     }
 
-    /// Independent Monte Carlo path count used by this pricer.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.pricer().config().num_paths
     }
-    /// Seed value used for path generation.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.seed")]
     #[getter]
     fn seed(&self) -> u64 {
         self.inner.pricer().config().seed
     }
-    /// Whether path generation runs on the rayon pool.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.use_parallel")]
     #[getter]
     fn use_parallel(&self) -> bool {
         self.inner.pricer().config().use_parallel
     }
-    /// Whether each path is paired with its sign-flipped counterpart.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.antithetic")]
     #[getter]
     fn antithetic(&self) -> bool {
         self.inner.pricer().config().antithetic
     }
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.basis")]
     #[getter]
     fn basis(&self) -> &'static str {
         self.inner.basis().as_str()
     }
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.basis_degree")]
     #[getter]
     fn basis_degree(&self) -> usize {
         self.inner.basis_degree()
     }
 
-    /// Price an American option under GBM dynamics.
-    ///
-    /// Releases the GIL during the Monte Carlo run.
-    ///
-    /// Parameters
-    /// ----------
-    /// spot, strike, rate, div_yield, vol, expiry : float
-    ///     GBM market inputs; ``rate`` / ``div_yield`` are continuously
-    ///     compounded decimals, ``vol`` is a positive decimal, ``expiry`` is in
-    ///     years.
-    /// is_call : bool
-    ///     ``True`` for a call, ``False`` for a put.
-    /// currency : Currency or str, optional
-    ///     Currency stamped on the estimate; defaults to the registry value.
-    /// num_steps : int, optional
-    ///     Per-call exercise-grid override in ``[1, 100_000]``; defaults to
-    ///     the instance ``num_steps``. Subject to the retained-storage limit.
-    /// basis : str, optional
-    ///     Per-call override of the regression basis family; defaults to the
-    ///     instance ``basis``.
-    /// basis_degree : int, optional
-    ///     Per-call override of the basis degree; defaults to the instance
-    ///     ``basis_degree``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the requested grid or path count exceeds the documented range,
-    ///     or retained spots exceed ``64_000_000`` values including time zero
-    ///     and both rows of each antithetic pair; also raised for invalid market
-    ///     inputs, currency, basis family, or basis degree.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.price_american")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, currency=None, num_steps=None, basis=None, basis_degree=None))]
     fn price_american(
@@ -528,19 +354,17 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
         let currency = extract_optional_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) = self
-            .inner
-            .call_config(num_steps, basis, basis_degree)
-            .map_err(core_to_py)?;
         py.detach(|| {
-            pricer.price_american(
-                OptionType::from(is_call),
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
+            self.inner.price_american(
+                &OptionMarketParams {
+                    option_type: OptionType::from(is_call),
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
                 num_steps,
                 currency,
                 basis,
@@ -551,22 +375,7 @@ impl PyLsmcPricer {
         .map_err(core_to_py)
     }
 
-    /// Two-pass unbiased American option price (training fit + out-of-sample pricing).
-    ///
-    /// Mitigates the in-sample upward bias of single-pass LSMC: the regression
-    /// is fit on a training path set seeded by the pricer's `seed`, and the
-    /// frozen exercise policy is replayed against an *independent* path set
-    /// seeded by `pricing_seed`. `pricing_seed` must differ from `seed`;
-    /// matching seeds reintroduce the bias and are rejected.
-    ///
-    /// Releases the GIL during both Monte Carlo passes. Accepts the same
-    /// per-call ``num_steps`` / ``basis`` / ``basis_degree`` overrides as
-    /// ``price_american``.
-    ///
-    /// Each pass applies the same workload limits and raises ``ValueError``
-    /// above ``100_000`` steps, ``10_000_000`` independent paths, or
-    /// ``64_000_000`` retained spot values including time zero and both rows
-    /// of each antithetic pair.
+    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.price_american_unbiased")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         spot, strike, rate, div_yield, vol, expiry, is_call, pricing_seed, currency=None,
@@ -589,19 +398,17 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
         let currency = extract_optional_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) = self
-            .inner
-            .call_config(num_steps, basis, basis_degree)
-            .map_err(core_to_py)?;
         py.detach(|| {
-            pricer.price_american_unbiased(
-                OptionType::from(is_call),
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
+            self.inner.price_american_unbiased(
+                &OptionMarketParams {
+                    option_type: OptionType::from(is_call),
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
                 num_steps,
                 currency,
                 basis,

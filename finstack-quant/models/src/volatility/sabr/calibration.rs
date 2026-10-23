@@ -374,7 +374,9 @@ impl<'de> serde::Deserialize<'de> for SabrShift {
 }
 
 /// Calibrated SABR parameters and deterministic solver diagnostics.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct SabrCalibrationOutcome {
     /// Calibrated model parameters.
     pub parameters: SabrParameters,
@@ -392,7 +394,7 @@ pub struct SabrCalibrationOutcome {
     /// Largest absolute quote error divided by its positive market quote.
     pub max_relative_quote_error: f64,
     /// Parameter names whose calibrated values landed on configured bounds.
-    pub parameters_at_bounds: Vec<&'static str>,
+    pub parameters_at_bounds: Vec<String>,
 }
 
 fn bounded_to_unconstrained(value: f64, lower: f64, upper: f64) -> f64 {
@@ -410,7 +412,7 @@ fn unconstrained_to_bounded(value: f64, lower: f64, upper: f64) -> f64 {
     lower + (upper - lower) * unit
 }
 
-fn sabr_parameters_at_bounds(_alpha: f64, nu: f64, rho: f64) -> Vec<&'static str> {
+fn sabr_parameters_at_bounds(_alpha: f64, nu: f64, rho: f64) -> Vec<String> {
     const BOUNDS: [(&str, f64, f64); 2] = [("nu", 0.001, 2.0), ("rho", -0.99, 0.99)];
     [nu, rho]
         .into_iter()
@@ -418,7 +420,7 @@ fn sabr_parameters_at_bounds(_alpha: f64, nu: f64, rho: f64) -> Vec<&'static str
         .filter_map(|(value, (name, lower, upper))| {
             let threshold = 1e-5 * (upper - lower);
             ((value - lower).abs() <= threshold || (upper - value).abs() <= threshold)
-                .then_some(name)
+                .then(|| name.to_owned())
         })
         .collect()
 }
@@ -659,52 +661,18 @@ impl SabrCalibrator {
         self.atm_pinning
     }
 
-    /// Calibrate SABR parameters to market implied volatilities.
+    /// Calibrate SABR and return the parameters with solver diagnostics.
     ///
-    /// Applies the configured [`SabrShift`] and ATM-pinning settings, then runs
-    /// the multi-start Levenberg-Marquardt fit and returns the parameters only.
-    /// Use [`calibrate_with_diagnostics`](Self::calibrate_with_diagnostics)
-    /// for solver statistics.
-    ///
-    /// # Vol quoting convention
-    ///
-    /// The objective compares Hagan-expansion vols to `market_vols` directly,
-    /// and the expansion's output convention is β-dependent (see
-    /// `SabrParameters::quote_convention`): pass **normal (Bachelier)** quotes when calibrating
-    /// with β≈0 and **lognormal (Black)** quotes for β>0. Mixing conventions
-    /// silently mis-calibrates.
-    ///
-    /// # Arguments
-    ///
-    /// * `forward` - Unshifted forward price or decimal rate.
-    /// * `strikes` - Unshifted strikes in the same units as `forward`; at
-    ///   least three, aligned with `market_vols`.
-    /// * `market_vols` - Implied volatilities aligned with `strikes`.
-    /// * `time_to_expiry` - Time to expiry in years.
-    /// * `beta` - Fixed SABR elasticity parameter in `[0, 1]`.
+    /// Applies the configured shift and ATM-pinning policy and runs a
+    /// deterministic multi-start fit. Normal quotes are absolute decimal-rate
+    /// volatilities for beta near zero; otherwise quotes are annual Black
+    /// volatilities in relative decimals.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] when fewer than three aligned quotes are
-    /// supplied, the (shifted) forward or a strike is non-positive, an
-    /// automatic shift would exceed 4%, the calibrator settings are invalid,
-    /// or no start reproduces every quote within `tolerance`.
-    pub fn calibrate(
-        &self,
-        forward: f64,
-        strikes: &[f64],
-        market_vols: &[f64],
-        time_to_expiry: f64,
-        beta: f64,
-    ) -> Result<SabrParameters> {
-        Ok(self
-            .calibrate_with_diagnostics(forward, strikes, market_vols, time_to_expiry, beta)?
-            .parameters)
-    }
-
-    /// Calibrate SABR and return the parameters with solver diagnostics.
-    ///
-    /// Same inputs, conventions, and errors as [`calibrate`](Self::calibrate).
+    /// Returns [`Error::Validation`] for invalid settings, fewer than three
+    /// aligned positive quotes, invalid shifted rates, or a fit outside the
+    /// configured per-quote error tolerance.
     ///
     /// # Arguments
     ///
@@ -714,7 +682,7 @@ impl SabrCalibrator {
     /// * `market_vols` - Implied volatilities aligned with `strikes`.
     /// * `time_to_expiry` - Time to expiry in years.
     /// * `beta` - Fixed SABR elasticity parameter in `[0, 1]`.
-    pub fn calibrate_with_diagnostics(
+    pub fn calibrate(
         &self,
         forward: f64,
         strikes: &[f64],
@@ -1264,14 +1232,14 @@ mod acceptance_tests {
 
         let calibrate_free = || {
             calibrator
-                .calibrate_with_diagnostics(forward, &strikes, &market_vols, time_to_expiry, beta)
+                .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
                 .expect("free-alpha calibration")
         };
         let calibrate_pinned = || {
             calibrator
                 .clone()
                 .with_atm_pinning(true)
-                .calibrate_with_diagnostics(forward, &strikes, &market_vols, time_to_expiry, beta)
+                .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
                 .expect("ATM-pinned calibration")
         };
         let free_first = calibrate_free();

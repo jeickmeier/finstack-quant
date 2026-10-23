@@ -231,10 +231,10 @@ pub(crate) fn solve(
         let res = match params.vol_convention {
             SwaptionVolConvention::Normal => sabr_calibrator
                 .with_atm_pinning(true)
-                .calibrate_with_diagnostics(fwd_rate, &strikes, &vols, t_exp, 0.0),
+                .calibrate(fwd_rate, &strikes, &vols, t_exp, 0.0),
             SwaptionVolConvention::Lognormal => sabr_calibrator
                 .with_shift(SabrShift::None)
-                .calibrate_with_diagnostics(fwd_rate, &strikes, &vols, t_exp, params.sabr_beta),
+                .calibrate(fwd_rate, &strikes, &vols, t_exp, params.sabr_beta),
             SwaptionVolConvention::ShiftedLognormal { shift } => {
                 if !shift.is_finite() || shift <= 0.0 {
                     Err(finstack_quant_core::Error::Validation(format!(
@@ -244,13 +244,7 @@ pub(crate) fn solve(
                 } else {
                     sabr_calibrator
                         .with_shift(SabrShift::Fixed(shift))
-                        .calibrate_with_diagnostics(
-                            fwd_rate,
-                            &strikes,
-                            &vols,
-                            t_exp,
-                            params.sabr_beta,
-                        )
+                        .calibrate(fwd_rate, &strikes, &vols, t_exp, params.sabr_beta)
                 }
             }
         };

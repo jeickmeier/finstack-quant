@@ -3,7 +3,9 @@
 use crate::irs::InterestRateSwap;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
+};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -15,7 +17,6 @@ use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
     resolve_volatility, validate_sigma, ResolvedVolatility, VolatilityRequest,
 };
@@ -357,7 +358,7 @@ impl Swaption {
     /// (which still governs annuity and accrual computations). Using the
     /// accrual day count (e.g. Act360) would inflate T by ~365/360.
     fn time_to_expiry(&self, as_of: Date) -> Result<f64> {
-        year_fraction(DayCount::Act365F, as_of, self.expiry)
+        DayCount::Act365F.year_fraction(as_of, self.expiry, DayCountContext::default())
     }
 
     /// Return the model-independent terminal value at or after expiry.
@@ -709,10 +710,10 @@ impl Swaption {
     /// This method treats the entire swap as a single zero-coupon payment
     /// at maturity. Rarely used in modern markets; included for completeness.
     pub fn cash_annuity_zero_coupon(&self, disc: &dyn Discounting, as_of: Date) -> Result<f64> {
-        let tenor = year_fraction(
-            self.get_fixed_day_count(),
+        let tenor = self.get_fixed_day_count().year_fraction(
             self.get_underlying_start_date(),
             self.get_underlying_maturity(),
+            DayCountContext::default(),
         )?;
         let df = finstack_quant_core::market_data::traits::Discounting::df_between_dates(
             disc,

@@ -360,10 +360,12 @@ fn hw1f_intrinsic(
     for (j, &payment_date) in schedule.payment_dates.iter().enumerate() {
         if payment_date > t {
             annuity += schedule.accrual_fractions[j]
-                * hw_bond_price(params, r_t, t, payment_date, discount_fn);
+                * hw_bond_price(params, r_t, t, payment_date, discount_fn).expect("valid HW curve");
         }
     }
-    let swap_rate = (1.0 - hw_bond_price(params, r_t, t, schedule.end_date, discount_fn)) / annuity;
+    let swap_rate = (1.0
+        - hw_bond_price(params, r_t, t, schedule.end_date, discount_fn).expect("valid HW curve"))
+        / annuity;
     (
         (swap_rate - strike).max(0.0) * annuity * notional,
         swap_rate,
@@ -626,6 +628,7 @@ fn lsmc_european_uses_pathwise_money_market_numeraire() {
                         .filter(|(pay, _)| **pay > t)
                         .map(|(pay, tau)| {
                             tau * hw_bond_price(hw.params(), rate, t, *pay, discount_fn)
+                                .expect("valid HW curve")
                         })
                         .sum();
                     Ok((swap_rate, annuity, intrinsic))
@@ -714,7 +717,10 @@ fn lsmc_bermudan_matches_pathwise_numeraire_reference() {
                     .iter()
                     .zip(&schedule.accrual_fractions)
                     .filter(|(pay, _)| **pay > t)
-                    .map(|(pay, tau)| tau * hw_bond_price(hw.params(), rate, t, *pay, discount_fn))
+                    .map(|(pay, tau)| {
+                        tau * hw_bond_price(hw.params(), rate, t, *pay, discount_fn)
+                            .expect("valid HW curve")
+                    })
                     .sum();
                 Ok((swap_rate, annuity, intrinsic))
             },

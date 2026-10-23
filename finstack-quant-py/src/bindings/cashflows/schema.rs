@@ -10,6 +10,7 @@
 //! Rust crate: it mutates a schema in place for the generator and is not a
 //! schema accessor.
 
+use crate::bindings::pydoc::pydoc;
 use crate::bindings::schema_registry::schema_registry_functions;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
@@ -46,29 +47,7 @@ fn schema_json(value: &Value) -> PyResult<String> {
         .map_err(|err| serde_json_to_py(err, "failed to serialize schema"))
 }
 
-/// Return every embedded cashflow schema, keyed by canonical URI.
-///
-/// The keys are the published ``$id`` URIs used by ``$ref`` targets in
-/// instrument and cashflow payload schemas, so the mapping can be handed
-/// directly to a resolver-aware validator.
-///
-/// Returns
-/// -------
-/// dict of str to str
-///     Mapping from canonical schema URI to pretty-printed JSON Schema text,
-///     one entry per embedded cashflow schema.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If a compiled-in schema is malformed or cannot be serialized
-///     back to JSON text.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows import schema
-/// >>> sorted(uri.rsplit("/", 1)[-1] for uri in schema.resources())[:2]
-/// ['accrual_config.schema.json', 'amortization_spec.schema.json']
+#[doc = pydoc!("finstack_quant.cashflows.schema", "resources")]
 #[pyfunction]
 #[pyo3(text_signature = "()")]
 fn resources<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {

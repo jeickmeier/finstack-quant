@@ -72,6 +72,8 @@ where
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
+// Declaration order is the final same-date tie-break in cashflow ordering;
+// reordering variants changes the order of otherwise identical rows.
 pub enum CFKind {
     /// Fixed-rate coupon cash-flow.
     ///

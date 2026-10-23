@@ -277,6 +277,8 @@ macro_rules! instrument_payload {
     (ty boxed $ty:ty) => { Box<$ty> };
     (wrap plain $value:expr) => { $value };
     (wrap boxed $value:expr) => { Box::new($value) };
+    (boxed plain $value:expr) => { Box::new($value) as Box<dyn Instrument> };
+    (boxed boxed $value:expr) => { $value as Box<dyn Instrument> };
     (unwrap plain $value:expr) => { $value };
     (unwrap boxed $value:expr) => { *$value };
     (as_dyn plain $value:expr) => { $value as &dyn Instrument };
@@ -341,12 +343,10 @@ macro_rules! define_instrument_json {
             }
 
             /// Box a payload without domain validation; callers must validate before pricing.
-            pub(crate) fn into_boxed_unchecked(self) -> Result<Box<dyn Instrument>> {
-                Ok(match self {
-                    $(Self::$variant(instrument) => {
-                        Box::new(instrument_payload!(unwrap $kind instrument)) as Box<dyn Instrument>
-                    })*
-                })
+            pub(crate) fn into_boxed_unchecked(self) -> Box<dyn Instrument> {
+                match self {
+                    $(Self::$variant(instrument) => instrument_payload!(boxed $kind instrument),)*
+                }
             }
         }
 
@@ -563,7 +563,7 @@ impl InstrumentJson {
     /// Returns an error if spec validation fails during conversion.
     pub fn into_boxed(self) -> Result<Box<dyn Instrument>> {
         self.validate_for_pricing()?;
-        self.into_boxed_unchecked()
+        Ok(self.into_boxed_unchecked())
     }
 }
 
@@ -976,6 +976,29 @@ mod tests {
                 "unknown variant message should list {tag}, got: {message}"
             );
         }
+    }
+
+    #[test]
+    fn boxed_payloads_keep_their_allocation() {
+        macro_rules! assert_allocation_preserved {
+            ($variant:ident, $ty:ty) => {{
+                let instrument = Box::new(<$ty>::example().expect("example"));
+                let original: *const $ty = instrument.as_ref();
+                let loaded = InstrumentJson::$variant(instrument).into_boxed_unchecked();
+                let concrete = loaded.as_any().downcast_ref::<$ty>().expect("same type");
+                assert!(std::ptr::eq(original, concrete));
+            }};
+        }
+
+        assert_allocation_preserved!(CallableRangeAccrual, CallableRangeAccrual);
+        assert_allocation_preserved!(BondFuture, BondFuture);
+        assert_allocation_preserved!(StructuredCredit, StructuredCredit);
+        assert_allocation_preserved!(AssetBackedFacility, AssetBackedFacility);
+        assert_allocation_preserved!(
+            LeveredRealEstateEquity,
+            crate::instruments::equity::real_estate::LeveredRealEstateEquity
+        );
+        assert_allocation_preserved!(Composite, CompositeInstrument);
     }
 
     #[test]

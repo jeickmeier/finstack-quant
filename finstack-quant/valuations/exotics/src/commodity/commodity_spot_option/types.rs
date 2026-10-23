@@ -78,6 +78,8 @@ pub struct CommoditySpotOptionExercise {
 ///
 /// For American exercise, the model requires a spot price to build the binomial tree.
 /// `spot_id` must identify an observed spot for early exercise and Monte Carlo.
+/// A numeric scalar is in the underlying currency; a Money scalar must carry
+/// that same currency.
 /// The commodity forward is never substituted for the spot underlying.
 /// The convenience yield (cost-of-carry) is implied from the forward/spot ratio:
 /// `q = r - ln(F/S)/T`
@@ -172,6 +174,7 @@ pub struct CommoditySpotOption {
     /// Volatility surface ID for implied vol.
     pub vol_surface_id: CurveId,
     /// Optional spot price ID (for spot-based pricing and American options).
+    /// Numeric prices use the underlying currency; Money prices must match it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spot_id: Option<PriceId>,
     /// Optional quoted forward price (overrides curve lookup).
@@ -435,10 +438,11 @@ impl CommoditySpotOption {
             return Ok(None);
         };
         let scalar = market.get_price(spot_id)?;
-        let spot = match scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-        };
+        let spot =
+            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+                scalar,
+                self.underlying.currency,
+            )?;
         Ok(Some(spot))
     }
 
@@ -468,30 +472,6 @@ impl CommoditySpotOption {
                 .get_price_curve(&self.forward_curve_id)?
                 .price_on_date(self.expiry)?,
         })
-    }
-
-    /// Price commodity option using Monte Carlo with Schwartz-Smith dynamics.
-    ///
-    /// Simulates paths under the Schwartz-Smith two-factor model and
-    /// computes discounted expected payoff.
-    ///
-    /// # Arguments
-    ///
-    /// * `mc_params` - Monte Carlo configuration (model, paths, steps, seed)
-    /// * `market` - Market data context for discount curves and forward prices
-    /// * `as_of` - Valuation date
-    ///
-    /// # Returns
-    ///
-    /// Present value as `Money` in the underlying currency.
-    pub fn npv_mc(
-        &self,
-        mc_params: &CommodityMcParams,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        self.price_mc(mc_params, market, as_of)
-            .map(|(value, _)| value)
     }
 
     pub(crate) fn price_mc(
@@ -715,7 +695,10 @@ impl Instrument for CommoditySpotOption {
                     .model_config
                     .tree_steps
                     .unwrap_or(201);
-                let tree = BinomialTree::leisen_reimer(steps);
+                let tree = BinomialTree::new(
+                    steps,
+                    finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer,
+                );
                 let params = OptionMarketParams {
                     spot: inputs.spot,
                     strike: self.strike,
@@ -739,7 +722,10 @@ impl Instrument for CommoditySpotOption {
                     .model_config
                     .tree_steps
                     .unwrap_or(201);
-                let tree = BinomialTree::leisen_reimer(steps);
+                let tree = BinomialTree::new(
+                    steps,
+                    finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer,
+                );
                 let params = OptionMarketParams {
                     spot: inputs.spot,
                     strike: self.strike,
@@ -1466,5 +1452,100 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("spot_id"));
+    }
+
+    #[test]
+    fn spot_currency_is_checked_at_expiry_and_in_analytic_and_mc_pricing() {
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+        use time::macros::date;
+        let mut option = CommoditySpotOption::example().expect("option");
+        option.spot_id = Some("WTI-SPOT".into());
+        option.quoted_forward = Some(80.0);
+        let as_of = date!(2025 - 01 - 15);
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert_surface(
+                VolSurface::builder("WTI-VOL")
+                    .expiries(&[0.25, 0.5, 1.0])
+                    .strikes(&[60.0, 75.0, 90.0])
+                    .row(&[0.25, 0.25, 0.25])
+                    .row(&[0.25, 0.25, 0.25])
+                    .row(&[0.25, 0.25, 0.25])
+                    .build()
+                    .expect("surface"),
+            );
+        let mc = CommodityMcParams {
+            params: SchwartzSmithParams::new(1.0, 0.1, 0.0, 0.05, 0.2).expect("model"),
+            num_paths: 64,
+            num_steps: 4,
+            seed: Some(71),
+        };
+        let mut american = option.clone();
+        american.exercise_style = ExerciseStyle::American;
+        let numeric = market
+            .clone()
+            .insert_price("WTI-SPOT", MarketScalar::Unitless(80.0));
+        let matching = market.clone().insert_price(
+            "WTI-SPOT",
+            MarketScalar::Price(Money::new(80.0, Currency::USD).expect("USD spot")),
+        );
+        assert_eq!(
+            option
+                .value(&numeric, option.expiry)
+                .expect("numeric expiry"),
+            option.value(&matching, option.expiry).expect("USD expiry")
+        );
+        assert_eq!(
+            american.value(&numeric, as_of).expect("numeric American"),
+            american.value(&matching, as_of).expect("USD American")
+        );
+        assert_eq!(
+            option.price_mc(&mc, &numeric, as_of).expect("numeric MC").0,
+            option.price_mc(&mc, &matching, as_of).expect("USD MC").0
+        );
+        let mismatched = market.insert_price(
+            "WTI-SPOT",
+            MarketScalar::Price(Money::new(80.0, Currency::EUR).expect("EUR spot")),
+        );
+        for error in [
+            option
+                .value(&mismatched, option.expiry)
+                .expect_err("expiry currency"),
+            american
+                .value(&mismatched, as_of)
+                .expect_err("American currency"),
+            option
+                .price_mc(&mc, &mismatched, as_of)
+                .expect_err("MC currency"),
+        ] {
+            assert!(
+                matches!(
+                    error,
+                    finstack_quant_core::Error::CurrencyMismatch {
+                        expected: Currency::USD,
+                        actual: Currency::EUR,
+                    }
+                ),
+                "{error}"
+            );
+        }
+    }
+
+    #[test]
+    fn scalar_spot_still_requires_a_finite_positive_amount() {
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+        let mut option = CommoditySpotOption::example().expect("option");
+        option.spot_id = Some("WTI-SPOT".into());
+        for value in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let market =
+                MarketContext::new().insert_price("WTI-SPOT", MarketScalar::Unitless(value));
+            assert!(option.required_spot(&market).is_err());
+        }
     }
 }

@@ -7,7 +7,7 @@ explicit cross-derivative term.
 
 The module is problem-agnostic — `PdeProblem1D` and `PdeProblem2D` supply raw
 coefficients, boundary conditions, and a terminal payoff — with three ready-made
-Feynman-Kac bridges (`BlackScholesPde`, `LocalVolPde`, `HestonPde`) so pricers do
+Feynman-Kac bridges (`BlackScholesPde`, `HestonPde`) so pricers do
 not implement the traits from scratch.
 
 ## Position in the stack
@@ -25,13 +25,12 @@ Three instrument pricers consume it, all in `crate::instruments`:
 
 Nothing here is bound in Python or WASM; the solvers are reached only through
 those pricers, selected via `ModelKey::PdeCrankNicolson1D` / `ModelKey::PdeAdi2D`
-(see [`../../pricer/README.md`](../../pricer/README.md)).
+(see [`../../../valuations/core/src/pricer/README.md`](../../../valuations/core/src/pricer/README.md)).
 [`models::closed_form`](../closed_form/README.md) is the convergence anchor for
 both dimensions.
 
-The module doc comment in [`mod.rs`](mod.rs) says the module "lives under
-`instruments/common/models/`". That path no longer exists; the module is at
-`models/src/pde/`.
+The reusable solvers live in `finstack-quant/models/src/pde/`; valuation
+pricers supply instrument terms and market data.
 
 ## Layout
 
@@ -46,18 +45,18 @@ The module doc comment in [`mod.rs`](mod.rs) says the module "lives under
 | [`operator.rs`](operator.rs) | `TridiagOperator` assembly, boundary elimination, Thomas solve, `ThomasError` |
 | [`operator2d.rs`](operator2d.rs) | `Operators2D` (per-line directional tridiagonals + cross-derivative coefficients), the monotone upwind switch, `apply_cross_derivative` |
 | [`stepper.rs`](stepper.rs) | `ThetaStepper` (theta scheme with optional Rannacher start-up), the CFL bound, `StepperError` |
-| [`adi.rs`](adi.rs) | `CraigSneydStepper` (Modified Craig-Sneyd), `AdiWorkBuffers`, `fill_boundaries` |
+| [`adi.rs`](adi.rs) | `McsStepper` (Modified Craig-Sneyd), `AdiWorkBuffers`, `fill_boundaries` |
 | [`exercise.rs`](exercise.rs) | `PenaltyExercise`, `ExerciseType::{American, Bermudan}` |
 | [`solver.rs`](solver.rs) | `Solver1D`, `Solver1DBuilder`, `PdeSolution`, `PdeSolverError` |
 | [`solver2d.rs`](solver2d.rs) | `Solver2D`, `PdeSolution2D`, `PdeSolver2DError` |
-| [`bridge.rs`](bridge.rs) | `BlackScholesPde` and the Dupire `LocalVolPde` in log-spot coordinates |
+| [`bridge.rs`](bridge.rs) | `BlackScholesPde` in log-spot coordinates |
 | [`bridge2d.rs`](bridge2d.rs) | `HestonPde` in (log-spot, variance) coordinates; the Fourier convergence anchors |
 
 Pipelines, as in the module doc:
 
 ```text
 PdeProblem1D → TridiagOperator → ThetaStepper → PenaltyExercise → PdeSolution
-PdeProblem2D → Operators2D     → CraigSneydStepper             → PdeSolution2D
+PdeProblem2D → Operators2D     → McsStepper             → PdeSolution2D
 ```
 
 ## Public API vs internal plumbing
@@ -65,7 +64,7 @@ PdeProblem2D → Operators2D     → CraigSneydStepper             → PdeSoluti
 Implementation submodules are private. The supported surface is explicitly
 re-exported at the `pde` root:
 
-`CraigSneydStepper`, `BoundaryCondition`, `BlackScholesPde`, `LocalVolPde`, `HestonPde`,
+`McsStepper`, `BoundaryCondition`, `BlackScholesPde`, `HestonPde`,
 `ExerciseError`, `Grid1D`, `PdeGridError`, `Grid2D`, `PdeProblem1D`,
 `PdeProblem2D`, `PdeSolution`, `PdeSolverError`, `Solver1D`, `Solver1DBuilder`,
 `PdeSolution2D`, `PdeSolver2DError`, `Solver2D`, `StepperError`, and
@@ -293,7 +292,7 @@ configuration (large κ) now solves with locally reduced order near the variance
 floor instead of erroring out, which `bridge2d::tests::heston_pde_high_kappa_solves_via_upwinding`
 pins against the Fourier reference at κ = 10.
 
-`CraigSneydStepper` implements the MCS scheme of In 't Hout & Welfert (2009), in
+`McsStepper` implements the MCS scheme of In 't Hout & Welfert (2009), in
 the form given by In 't Hout & Mishra (2010, eq. 1.4). With
 `F = F₀ + F₁ + F₂` (mixed, x, y):
 
@@ -324,7 +323,7 @@ grid. It uses differences between successive time refinements to cancel spatial
 bias; the absolute Fourier errors of different schemes have no guaranteed
 ordering because spatial and time errors can cancel.
 
-`CraigSneydStepper::with_damping(implicit_start, n_steps)` replaces the first
+`McsStepper::with_damping(implicit_start, n_steps)` replaces the first
 `implicit_start` intervals with pairs of factorized implicit-Euler halfsteps.
 Each halfstep solves the x and y directional operators implicitly and keeps
 the mixed derivative explicit. This first-order directional split damps stiff
@@ -343,7 +342,7 @@ use current y-edge values. It runs after each MCS step — the mixed corrector n
 boundary-inclusive `Y₂` for its four-point stencil — and again at `t = 0`.
 
 **`Solver2D` has no early exercise.** `Solver2D::new` takes only a grid and a
-`CraigSneydStepper` (plain or `with_damping`), and the `Solver2D` struct has
+`McsStepper` (plain or `with_damping`), and the `Solver2D` struct has
 no exercise field. `PdeSolution2D` likewise exposes only `interpolate`,
 `delta_x`, and `gamma_x` — there is no variance-direction sensitivity.
 
@@ -363,16 +362,6 @@ with `Dirichlet(0)` on the deep-OTM edge and `LinearInExp` on the deep-ITM edge,
 reports `is_time_homogeneous() == true`. `bridge::tests` grades it against
 `finstack_quant_core::math::special_functions::norm_cdf`-based Black-Scholes at 301 sinh points and
 300 CN steps: relative error below 1e-3 for both a call and a put.
-
-`LocalVolPde` solves the same equation with `σ` replaced by the Dupire local
-volatility `σ_loc(t, eˣ)` of a `volatility::local_vol::LocalVolSurface`, read at
-the calendar time of each time level, and reports `is_time_homogeneous() == false`.
-`bridge::tests` checks that a flat surface reproduces `BlackScholesPde` (relative
-difference below 1e-10) and that the local volatility extracted from an
-arbitrage-free SSVI surface reprices that surface: 801 sinh points, 400 Rannacher
-steps per year, implied-volatility error below 5 basis points at fifteen
-strike/expiry points (measured worst 4.2), within 2 basis points of the Monte
-Carlo `LocalVolProcess`.
 
 `HestonPde` solves, in `x = ln S` and `y = v`,
 
@@ -468,7 +457,7 @@ unmeasured. See [`../../../benches/README.md`](../../../benches/README.md).
    any conditionally stable scheme on `cfl_max_dt` rather than letting it produce
    `NaN`. Propagate `ThomasError` with `?` — `StepperError` has the `#[from]`.
 4. **A new 2D time scheme** needs more than a trait impl: `Solver2D` holds
-   `CraigSneydStepper` concretely, so a second scheme means introducing a 2D
+   `McsStepper` concretely, so a second scheme means introducing a 2D
    stepper trait first.
 5. Declare the file in [`mod.rs`](mod.rs) and add the root re-export.
 6. Anchor it. Every scheme here is graded against an independent closed form —
@@ -526,5 +515,5 @@ Full bibliography with stable anchors:
 - [`../closed_form/README.md`](../closed_form/README.md) — the analytic reference the PDE engines are graded against
 - [`../trees/README.md`](../trees/README.md) — the lattice alternative for early exercise
 - [`../credit/README.md`](../credit/README.md), [`../volatility/README.md`](../volatility/README.md) — sibling model families
-- [`../../pricer/README.md`](../../pricer/README.md) — `ModelKey::PdeCrankNicolson1D` / `PdeAdi2D` dispatch
+- [`../../../valuations/core/src/pricer/README.md`](../../../valuations/core/src/pricer/README.md) — `ModelKey::PdeCrankNicolson1D` / `PdeAdi2D` dispatch
 - [`../../instruments/README.md`](../../instruments/README.md) — the pricers that call in here

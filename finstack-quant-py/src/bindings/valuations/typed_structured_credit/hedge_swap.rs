@@ -9,21 +9,9 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     HedgeSwap, SwapNotional, SwapPriority,
 };
 
-use super::super::instruments::enum_from_str;
+use super::super::convert::enum_from_str;
 
-/// An interest-rate swap settled through the deal waterfall: net receipts
-/// join interest collections (and the IC test), net payments rank as a
-/// senior or junior fee.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import HedgeSwap, InterestRateSwap
-/// >>> swap = InterestRateSwap.example()
-/// >>> hedge = HedgeSwap(swap, notional="pool_par", priority="senior_fee")
-/// >>> hedge.priority, hedge.notional
-/// ('senior_fee', 'pool_par')
-/// >>> HedgeSwap(swap, notional={"tranche_par": "A"}).notional
-/// {'tranche_par': 'A'}
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "HedgeSwap",
@@ -36,30 +24,17 @@ pub struct PyHedgeSwap {
     pub(crate) inner: HedgeSwap,
 }
 
-crate::bindings::macros::wire_methods!(PyHedgeSwap, HedgeSwap, "HedgeSwap", to_dict);
+crate::bindings::macros::wire_methods!(
+    PyHedgeSwap,
+    HedgeSwap,
+    "HedgeSwap",
+    module = "finstack_quant.valuations.instruments",
+    to_dict
+);
 
 #[pymethods]
 impl PyHedgeSwap {
-    /// Construct a hedge from a typed swap.
-    ///
-    /// Parameters
-    /// ----------
-    /// swap : InterestRateSwap
-    ///     The swap; its side, legs and market dependencies drive the
-    ///     projected net settlements.
-    /// notional : str | dict, optional
-    ///     ``SwapNotional`` serde value: ``"contractual"`` (the swap's own
-    ///     notional, the default), ``"pool_par"`` (balance-tracking on the
-    ///     pool) or ``{"tranche_par": "<tranche id>"}`` (balance-tracking on
-    ///     one class).
-    /// priority : str, optional
-    ///     ``"senior_fee"`` (default: net payments rank with the senior fees)
-    ///     or ``"junior_fee"`` (after every note coupon).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``notional`` or ``priority`` is not a recognized value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap.__init__")]
     #[new]
     #[pyo3(signature = (swap, notional=None, priority=None))]
     #[pyo3(text_signature = "(swap, notional=None, priority=None)")]
@@ -86,8 +61,7 @@ impl PyHedgeSwap {
         })
     }
 
-    /// ``SwapNotional`` serde value (``"contractual"``, ``"pool_par"`` or
-    /// ``{"tranche_par": id}``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap.notional")]
     #[getter]
     fn notional<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.notional)
@@ -105,9 +79,9 @@ impl PyHedgeSwap {
 }
 
 crate::bindings::macros::py_getters!(PyHedgeSwap |s| {
-    /// The hedged swap as a typed ``InterestRateSwap``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap.swap")]
     swap -> PyInterestRateSwap = PyInterestRateSwap { inner: s.inner.swap.clone() };
 
-    /// ``"senior_fee"`` or ``"junior_fee"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap.priority")]
     priority -> PyResult<String> = enum_to_py_string(&s.inner.priority);
 });

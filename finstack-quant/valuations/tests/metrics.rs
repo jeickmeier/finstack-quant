@@ -20,7 +20,7 @@
 
 /// Equity-option builders (market builders live in `finstack_quant_valuations_test_support`).
 #[path = "common/mod.rs"]
-mod common;
+pub(crate) mod common;
 
 // `instruments::test_support` already loads these files. A second `mod` in this
 // crate is `clippy::duplicate_mod`.

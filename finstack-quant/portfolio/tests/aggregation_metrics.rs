@@ -252,7 +252,7 @@ fn degraded_positions_are_reported_on_portfolio_metrics() {
 fn additive_currency_metrics_aggregate_and_omissions_are_reported() {
     let as_of = base_date();
     let mut measures = IndexMap::new();
-    measures.insert(MetricId::FxDelta, 500.0);
+    measures.insert(MetricId::Fx01, 500.0);
     measures.insert(MetricId::custom("exotic_widget_score"), 7.0);
 
     let position = Position::new(
@@ -288,7 +288,7 @@ fn additive_currency_metrics_aggregate_and_omissions_are_reported() {
     let metrics =
         finstack_quant_portfolio::metrics::aggregate_metrics(&valuation, &market).unwrap();
 
-    assert_eq!(metrics.get_total("fx_delta"), Some(500.0));
+    assert_eq!(metrics.get_total("fx01"), Some(500.0));
     assert!(metrics.get_total("exotic_widget_score").is_none());
     assert_eq!(
         metrics.unaggregated_metrics,

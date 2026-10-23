@@ -1,6 +1,7 @@
 //! Pricers for snowball and inverse-floater structured notes.
 
 use crate::exotics::hw1f_note::{exact_estimate, zero_estimate, Hw1fNote, Hw1fNotePricer};
+use crate::exotics::snowball::types::SnowballCouponSpec;
 use crate::exotics::snowball::{Snowball, SnowballVariant};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -46,16 +47,6 @@ struct SnowballPayoff {
     last_bank: f64,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct SnowballCouponSpec {
-    variant: SnowballVariant,
-    initial_coupon: f64,
-    fixed_rate: f64,
-    gearing: f64,
-    coupon_floor: f64,
-    coupon_cap: Option<f64>,
-}
-
 impl SnowballPayoff {
     fn new(
         spec: SnowballCouponSpec,
@@ -75,21 +66,6 @@ impl SnowballPayoff {
             last_bank: 1.0,
         }
     }
-
-    fn compute_coupon(&self, floating_rate: f64) -> f64 {
-        self.spec.compute_coupon(floating_rate, self.prev_coupon)
-    }
-}
-
-impl SnowballCouponSpec {
-    fn compute_coupon(&self, floating_rate: f64, prev_coupon: f64) -> f64 {
-        let raw = match self.variant {
-            SnowballVariant::Snowball => prev_coupon + self.fixed_rate - floating_rate,
-            SnowballVariant::InverseFloater => self.fixed_rate - self.gearing * floating_rate,
-        };
-        let floored = raw.max(self.coupon_floor);
-        self.coupon_cap.map_or(floored, |cap| floored.min(cap))
-    }
 }
 
 impl SnowballPayoff {
@@ -104,7 +80,7 @@ impl SnowballPayoff {
         // short rate via the HW1F affine bond formula, instead of using the
         // instantaneous short rate r(t) directly as a term index rate.
         let floating_rate = event.forward_coeffs.simple_forward(short_rate);
-        let coupon_rate = self.compute_coupon(floating_rate);
+        let coupon_rate = self.spec.compute_coupon(floating_rate, self.prev_coupon);
         let coupon_amount = coupon_rate * event.accrual_fraction * self.notional;
         if self.pathwise {
             // Fixed now, paid at the period end — discounted when the
@@ -244,8 +220,9 @@ impl SnowballDiscountingPricer {
             inst.id.as_str(),
         )?;
 
+        let spec = SnowballCouponSpec::from_instrument(inst);
         let mut pv = 0.0;
-        let mut prev_coupon = inst.initial_coupon;
+        let mut prev_coupon = spec.initial_coupon;
         for period in inst.period_boundaries().windows(2) {
             let start = period[0];
             let end = period[1];
@@ -260,7 +237,7 @@ impl SnowballDiscountingPricer {
                 forward_curve.as_ref(),
                 projection_start,
             )?;
-            let coupon_rate = inst.compute_coupon(floating_rate, prev_coupon);
+            let coupon_rate = spec.compute_coupon(floating_rate, prev_coupon);
             pv += coupon_rate * accrual_fraction * inst.notional.amount() * discount_factor;
             prev_coupon = coupon_rate;
         }
@@ -397,14 +374,7 @@ impl Hw1fNote for Snowball {
             return Ok(zero_estimate(inst.notional.currency()));
         }
 
-        let spec = SnowballCouponSpec {
-            variant: inst.variant,
-            initial_coupon: inst.initial_coupon,
-            fixed_rate: inst.fixed_rate.as_f64(),
-            gearing: inst.gearing,
-            coupon_floor: inst.coupon_floor,
-            coupon_cap: inst.coupon_cap,
-        };
+        let spec = SnowballCouponSpec::from_instrument(inst);
         let config = pricer.effective_config(inst);
 
         let event_times = event_times(inst, as_of)?;
@@ -501,8 +471,8 @@ fn coupon_events(
             // index tenor, not the coupon accrual period.
             let fixing_time = model_time(as_of, start);
             let tenor = inst.index_tenor.to_years();
-            let coeffs = term_forward.period_coeffs(fixing_time, tenor);
-            let discount_forward = term_forward.curve_forward(fixing_time, tenor);
+            let coeffs = term_forward.period_coeffs(fixing_time, tenor)?;
+            let discount_forward = term_forward.curve_forward(fixing_time, tenor)?;
             let basis = finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_on_date(
                 forward_curve.as_ref(),
                 start,

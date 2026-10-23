@@ -13,6 +13,7 @@ by a per-binding table, and at least one of those tables disagreed with Rust.
 
 from __future__ import annotations
 
+from datetime import date
 import json
 
 import pytest
@@ -151,3 +152,13 @@ class TestCoreAndAnalytics:
 
     def test_a_calendar_union_resolves(self) -> None:
         assert _performance().cagr("bus_252", "nyse+gblo")["A"] > 0.0
+
+    def test_an_unknown_benchmark_ticker_is_not_found(self) -> None:
+        dates = [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)]
+        returns = [[0.01, 0.02, 0.0], [0.0, 0.01, 0.02]]
+        with pytest.raises(KeyError, match="NOPE"):
+            analytics.Performance.from_returns_arrays(dates, returns, ["A", "B"], "NOPE")
+        perf = analytics.Performance.from_returns_arrays(dates, returns, ["A", "B"])
+        with pytest.raises(KeyError, match="NOPE"):
+            perf.reset_bench_ticker("NOPE")
+        assert perf.get_benchmark_idx() == 0

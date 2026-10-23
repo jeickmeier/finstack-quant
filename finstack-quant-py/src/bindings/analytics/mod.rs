@@ -1,11 +1,12 @@
 //! Python bindings for the `finstack-quant-analytics` crate.
 //!
-//! The primary Python-callable entry point is [`Performance`]. All analytics —
-//! return transforms, return/risk metrics, periodic returns, benchmark
-//! comparisons, and basic factor models — are exposed as methods on a
-//! `Performance` instance built from a price or return panel. Four scalar
-//! free functions (`sharpe`, `sortino`, `volatility`, `max_drawdown`) cover
-//! the single-series case without a panel.
+//! The primary Python-callable entry point is [`Performance`]: return
+//! transforms, return/risk metrics, periodic returns, benchmark comparisons,
+//! and basic factor models are methods on an instance built from a price or
+//! return panel. Four scalar free functions (`sharpe`, `sortino`,
+//! `volatility`, `max_drawdown`) cover the single-series case without a
+//! panel, and `constrained_least_squares` is the standalone factor-return
+//! solver for factor-Brinson attribution.
 
 mod performance;
 mod regression;

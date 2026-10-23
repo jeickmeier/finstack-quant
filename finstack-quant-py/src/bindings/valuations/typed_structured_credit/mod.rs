@@ -33,7 +33,9 @@ mod hedge_swap;
 mod pool_asset;
 mod pool_stats;
 mod rep_line;
+mod simulation_run;
 mod specs;
+mod standard_deal_params;
 mod stochastic_result;
 mod structured_credit;
 mod tranche;
@@ -53,9 +55,11 @@ pub(crate) use equity_metrics::PyEquityMetrics;
 pub(crate) use hedge_swap::PyHedgeSwap;
 pub(crate) use pool_asset::PyPoolAsset;
 pub(crate) use rep_line::PyRepLine;
+pub(crate) use simulation_run::PySimulationRun;
 pub(crate) use specs::{
     PyBalloonSpec, PyLiquidationSpec, PyPrepaymentPenalty, PySpecialServicingSpec,
 };
+pub(crate) use standard_deal_params::PyStandardDealParams;
 pub(crate) use stochastic_result::PyStochasticPricingResult;
 pub(crate) use structured_credit::{PyStructuredCredit, PyStructuredCreditBuilder};
 pub(crate) use tranche::{PyTranche, PyTrancheBuilder};
@@ -76,10 +80,12 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCoverageRules>()?;
     m.add_class::<PyHedgeSwap>()?;
     m.add_class::<PyWaterfall>()?;
+    m.add_class::<PyStandardDealParams>()?;
     m.add_class::<PyStructuredCredit>()?;
     m.add_class::<PyStructuredCreditBuilder>()?;
     m.add_class::<PyStochasticPricingResult>()?;
     m.add_class::<PySimulationDiagnostics>()?;
+    m.add_class::<PySimulationRun>()?;
     m.add_class::<PyTrancheCashflows>()?;
     m.add_class::<PyEquityMetrics>()?;
     m.add_class::<pool_stats::PyPoolStats>()?;
@@ -116,7 +122,9 @@ pub(crate) const EXPORTS: &[&str] = &[
     "PrepaymentPenalty",
     "RepLine",
     "SimulationDiagnostics",
+    "SimulationRun",
     "SpecialServicingSpec",
+    "StandardDealParams",
     "StochasticPricingResult",
     "StructuredCredit",
     "StructuredCreditBuilder",

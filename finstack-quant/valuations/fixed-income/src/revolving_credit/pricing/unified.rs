@@ -20,8 +20,6 @@ use finstack_quant_valuations_core::pricer::{
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
-pub use super::results::{EnhancedMonteCarloResult, PathResult};
-
 /// Default utilization–credit correlation for the auto-synthesized `McConfig`.
 ///
 /// When a stochastic facility carries a hazard curve but no explicit
@@ -48,7 +46,6 @@ pub use super::results::{EnhancedMonteCarloResult, PathResult};
 /// Override by supplying an explicit `McConfig` (any `util_credit_corr` or a
 /// full `correlation_matrix`); pass `util_credit_corr: Some(0.0)` to disable
 /// adverse selection entirely.
-#[doc(hidden)]
 pub const DEFAULT_UTIL_CREDIT_CORR: f64 = 0.3;
 
 /// Default fractional implied volatility for the auto-synthesized
@@ -66,7 +63,6 @@ pub const DEFAULT_UTIL_CREDIT_CORR: f64 = 0.3;
 /// Override by supplying an explicit `McConfig` with a custom
 /// `credit_spread_process` (e.g. `implied_vol` near zero for deterministic
 /// credit).
-#[doc(hidden)]
 pub const DEFAULT_CREDIT_SPREAD_IMPLIED_VOL: f64 = 0.3;
 /// Unified pricer for revolving credit facilities.
 ///

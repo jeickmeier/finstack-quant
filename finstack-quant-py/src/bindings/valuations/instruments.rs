@@ -17,261 +17,22 @@ use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::{extract_basis_points, extract_market, extract_rate_decimal};
 use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::merton_mc::{PyMertonMcConfig, PyMertonMcResult};
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use finstack_quant_valuations::instruments::Instrument;
 
-use super::convert::{attributes_from_py, enum_to_py_string, money_from_py, money_to_py, opt_repr};
-use super::pricing::{market_history_json, metric_pricing_overrides_json};
+use super::convert::{
+    attributes_from_py, bps_value_from_py, enum_from_str, enum_to_py_string, instrument_expiry,
+    money_from_py, money_to_py, opt_repr, opt_serde_to_py, rate_from_py, stub_kind_from_py,
+};
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
-use super::PyValuationResult;
 
-/// Parse a canonical typed-instrument envelope through the shared Rust path.
-pub(crate) fn parse_typed_instrument_json<T>(json: &str) -> PyResult<T>
-where
-    T: TryFrom<InstrumentJson, Error = finstack_quant_core::Error>,
-{
-    finstack_quant_valuations::pricer::parse_typed_instrument_json(json).map_err(core_to_py)
-}
+use finstack_quant_valuations::instruments::fixed_income::bond::BondBuilder;
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanBuilder;
 
-/// Serialize a typed instrument as the canonical v1 persistence envelope.
-pub(crate) fn serialize_typed_instrument_json(
-    instrument: InstrumentJson,
-    what: &str,
-) -> PyResult<String> {
-    serde_json::to_string(&InstrumentEnvelope::new(instrument)).map_err(|err| {
-        serde_json_to_py(
-            err,
-            &format!("failed to serialize {what} instrument envelope"),
-        )
-    })
-}
-
-// Shared helpers for typed instrument builders (bond/term_loan today; every
-// later typed-instrument task reuses these).
-
-/// Parse a serde-tagged unit-enum value from its snake_case string form.
-///
-/// Used by typed builders so Python passes plain strings (typed as
-/// ``Literal[...]`` in the stubs) for Rust enums like ``PayReceive``.
-pub(crate) fn enum_from_str<T: serde::de::DeserializeOwned>(
-    value: &str,
-    what: &str,
-) -> PyResult<T> {
-    serde_json::from_value(serde_json::Value::String(value.to_string()))
-        .map_err(|err| value_error(format!("invalid {what}: {err}")))
-}
-
-/// Convert a Python float to `Decimal`, rejecting non-finite values.
-pub(crate) fn decimal_from_f64(value: f64, what: &str) -> PyResult<rust_decimal::Decimal> {
-    finstack_quant_core::decimal::f64_to_decimal(value)
-        .map_err(|err| value_error(format!("invalid {what}: {err}")))
-}
-
-/// Coerce `StubKind | str | None` to a Rust stub rule (`None` → short front).
-pub(crate) fn stub_kind_from_py(
-    obj: Option<&Bound<'_, PyAny>>,
-    what: &str,
-) -> PyResult<finstack_quant_core::dates::StubKind> {
-    let Some(obj) = obj else {
-        return Ok(finstack_quant_core::dates::StubKind::ShortFront);
-    };
-    if obj.is_none() {
-        return Ok(finstack_quant_core::dates::StubKind::ShortFront);
-    }
-    if let Ok(stub) = obj.cast::<PyStubKind>() {
-        return Ok(stub.borrow().inner);
-    }
-    if let Ok(name) = obj.extract::<&str>() {
-        return enum_from_str(name, what);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(format!(
-        "{what}: expected finstack_quant.core.dates.StubKind or a stub name such as \"none\" or \"short_front\", got {}",
-        obj.get_type().name()?
-    )))
-}
-
-/// Coerce `float | int | Rate | Bps` to a core `Rate` (decimal units).
-pub(crate) fn rate_from_py(
-    obj: &Bound<'_, PyAny>,
-    what: &str,
-) -> PyResult<finstack_quant_core::types::Rate> {
-    extract_rate_decimal(obj, what).and_then(|value| {
-        finstack_quant_core::types::Rate::from_decimal(value).map_err(crate::errors::core_to_py)
-    })
-}
-
-/// Coerce `float | int | Bps | Rate` to a core `Bps`.
-///
-/// The basis points go through the Rust `Bps::try_new`, which rejects
-/// non-finite, fractional and out-of-range basis points (`ValueError`),
-/// exactly as WASM `Bps` does; a `Bps` object round-trips unchanged.
-pub(crate) fn bps_value_from_py(
-    obj: &Bound<'_, PyAny>,
-    what: &str,
-) -> PyResult<finstack_quant_core::types::Bps> {
-    extract_basis_points(obj, what)
-        .and_then(|bp| finstack_quant_core::types::Bps::try_new(bp).map_err(core_to_py))
-}
-
-/// Price an instrument envelope through the canonical Rust pricer.
-///
-/// Shared by `price_instrument` and every typed wrapper's `.price()`, so all
-/// Python pricing entry points coerce their options identically.
-///
-/// # Arguments
-///
-/// * `py` - GIL token; parsing and pricing run with the GIL released.
-/// * `instrument` - Owned native Rust instrument, validated before pricing.
-/// * `market` - `MarketContext` object or market-context JSON string.
-/// * `as_of` - Valuation date (date-like or ISO 8601 string).
-/// * `model` - Model key (`"default"` selects the instrument-native model).
-/// * `metrics` - Metric identifiers to compute; `None` means valuation only.
-/// * `metric_pricing_overrides` - Optional `MetricPricingOverrides | dict |
-///   str` merged into `instrument.spec.metric_pricing_overrides` before
-///   validation; `None` keeps the instrument's own overrides.
-/// * `market_history` - Optional `MarketHistory | dict | str` scenarios for
-///   the historical risk metrics (`hvar`, `expected_shortfall`).
-// PyO3 binding helper: mirrors the keyword surface of `price_instrument`.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn price_typed(
-    py: Python<'_>,
-    instrument: Box<dyn Instrument>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    model: &str,
-    metrics: Option<Vec<String>>,
-    metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
-    market_history: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyValuationResult> {
-    let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
-    let instrument = py.detach(move || {
-        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-            instrument,
-            overrides.as_deref(),
-        )
-        .map_err(core_to_py)
-    })?;
-    price_prepared(
-        py,
-        instrument,
-        market,
-        as_of,
-        model,
-        metrics,
-        market_history,
-        false,
-    )
-}
-/// Pricing options shared by the host entry points: the recalibration
-/// provider, plus a step trace on the result when `explain` is set.
-fn pricing_options(explain: bool) -> finstack_quant_valuations::instruments::PricingOptions {
-    let options = finstack_quant_calibration::recalibration::pricing_options();
-    if explain {
-        options.with_explain(finstack_quant_core::explain::ExplainOpts::enabled())
-    } else {
-        options
-    }
-}
-
-/// Price a prepared instrument after host market/date conversion.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn price_prepared(
-    py: Python<'_>,
-    instrument: finstack_quant_valuations::pricer::ParsedInstrument,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    model: &str,
-    metrics: Option<Vec<String>>,
-    market_history: Option<&Bound<'_, PyAny>>,
-    explain: bool,
-) -> PyResult<PyValuationResult> {
-    let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let model = model.to_owned();
-    let metrics = metrics.unwrap_or_default();
-    let market_history = market_history_json(py, market_history)?;
-    let inner = py
-        .detach(move || {
-            finstack_quant_valuations::pricer::price_instrument(
-                &instrument,
-                &market,
-                &as_of,
-                &model,
-                &metrics,
-                market_history.as_deref(),
-                pricing_options(explain),
-            )
-        })
-        .map_err(core_to_py)?;
-    Ok(PyValuationResult { inner })
-}
-
-/// Compute one scalar metric for a native Rust instrument.
-pub(crate) fn metric_typed(
-    py: Python<'_>,
-    instrument: Box<dyn Instrument>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    metric_id: &str,
-    model: &str,
-) -> PyResult<f64> {
-    let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let model = model.to_owned();
-    let metric_id = metric_id.to_owned();
-    py.detach(move || {
-        let instrument =
-            finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)?;
-        finstack_quant_valuations::pricer::metric_value(
-            &instrument,
-            &market,
-            &as_of,
-            &model,
-            &metric_id,
-            finstack_quant_calibration::recalibration::pricing_options(),
-        )
-    })
-    .map_err(core_to_py)
-}
-
-/// `Instrument::expiry` as `datetime.date | None`.
-pub(crate) fn instrument_expiry<'py>(
-    py: Python<'py>,
-    instrument: &dyn Instrument,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    instrument
-        .expiry()
-        .map(|date| date_to_py(py, date))
-        .transpose()
-}
-
-/// Serialize an optional serde value as `dict | None`.
-pub(crate) fn opt_serde_to_py<'py, T: serde::Serialize>(
-    py: Python<'py>,
-    value: Option<&T>,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    value.map(|v| serde_to_py(py, v)).transpose()
-}
-
-type BondBuilderInner = finstack_quant_valuations::instruments::fixed_income::bond::BondBuilder;
-type TermLoanBuilderInner =
-    finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanBuilder;
-
-/// Typed wrapper for the Rust `Bond` instrument.
-///
-/// Construct via ``Bond.fixed`` (US corporate), ``Bond.with_convention`` (a
-/// named preset; override its stub with ``.with_stub``), ``Bond.floating`` /
-/// ``Bond.floating_with_convention``, ``Bond.zero_coupon``, the
-/// ``Bond.builder()`` fluent builder (callable, credit-curve, custom
-/// day-count / frequency / settlement), the ``Bond.example*`` presets, or
-/// ``Bond.from_json``. Every public Rust field is readable as a property;
-/// ``price`` / ``metric`` run the same pricer as ``price_instrument``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "Bond",
@@ -294,57 +55,7 @@ instrument_pricing_methods!(PyBond, "Bond");
 
 #[pymethods]
 impl PyBond {
-    /// Create a US corporate fixed-rate bond (semi-annual, 30/360, T+1).
-    ///
-    /// Mirrors Rust ``Bond::fixed``. For another market's conventions use
-    /// ``Bond.with_convention`` and, to override the preset's stub rule,
-    /// chain ``.with_stub(...)``.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money | float
-    ///     Principal amount; a bare number needs ``currency``.
-    /// coupon_rate : float | Rate
-    ///     Annual coupon rate as a decimal (``0.05`` = 5%) or a ``Rate``.
-    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Issue date (ISO 8601 strings accepted).
-    /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Maturity date.
-    /// stub : StubKind | str
-    ///     Placement and length policy for an irregular coupon period
-    ///     (``"none"``, ``"short_front"``, ``"long_front"``, ``"short_back"``,
-    ///     ``"long_back"`` or a ``StubKind``).
-    /// discount_curve_id : str
-    ///     Discount curve identifier used for pricing.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``notional`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A validated fixed-rate bond.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``stub`` is not a recognized name, a bare ``notional`` has no
-    ///     ``currency``, or validation fails (e.g. maturity not after
-    ///     issue_date).
-    /// TypeError
-    ///     If ``coupon_rate`` or ``notional`` has an unsupported type, or a
-    ///     date cannot be interpreted.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> bond = Bond.fixed(
-    /// ...     "BOND-1", 1_000_000.0, 0.05, "2024-01-01", "2034-01-01", "none", "USD-OIS",
-    /// ...     currency="USD",
-    /// ... )
-    /// >>> bond.id
-    /// 'BOND-1'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.fixed")]
     #[staticmethod]
     #[pyo3(signature = (id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, currency = None))]
     #[pyo3(
@@ -375,36 +86,7 @@ impl PyBond {
         Ok(Self { inner })
     }
 
-    /// Return a copy of this bond with a different coupon-schedule stub rule.
-    ///
-    /// Mirrors Rust ``Bond::with_stub``; the receiver is not modified.
-    ///
-    /// Parameters
-    /// ----------
-    /// stub : StubKind | str
-    ///     Placement and length policy for an irregular coupon period
-    ///     (``"none"``, ``"short_front"``, ``"long_front"``, ``"short_back"``,
-    ///     ``"long_back"`` or a ``StubKind``).
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A new bond whose coupon schedule uses ``stub``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``stub`` is not a recognized stub name.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> gilt = Bond.with_convention(
-    /// ...     "GILT", 1_000_000.0, 0.04, "2024-01-15", "2034-03-07", "uk_gilt", "GBP-SONIA",
-    /// ...     currency="GBP",
-    /// ... ).with_stub("long_back")
-    /// >>> gilt.to_dict()["cashflow_spec"]["fixed"]["stub"]
-    /// 'long_back'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.with_stub")]
     #[pyo3(text_signature = "($self, stub)")]
     fn with_stub(&self, stub: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
@@ -415,55 +97,7 @@ impl PyBond {
         })
     }
 
-    /// Create a fixed-rate bond from a named market convention.
-    ///
-    /// Mirrors Rust ``Bond::with_convention``; the stub rule is the preset's
-    /// own (chain ``.with_stub(...)`` to override it).
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money | float
-    ///     Principal amount; a bare number needs ``currency``.
-    /// coupon_rate : float | Rate
-    ///     Annual coupon rate as a decimal (``0.05`` = 5%) or a ``Rate``.
-    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Issue date.
-    /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Maturity date.
-    /// convention : str
-    ///     Bond convention preset (``"us_treasury"``, ``"us_agency"``,
-    ///     ``"german_bund"``, ``"uk_gilt"``, ``"french_oat"``, ``"jgb"``,
-    ///     ``"us_corporate"``, ``"eur_corporate"``).
-    /// discount_curve_id : str
-    ///     Discount curve identifier used for pricing.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``notional`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A validated fixed-rate bond.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``convention`` is unknown, a bare ``notional`` has no
-    ///     ``currency``, or validation fails.
-    /// TypeError
-    ///     If ``coupon_rate``/``notional`` has an unsupported type or a date
-    ///     cannot be interpreted.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> gilt = Bond.with_convention(
-    /// ...     "GILT", 1_000_000.0, 0.04, "2024-01-01", "2034-01-01", "uk_gilt", "GBP-OIS",
-    /// ...     currency="GBP",
-    /// ... )
-    /// >>> gilt.settlement_days
-    /// 1
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.with_convention")]
     #[staticmethod]
     #[pyo3(signature = (id, notional, coupon_rate, issue_date, maturity, convention, discount_curve_id, *, currency = None))]
     #[pyo3(
@@ -498,65 +132,7 @@ impl PyBond {
         Ok(Self { inner })
     }
 
-    /// Create a floating-rate bond (FRN) linked to a forward index.
-    ///
-    /// Mirrors Rust ``Bond::floating``. Settlement, calendar, and
-    /// business-day convention come from the notional currency:
-    /// USD ``us_corporate`` (T+1, ``usny``), EUR ``eur_corporate`` (T+2,
-    /// ``target2``), GBP ``uk_gilt`` (T+1), JPY ``jgb`` (T+2). Other
-    /// currencies raise ``ValueError``; use ``Bond.floating_with_convention``
-    /// to name the preset explicitly, or the builder.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money | float
-    ///     Principal amount; a bare number needs ``currency``.
-    /// forward_curve_id : str
-    ///     Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
-    /// spread_bp : float | Bps
-    ///     Spread over the index in whole basis points; fractional values
-    ///     raise ``ValueError`` (use ``Bond.from_json`` for sub-bp margins).
-    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Issue date.
-    /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Maturity date.
-    /// frequency : Tenor
-    ///     Payment frequency (e.g. ``Tenor.quarterly()``).
-    /// day_count : DayCount
-    ///     Day count convention (e.g. ``DayCount.ACT_360``).
-    /// discount_curve_id : str
-    ///     Discount curve identifier used for pricing.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``notional`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A validated floating-rate note.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the notional currency has no mapped settlement convention,
-    ///     ``notional`` is not finite and positive, ``spread_bp`` is not a
-    ///     finite whole number of basis points, or ``issue_date`` is not
-    ///     strictly before ``maturity``.
-    /// TypeError
-    ///     If ``spread_bp``/``notional`` has an unsupported type or a date
-    ///     cannot be interpreted.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.dates import DayCount, Tenor
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> frn = Bond.floating(
-    /// ...     "FRN", 1000.0, "USD-SOFR-3M", 125.0, "2024-01-01", "2029-01-01",
-    /// ...     Tenor.quarterly(), DayCount.ACT_360, "USD-OIS", currency="USD",
-    /// ... )
-    /// >>> frn.has_floating_coupons
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.floating")]
     #[staticmethod]
     #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, discount_curve_id, *, currency = None))]
     #[pyo3(
@@ -591,61 +167,7 @@ impl PyBond {
         Ok(Self { inner })
     }
 
-    /// Create a floating-rate bond with an explicit convention preset.
-    ///
-    /// Mirrors Rust ``Bond::floating_with_convention``.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money | float
-    ///     Principal amount; a bare number needs ``currency``.
-    /// forward_curve_id : str
-    ///     Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
-    /// spread_bp : float | Bps
-    ///     Spread over the index in whole basis points; fractional values
-    ///     raise ``ValueError`` (use ``Bond.from_json`` for sub-bp margins).
-    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Issue date.
-    /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Maturity date.
-    /// frequency : Tenor
-    ///     Payment frequency.
-    /// day_count : DayCount
-    ///     Day count convention.
-    /// convention : str
-    ///     Bond convention preset (see ``Bond.with_convention``).
-    /// discount_curve_id : str
-    ///     Discount curve identifier used for pricing.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``notional`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A validated floating-rate note.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``convention`` is unknown, a bare ``notional`` has no
-    ///     ``currency``, ``spread_bp`` is not a finite whole number of basis
-    ///     points, or validation fails.
-    /// TypeError
-    ///     If ``spread_bp``/``notional`` has an unsupported type or a date
-    ///     cannot be interpreted.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.dates import DayCount, Tenor
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> frn = Bond.floating_with_convention(
-    /// ...     "FRN-EUR", 1000.0, "EUR-EURIBOR-3M", 80.0, "2024-01-01", "2029-01-01",
-    /// ...     Tenor.quarterly(), DayCount.ACT_360, "eur_corporate", "EUR-OIS", currency="EUR",
-    /// ... )
-    /// >>> frn.settlement_days
-    /// 2
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.floating_with_convention")]
     #[staticmethod]
     #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, convention, discount_curve_id, *, currency = None))]
     #[pyo3(
@@ -685,45 +207,7 @@ impl PyBond {
         Ok(Self { inner })
     }
 
-    /// Create a zero-coupon bond (single principal redemption at maturity).
-    ///
-    /// Mirrors Rust ``Bond::zero_coupon``.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money | float
-    ///     Redemption amount; a bare number needs ``currency``.
-    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Issue date.
-    /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Maturity (redemption) date.
-    /// discount_curve_id : str
-    ///     Discount curve identifier used for pricing.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``notional`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A validated zero-coupon bond.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a bare ``notional`` has no ``currency`` or ``maturity`` is not
-    ///     after ``issue_date``.
-    /// TypeError
-    ///     If ``notional`` has an unsupported type or a date cannot be
-    ///     interpreted.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> zc = Bond.zero_coupon("ZC", 1_000_000.0, "2024-01-01", "2029-01-01", "USD-OIS", currency="USD")
-    /// >>> zc.has_floating_coupons
-    /// False
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.zero_coupon")]
     #[staticmethod]
     #[pyo3(signature = (id, notional, issue_date, maturity, discount_curve_id, *, currency = None))]
     #[pyo3(
@@ -748,23 +232,7 @@ impl PyBond {
         Ok(Self { inner })
     }
 
-    /// Canonical example fixed-rate bond (mirrors Rust ``Bond::example``).
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A 5-year USD 5% semi-annual bond discounted on ``USD-OIS``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> Bond.example().discount_curve_id
-    /// 'USD-OIS'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -773,23 +241,7 @@ impl PyBond {
             .map_err(core_to_py)
     }
 
-    /// Example floating-rate note (mirrors Rust ``Bond::example_floating``).
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A USD SOFR-linked FRN.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> Bond.example_floating().has_floating_coupons
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.example_floating")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_floating() -> PyResult<Self> {
@@ -798,23 +250,7 @@ impl PyBond {
             .map_err(core_to_py)
     }
 
-    /// Example callable bond (mirrors Rust ``Bond::example_callable``).
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A fixed-rate bond carrying a call schedule.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> Bond.example_callable().call_put is not None
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.example_callable")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_callable() -> PyResult<Self> {
@@ -823,23 +259,7 @@ impl PyBond {
             .map_err(core_to_py)
     }
 
-    /// Example amortizing bond (mirrors Rust ``Bond::example_amortizing``).
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A fixed-rate bond with a principal amortization schedule.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Bond
-    /// >>> "amortizing" in Bond.example_amortizing().cashflow_spec
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.example_amortizing")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_amortizing() -> PyResult<Self> {
@@ -848,19 +268,7 @@ impl PyBond {
             .map_err(core_to_py)
     }
 
-    /// Return a copy with a minimum MOIC return floor on early redemption.
-    ///
-    /// Mirrors Rust ``Bond::min_moic``.
-    ///
-    /// Parameters
-    /// ----------
-    /// multiple : float
-    ///     Minimum multiple of invested capital (e.g. ``1.25``).
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A new bond with ``return_floor`` set.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.min_moic")]
     #[pyo3(text_signature = "($self, multiple)")]
     fn min_moic(&self, multiple: f64) -> Self {
         Self {
@@ -868,24 +276,7 @@ impl PyBond {
         }
     }
 
-    /// Return a copy with a minimum XIRR return floor on early redemption.
-    ///
-    /// Mirrors Rust ``Bond::min_xirr``.
-    ///
-    /// Parameters
-    /// ----------
-    /// rate : float | Rate
-    ///     Target annualized IRR as a decimal (``0.12`` = 12%) or a ``Rate``.
-    ///
-    /// Returns
-    /// -------
-    /// Bond
-    ///     A new bond with ``return_floor`` set.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``rate`` is neither a number nor a ``Rate``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.min_xirr")]
     #[pyo3(text_signature = "($self, rate)")]
     fn min_xirr(&self, rate: &Bound<'_, PyAny>) -> PyResult<Self> {
         let rate = rate_from_py(rate, "rate")?;
@@ -894,51 +285,49 @@ impl PyBond {
         })
     }
 
-    /// Issue date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.issue_date)
     }
 
-    /// Maturity date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Coupon/cashflow specification in serde form (``{"fixed": {...}}``,
-    /// ``{"floating": {...}}``, ``{"step_up": {...}}`` or ``{"amortizing": {...}}``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.cashflow_spec")]
     #[getter]
     fn cashflow_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.cashflow_spec)
     }
 
-    /// Call/put schedule in serde form (``{"calls": [...], "puts": [...]}``), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.call_put")]
     #[getter]
     fn call_put<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.call_put.as_ref())
     }
 
-    /// Return-floor specification in serde form, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.return_floor")]
     #[getter]
     fn return_floor<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.return_floor.as_ref())
     }
 
-    /// Explicit cashflow schedule in serde form, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.custom_cashflows")]
     #[getter]
     fn custom_cashflows<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.custom_cashflows.as_ref())
     }
 
-    /// Settlement convention (``settlement_days`` / ``ex_coupon_days`` /
-    /// ``ex_coupon_calendar_id``) as a dict, or ``None`` when unset.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.settlement_convention")]
     #[getter]
     fn settlement_convention<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.settlement_convention.as_ref())
     }
 
-    /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
@@ -957,37 +346,7 @@ impl PyBond {
         )
     }
 
-    /// Price this bond with the Merton Monte Carlo structural credit engine.
-    ///
-    /// Uses geometric Brownian motion asset dynamics only. Floating-rate and
-    /// amortizing cashflow specs are rejected. When the config's PIK schedule
-    /// is the default uniform cash mode, the bond's ``CouponType`` overrides
-    /// the schedule; otherwise the config schedule takes precedence. The
-    /// independent-estimator count, antithetic flag and seed label come from
-    /// this bond's ``instrument_pricing_overrides.model_config`` (``mc_paths``,
-    /// ``mc_antithetic``, ``mc_seed_scenario``).
-    ///
-    /// Parameters
-    /// ----------
-    /// config : MertonMcConfig
-    ///     Structural model, PIK schedule, recovery and time grid.
-    /// discount_rate : float
-    ///     Flat continuously compounded risk-free rate as a decimal used to
-    ///     discount simulated cashflows (unless term-structure discount
-    ///     factors are set on the config).
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// MertonMcResult
-    ///     Monte Carlo pricing result with clean/dirty prices and path stats.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``as_of`` is invalid, the bond has floating or amortizing
-    ///     cashflows, or simulation parameters fail validation.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.price_merton_mc")]
     #[pyo3(text_signature = "($self, config, discount_rate, as_of)")]
     fn price_merton_mc(
         &self,
@@ -1007,85 +366,52 @@ impl PyBond {
 }
 
 crate::bindings::macros::py_getters!(PyBond |s| {
-    /// Principal amount.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Hazard curve identifier for credit-risky pricing, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.credit_curve_id")]
     credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(ToString::to_string);
 
-    /// Repo (financing) discount curve identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.repo_curve_id")]
     repo_curve_id -> Option<String> = s.inner.repo_curve_id.as_ref().map(ToString::to_string);
 
-    /// Accrual method (serde string, e.g. ``"linear"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.accrual_method")]
     accrual_method -> PyResult<String> = enum_to_py_string(&s.inner.accrual_method);
 
-    /// Settlement lag in business days, or ``None`` when no convention is set.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.settlement_days")]
     settlement_days -> Option<u32> = s.inner.settlement_days();
 
-    /// Ex-coupon period in business days, or ``None`` when no convention is set.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.ex_coupon_days")]
     ex_coupon_days -> Option<u32> = s.inner.ex_coupon_days();
 
-    /// ``True`` when coupons depend on forward-curve projection (FRNs).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Bond.has_floating_coupons")]
     has_floating_coupons -> bool = s.inner.has_floating_coupons();
 });
 
-/// Fluent builder for ``Bond``; wraps the Rust `FinancialBuilder`-generated
-/// builder (consuming setters).
-///
-/// Builders are consumed by build(); create a new builder per instrument.
-/// Nested specs (``cashflow_spec``, ``call_put``, ``return_floor``,
-/// ``custom_cashflows``, ``settlement_convention``) accept a ``dict`` or a
-/// JSON ``str`` in the Rust serde shape.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "BondBuilder",
     skip_from_py_object
 )]
 pub struct PyBondBuilder {
-    inner: Option<BondBuilderInner>,
+    inner: Option<BondBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
 #[pymethods]
 impl PyBondBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the bond.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: BondBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: BondBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    /// Set the principal amount.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float
-    ///     Principal; a bare number needs ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``value`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a bare number is given without ``currency``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.notional")]
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn notional<'py>(
@@ -1098,70 +424,33 @@ impl PyBondBuilder {
             slf,
             notional,
             crate::bindings::valuations::convert::money_repr(money),
-            |b: BondBuilderInner| b.notional(money)
+            |b: BondBuilder| b.notional(money)
         )
     }
 
-    /// Set the issue date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Required contractual issue date. Omission raises ``ValueError`` on ``build()``.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.issue_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn issue_date<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        builder_set!(slf, issue_date, date.to_string(), |b: BondBuilderInner| b
+        builder_set!(slf, issue_date, date.to_string(), |b: BondBuilder| b
             .issue_date(date))
     }
 
-    /// Set the maturity date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Maturity date.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        builder_set!(slf, maturity, date.to_string(), |b: BondBuilderInner| b
+        builder_set!(slf, maturity, date.to_string(), |b: BondBuilder| b
             .maturity(date))
     }
 
-    /// Set the coupon/cashflow specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``CashflowSpec`` in serde form, e.g.
-    ///     ``{"fixed": {"coupon_type": "cash", "rate": "0.05", "schedule": {...}}}``.
-    ///     Start from ``Bond.example().cashflow_spec`` for the exact shape.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as a ``CashflowSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.cashflow_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn cashflow_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1170,25 +459,11 @@ impl PyBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec =
             spec_from_py(py, value, "cashflow_spec")?;
-        builder_set!(
-            slf,
-            cashflow_spec,
-            "{...}".to_string(),
-            |b: BondBuilderInner| b.cashflow_spec(spec)
-        )
+        builder_set!(slf, cashflow_spec, "{...}".to_string(), |b: BondBuilder| b
+            .cashflow_spec(spec))
     }
 
-    /// Set the discount curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1198,21 +473,11 @@ impl PyBondBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: BondBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: BondBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the hazard curve identifier for ``"hazard_rate"`` or ``"rates_credit"`` pricing.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Hazard curve identifier consumed by scalar or joint rates-credit pricing.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.credit_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1222,21 +487,11 @@ impl PyBondBuilder {
             slf,
             credit_curve_id,
             format!("{value:?}"),
-            |b: BondBuilderInner| b.credit_curve_id(CurveId::new(value.to_string()))
+            |b: BondBuilder| b.credit_curve_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the repo (financing) discount curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Repo (financing) discount curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.repo_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn repo_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1246,28 +501,11 @@ impl PyBondBuilder {
             slf,
             repo_curve_id,
             format!("{value:?}"),
-            |b: BondBuilderInner| b.repo_curve_id(CurveId::new(value.to_string()))
+            |b: BondBuilder| b.repo_curve_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the call/put schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``CallPutSchedule`` in serde form:
-    ///     ``{"calls": [{"start": "2027-01-15", "end": "2029-01-15",
-    ///     "price_pct_of_par": 100.0}], "puts": []}``.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as a ``CallPutSchedule``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.call_put")]
     #[pyo3(text_signature = "($self, value)")]
     fn call_put<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1276,26 +514,11 @@ impl PyBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::CallPutSchedule =
             spec_from_py(py, value, "call_put")?;
-        builder_set!(slf, call_put, "{...}".to_string(), |b: BondBuilderInner| b
+        builder_set!(slf, call_put, "{...}".to_string(), |b: BondBuilder| b
             .call_put(spec))
     }
 
-    /// Set the return-floor specification (minimum MOIC / XIRR on early redemption).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``ReturnFloorSpec`` in serde form.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as a ``ReturnFloorSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.return_floor")]
     #[pyo3(text_signature = "($self, value)")]
     fn return_floor<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1304,30 +527,11 @@ impl PyBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::ReturnFloorSpec =
             spec_from_py(py, value, "return_floor")?;
-        builder_set!(
-            slf,
-            return_floor,
-            "{...}".to_string(),
-            |b: BondBuilderInner| b.return_floor(spec)
-        )
+        builder_set!(slf, return_floor, "{...}".to_string(), |b: BondBuilder| b
+            .return_floor(spec))
     }
 
-    /// Set an explicit cashflow schedule that overrides generated coupons.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``CashFlowSchedule`` in serde form.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as a ``CashFlowSchedule``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.custom_cashflows")]
     #[pyo3(text_signature = "($self, value)")]
     fn custom_cashflows<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1340,26 +544,11 @@ impl PyBondBuilder {
             slf,
             custom_cashflows,
             "{...}".to_string(),
-            |b: BondBuilderInner| b.custom_cashflows(schedule)
+            |b: BondBuilder| b.custom_cashflows(schedule)
         )
     }
 
-    /// Set the accrual method.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Serde name of the Rust ``AccrualMethod`` (``"linear"`` is the default).
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized accrual method.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.accrual_method")]
     #[pyo3(text_signature = "($self, value)")]
     fn accrual_method<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1371,30 +560,11 @@ impl PyBondBuilder {
             slf,
             accrual_method,
             format!("{value:?}"),
-            |b: BondBuilderInner| b.accrual_method(method)
+            |b: BondBuilder| b.accrual_method(method)
         )
     }
 
-    /// Set instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1405,26 +575,11 @@ impl PyBondBuilder {
             slf,
             attributes,
             "Attributes(...)".to_string(),
-            |b: BondBuilderInner| b.attributes(attrs)
+            |b: BondBuilder| b.attributes(attrs)
         )
     }
 
-    /// Set the settlement convention (settlement lag and ex-coupon period).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``{"settlement_days": 2, "ex_coupon_days": 0, "ex_coupon_calendar_id": None}``.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as a ``BondSettlementConvention``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BondBuilder.settlement_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1437,17 +592,12 @@ impl PyBondBuilder {
             slf,
             settlement_convention,
             "{...}".to_string(),
-            |b: BondBuilderInner| b.settlement_convention(convention)
+            |b: BondBuilder| b.settlement_convention(convention)
         )
     }
 }
 
-/// Typed wrapper for the Rust `TermLoan` instrument.
-///
-/// Construct via ``TermLoan.builder()`` (the Rust ``RateSpec`` accepts a bare
-/// fixed rate or a floating spec), the ``TermLoan.example*`` presets, or
-/// ``TermLoan.from_json``. Every public Rust field is readable as a property;
-/// ``price`` / ``metric`` run the same pricer as ``price_instrument``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TermLoan",
@@ -1470,26 +620,7 @@ instrument_pricing_methods!(PyTermLoan, "TermLoan");
 
 #[pymethods]
 impl PyTermLoan {
-    /// Canonical example term loan (mirrors Rust ``TermLoan::example``).
-    ///
-    /// Returns a 5-year USD fixed-rate loan (6%, quarterly, Act/360, 2.5%
-    /// per-period amortization) useful as a starting point and in tests.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoan
-    ///     The example loan.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import TermLoan
-    /// >>> TermLoan.example().id
-    /// 'TERM-LOAN-USD-5Y'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -1498,24 +629,7 @@ impl PyTermLoan {
             .map_err(core_to_py)
     }
 
-    /// Example floating-rate leveraged loan with a delayed-draw tranche
-    /// (mirrors Rust ``TermLoan::example_floating_with_ddtl``).
-    ///
-    /// Returns
-    /// -------
-    /// TermLoan
-    ///     A 7-year USD SOFR + 400bp loan with a DDTL commitment and a 0% floor.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import TermLoan
-    /// >>> TermLoan.example_floating_with_ddtl().ddtl is not None
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.example_floating_with_ddtl")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_floating_with_ddtl() -> PyResult<Self> {
@@ -1524,23 +638,7 @@ impl PyTermLoan {
             .map_err(core_to_py)
     }
 
-    /// Example callable term loan (mirrors Rust ``TermLoan::example_callable``).
-    ///
-    /// Returns
-    /// -------
-    /// TermLoan
-    ///     A loan carrying a prepayment (call) schedule.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import TermLoan
-    /// >>> TermLoan.example_callable().call_schedule is not None
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.example_callable")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_callable() -> PyResult<Self> {
@@ -1550,65 +648,61 @@ impl PyTermLoan {
         .map_err(core_to_py)
     }
 
-    /// Issue / funding date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.issue_date)
     }
 
-    /// Maturity date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Rate specification in serde form (``{"fixed": {"rate": 0.06}}`` with a
-    /// decimal rate, or ``{"floating": {...}}``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.rate")]
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.rate)
     }
 
-    /// Amortization specification in serde form (``"none"``,
-    /// ``{"percent_of_remaining_per_period": {"pct": 0.025}}``,
-    /// ``{"linear_between": {...}}``, …).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.amortization")]
     #[getter]
     fn amortization<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.amortization)
     }
 
-    /// Upfront fee in ``UpfrontFee`` serde form (``{"amount": Money-dict}`` or
-    /// ``{"fraction_of_commitment": 0.02}``), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.upfront_fee")]
     #[getter]
     fn upfront_fee<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.upfront_fee.as_ref())
     }
 
-    /// Delayed-draw term loan specification in serde form, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.ddtl")]
     #[getter]
     fn ddtl<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.ddtl.as_ref())
     }
 
-    /// Covenant event schedule in serde form, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.covenants")]
     #[getter]
     fn covenants<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.covenants.as_ref())
     }
 
-    /// OID / effective-interest-rate specification in serde form, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.oid_eir")]
     #[getter]
     fn oid_eir<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.oid_eir.as_ref())
     }
 
-    /// Prepayment (call) schedule in serde form, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.call_schedule")]
     #[getter]
     fn call_schedule<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.call_schedule.as_ref())
     }
 
-    /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
@@ -1628,122 +722,70 @@ impl PyTermLoan {
 }
 
 crate::bindings::macros::py_getters!(PyTermLoan |s| {
-    /// Loan currency (ISO-4217 code).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    /// Committed notional (facility limit).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.notional_limit")]
     notional_limit -> PyMoney = money_to_py(s.inner.notional_limit);
 
-    /// Payment frequency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    /// Accrual day-count convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    /// Business day convention (serde string).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    /// Holiday calendar identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    /// Stub rule.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Hazard curve identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.credit_curve_id")]
     credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(ToString::to_string);
 
-    /// Coupon type (serde string, e.g. ``"cash"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.coupon_type")]
     coupon_type -> PyResult<String> = enum_to_py_string(&s.inner.coupon_type);
 
-    /// Settlement lag in business days.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoan.settlement_days")]
     settlement_days -> u32 = s.inner.settlement_days;
 });
 
-/// Fluent builder for ``TermLoan``; wraps the Rust `FinancialBuilder`-generated
-/// builder (consuming setters).
-///
-/// Builders are consumed by build(); create a new builder per instrument.
-/// Nested specs (``rate`` when floating, ``amortization``, ``ddtl``,
-/// ``covenants``, ``oid_eir``, ``call_schedule``) accept a ``dict`` or a JSON
-/// ``str`` in the Rust serde shape.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TermLoanBuilder",
     skip_from_py_object
 )]
 pub struct PyTermLoanBuilder {
-    inner: Option<TermLoanBuilderInner>,
+    inner: Option<TermLoanBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
 #[pymethods]
 impl PyTermLoanBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the loan.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: TermLoanBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: TermLoanBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    /// Set the loan currency.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     ISO-4217 currency code (e.g. ``"USD"``).
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized currency code.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.currency")]
     #[pyo3(text_signature = "($self, value)")]
     fn currency<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let ccy = crate::bindings::module_utils::parse_currency(value)?;
-        builder_set!(
-            slf,
-            currency,
-            format!("{value:?}"),
-            |b: TermLoanBuilderInner| b.currency(ccy)
-        )
+        builder_set!(slf, currency, format!("{value:?}"), |b: TermLoanBuilder| b
+            .currency(ccy))
     }
 
-    /// Set the committed notional (facility limit).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float
-    ///     Commitment; a bare number needs ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``value`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a bare number is given without ``currency``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.notional_limit")]
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn notional_limit<'py>(
@@ -1756,81 +798,33 @@ impl PyTermLoanBuilder {
             slf,
             notional_limit,
             crate::bindings::valuations::convert::money_repr(money),
-            |b: TermLoanBuilderInner| b.notional_limit(money)
+            |b: TermLoanBuilder| b.notional_limit(money)
         )
     }
 
-    /// Set the issue / funding date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Required contractual issue date. Omission raises ``ValueError`` on ``build()``.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.issue_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn issue_date<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        builder_set!(
-            slf,
-            issue_date,
-            date.to_string(),
-            |b: TermLoanBuilderInner| b.issue_date(date)
-        )
+        builder_set!(slf, issue_date, date.to_string(), |b: TermLoanBuilder| b
+            .issue_date(date))
     }
 
-    /// Set the maturity date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Maturity date.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        builder_set!(
-            slf,
-            maturity,
-            date.to_string(),
-            |b: TermLoanBuilderInner| b.maturity(date)
-        )
+        builder_set!(slf, maturity, date.to_string(), |b: TermLoanBuilder| b
+            .maturity(date))
     }
 
-    /// Set the interest rate specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float | Rate | dict | str
-    ///     A bare decimal (``0.06`` = 6%) or ``Rate`` sets a fixed rate
-    ///     (mirrors Rust ``RateSpec::fixed_rate``). A ``dict``/JSON ``str`` is
-    ///     the Rust ``RateSpec`` in serde
-    ///     form, e.g. ``{"floating": {"forward_curve_id": "USD-SOFR-3M", "spread_bp": 400, ...}}``.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a dict/str does not deserialize as a ``RateSpec``.
-    /// TypeError
-    ///     If ``value`` has an unsupported type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1848,55 +842,21 @@ impl PyTermLoanBuilder {
                 rate.as_decimal().to_string(),
             )
         };
-        builder_set!(slf, rate, shown, |b: TermLoanBuilderInner| b.rate(spec))
+        builder_set!(slf, rate, shown, |b: TermLoanBuilder| b.rate(spec))
     }
 
-    /// Set the payment frequency.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Tenor | str
-    ///     Payment frequency (e.g. ``Tenor.quarterly()``).
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a string ``value`` is not a recognized tenor string.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let tenor = crate::bindings::core::dates::tenor::extract_tenor(value)?;
-        builder_set!(
-            slf,
-            frequency,
-            tenor.to_string(),
-            |b: TermLoanBuilderInner| b.frequency(tenor)
-        )
+        builder_set!(slf, frequency, tenor.to_string(), |b: TermLoanBuilder| b
+            .frequency(tenor))
     }
 
-    /// Set the accrual day-count convention.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : DayCount | str
-    ///     Day count convention (e.g. ``DayCount.ACT_360``).
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a string ``value`` is not a recognized day-count name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1908,26 +868,11 @@ impl PyTermLoanBuilder {
             slf,
             day_count,
             day_count.to_string(),
-            |b: TermLoanBuilderInner| b.day_count(day_count)
+            |b: TermLoanBuilder| b.day_count(day_count)
         )
     }
 
-    /// Set the business day convention (default ``"modified_following"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Serde name of the Rust ``BusinessDayConvention``.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.business_day_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1938,21 +883,11 @@ impl PyTermLoanBuilder {
             slf,
             business_day_convention,
             format!("{value:?}"),
-            |b: TermLoanBuilderInner| b.business_day_convention(convention)
+            |b: TermLoanBuilder| b.business_day_convention(convention)
         )
     }
 
-    /// Set the holiday calendar identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Calendar identifier (e.g. ``"usny"``).
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1962,26 +897,11 @@ impl PyTermLoanBuilder {
             slf,
             calendar_id,
             format!("{value:?}"),
-            |b: TermLoanBuilderInner| b.calendar_id(value.into())
+            |b: TermLoanBuilder| b.calendar_id(value.into())
         )
     }
 
-    /// Set the stub rule (default ``"short_front"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : StubKind | str
-    ///     Stub rule.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized stub name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.stub")]
     #[pyo3(text_signature = "($self, value)")]
     fn stub<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1992,21 +912,11 @@ impl PyTermLoanBuilder {
             slf,
             stub,
             format!("{:?}", enum_to_py_string(&stub).unwrap_or_default()),
-            |b: TermLoanBuilderInner| b.stub(stub)
+            |b: TermLoanBuilder| b.stub(stub)
         )
     }
 
-    /// Set the discount curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2016,21 +926,11 @@ impl PyTermLoanBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: TermLoanBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: TermLoanBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the hazard curve identifier for credit-risky pricing.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Hazard curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.credit_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2040,31 +940,11 @@ impl PyTermLoanBuilder {
             slf,
             credit_curve_id,
             format!("{value:?}"),
-            |b: TermLoanBuilderInner| b.credit_curve_id(CurveId::new(value.to_string()))
+            |b: TermLoanBuilder| b.credit_curve_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set the amortization schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``AmortizationSpec`` in serde form: ``"none"``,
-    ///     ``{"percent_of_remaining_per_period": {"pct": 0.025}}`` (declining
-    ///     balance), ``{"percent_of_original_per_period": {"pct": 0.01}}``,
-    ///     ``{"linear_between": {"start": "2025-01-01", "end": "2029-01-01"}}``
-    ///     or ``{"custom_principal": {"items": [...]}}``; ``linear_to`` and
-    ///     ``step_remaining`` are rejected at ``build()``.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as an ``AmortizationSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.amortization")]
     #[pyo3(text_signature = "($self, value)")]
     fn amortization<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2084,26 +964,11 @@ impl PyTermLoanBuilder {
             slf,
             amortization,
             "{...}".to_string(),
-            |b: TermLoanBuilderInner| b.amortization(spec)
+            |b: TermLoanBuilder| b.amortization(spec)
         )
     }
 
-    /// Set the coupon type (default ``"cash"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Serde name of the Rust ``CouponType`` (``"cash"``, ``"pik"``, …).
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized coupon type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.coupon_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn coupon_type<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2114,33 +979,11 @@ impl PyTermLoanBuilder {
             slf,
             coupon_type,
             format!("{value:?}"),
-            |b: TermLoanBuilderInner| b.coupon_type(coupon_type)
+            |b: TermLoanBuilder| b.coupon_type(coupon_type)
         )
     }
 
-    /// Set the upfront (arrangement or OID) fee paid on the issue date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float | dict | str
-    ///     A ``Money`` or bare number (which needs ``currency``) is an
-    ///     absolute amount; a ``dict``/JSON ``str`` is the Rust
-    ///     ``UpfrontFee`` in serde form (``{"amount": Money-dict}`` or
-    ///     ``{"fraction_of_commitment": 0.02}``, a decimal fraction of the
-    ///     DDTL commitment, else ``notional_limit``).
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``value`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a bare number is given without ``currency`` or a dict/str does
-    ///     not deserialize as an ``UpfrontFee``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.upfront_fee")]
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn upfront_fee<'py>(
@@ -2160,26 +1003,11 @@ impl PyTermLoanBuilder {
                 crate::bindings::valuations::convert::money_repr(money),
             )
         };
-        builder_set!(slf, upfront_fee, shown, |b: TermLoanBuilderInner| b
+        builder_set!(slf, upfront_fee, shown, |b: TermLoanBuilder| b
             .upfront_fee(fee))
     }
 
-    /// Set the delayed-draw (DDTL) specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``DdtlSpec`` in serde form.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as a ``DdtlSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.ddtl")]
     #[pyo3(text_signature = "($self, value)")]
     fn ddtl<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2188,26 +1016,11 @@ impl PyTermLoanBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::DdtlSpec =
             spec_from_py(py, value, "ddtl")?;
-        builder_set!(slf, ddtl, "{...}".to_string(), |b: TermLoanBuilderInner| b
+        builder_set!(slf, ddtl, "{...}".to_string(), |b: TermLoanBuilder| b
             .ddtl(spec))
     }
 
-    /// Set the covenant event schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``TermLoanCovenantEvents`` in serde form.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as ``TermLoanCovenantEvents``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.covenants")]
     #[pyo3(text_signature = "($self, value)")]
     fn covenants<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2216,30 +1029,11 @@ impl PyTermLoanBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanCovenantEvents =
             spec_from_py(py, value, "covenants")?;
-        builder_set!(
-            slf,
-            covenants,
-            "{...}".to_string(),
-            |b: TermLoanBuilderInner| b.covenants(spec)
-        )
+        builder_set!(slf, covenants, "{...}".to_string(), |b: TermLoanBuilder| b
+            .covenants(spec))
     }
 
-    /// Set the OID / effective-interest-rate specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``OidEirSpec`` in serde form.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as an ``OidEirSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.oid_eir")]
     #[pyo3(text_signature = "($self, value)")]
     fn oid_eir<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2248,30 +1042,11 @@ impl PyTermLoanBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::loan_terms::OidEirSpec =
             spec_from_py(py, value, "oid_eir")?;
-        builder_set!(
-            slf,
-            oid_eir,
-            "{...}".to_string(),
-            |b: TermLoanBuilderInner| b.oid_eir(spec)
-        )
+        builder_set!(slf, oid_eir, "{...}".to_string(), |b: TermLoanBuilder| b
+            .oid_eir(spec))
     }
 
-    /// Set the prepayment (call) schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``LoanCallSchedule`` in serde form.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as a ``LoanCallSchedule``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.call_schedule")]
     #[pyo3(text_signature = "($self, value)")]
     fn call_schedule<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2284,21 +1059,11 @@ impl PyTermLoanBuilder {
             slf,
             call_schedule,
             "{...}".to_string(),
-            |b: TermLoanBuilderInner| b.call_schedule(spec)
+            |b: TermLoanBuilder| b.call_schedule(spec)
         )
     }
 
-    /// Set the settlement lag in business days (default 2).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : int
-    ///     Settlement lag.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.settlement_days")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement_days<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2308,30 +1073,11 @@ impl PyTermLoanBuilder {
             slf,
             settlement_days,
             value.to_string(),
-            |b: TermLoanBuilderInner| b.settlement_days(value)
+            |b: TermLoanBuilder| b.settlement_days(value)
         )
     }
 
-    /// Set instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// TermLoanBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermLoanBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -2342,7 +1088,7 @@ impl PyTermLoanBuilder {
             slf,
             attributes,
             "Attributes(...)".to_string(),
-            |b: TermLoanBuilderInner| b.attributes(attrs)
+            |b: TermLoanBuilder| b.attributes(attrs)
         )
     }
 }

@@ -5,6 +5,7 @@
 
 use finstack_quant_analytics::Performance;
 use finstack_quant_core::dates::{Date, FiscalConfig, PeriodKind};
+use finstack_quant_core::ErrorKind;
 use time::Month;
 
 fn calendar_days(start: Date, n: usize) -> Vec<Date> {
@@ -312,14 +313,17 @@ fn performance_facade_exercises_broad_api_surface() {
     assert_eq!(perf.get_benchmark_idx(), 1);
     assert_eq!(perf.tracking_error(), baseline_tracking_error);
 
-    assert!(Performance::new(
+    let missing = Performance::new(
         dates.clone(),
         vec![ramp(dates.len(), 1.0, 0.01)],
         vec!["X".to_string()],
         Some("missing"),
         PeriodKind::Daily,
-    )
-    .is_err());
+    );
+    assert_eq!(missing.err().map(|e| e.kind()), Some(ErrorKind::NotFound));
+    let unknown = perf.reset_bench_ticker("missing");
+    assert_eq!(unknown.err().map(|e| e.kind()), Some(ErrorKind::NotFound));
+    assert_eq!(perf.get_benchmark_idx(), 1);
 }
 
 #[test]
@@ -451,9 +455,12 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
 
 #[test]
 fn lookback_returns_includes_maximum_reference_date_without_overflow() {
+    let last = Date::MAX;
+    let mid = last.previous_day().expect("prior date");
+    let first = mid.previous_day().expect("prior date");
     let perf = Performance::new(
-        vec![Date::MAX.previous_day().expect("prior date"), Date::MAX],
-        vec![vec![100.0, 110.0]],
+        vec![first, mid, last],
+        vec![vec![100.0, 110.0, 121.0]],
         vec!["A".into()],
         None,
         PeriodKind::Daily,
@@ -463,7 +470,7 @@ fn lookback_returns_includes_maximum_reference_date_without_overflow() {
         let lookbacks = perf.lookback_returns(Date::MAX, Some(fiscal_config));
         for values in [lookbacks.mtd, lookbacks.qtd, lookbacks.ytd, lookbacks.fytd] {
             assert_eq!(values.len(), 1);
-            assert!((values[0] - 0.1).abs() < 1.0e-14);
+            assert!((values[0] - 0.21).abs() < 1.0e-14);
         }
     }
 }

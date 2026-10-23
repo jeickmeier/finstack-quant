@@ -1521,21 +1521,21 @@ impl TreeValuator for NodeProbeValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
         let oas_bp = state.oas_bp;
         Ok(1.0
-            + state.interest_rate().unwrap_or(0.0)
-            + state.hazard_rate().unwrap_or(0.0)
+            + state.interest_rate.unwrap_or(0.0)
+            + state.hazard_rate.unwrap_or(0.0)
             + oas_bp / 10_000.0
-            + state.spot().unwrap_or(0.0)
-            + state.discount_factor().unwrap_or(0.0))
+            + state.spot.unwrap_or(0.0)
+            + state.df.unwrap_or(0.0))
     }
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64> {
         let oas_bp = state.oas_bp;
-        let survival = (-state.hazard_rate().unwrap_or(0.0) * dt).exp();
+        let survival = (-state.hazard_rate.unwrap_or(0.0) * dt).exp();
         Ok(survival * continuation_value
-            + 1e-3 * state.interest_rate().unwrap_or(0.0)
-            + 1e-3 * state.discount_factor().unwrap_or(0.0)
+            + 1e-3 * state.interest_rate.unwrap_or(0.0)
+            + 1e-3 * state.df.unwrap_or(0.0)
             + 1e-6 * oas_bp
             + 1e-9 * state.step as f64
-            + state.spot().unwrap_or(0.0))
+            + state.spot.unwrap_or(0.0))
     }
 }
 

@@ -61,25 +61,25 @@ fn per_type_constructors_set_expected_assumptions() {
     let (p, t) = (|| pool.clone(), || tranches.clone());
     let cases = [
         (
-            StructuredCredit::new_abs("ABS", p(), t(), closing, legal, "USD-OIS"),
+            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "ABS".into(), pool: p(), tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
             DealType::Abs,
             Tenor::monthly(),
             0.02,
         ),
         (
-            StructuredCredit::new_clo("CLO", p(), t(), closing, legal, "USD-OIS"),
+            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "CLO".into(), pool: p(), tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
             DealType::Clo,
             Tenor::quarterly(),
             0.02,
         ),
         (
-            StructuredCredit::new_cmbs("CMBS", p(), t(), closing, legal, "USD-OIS"),
+            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "CMBS".into(), pool: p(), tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
             DealType::Cmbs,
             Tenor::monthly(),
             0.005,
         ),
         (
-            StructuredCredit::new_rmbs("RMBS", p(), t(), closing, legal, "USD-OIS"),
+            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "RMBS".into(), pool: p(), tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
             DealType::Rmbs,
             Tenor::monthly(),
             0.006,
@@ -102,7 +102,7 @@ fn per_type_constructors_set_expected_assumptions() {
 
 /// One CLO profile in the registry: the BSL fee convention (small senior
 /// fee, larger subordinated fee), a senior-secured-loan recovery, and the
-/// serde credit-model defaults equal to what `new_clo` applies.
+/// serde credit-model defaults equal to what `new_standard(DealType::Clo, ...)` applies.
 #[test]
 fn clo_registry_profile_is_the_single_source_of_clo_defaults() {
     let fees = DealFees::clo_standard(Currency::USD);
@@ -112,13 +112,17 @@ fn clo_registry_profile_is_the_single_source_of_clo_defaults() {
         fees.senior_mgmt_fee_bp,
         fees.subordinated_mgmt_fee_bp
     );
-    let clo = StructuredCredit::new_clo(
-        "CLO",
-        create_pool_with_balance(100_000_000.0),
-        create_single_tranche(),
-        test_date(),
-        maturity_date(),
-        "USD-OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO".into(),
+            pool: create_pool_with_balance(100_000_000.0),
+            tranches: create_single_tranche(),
+            closing_date: test_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates");
     assert!(
@@ -157,13 +161,17 @@ fn test_example_has_expected_defaults() {
 fn test_prepayment_spec_shapes_drive_monthly_rates() {
     let pool = create_pool_with_balance(1_000_000.0);
     let tranches = create_single_tranche();
-    let mut sc = StructuredCredit::new_abs(
-        "TEST-ABS",
-        pool,
-        tranches,
-        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-        maturity_date(),
-        "USD-OIS",
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST-ABS".into(),
+            pool,
+            tranches,
+            closing_date: Date::from_calendar_date(2024, Month::January, 1).unwrap(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates");
 
@@ -188,13 +196,17 @@ fn test_prepayment_spec_shapes_drive_monthly_rates() {
 fn test_default_spec_shapes_drive_monthly_rates() {
     let pool = create_pool_with_balance(1_000_000.0);
     let tranches = create_single_tranche();
-    let mut sc = StructuredCredit::new_abs(
-        "TEST-ABS",
-        pool,
-        tranches,
-        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-        maturity_date(),
-        "USD-OIS",
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST-ABS".into(),
+            pool,
+            tranches,
+            closing_date: Date::from_calendar_date(2024, Month::January, 1).unwrap(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates");
 
@@ -223,4 +235,64 @@ fn test_default_spec_shapes_drive_monthly_rates() {
     let expected_decline = 1.0 - (1.0 - decline_cdr).powf(1.0 / 12.0);
     let decline_rate = sc.credit_model.default_spec.mdr(decline_seasoning).unwrap();
     assert!((decline_rate - expected_decline).abs() < 1e-12);
+}
+
+#[test]
+fn standard_constructor_applies_calendar_and_rejects_unsupported_profiles() {
+    use finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams;
+    let params = StandardDealParams {
+        id: "STANDARD".into(),
+        pool: create_pool_with_balance(1_000_000.0),
+        tranches: create_single_tranche(),
+        closing_date: test_date(),
+        maturity: maturity_date(),
+        discount_curve_id: "USD-OIS".into(),
+        calendar_id: Some("nyse".into()),
+    };
+    let deal = StructuredCredit::new_standard(DealType::Abs, params.clone()).unwrap();
+    assert_eq!(deal.calendar_id.as_deref(), Some("nyse"));
+    let mut no_calendar = params.clone();
+    no_calendar.calendar_id = None;
+    assert!(StructuredCredit::new_standard(DealType::Abs, no_calendar)
+        .unwrap()
+        .calendar_id
+        .is_none());
+    for unsupported in [DealType::Cbo, DealType::Auto, DealType::Card] {
+        assert!(StructuredCredit::new_standard(unsupported, params.clone()).is_err());
+    }
+    let mut invalid = params;
+    invalid.maturity = invalid.closing_date;
+    assert!(StructuredCredit::new_standard(DealType::Abs, invalid).is_err());
+}
+
+#[test]
+fn standard_constructor_rejects_invalid_nested_collateral_before_pricing() {
+    use finstack_quant_valuations_structured_credit::structured_credit::{
+        AssetType, BalloonSpec, StandardDealParams,
+    };
+
+    let mut pool = create_pool_with_balance(1_000_000.0);
+    pool.assets[0].asset_type = AssetType::CommercialMortgage { ltv: None };
+    pool.assets[0].balloon = Some(BalloonSpec {
+        extension_prob: 1.5,
+        extension_months: 24,
+        extension_rate: None,
+        loss_prob: 0.0,
+        severity_pct: 0.0,
+        workout_months: 0,
+    });
+    let error = StructuredCredit::new_standard(
+        DealType::Cmbs,
+        StandardDealParams {
+            id: "INVALID-COLLATERAL".into(),
+            pool,
+            tranches: create_single_tranche(),
+            closing_date: test_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect_err("constructor validates caller-supplied collateral terms");
+    assert!(error.to_string().contains("extension_prob"), "{error}");
 }
