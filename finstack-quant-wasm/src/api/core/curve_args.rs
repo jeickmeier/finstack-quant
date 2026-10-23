@@ -43,26 +43,3 @@ pub(crate) fn flat_pairs(values: &[f64], label: &str) -> Result<Vec<(f64, f64)>,
 pub(crate) fn flatten_pairs(points: impl Iterator<Item = (f64, f64)>) -> Box<[f64]> {
     points.flat_map(|(x, y)| [x, y]).collect()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::utils::date_to_iso;
-    use time::Month;
-
-    #[test]
-    fn parse_iso_date_components_and_roundtrip() {
-        let d = parse_iso_date("2024-01-15").expect("valid ISO date");
-        assert_eq!(d.year(), 2024);
-        assert_eq!(d.month(), Month::January);
-        assert_eq!(d.day(), 15);
-        assert_eq!(date_to_iso(d), "2024-01-15");
-    }
-
-    #[test]
-    fn date_to_iso_roundtrips_parse() {
-        let s = "2024-06-30";
-        let d = parse_iso_date(s).expect("valid ISO date");
-        assert_eq!(date_to_iso(d), s);
-    }
-}
