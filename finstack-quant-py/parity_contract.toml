@@ -2064,6 +2064,8 @@ js = "models.credit.migration"
 js = "models.credit.pd"
 types = { MasterScaleGrade = "MasterScaleGrade", MasterScaleResult = "MasterScaleResult" }
 
+# RecoveryWaterfallResult's Python to_json/from_json restore the stored Rust
+# aggregate and allocations; both existing wire methods are documented in stubs.
 [parity.modules."finstack_quant.models.credit.recovery_waterfall"]
 js = "models.credit.recoveryWaterfall"
 types = { RecoveryAllocation = "RecoveryAllocation", RecoveryClaim = "RecoveryClaim", RecoveryWaterfallResult = "RecoveryWaterfallResult" }
