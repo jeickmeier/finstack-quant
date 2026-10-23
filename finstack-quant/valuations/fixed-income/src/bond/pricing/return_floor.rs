@@ -67,10 +67,9 @@ pub(crate) fn realized_distributions(
     let outstanding_by_date = schedule.outstanding_by_date()?;
     let initial = bond.notional.amount();
 
-    // Sort defensively; schedule is usually already ordered. `schedule` is an
-    // owned local not used after this point, so move `flows` instead of cloning.
-    let mut flows = schedule.into_flows();
-    flows.sort_by_key(|cf| cf.date);
+    // `schedule` is an owned local not used after this point, so move `flows`
+    // instead of cloning. Flows are already date-ordered by `CashFlowSchedule`.
+    let flows = schedule.into_flows();
 
     let mut points: Vec<DistPoint> = Vec::new();
     // Cash paid strictly before the current date group, since `anchor`.
