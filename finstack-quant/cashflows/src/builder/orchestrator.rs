@@ -18,6 +18,7 @@ use super::compiler::{
     build_fee_schedules, compute_coupon_schedules, CompiledSchedules, CouponProgramPiece,
     FeeSchedules, FixedSchedule, FloatSchedule, PaymentProgramPiece,
 };
+use super::date_generation::CompiledPeriod;
 use super::specs::FeeSpec;
 use tracing::debug;
 
@@ -138,17 +139,12 @@ fn validate_core_inputs(
 
     notional.validate()?;
 
-    let out_of_range = match &notional.amort {
-        AmortizationSpec::StepRemaining { schedule } => schedule
-            .iter()
-            .find(|(date, _)| *date < issue || *date > maturity)
-            .map(|(date, _)| *date),
-        AmortizationSpec::CustomPrincipal { items } => items
-            .iter()
-            .find(|(date, _)| *date < issue || *date > maturity)
-            .map(|(date, _)| *date),
-        _ => None,
-    };
+    let out_of_range = notional
+        .amort
+        .dated_amounts()
+        .iter()
+        .find(|(date, _)| *date < issue || *date > maturity)
+        .map(|(date, _)| *date);
     if let Some(date) = out_of_range {
         return Err(InputError::DateOutOfRange {
             date,
@@ -167,15 +163,7 @@ fn derive_amortization_setup(
 ) -> finstack_quant_core::Result<AmortizationSetup> {
     // Rate groups and fixed/float switches partition coupon windows, not amortization cadence.
     let mut payment_dates = finstack_quant_core::FxHashMap::default();
-    for period in fixed_schedules
-        .iter()
-        .flat_map(|s| s.periods.iter().map(|entry| &entry.period))
-        .chain(
-            float_schedules
-                .iter()
-                .flat_map(|s| s.periods.iter().map(|entry| &entry.period)),
-        )
-    {
+    for period in coupon_periods(fixed_schedules, float_schedules).map(|entry| &entry.period) {
         if let Some(previous) = payment_dates.insert(period.accrual_end, period.payment_date) {
             if previous != period.payment_date {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -326,6 +314,17 @@ pub(super) fn initialize_build_state(
     })
 }
 
+/// Every fixed and floating coupon period, in schedule order.
+pub(super) fn coupon_periods<'a>(
+    fixed: &'a [FixedSchedule],
+    float: &'a [FloatSchedule],
+) -> impl Iterator<Item = &'a CompiledPeriod> {
+    fixed
+        .iter()
+        .flat_map(|s| &s.periods)
+        .chain(float.iter().flat_map(|s| &s.periods))
+}
+
 /// Redemption follows the payment date of the coupon ending at maturity.
 /// With no coupon leg, principal is paid on the raw maturity date.
 fn compute_redemption_dates(
@@ -333,14 +332,8 @@ fn compute_redemption_dates(
     fixed_schedules: &[FixedSchedule],
     float_schedules: &[FloatSchedule],
 ) -> (Date, Date) {
-    let fixed_periods = fixed_schedules
-        .iter()
-        .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period));
-    let float_periods = float_schedules
-        .iter()
-        .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period));
-    fixed_periods
-        .chain(float_periods)
+    coupon_periods(fixed_schedules, float_schedules)
+        .map(|entry| &entry.period)
         .filter(|period| period.unadjusted_end == maturity)
         .map(|period| (period.payment_date, period.accrual_end))
         .reduce(|previous, dates| (previous.0.max(dates.0), previous.1.max(dates.1)))
@@ -504,14 +497,6 @@ impl CashFlowBuilder {
         let (redemption_date, redemption_effective_date) =
             compute_redemption_dates(maturity, &fixed_schedules, &float_schedules);
         let late_amortization = match &notional.amort {
-            AmortizationSpec::StepRemaining { schedule } => schedule
-                .iter()
-                .find(|(date, _)| *date > redemption_effective_date)
-                .map(|(date, _)| *date),
-            AmortizationSpec::CustomPrincipal { items } => items
-                .iter()
-                .find(|(date, _)| *date > redemption_effective_date)
-                .map(|(date, _)| *date),
             AmortizationSpec::LinearBetween { start, end } => {
                 if *start < issue {
                     return Err(InputError::DateOutOfRange {
@@ -522,7 +507,12 @@ impl CashFlowBuilder {
                 }
                 (*end > redemption_effective_date).then_some(*end)
             }
-            _ => None,
+            _ => notional
+                .amort
+                .dated_amounts()
+                .iter()
+                .find(|(date, _)| *date > redemption_effective_date)
+                .map(|(date, _)| *date),
         };
         if let Some(date) = late_amortization {
             return Err(finstack_quant_core::Error::Validation(format!(
