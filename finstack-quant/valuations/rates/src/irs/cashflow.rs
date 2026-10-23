@@ -14,13 +14,33 @@
 //! Compounded floating-leg schedules in this module emit accrual-end dates;
 //! the pricer applies floating-leg payment lag when discounting those flows.
 
+#[cfg(test)]
+use finstack_quant_core::dates::BusinessDayConvention;
+use finstack_quant_core::dates::{Date, DateExt, StubKind, TenorUnit};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings::fixing_series_id;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::money::Money;
+use finstack_quant_core::Result;
+use rust_decimal::Decimal;
+
+use crate::irs::InterestRateSwap;
+use finstack_quant_cashflows::builder::{
+    build_periods, merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
+    FloatingLegCompounding, FloatingRateFallback, FloatingRateSpec, Notional, PrincipalExchange,
+    RollRule, ScheduleParams, SchedulePeriod,
+};
+use finstack_quant_valuations_core::instruments::pricing::overnight_conventions::builder_overnight_method;
+use finstack_quant_valuations_core::instruments::{FloatLegSpec, PayReceive};
+
 /// Coupon spec for one float leg. The caller chooses the calendar, the
 /// accrual-date adjustment and the fallback; every other field follows the leg.
 pub(crate) fn float_leg_coupon_spec(
     leg: &FloatLegSpec,
     calendar_id: &str,
     adjust_accrual_dates: bool,
-    fallback: finstack_quant_cashflows::builder::FloatingRateFallback,
+    fallback: FloatingRateFallback,
 ) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
@@ -37,9 +57,7 @@ pub(crate) fn float_leg_coupon_spec(
             index_tenor: None,
             reset_lag_days: leg.reset_lag_days,
             fixing_calendar_id: leg.fixing_calendar_id.clone(),
-            compounding: finstack_quant_valuations_core::instruments::pricing::overnight_conventions::builder_overnight_method(
-                leg.compounding,
-            ),
+            compounding: builder_overnight_method(leg.compounding),
             overnight_basis: None,
             fallback,
         },
@@ -57,27 +75,6 @@ pub(crate) fn float_leg_coupon_spec(
         },
     }
 }
-
-#[cfg(test)]
-use finstack_quant_core::dates::BusinessDayConvention;
-use finstack_quant_core::dates::{Date, DateExt, StubKind, TenorUnit};
-use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::fixings::fixing_series_id;
-use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
-use rust_decimal::Decimal;
-
-use crate::irs::InterestRateSwap;
-use finstack_quant_cashflows::builder::FloatingLegCompounding;
-use finstack_quant_cashflows::builder::{
-    build_periods, merge_cashflow_schedules, CashFlowSchedule, FloatingCouponSpec,
-    FloatingRateSpec, Notional, PrincipalExchange, SchedulePeriod,
-};
-use finstack_quant_cashflows::builder::{CouponType, RollRule, ScheduleParams};
-use finstack_quant_valuations_core::instruments::FloatLegSpec;
-use finstack_quant_valuations_core::instruments::PayReceive;
 
 /// Total backward shift (in business days) applied to overnight observation
 /// dates.
@@ -408,9 +405,9 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
 
     let mut float_b = CashFlowSchedule::builder();
     let fallback = if curves.is_some() {
-        finstack_quant_cashflows::builder::FloatingRateFallback::Error
+        FloatingRateFallback::Error
     } else {
-        finstack_quant_cashflows::builder::FloatingRateFallback::SpreadOnly
+        FloatingRateFallback::SpreadOnly
     };
     let _ = float_b
         .principal(irs.notional, float.start, float.end)
