@@ -1,4 +1,5 @@
-//! Stateful [`Performance`] analytics engine.
+//! Stateful [`Performance`] analytics engine and the four single-series
+//! scalar functions (`sharpe`, `sortino`, `volatility`, `max_drawdown`).
 
 use super::types::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
@@ -995,38 +996,7 @@ wire_methods!(
     module = "finstack_quant.analytics"
 );
 
-/// Sharpe ratio of one return series.
-///
-/// Annualized excess arithmetic mean over annualized sample volatility, the
-/// same kernel as ``Performance.sharpe``.
-///
-/// Parameters
-/// ----------
-/// returns : sequence of float | numpy.ndarray | pandas.Series
-///     Per-period simple decimal returns (``0.01`` is +1%) in date order.
-/// risk_free_rate : float, default 0.0
-///     Annualized risk-free rate as a decimal (``0.02`` for 2%),
-///     geometrically decompounded to the observation frequency.
-/// periods_per_year : float, default 252
-///     Observations per year used to annualize (252 daily, 52 weekly,
-///     12 monthly).
-///
-/// Returns
-/// -------
-/// float
-///     Sharpe ratio; ``inf``/``-inf`` when volatility is zero with non-zero
-///     excess return, ``nan`` when ``periods_per_year`` is not positive.
-///
-/// Raises
-/// ------
-/// TypeError
-///     If ``returns`` is not a float sequence, NumPy array, or Series.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.analytics import sharpe
-/// >>> round(sharpe([0.01, -0.02, 0.015, 0.003], 0.0, 252), 4)
-/// 2.0034
+#[doc = pydoc!("finstack_quant.analytics", "sharpe")]
 #[pyfunction]
 #[pyo3(signature = (returns, risk_free_rate = DEFAULT_RISK_FREE_RATE, periods_per_year = DEFAULT_PERIODS_PER_YEAR))]
 fn sharpe(returns: &Bound<'_, PyAny>, risk_free_rate: f64, periods_per_year: f64) -> PyResult<f64> {
@@ -1038,34 +1008,7 @@ fn sharpe(returns: &Bound<'_, PyAny>, risk_free_rate: f64, periods_per_year: f64
     ))
 }
 
-/// Annualized Sortino ratio of one return series.
-///
-/// Parameters
-/// ----------
-/// returns : sequence of float | numpy.ndarray | pandas.Series
-///     Per-period simple decimal returns in date order.
-/// mar : float, default 0.0
-///     Minimum acceptable return **per period** as a decimal (not
-///     annualized), matching ``Performance.sortino``.
-/// periods_per_year : float, default 252
-///     Observations per year used to annualize.
-///
-/// Returns
-/// -------
-/// float
-///     Sortino ratio; ``±inf`` when there is no downside deviation but a
-///     non-zero excess mean, ``nan`` for an invalid ``periods_per_year``.
-///
-/// Raises
-/// ------
-/// TypeError
-///     If ``returns`` is not a float sequence, NumPy array, or Series.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.analytics import sortino
-/// >>> sortino([0.01, -0.02, 0.015, 0.003]) > 0
-/// True
+#[doc = pydoc!("finstack_quant.analytics", "sortino")]
 #[pyfunction]
 #[pyo3(signature = (returns, mar = DEFAULT_MAR, periods_per_year = DEFAULT_PERIODS_PER_YEAR))]
 fn sortino(returns: &Bound<'_, PyAny>, mar: f64, periods_per_year: f64) -> PyResult<f64> {
@@ -1077,32 +1020,7 @@ fn sortino(returns: &Bound<'_, PyAny>, mar: f64, periods_per_year: f64) -> PyRes
     ))
 }
 
-/// Annualized sample volatility (n−1 denominator) of one return series.
-///
-/// Parameters
-/// ----------
-/// returns : sequence of float | numpy.ndarray | pandas.Series
-///     Per-period simple decimal returns in date order.
-/// periods_per_year : float, default 252
-///     Observations per year; the per-period standard deviation is scaled by
-///     its square root.
-///
-/// Returns
-/// -------
-/// float
-///     Annualized volatility as a decimal (``0.15`` is 15%); ``0.0`` for an
-///     empty input, ``nan`` for an invalid ``periods_per_year``.
-///
-/// Raises
-/// ------
-/// TypeError
-///     If ``returns`` is not a float sequence, NumPy array, or Series.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.analytics import volatility
-/// >>> round(volatility([0.01, -0.01, 0.01, -0.01], 252), 4)
-/// 0.1833
+#[doc = pydoc!("finstack_quant.analytics", "volatility")]
 #[pyfunction]
 #[pyo3(signature = (returns, periods_per_year = DEFAULT_PERIODS_PER_YEAR))]
 fn volatility(returns: &Bound<'_, PyAny>, periods_per_year: f64) -> PyResult<f64> {
@@ -1113,30 +1031,7 @@ fn volatility(returns: &Bound<'_, PyAny>, periods_per_year: f64) -> PyResult<f64
     ))
 }
 
-/// Maximum peak-to-trough drawdown of one return series.
-///
-/// Parameters
-/// ----------
-/// returns : sequence of float | numpy.ndarray | pandas.Series
-///     Per-period simple decimal returns in date order; they are compounded
-///     into a wealth path before the running-peak decline is measured.
-///
-/// Returns
-/// -------
-/// float
-///     Non-positive fraction (``-0.25`` is a 25% loss); ``0.0`` when the
-///     series never falls below its running peak or is empty.
-///
-/// Raises
-/// ------
-/// TypeError
-///     If ``returns`` is not a float sequence, NumPy array, or Series.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.analytics import max_drawdown
-/// >>> round(max_drawdown([0.10, -0.20, 0.05]), 4)
-/// -0.2
+#[doc = pydoc!("finstack_quant.analytics", "max_drawdown")]
 #[pyfunction]
 fn max_drawdown(returns: &Bound<'_, PyAny>) -> PyResult<f64> {
     let returns = extract_f64_vec(returns, "returns")?;

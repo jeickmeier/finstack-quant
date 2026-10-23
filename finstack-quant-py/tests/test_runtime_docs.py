@@ -75,6 +75,11 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
         "DrawdownEpisode",
         "LookbackReturns",
         "DatedSeries",
+        "constrained_least_squares",
+        "max_drawdown",
+        "sharpe",
+        "sortino",
+        "volatility",
     ),
     "finstack_quant.core.dates": ("PeriodKind",),
     "finstack_quant.statements_analytics": (

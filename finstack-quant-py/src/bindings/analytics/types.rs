@@ -1,4 +1,4 @@
-//! Result structs and enums for the analytics domain.
+//! Result classes for the analytics domain.
 
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
