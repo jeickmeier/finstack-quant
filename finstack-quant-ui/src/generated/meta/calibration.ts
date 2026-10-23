@@ -2463,7 +2463,7 @@ export default [
   {
     "path": "#/$defs/d_749ad577a783a3d90610",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/HierarchyNode",
-    "description": "A single node in the market data hierarchy tree.\n\nNodes form a tree: each has a name, optional key-value tags for cross-cutting\nqueries, ordered children, and leaf `CurveId` references."
+    "description": "A single node in the market data hierarchy tree.\n\nNodes form a tree: each is named by its key in the parent map, and carries\noptional key-value tags for cross-cutting queries, ordered children, and\nleaf `CurveId` references."
   },
   {
     "path": "#/$defs/d_749ad577a783a3d90610/properties/children",

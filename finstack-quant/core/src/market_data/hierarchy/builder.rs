@@ -52,7 +52,7 @@ impl HierarchyBuilder {
         if !self.hierarchy.roots.contains_key(root_name.as_str()) {
             self.hierarchy
                 .roots
-                .insert(root_name.clone(), HierarchyNode::new(root_name.as_str()));
+                .insert(root_name.clone(), HierarchyNode::new());
         }
 
         if let Some(root) = self.hierarchy.roots.get_mut(root_name.as_str()) {

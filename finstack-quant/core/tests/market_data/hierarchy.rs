@@ -1,7 +1,7 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
 use finstack_quant_core::market_data::hierarchy::{
-    HierarchyNode, HierarchyTarget, MarketDataHierarchy, ResolutionMode, TagFilter, TagPredicate,
+    HierarchyTarget, MarketDataHierarchy, ResolutionMode, TagFilter, TagPredicate,
 };
 use finstack_quant_core::types::CurveId;
 
@@ -48,9 +48,14 @@ fn empty_hierarchy_has_no_roots() {
 }
 
 #[test]
-fn hierarchy_node_stores_name_and_curves() {
-    let node = HierarchyNode::new("USD");
-    assert_eq!(node.name(), "USD");
+fn hierarchy_node_built_from_a_path_starts_empty() {
+    let h = MarketDataHierarchy::builder()
+        .add_node("Rates/USD")
+        .build()
+        .expect("valid hierarchy");
+    let node = h
+        .get_node(&["Rates".to_string(), "USD".to_string()])
+        .expect("USD node");
     assert!(node.curve_ids().is_empty());
     assert!(node.children().is_empty());
     assert!(node.tags().is_empty());

@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "c9e0045c1eba5d5aacb97930ec7f62e1d8ee817532bf670746d77ad3335c6e56",
+          "sha256": "f9291876357aacc8b816b261e5d4c50a584b584f81768705ee471baaa18cae9a",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "66700fa47b8c85bffb0f93b1e53ab8142562577ea3b1ae589ae9af25c70d0b3a",
+          "sha256": "38591755aafbff6b88e823e8578fb09800163eaaaecdd67a9b8f0b30670e6dcc",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -1189,7 +1189,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "c9e0045c1eba5d5aacb97930ec7f62e1d8ee817532bf670746d77ad3335c6e56",
+          "sha256": "f9291876357aacc8b816b261e5d4c50a584b584f81768705ee471baaa18cae9a",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]

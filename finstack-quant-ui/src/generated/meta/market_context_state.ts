@@ -437,7 +437,7 @@ export default [
   {
     "path": "#/$defs/d_467e0d727ff2ae92c819",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode",
-    "description": "A single node in the market data hierarchy tree.\n\nNodes form a tree: each has a name, optional key-value tags for cross-cutting\nqueries, ordered children, and leaf `CurveId` references."
+    "description": "A single node in the market data hierarchy tree.\n\nNodes form a tree: each is named by its key in the parent map, and carries\noptional key-value tags for cross-cutting queries, ordered children, and\nleaf `CurveId` references."
   },
   {
     "path": "#/$defs/d_467e0d727ff2ae92c819/properties/children",

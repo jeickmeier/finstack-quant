@@ -54,17 +54,13 @@ pub(crate) fn parse_path(path: &str) -> crate::Result<Vec<String>> {
 
 /// A single node in the market data hierarchy tree.
 ///
-/// Nodes form a tree: each has a name, optional key-value tags for cross-cutting
-/// queries, ordered children, and leaf `CurveId` references.
+/// Nodes form a tree: each is named by its key in the parent map, and carries
+/// optional key-value tags for cross-cutting queries, ordered children, and
+/// leaf `CurveId` references.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct HierarchyNode {
-    /// Node name. Populated from the parent map key during deserialization.
-    /// Skipped during serde to match the spec's JSON format where the name
-    /// is the map key (e.g., `{ "Rates": { "children": { "USD": ... } } }`).
-    #[serde(skip)]
-    name: String,
     /// Free-form key/value labels on this node, used for selection and
     /// reporting. Insertion order is preserved.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
@@ -79,19 +75,13 @@ pub struct HierarchyNode {
 }
 
 impl HierarchyNode {
-    /// Create a new node with the given name.
-    pub fn new(name: impl Into<String>) -> Self {
+    /// Create an empty node; its name is the map key it is stored under.
+    fn new() -> Self {
         Self {
-            name: name.into(),
             tags: IndexMap::new(),
             children: IndexMap::new(),
             curve_ids: Vec::new(),
         }
-    }
-
-    /// Node display name.
-    pub fn name(&self) -> &str {
-        &self.name
     }
 
     /// Tags attached to this node (key-value metadata).
@@ -118,7 +108,7 @@ impl HierarchyNode {
     pub(crate) fn get_or_create_child(&mut self, name: &str) -> &mut HierarchyNode {
         self.children
             .entry(name.to_string())
-            .or_insert_with(|| HierarchyNode::new(name))
+            .or_insert_with(HierarchyNode::new)
     }
 
     /// Add a curve ID to this node's leaf set.
@@ -140,7 +130,7 @@ pub struct MarketDataHierarchy {
     pub(crate) roots: IndexMap<String, HierarchyNode>,
 }
 
-/// Custom deserialize that populates each node's `name` field from its map key.
+/// Deserialize through the raw map shape, then validate the whole tree.
 impl<'de> Deserialize<'de> for MarketDataHierarchy {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(Deserialize)]
@@ -148,15 +138,7 @@ impl<'de> Deserialize<'de> for MarketDataHierarchy {
         struct Raw {
             roots: IndexMap<String, HierarchyNode>,
         }
-        let mut raw = Raw::deserialize(deserializer)?;
-        // Recursively set name from map key
-        fn fixup_names(children: &mut IndexMap<String, HierarchyNode>) {
-            for (key, node) in children.iter_mut() {
-                node.name = key.clone();
-                fixup_names(&mut node.children);
-            }
-        }
-        fixup_names(&mut raw.roots);
+        let raw = Raw::deserialize(deserializer)?;
         let hierarchy = MarketDataHierarchy { roots: raw.roots };
         hierarchy.validate().map_err(serde::de::Error::custom)?;
         Ok(hierarchy)
@@ -195,36 +177,29 @@ impl MarketDataHierarchy {
     /// Validate structural hierarchy invariants; run by deserialization and by
     /// [`HierarchyBuilder::build`].
     ///
-    /// A valid hierarchy has non-empty names which agree with their containing
-    /// map keys, and each [`CurveId`] appears at most once across every root
-    /// and descendant. Empty hierarchy roots are permitted.
+    /// A valid hierarchy has non-empty node names (the map keys), and each
+    /// [`CurveId`] appears at most once across every root and descendant. Empty
+    /// hierarchy roots are permitted.
     ///
     /// # Errors
     ///
-    /// Returns an error for an empty node name, a child whose name does not
-    /// match its map key, or a curve identifier assigned to more than one
-    /// hierarchy path. The diagnostic identifies the conflicting paths.
+    /// Returns an error for an empty node name or a curve identifier assigned
+    /// to more than one hierarchy path. The diagnostic identifies the
+    /// conflicting paths.
     pub(crate) fn validate(&self) -> crate::Result<()> {
         fn visit(
             node: &HierarchyNode,
-            expected_name: &str,
+            name: &str,
             path: &mut Vec<String>,
             seen: &mut FxHashMap<CurveId, String>,
         ) -> crate::Result<()> {
-            if expected_name.is_empty() || node.name().is_empty() {
+            if name.is_empty() {
                 return Err(crate::Error::Validation(
                     "Hierarchy node names must not be empty".to_string(),
                 ));
             }
-            if node.name() != expected_name {
-                return Err(crate::Error::Validation(format!(
-                    "Hierarchy node name '{}' does not match its map key '{}'",
-                    node.name(),
-                    expected_name
-                )));
-            }
 
-            path.push(node.name().to_string());
+            path.push(name.to_string());
             let current_path = path.join("/");
 
             for curve_id in node.curve_ids() {
