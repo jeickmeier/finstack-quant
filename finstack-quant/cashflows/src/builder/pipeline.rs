@@ -4,12 +4,13 @@
 //! and projected here into a [`CashFlowSchedule`].
 
 use super::compiler::{FixedSchedule, FloatSchedule, PeriodicFee};
+use super::date_generation::CompiledPeriod;
 use super::emission::{
     emit_amortization_on, emit_fees_on, emit_fixed_coupons_on, emit_float_coupons_on,
     ResolvedFloatMarket,
 };
 use super::orchestrator::{
-    apply_principal_event, initialize_build_state, AmortizationSetup, BuildState,
+    apply_principal_event, coupon_periods, initialize_build_state, AmortizationSetup, BuildState,
     PreparedAmortization,
 };
 use super::schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
@@ -29,6 +30,12 @@ use std::sync::Arc;
 use tracing::debug;
 
 impl CompiledCashFlowPlan {
+    /// Every fixed, floating and periodic-fee period, in schedule order.
+    fn all_periods(&self) -> impl Iterator<Item = &CompiledPeriod> {
+        coupon_periods(&self.fixed_schedules, &self.float_schedules)
+            .chain(self.periodic_fees.iter().flat_map(|s| &s.periods))
+    }
+
     /// Emit amortization scheduled exactly on the issue date.
     pub(super) fn process_issue_amortization(
         &self,
@@ -188,13 +195,7 @@ impl CompiledCashFlowPlan {
             .sum();
         let mut dates = Vec::with_capacity(3 + estimated_periods * 3 + self.principal_events.len());
         dates.extend([self.issue, self.maturity, self.redemption_date]);
-        for entry in self
-            .fixed_schedules
-            .iter()
-            .flat_map(|s| &s.periods)
-            .chain(self.float_schedules.iter().flat_map(|s| &s.periods))
-            .chain(self.periodic_fees.iter().flat_map(|s| &s.periods))
-        {
+        for entry in self.all_periods() {
             let period = &entry.period;
             dates.extend([
                 period.accrual_start,
@@ -202,15 +203,13 @@ impl CompiledCashFlowPlan {
                 period.payment_date,
             ]);
         }
-        match &self.notional.amort {
-            AmortizationSpec::CustomPrincipal { items } => {
-                dates.extend(items.iter().map(|(date, _)| *date))
-            }
-            AmortizationSpec::StepRemaining { schedule } => {
-                dates.extend(schedule.iter().map(|(date, _)| *date))
-            }
-            _ => {}
-        }
+        dates.extend(
+            self.notional
+                .amort
+                .dated_amounts()
+                .iter()
+                .map(|(date, _)| *date),
+        );
         for ev in &self.principal_events {
             dates.push(ev.date);
         }
@@ -249,20 +248,8 @@ impl CompiledCashFlowPlan {
         observation_date: Option<Date>,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let accrual_start = self
-            .fixed_schedules
-            .iter()
-            .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period))
-            .chain(
-                self.float_schedules
-                    .iter()
-                    .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period)),
-            )
-            .chain(
-                self.periodic_fees
-                    .iter()
-                    .flat_map(|schedule| schedule.periods.iter().map(|entry| &entry.period)),
-            )
-            .map(|period| period.accrual_start)
+            .all_periods()
+            .map(|entry| entry.period.accrual_start)
             .min()
             .unwrap_or(self.issue);
         let mut state = initialize_build_state(
