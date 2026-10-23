@@ -827,3 +827,34 @@ test('structured credit recovery-only specifications are reported and fully disa
     assert.deepEqual(deal.stochasticRecoverySpec, recovery);
   }
 });
+
+test('commodity spot money currency is checked at expiry and in Monte Carlo', () => {
+  const fixtures = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant/valuations/tests/fixtures/valuation_binding_regressions.json',
+        import.meta.url
+      )
+    )
+  );
+  for (const [model, asOf] of [
+    ['black76', '2025-06-15'],
+    ['monte_carlo_schwartz_smith', '2025-01-02'],
+  ]) {
+    const instrument = structuredClone(fixtures.commodity);
+    instrument.instrument.spec.instrument_pricing_overrides.model_config.mc_paths = 64;
+    const market = structuredClone(fixtures.market);
+    const price = () =>
+      instruments.priceInstrument(JSON.stringify(instrument), JSON.stringify(market), asOf, model);
+    const numeric = price().value;
+    market.prices['WTI-SPOT'] = { price: { amount: '80', currency: 'USD' } };
+    assert.deepEqual(price().value, numeric);
+    market.prices['WTI-SPOT'].price.currency = 'EUR';
+    assert.throws(
+      price,
+      (error) =>
+        error.kind === 'validation' &&
+        /Currency mismatch: expected USD, got EUR/.test(error.message)
+    );
+  }
+});
