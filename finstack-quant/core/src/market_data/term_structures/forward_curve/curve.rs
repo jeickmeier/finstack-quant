@@ -452,11 +452,6 @@ impl ForwardCurve {
         }
 
         let tau = self.tenor;
-        if !tau.is_finite() || tau <= 0.0 {
-            return Err(crate::Error::Validation(
-                "forward curve tenor must be finite and positive".to_string(),
-            ));
-        }
 
         let mut log_df = 0.0_f64;
         let mut cur = 0.0_f64;
@@ -530,9 +525,9 @@ impl ForwardCurve {
     ///
     /// # Errors
     ///
-    /// Returns an error when `t` is non-finite or negative, the stored tenor
-    /// is invalid, a projection step cannot produce a finite positive discount
-    /// factor, or the final exponentiation is non-finite or non-positive.
+    /// Returns an error when `t` is non-finite or negative, a projection step
+    /// cannot produce a finite positive discount factor, or the final
+    /// exponentiation is non-finite or non-positive.
     ///
     /// # Arguments
     ///
