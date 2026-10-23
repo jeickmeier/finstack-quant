@@ -767,37 +767,6 @@ impl CompiledCashFlowPlan {
             )?;
         }
 
-        let threshold = Decimal::new(1, 4); // 1e-4 = 1 bp relative
-        let initial_amount = self.notional.initial.amount();
-        if initial_amount.abs() > 0.0 {
-            let initial_dec = f64_to_decimal(initial_amount)?;
-            if initial_dec != Decimal::ZERO {
-                let abs_outstanding = if state.outstanding < Decimal::ZERO {
-                    -state.outstanding
-                } else {
-                    state.outstanding
-                };
-                let abs_initial = if initial_dec < Decimal::ZERO {
-                    -initial_dec
-                } else {
-                    initial_dec
-                };
-                let relative_residual = abs_outstanding / abs_initial;
-                if relative_residual > threshold {
-                    let final_outstanding = state.outstanding.as_f64();
-                    let relative_residual_f64 = relative_residual.as_f64();
-                    tracing::warn!(
-                        initial = initial_amount,
-                        final_outstanding,
-                        relative_residual = relative_residual_f64,
-                        threshold_bp = 1.0,
-                        "cashflow schedule: final outstanding balance deviates from zero; \
-                         check amortization schedule or instrument terminal flow"
-                    );
-                }
-            }
-        }
-
         let flows = state.flows;
         let (meta, out_day_count) = finalize_flows(
             &self.fixed_schedules,
