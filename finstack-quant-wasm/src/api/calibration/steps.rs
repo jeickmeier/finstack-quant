@@ -76,7 +76,7 @@ pub fn calibration_step_discount(
 /// @param discount_curve_id - Identifier of the discount curve used to price the quotes.
 /// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @param curve_id - Identifier of the produced curve; defaults to `id`.
-/// @param params - Optional object (or JSON) of further wire fields: `method`, `interpolation` (default `"monotone_convex"`), `conventions`. An entry named like another argument is replaced by that argument.
+/// @param params - Optional object (or JSON) of further wire fields: `method`, `interpolation` (default `"cubic_hermite"`), `conventions`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "forward"`.
 ///
 /// # Errors

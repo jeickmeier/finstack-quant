@@ -268,8 +268,8 @@
             },
             "interpolation": {
               "$ref": "#/$defs/d_e82c3e0b6558910d838d",
-              "default": "monotone_convex",
-              "description": "Interpolation style for the constructed forward curve.\n\nDefaults to Hagan-West monotone-convex interpolation for a smooth,\nshape-preserving forward term structure. `Linear` remains explicitly\nopt-in."
+              "default": "cubic_hermite",
+              "description": "Interpolation style for the constructed forward curve.\n\nDefaults to monotone cubic Hermite (Fritsch-Carlson) interpolation for a\nsmooth, shape-preserving forward term structure that admits zero and\nnegative rates. `Linear` remains explicitly opt-in; `MonotoneConvex` is\nrejected because it is defined on discount factors, not forward rates."
             },
             "kind": {
               "const": "forward",
