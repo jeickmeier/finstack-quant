@@ -283,9 +283,8 @@ impl std::str::FromStr for InflationLag {
 #[serde(try_from = "InflationIndexWire", into = "InflationIndexWire")]
 #[cfg_attr(feature = "json-schema", schemars(try_from = "InflationIndexWire"))]
 pub struct InflationIndex {
-    /// Unique identifier for this index (e.g., "US-CPI-U", "UK-RPI")
-    id: String,
-    /// Canonical observations and calendar-time interpolation policy.
+    /// Canonical observations and calendar-time interpolation policy; its id is
+    /// the index identifier (e.g., "US-CPI-U", "UK-RPI").
     series: ScalarTimeSeries,
     /// Lag policy for index application
     lag: InflationLag,
@@ -323,15 +322,10 @@ impl InflationIndex {
         observations: Vec<(Date, f64)>,
         currency: Currency,
     ) -> Result<Self> {
-        if observations.is_empty() {
-            return Err(Error::Input(crate::InputError::TooFewPoints));
-        }
-
-        // Use a placeholder internal id; external id is stored separately.
-        let series = ScalarTimeSeries::new("inflation-index", observations, Some(currency))?;
+        let id = id.into();
+        let series = ScalarTimeSeries::new(&id, observations, Some(currency))?;
 
         Ok(Self {
-            id: id.into(),
             series,
             lag: InflationLag::default(),
             currency,
@@ -343,7 +337,7 @@ impl InflationIndex {
     /// Unique identifier for this index (e.g., `"US-CPI-U"`, `"UK-RPI"`).
     #[inline]
     pub fn id(&self) -> &str {
-        &self.id
+        self.series.id().as_str()
     }
 
     /// Reporting currency of this inflation index.
@@ -487,7 +481,7 @@ impl InflationIndex {
                 .ok_or(Error::Input(crate::InputError::InvalidDateRange))?,
         };
         let base_value = self.series.value_on(effective_date)?;
-        let adjusted_value = self.apply_seasonality(base_value, effective_date)?;
+        let adjusted_value = self.apply_seasonality(base_value, effective_date);
 
         Ok(adjusted_value)
     }
@@ -528,12 +522,12 @@ impl InflationIndex {
         let lag_months = i32::try_from(lag_months)
             .map_err(|_| Error::Validation("CPI lag months exceed supported range".into()))?;
         let anchor0 = first_of_month.add_months(-lag_months)?;
-        let cpi0 = self.apply_seasonality(self.series.value_in_month(anchor0)?, anchor0)?;
+        let cpi0 = self.apply_seasonality(self.series.value_in_month(anchor0)?, anchor0);
         if date.day() == 1 {
             return Ok(cpi0);
         }
         let anchor1 = anchor0.add_months(1)?;
-        let cpi1 = self.apply_seasonality(self.series.value_in_month(anchor1)?, anchor1)?;
+        let cpi1 = self.apply_seasonality(self.series.value_in_month(anchor1)?, anchor1);
 
         let days_in_month = f64::from(date.month().length(date.year()));
         let weight = (f64::from(date.day()) - 1.0) / days_in_month;
@@ -627,12 +621,12 @@ impl InflationIndex {
         self.seasonality.as_ref()
     }
 
-    fn apply_seasonality(&self, base_value: f64, date: Date) -> Result<f64> {
+    fn apply_seasonality(&self, base_value: f64, date: Date) -> f64 {
         if let Some(factors) = &self.seasonality {
             let month_idx = (date.month() as usize) - 1;
-            Ok(base_value * factors[month_idx])
+            base_value * factors[month_idx]
         } else {
-            Ok(base_value)
+            base_value
         }
     }
 }
@@ -680,7 +674,7 @@ impl From<InflationIndex> for InflationIndexWire {
         let observations = index.observations();
 
         InflationIndexWire {
-            id: index.id.to_owned(),
+            id: index.id().to_owned(),
             currency: index.currency,
             observations,
             interpolation: index.interpolation(),
