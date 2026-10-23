@@ -256,15 +256,11 @@ fn registered_term_loan_metrics_cross_wasm_json_boundary() {
 
 #[wasm_bindgen_test]
 fn public_json_routes_validate_instrument_before_malformed_market() {
-    use finstack_quant_wasm::api::valuations::typed::structured::{
-        tranche_breakeven_cdr, tranche_discount_margin, tranche_metrics, tranche_oas,
-        tranche_scenario_table,
-    };
-
     let instrument = invalid_structured_credit_instrument_json();
     let market = "not-market-json";
     let metrics = serde_wasm_bindgen::to_value(&vec!["not-a-metric".to_string()]).unwrap();
 
+    assert!(JsStructuredCredit::from_json(JsValue::from(&instrument)).is_err());
     let errors = [
         price_instrument(
             JsValue::from(&instrument),
@@ -293,47 +289,6 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
             JsValue::from(market),
             JsValue::from("not-a-date"),
             JsValue::from("not-a-model"),
-        )
-        .unwrap_err(),
-        tranche_discount_margin(
-            JsValue::from(&instrument),
-            JsValue::from("missing"),
-            JsValue::from(market),
-            JsValue::from("not-a-date"),
-            JsValue::from(f64::NAN),
-        )
-        .unwrap_err(),
-        tranche_breakeven_cdr(
-            JsValue::from(&instrument),
-            JsValue::from("missing"),
-            JsValue::from(market),
-            JsValue::from("not-a-date"),
-        )
-        .unwrap_err(),
-        tranche_oas(
-            JsValue::from(&instrument),
-            JsValue::from("missing"),
-            JsValue::from(market),
-            JsValue::from("not-a-date"),
-            JsValue::from(f64::NAN),
-            Some(JsValue::from("not-json".to_string())),
-        )
-        .unwrap_err(),
-        tranche_scenario_table(
-            JsValue::from(&instrument),
-            JsValue::from("missing"),
-            JsValue::from(market),
-            JsValue::from("not-a-date"),
-            JsValue::from("not-json"),
-        )
-        .unwrap_err(),
-        tranche_metrics(
-            JsValue::from(&instrument),
-            JsValue::from("missing"),
-            JsValue::from(market),
-            JsValue::from("not-a-date"),
-            Some(JsValue::from(f64::NAN)),
-            None,
         )
         .unwrap_err(),
     ];
@@ -445,17 +400,18 @@ fn js_object_to_json(value: &wasm_bindgen::JsValue) -> serde_json::Value {
 }
 
 #[wasm_bindgen_test]
-fn structured_credit_tranche_metrics_through_json() {
+fn structured_credit_tranche_metrics_borrow_typed_deal() {
     use finstack_quant_wasm::api::valuations::typed::structured::{
         tranche_breakeven_cdr, tranche_discount_margin, tranche_metrics, tranche_oas,
         tranche_scenario_table,
     };
 
     let inst = structured_credit_instrument_json();
+    let deal = JsStructuredCredit::from_json(JsValue::from(&inst)).expect("typed deal");
     let mkt = market_context_json();
 
     let breakeven = tranche_breakeven_cdr(
-        JsValue::from(&inst),
+        &deal,
         JsValue::from("SR"),
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
@@ -467,7 +423,7 @@ fn structured_credit_tranche_metrics_through_json() {
     // fixed-rate, so the binding must surface the validation error rather than
     // silently returning a value (parity with the Python negative test).
     let dm_err = tranche_discount_margin(
-        JsValue::from(&inst),
+        &deal,
         JsValue::from("SR"),
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
@@ -477,7 +433,7 @@ fn structured_credit_tranche_metrics_through_json() {
     assert!(format!("{dm_err:?}").to_lowercase().contains("floating"));
 
     let oas = tranche_oas(
-        JsValue::from(&inst),
+        &deal,
         JsValue::from("SR"),
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
@@ -490,7 +446,7 @@ fn structured_credit_tranche_metrics_through_json() {
 
     let grid = r#"{"cprs":[0.10,0.20],"cdrs":[0.02],"severities":[0.40]}"#;
     let table = tranche_scenario_table(
-        JsValue::from(&inst),
+        &deal,
         JsValue::from("SR"),
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
@@ -502,7 +458,7 @@ fn structured_credit_tranche_metrics_through_json() {
 
     // Per-tranche metrics bundle: model-price z-spread ~ 0, widening at a cheaper price.
     let tm = tranche_metrics(
-        JsValue::from(&inst),
+        &deal,
         JsValue::from("SR"),
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
@@ -514,7 +470,7 @@ fn structured_credit_tranche_metrics_through_json() {
     assert_eq!(tm_parsed["tranche_id"], "SR");
     assert!(tm_parsed["pv"].as_f64().expect("pv") > 0.0);
     let tm_cheap = tranche_metrics(
-        JsValue::from(&inst),
+        &deal,
         JsValue::from("SR"),
         JsValue::from(&mkt),
         JsValue::from("2024-01-01"),
@@ -550,46 +506,6 @@ fn price_instrument_structured_credit_stochastic_missing_market_data_errors() {
 }
 
 #[wasm_bindgen_test]
-fn public_json_routes_validate_instrument_before_market_json_binding() {
-    assert!(tranche_discount_margin(
-        JsValue::from("{}"),
-        JsValue::from("missing"),
-        JsValue::from("not-market-json"),
-        JsValue::from("not-a-date"),
-        JsValue::from(f64::NAN),
-    )
-    .is_err());
-    assert!(tranche_breakeven_cdr(
-        JsValue::from("{}"),
-        JsValue::from("missing"),
-        JsValue::from("not-market-json"),
-        JsValue::from("not-a-date"),
-    )
-    .is_err());
-    assert!(tranche_oas(
-        JsValue::from("{}"),
-        JsValue::from("missing"),
-        JsValue::from("not-market-json"),
-        JsValue::from("not-a-date"),
-        JsValue::from(f64::NAN),
-        Some(JsValue::from("not-json".to_string())),
-    )
-    .is_err());
-    assert!(tranche_scenario_table(
-        JsValue::from("{}"),
-        JsValue::from("missing"),
-        JsValue::from("not-market-json"),
-        JsValue::from("not-a-date"),
-        JsValue::from("not-json"),
-    )
-    .is_err());
-    assert!(tranche_metrics(
-        JsValue::from("{}"),
-        JsValue::from("missing"),
-        JsValue::from("not-market-json"),
-        JsValue::from("not-a-date"),
-        Some(JsValue::from(f64::NAN)),
-        None,
-    )
-    .is_err());
+fn structured_credit_persistence_rejects_invalid_envelopes() {
+    assert!(JsStructuredCredit::from_json(JsValue::from("{}")).is_err());
 }

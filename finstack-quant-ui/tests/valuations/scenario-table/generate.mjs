@@ -30,18 +30,23 @@ const grid = {
   trancheId = "CLONOTES-A";
 const cases = [instrument, factor].map((input, index) => {
   const instrumentJson = native.validateInstrumentJson(JSON.stringify(input));
-  const table = native.trancheScenarioTable(
-    instrumentJson,
-    trancheId,
-    marketJson,
-    asOf,
-    JSON.stringify(grid),
-  );
-  return {
-    name: index ? "factor-adjusted" : "original",
-    instrument: JSON.parse(instrumentJson),
-    table,
-  };
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    const table = native.trancheScenarioTable(
+      deal,
+      trancheId,
+      marketJson,
+      asOf,
+      JSON.stringify(grid),
+    );
+    return {
+      name: index ? "factor-adjusted" : "original",
+      instrument: JSON.parse(instrumentJson),
+      table,
+    };
+  } finally {
+    deal.free();
+  }
 });
 await writeFile(
   new URL("./cases.json", import.meta.url),

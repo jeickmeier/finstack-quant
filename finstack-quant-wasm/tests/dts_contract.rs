@@ -666,23 +666,23 @@ fn structured_credit_tranche_analytics_declare_typed_results() {
     assert!(declares_type(&dts, "ScenarioCell"));
     assert!(contains_ignoring_ws(
         &dts,
-        "trancheOas(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number, config?: string | null): OasResult;",
+        "trancheOas(deal: StructuredCredit, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number, config?: string | null): OasResult;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "trancheMetrics(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct?: number | null, metrics?: string[] | null): TrancheMetrics;",
+        "trancheMetrics(deal: StructuredCredit, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct?: number | null, metrics?: string[] | null): TrancheMetrics;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "trancheScenarioTable(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, grid: string): ScenarioTable;",
+        "trancheScenarioTable(deal: StructuredCredit, trancheId: string, marketJson: JsonInput, asOf: string, grid: string): ScenarioTable;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "trancheDiscountMargin(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number): number;",
+        "trancheDiscountMargin(deal: StructuredCredit, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number): number;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "trancheBreakevenCdr(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string): number;",
+        "trancheBreakevenCdr(deal: StructuredCredit, trancheId: string, marketJson: JsonInput, asOf: string): number;",
     ));
 }
 
