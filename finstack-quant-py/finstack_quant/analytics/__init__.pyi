@@ -1,7 +1,7 @@
 """
 Performance analytics: returns, drawdowns, risk metrics, and benchmarks.
 
-The sole entry point is :class:`Performance`. Construct from a price panel
+The panel entry point is :class:`Performance`. Construct from a price panel
 (``Performance(prices_df)`` / ``Performance.from_arrays(...)``) or from a
 return panel (``Performance.from_returns(returns_df)`` /
 ``Performance.from_returns_arrays(...)``); every analytic — return / risk
@@ -10,9 +10,12 @@ scalars, drawdown statistics, rolling windows, periodic returns
 method on the resulting instance.
 
 The remaining classes are value-object outputs returned by `Performance`
-methods (`LookbackReturns`, `PeriodStats`, etc.). Four scalar free functions
+methods (`LookbackReturns`, `PeriodStats`, etc.) and the
+:class:`AnalyticsError` exception. Four scalar free functions
 (:func:`sharpe`, :func:`sortino`, :func:`volatility`, :func:`max_drawdown`)
-cover a single return series without a panel.
+cover a single return series without a panel, and
+:func:`constrained_least_squares` fits factor returns for factor-Brinson
+attribution.
 
 Examples
 --------
@@ -2629,7 +2632,8 @@ class Performance:
         Returns
         -------
         pd.Series
-            Sum of gains divided by sum of absolute losses indexed by ticker name.
+            Sum of all returns divided by the sum of absolute losses, indexed by
+            ticker name.
 
         Notes
         -----
@@ -3420,7 +3424,7 @@ class Performance:
             ``risk_free_rate`` is non-zero with ``"excess"``.
         AnalyticsError
             If ``ticker_idx`` is out of range, no factors are supplied, factor
-            lengths differ from the ticker return series, returns are
+            lengths differ from the ticker return series, factor returns are
             non-finite, observations are insufficient, or the regression is
             numerically singular; also if a fitted coefficient, annualized
             intercept, or residual volatility cannot be represented as a
@@ -3761,8 +3765,8 @@ def volatility(
     Returns
     -------
     float
-        Annualized volatility as a decimal (``0.15`` is 15%); ``0.0`` for an
-        empty input, ``nan`` for an invalid ``periods_per_year``.
+        Annualized volatility as a decimal (``0.15`` is 15%); ``0.0`` for fewer
+        than two observations, ``nan`` for an invalid ``periods_per_year``.
 
     Raises
     ------

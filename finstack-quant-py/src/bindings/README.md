@@ -24,7 +24,7 @@ for this crate.
 | Path | Visibility | Role |
 |------|-----------|------|
 | `mod.rs` | private (`mod bindings;` in `../lib.rs`) | Declares every submodule; `register_root` sets `__package__`, `__version__` (from `CARGO_PKG_VERSION`), calls the 13 domain `register` functions plus `schema::register` in a fixed order, and sets the root `__all__` |
-| `analytics/` | `pub` | `Performance` and `constrained_least_squares` — `performance.rs`, `regression.rs`, `types.rs` |
+| `analytics/` | `pub` | `Performance`, the scalar `sharpe` / `sortino` / `volatility` / `max_drawdown`, and `constrained_least_squares` — `performance.rs`, `regression.rs`, `types.rs` |
 | `attribution/` | `pub` | `entry.rs` (spec pipeline), `pnl_attribution.rs`, `return_contribution.rs`, `schema.rs` |
 | `cashflows/` | `pub` | `builder/` (`orchestrator.rs`, `schedule.rs`, `specs.rs`), `accrual.rs`, `aggregation.rs`, `primitives.rs`, `schema.rs` |
 | `core/` | `pub` | Most files (45), though `valuations/` is larger by line count: `dates/`, `market_data/` (with `curves/`), `math/`, `credit/`, plus `config.rs`, `currency.rs`, `money.rs`, `types.rs`, `rating_scales.rs`, `table.rs`, `schema.rs` |
