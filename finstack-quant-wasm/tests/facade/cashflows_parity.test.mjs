@@ -395,14 +395,17 @@ const cases = {
     { split: { cash_fraction: '0.6', pik_fraction: '0.4' } },
     { undrawn: { commitment: usd('5000000') } },
     { fixed: { date: '2025-03-01', amount: usd('25000') } },
-    cashflows.feeSpecPeriodicBp({
-      base: { undrawn: { commitment: usd('5000000') } },
-      bp: '37.5',
-      frequency: { count: 3, unit: 'months' },
-      day_count: 'act_360',
-      business_day_convention: 'modified_following',
-      calendar_id: 'usny',
-    }),
+    {
+      periodic_bp: {
+        base: { undrawn: { commitment: usd('5000000') } },
+        bp: '37.5',
+        frequency: { count: 3, unit: 'months' },
+        day_count: 'act_360',
+        business_day_convention: 'modified_following',
+        calendar_id: 'usny',
+        stub: 'short_front',
+      },
+    },
     { fixed_rate: '0.03' },
     { compounded_in_arrears: { lookback_days: 5 } },
     { compounded_with_observation_shift: { shift_days: 2 } },
@@ -694,8 +697,8 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     kind('invalid_type', /^seasoningMonths: /)
   );
   assert.throws(
-    () => cashflows.feeSpecPeriodicBp({ bp: '10' }),
-    kind('validation', /fields: missing field `base`/)
+    () => new cashflows.CashFlowBuilder().fee({ periodic_bp: { bp: '10' } }),
+    kind('validation', /missing field `base`/)
   );
   assert.throws(
     () => cashflows.notionalPar(100, 'usd!'),

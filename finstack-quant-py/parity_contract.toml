@@ -2341,8 +2341,7 @@ excluded = { constant_cdr = "literal", cumulative_loss = "literal", sda = "liter
 excluded = { undrawn = "literal", kind = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FeeSpec"]
-renames = { periodic_bp = { js = "cashflows.feeSpecPeriodicBp", reason = "WASM FeeSpec values are plain objects; the Rust FeeSpec::PeriodicBp variant is built by a free function returning the wire value" } }
-excluded = { fixed = "literal", kind = "literal" }
+excluded = { fixed = "literal", periodic_bp = "literal", kind = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FixedCouponSpec"]
 excluded = { schedule = "literal" }

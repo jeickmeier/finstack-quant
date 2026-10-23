@@ -403,7 +403,6 @@
       "defaultModelSpecValidate",
       "exCouponRuleExDate",
       "exCouponRuleIsExCoupon",
-      "feeSpecPeriodicBp",
       "floatingLegCompoundingIsOvernight",
       "floatingLegCompoundingSofrObservationShift",
       "floatingLegCompoundingSoniaObservationShift",
@@ -541,9 +540,6 @@
     "kind": "function"
   },
   "cashflows.exCouponRuleIsExCoupon": {
-    "kind": "function"
-  },
-  "cashflows.feeSpecPeriodicBp": {
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingIsOvernight": {

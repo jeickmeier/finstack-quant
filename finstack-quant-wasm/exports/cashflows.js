@@ -45,7 +45,6 @@ export const cashflows = {
   defaultModelSpecValidate: wasm.defaultModelSpecValidate,
   exCouponRuleExDate: wasm.exCouponRuleExDate,
   exCouponRuleIsExCoupon: wasm.exCouponRuleIsExCoupon,
-  feeSpecPeriodicBp: wasm.feeSpecPeriodicBp,
   floatingLegCompoundingIsOvernight: wasm.floatingLegCompoundingIsOvernight,
   floatingLegCompoundingSofrObservationShift: wasm.floatingLegCompoundingSofrObservationShift,
   floatingLegCompoundingSoniaObservationShift: wasm.floatingLegCompoundingSoniaObservationShift,

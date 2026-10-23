@@ -93,7 +93,6 @@ const EXPORTED_KEYS = [
   'defaultModelSpecValidate',
   'exCouponRuleExDate',
   'exCouponRuleIsExCoupon',
-  'feeSpecPeriodicBp',
   'floatingLegCompoundingIsOvernight',
   'floatingLegCompoundingSofrObservationShift',
   'floatingLegCompoundingSoniaObservationShift',
