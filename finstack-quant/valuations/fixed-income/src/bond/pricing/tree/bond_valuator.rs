@@ -716,7 +716,7 @@ impl BondValuator {
         }
 
         // Source recovery rate from the bond's explicit credit_curve_id,
-        // consistent with HazardBondEngine.
+        // consistent with the hazard-rate pricing kernel.
         let recovery_rate = Self::resolve_recovery_rate(&bond, market_context);
         let call_friction_cents = bond
             .instrument_pricing_overrides
@@ -1145,7 +1145,7 @@ impl BondValuator {
     }
 
     /// Resolve the recovery rate from the bond's explicit `credit_curve_id`
-    /// opt-in, consistent with `HazardBondEngine` and `TreePricer`.
+    /// opt-in, consistent with the hazard-rate and tree pricing kernels.
     ///
     /// Returns `None` when the bond has no `credit_curve_id` or the named
     /// hazard curve is absent from the market context.

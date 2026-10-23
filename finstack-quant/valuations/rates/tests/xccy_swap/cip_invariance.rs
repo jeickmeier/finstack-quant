@@ -645,10 +645,10 @@ fn cip_invariance_holds_under_reversed_rate_ordering() {
 }
 
 /// A fixed-notional swap with no principal exchange leaves the EUR coupon
-/// stream as an open FX position. `fx_delta` reports the PV change for a 1%
+/// stream as an open FX position. `fx01` reports the PV change for a 1%
 /// spot move and must equal an independent revaluation at ±1% spot.
 #[test]
-fn fx_delta_matches_one_percent_spot_revaluation() {
+fn fx01_matches_one_percent_spot_revaluation() {
     use finstack_quant_valuations_core::instruments::PricingOptions;
     use finstack_quant_valuations_core::metrics::MetricId;
 
@@ -657,14 +657,8 @@ fn fx_delta_matches_one_percent_spot_revaluation() {
     let market = build_market_context();
 
     let result = swap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::FxDelta, MetricId::Fx01],
-            PricingOptions::default(),
-        )
+        .price_with_metrics(&market, as_of, &[MetricId::Fx01], PricingOptions::default())
         .expect("FX metrics");
-    let fx_delta = *result.measures.get("fx_delta").expect("fx_delta");
     let fx01 = *result.measures.get("fx01").expect("fx01");
 
     let pv_at = |spot: f64| {
@@ -678,8 +672,7 @@ fn fx_delta_matches_one_percent_spot_revaluation() {
         "fixture must carry FX exposure, got {expected}"
     );
     assert!(
-        (fx_delta - expected).abs() < 1e-6 * expected.abs(),
-        "fx_delta {fx_delta} should equal the ±1% spot revaluation {expected}"
+        (fx01 - expected).abs() < 1e-6 * expected.abs(),
+        "fx01 {fx01} should equal the ±1% spot revaluation {expected}"
     );
-    assert_eq!(fx_delta, fx01, "fx_delta and fx01 are the same quantity");
 }

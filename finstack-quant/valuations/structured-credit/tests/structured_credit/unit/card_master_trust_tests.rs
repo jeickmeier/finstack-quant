@@ -13,10 +13,10 @@ use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AbsExcessSpreadCalculator, AbsPaymentRateCalculator, AssetPool,
-    CardPortfolioSpec, ControlledAccumulationSpec, DealFees, DealType, EarlyAmortizationSpec,
-    PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche,
-    TrancheCashflows, TrancheStructure, WaterfallRules,
+    AbsExcessSpreadCalculator, AbsPaymentRateCalculator, AssetPool, CardPortfolioSpec,
+    ControlledAccumulationSpec, DealFees, DealType, EarlyAmortizationSpec, PoolAsset,
+    ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows,
+    TrancheStructure, WaterfallRules,
 };
 use std::sync::Arc;
 use time::Month;
@@ -100,9 +100,20 @@ fn trust(spec: CardPortfolioSpec, revolving_end: Date) -> StructuredCredit {
     .expect("structure");
     let mut deal = StructuredCredit {
         fees: Some(fees(0.0)),
-        ..StructuredCredit::new_abs("CARD-MT", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse")
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CARD-MT".into(),
+                pool,
+                tranches,
+                closing_date: close(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse")
     };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -144,7 +155,9 @@ fn no_rules() -> WaterfallRules {
 }
 
 fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
-    run_simulation(deal, &market(), close()).expect("simulation")
+    deal.run_simulation(&market(), close())
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 fn first_principal(results: &FxHashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
@@ -346,12 +359,7 @@ fn early_amortization_pays_down_at_the_fixed_allocation_of_the_payment_rate() {
             ..no_rules()
         },
     );
-    let run = finstack_quant_valuations_structured_credit::structured_credit::run_simulation_with_diagnostics(
-        &deal,
-        &market(),
-        close(),
-    )
-    .expect("simulation");
+    let run = deal.run_simulation(&market(), close()).expect("simulation");
     let a_flows: Vec<(Date, f64)> = run.tranches["A"]
         .principal_flows
         .iter()
@@ -432,12 +440,7 @@ fn fixed_allocation_pct_applies_to_the_level_trust_receivables() {
             ..no_rules()
         },
     );
-    let diagnostics = finstack_quant_valuations_structured_credit::structured_credit::run_simulation_with_diagnostics(
-        &deal,
-        &market(),
-        close(),
-    )
-    .expect("simulation");
+    let diagnostics = deal.run_simulation(&market(), close()).expect("simulation");
     let first_accumulating = diagnostics
         .diagnostics
         .periods
@@ -469,12 +472,9 @@ fn fixed_allocation_pct_applies_to_the_level_trust_receivables() {
             ..no_rules()
         },
     );
-    let floating = finstack_quant_valuations_structured_credit::structured_credit::run_simulation_with_diagnostics(
-        &floating,
-        &market(),
-        close(),
-    )
-    .expect("simulation");
+    let floating = floating
+        .run_simulation(&market(), close())
+        .expect("simulation");
     let principal = floating
         .diagnostics
         .periods

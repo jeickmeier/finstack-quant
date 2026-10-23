@@ -5,7 +5,8 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
+use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve;
 use time::macros::date;
 
@@ -31,7 +32,8 @@ fn cs01_follows_the_selected_pricing_model() {
     let as_of = date!(2024 - 01 - 01);
     let (loan, market) = credit_loan_and_market();
 
-    let tree = standard_pricer_registry()
+    let tree = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             &loan,
             ModelKey::Tree,
@@ -49,7 +51,8 @@ fn cs01_follows_the_selected_pricing_model() {
         .keys()
         .any(|key| key.as_str().starts_with("bucketed_cs01::USD-CREDIT::")));
 
-    let discounting = standard_pricer_registry()
+    let discounting = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             &loan,
             ModelKey::Discounting,
@@ -76,7 +79,7 @@ fn quoted_z_spread_cs01_matches_settlement_price_bumps() {
     loan.instrument_pricing_overrides
         .market_quotes
         .quoted_z_spread = Some(spread);
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let result = registry
         .price_with_metrics(
             &loan,
@@ -133,7 +136,7 @@ fn quoted_z_spread_cs01_matches_settlement_price_bumps() {
 fn quoted_clean_price_changes_term_loan_cs01() {
     let as_of = date!(2024 - 01 - 15);
     let market = MarketContext::new().insert(flat_discount_curve(0.04, as_of, "USD-OIS"));
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let mut sensitivities = Vec::with_capacity(3);
     for clean_price in [80.0, 99.0, 110.0] {
         let mut loan = TermLoan::example().expect("term loan");
@@ -164,7 +167,7 @@ fn impossible_clean_price_does_not_return_model_anchored_risk() {
     loan.instrument_pricing_overrides
         .market_quotes
         .quoted_clean_price_pct = Some(-100.0);
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     for metric in [MetricId::Dv01, MetricId::Cs01, MetricId::BucketedCs01] {
         registry
             .price_with_metrics(

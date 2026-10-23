@@ -6,7 +6,7 @@ use super::helpers::{
     validate_recovery_consistency,
 };
 use crate::cds::CreditDefaultSwap;
-use finstack_quant_core::dates::{Date, HolidayCalendar};
+use finstack_quant_core::dates::{Date, DayCountContext, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
@@ -14,7 +14,6 @@ use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::credit;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use rust_decimal::prelude::ToPrimitive;
 
 /// CDS pricing engine.
@@ -327,10 +326,10 @@ impl CdsPricer {
             let days = (inp.end_date - inp.accrual_start_date).whole_days() + 1;
             (days.max(0) as f64) / 360.0
         } else {
-            year_fraction(
-                inp.cds.premium_leg.day_count,
+            inp.cds.premium_leg.day_count.year_fraction(
                 inp.accrual_start_date,
                 inp.end_date,
+                DayCountContext::default(),
             )?
         };
         let accrual_period_length_haz = t_end - t_accrual_start;

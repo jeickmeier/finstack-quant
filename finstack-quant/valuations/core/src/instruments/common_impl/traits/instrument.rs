@@ -327,26 +327,15 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// structures (e.g. PIK bonds with compounded terminal notional), the
     /// "native" z-spread is not comparable to a standard cash-pay bond.
     ///
-    /// This method returns a version of the instrument whose cashflows are
-    /// normalized to the standard (discount-model) basis.  The default
-    /// implementation returns `self.clone_box()` — instruments with standard
-    /// cashflows need no override.  Bonds override this to convert PIK coupon
-    /// type to Cash so that spread metrics are on a cash-equivalent basis.
+    /// Return `Some` with cashflows normalized to the standard discount-model
+    /// basis, or `None` when no normalization is needed. The default is `None`,
+    /// so ordinary instruments do not allocate a redundant clone. Bonds return
+    /// a cash-pay equivalent for spread and yield metrics.
     ///
     /// This method affects spread- and yield-style metrics only. It should not be
     /// used to change the economic basis of PV itself or unrelated risk measures.
-    fn metrics_equivalent(&self) -> Box<dyn Instrument> {
-        self.clone_box()
-    }
-
-    /// Returns `true` when [`Self::metrics_equivalent`] changes the instrument's
-    /// metric cashflow basis.
-    ///
-    /// The default equivalent is just `clone_box()`. Non-discounting pricing
-    /// paths use this flag to avoid splitting spread and risk metrics when both
-    /// sides would consume the same cloned instrument.
-    fn has_custom_metrics_equivalent(&self) -> bool {
-        false
+    fn metrics_equivalent(&self) -> Option<Box<dyn Instrument>> {
+        None
     }
 
     /// Narrow a metric menu to the entries this instrument can compute.

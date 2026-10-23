@@ -26,10 +26,10 @@ use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AdvanceRate, AdvancingPolicy, AssetPool, BorrowingBaseRules, CoverageRules,
-    CoverageTestSpec, CoverageTrigger, DealFees, DealType, DelinquencyModel, EligibilityRule,
-    HedgeSwap, IncentiveFeeSpec, LossAllocationPolicy, LossRecognition, ModificationSpec,
-    PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit,
+    AdvanceRate, AdvancingPolicy, AssetPool, BorrowingBaseRules, CoverageRules, CoverageTestSpec,
+    CoverageTrigger, DealFees, DealType, DelinquencyModel, EligibilityRule, HedgeSwap,
+    IncentiveFeeSpec, LossAllocationPolicy, LossRecognition, ModificationSpec, PoolAsset,
+    ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit,
     SwapNotional, Tranche, TrancheStructure, TriggerConsequence,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
@@ -115,9 +115,20 @@ fn baseline() -> StructuredCredit {
     let mut deal = StructuredCredit {
         fees: Some(DealFees::clo_standard(Currency::USD)),
         coverage_triggers: vec![CoverageTestSpec::oc("A", 1.20)],
-        ..StructuredCredit::new_clo("CLO-KNOBS", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse")
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-KNOBS".into(),
+                pool,
+                tranches,
+                closing_date: close(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse")
     };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
@@ -163,7 +174,10 @@ fn reinvestment(deal: &mut StructuredCredit) -> &mut ReinvestmentPeriod {
 /// Every tranche flow (interest, principal, PIK, deferred, write-down) by
 /// class and date, rounded to the cent.
 fn fingerprint(deal: &StructuredCredit, market: &MarketContext) -> Vec<(String, Date, i64)> {
-    let results = run_simulation(deal, market, close()).expect("simulation");
+    let results = deal
+        .run_simulation(market, close())
+        .map(|run| run.tranches)
+        .expect("simulation");
     let mut ids: Vec<&String> = results.keys().collect();
     ids.sort();
     let mut out = Vec::new();

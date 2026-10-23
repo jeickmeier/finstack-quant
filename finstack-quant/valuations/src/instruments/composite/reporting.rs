@@ -98,7 +98,7 @@ pub(super) fn flatten_composite(
                 quantity,
                 value: Money::from((0_i64, composite.spec.reporting_currency)),
                 measures: IndexMap::new(),
-                instrument: Some(Arc::from(primitive.clone().into_boxed_unchecked()?)),
+                instrument: Some(Arc::from(primitive.clone().into_boxed_unchecked())),
                 metric_defaults: metric_defaults.clone(),
             }),
         }

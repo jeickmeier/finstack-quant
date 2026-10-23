@@ -5,7 +5,7 @@
 //! convention record as a plain object typed by the schema-generated
 //! TypeScript types.
 
-use crate::utils::input::js_string;
+use crate::utils::input::{js_opt_string, js_string};
 use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::market::conventions::ids::{
@@ -111,4 +111,25 @@ impl JsConventionRegistry {
         let id = XccyConventionId::new(js_string(&id, "id")?);
         to_js_value(registry()?.require_xccy(&id).map_err(to_js_err)?)
     }
+}
+
+/// Return the maintained liquid listed-derivatives coverage catalog.
+///
+/// The catalog maps stable CME, Eurex, Montréal, and SGX product families to
+/// canonical Finstack instrument types and names residual model gaps. It is not
+/// a live contract-month or liquidity feed.
+/// @param exchange - Optional exact filter: `"cme"`, `"eurex"`, `"montreal"`, or `"sgx"`.
+/// @returns Product-family coverage rows with instrument routes and official source URLs.
+/// @throws Error - Throws when `exchange` is unsupported, the embedded listed-product sidecar is invalid, or rows cannot be converted to JavaScript.
+#[wasm_bindgen(js_name = listedProductCatalog)]
+pub fn listed_product_catalog(exchange: Option<JsValue>) -> Result<JsValue, JsValue> {
+    let exchange = js_opt_string(exchange.as_ref(), "exchange")?;
+    let exchange = exchange
+        .as_deref()
+        .map(str::parse::<finstack_quant_valuations::market::listed::ListedExchange>)
+        .transpose()
+        .map_err(to_js_err)?;
+    let rows = finstack_quant_valuations::market::listed::listed_product_catalog(exchange)
+        .map_err(to_js_err)?;
+    to_js_value(&rows)
 }

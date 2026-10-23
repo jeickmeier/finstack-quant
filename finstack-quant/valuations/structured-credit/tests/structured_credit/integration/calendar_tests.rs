@@ -86,13 +86,17 @@ fn create_test_market() -> MarketContext {
 #[test]
 fn test_missing_calendar_fails_with_helpful_message() {
     // Arrange: Create CLO WITHOUT setting calendar_id
-    let clo = StructuredCredit::new_clo(
-        "NO_CALENDAR_CLO",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "NO_CALENDAR_CLO".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates");
     // Note: NOT calling .with_calendar_id()
@@ -117,13 +121,17 @@ fn test_missing_calendar_fails_with_helpful_message() {
 #[test]
 fn test_invalid_calendar_id_fails_with_available_options() {
     // Arrange: Create CLO with an invalid calendar ID
-    let clo = StructuredCredit::new_clo(
-        "INVALID_CALENDAR_CLO",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "INVALID_CALENDAR_CLO".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("NONEXISTENT_CALENDAR");
@@ -150,13 +158,17 @@ fn test_invalid_calendar_id_fails_with_available_options() {
 #[test]
 fn test_valid_nyse_calendar_succeeds() {
     // Arrange: Create CLO with valid NYSE calendar
-    let clo = StructuredCredit::new_clo(
-        "NYSE_CALENDAR_CLO",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "NYSE_CALENDAR_CLO".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -180,13 +192,17 @@ fn test_valid_nyse_calendar_succeeds() {
 #[test]
 fn test_valid_target2_calendar_succeeds() {
     // Arrange: Create CLO with valid TARGET2 calendar (European)
-    let clo = StructuredCredit::new_clo(
-        "TARGET2_CALENDAR_CLO",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TARGET2_CALENDAR_CLO".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("target2");
@@ -210,13 +226,17 @@ fn test_valid_target2_calendar_succeeds() {
 fn test_clo_schedule_avoids_us_holidays() {
     // Arrange: Create CLO spanning a period with US holidays
     // Using a first payment date near July 4th to test holiday adjustment
-    let clo = StructuredCredit::new_clo(
-        "HOLIDAY_TEST_CLO",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "HOLIDAY_TEST_CLO".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -239,13 +259,17 @@ fn test_clo_schedule_avoids_us_holidays() {
 
 #[test]
 fn test_seasoned_clo_keeps_contractual_coupon_grid() {
-    let mut clo = StructuredCredit::new_clo(
-        "SEASONED_CLO",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let mut clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "SEASONED_CLO".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -269,24 +293,32 @@ fn test_seasoned_clo_keeps_contractual_coupon_grid() {
 #[test]
 fn test_payment_schedule_is_deterministic_with_calendar() {
     // Arrange: Create two identical CLOs with same calendar
-    let clo1 = StructuredCredit::new_clo(
-        "DETERMINISTIC_CLO_1",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo1 = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "DETERMINISTIC_CLO_1".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
-    let clo2 = StructuredCredit::new_clo(
-        "DETERMINISTIC_CLO_2",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo2 = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "DETERMINISTIC_CLO_2".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");

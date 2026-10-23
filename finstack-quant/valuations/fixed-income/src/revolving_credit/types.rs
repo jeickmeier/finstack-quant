@@ -1241,7 +1241,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for RevolvingCredit
         // registry and host-language JSON entry points. A stochastic facility
         // must have one canonical value regardless of which public lifecycle
         // invokes it.
-        crate::revolving_credit::pricing::unified::RevolvingCreditPricer::price(self, curves, as_of)
+        crate::revolving_credit::RevolvingCreditPricer::price(self, curves, as_of)
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
@@ -1261,7 +1261,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RevolvingCredit {
         // Stochastic facilities expose their Monte Carlo expected schedule
         // (path-averaged flow by flow) so theta carry and the exporters work.
         if self.is_stochastic() {
-            return crate::revolving_credit::pricing::unified::RevolvingCreditPricer::expected_cashflows(
+            return crate::revolving_credit::RevolvingCreditPricer::expected_cashflows(
                 self, curves, as_of,
             )
             .map(|schedule| {

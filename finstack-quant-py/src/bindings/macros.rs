@@ -28,7 +28,23 @@ macro_rules! wire_methods {
         $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [], |inner| inner,
             $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
             $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json")));
-        $crate::bindings::macros::wire_methods!(@reduce $py_type);
+        $crate::bindings::macros::wire_methods!(@reduce $py_type, $crate::bindings::pydoc::pydoc!($module, concat!($name, ".__reduce__")));
+    };
+
+    ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, to_dict) => {
+        $crate::bindings::macros::wire_methods!($py_type, $rust_type, $name, module = $module);
+
+        #[::pyo3::pymethods]
+        impl $py_type {
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_dict"))]
+            #[pyo3(text_signature = "($self)")]
+            fn to_dict<'py>(
+                &self,
+                py: ::pyo3::Python<'py>,
+            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
+                $crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+            }
+        }
     };
 
     ($py_type:ident, $rust_type:ty, $name:literal) => {
@@ -62,7 +78,7 @@ macro_rules! wire_methods {
         },
             $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
             $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json")));
-        $crate::bindings::macros::wire_methods!(@reduce $py_type);
+        $crate::bindings::macros::wire_methods!(@reduce $py_type, $crate::bindings::pydoc::pydoc!($module, concat!($name, ".__reduce__")));
     };
     ($py_type:ident, $rust_type:ty, $name:literal, validate) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [], |inner| {
@@ -163,10 +179,15 @@ macro_rules! wire_methods {
         }
     };
     (@reduce $py_type:ident) => {
+        $crate::bindings::macros::wire_methods!(@reduce $py_type, concat!(
+            "Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``, ``dask``)\n",
+            "through the same strict serde round-trip as ``to_json`` / ``from_json``."
+        ));
+    };
+    (@reduce $py_type:ident, $doc:expr) => {
         #[::pyo3::pymethods]
         impl $py_type {
-            /// Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``, ``dask``)
-            /// through the same strict serde round-trip as ``to_json`` / ``from_json``.
+            #[doc = $doc]
             fn __reduce__<'py>(
                 &self,
                 py: ::pyo3::Python<'py>,

@@ -9,7 +9,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 
 use super::PyTranche;
 
-/// Typed wrapper for the Rust `TrancheStructure` (capital structure).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TrancheStructure",
@@ -24,61 +24,7 @@ pub struct PyTrancheStructure {
 
 #[pymethods]
 impl PyTrancheStructure {
-    /// Capital structure formed from a list of tranches.
-    ///
-    /// Validates that attachment/detachment points tile ``[0, 100]`` without
-    /// gaps or overlaps, that every tranche shares one currency, and assigns
-    /// each tranche a distinct, strictly-increasing ``payment_priority``
-    /// ranked by seniority (see Rust ``TrancheStructure::new``).
-    ///
-    /// Parameters
-    /// ----------
-    /// tranches : list[Tranche]
-    ///     Tranches forming the capital structure.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheStructure
-    ///     The validated tranche structure.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``tranches`` is empty, has non-finite attachment/detachment
-    ///     points, leaves a gap/overlap, doesn't tile to 100%, or mixes
-    ///     currencies.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import Tranche, TrancheStructure
-    /// >>> senior = (
-    /// ...     Tranche.builder()
-    /// ...     .id("A")
-    /// ...     .attach_pct(10.0)
-    /// ...     .detach_pct(100.0)
-    /// ...     .seniority("senior")
-    /// ...     .original_balance(Money(72_000_000.0, Currency("USD")))
-    /// ...     .coupon_fixed(0.05)
-    /// ...     .maturity(datetime.date(2031, 1, 15))
-    /// ...     .build()
-    /// ... )
-    /// >>> equity = (
-    /// ...     Tranche.builder()
-    /// ...     .id("E")
-    /// ...     .attach_pct(0.0)
-    /// ...     .detach_pct(10.0)
-    /// ...     .seniority("equity")
-    /// ...     .original_balance(Money(8_000_000.0, Currency("USD")))
-    /// ...     .coupon_fixed(0.0)
-    /// ...     .maturity(datetime.date(2031, 1, 15))
-    /// ...     .build()
-    /// ... )
-    /// >>> structure = TrancheStructure([senior, equity])
-    /// >>> "tranches=2" in repr(structure)
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.__init__")]
     #[new]
     #[pyo3(text_signature = "(tranches)")]
     fn new(tranches: Vec<PyRef<'_, PyTranche>>) -> PyResult<Self> {
@@ -87,52 +33,7 @@ impl PyTrancheStructure {
         Ok(Self { inner })
     }
 
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     Strict JSON object with exactly the fields ``to_json`` writes.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or has the wrong shape.
-    /// Build a structure whose attachment and detachment points come from
-    /// the balance shares alone (mirrors Rust ``TrancheStructure::from_balances``).
-    ///
-    /// Any points declared on the tranches are discarded: the first-loss
-    /// class attaches at 0, each senior class stacks on top in
-    /// payment-priority order and the most senior class detaches at 100.
-    ///
-    /// Parameters
-    /// ----------
-    /// tranches : list[Tranche]
-    ///     Notes of the capital structure; ``seniority`` and
-    ///     ``original_balance`` decide the boundaries.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheStructure
-    ///     The validated structure with derived points.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the list is empty or the notes mix currencies.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import Tranche, TrancheStructure
-    /// >>> def note(id_, seniority, balance):
-    /// ...     return (Tranche.builder().id(id_).seniority(seniority).original_balance(Money(balance, Currency("USD")))
-    /// ...             .coupon_fixed(0.05).maturity(datetime.date(2031, 1, 15)).build())
-    /// >>> structure = TrancheStructure.from_balances([note("A", "senior", 60.0), note("B", "mezzanine", 30.0), note("E", "equity", 10.0)])
-    /// >>> [(t.id, t.attach_pct, t.detach_pct) for t in structure.tranches]
-    /// [('A', 40.0, 100.0), ('B', 10.0, 40.0), ('E', 0.0, 10.0)]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.from_balances")]
     #[staticmethod]
     #[pyo3(text_signature = "(tranches)")]
     fn from_balances(tranches: Vec<PyRef<'_, PyTranche>>) -> PyResult<Self> {
@@ -146,6 +47,7 @@ impl PyTrancheStructure {
         Ok(Self { inner })
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -154,25 +56,25 @@ impl PyTrancheStructure {
         Ok(Self { inner })
     }
 
-    /// Serialize to the canonical JSON wire form.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
     }
 
-    /// Return every field as a plain ``dict`` (canonical serde shape).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Tranches in payment-priority order.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.tranches")]
     #[getter]
     fn tranches(&self) -> Vec<PyTranche> {
         self.inner
@@ -193,7 +95,7 @@ impl PyTrancheStructure {
 }
 
 crate::bindings::macros::py_getters!(PyTrancheStructure |s| {
-    /// Total original size of the capital structure.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.total_size")]
     total_size -> PyResult<PyMoney> =
         s.inner.total_size().map(money_to_py).map_err(crate::errors::core_to_py);
 });

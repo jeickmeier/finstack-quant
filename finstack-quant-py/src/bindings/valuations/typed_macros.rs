@@ -35,7 +35,7 @@ macro_rules! instrument_pricing_methods {
                 metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
                 market_history: Option<&Bound<'_, PyAny>>,
             ) -> PyResult<$crate::bindings::valuations::PyValuationResult> {
-                $crate::bindings::valuations::instruments::price_typed(
+                $crate::bindings::valuations::pricing::price_typed(
                     py,
                     Box::new(self.inner.clone()),
                     market,
@@ -58,7 +58,7 @@ macro_rules! instrument_pricing_methods {
                 metric_id: &str,
                 model: &str,
             ) -> PyResult<f64> {
-                $crate::bindings::valuations::instruments::metric_typed(
+                $crate::bindings::valuations::pricing::metric_typed(
                     py,
                     Box::new(self.inner.clone()),
                     market,
@@ -102,45 +102,6 @@ macro_rules! instrument_pricing_methods {
     };
 }
 pub(crate) use instrument_pricing_methods;
-
-/// Stamp fixed-metric Greek methods on a typed option wrapper.
-///
-/// `instrument_greek_methods!(PyType("Name") { delta, gamma, ... })` expands
-/// each entry to `name(market, as_of, model="default") -> float`, which prices
-/// the wrapped instrument and returns the metric whose id is `stringify!(name)`
-/// (the same call as ``metric(market, as_of, "name", model)``). Each method's
-/// docstring is the stub's `Name.<greek>`.
-macro_rules! instrument_greek_methods {
-    ($ty:ident($name:literal) { $( $greek:ident ),+ $(,)? }) => {
-        #[pymethods]
-        impl $ty {
-            $(
-                #[doc = $crate::bindings::pydoc::pydoc!(
-                    "finstack_quant.valuations.instruments",
-                    concat!($name, ".", stringify!($greek))
-                )]
-                #[pyo3(signature = (market, as_of, model="default"))]
-                fn $greek(
-                    &self,
-                    py: Python<'_>,
-                    market: &Bound<'_, PyAny>,
-                    as_of: &Bound<'_, PyAny>,
-                    model: &str,
-                ) -> PyResult<f64> {
-                    $crate::bindings::valuations::instruments::metric_typed(
-                        py,
-                        Box::new(self.inner.clone()),
-                        market,
-                        as_of,
-                        stringify!($greek),
-                        model,
-                    )
-                }
-            )+
-        }
-    };
-}
-pub(crate) use instrument_greek_methods;
 
 /// Stamp the envelope and builder surface of a typed instrument wrapper.
 ///
@@ -210,11 +171,7 @@ macro_rules! instrument_envelope_methods {
                 )
             }
 
-            /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-            ///
-            /// Reconstruction goes through the same strict serde round-trip as
-            /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-            /// format defines — there is no second state format that can drift.
+            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".__reduce__"))]
             fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
                 let from_json = py.get_type::<Self>().getattr("from_json")?;
                 $crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -224,13 +181,13 @@ macro_rules! instrument_envelope_methods {
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]
             fn from_json(json: &str) -> PyResult<Self> {
-                $crate::bindings::valuations::instruments::parse_typed_instrument_json(json).map(|inner| Self { inner })
+                $crate::bindings::valuations::convert::parse_typed_instrument_json(json).map(|inner| Self { inner })
             }
 
             #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".to_json"))]
             #[pyo3(text_signature = "($self)")]
             fn to_json(&self) -> PyResult<String> {
-                $crate::bindings::valuations::instruments::serialize_typed_instrument_json(
+                $crate::bindings::valuations::convert::serialize_typed_instrument_json(
                     finstack_quant_valuations::instruments::json_loader::InstrumentJson::from(
                         self.inner.clone(),
                     ),

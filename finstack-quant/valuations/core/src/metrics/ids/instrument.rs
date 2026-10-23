@@ -137,19 +137,13 @@ impl MetricId {
     /// `gp_irr` despite returning a dollar amount).
     pub const GpCarryTotal: Self = Self(Cow::Borrowed("gp_carry_total"));
 
-    /// LP multiple on invested capital, net of GP carry:
-    /// `(realized LP distributions + residual value) / paid-in capital`.
-    /// On this net LP basis MOIC equals TVPI by definition.
-    ///
-    /// Units: ratio multiple (`1.80 = 1.8x`).
-    pub const MoicLp: Self = Self(Cow::Borrowed("moic_lp"));
-
     /// LP distributions to paid-in capital (DPI).
     ///
     /// Units: ratio multiple (`0.75 = 0.75x`).
     pub const DpiLp: Self = Self(Cow::Borrowed("dpi_lp"));
 
-    /// LP total value to paid-in capital (TVPI).
+    /// LP total value to paid-in capital (TVPI), net of GP carry:
+    /// `(realized LP distributions + residual value) / paid-in capital`.
     ///
     /// Units: ratio multiple (`1.40 = 1.4x`).
     pub const TvpiLp: Self = Self(Cow::Borrowed("tvpi_lp"));

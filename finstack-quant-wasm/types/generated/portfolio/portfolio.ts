@@ -1517,7 +1517,7 @@ export type ReplayErrorPolicy = "strict" | "best_effort";
  * positions is standard desk practice: `dv01`, `cs01`, `pv01` and their
  * bucketed series all measure a change per basis point of the *same* kind of
  * risk factor, and their sum is a portfolio-level number a risk manager can
- * hedge with (Tuckman & Serrat, *Fixed Income Securities*). `fx_delta` and
+ * hedge with (Tuckman & Serrat, *Fixed Income Securities*). `fx01` and
  * `index_delta` are likewise currency-denominated and linear in size.
  *
  * Unqualified scalar Greeks (`delta`, `gamma`, `vega`, `vanna`, `volga`)

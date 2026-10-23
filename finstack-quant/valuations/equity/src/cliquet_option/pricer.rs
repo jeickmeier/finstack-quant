@@ -105,9 +105,6 @@ impl CliquetOptionMcPricer {
         // All periods observed: the payoff is fully determined; discount the
         // known cashflow from the contract expiry.
         if future_resets.is_empty() {
-            if as_of > inst.expiry {
-                return Ok((Money::from((0_i64, inst.notional.currency())), None));
-            }
             let total_return = match inst.payoff_type {
                 CliquetPayoffType::Additive => locked_sum,
                 CliquetPayoffType::Multiplicative => locked_growth - 1.0,

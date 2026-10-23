@@ -616,3 +616,112 @@ mod seniority_tests {
         }
     }
 }
+
+#[test]
+fn conditional_default_prob_flat_dates_and_day_count() {
+    use time::Duration;
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let curve = HazardCurve::builder("CONDITIONAL")
+        .base_date(base)
+        .day_count(DayCount::Act360)
+        .knots([(1.0, 0.02)])
+        .recovery_rate(0.4)
+        .build()
+        .expect("curve");
+    let end = base + Duration::days(540);
+    let expected = -(-0.02_f64).exp_m1();
+    assert!(
+        (curve
+            .conditional_default_prob(base + Duration::days(180), end)
+            .expect("PD")
+            - expected)
+            .abs()
+            < 1e-15
+    );
+    assert_eq!(curve.conditional_default_prob(end, end).expect("zero"), 0.0);
+    assert!(curve.conditional_default_prob(end, base).is_err());
+    assert_eq!(
+        curve
+            .conditional_default_prob(base - Duration::days(10), base)
+            .expect("pre-base"),
+        0.0
+    );
+    assert!(
+        (curve
+            .conditional_default_prob(base - Duration::days(10), base + Duration::days(360))
+            .expect("cross-base")
+            - expected)
+            .abs()
+            < 1e-15
+    );
+}
+
+#[test]
+fn conditional_default_prob_integrates_ending_segments_and_tail() {
+    use time::Duration;
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    for zero_knot in [0.0, 1e-9] {
+        let curve = HazardCurve::builder("SEGMENTS")
+            .base_date(base)
+            .knots([(zero_knot, 9.0), (1.0, 0.01), (2.0, 0.03), (3.0, 0.05)])
+            .recovery_rate(0.4)
+            .build()
+            .expect("curve");
+        for (start_days, end_days, integral) in [
+            (0, 365, 0.01_f64),
+            (365, 730, 0.03),
+            (730, 1095, 0.05),
+            (1095, 1460, 0.05),
+            (
+                182,
+                1277,
+                0.01 * (183.0 / 365.0) + 0.03 + 0.05 * (547.0 / 365.0),
+            ),
+        ] {
+            let actual = curve
+                .conditional_default_prob(
+                    base + Duration::days(start_days),
+                    base + Duration::days(end_days),
+                )
+                .expect("PD");
+            assert!((actual - -(-integral).exp_m1()).abs() < 1e-15);
+        }
+    }
+}
+
+#[test]
+fn conditional_default_prob_preserves_tiny_hazards_after_large_integrals() {
+    use time::Duration;
+    let base = Date::from_calendar_date(1900, Month::January, 1).expect("date");
+    let curve = HazardCurve::builder("TINY")
+        .base_date(base)
+        .knots([(100.0, 7.0), (200.0, 1e-18)])
+        .recovery_rate(0.4)
+        .build()
+        .expect("curve");
+    let start = base + Duration::days(365 * 125);
+    let end = start + Duration::days(365);
+    let actual = curve.conditional_default_prob(start, end).expect("tiny PD");
+    assert!(actual > 0.0);
+    assert!((actual / 1e-18 - 1.0).abs() < 1e-14);
+    assert_eq!(
+        curve.sp_on_date(start).expect("survival"),
+        curve.sp_on_date(end).expect("survival")
+    );
+    let flat = HazardCurve::flat("TINY-FLAT", base, 1e-18, 0.4).expect("curve");
+    assert!(
+        (flat.conditional_default_prob(start, end).expect("tiny PD") / 1e-18 - 1.0).abs() < 1e-14
+    );
+}
+
+#[test]
+fn conditional_default_prob_survives_unconditional_underflow() {
+    use time::Duration;
+    let base = Date::from_calendar_date(1900, Month::January, 1).expect("date");
+    let curve = HazardCurve::flat("UNDERFLOW", base, 10.0, 0.4).expect("curve");
+    let start = base + Duration::days(365 * 125);
+    let end = start + Duration::days(365);
+    assert_eq!(curve.sp_on_date(start).expect("survival"), 0.0);
+    let actual = curve.conditional_default_prob(start, end).expect("PD");
+    assert!((actual - -(-10.0_f64).exp_m1()).abs() < 1e-15);
+}

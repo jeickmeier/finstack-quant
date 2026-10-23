@@ -15,7 +15,7 @@ use crate::bindings::valuations::convert::{
     attributes_from_py, bdc_from_py, day_count_from_py, enum_to_py_string, money_from_py,
     money_repr, money_to_py,
 };
-use crate::bindings::valuations::instruments::{instrument_expiry, stub_kind_from_py};
+use crate::bindings::valuations::convert::{instrument_expiry, stub_kind_from_py};
 use crate::bindings::valuations::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
@@ -23,24 +23,16 @@ use crate::errors::core_to_py;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 
 use super::PyEnhancedMonteCarloResult;
 
-type RevolvingCreditBuilderInner =
-    finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditBuilder;
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditBuilder;
 
-/// Typed wrapper for the Rust `RevolvingCredit` instrument.
-///
-/// Construct via ``RevolvingCredit.builder()``, the ``RevolvingCredit.example``
-/// preset, or ``RevolvingCredit.from_json``. Every public Rust field is
-/// readable as a property; ``price`` / ``metric`` run the same pricer as
-/// ``price_instrument``. Stochastic facilities (``draw_repay_spec`` of kind
-/// ``"stochastic"``) additionally expose ``price_with_paths`` and their
-/// path-averaged ``expected_cashflows``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "RevolvingCredit",
@@ -63,25 +55,7 @@ instrument_pricing_methods!(PyRevolvingCredit, "RevolvingCredit");
 
 #[pymethods]
 impl PyRevolvingCredit {
-    /// Canonical example: USD 50M three-year SOFR + 250bp facility, USD 10M
-    /// drawn, with a scheduled draw and repayment (mirrors Rust
-    /// ``RevolvingCredit::example``).
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCredit
-    ///     The example facility.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import RevolvingCredit
-    /// >>> RevolvingCredit.example().id
-    /// 'RCF-USD-3Y'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -90,32 +64,7 @@ impl PyRevolvingCredit {
             .map_err(core_to_py)
     }
 
-    /// Run the stochastic Monte Carlo valuation and keep every path.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context with the discount curve, the index forward curve
-    ///     and fixings for floating facilities, and the hazard curve for
-    ///     market-anchored spread processes.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date; the simulation starts here with the current drawn
-    ///     amount.
-    ///
-    /// Returns
-    /// -------
-    /// EnhancedMonteCarloResult
-    ///     Present value and draw option cost estimates plus every path.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the facility has a deterministic ``draw_repay_spec`` or fails
-    ///     validation.
-    /// KeyError
-    ///     If a required curve is missing from ``market``.
-    /// RuntimeError
-    ///     If the simulation fails.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.price_with_paths")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn price_with_paths(
         &self,
@@ -132,29 +81,7 @@ impl PyRevolvingCredit {
         Ok(PyEnhancedMonteCarloResult { inner })
     }
 
-    /// Cashflow schedule of the facility: the contractual schedule for a
-    /// deterministic ``draw_repay_spec``, the path-averaged schedule for a
-    /// stochastic one.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context with the curves the schedule projects from.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date; flows are projected from this date.
-    ///
-    /// Returns
-    /// -------
-    /// CashFlowSchedule
-    ///     Dated interest, fee and principal flows from the lender's
-    ///     perspective (draws negative, repayments positive).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the facility fails validation or the schedule cannot be built.
-    /// KeyError
-    ///     If a required curve is missing from ``market``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.expected_cashflows")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn expected_cashflows(
         &self,
@@ -171,56 +98,49 @@ impl PyRevolvingCredit {
         Ok(PyCashFlowSchedule::from_inner(schedule))
     }
 
-    /// Date the facility becomes available, as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.issue_date)
     }
 
-    /// Expiry of the commitment, as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Coupon specification as its serde ``dict`` (``{"fixed": {"rate": r}}``
-    /// with a decimal rate, or ``{"floating": {...}}``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.rate")]
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.rate)
     }
 
-    /// Fee structure as its serde ``dict`` (including dated ``steps``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.fees")]
     #[getter]
     fn fees<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.fees)
     }
 
-    /// Scheduled commitment changes as a ``list`` of serde ``dict`` rows
-    /// (``date``, ``amount``, ``reduction_fee_bp``), empty when the commitment
-    /// is flat.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.commitment_steps")]
     #[getter]
     fn commitment_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.commitment_steps)
     }
 
-    /// Dated margin steps as a ``list`` of serde ``dict`` rows (``date``,
-    /// ``delta_bp``), empty when the margin is flat.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.margin_steps")]
     #[getter]
     fn margin_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.margin_steps)
     }
 
-    /// Dated fixed fees as a ``list`` of serde ``dict`` rows (``date``,
-    /// ``amount``), empty when none are scheduled.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.scheduled_fees")]
     #[getter]
     fn scheduled_fees<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.scheduled_fees)
     }
 
-    /// Effective-interest-rate reporting switch as its serde ``dict``
-    /// (``{"include_fees": bool}``), or ``None`` for the default (fees
-    /// included).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.oid_eir")]
     #[getter]
     fn oid_eir<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -230,9 +150,7 @@ impl PyRevolvingCredit {
             .transpose()
     }
 
-    /// Letter-of-credit sub-facility as its serde ``dict`` (``sublimit``,
-    /// ``outstanding``, ``events``, ``fee_bp``, ``fronting_fee_bp``,
-    /// ``leq``), or ``None`` when the facility has no LC sublimit.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.lc")]
     #[getter]
     fn lc<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -242,14 +160,13 @@ impl PyRevolvingCredit {
             .transpose()
     }
 
-    /// Draw/repay specification as its serde ``dict`` (``{"deterministic":
-    /// [...]}`` or ``{"stochastic": {...}}``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.draw_repay_spec")]
     #[getter]
     fn draw_repay_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.draw_repay_spec)
     }
 
-    /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
@@ -269,148 +186,75 @@ impl PyRevolvingCredit {
 }
 
 crate::bindings::macros::py_getters!(PyRevolvingCredit |s| {
-    /// Total committed amount.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.commitment")]
     commitment -> PyMoney = money_to_py(s.inner.commitment);
 
-    /// Drawn balance at the simulation anchor (the later of the commitment
-    /// and valuation dates), in both deterministic and stochastic mode.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.drawn")]
     drawn -> PyMoney = money_to_py(s.inner.drawn);
 
-    /// Interest accrual day count.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    /// Payment frequency for interest and fees.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    /// ``True`` when utilization is simulated (stochastic ``draw_repay_spec``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.is_stochastic")]
     is_stochastic -> bool = s.inner.is_stochastic();
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Credit (hazard) curve identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.credit_curve_id")]
     credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(ToString::to_string);
 
-    /// Recovery rate on default, as a decimal in ``[0, 1]``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.recovery_rate")]
     recovery_rate -> f64 = s.inner.recovery_rate;
 
-    /// Loan-equivalent exposure: fraction of the undrawn commitment drawn at
-    /// default, as a decimal in ``[0, 1]``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.leq")]
     leq -> f64 = s.inner.leq;
 
-    /// Stub rule for schedule generation.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    /// Business-day convention applied to payment dates (serde string, e.g.
-    /// ``"modified_following"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    /// Holiday calendar identifier used for payment, fixing and settlement
-    /// rolls, or ``None`` for weekends only.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    /// Business days between an accrual end and its payment date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.payment_lag_days")]
     payment_lag_days -> u32 = s.inner.payment_lag_days;
 
-    /// Business days from the valuation date to the settlement date used by
-    /// quote metrics.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.settlement_days")]
     settlement_days -> u32 = s.inner.settlement_days;
 });
 
-/// Fluent builder for ``RevolvingCredit``; wraps the Rust
-/// `FinancialBuilder`-generated builder (consuming setters).
-///
-/// Builders are consumed by ``build()``; create a new builder per facility.
-/// Nested specs (``rate`` when floating, ``fees``,
-/// ``draw_repay_spec``) accept a ``dict`` or a JSON ``str`` in the Rust
-/// serde shape.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.core.currency import Currency
-/// >>> from finstack_quant.core.money import Money
-/// >>> from finstack_quant.valuations.instruments import RevolvingCredit
-/// >>> facility = (
-/// ...     RevolvingCredit.builder()
-/// ...     .id("RCF-1")
-/// ...     .commitment(Money(50_000_000.0, Currency("USD")))
-/// ...     .drawn(Money(10_000_000.0, Currency("USD")))
-/// ...     .issue_date(datetime.date(2024, 1, 15))
-/// ...     .maturity(datetime.date(2027, 1, 15))
-/// ...     .rate(0.06)
-/// ...     .day_count("act_360")
-/// ...     .frequency("3M")
-/// ...     .fees({"commitment_fee_tiers": [{"threshold": "0", "bp": "25"}],
-/// ...           "usage_fee_tiers": [{"threshold": "0", "bp": "10"}],
-/// ...           "facility_fee_bp": 5.0})
-/// ...     .draw_repay_spec({"deterministic": []})
-/// ...     .discount_curve_id("USD-OIS")
-/// ...     .recovery_rate(0.4)
-/// ...     .build()
-/// ... )
-/// >>> facility.is_stochastic
-/// False
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "RevolvingCreditBuilder",
     skip_from_py_object
 )]
 pub struct PyRevolvingCreditBuilder {
-    inner: Option<RevolvingCreditBuilderInner>,
+    inner: Option<RevolvingCreditBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
 #[pymethods]
 impl PyRevolvingCreditBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the facility.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed by ``build()``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
             slf,
             id,
             format!("{value:?}"),
-            |b: RevolvingCreditBuilderInner| b.id(InstrumentId::new(value.to_string()))
+            |b: RevolvingCreditBuilder| b.id(InstrumentId::new(value.to_string()))
         )
     }
 
-    /// Set the total commitment.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float
-    ///     Commitment; a bare number needs ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``value`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the amount is not finite, a bare number has no currency, or
-    ///     the builder was already consumed.
-    /// TypeError
-    ///     If ``value`` is neither ``Money`` nor a number.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.commitment")]
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn commitment<'py>(
@@ -423,33 +267,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             commitment,
             money_repr(money),
-            |b: RevolvingCreditBuilderInner| b.commitment(money)
+            |b: RevolvingCreditBuilder| b.commitment(money)
         )
     }
 
-    /// Set the drawn balance at the simulation anchor, the later of the
-    /// commitment date and the valuation date, in both modes. Deterministic
-    /// draw/repay events must be dated after that anchor.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float
-    ///     Drawn balance; a bare number needs ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code applied when ``value`` is a bare number.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the amount is not finite, a bare number has no currency, or
-    ///     the builder was already consumed.
-    /// TypeError
-    ///     If ``value`` is neither ``Money`` nor a number.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.drawn")]
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn drawn<'py>(
@@ -462,26 +284,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             drawn,
             money_repr(money),
-            |b: RevolvingCreditBuilderInner| b.drawn(money)
+            |b: RevolvingCreditBuilder| b.drawn(money)
         )
     }
 
-    /// Set the date the facility becomes available.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Commitment date (ISO 8601 strings accepted).
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a date or the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.issue_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn issue_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -492,26 +299,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             issue_date,
             date.to_string(),
-            |b: RevolvingCreditBuilderInner| b.issue_date(date)
+            |b: RevolvingCreditBuilder| b.issue_date(date)
         )
     }
 
-    /// Set the expiry of the commitment.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Maturity date (ISO 8601 strings accepted).
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a date or the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -522,30 +314,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             maturity,
             date.to_string(),
-            |b: RevolvingCreditBuilderInner| b.maturity(date)
+            |b: RevolvingCreditBuilder| b.maturity(date)
         )
     }
 
-    /// Set the facility coupon.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float | dict | str
-    ///     A bare decimal builds a fixed rate (``0.06`` = 6%); a ``dict`` or
-    ///     JSON ``str`` in the ``RateSpec`` serde shape
-    ///     (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
-    ///     ``FloatingRateSpec``) is used verbatim.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the spec does not match the serde shape or the builder was
-    ///     already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -558,28 +331,10 @@ impl PyRevolvingCreditBuilder {
             spec_from_py(py, value, "rate")?
         };
         let repr = serde_json::to_string(&spec).unwrap_or_default();
-        builder_set!(slf, rate, repr, |b: RevolvingCreditBuilderInner| b
-            .rate(spec))
+        builder_set!(slf, rate, repr, |b: RevolvingCreditBuilder| b.rate(spec))
     }
 
-    /// Set the interest accrual day count.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : DayCount | str
-    ///     Day count object or serde name (``"act_360"``, ``"act_365f"``, ``"30_360"``, …).
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the name is unknown or the builder was already consumed.
-    /// TypeError
-    ///     If ``value`` is neither ``DayCount`` nor ``str``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -590,28 +345,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             day_count,
             format!("{day_count:?}"),
-            |b: RevolvingCreditBuilderInner| b.day_count(day_count)
+            |b: RevolvingCreditBuilder| b.day_count(day_count)
         )
     }
 
-    /// Set the payment frequency for interest and fees.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Tenor | str
-    ///     Tenor object or string such as ``"3M"``.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the tenor cannot be parsed or the builder was already consumed.
-    /// TypeError
-    ///     If ``value`` is neither ``Tenor`` nor ``str``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -622,32 +360,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             frequency,
             format!("{tenor:?}"),
-            |b: RevolvingCreditBuilderInner| b.frequency(tenor)
+            |b: RevolvingCreditBuilder| b.frequency(tenor)
         )
     }
 
-    /// Set the fee structure from its serde shape.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``RevolvingCreditFees`` as a ``dict`` or JSON ``str``
-    ///     (``upfront_fee`` as ``None``, ``{"amount": Money-dict}`` or
-    ///     ``{"fraction_of_commitment": 0.02}``; ``commitment_fee_tiers``,
-    ///     ``usage_fee_tiers``, ``facility_fee_bp`` and the dated ``steps`` list of
-    ///     ``{"date", "commitment_delta_bp", "usage_delta_bp",
-    ///     "facility_delta_bp"}`` rows).
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the spec does not match the serde shape or the builder was
-    ///     already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.fees")]
     #[pyo3(text_signature = "($self, value)")]
     fn fees<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -659,33 +376,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             fees,
             "{..}".to_string(),
-            |b: RevolvingCreditBuilderInner| b.fees(fees)
+            |b: RevolvingCreditBuilder| b.fees(fees)
         )
     }
 
-    /// Set the scheduled commitment changes.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[dict[str, Any]] | str
-    ///     Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict,
-    ///     "reduction_fee_bp": str}`` (a ``list`` of dicts or a JSON ``str``),
-    ///     each the commitment in force from its date; ``reduction_fee_bp`` is
-    ///     the one-off reduction fee on a step down, a decimal string in basis
-    ///     points of the reduced amount (default ``"0"``). Dates must
-    ///     be strictly increasing, after the commitment date and on or before
-    ///     maturity.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a row does not match the serde shape or the builder was
-    ///     already consumed; ordering and feasibility fail at ``build()``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.commitment_steps")]
     #[pyo3(text_signature = "($self, value)")]
     fn commitment_steps<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -699,29 +394,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             commitment_steps,
             "[..]".to_string(),
-            |b: RevolvingCreditBuilderInner| b.commitment_steps(steps)
+            |b: RevolvingCreditBuilder| b.commitment_steps(steps)
         )
     }
 
-    /// Set the dated fixed fees (amendment, waiver, extension, consent).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[dict[str, Any]] | str
-    ///     Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict}`` (a
-    ///     ``list`` of dicts or a JSON ``str``), each paid on its date. Dates
-    ///     must lie after the commitment date and on or before maturity.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a row does not match the serde shape or the builder was
-    ///     already consumed; date and sign checks fail at ``build()``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.scheduled_fees")]
     #[pyo3(text_signature = "($self, value)")]
     fn scheduled_fees<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -735,28 +412,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             scheduled_fees,
             "[..]".to_string(),
-            |b: RevolvingCreditBuilderInner| b.scheduled_fees(fees)
+            |b: RevolvingCreditBuilder| b.scheduled_fees(fees)
         )
     }
 
-    /// Set the effective-interest-rate reporting switch.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict[str, Any] | str | None
-    ///     ``{"include_fees": bool}`` as a ``dict`` or JSON ``str``; ``None``
-    ///     (the default) includes fees in the effective yield.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the spec does not match the serde shape or the builder was
-    ///     already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.oid_eir")]
     #[pyo3(signature = (value))]
     #[pyo3(text_signature = "($self, value)")]
     fn oid_eir<'py>(
@@ -772,32 +432,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             oid_eir,
             repr.to_string(),
-            |b: RevolvingCreditBuilderInner| b.oid_eir_opt(spec)
+            |b: RevolvingCreditBuilder| b.oid_eir_opt(spec)
         )
     }
 
-    /// Set the letter-of-credit sub-facility.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict[str, Any] | str | None
-    ///     ``LetterOfCreditSpec`` as a ``dict`` or JSON ``str`` with
-    ///     ``sublimit`` and ``outstanding`` (Money dicts), ``events`` (rows
-    ///     of ``{"date", "amount", "is_issue"}``), ``fee_bp`` (``None``
-    ///     accrues the floating margin), ``fronting_fee_bp`` and ``leq`` (the
-    ///     fraction of the LC face drawn at default). ``None`` removes the
-    ///     sublimit.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the spec does not match the serde shape or the builder was
-    ///     already consumed; sublimit and capacity checks fail at ``build()``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.lc")]
     #[pyo3(signature = (value))]
     #[pyo3(text_signature = "($self, value)")]
     fn lc<'py>(
@@ -809,35 +448,11 @@ impl PyRevolvingCreditBuilder {
             finstack_quant_valuations::instruments::fixed_income::loan_terms::LetterOfCreditSpec,
         > = opt_spec_from_py(py, value, "lc")?;
         let repr = if lc.is_some() { "{..}" } else { "None" };
-        builder_set!(
-            slf,
-            lc,
-            repr.to_string(),
-            |b: RevolvingCreditBuilderInner| b.lc_opt(lc)
-        )
+        builder_set!(slf, lc, repr.to_string(), |b: RevolvingCreditBuilder| b
+            .lc_opt(lc))
     }
 
-    /// Set the dated margin steps.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[dict[str, Any]] | str
-    ///     Rows of ``{"date": "YYYY-MM-DD", "delta_bp": str}`` (a decimal
-    ///     string in basis points; a ``list`` of
-    ///     dicts or a JSON ``str``); each delta shifts the floating spread or
-    ///     the fixed rate from its date, cumulatively. Dates must be strictly
-    ///     increasing and strictly inside the facility life.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a row does not match the serde shape or the builder was
-    ///     already consumed; ordering fails at ``build()``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.margin_steps")]
     #[pyo3(text_signature = "($self, value)")]
     fn margin_steps<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -851,32 +466,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             margin_steps,
             "[..]".to_string(),
-            |b: RevolvingCreditBuilderInner| b.margin_steps(steps)
+            |b: RevolvingCreditBuilder| b.margin_steps(steps)
         )
     }
 
-    /// Set the draw/repay specification from its serde shape.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``DrawRepaySpec`` as a ``dict`` or JSON ``str``:
-    ///     ``{"deterministic": [{"date": ..., "amount": Money, "is_draw": bool}, ...]}``
-    ///     or ``{"stochastic": {"utilization_process": {...}, "mc_config": ...}}``.
-    ///     The estimator count, antithetic flag and seed label come from
-    ///     ``instrument_pricing_overrides.model_config`` (``mc_paths``,
-    ///     ``mc_antithetic``, ``mc_seed_scenario``).
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the spec does not match the serde shape or the builder was
-    ///     already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.draw_repay_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn draw_repay_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -892,26 +486,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             draw_repay_spec,
             kind.to_string(),
-            |b: RevolvingCreditBuilderInner| b.draw_repay_spec(spec)
+            |b: RevolvingCreditBuilder| b.draw_repay_spec(spec)
         )
     }
 
-    /// Set the discount curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve id in the market context.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -921,28 +500,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: RevolvingCreditBuilderInner| b.discount_curve_id(CurveId::new(value.to_string()))
+            |b: RevolvingCreditBuilder| b.discount_curve_id(CurveId::new(value.to_string()))
         )
     }
 
-    /// Set (or clear) the credit curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str | None
-    ///     Hazard curve id used for survival weighting; ``None`` prices
-    ///     without credit risk. A stochastic facility with a credit curve
-    ///     must use a market-anchored spread process on the same curve.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.credit_curve_id")]
     #[pyo3(signature = (value))]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_curve_id<'py>(
@@ -953,27 +515,12 @@ impl PyRevolvingCreditBuilder {
             slf,
             credit_curve_id,
             format!("{value:?}"),
-            |b: RevolvingCreditBuilderInner| b
+            |b: RevolvingCreditBuilder| b
                 .credit_curve_id_opt(value.map(|v| CurveId::new(v.to_string())))
         )
     }
 
-    /// Set the recovery rate on default.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Recovery fraction as a decimal in ``[0, 1]``.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.recovery_rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn recovery_rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -983,57 +530,18 @@ impl PyRevolvingCreditBuilder {
             slf,
             recovery_rate,
             value.to_string(),
-            |b: RevolvingCreditBuilderInner| b.recovery_rate(value)
+            |b: RevolvingCreditBuilder| b.recovery_rate(value)
         )
     }
 
-    /// Set the loan-equivalent exposure drawn at default.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Fraction of the undrawn commitment assumed drawn at default, as a
-    ///     decimal in ``[0, 1]`` (default ``0.0``).
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.leq")]
     #[pyo3(text_signature = "($self, value)")]
     fn leq<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(
-            slf,
-            leq,
-            value.to_string(),
-            |b: RevolvingCreditBuilderInner| b.leq(value)
-        )
+        builder_set!(slf, leq, value.to_string(), |b: RevolvingCreditBuilder| b
+            .leq(value))
     }
 
-    /// Set the stub rule for schedule generation.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : StubKind | str
-    ///     Stub kind object or serde name (``"short_front"``, ``"short_back"``,
-    ///     ``"long_front"``, ``"long_back"``, ``"none"``); default
-    ///     ``"short_front"``.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the name is unknown or the builder was already consumed.
-    /// TypeError
-    ///     If ``value`` is neither ``StubKind`` nor ``str``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.stub")]
     #[pyo3(text_signature = "($self, value)")]
     fn stub<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1044,30 +552,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             stub,
             format!("{stub:?}"),
-            |b: RevolvingCreditBuilderInner| b.stub(stub)
+            |b: RevolvingCreditBuilder| b.stub(stub)
         )
     }
 
-    /// Set the business-day convention for payment dates.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : BusinessDayConvention | str
-    ///     Convention object or serde name (``"modified_following"``,
-    ///     ``"following"``, ``"preceding"``, ...); default
-    ///     ``"modified_following"``. Accrual boundaries stay unadjusted.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the name is unknown or the builder was already consumed.
-    /// TypeError
-    ///     If ``value`` is neither ``BusinessDayConvention`` nor ``str``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.business_day_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1078,28 +567,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             business_day_convention,
             format!("{convention:?}"),
-            |b: RevolvingCreditBuilderInner| b.business_day_convention(convention)
+            |b: RevolvingCreditBuilder| b.business_day_convention(convention)
         )
     }
 
-    /// Set the holiday calendar used for payment, fixing and settlement rolls.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str | None
-    ///     Calendar identifier such as ``"usny"``; ``None`` (the default)
-    ///     adjusts for weekends only. An unknown identifier fails at
-    ///     ``build()``.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.calendar_id")]
     #[pyo3(signature = (value))]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
@@ -1110,27 +582,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             calendar_id,
             format!("{value:?}"),
-            |b: RevolvingCreditBuilderInner| b.calendar_id_opt(value.clone().map(Into::into))
+            |b: RevolvingCreditBuilder| b.calendar_id_opt(value.clone().map(Into::into))
         )
     }
 
-    /// Set the payment lag in business days after each accrual end.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : int
-    ///     Business days on the facility calendar; ``0`` (the default) pays
-    ///     on the adjusted accrual end.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.payment_lag_days")]
     #[pyo3(text_signature = "($self, value)")]
     fn payment_lag_days<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1140,28 +596,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             payment_lag_days,
             value.to_string(),
-            |b: RevolvingCreditBuilderInner| b.payment_lag_days(value)
+            |b: RevolvingCreditBuilder| b.payment_lag_days(value)
         )
     }
 
-    /// Set the settlement lag used by quote metrics.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : int
-    ///     Business days from the valuation date to settlement; ``0`` (the
-    ///     default) settles on the valuation date. The base present value is
-    ///     always anchored at the valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.settlement_days")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement_days<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1171,32 +610,11 @@ impl PyRevolvingCreditBuilder {
             slf,
             settlement_days,
             value.to_string(),
-            |b: RevolvingCreditBuilderInner| b.settlement_days(value)
+            |b: RevolvingCreditBuilder| b.settlement_days(value)
         )
     }
 
-    /// Set scenario-selection attributes.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed.
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1207,7 +625,7 @@ impl PyRevolvingCreditBuilder {
             slf,
             attributes,
             "{..}".to_string(),
-            |b: RevolvingCreditBuilderInner| b.attributes(attributes)
+            |b: RevolvingCreditBuilder| b.attributes(attributes)
         )
     }
 }

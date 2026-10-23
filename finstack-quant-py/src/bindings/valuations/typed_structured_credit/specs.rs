@@ -19,20 +19,7 @@ fn opt_date(
     value.map(py_to_date).transpose()
 }
 
-/// Balloon terms of a commercial mortgage at maturity.
-///
-/// At the loan's maturity a share ``extension_prob`` of the performing
-/// balance is extended ``extension_months`` at ``extension_rate`` (the
-/// original coupon when ``None``), a share ``loss_prob`` defaults into a
-/// workout that recovers ``1 − severity_pct / 100`` after ``workout_months``,
-/// and the rest pays as the balloon.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import BalloonSpec
-/// >>> spec = BalloonSpec(0.3, 24, extension_rate=0.07, loss_prob=0.1, severity_pct=40.0, workout_months=18)
-/// >>> spec.extension_prob, spec.workout_months
-/// (0.3, 18)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "BalloonSpec",
@@ -45,37 +32,17 @@ pub struct PyBalloonSpec {
     pub(crate) inner: BalloonSpec,
 }
 
-crate::bindings::macros::wire_methods!(PyBalloonSpec, BalloonSpec, "BalloonSpec", to_dict);
+crate::bindings::macros::wire_methods!(
+    PyBalloonSpec,
+    BalloonSpec,
+    "BalloonSpec",
+    module = "finstack_quant.valuations.instruments",
+    to_dict
+);
 
 #[pymethods]
 impl PyBalloonSpec {
-    /// Construct balloon terms.
-    ///
-    /// Parameters
-    /// ----------
-    /// extension_prob : float
-    ///     Share of the performing balance extended at maturity, decimal in
-    ///     ``[0, 1]``.
-    /// extension_months : int
-    ///     Length of the extension in months.
-    /// extension_rate : float, optional
-    ///     Annual coupon (decimal) on the extended balance; ``None`` keeps
-    ///     the loan's coupon (spread and index for a floater).
-    /// loss_prob : float, optional
-    ///     Share of the performing balance that defaults into a workout at
-    ///     maturity, decimal in ``[0, 1]``; ``0.0`` by default.
-    /// severity_pct : float, optional
-    ///     Loss severity on the workout share in percent (``40.0`` = 40%);
-    ///     ``0.0`` by default.
-    /// workout_months : int, optional
-    ///     Months after maturity until the workout recovery is received;
-    ///     ``0`` by default (the deal's recovery lag).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a share is outside ``[0, 1]``, the severity is outside
-    ///     ``[0, 100]`` or the rate is not finite.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.__init__")]
     #[new]
     #[pyo3(signature = (extension_prob, extension_months, *, extension_rate=None, loss_prob=0.0, severity_pct=0.0, workout_months=0))]
     #[pyo3(
@@ -114,41 +81,26 @@ impl PyBalloonSpec {
 }
 
 crate::bindings::macros::py_getters!(PyBalloonSpec |s| {
-    /// Share of the performing balance extended at maturity (decimal).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.extension_prob")]
     extension_prob -> f64 = s.inner.extension_prob;
 
-    /// Length of the extension in months.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.extension_months")]
     extension_months -> u32 = s.inner.extension_months;
 
-    /// Annual coupon on the extended balance (decimal), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.extension_rate")]
     extension_rate -> Option<f64> = s.inner.extension_rate;
 
-    /// Share of the performing balance that defaults into a workout (decimal).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.loss_prob")]
     loss_prob -> f64 = s.inner.loss_prob;
 
-    /// Loss severity on the workout share in percent.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.severity_pct")]
     severity_pct -> f64 = s.inner.severity_pct;
 
-    /// Months after maturity until the workout recovery is received.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.workout_months")]
     workout_months -> u32 = s.inner.workout_months;
 });
 
-/// Prepayment protection on a commercial mortgage.
-///
-/// Built through one of the four constructors: :meth:`lockout` blocks
-/// voluntary prepayment, :meth:`fixed` charges a percent of the prepaid
-/// balance, :meth:`step_down` charges the step in force from a declining
-/// schedule and :meth:`yield_maintenance` charges the coupon lost over the
-/// remaining term. Premiums are collected by the trust as interest.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
-/// >>> PrepaymentPenalty.fixed(3.0, through=datetime.date(2026, 1, 1)).kind
-/// 'fixed'
-/// >>> PrepaymentPenalty.lockout(datetime.date(2025, 12, 31)).through
-/// datetime.date(2025, 12, 31)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "PrepaymentPenalty",
@@ -165,6 +117,7 @@ crate::bindings::macros::wire_methods!(
     PyPrepaymentPenalty,
     PrepaymentPenalty,
     "PrepaymentPenalty",
+    module = "finstack_quant.valuations.instruments",
     to_dict
 );
 
@@ -177,28 +130,7 @@ impl PyPrepaymentPenalty {
 
 #[pymethods]
 impl PyPrepaymentPenalty {
-    /// A lockout: no voluntary prepayment on or before ``through``.
-    ///
-    /// Parameters
-    /// ----------
-    /// through : datetime.date, optional
-    ///     Last date of the lockout; ``None`` locks the loan out to maturity.
-    ///
-    /// Returns
-    /// -------
-    /// PrepaymentPenalty
-    ///     The lockout.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``through`` is not a valid date.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
-    /// >>> PrepaymentPenalty.lockout().kind
-    /// 'lockout'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.lockout")]
     #[staticmethod]
     #[pyo3(signature = (through=None))]
     #[pyo3(text_signature = "(through=None)")]
@@ -208,30 +140,7 @@ impl PyPrepaymentPenalty {
         })
     }
 
-    /// A fixed percent of the prepaid balance.
-    ///
-    /// Parameters
-    /// ----------
-    /// pct : float
-    ///     Premium in percent of the prepaid balance (``3.0`` = 3%).
-    /// through : datetime.date, optional
-    ///     Last date the penalty applies; ``None`` applies it to maturity.
-    ///
-    /// Returns
-    /// -------
-    /// PrepaymentPenalty
-    ///     The fixed penalty.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``pct`` is negative or ``through`` is not a valid date.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
-    /// >>> PrepaymentPenalty.fixed(3.0).pct
-    /// 3.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.fixed")]
     #[staticmethod]
     #[pyo3(signature = (pct, through=None))]
     #[pyo3(text_signature = "(pct, through=None)")]
@@ -242,32 +151,7 @@ impl PyPrepaymentPenalty {
         })
     }
 
-    /// A declining schedule of percents (5-4-3-2-1).
-    ///
-    /// Parameters
-    /// ----------
-    /// schedule : list[tuple[datetime.date, float]]
-    ///     ``(through, pct)`` steps in ascending date order; the first step
-    ///     whose date is on or after the prepayment applies, nothing after
-    ///     the last.
-    ///
-    /// Returns
-    /// -------
-    /// PrepaymentPenalty
-    ///     The step-down penalty.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the schedule is empty, not ascending, or a percent is negative.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
-    /// >>> steps = [(datetime.date(2025, 12, 31), 5.0), (datetime.date(2026, 12, 31), 3.0)]
-    /// >>> len(PrepaymentPenalty.step_down(steps).schedule)
-    /// 2
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.step_down")]
     #[staticmethod]
     #[pyo3(text_signature = "(schedule)")]
     fn step_down(schedule: Vec<(Bound<'_, PyAny>, f64)>) -> PyResult<Self> {
@@ -283,39 +167,7 @@ impl PyPrepaymentPenalty {
         Self::build(PrepaymentPenalty::StepDown { schedule })
     }
 
-    /// Yield maintenance: the coupon lost over the remaining term.
-    ///
-    /// Parameters
-    /// ----------
-    /// reinvestment_rate : float, optional
-    ///     Annual reinvestment rate as a decimal; ``None`` uses the curve's
-    ///     zero rate to maturity (then ``discount_curve_id`` is required).
-    /// discount_curve_id : str, optional
-    ///     Market-context discount curve the annual lost coupons are
-    ///     discounted on; ``None`` leaves the premium undiscounted.
-    /// floor_pct : float, optional
-    ///     Minimum premium in percent of the prepaid balance (the common
-    ///     ``1.0``); ``None`` for no floor.
-    /// through : datetime.date, optional
-    ///     Last date the penalty applies; ``None`` applies it to maturity.
-    ///
-    /// Returns
-    /// -------
-    /// PrepaymentPenalty
-    ///     The yield-maintenance penalty.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If neither a rate nor a curve is given, a rate or floor is
-    ///     negative, or ``through`` is not a valid date.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
-    /// >>> ym = PrepaymentPenalty.yield_maintenance(discount_curve_id="USD-OIS", floor_pct=1.0)
-    /// >>> ym.kind, ym.floor_pct
-    /// ('yield_maintenance', 1.0)
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.yield_maintenance")]
     #[staticmethod]
     #[pyo3(signature = (*, reinvestment_rate=None, discount_curve_id=None, floor_pct=None, through=None))]
     #[pyo3(
@@ -335,7 +187,7 @@ impl PyPrepaymentPenalty {
         })
     }
 
-    /// ``"lockout"``, ``"fixed"``, ``"step_down"`` or ``"yield_maintenance"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.kind")]
     #[getter]
     fn kind(&self) -> &'static str {
         match self.inner {
@@ -346,8 +198,7 @@ impl PyPrepaymentPenalty {
         }
     }
 
-    /// Last date the penalty or lockout applies as ``datetime.date``, or
-    /// ``None`` (to maturity, or a step-down schedule).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.through")]
     #[getter]
     fn through<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         let through = match &self.inner {
@@ -359,7 +210,7 @@ impl PyPrepaymentPenalty {
         through.map(|date| date_to_py(py, date)).transpose()
     }
 
-    /// Step-down schedule as ``(through, pct)`` pairs, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.schedule")]
     #[getter]
     fn schedule<'py>(&self, py: Python<'py>) -> PyResult<Option<PenaltySteps<'py>>> {
         match &self.inner {
@@ -372,7 +223,7 @@ impl PyPrepaymentPenalty {
         }
     }
 
-    /// Yield-maintenance reinvestment rate (decimal), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.reinvestment_rate")]
     #[getter]
     fn reinvestment_rate(&self) -> Option<f64> {
         match self.inner {
@@ -383,7 +234,7 @@ impl PyPrepaymentPenalty {
         }
     }
 
-    /// Yield-maintenance discount curve identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.discount_curve_id")]
     #[getter]
     fn discount_curve_id(&self) -> Option<String> {
         match &self.inner {
@@ -401,29 +252,18 @@ impl PyPrepaymentPenalty {
 }
 
 crate::bindings::macros::py_getters!(PyPrepaymentPenalty |s| {
-    /// Fixed premium percent, or ``None`` for the other kinds.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.pct")]
     pct -> Option<f64> =
         match s.inner { PrepaymentPenalty::Fixed { pct, .. } => Some(pct), _ => None };
 
-    /// Yield-maintenance floor in percent of the prepaid balance, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.floor_pct")]
     floor_pct -> Option<f64> = match s.inner {
         PrepaymentPenalty::YieldMaintenance { floor_pct, .. } => floor_pct,
         _ => None,
     };
 });
 
-/// Special-servicing state of a commercial mortgage at closing.
-///
-/// The appraisal reduction (ASER) cuts the interest advanced on the loan to
-/// ``1 − appraisal_reduction_pct / 100`` of its balance; the loan is
-/// specially serviced from closing, so the deal's special servicer fee,
-/// workout fee and liquidation fee apply to it.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import SpecialServicingSpec
-/// >>> SpecialServicingSpec(40.0).appraisal_reduction_pct
-/// 40.0
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SpecialServicingSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "SpecialServicingSpec",
@@ -440,24 +280,13 @@ crate::bindings::macros::wire_methods!(
     PySpecialServicingSpec,
     SpecialServicingSpec,
     "SpecialServicingSpec",
+    module = "finstack_quant.valuations.instruments",
     to_dict
 );
 
 #[pymethods]
 impl PySpecialServicingSpec {
-    /// Construct the special-servicing state.
-    ///
-    /// Parameters
-    /// ----------
-    /// appraisal_reduction_pct : float
-    ///     Appraisal reduction in percent of the loan balance (``40.0`` =
-    ///     40%); required as in Rust (``0.0`` = specially serviced with full
-    ///     advancing).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the percent is outside ``[0, 100]``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SpecialServicingSpec.__init__")]
     #[new]
     #[pyo3(text_signature = "(appraisal_reduction_pct)")]
     fn new(appraisal_reduction_pct: f64) -> PyResult<Self> {
@@ -478,23 +307,11 @@ impl PySpecialServicingSpec {
 }
 
 crate::bindings::macros::py_getters!(PySpecialServicingSpec |s| {
-    /// Appraisal reduction in percent of the loan balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SpecialServicingSpec.appraisal_reduction_pct")]
     appraisal_reduction_pct -> f64 = s.inner.appraisal_reduction_pct;
 });
 
-/// Resolution timeline of a non-performing or re-performing loan.
-///
-/// The loan pays nothing until ``months_to_resolution`` months from its
-/// origination (acquisition date, else closing); then the share
-/// ``1 − reperformance_prob`` liquidates at ``proceeds_pct − carry_cost_pct``
-/// percent of its balance and the rest re-performs at ``modified_rate``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import LiquidationSpec
-/// >>> spec = LiquidationSpec(18, 65.0, carry_cost_pct=5.0, reperformance_prob=0.2, modified_rate=0.04)
-/// >>> spec.months_to_resolution, spec.net_proceeds_fraction
-/// (18, 0.6)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "LiquidationSpec",
@@ -511,34 +328,13 @@ crate::bindings::macros::wire_methods!(
     PyLiquidationSpec,
     LiquidationSpec,
     "LiquidationSpec",
+    module = "finstack_quant.valuations.instruments",
     to_dict
 );
 
 #[pymethods]
 impl PyLiquidationSpec {
-    /// Construct the resolution terms.
-    ///
-    /// Parameters
-    /// ----------
-    /// months_to_resolution : int
-    ///     Months from origination until the loan resolves.
-    /// proceeds_pct : float
-    ///     Gross liquidation proceeds in percent of the balance.
-    /// carry_cost_pct : float, optional
-    ///     Carry and disposition costs in percent of the balance, netted
-    ///     from the proceeds; ``0.0`` by default.
-    /// reperformance_prob : float, optional
-    ///     Share of the balance that re-performs instead of liquidating,
-    ///     decimal in ``[0, 1]``; ``0.0`` by default.
-    /// modified_rate : float, optional
-    ///     Annual coupon (decimal) of the re-performing share; ``None`` keeps
-    ///     the loan's coupon.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a percent is outside ``[0, 100]``, the share is outside
-    ///     ``[0, 1]`` or the rate is not finite.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.__init__")]
     #[new]
     #[pyo3(signature = (months_to_resolution, proceeds_pct, *, carry_cost_pct=0.0, reperformance_prob=0.0, modified_rate=None))]
     #[pyo3(
@@ -572,22 +368,21 @@ impl PyLiquidationSpec {
 }
 
 crate::bindings::macros::py_getters!(PyLiquidationSpec |s| {
-    /// Months from origination until the loan resolves.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.months_to_resolution")]
     months_to_resolution -> u32 = s.inner.months_to_resolution;
 
-    /// Gross liquidation proceeds in percent of the balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.proceeds_pct")]
     proceeds_pct -> f64 = s.inner.proceeds_pct;
 
-    /// Carry and disposition costs in percent of the balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.carry_cost_pct")]
     carry_cost_pct -> f64 = s.inner.carry_cost_pct;
 
-    /// Share of the balance that re-performs (decimal).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.reperformance_prob")]
     reperformance_prob -> f64 = s.inner.reperformance_prob;
 
-    /// Coupon of the re-performing share (decimal), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.modified_rate")]
     modified_rate -> Option<f64> = s.inner.modified_rate;
 
-    /// Net liquidation proceeds as a fraction of the balance
-    /// (``(proceeds_pct − carry_cost_pct) / 100``, floored at zero).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.net_proceeds_fraction")]
     net_proceeds_fraction -> f64 = s.inner.net_proceeds_fraction();
 });

@@ -28,11 +28,12 @@ impl CashflowScheduleSource for StructuredCredit {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let detailed_flows =
-            crate::structured_credit::pricing::run_simulation(self, context, as_of)?
-                .into_values()
-                .flat_map(|result| result.detailed_flows.into_iter())
-                .collect();
+        let detailed_flows = self
+            .run_simulation(context, as_of)?
+            .tranches
+            .into_values()
+            .flat_map(|result| result.detailed_flows.into_iter())
+            .collect();
         self.projected_schedule(detailed_flows)
     }
 }
@@ -71,7 +72,7 @@ impl StructuredCredit {
         as_of: Date,
     ) -> finstack_quant_core::Result<(Money, SimulationMetricSeed)> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let run = crate::structured_credit::pricing::run_simulation(self, market, as_of)?;
+        let run = self.run_simulation(market, as_of)?.tranches;
         let flows = RunFlows {
             deal: self,
             run: &run,
@@ -278,8 +279,7 @@ impl Instrument for StructuredCredit {
         if context.tagged_cashflows.is_some() {
             return;
         }
-        if let Ok(results) = crate::structured_credit::pricing::run_simulation(self, market, as_of)
-        {
+        if let Ok(results) = self.run_simulation(market, as_of).map(|run| run.tranches) {
             SimulationMetricSeed::from_run(results).install(context);
         }
     }
@@ -559,9 +559,8 @@ impl StructuredCredit {
 mod tests {
     use super::*;
     use crate::structured_credit::pricing::SIMULATION_RUNS;
-    use finstack_quant_valuations_core::instruments::common_impl::helpers::compute_metrics_dyn;
     use finstack_quant_valuations_core::instruments::PricingOptions;
-    use finstack_quant_valuations_core::metrics::MetricId;
+    use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
     use finstack_quant_valuations_test_support::discount_forward_curves::{
         flat_discount_with_tenor, flat_forward_with_tenor,
     };
@@ -603,15 +602,21 @@ mod tests {
                 .amount()
                 .to_bits()
         );
-        let unseeded = compute_metrics_dyn(
-            Arc::new(deal),
-            Arc::new(market),
+        let market = Arc::new(market);
+        let mut context = MetricContext::new(
+            Arc::new(deal.clone()),
+            Arc::clone(&market),
             as_of,
             priced.value,
-            &metrics,
-            Default::default(),
-        )
-        .expect("unseeded metrics");
+            MetricContext::default_config(),
+        );
+        // Seed only through the public instrument hook: no pricing-result seed.
+        deal.seed_metric_context(&mut context, market.as_ref(), as_of);
+        let unseeded = deal
+            .family()
+            .metrics()
+            .compute(&metrics, &mut context)
+            .expect("unseeded metrics");
         assert_eq!(
             priced.metric(MetricId::WAL).map(f64::to_bits),
             unseeded.get(&MetricId::WAL).copied().map(f64::to_bits)

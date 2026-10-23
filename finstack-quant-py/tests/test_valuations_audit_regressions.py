@@ -111,3 +111,26 @@ def test_cms_replication_zero_volatility_matches_discounted_intrinsic(strike: st
         for model in ["black76", "static_replication"]
     ]
     assert prices[1] == pytest.approx(prices[0], abs=1e-7)
+
+
+@pytest.mark.parametrize(
+    ("model", "as_of"),
+    [
+        ("black76", "2025-06-15"),
+        ("monte_carlo_schwartz_smith", "2025-01-02"),
+    ],
+)
+def test_commodity_spot_money_currency_is_checked(model: str, as_of: str) -> None:
+    instrument = copy.deepcopy(_FIXTURES["commodity"])
+    instrument["instrument"]["spec"]["instrument_pricing_overrides"]["model_config"]["mc_paths"] = 64
+    market = copy.deepcopy(_FIXTURES["market"])
+
+    def price() -> float:
+        return price_instrument(json.dumps(instrument), json.dumps(market), as_of, model).price
+
+    numeric = price()
+    market["prices"]["WTI-SPOT"] = {"price": {"amount": "80", "currency": "USD"}}
+    assert price() == numeric
+    market["prices"]["WTI-SPOT"]["price"]["currency"] = "EUR"
+    with pytest.raises(ValueError, match="Currency mismatch: expected USD, got EUR"):
+        price()

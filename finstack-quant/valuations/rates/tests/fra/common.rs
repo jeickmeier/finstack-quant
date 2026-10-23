@@ -252,22 +252,6 @@ impl TestFraBuilder {
     }
 }
 
-/// Assertion helpers for FRA tests
-/// Assert value is finite (not NaN or infinite)
-pub fn assert_finite(value: f64, msg: &str) {
-    assert!(value.is_finite(), "{}: value is not finite: {}", msg, value);
-}
-
-/// Assert value is positive
-pub fn assert_positive(value: f64, msg: &str) {
-    assert!(
-        value > 0.0,
-        "{}: value should be positive, got {}",
-        msg,
-        value
-    );
-}
-
 /// Assert value is negative
 pub fn assert_negative(value: f64, msg: &str) {
     assert!(

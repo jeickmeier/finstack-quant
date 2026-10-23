@@ -26,38 +26,10 @@ fn production_structured_constructor_rejects_date_overflow() {
     let base = StructuredCredit::example().expect("example");
     let (pool, tranches) = (|| base.pool.clone(), || base.tranches.clone());
     for deal in [
-        StructuredCredit::new_abs(
-            "BOUNDARY",
-            pool(),
-            tranches(),
-            Date::MAX,
-            Date::MAX,
-            "USD-OIS",
-        ),
-        StructuredCredit::new_clo(
-            "BOUNDARY",
-            pool(),
-            tranches(),
-            Date::MAX,
-            Date::MAX,
-            "USD-OIS",
-        ),
-        StructuredCredit::new_cmbs(
-            "BOUNDARY",
-            pool(),
-            tranches(),
-            Date::MAX,
-            Date::MAX,
-            "USD-OIS",
-        ),
-        StructuredCredit::new_rmbs(
-            "BOUNDARY",
-            pool(),
-            tranches(),
-            Date::MAX,
-            Date::MAX,
-            "USD-OIS",
-        ),
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: pool(), tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: pool(), tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: pool(), tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: pool(), tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
     ] {
         assert!(deal.is_err());
     }
@@ -69,50 +41,22 @@ fn production_structured_constructor_uses_closing_date() {
     let closing = date!(2026 - 09 - 09);
     for (deal, expected) in [
         (
-            StructuredCredit::new_abs(
-                "ABS",
-                base.pool.clone(),
-                base.tranches.clone(),
-                closing,
-                base.maturity,
-                "USD-OIS",
-            )
+            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "ABS".into(), pool: base.pool.clone(), tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
             .expect("valid structured-credit dates"),
             date!(2026 - 10 - 09),
         ),
         (
-            StructuredCredit::new_clo(
-                "CLO",
-                base.pool.clone(),
-                base.tranches.clone(),
-                closing,
-                base.maturity,
-                "USD-OIS",
-            )
+            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "CLO".into(), pool: base.pool.clone(), tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
             .expect("valid structured-credit dates"),
             date!(2026 - 12 - 09),
         ),
         (
-            StructuredCredit::new_cmbs(
-                "CMBS",
-                base.pool.clone(),
-                base.tranches.clone(),
-                closing,
-                base.maturity,
-                "USD-OIS",
-            )
+            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "CMBS".into(), pool: base.pool.clone(), tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
             .expect("valid structured-credit dates"),
             date!(2026 - 10 - 09),
         ),
         (
-            StructuredCredit::new_rmbs(
-                "RMBS",
-                base.pool.clone(),
-                base.tranches.clone(),
-                closing,
-                base.maturity,
-                "USD-OIS",
-            )
+            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "RMBS".into(), pool: base.pool.clone(), tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
             .expect("valid structured-credit dates"),
             date!(2026 - 10 - 09),
         ),
@@ -271,10 +215,9 @@ fn production_structured_credit_model_matches_dated_distributions() {
     let value = deal.value(&market(as_of), as_of).expect("value");
     let market = market(as_of);
     let disc = market.get_discount("USD-OIS").expect("curve");
-    let run =
-        finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation(
-            &deal, &market, as_of,
-        )
+    let run = deal
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
         .expect("simulation");
     let mut expected = 0.0;
     for tranche in run.values() {

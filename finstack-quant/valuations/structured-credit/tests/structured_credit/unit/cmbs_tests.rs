@@ -16,9 +16,9 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, AssetType, BalloonSpec, CmbsDscrCalculator,
-    DealFees, DealType, PenaltyStep, PeriodDiagnostics, PoolAsset, PrepaymentPenalty,
-    SpecialServicingSpec, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, AssetType, BalloonSpec, CmbsDscrCalculator, DealFees, DealType, PenaltyStep,
+    PeriodDiagnostics, PoolAsset, PrepaymentPenalty, SpecialServicingSpec, StructuredCredit,
+    Tranche, TrancheStructure,
 };
 use std::sync::Arc;
 use time::Month;
@@ -100,10 +100,20 @@ fn cmbs(loans: Vec<PoolAsset>) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_cmbs("CMBS-T14", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CMBS-T14".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     deal.fees = None;
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -111,14 +121,14 @@ fn cmbs(loans: Vec<PoolAsset>) -> StructuredCredit {
 }
 
 fn periods(deal: &StructuredCredit) -> Vec<PeriodDiagnostics> {
-    run_simulation_with_diagnostics(deal, &market(), close())
+    deal.run_simulation(&market(), close())
         .expect("run")
         .diagnostics
         .periods
 }
 
 fn first_interest(deal: &StructuredCredit, tranche: &str) -> f64 {
-    run_simulation_with_diagnostics(deal, &market(), close())
+    deal.run_simulation(&market(), close())
         .expect("run")
         .tranches[tranche]
         .interest_flows[0]
@@ -261,7 +271,7 @@ fn appraisal_reduction_shortfall_hits_the_junior_classes_first() {
         impaired_interest - a_impaired
     );
 
-    let run = run_simulation_with_diagnostics(&impaired, &market(), close()).expect("run");
+    let run = impaired.run_simulation(&market(), close()).expect("run");
     let e_first = run.tranches["E"]
         .cashflows
         .iter()
@@ -401,8 +411,9 @@ fn dscr_comes_from_loan_level_noi_and_debt_service() {
 /// Malformed commercial-mortgage terms are rejected by instrument validation.
 #[test]
 fn cmbs_terms_are_validated() {
-    let mut bad_balloon = loan("L1", maturity());
-    bad_balloon.balloon = Some(BalloonSpec {
+    let valid = cmbs(vec![loan("L1", maturity())]);
+    let mut bad_balloon = valid.clone();
+    bad_balloon.pool.assets[0].balloon = Some(BalloonSpec {
         extension_prob: 1.5,
         extension_months: 24,
         extension_rate: None,
@@ -410,28 +421,26 @@ fn cmbs_terms_are_validated() {
         severity_pct: 0.0,
         workout_months: 0,
     });
-    assert!(cmbs(vec![bad_balloon]).validate_invariants().is_err());
+    assert!(bad_balloon.validate_invariants().is_err());
 
-    let mut bad_penalty = loan("L1", maturity());
-    bad_penalty.prepayment_penalty = Some(PrepaymentPenalty::Fixed {
+    let mut bad_penalty = valid.clone();
+    bad_penalty.pool.assets[0].prepayment_penalty = Some(PrepaymentPenalty::Fixed {
         pct: -1.0,
         through: None,
     });
-    assert!(cmbs(vec![bad_penalty]).validate_invariants().is_err());
+    assert!(bad_penalty.validate_invariants().is_err());
 
-    let mut bad_appraisal = loan("L1", maturity());
-    bad_appraisal.special_servicing = Some(SpecialServicingSpec {
+    let mut bad_appraisal = valid.clone();
+    bad_appraisal.pool.assets[0].special_servicing = Some(SpecialServicingSpec {
         appraisal_reduction_pct: 120.0,
     });
-    assert!(cmbs(vec![bad_appraisal]).validate_invariants().is_err());
+    assert!(bad_appraisal.validate_invariants().is_err());
 
-    let mut foreign_noi = loan("L1", maturity());
-    foreign_noi.noi = Some(Money::new(1.0, Currency::EUR).expect("money"));
-    assert!(cmbs(vec![foreign_noi]).validate_invariants().is_err());
+    let mut foreign_noi = valid.clone();
+    foreign_noi.pool.assets[0].noi = Some(Money::new(1.0, Currency::EUR).expect("money"));
+    assert!(foreign_noi.validate_invariants().is_err());
 
-    assert!(cmbs(vec![loan("L1", maturity())])
-        .validate_invariants()
-        .is_ok());
+    assert!(valid.validate_invariants().is_ok());
 }
 
 fn balloon(extension_prob: f64, extension_rate: Option<f64>) -> BalloonSpec {
@@ -462,8 +471,9 @@ fn a_fixed_extension_rate_replaces_the_index_and_spread() {
     floating.io_months = Some(close().months_until(loan_maturity));
     floating.balloon = Some(balloon(0.3, Some(0.09)));
     let deal = cmbs(vec![floating]);
-    let run =
-        run_simulation_with_diagnostics(&deal, &market_with_curves(close()), close()).expect("run");
+    let run = deal
+        .run_simulation(&market_with_curves(close()), close())
+        .expect("run");
     let periods = &run.diagnostics.periods;
     let months = deal.frequency.months().expect("month frequency") as i32;
     let k = periods

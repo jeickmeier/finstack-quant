@@ -241,10 +241,12 @@ fn metrics_based_explains_convertible_credit_spread_move() {
     // `required_metrics()` is the engine's cross-instrument menu, not a
     // request, so narrow it to what a convertible actually supports, exactly
     // as the execution path does.
-    let metrics = finstack_quant_valuations::metrics::standard_registry().applicable_subset(
-        &AttributionMethod::MetricsBased.required_metrics(),
-        conv.key(),
-    );
+    let metrics = finstack_quant_valuations::pricer::STANDARD
+        .metrics()
+        .applicable_subset(
+            &AttributionMethod::MetricsBased.required_metrics(),
+            conv.key(),
+        );
     let opts = finstack_quant_valuations::instruments::PricingOptions::default()
         .with_recalibration_provider(Arc::new(
             finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default(),

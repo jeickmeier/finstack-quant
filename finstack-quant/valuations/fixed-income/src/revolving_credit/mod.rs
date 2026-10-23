@@ -67,8 +67,7 @@
 
 pub mod cashflow_engine;
 pub(crate) mod metrics;
-#[doc(hidden)]
-pub mod pricing;
+mod pricing;
 pub(crate) mod types;
 
 mod utils;
@@ -107,4 +106,10 @@ pub use types::{
 pub use types::{
     CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, RevolvingCreditMcRun,
     StochasticUtilizationSpec,
+};
+
+pub use pricing::{
+    path_generator::build_credit_spread_params,
+    results::{EnhancedMonteCarloResult, PathResult},
+    unified::{RevolvingCreditPricer, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR},
 };

@@ -21,7 +21,7 @@
 //! tables for the types it owns (`RATES`, `FIXED_INCOME`, `STRUCTURED_CREDIT`, `CREDIT`,
 //! `EQUITY`, `FX`, `EXOTICS` in the umbrella crate). The umbrella's `STANDARD` family merges
 //! them all and adds the composite instruments (`Composite`, `Basket`) that can hold any leg;
-//! its `standard_pricer_registry()` is that pricer registry.
+//! its `finstack_quant_valuations::pricer::STANDARD.pricers()` is that pricer registry.
 
 // Core submodules
 #[doc(hidden)]

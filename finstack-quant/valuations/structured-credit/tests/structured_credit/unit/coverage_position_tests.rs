@@ -13,9 +13,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, run_simulation_with_diagnostics, AssetPool, CoverageTestAction,
-    CoverageTestSpec, DealType, PoolAsset, SimulationRun, StructuredCredit, Tranche,
-    TrancheCashflows, TrancheStructure,
+    AssetPool, CoverageTestAction, CoverageTestSpec, DealType, PoolAsset, SimulationRun,
+    StructuredCredit, Tranche, TrancheCashflows, TrancheStructure,
 };
 use time::Month;
 
@@ -111,13 +110,17 @@ fn clo(tests: Vec<CoverageTestSpec>) -> (StructuredCredit, Date) {
     .expect("structure");
     let mut deal = StructuredCredit {
         coverage_triggers: tests,
-        ..StructuredCredit::new_clo(
-            "CLO-COVERAGE-POSITION",
-            pool,
-            tranches,
-            close,
-            maturity,
-            "USD-OIS",
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-COVERAGE-POSITION".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse")
@@ -131,7 +134,9 @@ fn clo(tests: Vec<CoverageTestSpec>) -> (StructuredCredit, Date) {
 fn simulate(tests: Vec<CoverageTestSpec>) -> FxHashMap<String, TrancheCashflows> {
     let (deal, as_of) = clo(tests);
     let market = market(as_of);
-    run_simulation(&deal, &market, as_of).expect("simulation")
+    deal.run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 fn first_deferral(results: &FxHashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
@@ -165,7 +170,7 @@ fn residual_on(results: &FxHashMap<String, TrancheCashflows>, date: Date) -> f64
 fn simulate_run(tests: Vec<CoverageTestSpec>) -> SimulationRun {
     let (deal, as_of) = clo(tests);
     let market = market(as_of);
-    run_simulation_with_diagnostics(&deal, &market, as_of).expect("simulation")
+    deal.run_simulation(&market, as_of).expect("simulation")
 }
 
 /// Original balances of the notes, for opening-balance reconstruction.

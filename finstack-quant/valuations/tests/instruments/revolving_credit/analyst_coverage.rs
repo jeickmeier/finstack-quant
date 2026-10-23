@@ -18,7 +18,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
+use finstack_quant_valuations::pricer::ModelKey;
 use time::macros::date;
 
 const COMMITMENT: finstack_quant_core::dates::Date = date!(2024 - 01 - 15);
@@ -81,7 +81,8 @@ fn zero_vol_stochastic() -> DrawRepaySpec {
 }
 
 fn metrics(facility: &RevolvingCredit, model: ModelKey) -> (f64, f64, f64) {
-    let result = standard_pricer_registry()
+    let result = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             facility,
             model,
@@ -442,7 +443,7 @@ fn commitment_step_below_the_drawn_balance_is_rejected() {
 fn stochastic_utilization_books_the_principal_implied_by_a_commitment_step() {
     let facility =
         stepped(5_000_000.0, zero_vol_stochastic_at(0.5), step_to_6m()).expect("facility");
-    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
+    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
         .expect("paths");
     let flows = result.path_results[0].cashflows.get_flows().to_vec();
     let notional: Vec<_> = flows
@@ -491,7 +492,8 @@ fn capacity_metrics_read_the_stepped_commitment() {
     )
     .expect("facility");
     let after = date!(2026 - 03 - 01);
-    let result = standard_pricer_registry()
+    let result = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             &facility,
             ModelKey::Discounting,
@@ -765,7 +767,8 @@ fn letters_of_credit_reduce_availability_and_pay_lc_and_fronting_fees() {
     // Usage fee tier at 50% utilization (3M drawn + 2M LC) applies 25 bp to the drawn 3M.
     assert!((flow_amount(&flows, CFKind::UsageFee, pay) - 3_000_000.0 * 0.0025 * dt).abs() < 1e-6);
 
-    let result = standard_pricer_registry()
+    let result = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             &facility,
             ModelKey::Discounting,
@@ -861,7 +864,7 @@ fn stochastic_utilization_is_capped_by_outstanding_letters_of_credit() {
         }),
     }));
     let facility = with_lc(spec, lc_spec(2_000_000.0, vec![], 0.0), None).expect("facility");
-    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer::price_with_paths(&facility, &market_with_forward(), AS_OF)
+    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market_with_forward(), AS_OF)
         .expect("paths");
     for path in &result.path_results {
         let data = path.path_data.as_ref().expect("path data");
@@ -957,7 +960,8 @@ fn quote_facility(
 }
 
 fn quote_metric(facility: &RevolvingCredit, market: &MarketContext, id: MetricId) -> f64 {
-    let result = standard_pricer_registry()
+    let result = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             facility,
             ModelKey::Discounting,
@@ -1144,7 +1148,8 @@ fn exposure_facility(drawn: f64, leq: f64, credit: bool) -> RevolvingCredit {
 }
 
 fn measure(facility: &RevolvingCredit, market: &MarketContext, id: MetricId) -> f64 {
-    let result = standard_pricer_registry()
+    let result = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             facility,
             ModelKey::Discounting,
@@ -1320,7 +1325,8 @@ fn oid_effective_rate_exceeds_the_running_rate_with_an_upfront_fee() {
     let m = market();
     let with_fee = origination_facility(Some(UpfrontFee::FractionOfCommitment(0.02)), 0.0);
     let run = |facility: &RevolvingCredit| {
-        standard_pricer_registry()
+        finstack_quant_valuations::pricer::STANDARD
+            .pricers()
             .price_with_metrics(
                 facility,
                 ModelKey::Discounting,
@@ -1511,7 +1517,8 @@ fn accordion_allows_draws_above_the_opening_commitment() {
         .value(&market, AS_OF)
         .expect("prices with the default leg");
     assert!(pv.amount().is_finite());
-    let result = standard_pricer_registry()
+    let result = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             &facility,
             ModelKey::Discounting,
@@ -1540,7 +1547,7 @@ fn historical_commitment_steps_book_no_principal() {
     }];
     facility.drawn = usd(5_000_000.0);
     facility.validate().expect("seasoned facility");
-    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
+    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
         .expect("paths");
     let flows = result.path_results[0].cashflows.get_flows().to_vec();
     let notional: Vec<_> = flows

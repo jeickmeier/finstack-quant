@@ -45,9 +45,9 @@ bond/
 ├── json.rs                  # bond_from_cashflows_json
 ├── pricing/
 │   ├── mod.rs               # the model-preserving BondPricer adapter
-│   ├── discount.rs          # BondEngine: PV = Σ CF_i × DF_i
-│   ├── hazard.rs            # HazardBondEngine: non-callable survival-weighted PV + FRP
-│   ├── tree/                # TreePricer: rates-only and joint rates-credit optionality + OAS
+│   ├── discount.rs          # Discounting kernel: PV = Σ CF_i × DF_i
+│   ├── hazard.rs            # Hazard-rate kernel: non-callable survival-weighted PV + FRP
+│   ├── tree/                # Internal tree pricer: rates-only and joint rates-credit optionality + OAS
 │   ├── merton_mc/           # MertonMcEngine: structural credit and PIK
 │   ├── quote_conversions/   # yield↔price, spread↔price, annuity helpers
 │   ├── ytm_solver.rs        # Newton/Brent yield-to-maturity solver
@@ -317,7 +317,7 @@ Registered for `InstrumentType::Bond` in `metrics/mod.rs`:
 | Credit risk | `Cs01`, `BucketedCs01`, `CrossGammaRatesCredit` |
 | Return floor | `Moic`, `MoicToWorst`, `Xirr`, `XirrToWorst` |
 
-`Theta` is registered universally by `metrics::standard_registry()`.
+`Theta` is registered universally by `pricer::STANDARD.metrics()`.
 Duration and convexity switch to the effective (option-aware) computation in
 `metrics/effective.rs` when the bond carries a call/put schedule or return-floor
 rights. Deterministic return floors use the pricing-effective daily call

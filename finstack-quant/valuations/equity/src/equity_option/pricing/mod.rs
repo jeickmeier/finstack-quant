@@ -9,9 +9,7 @@
 mod black;
 pub(crate) mod inputs;
 
-pub(crate) use black::{
-    compute_greeks, compute_pv, EquityOptionGreeks, SimpleEquityOptionBlackPricer,
-};
+pub(crate) use black::{compute_greeks, compute_pv, SimpleEquityOptionBlackPricer};
 pub(crate) use inputs::{
     collect_inputs, has_future_discrete_dividends, model_error, model_inputs,
     stochastic_vol_inputs, ModelInputs,
@@ -119,6 +117,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionHestonFourie
 
 #[cfg(test)]
 mod tests {
+    use super::black::EquityOptionGreeks;
     use super::inputs::adjust_spot_for_discrete_dividends;
     use super::*;
     use crate::equity_option::types::{EquityOption, EquityOptionExercise};

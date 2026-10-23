@@ -22,6 +22,33 @@ use finstack_quant_valuations_test_support::date::date;
 use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
 use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 
+/// Price through the configured registry, retaining the normal lifecycle and diagnostics.
+fn price_with_mc_registry(
+    option: &CommoditySpotOption,
+    params: &CommodityMcParams,
+    market: &MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+) -> Result<
+    finstack_quant_valuations_core::results::ValuationResult,
+    finstack_quant_valuations_core::pricer::PricingError,
+> {
+    use finstack_quant_valuations_core::{
+        instruments::PricingOptions,
+        pricer::{ModelKey, PricerRegistry},
+    };
+    use finstack_quant_valuations_exotics::commodity::commodity_spot_option::CommoditySpotOptionMcPricer;
+    let mut registry = PricerRegistry::new();
+    registry.register(CommoditySpotOptionMcPricer::new(params.clone()))?;
+    registry.price_with_metrics(
+        option,
+        ModelKey::MonteCarloSchwartzSmith,
+        market,
+        as_of,
+        &[],
+        PricingOptions::default(),
+    )
+}
+
 /// Helper to build a standard commodity option for MC tests.
 fn build_commodity_spot_option(strike: f64, option_type: OptionType) -> CommoditySpotOption {
     let expiry = date(2026, 1, 1);
@@ -108,7 +135,9 @@ fn test_schwartz_smith_gbm_limit_converges_to_black76() {
         seed: Some(42),
     };
 
-    let mc_pv = call.npv_mc(&mc_params, &market, as_of).expect("MC price");
+    let mc_pv = price_with_mc_registry(&call, &mc_params, &market, as_of)
+        .expect("MC price")
+        .value;
 
     let analytical_val = analytical_pv.amount();
     let mc_val = mc_pv.amount();
@@ -147,7 +176,9 @@ fn test_mc_estimates_consistent_across_path_counts() {
         num_steps: 50,
         seed: Some(42),
     };
-    let pv_10k = call.npv_mc(&mc_10k, &market, as_of).expect("10k paths");
+    let pv_10k = price_with_mc_registry(&call, &mc_10k, &market, as_of)
+        .expect("10k paths")
+        .value;
 
     // Price with 100k paths
     let mc_100k = CommodityMcParams {
@@ -156,7 +187,9 @@ fn test_mc_estimates_consistent_across_path_counts() {
         num_steps: 50,
         seed: Some(42),
     };
-    let pv_100k = call.npv_mc(&mc_100k, &market, as_of).expect("100k paths");
+    let pv_100k = price_with_mc_registry(&call, &mc_100k, &market, as_of)
+        .expect("100k paths")
+        .value;
 
     // Both should produce positive values for an ATM call
     assert!(
@@ -213,12 +246,12 @@ fn test_put_call_parity_mc() {
         seed: Some(42),
     };
 
-    let call_pv = call
-        .npv_mc(&mc_params, &market, as_of)
-        .expect("MC call price");
-    let put_pv = put
-        .npv_mc(&mc_params, &market, as_of)
-        .expect("MC put price");
+    let call_pv = price_with_mc_registry(&call, &mc_params, &market, as_of)
+        .expect("MC call price")
+        .value;
+    let put_pv = price_with_mc_registry(&put, &mc_params, &market, as_of)
+        .expect("MC put price")
+        .value;
 
     // Get forward and discount factor
     let forward = call.forward_price(&market, as_of).expect("forward");
@@ -266,7 +299,9 @@ fn test_schwartz_smith_positive_option_values() {
 
     // ATM call
     let call = build_commodity_spot_option(100.0, OptionType::Call);
-    let call_pv = call.npv_mc(&mc_params, &market, as_of).expect("MC call");
+    let call_pv = price_with_mc_registry(&call, &mc_params, &market, as_of)
+        .expect("MC call")
+        .value;
     assert!(
         call_pv.amount() > 0.0,
         "ATM call should have positive value: {}",
@@ -275,7 +310,9 @@ fn test_schwartz_smith_positive_option_values() {
 
     // ATM put
     let put = build_commodity_spot_option(100.0, OptionType::Put);
-    let put_pv = put.npv_mc(&mc_params, &market, as_of).expect("MC put");
+    let put_pv = price_with_mc_registry(&put, &mc_params, &market, as_of)
+        .expect("MC put")
+        .value;
     assert!(
         put_pv.amount() > 0.0,
         "ATM put should have positive value: {}",
@@ -284,9 +321,9 @@ fn test_schwartz_smith_positive_option_values() {
 
     // Deep OTM call (strike = 150) should still be non-negative
     let otm_call = build_commodity_spot_option(150.0, OptionType::Call);
-    let otm_call_pv = otm_call
-        .npv_mc(&mc_params, &market, as_of)
-        .expect("MC OTM call");
+    let otm_call_pv = price_with_mc_registry(&otm_call, &mc_params, &market, as_of)
+        .expect("MC OTM call")
+        .value;
     assert!(
         otm_call_pv.amount() >= 0.0,
         "OTM call should be non-negative: {}",
@@ -296,9 +333,7 @@ fn test_schwartz_smith_positive_option_values() {
 
 #[test]
 fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
-    use finstack_quant_valuations_core::pricer::Pricer;
     use finstack_quant_valuations_core::results::{MonteCarloValuationDetails, ValuationDetails};
-    use finstack_quant_valuations_exotics::commodity::commodity_spot_option::CommoditySpotOptionMcPricer;
     let as_of = date(2025, 1, 1);
     let market = build_market(as_of);
     let mut call = build_commodity_spot_option(100.0, OptionType::Call);
@@ -315,8 +350,7 @@ fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
         num_steps: 12,
         seed: Some(123),
     };
-    let pricer = CommoditySpotOptionMcPricer::new(params);
-    let unit = pricer.price_dyn(&call, &market, as_of).unwrap();
+    let unit = price_with_mc_registry(&call, &params, &market, as_of).unwrap();
     let details = |result: &finstack_quant_valuations_core::results::ValuationResult| -> MonteCarloValuationDetails {
         match &result.details {
             Some(ValuationDetails::MonteCarlo(details)) => details.clone(),
@@ -333,19 +367,19 @@ fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
     assert_eq!(base.time_grid[0], 0.0);
     assert_eq!(*base.time_grid.last().unwrap(), 1.0);
     assert!(!base.antithetic && !base.sobol && !base.brownian_bridge);
-    let replay = pricer.price_dyn(&call, &market, as_of).unwrap();
+    let replay = price_with_mc_registry(&call, &params, &market, as_of).unwrap();
     assert_eq!(unit.value, replay.value);
     assert_eq!(base.standard_error, details(&replay).standard_error);
     call.quantity = 10.0;
     call.multiplier = 100.0;
-    let scaled = pricer.price_dyn(&call, &market, as_of).unwrap();
+    let scaled = price_with_mc_registry(&call, &params, &market, as_of).unwrap();
     assert!((scaled.value.amount() - 1000.0 * unit.value.amount()).abs() < 1e-8);
     assert_eq!(
         details(&scaled).standard_error,
         1000.0 * base.standard_error
     );
     call.instrument_pricing_overrides.model_config.mc_paths = Some(8000);
-    let larger = pricer.price_dyn(&call, &market, as_of).unwrap();
+    let larger = price_with_mc_registry(&call, &params, &market, as_of).unwrap();
     assert_eq!(details(&larger).estimator_paths, 8000);
     let ratio = details(&larger).standard_error / details(&scaled).standard_error;
     assert!(
@@ -355,6 +389,24 @@ fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
     let wire = serde_json::to_value(&larger).unwrap();
     assert_eq!(wire["details"]["type"], "monte_carlo");
     assert_eq!(wire["details"]["data"]["estimator_paths"], 8000);
+
+    call.scenario_pricing_overrides.scenario_price_shock_decimal = Some(0.1);
+    let shocked = price_with_mc_registry(&call, &params, &market, as_of).unwrap();
+    assert!((shocked.value.amount() - 1.1 * larger.value.amount()).abs() < 1e-8);
+    assert!(shocked.provenance.is_some());
+    assert_eq!(details(&shocked).estimator_paths, 8000);
+
+    call.scenario_pricing_overrides.scenario_price_shock_decimal = None;
+    call.exercise = Some(finstack_quant_valuations_exotics::commodity::commodity_spot_option::CommoditySpotOptionExercise {
+        date: call.expiry,
+        spot: 110.0,
+        settlement_date: call.expiry,
+        exercised: true,
+    });
+    let settled =
+        price_with_mc_registry(&call, &params, &MarketContext::new(), date(2026, 1, 2)).unwrap();
+    assert_eq!(settled.value.amount(), 0.0);
+    assert!(settled.details.is_none());
 }
 
 #[test]

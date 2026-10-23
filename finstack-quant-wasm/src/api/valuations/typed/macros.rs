@@ -409,17 +409,17 @@ macro_rules! common_setters {
             /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
             /// @returns The builder, for chaining.
             /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-            instrument_pricing_overrides as instrumentPricingOverrides => json,
+            instrument_pricing_overrides as instrumentPricingOverrides => from_js_json,
             /// Set the metric-time pricing configuration stored on the instrument.
             /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
             /// @returns The builder, for chaining.
             /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-            metric_pricing_overrides as metricPricingOverrides => json,
+            metric_pricing_overrides as metricPricingOverrides => from_js_json,
             /// Set the scenario-only pricing adjustments.
             /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
             /// @returns The builder, for chaining.
             /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-            scenario_pricing_overrides as scenarioPricingOverrides => json,
+            scenario_pricing_overrides as scenarioPricingOverrides => from_js_json,
         });
     };
     ($bty:ident, $bjs:literal, attributes) => {
@@ -428,7 +428,7 @@ macro_rules! common_setters {
             /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
             /// @returns The builder, for chaining.
             /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-            attributes as attributes => json,
+            attributes as attributes => from_js_json,
         });
     };
 }

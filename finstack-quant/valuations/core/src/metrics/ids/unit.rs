@@ -151,7 +151,6 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "conversion_factor"
         | "moic"
         | "moic_to_worst"
-        | "moic_lp"
         | "dpi_lp"
         | "tvpi_lp"
         | "df_start"

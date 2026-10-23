@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json",
-      "bytes": 44518,
+      "bytes": 44514,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_result.schema.json",
       "summary": "Complete results from portfolio evaluation.",

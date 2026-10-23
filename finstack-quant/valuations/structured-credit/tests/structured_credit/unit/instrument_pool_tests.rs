@@ -18,8 +18,8 @@ use finstack_quant_valuations_fixed_income::revolving_credit::{
 };
 use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, CallExercisePolicy, DealType, InstrumentCollateral,
-    PutExercisePolicy, SimulationRun, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, CallExercisePolicy, DealType, InstrumentCollateral, PutExercisePolicy,
+    SimulationRun, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::macros::date;
 
@@ -102,13 +102,17 @@ pub(crate) fn deal_with(spec: DealSpec) -> StructuredCredit {
         .expect("senior"),
     ])
     .expect("tranches");
-    let mut deal = StructuredCredit::new_clo(
-        "POOL-DEAL",
-        pool,
-        tranches,
-        spec.closing,
-        spec.maturity,
-        "USD-OIS",
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "POOL-DEAL".into(),
+            pool,
+            tranches,
+            closing_date: spec.closing,
+            maturity: spec.maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -187,7 +191,7 @@ fn single_revolver_pool_reproduces_the_standalone_schedule() {
         senior: 9_000_000.0,
         equity: 1_000_000.0,
     });
-    let run = run_simulation_with_diagnostics(&deal, &market, closing).expect("pool run");
+    let run = deal.run_simulation(&market, closing).expect("pool run");
     // The registry valuation path routes through the same engine.
     let market_with_discount =
         MarketContext::new().insert(flat_discount_curve(0.03, closing, "USD-OIS"));
@@ -247,7 +251,7 @@ fn revolver_repayments_replenish_the_reserve_toward_target() {
         senior: 9_000_000.0,
         equity: 1_000_000.0,
     });
-    let run = run_simulation_with_diagnostics(&deal, &market, closing).expect("pool run");
+    let run = deal.run_simulation(&market, closing).expect("pool run");
     let d = &run.diagnostics;
     // The 3M repayment tops the reserve back up from 45M to 48M; the terminal
     // repayment then fills the remaining 2M of room, so 5M is diverted in all.
@@ -321,12 +325,12 @@ fn mixed_pool_funds_draws_and_exercises_calls() {
         })
     };
 
-    let contractual =
-        run_simulation_with_diagnostics(&build(CallExercisePolicy::Contractual), &market, closing)
-            .expect("contractual run");
-    let first_call =
-        run_simulation_with_diagnostics(&build(CallExercisePolicy::FirstCall), &market, closing)
-            .expect("first-call run");
+    let contractual = (build(CallExercisePolicy::Contractual))
+        .run_simulation(&market, closing)
+        .expect("contractual run");
+    let first_call = (build(CallExercisePolicy::FirstCall))
+        .run_simulation(&market, closing)
+        .expect("first-call run");
 
     for run in [&contractual, &first_call] {
         let d = &run.diagnostics;
@@ -410,7 +414,7 @@ fn exercise_policies_redeem_when_they_should() {
             senior: 900_000.0,
             equity: 100_000.0,
         });
-        run_simulation_with_diagnostics(&deal, &market, closing).expect("run")
+        deal.run_simulation(&market, closing).expect("run")
     };
 
     // Contractual: principal only at maturity.
@@ -489,7 +493,8 @@ fn unfundable_draw_calendar_fails_at_preparation() {
         senior: 9_000_000.0,
         equity: 1_000_000.0,
     });
-    let err = run_simulation_with_diagnostics(&deal, &market, closing)
+    let err = deal
+        .run_simulation(&market, closing)
         .expect_err("10M draw against a 1M reserve must fail");
     let message = err.to_string();
     assert!(
@@ -547,9 +552,12 @@ fn principal_funds_the_draw_first_and_then_the_senior_coupon_shortfall() {
         deal.principal_covers_senior_interest = covers;
         deal
     };
-    let funded = run_simulation_with_diagnostics(&build(None), &market, closing).expect("funded");
-    let separate =
-        run_simulation_with_diagnostics(&build(Some(false)), &market, closing).expect("separate");
+    let funded = (build(None))
+        .run_simulation(&market, closing)
+        .expect("funded");
+    let separate = (build(Some(false)))
+        .run_simulation(&market, closing)
+        .expect("separate");
     let first = date!(2024 - 04 - 01);
     let on = |flows: &[(Date, Money)]| -> f64 {
         flows
@@ -673,7 +681,7 @@ fn stepped_revolver_pool_reproduces_the_standalone_schedule() {
         senior: 9_000_000.0,
         equity: 1_000_000.0,
     });
-    let run = run_simulation_with_diagnostics(&deal, &market, closing).expect("pool run");
+    let run = deal.run_simulation(&market, closing).expect("pool run");
     let (interest, principal) = totals(&run);
     let expected_total = expected_interest + 10_000_000.0 + 50_000_000.0;
     assert!(
@@ -734,7 +742,7 @@ fn revolver_with_letters_of_credit_pool_reproduces_the_standalone_schedule() {
         senior: 9_000_000.0,
         equity: 1_000_000.0,
     });
-    let run = run_simulation_with_diagnostics(&deal, &market, closing).expect("pool run");
+    let run = deal.run_simulation(&market, closing).expect("pool run");
     let (interest, principal) = totals(&run);
     let expected_total = expected_interest + 10_000_000.0 + 50_000_000.0;
     assert!(

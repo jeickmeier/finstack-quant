@@ -10,7 +10,8 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::commodity::commodity_spread_option::CommoditySpreadOption;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
 use finstack_quant_valuations_test_support::date::date;
 use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
@@ -61,7 +62,7 @@ fn spread_call() -> (CommoditySpreadOption, MarketContext, Date) {
 /// positive (observed > 0) and vega is positive.
 #[test]
 fn test_commodity_spread_option_delta_and_vega() -> finstack_quant_core::Result<()> {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let (option, market, as_of) = spread_call();
     let pv = option.value(&market, as_of)?;
     let mut ctx = MetricContext::new(
@@ -93,7 +94,7 @@ fn test_commodity_spread_option_delta_and_vega() -> finstack_quant_core::Result<
 /// with the parallel DV01.
 #[test]
 fn test_commodity_spread_option_dv01_and_bucketed_dv01() -> finstack_quant_core::Result<()> {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let (option, market, as_of) = spread_call();
     let pv = option.value(&market, as_of)?;
     let mut ctx = MetricContext::new(
@@ -144,8 +145,9 @@ fn commodity_spread_vega_bumps_each_market_surface_once() -> finstack_quant_core
                 MetricContext::default_config(),
             );
             context.set_metric_pricing_overrides(Some(option.metric_pricing_overrides.clone()));
-            let actual =
-                standard_registry().compute(&[MetricId::Vega], &mut context)?[&MetricId::Vega];
+            let actual = finstack_quant_valuations::pricer::STANDARD
+                .metrics()
+                .compute(&[MetricId::Vega], &mut context)?[&MetricId::Vega];
             let shock = |shift| {
                 let mut ids = vec![option.leg1_vol_surface_id.clone()];
                 if !shared_surface {

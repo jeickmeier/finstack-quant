@@ -23,7 +23,8 @@ use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use std::sync::Arc;
 use time::macros::date;
 
@@ -128,7 +129,7 @@ fn test_equity_option_greek(
     metric_id: MetricId,
     analytical_fn: fn(&EquityOption, &MarketContext, Date) -> Result<f64>,
 ) {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = option.value(market, as_of).unwrap();
 
     // Compute analytical greek directly
@@ -194,16 +195,36 @@ fn test_equity_option_instantaneous_analytical_greeks() {
 
     // Test all analytical greeks
     test_equity_option_greek(&option, &market, as_of, MetricId::Delta, |opt, mkt, dt| {
-        opt.delta(mkt, dt)
+        crate::metrics::common::direct_equity_greek(
+            opt,
+            mkt,
+            dt,
+            finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+        )
     });
     test_equity_option_greek(&option, &market, as_of, MetricId::Gamma, |opt, mkt, dt| {
-        opt.gamma(mkt, dt)
+        crate::metrics::common::direct_equity_greek(
+            opt,
+            mkt,
+            dt,
+            finstack_quant_valuations::instruments::OptionGreekKind::Gamma,
+        )
     });
     test_equity_option_greek(&option, &market, as_of, MetricId::Vega, |opt, mkt, dt| {
-        opt.vega(mkt, dt)
+        crate::metrics::common::direct_equity_greek(
+            opt,
+            mkt,
+            dt,
+            finstack_quant_valuations::instruments::OptionGreekKind::Vega,
+        )
     });
     test_equity_option_greek(&option, &market, as_of, MetricId::Rho, |opt, mkt, dt| {
-        opt.rho(mkt, dt)
+        crate::metrics::common::direct_equity_greek(
+            opt,
+            mkt,
+            dt,
+            finstack_quant_valuations::instruments::OptionGreekKind::Rho,
+        )
     });
 }
 
@@ -240,9 +261,27 @@ fn test_equity_option_fd_matches_analytical_greeks() {
     };
 
     let market = create_option_market(as_of, spot, vol, rate);
-    let delta_analytic = option.delta(&market, as_of).unwrap();
-    let gamma_analytic = option.gamma(&market, as_of).unwrap();
-    let vega_analytic = option.vega(&market, as_of).unwrap();
+    let delta_analytic = crate::metrics::common::direct_equity_greek(
+        &option,
+        &market,
+        as_of,
+        finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+    )
+    .unwrap();
+    let gamma_analytic = crate::metrics::common::direct_equity_greek(
+        &option,
+        &market,
+        as_of,
+        finstack_quant_valuations::instruments::OptionGreekKind::Gamma,
+    )
+    .unwrap();
+    let vega_analytic = crate::metrics::common::direct_equity_greek(
+        &option,
+        &market,
+        as_of,
+        finstack_quant_valuations::instruments::OptionGreekKind::Vega,
+    )
+    .unwrap();
 
     let delta_fd = equity_option_fd_delta(&option, as_of, spot, vol, rate);
     let gamma_fd = equity_option_fd_gamma(&option, as_of, spot, vol, rate);
@@ -294,7 +333,7 @@ fn test_bucketed_dv01_sums_to_parallel() {
         .unwrap();
 
     let market = MarketContext::new().insert(disc_curve);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = bond.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(bond),
@@ -400,7 +439,7 @@ fn test_bucketed_vega_reports_raw_total_and_residual() {
     };
 
     let market = create_option_market(as_of, 100.0, 0.25, 0.05);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),

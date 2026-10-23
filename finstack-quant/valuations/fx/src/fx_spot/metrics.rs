@@ -25,10 +25,6 @@ pub(crate) fn register_fx_spot_metrics(
         registry: registry,
         instrument: InstrumentType::FxSpot,
         metrics: [
-            // FxDelta and Fx01 are the same quantity (PV change per 1%
-            // relative spot move) and share the generic calculator; both ids
-            // are kept because consumers ask for either name.
-            (FxDelta, GenericFx01Calculator),
             (Fx01, GenericFx01Calculator),
             (SpotRate, SpotRateCalculator),
             (BaseAmount, BaseAmountCalculator),
@@ -205,7 +201,7 @@ mod tests {
 
     // FxSpot intentionally does not register DV01/BucketedDv01: it has no
     // discount or forward curve dependency. FX risk is exposed through
-    // FxDelta and Fx01.
+    // Fx01.
 }
 
 #[cfg(test)]

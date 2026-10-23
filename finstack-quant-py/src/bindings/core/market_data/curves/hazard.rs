@@ -318,6 +318,21 @@ impl PyHazardCurve {
         self.inner.default_prob(t1, t2).map_err(core_to_py)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!(
+        "finstack_quant.core.market_data",
+        "HazardCurve.conditional_default_prob"
+    )]
+    #[pyo3(text_signature = "(self, start, end)")]
+    fn conditional_default_prob(
+        &self,
+        start: &Bound<'_, PyAny>,
+        end: &Bound<'_, PyAny>,
+    ) -> PyResult<f64> {
+        self.inner
+            .conditional_default_prob(py_to_date(start)?, py_to_date(end)?)
+            .map_err(core_to_py)
+    }
+
     /// Interpolated par CDS spread in **basis points** at year fraction ``t``.
     ///
     /// Uses the stored ``par_spreads`` quotes; when fewer than two quotes are

@@ -61,7 +61,6 @@ pub fn is_additive_metric(metric_id: &MetricId) -> bool {
             | "cross_gamma_fx_rates"
             | "cross_gamma_credit_vol"
             | "index_delta"
-            | "fx_delta"
             | "foreign_rho"
             | "bucketed_dv01"
             | "bucketed_cs01"
