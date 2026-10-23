@@ -2320,11 +2320,15 @@ wasm_only = { parse = "Rust Rate::from_str; twin of the Python Rate(text) constr
 [parity.members."finstack_quant.cashflows.accrual.ExCouponRule"]
 renames = { ex_date = { js = "cashflows.exCouponRuleExDate", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::ex_date function is a free function over the wire value" }, is_ex_coupon = { js = "cashflows.exCouponRuleIsExCoupon", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::is_ex_coupon function is a free function over the wire value" } }
 
+[parity.members."finstack_quant.cashflows.accrual.AccrualMethod"]
+excluded = { name = "literal" }
+
 [parity.members."finstack_quant.cashflows.aggregation.PeriodAggregation"]
 renames = { get_amount = { js = "cashflows.periodAggregationGetAmount", reason = "WASM aggregation values are plain objects; Rust owns the period and currency lookup" }, get_period = { js = "cashflows.periodAggregationGetPeriod", reason = "WASM aggregation values are plain objects; Rust owns exact period-label lookup" } }
+excluded = { periods = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.AmortizationSpec"]
-excluded = { custom_principal = "literal", linear_between = "literal", linear_to = "literal", percent_of_original_per_period = "literal", percent_of_remaining_per_period = "literal", step_remaining = "literal" }
+excluded = { custom_principal = "literal", linear_between = "literal", linear_to = "literal", percent_of_original_per_period = "literal", percent_of_remaining_per_period = "literal", step_remaining = "literal", kind = "literal", window = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.CouponType"]
 excluded = { split = "literal" }
@@ -2334,18 +2338,24 @@ renames = { mdr = { js = "cashflows.defaultModelSpecMdr", reason = "WASM Default
 excluded = { constant_cdr = "literal", cumulative_loss = "literal", sda = "literal", timing = "literal", vector = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FeeBase"]
-excluded = { undrawn = "literal" }
+excluded = { undrawn = "literal", kind = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FeeSpec"]
 renames = { periodic_bp = { js = "cashflows.feeSpecPeriodicBp", reason = "WASM FeeSpec values are plain objects; the Rust FeeSpec::PeriodicBp variant is built by a free function returning the wire value" } }
-excluded = { fixed = "literal" }
+excluded = { fixed = "literal", kind = "literal" }
+
+[parity.members."finstack_quant.cashflows.builder.FixedCouponSpec"]
+excluded = { schedule = "literal" }
+
+[parity.members."finstack_quant.cashflows.builder.FloatingCouponSpec"]
+excluded = { schedule = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FloatingLegCompounding"]
 renames = { is_overnight = { js = "cashflows.floatingLegCompoundingIsOvernight", reason = "WASM FloatingLegCompounding values are plain objects; the Rust FloatingLegCompounding::is_overnight function is a free function returning or reading the wire value" }, sofr_observation_shift = { js = "cashflows.floatingLegCompoundingSofrObservationShift", reason = "WASM FloatingLegCompounding values are plain objects; the Rust FloatingLegCompounding::sofr_observation_shift function is a free function returning or reading the wire value" }, sonia_observation_shift = { js = "cashflows.floatingLegCompoundingSoniaObservationShift", reason = "WASM FloatingLegCompounding values are plain objects; the Rust FloatingLegCompounding::sonia_observation_shift function is a free function returning or reading the wire value" } }
 excluded = { compounded_in_arrears = "literal", compounded_with_observation_shift = "literal", rate_cutoff = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FloatingRateFallback"]
-excluded = { fixed_rate = "literal" }
+excluded = { fixed_rate = "literal", rate = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FloatingRateSpec"]
 renames = { euribor_3m = { js = "cashflows.floatingRateSpecEuribor3m", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::euribor_3m function is a free function over the wire value" }, sofr = { js = "cashflows.floatingRateSpecSofr", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::sofr function is a free function over the wire value" }, sonia = { js = "cashflows.floatingRateSpecSonia", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::sonia function is a free function over the wire value" }, validate = { js = "cashflows.floatingRateSpecValidate", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::validate function is a free function over the wire value" } }
@@ -2361,6 +2371,9 @@ excluded = { abs = "literal", cmbs_with_lockout = "literal", constant_cpr = "lit
 [parity.members."finstack_quant.cashflows.builder.RecoveryModelSpec"]
 renames = { recovery_rate = { js = "cashflows.recoveryModelSpecRecoveryRate", reason = "WASM RecoveryModelSpec values are plain objects; the Rust RecoveryModelSpec::recovery_rate function is a free function over the wire value" }, validate = { js = "cashflows.recoveryModelSpecValidate", reason = "WASM RecoveryModelSpec values are plain objects; the Rust RecoveryModelSpec::validate function is a free function over the wire value" } }
 excluded = { with_severity_vector = "literal" }
+
+[parity.members."finstack_quant.cashflows.builder.StepUpCouponSpec"]
+excluded = { schedule = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.ScheduleParams"]
 renames = { annual_actact = { js = "cashflows.scheduleParamsAnnualActact", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::annual_actact function is a free function over the wire value" }, eur_estr_swap = { js = "cashflows.scheduleParamsEurEstrSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::eur_estr_swap function is a free function over the wire value" }, eur_gov_bond = { js = "cashflows.scheduleParamsEurGovBond", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::eur_gov_bond function is a free function over the wire value" }, gbp_sonia_swap = { js = "cashflows.scheduleParamsGbpSoniaSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::gbp_sonia_swap function is a free function over the wire value" }, jpy_tona_swap = { js = "cashflows.scheduleParamsJpyTonaSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::jpy_tona_swap function is a free function over the wire value" }, quarterly_act360 = { js = "cashflows.scheduleParamsQuarterlyAct360", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::quarterly_act360 function is a free function over the wire value" }, semiannual_30360 = { js = "cashflows.scheduleParamsSemiannual30360", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::semiannual_30360 function is a free function over the wire value" }, usd_corporate_bond = { js = "cashflows.scheduleParamsUsdCorporateBond", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_corporate_bond function is a free function over the wire value" }, usd_sofr_swap = { js = "cashflows.scheduleParamsUsdSofrSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_sofr_swap function is a free function over the wire value" }, usd_treasury = { js = "cashflows.scheduleParamsUsdTreasury", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_treasury function is a free function over the wire value" }, validate = { js = "cashflows.scheduleParamsValidate", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::validate function is a free function over the wire value" } }
