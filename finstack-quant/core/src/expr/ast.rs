@@ -18,8 +18,6 @@
 //! - **Serialization**: Full serde support for persistence
 //! - **Type safety**: Strong typing prevents runtime type errors
 
-use core::hash::{Hash, Hasher};
-
 /// Expression AST for structural DAG planning.
 ///
 /// Deserialization is strict (`deny_unknown_fields`): unknown fields on
@@ -194,59 +192,6 @@ impl Expr {
     }
 }
 
-/// Hash implementation for Expr to support deduplication in DAG planning.
-///
-/// Identity depends only on expression structure.
-impl Hash for Expr {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match &self.node {
-            ExprNode::Column(name) => {
-                0u8.hash(state);
-                name.hash(state);
-            }
-            ExprNode::CsRef {
-                component,
-                instrument_or_total,
-            } => {
-                6u8.hash(state);
-                component.hash(state);
-                instrument_or_total.hash(state);
-            }
-            ExprNode::Literal(val) => {
-                1u8.hash(state);
-                // Hash via raw f64 bits for determinism (covers NaN payloads)
-                (*val).to_bits().hash(state);
-            }
-            ExprNode::Call(func, args) => {
-                2u8.hash(state);
-                (*func as u8).hash(state);
-                args.hash(state);
-            }
-            ExprNode::BinOp { op, left, right } => {
-                3u8.hash(state);
-                op.hash(state);
-                left.hash(state);
-                right.hash(state);
-            }
-            ExprNode::UnaryOp { op, operand } => {
-                4u8.hash(state);
-                op.hash(state);
-                operand.hash(state);
-            }
-            ExprNode::IfThenElse {
-                condition,
-                then_expr,
-                else_expr,
-            } => {
-                5u8.hash(state);
-                condition.hash(state);
-                then_expr.hash(state);
-                else_expr.hash(state);
-            }
-        }
-    }
-}
-
 impl PartialEq for Expr {
     fn eq(&self, other: &Self) -> bool {
         match (&self.node, &other.node) {
@@ -304,8 +249,6 @@ impl PartialEq for Expr {
         }
     }
 }
-
-impl Eq for Expr {}
 
 macro_rules! for_all_functions {
     ($(

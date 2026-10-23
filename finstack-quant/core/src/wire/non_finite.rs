@@ -1,6 +1,6 @@
 //! Non-finite `f64` wire sentinels and the `NonFiniteFields` trait.
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 /// Serde field adapter for an `f64` that may legitimately be non-finite.
 ///
@@ -114,7 +114,7 @@ pub mod non_finite_f64 {
 /// `#[serde(with = "finstack_quant_core::wire::non_finite_f64")]` and name this
 /// type in `#[schemars(with = ...)]`, so the generated schema describes the
 /// sentinel strings the serializer actually writes.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum NonFiniteF64Wire {
@@ -125,7 +125,7 @@ pub enum NonFiniteF64Wire {
 }
 
 /// Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum NonFiniteSentinel {

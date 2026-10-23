@@ -155,7 +155,7 @@ fn bp_from_conversions() {
 fn cross_type_conversions() {
     // Rate <-> Bps
     let rate = Rate::from_percent(2.5).expect("valid rate fixture");
-    let bp: Bps = rate.into();
+    let bp = Bps::new(rate.as_bp());
     assert_eq!(bp.as_bp(), 250);
     let rate_back = bp.as_rate();
     assert_eq!(rate.as_bp(), rate_back.as_bp());

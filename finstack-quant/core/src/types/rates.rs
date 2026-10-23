@@ -534,15 +534,6 @@ impl From<Bps> for i32 {
 // (25bp → 0.0025) would be asymmetric with it. Use [`Bps::as_decimal`],
 // [`Bps::as_percent`], or `f64::from(bp.as_bp())`.
 
-/// Converts to whole basis points, **rounding** to the nearest bp — `Bps` is an
-/// integer type, so sub-bp precision (common for credit/swap spreads) is lost.
-/// Keep the [`Rate`] (or use [`Rate::as_decimal`]) when full precision matters.
-impl From<Rate> for Bps {
-    fn from(rate: Rate) -> Self {
-        Bps::new(rate.as_bp())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

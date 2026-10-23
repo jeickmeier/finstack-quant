@@ -86,25 +86,6 @@ macro_rules! define_curve_state {
 
 super::for_each_context_curve!(define_curve_state);
 
-impl serde::Serialize for CurveStorage {
-    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.to_state().serialize(serializer)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CurveStorage {
-    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let state = CurveState::deserialize(deserializer)?;
-        Ok(Self::from_state(state))
-    }
-}
-
 // Credit Index State (for serialization of CreditIndexData)
 
 /// Serializable state for credit index data.

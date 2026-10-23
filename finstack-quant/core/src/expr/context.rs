@@ -15,8 +15,7 @@ use crate::FxHashMap;
 ///
 /// Deserialization is strict (`deny_unknown_fields`): unknown fields on
 /// inbound payloads are rejected rather than silently ignored.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug)]
 pub struct SimpleContext {
     /// Column name to index mapping for O(1) resolution.
     column_indices: FxHashMap<String, usize>,
