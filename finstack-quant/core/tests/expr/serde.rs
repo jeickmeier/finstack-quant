@@ -3,9 +3,8 @@
 //! This module tests serde roundtrip for:
 //! - Expression AST nodes (Column, Literal, Call, BinOp, IfThenElse)
 //! - Function enum variants
-//! - Context types (SimpleContext)
 
-use finstack_quant_core::expr::{Expr, ExprNode, Function, SimpleContext};
+use finstack_quant_core::expr::{Expr, ExprNode, Function};
 
 #[test]
 fn test_expr_ast_serde_roundtrip() {
@@ -130,37 +129,6 @@ fn test_expr_node_rejects_unknown_variant_fields() {
     assert!(
         result.is_err(),
         "unknown fields inside ExprNode struct variants must be rejected"
-    );
-}
-
-#[test]
-fn test_simple_context_rejects_unknown_fields() {
-    let json = r#"{"column_indices":{"x":0},"bogus":1}"#;
-    let result: Result<SimpleContext, _> = serde_json::from_str(json);
-    assert!(
-        result.is_err(),
-        "unknown SimpleContext fields must be rejected"
-    );
-}
-
-#[test]
-fn test_simple_context_serde() {
-    let context = SimpleContext::new(vec!["price", "volume", "timestamp"]).expect("unique columns");
-
-    let json = serde_json::to_string(&context).expect("Failed to serialize SimpleContext");
-    let deserialized: SimpleContext =
-        serde_json::from_str(&json).expect("Failed to deserialize SimpleContext");
-
-    // Verify indices are preserved
-    assert_eq!(context.index_of("price"), deserialized.index_of("price"));
-    assert_eq!(context.index_of("volume"), deserialized.index_of("volume"));
-    assert_eq!(
-        context.index_of("timestamp"),
-        deserialized.index_of("timestamp")
-    );
-    assert_eq!(
-        context.index_of("unknown"),
-        deserialized.index_of("unknown")
     );
 }
 

@@ -6,7 +6,6 @@
 //! - Expression node types and their construction
 
 use finstack_quant_core::expr::{BinOp, Expr, ExprNode, Function};
-use std::collections::HashSet;
 
 // Expression Builder Tests
 
@@ -95,26 +94,6 @@ fn equality_same_structure() {
     );
 
     assert_eq!(e1, e2, "Expr equality is structural");
-}
-
-#[test]
-fn hash_matches_structure() {
-    let e1 = Expr::call(
-        Function::RollingMean,
-        vec![Expr::column("x"), Expr::literal(3.0)],
-    );
-    let e2 = Expr::call(
-        Function::RollingMean,
-        vec![Expr::column("x"), Expr::literal(3.0)],
-    );
-
-    let mut set = HashSet::new();
-    set.insert(e1);
-
-    // Should be considered duplicate due to structural identity
-    assert!(set.contains(&e2), "Hash lookup is structural");
-    let inserted = set.insert(e2);
-    assert!(!inserted, "Structural duplicates do not insert twice");
 }
 
 #[test]

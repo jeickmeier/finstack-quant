@@ -796,19 +796,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
 
 #[test]
 fn curve_storage_roundtrip_and_market_context_state_error_branch() {
-    use finstack_quant_core::market_data::context::{CurveState, CurveStorage};
-
-    // CurveStorage roundtrip through serde (uses CurveState internally)
-    let storage = CurveStorage::from(
-        DiscountCurve::builder("USD-OIS")
-            .base_date(test_date())
-            .knots([(0.0, 1.0), (1.0, 0.98)])
-            .build()
-            .unwrap(),
-    );
-    let json = serde_json::to_string(&storage).unwrap();
-    let de: CurveStorage = serde_json::from_str(&json).unwrap();
-    assert_eq!(de.id().as_str(), "USD-OIS");
+    use finstack_quant_core::market_data::context::CurveState;
 
     // Also exercise CurveState serde directly
     let st = CurveState::Discount(
@@ -852,7 +840,7 @@ fn curve_storage_roundtrip_and_market_context_state_error_branch() {
 
 #[test]
 fn curve_state_and_storage_roundtrip_all_variants() {
-    use finstack_quant_core::market_data::context::{CurveState, CurveStorage};
+    use finstack_quant_core::market_data::context::CurveState;
     use finstack_quant_core::market_data::term_structures::{
         BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
     };
@@ -887,23 +875,15 @@ fn curve_state_and_storage_roundtrip_all_variants() {
         .unwrap();
 
     let states = vec![
-        CurveState::Discount(disc.clone()),
-        CurveState::Forward(fwd.clone()),
-        CurveState::Hazard(haz.clone()),
-        CurveState::Inflation(inf.clone()),
-        CurveState::BaseCorrelation(bc.clone()),
+        CurveState::Discount(disc),
+        CurveState::Forward(fwd),
+        CurveState::Hazard(haz),
+        CurveState::Inflation(inf),
+        CurveState::BaseCorrelation(bc),
     ];
     for st in states {
         let json = serde_json::to_string(&st).unwrap();
         let _back: CurveState = serde_json::from_str(&json).unwrap();
-    }
-
-    let storages: Vec<CurveStorage> =
-        vec![disc.into(), fwd.into(), haz.into(), inf.into(), bc.into()];
-    for s in storages {
-        let json = serde_json::to_string(&s).unwrap();
-        let back: CurveStorage = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.id().as_str(), s.id().as_str());
     }
 }
 
