@@ -97,7 +97,7 @@ pub(crate) fn load_registry() -> Result<FxHashMap<IrFutureContractId, IrFutureCo
         json,
         "IR future",
         IrFutureContractId::new,
-        |rec: &IrFutureConventionsRecord| rec.clone().into_conventions(),
+        IrFutureConventionsRecord::into_conventions,
     )
 }
 

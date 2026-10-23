@@ -44,6 +44,6 @@ pub(crate) fn load_registry(
         json,
         "Inflation Swap",
         InflationSwapConventionId::new,
-        |rec: &InflationSwapConventionRecord| rec.clone().into_conventions(),
+        InflationSwapConventionRecord::into_conventions,
     )
 }
