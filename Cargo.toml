@@ -88,7 +88,6 @@ schemars = { version = "1.2", features = ["rust_decimal1", "indexmap2"] }
 rust_decimal_macros = "1.40.0"
 criterion = { version = "0.8" }
 strum = "0.28"
-strum_macros = "0.28"
 rustc-hash = "2.1"
 arrow = { version = "57", default-features = false }
 

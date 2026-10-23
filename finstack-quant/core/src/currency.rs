@@ -114,7 +114,7 @@
 // parse it for auto-completion and navigation.
 include!("generated/currency_generated.rs");
 
-/// Parse-error constructor wired into the generated `FromStr` derive.
+/// Parse-error constructor used by the `FromStr` implementation.
 ///
 /// This is the only currency-text parser: `FromStr`, `TryFrom<&str>` and
 /// every host binding go through it, so a bad code always reports
@@ -125,6 +125,48 @@ fn unknown_currency_code(code: &str) -> crate::Error {
         code: code.to_string(),
     }
     .into()
+}
+
+impl std::fmt::Display for Currency {
+    /// Writes the ISO 4217 alphabetic code, such as `USD`.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.code())
+    }
+}
+
+impl AsRef<str> for Currency {
+    fn as_ref(&self) -> &str {
+        self.code()
+    }
+}
+
+/// Parses an ISO 4217 alphabetic code, ignoring ASCII case.
+impl std::str::FromStr for Currency {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> crate::Result<Self> {
+        ALL_CURRENCIES
+            .iter()
+            .copied()
+            .find(|currency| currency.code().eq_ignore_ascii_case(s))
+            .ok_or_else(|| unknown_currency_code(s))
+    }
+}
+
+impl TryFrom<&str> for Currency {
+    type Error = crate::Error;
+
+    fn try_from(code: &str) -> crate::Result<Self> {
+        code.parse()
+    }
+}
+
+impl strum::IntoEnumIterator for Currency {
+    type Iterator = std::iter::Copied<std::slice::Iter<'static, Currency>>;
+
+    fn iter() -> Self::Iterator {
+        ALL_CURRENCIES.iter().copied()
+    }
 }
 
 impl Currency {

@@ -805,7 +805,6 @@ dependencies = [
  "smallvec",
  "statrs",
  "strum",
- "strum_macros",
  "tempfile",
  "thiserror",
  "time",

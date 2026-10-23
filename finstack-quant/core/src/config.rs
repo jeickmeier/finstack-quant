@@ -71,15 +71,9 @@ pub enum RoundingMode {
 }
 
 impl std::fmt::Display for RoundingMode {
+    /// Writes the snake_case serde label (`bankers`, `away_from_zero`, ...).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let label = match self {
-            RoundingMode::Bankers => "bankers",
-            RoundingMode::AwayFromZero => "away_from_zero",
-            RoundingMode::TowardZero => "toward_zero",
-            RoundingMode::Floor => "floor",
-            RoundingMode::Ceil => "ceil",
-        };
-        f.write_str(label)
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 

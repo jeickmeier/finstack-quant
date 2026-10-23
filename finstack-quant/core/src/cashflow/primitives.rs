@@ -69,20 +69,9 @@ where
 /// case-insensitive and ignores surrounding whitespace; serde accepts only
 /// the canonical label.
 #[non_exhaustive]
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    strum_macros::Display,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
 pub enum CFKind {
     /// Fixed-rate coupon cash-flow.
     ///
@@ -250,16 +239,22 @@ pub enum CFKind {
     CollateralSubstitutionOut,
 }
 
-impl std::str::FromStr for CFKind {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        crate::wire::serde_parse(&s.trim().to_ascii_lowercase()).map_err(|_| unknown_cf_kind(s))
+/// Writes the snake_case serde label (`fixed`, `float_reset`, ...).
+impl std::fmt::Display for CFKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
-fn unknown_cf_kind(s: &str) -> String {
-    format!("unknown cashflow kind {s:?}")
+impl std::str::FromStr for CFKind {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> crate::Result<Self> {
+        crate::wire::serde_parse_with_context(
+            "unknown cashflow kind",
+            &s.trim().to_ascii_lowercase(),
+        )
+    }
 }
 
 impl CFKind {
