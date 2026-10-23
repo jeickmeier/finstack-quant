@@ -15,7 +15,7 @@ use super::bond_valuator::BondValuator;
 use crate::bond::pricing::return_floor::realized_distributions;
 use crate::bond::{Bond, CallPut, CashflowSpec, ProtectionWindow, ReturnFloorKind};
 use finstack_quant_cashflows::builder::{
-    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
+    observed_index_fixing, CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
     FloatingCouponReplayState, FloatingRateObservation, OvernightObservationSchedule,
     OvernightRateConstraints,
 };
@@ -24,7 +24,7 @@ use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};
+use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::{Error, Result};

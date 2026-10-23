@@ -5,7 +5,7 @@ use crate::builder::FloatingLegCompounding;
 use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};
+use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
@@ -119,12 +119,8 @@ fn require_supplied_historical_fixings(
         return Ok(());
     };
     let as_of = observation_date.unwrap_or(curve.base_date());
-    let require_historical = |date| {
-        if date < as_of {
-            require_fixing_value_exact(Some(fixings), forward_curve_id, date, as_of)?;
-        }
-        Ok(())
-    };
+    let require_historical =
+        |date| observed_index_fixing(date, Some(fixings), forward_curve_id, as_of).map(drop);
     match observation {
         FloatingRateObservation::Term { reset_date, .. } => require_historical(*reset_date),
         FloatingRateObservation::Overnight { schedule, .. } => schedule
