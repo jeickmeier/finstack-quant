@@ -53,21 +53,20 @@ use time::{Date, Duration};
 pub(crate) const MAX_BUSINESS_DAY_SEARCH_DAYS: i32 = 100;
 
 /// Seek the nearest business day from `date` moving in steps of `step_days` (±1),
-/// searching up to `max_days` steps using the provided `cal`.
+/// searching up to [`MAX_BUSINESS_DAY_SEARCH_DAYS`] steps using the provided `cal`.
 ///
 /// Returns `Some(date)` when found, or `None` if no business day is found within the window.
 #[inline]
 pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
     mut date: Date,
     step_days: i32,
-    max_days: i32,
     cal: &C,
 ) -> Option<Date> {
     let mut searched = 0;
     while !cal.is_business_day(date) {
         date = date.checked_add(Duration::days(i64::from(step_days)))?;
         searched += 1;
-        if searched > max_days {
+        if searched > MAX_BUSINESS_DAY_SEARCH_DAYS {
             return None;
         }
     }
@@ -370,7 +369,7 @@ pub fn adjust<C: HolidayCalendar + ?Sized>(
     if cal.is_business_day(date) {
         return Ok(date);
     }
-    let seek = |step: i32| seek_business_day(date, step, MAX_BUSINESS_DAY_SEARCH_DAYS, cal);
+    let seek = |step: i32| seek_business_day(date, step, cal);
     let failed = || adjustment_failed(date, conv);
     // Search direction and whether crossing the month end reverses it.
     let (step, modified) = match conv {
@@ -760,5 +759,143 @@ mod serde_tests {
             adjusted, expected,
             "ModifiedFollowing must be evaluated on the joint calendar, not sequentially"
         );
+    }
+}
+
+#[cfg(test)]
+mod joint_calendar_tests {
+    use super::*;
+    use crate::dates::{create_date, DateExt};
+    use time::Month;
+
+    #[test]
+    fn test_joint_business_days_no_holidays() {
+        // Test with weekends-only calendars (no holidays)
+        let start = create_date(2024, Month::January, 15).unwrap(); // Monday
+        let result = resolve_joint_calendar(None, None)
+            .and_then(|cal| start.add_business_days(2, cal))
+            .expect("Should succeed with no holidays");
+
+        // 2 business days from Monday (Jan 15) should be Wednesday (Jan 17)
+        let expected = create_date(2024, Month::January, 17).unwrap();
+        assert_eq!(result, expected, "Should add 2 business days");
+    }
+
+    #[test]
+    fn test_joint_business_days_base_holiday() {
+        // Test when base calendar has a holiday
+        // Using NYSE (US markets closed on holidays) vs weekends-only
+        let start = create_date(2024, Month::January, 12).unwrap(); // Friday before MLK day (Jan 15, 2024)
+
+        let result = resolve_joint_calendar(Some("nyse"), None)
+            .and_then(|cal| start.add_business_days(3, cal))
+            .expect("Should succeed");
+
+        // From Friday Jan 12:
+        // - Skip Sat 13, Sun 14 (weekend)
+        // - Skip Mon 15 (MLK day, NYSE closed)
+        // - Count Tue 16 (business day 1)
+        // - Count Wed 17 (business day 2)
+        // - Count Thu 18 (business day 3)
+        let expected = create_date(2024, Month::January, 18).unwrap();
+        assert_eq!(result, expected, "Should skip MLK day on NYSE calendar");
+    }
+
+    #[test]
+    fn test_joint_business_days_quote_holiday() {
+        // Test when quote calendar has a holiday
+        // Using weekends-only vs UK calendar
+        let start = create_date(2024, Month::December, 23).unwrap(); // Monday before Christmas
+
+        let result = resolve_joint_calendar(None, Some("gblo"))
+            .and_then(|cal| start.add_business_days(3, cal))
+            .expect("Should succeed");
+
+        // From Monday Dec 23:
+        // - Count Tue 24 (business day 1, both calendars open)
+        // - Skip Wed 25 (Christmas, GBLO closed)
+        // - Skip Thu 26 (Boxing Day, GBLO closed)
+        // - Count Fri 27 (business day 2)
+        // - Skip Sat 28, Sun 29 (weekend)
+        // - Count Mon 30 (business day 3)
+        let expected = create_date(2024, Month::December, 30).unwrap();
+        assert_eq!(result, expected, "Should skip UK holidays");
+    }
+
+    #[test]
+    fn test_joint_business_days_both_holidays() {
+        // Test when both calendars have holidays (joint closure)
+        // New Year's Day is typically closed on both NYSE and GBLO
+        let start = create_date(2023, Month::December, 29).unwrap(); // Friday before New Year
+
+        let result = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+            .and_then(|cal| start.add_business_days(2, cal))
+            .expect("Should succeed");
+
+        // From Friday Dec 29:
+        // - Skip Sat 30, Sun 31 (weekend)
+        // - Skip Mon Jan 1 (New Year's Day, both closed)
+        // - Count Tue Jan 2 (business day 1, both open)
+        // - Count Wed Jan 3 (business day 2, both open)
+        let expected = create_date(2024, Month::January, 3).unwrap();
+        assert_eq!(result, expected, "Should skip joint holidays");
+    }
+
+    #[test]
+    fn test_joint_business_days_near_holiday() {
+        // Test T+2 spot rolling near a holiday
+        let trade_date = create_date(2024, Month::January, 12).unwrap(); // Friday before MLK day
+
+        let spot_date = resolve_joint_calendar(Some("nyse"), None)
+            .and_then(|cal| trade_date.add_business_days(2, cal))
+            .expect("Should succeed");
+
+        // From Friday Jan 12, T+2 joint business days:
+        // - Skip Sat 13, Sun 14 (weekend)
+        // - Skip Mon 15 (MLK day, NYSE closed)
+        // - Count Tue 16 (business day 1)
+        // - Count Wed 17 (business day 2)
+        let expected = create_date(2024, Month::January, 17).unwrap();
+        assert_eq!(spot_date, expected, "T+2 should skip MLK day");
+    }
+
+    #[test]
+    fn test_joint_business_days_zero_days() {
+        // Edge case: adding 0 days should return the start date
+        let start = create_date(2024, Month::January, 15).unwrap();
+        let result = resolve_joint_calendar(None, None)
+            .and_then(|cal| start.add_business_days(0, cal))
+            .expect("Should succeed");
+
+        assert_eq!(result, start, "Adding 0 days should return start date");
+    }
+
+    #[test]
+    fn test_joint_calendar_adjust_unknown_base() {
+        // Test that adjusting on the joint calendar errors on unknown base calendar
+        let date = create_date(2024, Month::January, 15).unwrap();
+        let result = resolve_joint_calendar(Some("unknown_base"), None)
+            .and_then(|cal| adjust(date, BusinessDayConvention::Following, cal));
+
+        assert!(result.is_err(), "Unknown base calendar should error");
+    }
+
+    #[test]
+    fn test_joint_calendar_adjust_unknown_quote() {
+        // Test that adjusting on the joint calendar errors on unknown quote calendar
+        let date = create_date(2024, Month::January, 15).unwrap();
+        let result = resolve_joint_calendar(None, Some("unknown_quote"))
+            .and_then(|cal| adjust(date, BusinessDayConvention::Following, cal));
+
+        assert!(result.is_err(), "Unknown quote calendar should error");
+    }
+
+    #[test]
+    fn test_joint_business_days_unknown_calendar() {
+        let trade_date = create_date(2024, Month::January, 15).unwrap();
+        let result = resolve_joint_calendar(Some("unknown_cal"), None)
+            .and_then(|cal| trade_date.add_business_days(2, cal));
+
+        assert!(result.is_err(), "Unknown calendar should error");
     }
 }
