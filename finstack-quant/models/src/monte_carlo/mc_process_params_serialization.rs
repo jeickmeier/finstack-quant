@@ -55,16 +55,16 @@ fn test_heston_params_serialization() {
     // Compare fields
     assert_eq!(params.r, restored.r);
     assert_eq!(params.q, restored.q);
-    assert_eq!(params.kappa, restored.kappa);
-    assert_eq!(params.theta, restored.theta);
-    assert_eq!(params.sigma_v, restored.sigma_v);
-    assert_eq!(params.rho, restored.rho);
-    assert_eq!(params.v0, restored.v0);
+    assert_eq!(params.model.kappa, restored.model.kappa);
+    assert_eq!(params.model.theta, restored.model.theta);
+    assert_eq!(params.model.sigma_v, restored.model.sigma_v);
+    assert_eq!(params.model.rho, restored.model.rho);
+    assert_eq!(params.model.v0, restored.model.v0);
 
     // Verify Feller condition is preserved
     assert_eq!(
-        params.satisfies_feller(),
-        restored.satisfies_feller(),
+        params.model.satisfies_feller(),
+        restored.model.satisfies_feller(),
         "Feller condition should be preserved"
     );
 }
@@ -105,7 +105,6 @@ fn test_hull_white_1f_params_serialization() {
     let restored = roundtrip_json(&params);
 
     // Compare fields
-    assert_eq!(params.kappa, restored.kappa);
     assert_eq!(params.model, restored.model);
     assert_eq!(params.theta_values(), restored.theta_values());
     assert_eq!(params.theta_times(), restored.theta_times());
@@ -131,7 +130,6 @@ fn test_hull_white_1f_params_time_dependent_serialization() {
     let restored = roundtrip_json(&params);
 
     // Compare fields
-    assert_eq!(params.kappa, restored.kappa);
     assert_eq!(params.model, restored.model);
     assert_eq!(params.theta_values(), restored.theta_values());
     assert_eq!(params.theta_times(), restored.theta_times());

@@ -1985,6 +1985,13 @@
         }
       ]
     },
+    "ClosedUnitIntervalF64Wire": {
+      "description": "Finite JSON number in the closed interval `[0, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
     "CollateralAssetClass": {
       "description": "Collateral asset classes per BCBS-IOSCO standards.\n\nAsset classes determine baseline haircuts and eligibility criteria.\nThe BCBS-IOSCO framework specifies minimum haircuts by asset class.\n\n# Reference\n\nBCBS-IOSCO \"Margin requirements for non-centrally cleared derivatives\" (2020)\nAnnex A: Standardized haircut schedule `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`",
       "oneOf": [
@@ -2342,6 +2349,13 @@
           "type": "object"
         }
       ]
+    },
+    "CorrelationWire": {
+      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": -1.0,
+      "type": "number"
     },
     "CouponType": {
       "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
@@ -6043,8 +6057,7 @@
           "additionalProperties": false,
           "properties": {
             "rate": {
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/ClosedUnitIntervalF64Wire"
             },
             "type": {
               "const": "constant",
@@ -6061,15 +6074,18 @@
           "additionalProperties": false,
           "properties": {
             "factor_correlation": {
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/CorrelationWire",
+              "description": "Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress."
             },
             "mean_recovery": {
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/ClosedUnitIntervalF64Wire",
+              "description": "Zero-total-shock recovery location in [0, 1], not the unconditional mean."
             },
             "recovery_volatility": {
+              "description": "Local shock scale in [0, 0.5], not realized recovery standard deviation.",
               "format": "double",
+              "maximum": 0.5,
+              "minimum": 0.0,
               "type": "number"
             },
             "type": {

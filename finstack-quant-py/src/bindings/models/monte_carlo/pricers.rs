@@ -3,10 +3,11 @@
 use super::engine::extract_optional_currency;
 use super::results::{PyLrmGreeks, PyMoneyEstimate};
 use crate::errors::core_to_py;
-use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
+use finstack_quant_models::monte_carlo::convenience;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
+use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
-use finstack_quant_models::types::OptionType;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use pyo3::prelude::*;
 
 /// Render a bool the way Python's `repr` does.
@@ -382,7 +383,7 @@ impl PyPathDependentPricer {
     frozen
 )]
 pub struct PyLsmcPricer {
-    inner: LsmcConvenience,
+    inner: LsmcPricer,
 }
 
 #[pymethods]
@@ -437,7 +438,7 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
         antithetic: Option<bool>,
     ) -> PyResult<Self> {
-        LsmcConvenience::new(
+        LsmcPricer::new(
             num_paths,
             seed,
             use_parallel,
@@ -528,19 +529,17 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
         let currency = extract_optional_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) = self
-            .inner
-            .call_config(num_steps, basis, basis_degree)
-            .map_err(core_to_py)?;
         py.detach(|| {
-            pricer.price_american(
-                OptionType::from(is_call),
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
+            self.inner.price_american(
+                &OptionMarketParams {
+                    option_type: OptionType::from(is_call),
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
                 num_steps,
                 currency,
                 basis,
@@ -589,19 +588,17 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
         let currency = extract_optional_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) = self
-            .inner
-            .call_config(num_steps, basis, basis_degree)
-            .map_err(core_to_py)?;
         py.detach(|| {
-            pricer.price_american_unbiased(
-                OptionType::from(is_call),
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
+            self.inner.price_american_unbiased(
+                &OptionMarketParams {
+                    option_type: OptionType::from(is_call),
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
                 num_steps,
                 currency,
                 basis,

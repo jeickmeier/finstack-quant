@@ -25820,8 +25820,7 @@
           "additionalProperties": false,
           "properties": {
             "rate": {
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/ClosedUnitIntervalF64Wire"
             },
             "type": {
               "const": "constant",
@@ -25838,15 +25837,18 @@
           "additionalProperties": false,
           "properties": {
             "factor_correlation": {
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/CorrelationWire",
+              "description": "Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress."
             },
             "mean_recovery": {
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/ClosedUnitIntervalF64Wire",
+              "description": "Zero-total-shock recovery location in [0, 1], not the unconditional mean."
             },
             "recovery_volatility": {
+              "description": "Local shock scale in [0, 0.5], not realized recovery standard deviation.",
               "format": "double",
+              "maximum": 0.5,
+              "minimum": 0.0,
               "type": "number"
             },
             "type": {

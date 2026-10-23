@@ -19,13 +19,38 @@ use finstack_quant_core::Result;
 /// at the time of default.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "CreditConversionFactorWire")]
 pub struct CreditConversionFactor {
     /// CCF value in \[0, 1\]. Basel IRB: typically 0.75 for revolvers.
     ccf: f64,
 }
 
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct CreditConversionFactorWire {
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::ClosedUnitIntervalF64Wire")
+    )]
+    ccf: f64,
+}
+
+impl TryFrom<CreditConversionFactorWire> for CreditConversionFactor {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(wire: CreditConversionFactorWire) -> Result<Self> {
+        Self::new(wire.ccf)
+    }
+}
+
 impl CreditConversionFactor {
     /// Create a CCF.
+    ///
+    /// # Arguments
+    ///
+    /// * `ccf` - Finite fraction of undrawn commitment expected to be drawn at
+    ///   default, in `[0, 1]`; `0.75` means 75%.
     ///
     /// # Errors
     ///
@@ -69,6 +94,7 @@ impl CreditConversionFactor {
 /// facilities where the CCF varies with utilization.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "EadCalculatorWire")]
 pub struct EadCalculator {
     /// Currently drawn amount.
     drawn: f64,
@@ -78,8 +104,40 @@ pub struct EadCalculator {
     ccf: CreditConversionFactor,
 }
 
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct EadCalculatorWire {
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonNegativeF64Wire")
+    )]
+    drawn: f64,
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonNegativeF64Wire")
+    )]
+    undrawn: f64,
+    ccf: CreditConversionFactor,
+}
+
+impl TryFrom<EadCalculatorWire> for EadCalculator {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(wire: EadCalculatorWire) -> Result<Self> {
+        Self::new(wire.drawn, wire.undrawn, wire.ccf)
+    }
+}
+
 impl EadCalculator {
     /// Create an EAD calculator.
+    ///
+    /// # Arguments
+    ///
+    /// * `drawn` - Finite, non-negative currently drawn exposure in cash units.
+    /// * `undrawn` - Finite, non-negative available commitment in the same
+    ///   currency and cash units as `drawn`.
+    /// * `ccf` - Validated decimal conversion fraction applied to `undrawn`.
     ///
     /// # Errors
     ///
@@ -147,6 +205,39 @@ impl EadCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn serde_uses_checked_credit_conversion_and_exposure_construction() {
+        for value in [-0.1, 1.1] {
+            assert!(CreditConversionFactor::new(value).is_err());
+            assert!(serde_json::from_value::<CreditConversionFactor>(
+                serde_json::json!({"ccf": value})
+            )
+            .is_err());
+        }
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(CreditConversionFactor::new(value).is_err());
+            assert!(EadCalculator::term_loan(value).is_err());
+            assert!(EadCalculator::revolver(0.0, value).is_err());
+        }
+        for wire in [
+            serde_json::json!({"drawn": -1.0, "undrawn": 2.0, "ccf": {"ccf": 0.75}}),
+            serde_json::json!({"drawn": 1.0, "undrawn": -2.0, "ccf": {"ccf": 0.75}}),
+            serde_json::json!({"drawn": 1.0, "undrawn": 2.0, "ccf": {"ccf": 2.0}}),
+        ] {
+            assert!(serde_json::from_value::<EadCalculator>(wire).is_err());
+        }
+        for ccf in [0.0, 0.75, 1.0] {
+            let wire = serde_json::json!({"drawn": 100.0, "undrawn": 20.0, "ccf": {"ccf": ccf}});
+            let restored: EadCalculator =
+                serde_json::from_value(wire.clone()).expect("valid exposure wire");
+            assert_eq!(restored.ead(), 100.0 + 20.0 * ccf);
+            assert_eq!(
+                serde_json::to_value(restored).expect("canonical wire"),
+                wire
+            );
+        }
+    }
 
     #[test]
     fn ccf_validation() {

@@ -366,7 +366,7 @@ impl StochasticProcess for CreditLineProcess {
         // Short rate: κ_r [θ_r(t) - r_t] for floating, or 0 for fixed
         out[1] = match &self.params.interest_rate {
             InterestRateSpec::Floating { params, .. } => {
-                params.kappa * (params.theta_at_time(self.params.time_offset + t) - x[1])
+                params.model.kappa * (params.theta_at_time(self.params.time_offset + t) - x[1])
             }
             InterestRateSpec::Fixed { .. } | InterestRateSpec::DeterministicForward { .. } => 0.0,
         };
@@ -443,7 +443,7 @@ impl ProcessMetadata for CreditLineProcess {
                 initial,
             } => {
                 params.add_param("rate_type", 1.0); // 1.0 = floating
-                params.add_param("rate_kappa", hw_params.kappa);
+                params.add_param("rate_kappa", hw_params.model.kappa);
                 params.add_param("rate_sigma", hw_params.sigma_at_time(0.0));
                 params.add_param("rate_initial", *initial);
             }

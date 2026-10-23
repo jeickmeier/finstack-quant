@@ -624,7 +624,7 @@ impl OasPricer<'_> {
                 valuator.price_with_hw_tree(tree, oas_bp, compounding)?
             }
             PreparedTree::ShortRate { tree, valuator } => {
-                tree.price_with_oas_compounding(oas_bp, compounding, valuator)?
+                tree.price(oas_bp, compounding, valuator)?
             }
         };
         Ok(TreePriceOutcome::deterministic(amount))
@@ -649,8 +649,8 @@ fn validate_calibration_quality(
     }
 
     Err(Error::Validation(format!(
-        "{model} calibration quality is unacceptable: max_error_bp={:.6}, max_error_step={}, fallback_count={}, converged={}",
-        quality.max_error_bp, quality.max_error_step, quality.fallback_count, quality.converged
+        "{model} calibration quality is unacceptable: max_error_bp={:.6}, max_error_step={}",
+        quality.max_error_bp, quality.max_error_step
     )))
 }
 
@@ -668,12 +668,10 @@ mod tests {
     use finstack_quant_models::trees::short_rate_tree::TreeCalibrationResult;
 
     #[test]
-    fn bdt_calibration_quality_rejects_fallbacks_and_large_error() {
+    fn bdt_calibration_quality_rejects_large_error() {
         let poor = TreeCalibrationResult {
             max_error_bp: 1.25,
             max_error_step: 4,
-            fallback_count: 1,
-            converged: true,
         };
 
         let err = validate_calibration_quality("BDT", Some(&poor))

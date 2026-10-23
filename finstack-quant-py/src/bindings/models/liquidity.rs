@@ -1091,7 +1091,7 @@ fn kyle_lambda(
     volumes: Vec<f64>,
     reference_price: f64,
 ) -> Option<f64> {
-    py.detach(move || KyleLambdaModel::lambda_from_series(&returns, &volumes, reference_price))
+    py.detach(move || liquidity::kyle_lambda(&returns, &volumes, reference_price))
 }
 
 /// Register the `models.liquidity` Python domain.

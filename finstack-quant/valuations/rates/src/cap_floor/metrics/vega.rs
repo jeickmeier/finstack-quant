@@ -117,8 +117,7 @@ fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> 
             .is_some()
         {
             let values = base
-                .volatility
-                .values()
+                .get_values()
                 .iter()
                 .map(|sigma| sigma + shift)
                 .collect();
@@ -128,13 +127,13 @@ fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> 
                 .model_config
                 .hw1f_sigma_schedule = Some(
                 finstack_quant_core::math::piecewise::PiecewiseConstantCurve::new(
-                    base.volatility.times().to_vec(),
+                    base.get_times().to_vec(),
                     values,
                 )?,
             );
         } else {
             bumped.instrument_pricing_overrides.model_config.hw1f_sigma =
-                Some(base.volatility.values()[0] + shift);
+                Some(base.get_values()[0] + shift);
         }
         Ok(bumped)
     };
@@ -142,7 +141,7 @@ fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> 
     let up = with_sigma(bump)?;
     let pv_up = context.reprice_instrument_raw(&up, market, context.as_of)?;
 
-    if base.volatility.values().iter().all(|sigma| *sigma > bump) {
+    if base.get_values().iter().all(|sigma| *sigma > bump) {
         let down = with_sigma(-bump)?;
         let pv_down = context.reprice_instrument_raw(&down, market, context.as_of)?;
         Ok((pv_up - pv_down) / (2.0 * bump) * 0.01)

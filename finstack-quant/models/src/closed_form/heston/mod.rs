@@ -52,7 +52,7 @@ use fourier_prices::black_scholes_call;
 #[cfg(test)]
 use params::{HESTON_TAIL_DIAGNOSTIC_THRESHOLD, SUPPORTED_GL_ORDERS};
 #[cfg(test)]
-use strip_pricer::{heston_pj_characteristic_function, heston_pj_with_diagnostics};
+use strip_pricer::heston_pj_with_diagnostics;
 
 #[cfg(test)]
 mod tests;

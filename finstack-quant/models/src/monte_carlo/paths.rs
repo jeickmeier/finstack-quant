@@ -19,19 +19,6 @@ use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
-/// Default state-variable index for the spot in single-factor layouts.
-///
-/// Higher indices are intentionally not aliased here: `state[1]` means
-/// "variance" in stochastic-vol models and "short rate" in HW1F-style rate
-/// models, so naming both would invite confusion at call sites that mix
-/// model families. Multi-asset and less standard models should prefer
-/// [`PathDataset::process_params.factor_names`](PathDataset::process_params)
-/// or [`PathDataset::state_var_keys`] to interpret captured state vectors.
-pub(crate) mod state_indices {
-    /// Spot price (equity/FX) — slot 0 across all single-asset processes.
-    pub const IDX_SPOT: usize = 0;
-}
-
 /// Classifies captured cashflows by economic meaning.
 ///
 /// These tags are diagnostic metadata only. They do not change pricing logic by
@@ -68,9 +55,7 @@ pub enum CashflowType {
 /// # State Vector Layout
 ///
 /// The `state` vector contains the raw state variables in process-defined order.
-/// For simple single-asset models, the crate's internal `state_indices`
-/// constants provide common aliases.
-/// For multi-asset or process-specific layouts, consult
+/// Interpret every layout using
 /// [`PathDataset::process_params.factor_names`](PathDataset::process_params) or
 /// [`PathDataset::state_var_keys`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,7 +66,7 @@ pub struct PathPoint {
     /// Time in years from valuation date
     pub time: f64,
     /// State variables at this point (spot, variance, rate, etc.)
-    /// Indexed by position - see `state_indices` for standard layout
+    /// Positions follow `PathDataset::process_params.factor_names`.
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<f64>"))]
     pub state: SmallVec<[f64; 8]>,
     /// Optional payoff snapshot at this point.
@@ -126,35 +111,6 @@ impl PathPoint {
         self.payoff_value = Some(value);
     }
 
-    /// Get spot price (convenience method for standard single-asset models).
-    ///
-    /// Returns the value at `state_indices::IDX_SPOT` if it exists.
-    /// For multi-asset models, use `state` directly with the schema from `PathDataset`.
-    pub fn spot(&self) -> Option<f64> {
-        self.state.get(state_indices::IDX_SPOT).copied()
-    }
-
-    /// Get variance (convenience method for standard stochastic volatility models).
-    ///
-    /// Returns `state[1]` if present, treating it as the variance state for
-    /// Heston-family models. For multi-asset or non-stochastic-vol models,
-    /// use `state` directly with the schema from `PathDataset`.
-    pub fn variance(&self) -> Option<f64> {
-        // Slot 1 is variance in stochastic-vol models. Same numeric slot,
-        // different meaning, in HW1F-style rate models — see `short_rate`.
-        self.state.get(1).copied()
-    }
-
-    /// Get the short rate for common interest-rate layouts.
-    ///
-    /// Returns `state[1]` if present, treating it as the short-rate state for
-    /// HW1F-style models. This shares the same numeric slot as
-    /// [`Self::variance`]; the meaning is process-defined and the caller is
-    /// responsible for picking the accessor that matches the process family.
-    pub fn short_rate(&self) -> Option<f64> {
-        self.state.get(1).copied()
-    }
-
     /// Add a generic cashflow to this point.
     ///
     /// # Arguments
@@ -188,16 +144,6 @@ impl PathPoint {
             .filter(|(_, _, t)| *t == cf_type)
             .map(|(time, amount, _)| (*time, *amount))
             .collect()
-    }
-
-    /// Get principal flows (convenience method).
-    pub fn principal_flows(&self) -> Vec<(f64, f64)> {
-        self.get_cashflows_by_type(CashflowType::Principal)
-    }
-
-    /// Get interest flows (convenience method).
-    pub fn interest_flows(&self) -> Vec<(f64, f64)> {
-        self.get_cashflows_by_type(CashflowType::Interest)
     }
 
     /// Get total cashflow amount at this timestep.
@@ -534,7 +480,7 @@ mod tests {
         let mut state = SmallVec::new();
         state.push(100.0); // spot
         let mut point_with_state = PathPoint::with_state(0, 0.0, state);
-        assert_eq!(point_with_state.spot(), Some(100.0));
+        assert_eq!(point_with_state.state.first().copied(), Some(100.0));
 
         point_with_state.set_payoff(42.5);
         assert_eq!(point_with_state.payoff_value, Some(42.5));
@@ -552,8 +498,14 @@ mod tests {
         let mut point2 = PathPoint::new(1, 0.5);
         point2.add_typed_cashflow(0.5, 100.0, CashflowType::Interest);
         point2.add_typed_cashflow(0.5, 50.0, CashflowType::Principal);
-        assert_eq!(point2.principal_flows().len(), 1);
-        assert_eq!(point2.interest_flows().len(), 1);
+        assert_eq!(
+            point2.get_cashflows_by_type(CashflowType::Principal).len(),
+            1
+        );
+        assert_eq!(
+            point2.get_cashflows_by_type(CashflowType::Interest).len(),
+            1
+        );
         assert_eq!(point2.total_cashflow_by_type(CashflowType::Interest), 100.0);
     }
 
@@ -577,13 +529,17 @@ mod tests {
         assert_eq!(
             path.initial_point()
                 .expect("Path should have initial point")
-                .spot(),
+                .state
+                .first()
+                .copied(),
             Some(100.0)
         );
         assert_eq!(
             path.point(1)
                 .expect("Path should have terminal point")
-                .spot(),
+                .state
+                .first()
+                .copied(),
             Some(102.0)
         );
 

@@ -1,5 +1,6 @@
 //! Stochastic structured-credit scenario waterfall pricing engine.
 
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::monte_carlo::estimate::independent_estimator_stats;
 
@@ -17,7 +18,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{FxHashMap, Result};
-use finstack_quant_models::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
+use finstack_quant_models::correlation::{
+    CopulaSpec, LatentFactorSpec, RecoveryModel, RecoverySpec,
+};
 use finstack_quant_models::credit::pool::{
     PerNameCopulaDefault, StochasticDefault, StochasticDefaultSpec,
 };
@@ -97,6 +100,46 @@ impl PrepaymentPath {
     }
 }
 
+/// Selected default branch, prepared once from the immutable run config.
+enum PreparedDefault {
+    Deterministic(DefaultModelSpec),
+    Model(Box<dyn StochasticDefault>),
+}
+
+impl PreparedDefault {
+    fn new(spec: &StochasticDefaultSpec) -> Result<Self> {
+        if let StochasticDefaultSpec::Deterministic(spec) = spec {
+            spec.validate()?;
+            return Ok(Self::Deterministic(spec.clone()));
+        }
+        spec.build()?.map(Self::Model).ok_or_else(|| {
+            finstack_quant_core::Error::Internal(
+                "stochastic default specification built no model".into(),
+            )
+        })
+    }
+}
+
+/// Selected prepayment branch, with no spec/model mismatch in path loops.
+enum PreparedPrepayment {
+    Deterministic(PrepaymentModelSpec),
+    Model(Box<dyn StochasticPrepayment>),
+}
+
+impl PreparedPrepayment {
+    fn new(spec: &StochasticPrepaySpec) -> Result<Self> {
+        if let StochasticPrepaySpec::Deterministic(spec) = spec {
+            spec.validate()?;
+            return Ok(Self::Deterministic(spec.clone()));
+        }
+        spec.build().map(Self::Model).ok_or_else(|| {
+            finstack_quant_core::Error::Internal(
+                "stochastic prepayment specification built no model".into(),
+            )
+        })
+    }
+}
+
 /// Loop-invariant state built once per pricing run and shared read-only
 /// across all paths.
 ///
@@ -107,18 +150,17 @@ impl PrepaymentPath {
 /// every trait method takes `&self` and no model carries cross-call state
 /// (burnout and latent regimes live in the caller's [`PrepaymentPath`]).
 pub(crate) struct PreparedRun {
-    /// Default model from
-    /// [`build_with_seasoning_offset`](StochasticDefaultSpec::build_with_seasoning_offset)
-    /// on the run's constant `seasoning_months`. Gates the pool-wide MDR
-    /// channel and sources the copula marginal-PD plan.
-    pub(crate) default_model: Option<Box<dyn StochasticDefault>>,
-    /// Prepayment model from [`StochasticPrepaySpec::build`]. Gates the
-    /// stochastic SMM channel.
-    pub(crate) prepay_model: Option<Box<dyn StochasticPrepayment>>,
+    /// Checked deterministic specification or built stochastic default model.
+    /// Selects the monthly MDR calculation and sources copula marginal PDs.
+    default_model: PreparedDefault,
+    /// Canonical recovery distribution shared across path engines.
+    recovery_model: Arc<dyn RecoveryModel>,
+    /// Checked deterministic specification or built stochastic prepayment model.
+    /// Selects the SMM calculation and whether latent path state is advanced.
+    prepay_model: PreparedPrepayment,
     /// `Some(rho)` iff the default spec is a copula variant, with the deal
-    /// correlation override applied. Gates the per-name overlay channel —
-    /// NOT `default_model.is_some()`, which is also true for non-copula
-    /// stochastic specs.
+    /// correlation override applied. Gates the per-name overlay channel;
+    /// other stochastic default variants keep the pool-wide channel.
     pub(crate) copula_rho: Option<f64>,
     /// Configured systematic-factor mean-reversion speed κ (per year).
     pub(crate) factor_kappa: f64,
@@ -156,7 +198,7 @@ impl StochasticPricer {
     ) -> Result<PreparedRun> {
         // Fail fast on invalid default specs and keep the built model so the
         // per-path hot loops can assume a validated, already-built spec.
-        let default_model = self.config.tree_config.default_spec.build()?;
+        let default_model = PreparedDefault::new(&self.config.tree_config.default_spec)?;
         // Prepare the loop-invariant deal simulation once. A `None` here
         // (exhausted pool) yields no tranche results, which the collector
         // reports as a missing-tranche validation error; raise it here with
@@ -173,7 +215,7 @@ impl StochasticPricer {
                         .unwrap_or_default()
                 ))
             })?;
-        let prepay_model = self.config.tree_config.prepay_spec.build();
+        let prepay_model = PreparedPrepayment::new(&self.config.tree_config.prepay_spec)?;
         let copula_rho = self.copula_rho();
         let factor_kappa = self.factor_mean_reversion();
         let factor_correlation = self.factor_correlation()?;
@@ -190,6 +232,7 @@ impl StochasticPricer {
         };
         Ok(PreparedRun {
             default_model,
+            recovery_model: Arc::from(self.config.tree_config.recovery_spec.build()?),
             prepay_model,
             copula_rho,
             factor_kappa,
@@ -260,7 +303,7 @@ impl StochasticPricer {
             )?;
             let per_name_engine = per_name_simulator
                 .as_ref()
-                .map(|sim| self.per_name_engine(sim, path_index, antithetic));
+                .map(|sim| self.per_name_engine(sim, path_index, antithetic, prepared));
             self.price_path(
                 instrument,
                 context,
@@ -384,9 +427,9 @@ impl StochasticPricer {
         simulator: &Arc<PerNameCopulaDefault>,
         path_index: usize,
         antithetic: bool,
+        prepared: &PreparedRun,
     ) -> PerNameDefaultEngine {
         let base = PhiloxRng::new(self.config.tree_config.seed ^ PER_NAME_SEED_SALT);
-        let idio_recovery_vol = self.idiosyncratic_recovery_vol();
         if antithetic {
             // Both members of pair k share substream(k); the odd member is
             // the antithetic partner (negates idiosyncratic draws).
@@ -397,14 +440,14 @@ impl StochasticPricer {
                     Arc::clone(simulator),
                     self.config.pool_granularity,
                     rng,
-                    idio_recovery_vol,
+                    Arc::clone(&prepared.recovery_model),
                 )
             } else {
                 PerNameDefaultEngine::new(
                     Arc::clone(simulator),
                     self.config.pool_granularity,
                     rng,
-                    idio_recovery_vol,
+                    Arc::clone(&prepared.recovery_model),
                 )
             }
         } else {
@@ -413,7 +456,7 @@ impl StochasticPricer {
                 Arc::clone(simulator),
                 self.config.pool_granularity,
                 rng,
-                idio_recovery_vol,
+                Arc::clone(&prepared.recovery_model),
             )
         }
     }
@@ -778,7 +821,7 @@ impl StochasticPricer {
                 month_slice,
                 prepay_slice,
                 &mut prepayment,
-            );
+            )?;
             shock.systematic_z = self.period_systematic_z(prepared, month_slice);
             shock.per_name = self.copula_period_input(prepared, start as u32, month_slice);
             shocks.push(shock);
@@ -801,7 +844,7 @@ impl StochasticPricer {
                 .substream(stream_index as u64),
             mirror_draws: antithetic && path_index % 2 == 1,
         };
-        if let Some(model) = prepared.prepay_model.as_deref() {
+        if let PreparedPrepayment::Model(model) = &prepared.prepay_model {
             let uniform = prepayment.next_uniform();
             prepayment.model_state =
                 model.initial_state(self.config.tree_config.seasoning_months, uniform);
@@ -829,8 +872,11 @@ impl StochasticPricer {
         // Per-name simulation applies only to copula default models; other
         // stochastic specs keep the pool-wide MDR path even though they also
         // carry a built default model.
-        prepared.copula_rho?;
-        let model = prepared.default_model.as_deref()?;
+        let (Some(_), PreparedDefault::Model(model)) =
+            (prepared.copula_rho, &prepared.default_model)
+        else {
+            return None;
+        };
         let months = factors.len().max(1) as u32;
 
         // Unconditional period marginal PD: 1 − ∏(1 − monthly_unconditional_MDR).
@@ -875,7 +921,7 @@ impl StochasticPricer {
         factors: &[f64],
         prepay_factors: &[f64],
         prepayment: &mut PrepaymentPath,
-    ) -> PeriodPoolShock {
+    ) -> Result<PeriodPoolShock> {
         if factors.is_empty() {
             return self.monthly_shock(
                 prepared,
@@ -888,27 +934,32 @@ impl StochasticPricer {
 
         let mut prepay_survival = 1.0;
         let mut default_survival = 1.0;
-        let mut recovery_sum = 0.0;
+        let mut recovery_factor_sum = 0.0;
         for (offset, factor) in factors.iter().enumerate() {
             let prepay_factor = prepay_factors.get(offset).copied().unwrap_or(*factor);
-            let shock = self.monthly_shock(
+            let (smm, mdr, factor) = self.monthly_rates(
                 prepared,
                 start_month.saturating_add(offset as u32 + 1),
                 *factor,
                 prepay_factor,
                 prepayment,
-            );
-            prepay_survival *= 1.0 - shock.smm;
-            default_survival *= 1.0 - shock.mdr;
-            recovery_sum += shock.recovery_rate;
+            )?;
+            prepay_survival *= 1.0 - smm;
+            default_survival *= 1.0 - mdr;
+            recovery_factor_sum += factor;
         }
 
         let months = factors.len() as f64;
-        PeriodPoolShock::pool_wide(
+        let recovery_factor = recovery_factor_sum / months;
+        let mut shock = PeriodPoolShock::pool_wide(
             1.0 - prepay_survival.powf(1.0 / months),
             1.0 - default_survival.powf(1.0 / months),
-            recovery_sum / months,
-        )
+            prepared
+                .recovery_model
+                .conditional_recovery(recovery_factor)?,
+        );
+        shock.recovery_factor = recovery_factor;
+        Ok(shock)
     }
 
     fn monthly_shock(
@@ -918,7 +969,26 @@ impl StochasticPricer {
         z: f64,
         z_prepay: f64,
         prepayment: &mut PrepaymentPath,
-    ) -> PeriodPoolShock {
+    ) -> Result<PeriodPoolShock> {
+        let (smm, mdr, factor) =
+            self.monthly_rates(prepared, month_offset, z, z_prepay, prepayment)?;
+        let mut shock = PeriodPoolShock::pool_wide(
+            smm,
+            mdr,
+            prepared.recovery_model.conditional_recovery(factor)?,
+        );
+        shock.recovery_factor = factor;
+        Ok(shock)
+    }
+
+    fn monthly_rates(
+        &self,
+        prepared: &PreparedRun,
+        month_offset: u32,
+        z: f64,
+        z_prepay: f64,
+        prepayment: &mut PrepaymentPath,
+    ) -> Result<(f64, f64, f64)> {
         let stochastic = self.has_stochastic_rates();
         let factor = if stochastic { z } else { 0.0 };
         // Prepayment reads its own factor. With no configured
@@ -933,14 +1003,11 @@ impl StochasticPricer {
         let factor_path = [factor];
         let prepay_factors = [prepay_factor];
 
-        PeriodPoolShock::pool_wide(
-            self.conditional_smm(prepared, seasoning, &prepay_factors, prepayment),
-            self.conditional_mdr(prepared, seasoning, &factor_path),
-            // Recovery is a CREDIT quantity and stays on the credit factor, so
-            // defaults and recoveries continue to co-move as the sign
-            // convention requires.
-            self.recovery_rate(factor),
-        )
+        Ok((
+            self.conditional_smm(prepared, seasoning, &prepay_factors, prepayment)?,
+            self.conditional_mdr(prepared, seasoning, &factor_path)?,
+            factor,
+        ))
     }
 
     /// Conditional SMM for one month, advancing the path's burnout state.
@@ -961,89 +1028,44 @@ impl StochasticPricer {
         seasoning: u32,
         factors: &[f64],
         prepayment: &mut PrepaymentPath,
-    ) -> f64 {
-        if let Some(model) = prepared.prepay_model.as_deref() {
-            let uniform = prepayment.next_uniform();
-            let realized = model
-                .sample_smm(
-                    seasoning,
-                    factors,
-                    self.config.tree_config.market_refi_rate,
-                    prepayment.burnout,
-                    &mut prepayment.model_state,
-                    uniform,
-                )
-                .clamp(0.0, 0.50);
-            if model.has_burnout() {
-                let expected = model.expected_smm(seasoning);
-                prepayment.burnout = model.update_burnout(prepayment.burnout, realized, expected);
+    ) -> Result<f64> {
+        match &prepared.prepay_model {
+            PreparedPrepayment::Model(model) => {
+                let uniform = prepayment.next_uniform();
+                let realized = model
+                    .sample_smm(
+                        seasoning,
+                        factors,
+                        self.config.tree_config.market_refi_rate,
+                        prepayment.burnout,
+                        &mut prepayment.model_state,
+                        uniform,
+                    )
+                    .clamp(0.0, 0.50);
+                if model.has_burnout() {
+                    let expected = model.expected_smm(seasoning);
+                    prepayment.burnout =
+                        model.update_burnout(prepayment.burnout, realized, expected);
+                }
+                Ok(realized)
             }
-            return realized;
-        }
-        match &self.config.tree_config.prepay_spec {
-            StochasticPrepaySpec::Deterministic(spec) => {
-                spec.smm(seasoning).unwrap_or(0.0).clamp(0.0, 0.50)
-            }
-            _ => self
-                .config
-                .tree_config
-                .prepay_spec
-                .base_smm()
-                .clamp(0.0, 0.50),
-        }
-    }
-
-    fn conditional_mdr(&self, prepared: &PreparedRun, seasoning: u32, factors: &[f64]) -> f64 {
-        if let Some(model) = prepared.default_model.as_deref() {
-            return model.conditional_mdr(seasoning, factors).clamp(0.0, 0.50);
-        }
-        match &self.config.tree_config.default_spec {
-            StochasticDefaultSpec::Deterministic(spec) => {
-                spec.mdr(seasoning).unwrap_or(0.0).clamp(0.0, 0.50)
-            }
-            _ => self
-                .config
-                .tree_config
-                .default_spec
-                .base_mdr()
-                .clamp(0.0, 0.50),
-        }
-    }
-
-    fn recovery_rate(&self, factor: f64) -> f64 {
-        match &self.config.tree_config.recovery_spec {
-            RecoverySpec::Constant { rate } => *rate,
-            RecoverySpec::MarketCorrelated {
-                mean_recovery,
-                recovery_volatility,
-                factor_correlation,
-            } => {
-                (mean_recovery + factor_correlation * recovery_volatility * factor).clamp(0.0, 1.0)
+            PreparedPrepayment::Deterministic(spec) => {
+                spec.smm(seasoning).map(|rate| rate.clamp(0.0, 0.50))
             }
         }
     }
 
-    /// Idiosyncratic (name-specific) recovery volatility for the per-name
-    /// engine.
-    ///
-    /// The recovery volatility `σ_R` of the market-correlated recovery model
-    /// splits into a systematic loading and an idiosyncratic residual.
-    /// [`Self::recovery_rate`] already applies the systematic `ρ_R·σ_R·Z`
-    /// channel (shared by every name in a period); this returns the residual
-    /// `σ_R·√(1−ρ_R²)` that the per-name engine scatters independently across
-    /// defaulted obligors. `Constant` recovery has no dispersion.
-    fn idiosyncratic_recovery_vol(&self) -> f64 {
-        match &self.config.tree_config.recovery_spec {
-            RecoverySpec::Constant { .. } => 0.0,
-            RecoverySpec::MarketCorrelated {
-                recovery_volatility,
-                factor_correlation,
-                ..
-            } => {
-                let systematic_share = (factor_correlation * factor_correlation).min(1.0);
-                recovery_volatility * (1.0 - systematic_share).max(0.0).sqrt()
-            }
-        }
+    fn conditional_mdr(
+        &self,
+        prepared: &PreparedRun,
+        seasoning: u32,
+        factors: &[f64],
+    ) -> Result<f64> {
+        let rate = match &prepared.default_model {
+            PreparedDefault::Model(model) => model.conditional_mdr(seasoning, factors),
+            PreparedDefault::Deterministic(spec) => spec.mdr(seasoning)?,
+        };
+        Ok(rate.clamp(0.0, 0.50))
     }
 
     fn has_stochastic_rates(&self) -> bool {
@@ -1823,7 +1845,8 @@ mod tests {
         let market = MarketContext::new().insert((*test_discount_curve()).clone());
         let price_with_kappa = |kappa: f64| {
             let mut tree_config = ScenarioTreeConfig::new(24);
-            tree_config.factor_spec = LatentFactorSpec::single_factor(1.0, kappa);
+            tree_config.factor_spec =
+                LatentFactorSpec::single_factor(1.0, kappa).expect("valid model inputs");
             tree_config.default_spec =
                 StochasticDefaultSpec::intensity_process(0.10, 1.0, 0.5, 0.8);
             let config = StochasticPricerConfig::new(
@@ -1863,7 +1886,8 @@ mod tests {
     fn mc_engine_defaults_and_recoveries_co_move_negatively() {
         let mut rmbs = ScenarioTreeConfig::new(24);
         rmbs.default_spec = rmbs_default_spec();
-        rmbs.recovery_spec = RecoverySpec::market_standard_stochastic();
+        rmbs.recovery_spec =
+            RecoverySpec::market_standard_stochastic().expect("valid model inputs");
 
         let mut clo = ScenarioTreeConfig::new(24);
         clo.default_spec = clo_default_spec();
@@ -1890,13 +1914,15 @@ mod tests {
             let shocks: Vec<_> = zs
                 .iter()
                 .map(|&z| {
-                    pricer.monthly_shock(
-                        &prepared,
-                        36,
-                        z,
-                        z,
-                        &mut pricer.prepayment_path(&prepared, (0, false)),
-                    )
+                    pricer
+                        .monthly_shock(
+                            &prepared,
+                            36,
+                            z,
+                            z,
+                            &mut pricer.prepayment_path(&prepared, (0, false)),
+                        )
+                        .expect("valid monthly shock")
                 })
                 .collect();
             let mdrs: Vec<f64> = shocks.iter().map(|s| s.mdr).collect();
@@ -2504,7 +2530,8 @@ mod per_name_copula_tests {
     #[test]
     fn zero_correlation_is_independent_not_shared() {
         let mut two = copula_config(0.06, 0.20, 12, PoolGranularity::PerName, 16);
-        two.tree_config.factor_spec = LatentFactorSpec::two_factor(0.20, 0.25, 0.0);
+        two.tree_config.factor_spec =
+            LatentFactorSpec::two_factor(0.20, 0.25, 0.0).expect("valid model inputs");
         assert_eq!(
             StochasticPricer::new(two)
                 .factor_correlation()
@@ -2548,7 +2575,8 @@ mod per_name_copula_tests {
         const PATHS: usize = 20_000;
 
         let mut cfg = copula_config(0.06, 0.20, 12, PoolGranularity::PerName, 16);
-        cfg.tree_config.factor_spec = LatentFactorSpec::two_factor(0.20, 0.25, RHO);
+        cfg.tree_config.factor_spec =
+            LatentFactorSpec::two_factor(0.20, 0.25, RHO).expect("valid model inputs");
         let pricer = StochasticPricer::new(cfg);
 
         let rho = pricer
@@ -2627,7 +2655,8 @@ mod per_name_copula_tests {
                 .sum()
         };
 
-        let two_factor = smm_for(LatentFactorSpec::two_factor(0.20, 0.25, RHO));
+        let two_factor =
+            smm_for(LatentFactorSpec::two_factor(0.20, 0.25, RHO).expect("valid model inputs"));
         let single_factor = smm_for(LatentFactorSpec::SingleFactor {
             volatility: 1.0,
             mean_reversion: 0.0,
@@ -2650,7 +2679,8 @@ mod per_name_copula_tests {
     #[test]
     fn antithetic_pair_prepayment_factors_sum_to_zero() {
         let mut cfg = copula_config(0.06, 0.20, 12, PoolGranularity::PerName, 16);
-        cfg.tree_config.factor_spec = LatentFactorSpec::two_factor(0.20, 0.25, -0.30);
+        cfg.tree_config.factor_spec =
+            LatentFactorSpec::two_factor(0.20, 0.25, -0.30).expect("valid model inputs");
         let pricer = StochasticPricer::new(cfg);
         let prepared = pricer
             .prepare_run(&clo_deal(10), &MarketContext::new())
@@ -2709,7 +2739,9 @@ mod per_name_copula_tests {
 
         // Exercise the month loop directly so the state is observable.
         for month in 1..=24u32 {
-            let _ = pricer.monthly_shock(&prepared, month, 1.5, 1.5, &mut prepayment);
+            let _ = pricer
+                .monthly_shock(&prepared, month, 1.5, 1.5, &mut prepayment)
+                .expect("valid monthly shock");
         }
 
         let burnout = prepayment.burnout;
@@ -2751,6 +2783,7 @@ mod per_name_copula_tests {
             for month in 1..=12 {
                 let smm = pricer
                     .monthly_shock(&prepared, month, 0.0, 0.0, &mut prepayment)
+                    .expect("valid monthly shock")
                     .smm;
                 assert!((smm - low).abs() < 1e-14 || (smm - high).abs() < 1e-14);
                 let current_high = (smm - high).abs() < 1e-14;
@@ -2881,9 +2914,98 @@ mod per_name_copula_tests {
         );
     }
 
+    #[test]
+    fn recovery_uses_raw_period_mean_while_default_uses_standardized_factor() {
+        let mut config = copula_config(0.05, 0.3, 36, PoolGranularity::PerName, 20);
+        config.tree_config.recovery_spec =
+            RecoverySpec::market_correlated(0.4, 0.25, 0.4).expect("spec");
+        config.tree_config.factor_spec =
+            LatentFactorSpec::single_factor(1.0, 20.0).expect("factor");
+        let pricer = StochasticPricer::new(config);
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(40);
+        let prepared = pricer.prepare_run(&deal, &market).expect("prepared");
+        let factors = [-1.0, 0.0, 0.4];
+        let mut prepayment = pricer.prepayment_path(&prepared, (0, false));
+        let shock = pricer
+            .aggregate_monthly_shocks(&prepared, 0, &factors, &factors, &mut prepayment)
+            .expect("shock");
+        let mean = -0.2;
+        assert!((shock.recovery_factor - mean).abs() < 1e-15);
+        assert_eq!(
+            shock.recovery_rate,
+            prepared
+                .recovery_model
+                .conditional_recovery(shock.recovery_factor)
+                .expect("mean")
+        );
+        assert!((pricer.period_systematic_z(&prepared, &factors) - mean).abs() > 0.1);
+    }
+
+    #[test]
+    fn stochastic_recovery_is_repeatable_and_serial_parallel_identical() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(80);
+        for mut config in [
+            copula_config(0.05, 0.3, 36, PoolGranularity::PerName, 128),
+            student_t_copula_config(0.05, 0.3, 6.0, 36, PoolGranularity::PerName, 128),
+        ] {
+            config.tree_config.recovery_spec =
+                RecoverySpec::market_correlated(0.4, 0.25, 0.4).expect("spec");
+            let pricer = StochasticPricer::new(config);
+            let run = |threads| {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(threads)
+                    .build()
+                    .expect("pool")
+                    .install(|| {
+                        serde_json::to_value(pricer.price(&deal, &market).expect("price"))
+                            .expect("result")
+                    })
+            };
+            assert_eq!(run(1), run(4));
+            assert_eq!(run(4), run(4));
+        }
+    }
+
+    #[test]
+    #[ignore = "slow: stochastic recovery finite-pool/LHP convergence"]
+    fn stochastic_recovery_large_pool_converges_to_lhp() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(600);
+        for student_t in [false, true] {
+            let run = |granularity| {
+                let mut config = if student_t {
+                    student_t_copula_config(0.05, 0.3, 6.0, 36, granularity, 2_000)
+                } else {
+                    copula_config(0.05, 0.3, 36, granularity, 2_000)
+                };
+                config.tree_config.recovery_spec =
+                    RecoverySpec::market_correlated(0.4, 0.25, 0.4).expect("spec");
+                StochasticPricer::new(config)
+                    .price(&deal, &market)
+                    .expect("price")
+            };
+            let finite = run(PoolGranularity::PerName);
+            let lhp = run(PoolGranularity::LargeHomogeneous);
+            let expected = deal_credit_loss(&lhp);
+            assert!(
+                (deal_credit_loss(&finite) - expected).abs()
+                    < (0.05 * expected.abs()).max(250_000.0)
+            );
+            for id in ["SR", "MEZZ", "EQ"] {
+                let reference = tranche_pv(&lhp, id);
+                assert!(
+                    (tranche_pv(&finite, id) - reference).abs()
+                        < (0.015 * reference.abs()).max(250_000.0)
+                );
+            }
+        }
+    }
+
     /// Per-name idiosyncratic recovery dispersion widens deal-loss variance.
     ///
-    /// Both runs share a flat 40% systematic recovery; only `σ_R = 0.30`
+    /// The constant model is calibrated to the stochastic model mean; only
     /// idiosyncratic scatter differs (`ρ_R = 0`). Asset correlation is kept
     /// low (2%) so the systematic factor does not swamp the channel under test.
     #[test]
@@ -2895,10 +3017,20 @@ mod per_name_copula_tests {
         constant_cfg.tree_config.recovery_spec = RecoverySpec::Constant { rate: 0.40 };
 
         let mut dispersed_cfg = copula_config(0.06, 0.02, 36, PoolGranularity::PerName, 4_000);
-        // ρ_R = 0 ⇒ the systematic recovery is a flat 0.40, bit-identical to
-        // the constant model; only the idiosyncratic σ_R = 0.30 channel differs.
+        // Zero correlation gives a constant conditional mean, with residual
+        // obligor variation around that mean.
         dispersed_cfg.tree_config.recovery_spec = RecoverySpec::market_correlated(0.40, 0.30, 0.0)
             .expect("valid dispersed recovery inputs");
+
+        constant_cfg.tree_config.recovery_spec = RecoverySpec::constant(
+            dispersed_cfg
+                .tree_config
+                .recovery_spec
+                .build()
+                .expect("model")
+                .expected_recovery(),
+        )
+        .expect("matched mean");
 
         let constant = StochasticPricer::new(constant_cfg)
             .price(&deal, &market)

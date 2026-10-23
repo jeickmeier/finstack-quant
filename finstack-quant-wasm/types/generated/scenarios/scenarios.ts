@@ -3408,12 +3408,21 @@ export type StochasticPrepaySpec =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
-      factor_correlation: number;
-      mean_recovery: number;
+      /**
+       * Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress.
+       */
+      factor_correlation: CorrelationWire;
+      /**
+       * Zero-total-shock recovery location in [0, 1], not the unconditional mean.
+       */
+      mean_recovery: ClosedUnitIntervalF64Wire;
+      /**
+       * Local shock scale in [0, 0.5], not realized recovery standard deviation.
+       */
       recovery_volatility: number;
       type: "market_correlated";
     };

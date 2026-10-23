@@ -2565,15 +2565,31 @@ export type PrepaymentModelSpec3 =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
+      /**
+       * Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress.
+       */
       factor_correlation: number;
+      /**
+       * Finite JSON number in the closed interval `[0, 1]`.
+       */
       mean_recovery: number;
+      /**
+       * Local shock scale in [0, 0.5], not realized recovery standard deviation.
+       */
       recovery_volatility: number;
       type: "market_correlated";
     };
+/**
+ * Finite JSON number in the closed interval `[0, 1]`.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "ClosedUnitIntervalF64Wire".
+ */
+export type ClosedUnitIntervalF64Wire = number;
 /**
  * Asset type classification for pool composition (flattened hierarchy)
  *
@@ -13924,13 +13940,6 @@ export type ClearingStatus =
  * via the `definition` "CliquetPayoffType".
  */
 export type CliquetPayoffType = "additive" | "multiplicative";
-/**
- * Finite JSON number in the closed interval `[0, 1]`.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "ClosedUnitIntervalF64Wire".
- */
-export type ClosedUnitIntervalF64Wire = number;
 /**
  * CMO tranche type enumeration.
  *
@@ -35490,7 +35499,7 @@ export interface SabrParameters {
    */
   alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * Finite JSON number in the closed interval `[0, 1]`.
    */
   beta: number;
   /**

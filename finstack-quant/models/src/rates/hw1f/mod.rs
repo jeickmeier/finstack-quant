@@ -17,9 +17,8 @@
 //!   implementing [`ExerciseBoundaryPayoff`].
 //! - [`Hw1fMcConfig`] runtime settings with crate-level defaults from the
 //!   Monte Carlo defaults registry.
-//! - Numeraire, coupon-tracking and regression-basis helpers shared by the
-//!   payoffs ([`accumulate_bank_factors`], [`CumulativeCouponTracker`],
-//!   [`ShortRateBasis`]).
+//! - Numeraire, coupon-event and regression-basis data shared by the
+//!   payoffs ([`accumulate_bank_factors`], [`CouponEvent`], [`ShortRateBasis`]).
 //!
 //! Instrument-level concerns (reading pricing overrides, resolving calibrated
 //! market scalars, contract terms such as call schedules) stay in
@@ -43,9 +42,9 @@ pub use bank_account::accumulate_bank_factors;
 mod config;
 pub use config::{Hw1fMcConfig, SampleSplit};
 
-/// Cumulative coupon tracker for path-dependent products (TARN, snowball).
-mod cumulative_coupon;
-pub use cumulative_coupon::{CouponEvent, CumulativeCouponTracker};
+/// Coupon event data for path-dependent products (TARN, snowball).
+mod coupon_event;
+pub use coupon_event::CouponEvent;
 
 /// HW1F θ(t) preparation and term-forward bond reconstruction.
 mod curve;

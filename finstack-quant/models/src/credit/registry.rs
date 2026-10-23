@@ -60,7 +60,7 @@ impl CreditAssumptionRegistry {
         let record = self
             .rating_factor_tables
             .iter()
-            .find(|record| record.ids.iter().any(|c| c == id))
+            .find(|record| record.id == id)
             .ok_or_else(|| not_found("rating factor table", id))?;
         let factors = record
             .factors
@@ -79,7 +79,7 @@ impl CreditAssumptionRegistry {
         let record = self
             .seniority_calibrations
             .iter()
-            .find(|record| record.ids.iter().any(|c| c == id))
+            .find(|record| record.id == id)
             .ok_or_else(|| not_found("seniority calibration", id))?;
         let classes = record
             .classes
@@ -96,7 +96,7 @@ impl CreditAssumptionRegistry {
         let record = self
             .pd_master_scales
             .iter()
-            .find(|record| record.ids.iter().any(|candidate| candidate == id))
+            .find(|record| record.id == id)
             .ok_or_else(|| not_found("PD master scale", id))?;
         Ok(record
             .grades
@@ -113,7 +113,7 @@ impl CreditAssumptionRegistry {
         let record = self
             .downturn_lgd_presets
             .iter()
-            .find(|record| record.ids.iter().any(|c| c == id))
+            .find(|record| record.id == id)
             .ok_or_else(|| not_found("downturn LGD preset", id))?;
         Ok(DownturnLgdPreset {
             method: record.method.clone(),
@@ -126,7 +126,7 @@ impl CreditAssumptionRegistry {
         let record = self
             .workout_lgd_defaults
             .iter()
-            .find(|record| record.ids.iter().any(|c| c == id))
+            .find(|record| record.id == id)
             .ok_or_else(|| not_found("workout LGD defaults", id))?;
         Ok(WorkoutLgdDefaults {
             workout_years: record.workout_years,
@@ -149,35 +149,35 @@ impl CreditAssumptionRegistry {
             "rating factor table",
             self.rating_factor_tables
                 .iter()
-                .map(|record| record.ids.as_slice()),
+                .map(|record| std::slice::from_ref(&record.id)),
         )?;
         finstack_quant_core::validation::validate_unique_ids(
             "credit assumptions registry",
             "seniority calibration",
             self.seniority_calibrations
                 .iter()
-                .map(|record| record.ids.as_slice()),
+                .map(|record| std::slice::from_ref(&record.id)),
         )?;
         finstack_quant_core::validation::validate_unique_ids(
             "credit assumptions registry",
             "PD master scale",
             self.pd_master_scales
                 .iter()
-                .map(|record| record.ids.as_slice()),
+                .map(|record| std::slice::from_ref(&record.id)),
         )?;
         finstack_quant_core::validation::validate_unique_ids(
             "credit assumptions registry",
             "downturn LGD preset",
             self.downturn_lgd_presets
                 .iter()
-                .map(|record| record.ids.as_slice()),
+                .map(|record| std::slice::from_ref(&record.id)),
         )?;
         finstack_quant_core::validation::validate_unique_ids(
             "credit assumptions registry",
             "workout LGD defaults",
             self.workout_lgd_defaults
                 .iter()
-                .map(|record| record.ids.as_slice()),
+                .map(|record| std::slice::from_ref(&record.id)),
         )?;
 
         // A default id that names no record is a malformed registry, not a
@@ -197,17 +197,14 @@ impl CreditAssumptionRegistry {
             if record.default_factor < 0.0 || !record.default_factor.is_finite() {
                 return Err(Error::Validation(format!(
                     "rating factor table '{}' has invalid default factor {}",
-                    first_id(&record.ids),
-                    record.default_factor
+                    record.id, record.default_factor
                 )));
             }
             for factor in &record.factors {
                 if factor.factor < 0.0 || !factor.factor.is_finite() {
                     return Err(Error::Validation(format!(
                         "rating factor table '{}' has invalid factor {} for {:?}",
-                        first_id(&record.ids),
-                        factor.factor,
-                        factor.rating
+                        record.id, factor.factor, factor.rating
                     )));
                 }
             }
@@ -223,8 +220,7 @@ impl CreditAssumptionRegistry {
                 {
                     return Err(Error::Validation(format!(
                         "PD master scale '{}' has invalid grade '{}'",
-                        first_id(&record.ids),
-                        grade.label
+                        record.id, grade.label
                     )));
                 }
             }
@@ -234,8 +230,7 @@ impl CreditAssumptionRegistry {
             if record.method != "regulatory_floor" {
                 return Err(Error::Validation(format!(
                     "downturn LGD preset '{}' has unsupported method '{}'",
-                    first_id(&record.ids),
-                    record.method
+                    record.id, record.method
                 )));
             }
             finstack_quant_core::validation::validate_f64_unit_interval(
@@ -252,8 +247,7 @@ impl CreditAssumptionRegistry {
             if record.workout_years <= 0.0 || !record.workout_years.is_finite() {
                 return Err(Error::Validation(format!(
                     "workout LGD defaults '{}' has invalid workout years {}",
-                    first_id(&record.ids),
-                    record.workout_years
+                    record.id, record.workout_years
                 )));
             }
             finstack_quant_core::validation::validate_f64_unit_interval(
@@ -297,10 +291,6 @@ fn validate_registry(registry: CreditAssumptionRegistry) -> Result<CreditAssumpt
     Ok(registry)
 }
 
-fn first_id(ids: &[String]) -> &str {
-    ids.first().map_or("<missing>", String::as_str)
-}
-
 /// Lookup miss for `id` in the `kind` section of the registry. Its kind is
 /// [`ErrorKind::NotFound`](finstack_quant_core::ErrorKind::NotFound), so
 /// hosts raise their missing-key error (`KeyError` / `not_found`).
@@ -336,7 +326,7 @@ pub(crate) struct WorkoutLgdDefaults {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct RatingFactorTableRecord {
-    ids: Vec<String>,
+    id: String,
     agency: String,
     methodology: String,
     source: String,
@@ -354,7 +344,7 @@ struct RatingFactorRecord {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct SeniorityCalibrationRecord {
-    ids: Vec<String>,
+    id: String,
     source: String,
     #[serde(default)]
     study_period: Option<StudyPeriod>,
@@ -370,7 +360,7 @@ struct SeniorityClassRecord {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct PdMasterScaleRecord {
-    ids: Vec<String>,
+    id: String,
     source: String,
     #[serde(default)]
     study_period: Option<StudyPeriod>,
@@ -386,7 +376,7 @@ struct PdMasterScaleGradeRecord {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct DownturnLgdPresetRecord {
-    ids: Vec<String>,
+    id: String,
     method: String,
     add_on: f64,
     floor: f64,
@@ -394,7 +384,7 @@ struct DownturnLgdPresetRecord {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct WorkoutLgdDefaultsRecord {
-    ids: Vec<String>,
+    id: String,
     workout_years: f64,
     discount_rate: f64,
     direct_cost_rate: f64,
@@ -410,6 +400,41 @@ struct StudyPeriod {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn registry_ids_are_exact_and_do_not_accept_provider_aliases() {
+        let registry = embedded_registry().expect("embedded registry");
+        for rejected in [
+            "moodys_idealized_default_rates_2024_09",
+            "MOODYS_STANDARD",
+            " moodys_standard",
+        ] {
+            assert!(matches!(
+                registry.rating_factor_table(rejected),
+                Err(Error::Input(InputError::NotFound { .. }))
+            ));
+        }
+        for rejected in [
+            "moodys",
+            "moody",
+            "moody_s",
+            "sp",
+            "s_p",
+            "standard_and_poors",
+            "standardandpoors",
+            "S&P",
+            "SP_RECOVERY_HISTORICAL",
+            "sp_recovery_historical ",
+        ] {
+            assert!(matches!(
+                registry.seniority_calibration(rejected),
+                Err(Error::Input(InputError::NotFound { .. }))
+            ));
+        }
+        assert!(registry.workout_lgd_defaults("default").is_err());
+        assert!(registry.pd_master_scale_grades("SP_ASSUMPTIONS").is_err());
+        assert!(registry.downturn_lgd_preset("basel_secured ").is_err());
+    }
 
     #[test]
     fn embedded_registry_loads_expected_defaults() {
@@ -433,7 +458,7 @@ mod tests {
         assert_eq!(warf.factors.get(&CreditRating::B), Some(&2720.0));
 
         let seniority = registry
-            .seniority_calibration("sp")
+            .seniority_calibration("sp_recovery_historical")
             .expect("S&P recovery table should exist");
         let senior_secured = seniority
             .classes

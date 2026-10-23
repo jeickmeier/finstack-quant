@@ -5,7 +5,9 @@ use super::targets::{
     HW_NUM_RESTARTS, SWAPTION_VEGA_FLOOR,
 };
 use super::*;
-use finstack_quant_models::rates::hull_white::{hw_b, hw_bond_vol, hw_ln_a};
+use finstack_quant_models::rates::hull_white::{
+    fd_instantaneous_forward, hw_b, hw_bond_vol, hw_ln_a,
+};
 
 /// Calibrate Hull-White 1-factor parameters to European swaption market data.
 ///
@@ -442,7 +444,7 @@ pub(crate) fn hw1f_swaption_price(
     tenor: f64,
     swap_rate: f64,
     periods_per_year: usize,
-) -> f64 {
+) -> finstack_quant_core::Result<f64> {
     let cashflows = build_swaption_cashflows(swap_rate, t0, tenor, periods_per_year);
     hw1f_swaption_price_prepared(kappa, sigma, df, t0, t0, &cashflows)
 }
@@ -498,14 +500,14 @@ pub(super) fn hw1f_swaption_price_prepared(
     t0: f64,
     swap_start_time: f64,
     cashflows: &[(f64, f64)],
-) -> f64 {
+) -> finstack_quant_core::Result<f64> {
     // Pre-compute B and ln A for each payment date
     let coefficients: Vec<(f64, f64)> = cashflows
         .iter()
-        .map(|&(time, _)| (hw_b(kappa, t0, time), hw_ln_a(kappa, sigma, t0, time, df)))
-        .collect();
+        .map(|&(time, _)| Ok((hw_b(kappa, t0, time), hw_ln_a(kappa, sigma, t0, time, df)?)))
+        .collect::<finstack_quant_core::Result<_>>()?;
     let b_start = hw_b(kappa, t0, swap_start_time);
-    let ln_a_start = hw_ln_a(kappa, sigma, t0, swap_start_time, df);
+    let ln_a_start = hw_ln_a(kappa, sigma, t0, swap_start_time, df)?;
 
     // Find r* such that the fixed-bond value equals the forward-start bond:
     // Σ c_i P(T₀,T_i;r*) / P(T₀,T_start;r*) = 1.
@@ -543,12 +545,11 @@ pub(super) fn hw1f_swaption_price_prepared(
     };
 
     // Initial guess: the instantaneous forward rate at t0
-    let h = (t0 * 1e-3).clamp(1e-6, 1e-3);
-    let f0t0 = if t0 > h {
-        -(df(t0 + h).ln() - df(t0 - h).ln()) / (2.0 * h)
-    } else {
-        -(df(h).ln()) / h
-    };
+    let f0t0 = fd_instantaneous_forward(df, t0).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "Hull-White initial forward is undefined or non-finite at expiry {t0}"
+        ))
+    })?;
 
     // Newton iterations to find r*.
     //
@@ -620,28 +621,21 @@ pub(super) fn hw1f_swaption_price_prepared(
         let brent = BrentSolver::new()
             .with_tolerance(1e-12)
             .with_bracket_bounds(bracket_lo, bracket_hi);
-        match brent.solve(g, f0t0) {
-            Ok(r) => r_star = r,
-            Err(_) => {
-                tracing::warn!("HW1F r* Brent fallback also failed; returning NaN");
-                r_star = f64::NAN;
-            }
-        }
+        r_star = brent.solve(g, f0t0)?;
     }
-
-    // r* solver failure (NaN) and pathological discount factors must propagate
-    // as NaN to the caller — `.max(0.0)` would silently turn NaN into 0.0
-    // because IEEE 754 `max(NaN, 0.0) == 0.0`, fooling the LM closure into
-    // treating the input as a legitimate zero-price swaption.
     if !r_star.is_finite() {
-        return f64::NAN;
+        return Err(finstack_quant_core::Error::Internal(
+            "Hull-White swaption exercise root is non-finite".into(),
+        ));
     }
 
     // Sum zero-coupon bond put prices (payer swaption = portfolio of bond puts)
     // ZBO_put(0, T₀, T_i, K_i) = K_i P(0,T₀) N(−d₂) − P(0,T_i) N(−d₁)
     let p0_start = df(swap_start_time);
     if !(p0_start > 0.0 && p0_start.is_finite()) {
-        return f64::NAN;
+        return Err(finstack_quant_core::Error::Validation(
+            "Hull-White swap start discount factor must be positive and finite".into(),
+        ));
     }
     let mut swaption_price = 0.0;
     let start_bond_vol = hw_bond_vol(kappa, sigma, 0.0, t0, swap_start_time);
@@ -650,7 +644,9 @@ pub(super) fn hw1f_swaption_price_prepared(
         let strike = (ln_a - ln_a_start - (b - b_start) * r_star).exp();
         let p0_ti = df(t_i);
         if !(p0_ti > 0.0 && p0_ti.is_finite()) {
-            return f64::NAN;
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Hull-White payment discount factor at {t_i} must be positive and finite"
+            )));
         }
         let sigma_p = (hw_bond_vol(kappa, sigma, 0.0, t0, t_i) - start_bond_vol).abs();
 
@@ -678,11 +674,12 @@ pub(super) fn hw1f_swaption_price_prepared(
         swaption_price += amount * put_price_clamped;
     }
 
-    if swaption_price < 0.0 {
-        0.0
-    } else {
-        swaption_price
+    if !swaption_price.is_finite() {
+        return Err(finstack_quant_core::Error::Internal(
+            "Hull-White swaption price is non-finite".into(),
+        ));
     }
+    Ok(swaption_price.max(0.0))
 }
 
 #[cfg(test)]
@@ -760,7 +757,8 @@ mod timing_tests {
             floating_is_compounded: false,
         };
         let (_, forward) = compute_swap_annuity_and_rate(&df, 1.0, 1.0, 2, None);
-        let synthetic = hw1f_swaption_price(0.05, 0.01, &df, 1.0, 1.0, forward, 2);
+        let synthetic = hw1f_swaption_price(0.05, 0.01, &df, 1.0, 1.0, forward, 2)
+            .expect("valid synthetic swaption");
         let explicit = super::super::contractual_swaption::price(
             HullWhiteCalibrationParams {
                 kappa: 0.05,
@@ -820,7 +818,8 @@ mod timing_tests {
         let (annuity, forward) = compute_swap_annuity_and_rate(&df, 1.0, 5.0, 2, None);
         assert!(annuity > 0.0);
         let cashflows = build_swaption_cashflows(forward, 1.0, 5.0, 2);
-        let price = hw1f_swaption_price_prepared(0.05, 0.01, &df, 1.0, 1.0, &cashflows);
+        let price = hw1f_swaption_price_prepared(0.05, 0.01, &df, 1.0, 1.0, &cashflows)
+            .expect("valid prepared swaption");
         assert!((price - 0.015679161704558964).abs() < 1e-14);
     }
 }

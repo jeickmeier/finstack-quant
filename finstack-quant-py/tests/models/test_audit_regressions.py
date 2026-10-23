@@ -110,7 +110,7 @@ def test_implied_vol_black_matches_undiscounted_black76() -> None:
 def test_sabr_parameters_round_trip_compare_and_pickle() -> None:
     strikes = [0.02, 0.025, 0.03, 0.035, 0.04]
     vols = SabrSmile(SabrParameters(0.05, 0.5, 0.4, -0.2), 0.03, 1.0).generate_smile(strikes)
-    fitted = SabrCalibrator().calibrate(forward=0.03, strikes=strikes, market_vols=vols, t=1.0, beta=0.5)
+    fitted = SabrCalibrator().calibrate(forward=0.03, strikes=strikes, market_vols=vols, t=1.0, beta=0.5).parameters
     assert SabrParameters.from_json(fitted.to_json()) == fitted
     assert pickle.loads(pickle.dumps(fitted)) == fitted  # noqa: S301 - round-trips our own bytes
     assert copy.deepcopy(fitted) == fitted

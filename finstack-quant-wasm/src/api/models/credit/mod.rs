@@ -51,16 +51,15 @@ json_round_trip!(JsRatingFactorTable, RatingFactorTable);
 
 #[wasm_bindgen(js_class = RatingFactorTable)]
 impl JsRatingFactorTable {
-    /// Moody's standard WARF table from the embedded credit-assumption registry.
-    /// @returns The Moody's standard rating-factor table.
+    /// Load the calibration selected by the embedded registry's default ID.
+    /// @returns The registry-selected calibration handle.
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if the embedded registry cannot supply the
-    /// table.
-    #[wasm_bindgen(js_name = moodysStandard)]
-    pub fn moodys_standard() -> Result<JsRatingFactorTable, JsValue> {
-        RatingFactorTable::moodys_standard()
+    /// Throws a `validation` error if the registry or its configured default is malformed.
+    #[wasm_bindgen(js_name = defaultCalibration)]
+    pub fn default_calibration() -> Result<JsRatingFactorTable, JsValue> {
+        RatingFactorTable::default_calibration()
             .map(|inner| Self { inner })
             .map_err(to_js_err)
     }

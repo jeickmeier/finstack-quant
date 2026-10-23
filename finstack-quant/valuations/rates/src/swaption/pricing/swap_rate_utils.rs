@@ -1,6 +1,7 @@
 //! Hull-White zero-coupon bond price from a simulated short rate, used by the
 //! Bermudan swaption Monte Carlo pricer.
 
+use finstack_quant_core::{Error, Result};
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::rates::hull_white::{hw_b, hw_ln_a};
 
@@ -14,27 +15,45 @@ use finstack_quant_models::rates::hull_white::{hw_b, hw_ln_a};
 ///
 /// # Arguments
 ///
-/// * `params` - Hull-White parameters (κ and σ(t) are used)
-/// * `r_t` - Current short rate
-/// * `t` - Current time
-/// * `maturity_time` - Maturity time (T)
-/// * `discount_curve_fn` - Market discount factors `P_mkt(0, ·)`
+/// * `params` - Calibrated process supplying mean reversion per model year and
+///   absolute short-rate volatility per square-root model year at `t`.
+/// * `r_t` - Finite instantaneous short rate at `t`, in annual decimal units.
+/// * `t` - Finite non-negative ACT/365F years from the valuation date.
+/// * `maturity_time` - Finite bond maturity time in the same model years, at or after `t`.
+/// * `discount_curve_fn` - Market discount factors `P_mkt(0, ·)` on the same model clock;
+///   sampled factors must be positive and finite, with `P_mkt(0, 0) = 1`.
+///
+/// # Errors
+///
+/// Returns a validation error for invalid times, rates or curve samples, or
+/// a computation error if the bond price is not positive and finite.
 pub fn hw_bond_price(
     params: &HullWhite1FParams,
     r_t: f64,
     t: f64,
     maturity_time: f64,
     discount_curve_fn: impl Fn(f64) -> f64,
-) -> f64 {
-    let b = hw_b(params.kappa, t, maturity_time);
+) -> Result<f64> {
+    let b = hw_b(params.model.kappa, t, maturity_time);
     let ln_a = hw_ln_a(
-        params.kappa,
+        params.model.kappa,
         params.sigma_at_time(t),
         t,
         maturity_time,
         &discount_curve_fn,
-    );
-    (ln_a - b * r_t).exp()
+    )?;
+    if !r_t.is_finite() {
+        return Err(Error::Validation(
+            "Hull-White short rate must be finite".into(),
+        ));
+    }
+    let price = (ln_a - b * r_t).exp();
+    if !price.is_finite() || price <= 0.0 {
+        return Err(Error::Internal(
+            "Hull-White reconstructed bond price must be positive and finite".into(),
+        ));
+    }
+    Ok(price)
 }
 
 #[cfg(test)]
@@ -53,7 +72,7 @@ mod tests {
         maturity_time: f64,
         discount_curve_fn: impl Fn(f64) -> f64,
     ) -> f64 {
-        let kappa = params.kappa;
+        let kappa = params.model.kappa;
         let sigma = params.sigma_at_time(t);
         let B = hw_b(kappa, t, maturity_time);
         let tau = maturity_time - t;
@@ -71,6 +90,14 @@ mod tests {
         let term4 = (sigma * sigma) / (4.0 * kappa) * B * B;
         let A = (term1 - term2 + term3 + term4).exp();
         A * (-B * r_t).exp()
+    }
+
+    #[test]
+    fn reconstructed_bond_rejects_invalid_curve_samples() {
+        let params = HullWhite1FParams::new(0.1, 0.01, 0.03).expect("HW parameters");
+        for invalid in [f64::NAN, f64::INFINITY, 0.0, -1.0] {
+            assert!(hw_bond_price(&params, 0.03, 1.0, 2.0, |_| invalid).is_err());
+        }
     }
 
     #[test]
@@ -102,7 +129,7 @@ mod tests {
     #[allow(non_snake_case)]
     fn test_bond_price_exact_a_reproduces_curve_non_flat() {
         let params = HullWhite1FParams::new(0.2, 0.015, 0.03).expect("valid Hull-White parameters");
-        let kappa = params.kappa;
+        let kappa = params.model.kappa;
         let sigma = params.sigma_at_time(0.0);
 
         // Non-flat (humped) discount curve: instantaneous forward varies in t,
@@ -118,14 +145,14 @@ mod tests {
         // Market instantaneous forward at t. Use the *same* finite-difference
         // estimator the reconstruction itself uses, so the test isolates the
         // formula (not FD-step mismatch).
-        let f0 = |t: f64| fd_instantaneous_forward(&discount_fn, t).unwrap_or(0.0);
+        let f0 = |t: f64| fd_instantaneous_forward(&discount_fn, t).expect("valid curve forward");
 
         // At several t > 0, evaluate P(t,T) with r = f(0,t) and check it
         // reproduces the forward term ratio modulo the HW1F variance term.
         let mut old_max_err = 0.0_f64;
         for &(t, big_t) in &[(0.5, 2.0), (1.0, 3.0), (2.5, 5.0), (4.0, 7.0)] {
             let r_t = f0(t);
-            let recon = hw_bond_price(&params, r_t, t, big_t, discount_fn);
+            let recon = hw_bond_price(&params, r_t, t, big_t, discount_fn).expect("valid HW curve");
 
             let B = hw_b(kappa, t, big_t);
             let var = sigma * sigma / (4.0 * kappa) * (1.0 - (-2.0 * kappa * t).exp()) * B * B;
@@ -157,7 +184,8 @@ mod tests {
         // f(0,0) = 0.025.
         let r0 = 0.025;
         for &big_t in &[0.25, 1.0, 5.0, 10.0] {
-            let recon = hw_bond_price(&params, r0, 0.0, big_t, discount_fn);
+            let recon =
+                hw_bond_price(&params, r0, 0.0, big_t, discount_fn).expect("valid HW curve");
             let market = discount_fn(big_t);
             assert!(
                 (recon - market).abs() < 1e-6,

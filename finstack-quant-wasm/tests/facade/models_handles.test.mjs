@@ -37,12 +37,12 @@ test('every serde handle round-trips its canonical JSON', () => {
     [credit.DynamicRecoverySpec, credit.DynamicRecoverySpec.linearDecline(0.4, 100, 0.1, 0.05)],
     [credit.EndogenousHazardSpec, credit.EndogenousHazardSpec.exponential(0.1, 1.5, 2)],
     [credit.ToggleExerciseModel, credit.ToggleExerciseModel.stochastic('leverage', -2, 4)],
-    [credit.RatingFactorTable, credit.RatingFactorTable.moodysStandard()],
+    [credit.RatingFactorTable, credit.RatingFactorTable.defaultCalibration()],
     [credit.lgd.BetaRecovery, new credit.lgd.BetaRecovery(0.4, 0.2)],
     [credit.lgd.WorkoutCosts, new credit.lgd.WorkoutCosts(0.05, 0.03)],
     [credit.lgd.DownturnLgd, credit.lgd.DownturnLgd.stressed(0.15, 0.3, 0.999)],
     [credit.lgd.EadCalculator, new credit.lgd.EadCalculator(600, 400, 0.75)],
-    [credit.pd.MasterScale, credit.pd.MasterScale.spAssumptions()],
+    [credit.pd.MasterScale, credit.pd.MasterScale.defaultCalibration()],
     [credit.migration.RatingScale, scale()],
     [credit.migration.TransitionMatrix, credit.migration.project(generator(), 1)],
     [credit.migration.GeneratorMatrix, generator()],
@@ -116,7 +116,7 @@ test('migration lookups report the Rust error kind', () => {
     [0.9, 0.08, 0.02, 0.1, 0.8, 0.1, 0, 0, 1],
     1
   );
-  const rows = new credit.migration.TransitionMatrix(scale(), flat.toMatrix(), 1);
+  const rows = new credit.migration.TransitionMatrix(scale(), flat.toRows(), 1);
   assert.equal(rows.toJson(), flat.toJson());
   assert.throws(
     () =>
@@ -185,10 +185,13 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.throws(() => new credit.lgd.BetaRecovery(0.4, 2), kind('validation'));
   assert.throws(() => beta.quantile(2), kind('validation'));
   assert.throws(() => beta.sampleSeeded(1.5, 7), invalidType);
-  assert.throws(() => credit.lgd.seniorityRecoveryStats('nope'), kind('validation'));
+  assert.throws(
+    () => credit.lgd.seniorityRecoveryStats('nope', 'moodys_recovery_1982_2023'),
+    kind('validation')
+  );
   assert.throws(
     () => credit.lgd.seniorityRecoveryStats('senior_secured', 'nope'),
-    kind('validation')
+    kind('not_found')
   );
 
   const costs = new credit.lgd.WorkoutCosts(0.05, 0.03);
@@ -213,7 +216,7 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.throws(() => new credit.lgd.EadCalculator(600, 400, 1.5), kind('validation'));
   assert.throws(() => new credit.lgd.EadCalculator(-1, 0, 0.5), kind('validation'));
 
-  const scaleHandle = credit.pd.MasterScale.moodysAssumptions();
+  const scaleHandle = credit.pd.MasterScale.fromRegistryId('moodys_assumptions');
   assert.equal(scaleHandle.grades.length, scaleHandle.nGrades);
   assert.equal(typeof scaleHandle.grades[0].label, 'string');
   assert.throws(() => scaleHandle.mapPd(5), kind('validation'));
@@ -516,15 +519,15 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
 test('rates handles expose their accessors and reject bad input', () => {
   const params = new hullWhite.HullWhiteParams(0.05, 0.01);
   assert.equal(params.kappa, 0.05);
-  assert.deepEqual(Array.from(params.values), [0.01]);
-  assert.equal(params.times.length, 1);
-  assert.equal(params.sigma(10), 0.01);
+  assert.deepEqual(Array.from(params.getValues()), [0.01]);
+  assert.equal(params.getTimes().length, 1);
+  assert.equal(params.getSigma(10), 0.01);
   assert.throws(() => new hullWhite.HullWhiteParams(-1, 0.01), kind('validation'));
   assert.throws(
     () => hullWhite.HullWhiteParams.piecewise(0.05, [0], [0.01, 0.02]),
     kind('validation')
   );
-  // The forward curve defaults to the discount curve, as in Python.
+  // Both curve roles are explicit; the same handle gives single-curve pricing.
   const curve = new core.DiscountCurve({
     id: 'USD-OIS',
     baseDate: '2025-01-15',
@@ -535,12 +538,49 @@ test('rates handles expose their accessors and reject bad input', () => {
     [0.25, 0.5, 0.25],
     [0.5, 0.75, 0.25],
   ];
-  assert.equal(
-    hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve),
-    hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve, curve)
+  const cap = hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve, curve);
+  const floor = hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, false, curve, curve);
+  const parity = periods.reduce(
+    (sum, [fix, pay, accrual]) =>
+      sum + curve.df(pay) * (curve.df(fix) / curve.df(pay) - 1 - accrual * 0.03),
+    0
   );
+  assert.ok(Math.abs(cap - floor - parity) < 1e-12);
+  const projection = new core.DiscountCurve({
+    id: 'USD-FWD',
+    baseDate: '2025-01-15',
+    knots: [0, 1, 1, 0.95, 2, 0.9],
+    dayCount: 'act_365f',
+  });
+  const projectedCap = hullWhite.hw1fCapFloorPrice(
+    0.05,
+    0.01,
+    periods,
+    0.03,
+    true,
+    curve,
+    projection
+  );
+  const projectedFloor = hullWhite.hw1fCapFloorPrice(
+    0.05,
+    0.01,
+    periods,
+    0.03,
+    false,
+    curve,
+    projection
+  );
+  const projectedParity = periods.reduce(
+    (sum, [fix, pay, accrual]) =>
+      sum + curve.df(pay) * (projection.df(fix) / projection.df(pay) - 1 - accrual * 0.03),
+    0
+  );
+  assert.ok(Math.abs(projectedCap - projectedFloor - projectedParity) < 1e-12);
+  assert.ok(projectedCap > cap);
+  assert.throws(() => hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve));
+  assert.throws(() => hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve, null));
   assert.throws(
-    () => hullWhite.hw1fCapFloorPrice(0.05, 0.01, [[0.25, 0.5]], 0.03, true, curve),
+    () => hullWhite.hw1fCapFloorPrice(0.05, 0.01, [[0.25, 0.5]], 0.03, true, curve, curve),
     kind('validation')
   );
   assert.throws(() => hullWhite.hw1fZcbOptionPrice(0.95, 0.8, 0.84, 0.02, 1), invalidType);
@@ -758,5 +798,26 @@ test('local volatility is a plain object with free-function twins', () => {
         seed: 5,
       }),
     message(/scheme 'milstein' is not available for process 'local_vol'/)
+  );
+});
+
+test('credit registry methods require exact IDs and an explicit recovery calibration', () => {
+  assert.equal(credit.RatingFactorTable.fromRegistryId('moodys_standard').getFactor('B'), 2720);
+  for (const rejected of [
+    'moodys',
+    'sp',
+    's_p',
+    'SP_RECOVERY_HISTORICAL',
+    'sp_recovery_historical ',
+  ]) {
+    assert.throws(
+      () => credit.lgd.seniorityRecoveryStats('senior_secured', rejected),
+      kind('not_found')
+    );
+  }
+  assert.throws(() => credit.lgd.seniorityRecoveryStats('senior_secured'), invalidType);
+  assert.throws(
+    () => credit.RatingFactorTable.fromRegistryId('moodys_idealized_default_rates_2024_09'),
+    kind('not_found')
   );
 });

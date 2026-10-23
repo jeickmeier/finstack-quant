@@ -850,6 +850,10 @@ export type DynamicRecoveryModel =
       };
     };
 /**
+ * Finite JSON number greater than or equal to zero.
+ */
+export type NonNegativeF64Wire = number;
+/**
  * Map from leverage to hazard rate.
  */
 export type LeverageHazardMap =
@@ -924,44 +928,44 @@ export type FbmSpec =
 export type LatentFactorSpec =
   | {
       /**
-       * Mean reversion speed (0 = random walk)
+       * Finite non-negative mean-reversion speed per year.
        */
-      mean_reversion: number;
+      mean_reversion: NonNegativeF64Wire;
       type: "single_factor";
       /**
-       * Factor volatility (std dev of innovations)
+       * Finite non-negative decimal factor volatility.
        */
-      volatility: number;
+      volatility: NonNegativeF64Wire;
     }
   | {
       /**
-       * Correlation between prepayment and credit factors
+       * Gaussian correlation in [-1, 1], including endpoints.
        */
-      correlation: number;
+      correlation: CorrelationWire;
       /**
-       * Credit factor volatility
+       * Finite non-negative decimal credit-factor volatility.
        */
-      credit_vol: number;
+      credit_vol: NonNegativeF64Wire;
       /**
-       * Prepayment factor volatility
+       * Finite non-negative decimal prepayment-factor volatility.
        */
-      prepay_vol: number;
+      prepay_vol: NonNegativeF64Wire;
       type: "two_factor";
     }
   | {
       /**
-       * Correlation matrix (flattened row-major)
+       * Row-major square Gaussian correlation matrix with entries in [-1, 1].
        */
-      correlations: number[];
+      correlations: CorrelationWire[];
       /**
-       * Number of factors
+       * Positive number of factors.
        */
       num_factors: number;
       type: "multi_factor";
       /**
-       * Factor volatilities
+       * One finite non-negative decimal volatility per factor.
        */
-      volatilities: number[];
+      volatilities: NonNegativeF64Wire[];
     };
 /**
  * How [`LiquidityProfile::spread_volatility`] should be interpreted.
@@ -1101,10 +1105,6 @@ export type NonFiniteF64Wire = number | NonFiniteSentinel;
  * Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
  */
 export type NonFiniteSentinel = "inf" | "-inf" | "nan";
-/**
- * Finite JSON number greater than or equal to zero.
- */
-export type NonNegativeF64Wire = number;
 /**
  * Option payoff direction used by analytical and numerical model engines.
  */
@@ -1533,12 +1533,21 @@ export type PrepaymentModelSpec =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
-      factor_correlation: number;
-      mean_recovery: number;
+      /**
+       * Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress.
+       */
+      factor_correlation: CorrelationWire;
+      /**
+       * Zero-total-shock recovery location in [0, 1], not the unconditional mean.
+       */
+      mean_recovery: ClosedUnitIntervalF64Wire;
+      /**
+       * Local shock scale in [0, 0.5], not realized recovery standard deviation.
+       */
       recovery_volatility: number;
       type: "market_correlated";
     };
@@ -2667,11 +2676,7 @@ export interface IssuerTags {
  * at the time of default.
  */
 export interface CreditConversionFactor {
-  /**
-   * CCF value in \[0, 1\]. Basel IRB: typically 0.75 for revolvers.
-   */
-  ccf: number;
-  [k: string]: unknown;
+  ccf: ClosedUnitIntervalF64Wire;
 }
 /**
  * One name in a finite credit portfolio.
@@ -3346,19 +3351,9 @@ export interface DynamicRecoverySpec {
  * Exposure at Default calculator.
  */
 export interface EadCalculator {
-  /**
-   * Credit conversion factor for the undrawn portion.
-   */
   ccf: CreditConversionFactor;
-  /**
-   * Currently drawn amount.
-   */
-  drawn: number;
-  /**
-   * Undrawn (available) commitment.
-   */
-  undrawn: number;
-  [k: string]: unknown;
+  drawn: NonNegativeF64Wire;
+  undrawn: NonNegativeF64Wire;
 }
 /**
  * Specification for endogenous (leverage-dependent) hazard rate.
@@ -4385,9 +4380,7 @@ export interface SimulatedPath {
  * # State Vector Layout
  *
  * The `state` vector contains the raw state variables in process-defined order.
- * For simple single-asset models, the crate's internal `state_indices`
- * constants provide common aliases.
- * For multi-asset or process-specific layouts, consult
+ * Interpret every layout using
  * [`PathDataset::process_params.factor_names`](PathDataset::process_params) or
  * [`PathDataset::state_var_keys`].
  */
@@ -4409,7 +4402,7 @@ export interface PathPoint {
   payoff_value?: number | null;
   /**
    * State variables at this point (spot, variance, rate, etc.)
-   * Indexed by position - see `state_indices` for standard layout
+   * Positions follow `PathDataset::process_params.factor_names`.
    */
   state: number[];
   /**
@@ -5310,6 +5303,47 @@ export interface RoughHestonParams {
    * Initial variance (v₀ > 0).
    */
   v0: number;
+}
+/**
+ * Calibrated SABR parameters and deterministic solver diagnostics.
+ */
+export interface SabrCalibrationOutcome {
+  /**
+   * Largest absolute quote error divided by its positive market quote.
+   */
+  max_relative_quote_error: number;
+  /**
+   * Calibrated model parameters.
+   */
+  parameters: SabrParameters;
+  /**
+   * Parameter names whose calibrated values landed on configured bounds.
+   */
+  parameters_at_bounds: string[];
+  /**
+   * Signed model-minus-market errors, in the original quote units: decimal
+   * absolute rate volatility for normal quotes, relative decimals for Black.
+   */
+  quote_errors: number[];
+  /**
+   * Total objective residual evaluations.
+   */
+  residual_evaluations: number;
+  /**
+   * Total iterations consumed across all attempted starts.
+   */
+  total_iterations: number;
+  /**
+   * Iterations consumed by the selected start.
+   */
+  winning_iterations: number;
+  /**
+   * Initial alpha, nu, and rho values for the selected start.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  winning_start: [number, number, number];
 }
 /**
  * SABR model parameters

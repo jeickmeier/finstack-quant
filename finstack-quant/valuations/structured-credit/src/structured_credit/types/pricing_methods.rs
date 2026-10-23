@@ -373,11 +373,11 @@ impl StructuredCredit {
         let prepay = model
             .stochastic_prepay_spec
             .clone()
-            .unwrap_or_else(|| StochasticPrepaySpec::deterministic(model.prepayment_spec.clone()));
+            .unwrap_or_else(|| StochasticPrepaySpec::Deterministic(model.prepayment_spec.clone()));
         let default = model
             .stochastic_default_spec
             .clone()
-            .unwrap_or_else(|| StochasticDefaultSpec::deterministic(model.default_spec.clone()));
+            .unwrap_or_else(|| StochasticDefaultSpec::Deterministic(model.default_spec.clone()));
 
         Ok((prepay, default))
     }

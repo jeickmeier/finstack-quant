@@ -21,7 +21,7 @@ use finstack_quant_core::math::fractional::HurstExponent;
 use finstack_quant_models::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
-use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanExercise, LsmcConfig, LsmcPricer};
+use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanExercise, LsmcConfig, LsmcEngine};
 use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_quant_models::monte_carlo::process::rough_heston::{
     RoughHestonParams, RoughHestonProcess,
@@ -125,7 +125,7 @@ fn scaling_lsmc_paths(c: &mut Criterion) {
         let config = LsmcConfig::new(n, exercise_dates.clone(), num_steps)
             .expect("valid LSMC config")
             .with_seed(SEED);
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {

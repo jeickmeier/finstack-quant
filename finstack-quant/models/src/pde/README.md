@@ -46,7 +46,7 @@ The module doc comment in [`mod.rs`](mod.rs) says the module "lives under
 | [`operator.rs`](operator.rs) | `TridiagOperator` assembly, boundary elimination, Thomas solve, `ThomasError` |
 | [`operator2d.rs`](operator2d.rs) | `Operators2D` (per-line directional tridiagonals + cross-derivative coefficients), the monotone upwind switch, `apply_cross_derivative` |
 | [`stepper.rs`](stepper.rs) | `ThetaStepper` (theta scheme with optional Rannacher start-up), the CFL bound, `StepperError` |
-| [`adi.rs`](adi.rs) | `CraigSneydStepper` (Modified Craig-Sneyd), `AdiWorkBuffers`, `fill_boundaries` |
+| [`adi.rs`](adi.rs) | `McsStepper` (Modified Craig-Sneyd), `AdiWorkBuffers`, `fill_boundaries` |
 | [`exercise.rs`](exercise.rs) | `PenaltyExercise`, `ExerciseType::{American, Bermudan}` |
 | [`solver.rs`](solver.rs) | `Solver1D`, `Solver1DBuilder`, `PdeSolution`, `PdeSolverError` |
 | [`solver2d.rs`](solver2d.rs) | `Solver2D`, `PdeSolution2D`, `PdeSolver2DError` |
@@ -57,7 +57,7 @@ Pipelines, as in the module doc:
 
 ```text
 PdeProblem1D → TridiagOperator → ThetaStepper → PenaltyExercise → PdeSolution
-PdeProblem2D → Operators2D     → CraigSneydStepper             → PdeSolution2D
+PdeProblem2D → Operators2D     → McsStepper             → PdeSolution2D
 ```
 
 ## Public API vs internal plumbing
@@ -65,7 +65,7 @@ PdeProblem2D → Operators2D     → CraigSneydStepper             → PdeSoluti
 Implementation submodules are private. The supported surface is explicitly
 re-exported at the `pde` root:
 
-`CraigSneydStepper`, `BoundaryCondition`, `BlackScholesPde`, `LocalVolPde`, `HestonPde`,
+`McsStepper`, `BoundaryCondition`, `BlackScholesPde`, `LocalVolPde`, `HestonPde`,
 `ExerciseError`, `Grid1D`, `PdeGridError`, `Grid2D`, `PdeProblem1D`,
 `PdeProblem2D`, `PdeSolution`, `PdeSolverError`, `Solver1D`, `Solver1DBuilder`,
 `PdeSolution2D`, `PdeSolver2DError`, `Solver2D`, `StepperError`, and
@@ -293,7 +293,7 @@ configuration (large κ) now solves with locally reduced order near the variance
 floor instead of erroring out, which `bridge2d::tests::heston_pde_high_kappa_solves_via_upwinding`
 pins against the Fourier reference at κ = 10.
 
-`CraigSneydStepper` implements the MCS scheme of In 't Hout & Welfert (2009), in
+`McsStepper` implements the MCS scheme of In 't Hout & Welfert (2009), in
 the form given by In 't Hout & Mishra (2010, eq. 1.4). With
 `F = F₀ + F₁ + F₂` (mixed, x, y):
 
@@ -324,7 +324,7 @@ grid. It uses differences between successive time refinements to cancel spatial
 bias; the absolute Fourier errors of different schemes have no guaranteed
 ordering because spatial and time errors can cancel.
 
-`CraigSneydStepper::with_damping(implicit_start, n_steps)` replaces the first
+`McsStepper::with_damping(implicit_start, n_steps)` replaces the first
 `implicit_start` intervals with pairs of factorized implicit-Euler halfsteps.
 Each halfstep solves the x and y directional operators implicitly and keeps
 the mixed derivative explicit. This first-order directional split damps stiff
@@ -343,7 +343,7 @@ use current y-edge values. It runs after each MCS step — the mixed corrector n
 boundary-inclusive `Y₂` for its four-point stencil — and again at `t = 0`.
 
 **`Solver2D` has no early exercise.** `Solver2D::new` takes only a grid and a
-`CraigSneydStepper` (plain or `with_damping`), and the `Solver2D` struct has
+`McsStepper` (plain or `with_damping`), and the `Solver2D` struct has
 no exercise field. `PdeSolution2D` likewise exposes only `interpolate`,
 `delta_x`, and `gamma_x` — there is no variance-direction sensitivity.
 
@@ -468,7 +468,7 @@ unmeasured. See [`../../../benches/README.md`](../../../benches/README.md).
    any conditionally stable scheme on `cfl_max_dt` rather than letting it produce
    `NaN`. Propagate `ThomasError` with `?` — `StepperError` has the `#[from]`.
 4. **A new 2D time scheme** needs more than a trait impl: `Solver2D` holds
-   `CraigSneydStepper` concretely, so a second scheme means introducing a 2D
+   `McsStepper` concretely, so a second scheme means introducing a 2D
    stepper trait first.
 5. Declare the file in [`mod.rs`](mod.rs) and add the root re-export.
 6. Anchor it. Every scheme here is graded against an independent closed form —

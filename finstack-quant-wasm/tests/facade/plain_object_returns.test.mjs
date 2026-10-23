@@ -125,11 +125,21 @@ test('SabrCalibrator surface: withTolerance, withShift, calibrate, params', () =
 
   // Calibration uses normalized residuals and verifies the final quote fit.
   const calibrator = new wasm.SabrCalibrator().withTolerance(1e-6);
-  const fitted = calibrator.calibrate(forward, strikes, vols, t, beta);
+  const fit = calibrator.calibrate(forward, strikes, vols, t, beta);
+  assert.equal(Object.getPrototypeOf(fit), Object.prototype);
+  assert.ok(fit.total_iterations >= fit.winning_iterations);
+  assert.ok(fit.residual_evaluations > 0);
+  assert.equal(fit.quote_errors.length, strikes.length);
+  assert.ok(fit.max_relative_quote_error <= 1e-6);
+  const fitted = wasm.SabrParameters.fromJson(JSON.stringify(fit.parameters));
   assert.equal(fitted.beta, beta);
   assert.ok(fitted.alpha > 0);
 
-  const auto = calibrator.withShift('auto').calibrate(forward, strikes, vols, t, beta);
+  const auto = wasm.SabrParameters.fromJson(
+    JSON.stringify(
+      calibrator.withShift('auto').calibrate(forward, strikes, vols, t, beta).parameters
+    )
+  );
   assert.equal(auto.beta, beta);
   assert.equal(auto.shift, undefined, 'positive-rate smile needs no shift');
   assert.ok(fitted.impliedVol(forward, forward, t) > 0);
@@ -149,11 +159,12 @@ test('withShift("auto") fits a negative-rate smile with a shift', () => {
   const fitted = new wasm.SabrCalibrator()
     .withShift('auto')
     .calibrate(forward, strikes, vols, t, beta);
-  assert.equal(typeof fitted.shift, 'number', 'negative-rate fit must carry a shift');
-  assert.ok(fitted.shift > 0);
-  assert.ok(fitted.isShifted());
-  assert.equal(fitted.shift, 0.02);
-  const repriced = new wasm.SabrSmile(fitted, forward, t).generateSmile(strikes);
+  const parameters = wasm.SabrParameters.fromJson(JSON.stringify(fitted.parameters));
+  assert.equal(typeof parameters.shift, 'number', 'negative-rate fit must carry a shift');
+  assert.ok(parameters.shift > 0);
+  assert.ok(parameters.isShifted());
+  assert.equal(parameters.shift, 0.02);
+  const repriced = new wasm.SabrSmile(parameters, forward, t).generateSmile(strikes);
   for (let i = 0; i < vols.length; ++i) {
     assert.ok(
       Math.abs(repriced[i] - vols[i]) < 1e-6,

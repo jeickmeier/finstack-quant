@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from finstack_quant.models.correlation import RecoverySpec
@@ -31,14 +33,14 @@ def test_zero_volatility_recovery_preserves_extreme_location(mean: float) -> Non
     spec = RecoverySpec.market_correlated(mean, 0.0, 0.0)
     recovery = spec.build()
 
-    assert spec.expected_recovery == pytest.approx(mean, abs=1e-14)
+    assert not hasattr(spec, "expected_recovery")
     assert recovery.expected_recovery == pytest.approx(mean, abs=1e-14)
     for factor in [-6.0, 0.0, 6.0]:
         assert recovery.conditional_recovery(factor) == pytest.approx(mean, abs=1e-14)
         assert recovery.conditional_lgd(factor) == pytest.approx(1.0 - mean, abs=1e-14)
 
 
-@pytest.mark.parametrize(("mean", "expected"), [(0.01, 0.3271433591834951), (0.99, 0.6728566408165049)])
+@pytest.mark.parametrize(("mean", "expected"), [(0.01, 0.4279876161844263), (0.99, 0.5720123838154901)])
 def test_recovery_expectation_resolves_steep_near_boundary_curve(mean: float, expected: float) -> None:
     recovery = RecoverySpec.market_correlated(mean, 0.25, 0.4).build()
     assert recovery.expected_recovery == pytest.approx(expected, abs=1e-10)
@@ -86,7 +88,7 @@ def test_migration_rejects_reshaped_nested_matrix() -> None:
     scale = RatingScale.custom(["A", "D"])
     with pytest.raises(ValueError, match="rows"):
         TransitionMatrix(scale, [[0.9, 0.1, 0.0, 1.0]], 1.0)
-    assert TransitionMatrix(scale, [0.9, 0.1, 0.0, 1.0], 1.0).to_matrix() == [
+    assert TransitionMatrix(scale, [0.9, 0.1, 0.0, 1.0], 1.0).to_rows() == [
         [0.9, 0.1],
         [0.0, 1.0],
     ]
@@ -98,3 +100,22 @@ def test_uncorrelated_factors_validate_volatilities(volatilities: list[float]) -
 
     with pytest.raises(ValueError, match=r"(?i)volatil"):
         LatentMultiFactor.uncorrelated(2, volatilities)
+
+
+def test_canonical_recovery_sample_mean_and_invalid_factors() -> None:
+    model = RecoverySpec.market_correlated(0.4, 0.25, 0.4).build()
+    assert model.sample_recovery(0.0, 0.0) == 0.4
+    assert model.has_idiosyncratic_dispersion
+    assert model.expected_recovery == pytest.approx(0.41793410996246017, abs=1e-11)
+    assert model.conditional_recovery(0.0) != pytest.approx(0.4, abs=1e-3)
+    for z, e in [(-2.0, 1.0), (0.0, -1.0), (2.0, -0.5)]:
+        shock = 0.4 * z + math.sqrt(1.0 - 0.4**2) * e
+        expected = 1.0 / (1.0 + math.exp(-math.log(0.4 / 0.6) - 0.25 / 0.24 * shock))
+        assert model.sample_recovery(z, e) == pytest.approx(expected, abs=1e-14)
+    for spec in [RecoverySpec.constant(0.4), RecoverySpec.market_correlated(0.4, 0.25, 0.4)]:
+        model = spec.build()
+        for bad in [float("nan"), float("inf"), -float("inf")]:
+            with pytest.raises(ValueError, match="finite"):
+                model.conditional_recovery(bad)
+            with pytest.raises(ValueError, match="finite"):
+                model.sample_recovery(0.0, bad)

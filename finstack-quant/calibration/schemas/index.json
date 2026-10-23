@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
-      "bytes": 2989,
+      "bytes": 2977,
       "kind": "component",
       "path": "schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
       "summary": "Settings of the scalar Hull-White fit to cap/floor quotes.",

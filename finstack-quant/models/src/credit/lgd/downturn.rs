@@ -219,16 +219,11 @@ impl DownturnLgd {
         }
     }
 
-    /// Basel III secured asset floor (10% LGD floor, 8% add-on).
-    pub fn basel_secured() -> Result<Self> {
+    /// Load the registry-selected default downturn LGD calibration.
+    pub fn default_calibration() -> Result<Self> {
         Self::from_registry_id(
             crate::credit::registry::embedded_registry()?.default_downturn_lgd_id(),
         )
-    }
-
-    /// Basel III unsecured floor (25% LGD floor, 5% add-on).
-    pub fn basel_unsecured() -> Result<Self> {
-        Self::from_registry_id("basel_unsecured")
     }
 
     /// Apply downturn adjustment to a base LGD.
@@ -382,8 +377,8 @@ mod tests {
 
     #[test]
     fn basel_presets_construct() {
-        let secured = DownturnLgd::basel_secured().expect("valid");
-        let unsecured = DownturnLgd::basel_unsecured().expect("valid");
+        let secured = DownturnLgd::default_calibration().expect("valid");
+        let unsecured = DownturnLgd::from_registry_id("basel_unsecured").expect("valid");
 
         // Both should adjust a moderate base LGD
         let adj_s = secured.adjust(0.20).expect("valid");

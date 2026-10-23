@@ -296,18 +296,18 @@ impl Discretization<HestonProcess> for QeHeston {
         let regime = match self.prepared {
             Some(c) if c.dt.to_bits() == dt.to_bits() => qe_regime_with_exp(
                 v_t,
-                params.kappa,
-                params.theta,
-                params.sigma_v,
+                params.model.kappa,
+                params.model.theta,
+                params.model.sigma_v,
                 dt,
                 self.psi_c,
                 c.exp_kappa_dt,
             ),
             _ => qe_regime(
                 v_t,
-                params.kappa,
-                params.theta,
-                params.sigma_v,
+                params.model.kappa,
+                params.model.theta,
+                params.model.sigma_v,
                 dt,
                 self.psi_c,
             ),
@@ -335,15 +335,15 @@ impl Discretization<HestonProcess> for QeHeston {
         // so that E[S_{t+Δt} | S_t, v_t] = S_t·e^{(r−q)Δt} holds exactly.
         // When M(A) is not finite (A outside the regime's domain) or σ_v is
         // degenerate, the analytic drift is used as a fallback.
-        let rho = params.rho.clamp(-1.0, 1.0);
-        let (c0, c1, c2) = self.int_var_coeffs(dt, params.kappa, params.theta);
+        let rho = params.model.rho.clamp(-1.0, 1.0);
+        let (c0, c1, c2) = self.int_var_coeffs(dt, params.model.kappa, params.model.theta);
         let int_var = (c0 + c1 * v_t + c2 * v_next).max(0.0);
         let one_minus_rho2 = (1.0 - rho * rho).max(0.0);
         let orthogonal_diffusion = one_minus_rho2.sqrt() * int_var.sqrt() * z[0];
 
-        let log_increment = if params.sigma_v.abs() > 1e-10 {
-            let rho_over_sigma = rho / params.sigma_v;
-            let a_pre = -0.5 * c2 + rho_over_sigma * (params.kappa * c2 + 1.0);
+        let log_increment = if params.model.sigma_v.abs() > 1e-10 {
+            let rho_over_sigma = rho / params.model.sigma_v;
+            let a_pre = -0.5 * c2 + rho_over_sigma * (params.model.kappa * c2 + 1.0);
             let a_coeff = a_pre + 0.5 * one_minus_rho2 * c2;
             match regime.exp_moment(a_coeff) {
                 Some(mgf) if mgf > 0.0 => {
@@ -358,8 +358,8 @@ impl Discretization<HestonProcess> for QeHeston {
                     // Fallback: analytic Itô-compensated drift (plain QE).
                     let drift = process.log_drift_increment(t, t + dt) - 0.5 * int_var;
                     let variance_correction = rho_over_sigma
-                        * (v_next - v_t - params.kappa * params.theta * dt
-                            + params.kappa * int_var);
+                        * (v_next - v_t - params.model.kappa * params.model.theta * dt
+                            + params.model.kappa * int_var);
                     drift + variance_correction + orthogonal_diffusion
                 }
             }
@@ -389,7 +389,7 @@ impl Discretization<HestonProcess> for QeHeston {
         let dt = time_grid.dt(0);
         self.prepared = Some(QeHestonConstants {
             dt,
-            exp_kappa_dt: (-process.params().kappa * dt).exp(),
+            exp_kappa_dt: (-process.params().model.kappa * dt).exp(),
         });
     }
 
@@ -415,8 +415,14 @@ mod tests {
             HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
 
         for z in [-3.0, -1.0, 0.0, 1.0, 3.0] {
-            let v_next =
-                qe.step_variance(0.04, params.kappa, params.theta, params.sigma_v, 0.01, z);
+            let v_next = qe.step_variance(
+                0.04,
+                params.model.kappa,
+                params.model.theta,
+                params.model.sigma_v,
+                0.01,
+                z,
+            );
             assert!(v_next >= 0.0, "Variance became negative with z={}", z);
         }
     }
@@ -428,18 +434,34 @@ mod tests {
             HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.1, -0.5, 0.04).expect("valid");
 
         // Starting above theta
-        let v_high = qe.step_variance(0.08, params.kappa, params.theta, params.sigma_v, 0.1, 0.0);
+        let v_high = qe.step_variance(
+            0.08,
+            params.model.kappa,
+            params.model.theta,
+            params.model.sigma_v,
+            0.1,
+            0.0,
+        );
         assert!(v_high < 0.08, "Should mean-revert toward theta");
 
         // Starting below theta
-        let v_low = qe.step_variance(0.02, params.kappa, params.theta, params.sigma_v, 0.1, 0.0);
+        let v_low = qe.step_variance(
+            0.02,
+            params.model.kappa,
+            params.model.theta,
+            params.model.sigma_v,
+            0.1,
+            0.0,
+        );
         assert!(v_low > 0.02, "Should mean-revert toward theta");
     }
 
     #[test]
     fn test_qe_heston_step() {
         let heston =
-            HestonProcess::with_params(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+            crate::closed_form::HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
+                .map(HestonProcess::new)
+                .expect("valid");
         let qe = QeHeston::new();
 
         let mut x = vec![100.0, 0.04];
@@ -458,7 +480,9 @@ mod tests {
     #[test]
     fn test_qe_heston_correlated_shocks() {
         let heston =
-            HestonProcess::with_params(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+            crate::closed_form::HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
+                .map(HestonProcess::new)
+                .expect("valid");
         let qe = QeHeston::new();
 
         // Negative variance shock should (with neg correlation) give positive spot shock
@@ -601,7 +625,14 @@ mod tests {
 
         let params =
             HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
-        let v = qe.step_variance(0.04, params.kappa, params.theta, params.sigma_v, 0.1, 0.0);
+        let v = qe.step_variance(
+            0.04,
+            params.model.kappa,
+            params.model.theta,
+            params.model.sigma_v,
+            0.1,
+            0.0,
+        );
         assert!(v >= 0.0);
     }
 
@@ -612,7 +643,14 @@ mod tests {
             HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
 
         for z in [-2.0, 0.0, 2.0] {
-            let v = qe.step_variance(0.04, params.kappa, params.theta, params.sigma_v, 0.1, z);
+            let v = qe.step_variance(
+                0.04,
+                params.model.kappa,
+                params.model.theta,
+                params.model.sigma_v,
+                0.1,
+                z,
+            );
             assert!(v >= 0.0);
         }
     }
@@ -631,7 +669,9 @@ mod tests {
     #[test]
     fn test_qe_heston_spot_update_uses_k0_star_correction() {
         let heston =
-            HestonProcess::with_params(0.03, 0.01, 1.7, 0.04, 0.6, -0.4, 0.05).expect("valid");
+            crate::closed_form::HestonPricingParams::new(0.03, 0.01, 1.7, 0.04, 0.6, -0.4, 0.05)
+                .map(HestonProcess::new)
+                .expect("valid");
         let qe = QeHeston::new();
         let dt = 0.1;
         let mut x = vec![100.0, 0.05];
@@ -642,13 +682,20 @@ mod tests {
         let params = heston.params();
         let s_t = x[0];
         let v_t = x[1];
-        let regime = qe_regime(v_t, params.kappa, params.theta, params.sigma_v, dt, 1.5);
+        let regime = qe_regime(
+            v_t,
+            params.model.kappa,
+            params.model.theta,
+            params.model.sigma_v,
+            dt,
+            1.5,
+        );
         let v_next = regime.sample(z[1]);
         let (c0, c1, c2) = (0.0, 0.5 * dt, 0.5 * dt); // trapezoidal γ1=γ2=½
         let int_var = c0 + c1 * v_t + c2 * v_next;
-        let rho = params.rho;
+        let rho = params.model.rho;
         let one_minus_rho2 = 1.0 - rho * rho;
-        let a_pre = -0.5 * c2 + rho / params.sigma_v * (params.kappa * c2 + 1.0);
+        let a_pre = -0.5 * c2 + rho / params.model.sigma_v * (params.model.kappa * c2 + 1.0);
         let a_coeff = a_pre + 0.5 * one_minus_rho2 * c2;
         let mgf = regime.exp_moment(a_coeff).expect("finite MGF");
         let k0_star = -mgf.ln() - 0.5 * one_minus_rho2 * (c0 + c1 * v_t);
@@ -678,7 +725,9 @@ mod tests {
         use crate::monte_carlo::traits::RandomStream;
 
         let heston =
-            HestonProcess::with_params(0.05, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04).expect("valid");
+            crate::closed_form::HestonPricingParams::new(0.05, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04)
+                .map(HestonProcess::new)
+                .expect("valid");
         let qe = QeHeston::new();
         let dt = 0.25; // coarse quarterly step
         let params = heston.params();
@@ -719,7 +768,10 @@ mod tests {
         use crate::monte_carlo::traits::RandomStream;
 
         let r = 0.05;
-        let heston = HestonProcess::with_params(r, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04).expect("valid");
+        let heston =
+            crate::closed_form::HestonPricingParams::new(r, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04)
+                .map(HestonProcess::new)
+                .expect("valid");
         let qe = QeHeston::new();
         let t_end = 1.0;
         let n_steps = 12usize; // coarse monthly grid

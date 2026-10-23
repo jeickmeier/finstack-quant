@@ -51,7 +51,7 @@ pub fn capfloor_hw1f_sigma_schedule_key(curve_id: &str) -> String {
 /// use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 ///
 /// let params = HullWhiteCalibrationParams::new(0.05, 0.01).unwrap();
-/// assert!(!params.is_uncalibrated_default());
+/// assert_eq!(params.sigma, 0.01);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -121,12 +121,6 @@ impl HullWhiteCalibrationParams {
         }
         Ok(Self { kappa, sigma })
     }
-
-    /// Return whether the parameters equal the generic uncalibrated defaults.
-    #[must_use]
-    pub fn is_uncalibrated_default(&self) -> bool {
-        (self.kappa - 0.03).abs() < f64::EPSILON && (self.sigma - 0.01).abs() < f64::EPSILON
-    }
 }
 
 /// Hull-White parameters with piecewise-constant short-rate volatility.
@@ -136,9 +130,9 @@ impl HullWhiteCalibrationParams {
 pub struct HullWhiteParams {
     /// Mean-reversion speed κ in inverse years; strictly positive and finite.
     pub kappa: f64,
-    /// Left-continuous short-rate volatility σ(t), in absolute rate units per
+    /// Piecewise-constant short-rate volatility σ(t), in absolute rate units per
     /// square-root year.
-    pub volatility: PiecewiseConstantCurve,
+    volatility: PiecewiseConstantCurve,
 }
 
 #[derive(serde::Deserialize)]
@@ -220,23 +214,23 @@ impl HullWhiteParams {
     ///
     /// # Arguments
     ///
-    /// * `t` - Model time in years; the left-continuous schedule segment
-    ///   containing `t` supplies the value (flat after the last knot).
+    /// * `t` - Model time in years; the segment starting at or before `t`
+    ///   supplies the value, clamped to the first or last segment outside the knots.
     #[must_use]
-    pub fn sigma(&self, t: f64) -> f64 {
+    pub fn get_sigma(&self, t: f64) -> f64 {
         self.volatility.value_at(t)
     }
 
     /// Segment start times of the volatility schedule, in years.
     #[must_use]
-    pub fn times(&self) -> &[f64] {
+    pub fn get_times(&self) -> &[f64] {
         self.volatility.times()
     }
 
     /// Volatility on each schedule segment, in absolute rate units per
     /// square-root year.
     #[must_use]
-    pub fn values(&self) -> &[f64] {
+    pub fn get_values(&self) -> &[f64] {
         self.volatility.values()
     }
 
@@ -282,8 +276,13 @@ impl HullWhiteParams {
     /// Returns an error when the integration interval or volatility schedule
     /// is invalid.
     pub fn state_variance(&self, t: f64) -> Result<f64> {
+        self.state_variance_between(0.0, t)
+    }
+
+    /// Exact centered-state variance contributed over an interval in years.
+    pub(crate) fn state_variance_between(&self, start: f64, end: f64) -> Result<f64> {
         self.volatility
-            .integrate_squared_exp_weight(self.kappa, t, 0.0, t)
+            .integrate_squared_exp_weight(self.kappa, end, start, end)
     }
 
     /// Compute covariance of the centered short-rate state at two times.
@@ -414,25 +413,61 @@ pub fn hw_bond_vol(kappa: f64, sigma: f64, t: f64, expiry: f64, maturity: f64) -
 ///
 /// # Arguments
 ///
-/// * `kappa` - Mean-reversion speed κ in inverse years.
-/// * `sigma` - Constant short-rate volatility σ in absolute rate units per
+/// * `kappa` - Finite non-negative mean-reversion speed κ in inverse years; zero
+///   selects the continuous Ho-Lee limit.
+/// * `sigma` - Finite non-negative constant short-rate volatility σ in absolute rate units per
 ///   square-root year.
-/// * `t` - Bond valuation time in years.
-/// * `maturity` - Bond maturity time in years.
+/// * `t` - Finite non-negative bond valuation time in years.
+/// * `maturity` - Finite bond maturity time in years, at or after `t`.
 /// * `df` - Initial discount-factor function returning `P(0,u)` for time `u`
-///   in years.
-#[must_use]
-pub fn hw_ln_a(kappa: f64, sigma: f64, t: f64, maturity: f64, df: &dyn Fn(f64) -> f64) -> f64 {
+///   in years, normalized so `P(0,0) = 1`; queried factors must be positive and finite.
+///
+/// # Errors
+///
+/// Returns a validation error for invalid parameters, discount factors or
+/// instantaneous-forward samples, and a computation error if the coefficient
+/// cannot be represented as a finite number.
+pub fn hw_ln_a(
+    kappa: f64,
+    sigma: f64,
+    t: f64,
+    maturity: f64,
+    df: &dyn Fn(f64) -> f64,
+) -> Result<f64> {
+    if !kappa.is_finite()
+        || kappa < 0.0
+        || !sigma.is_finite()
+        || sigma < 0.0
+        || !t.is_finite()
+        || t < 0.0
+        || !maturity.is_finite()
+        || maturity < t
+    {
+        return Err(Error::Validation("Hull-White coefficients require finite non-negative kappa, sigma and time, with maturity at or after time".into()));
+    }
     let p0t = df(t);
     let p0_maturity = df(maturity);
+    if !p0t.is_finite() || p0t <= 0.0 || !p0_maturity.is_finite() || p0_maturity <= 0.0 {
+        return Err(Error::Validation(format!("Hull-White discount factors must be positive and finite: P(0,{t})={p0t}, P(0,{maturity})={p0_maturity}")));
+    }
     let b = hw_b(kappa, t, maturity);
-    let f0t = fd_instantaneous_forward(df, t).unwrap_or(0.0);
+    let f0t = fd_instantaneous_forward(df, t).ok_or_else(|| {
+        Error::Validation(format!(
+            "Hull-White instantaneous forward is undefined or non-finite at t={t}"
+        ))
+    })?;
     let var_term = if kappa.abs() < 1e-10 {
         sigma * sigma * t * b * b / 2.0
     } else {
         sigma * sigma / (4.0 * kappa) * (1.0 - (-2.0 * kappa * t).exp()) * b * b
     };
-    (p0_maturity / p0t).ln() + b * f0t - var_term
+    let ln_a = p0_maturity.ln() - p0t.ln() + b * f0t - var_term;
+    if !ln_a.is_finite() {
+        return Err(Error::Internal(format!(
+            "Hull-White log bond coefficient is non-finite at t={t}, maturity={maturity}"
+        )));
+    }
+    Ok(ln_a)
 }
 
 /// Payment-measure adjustment to a simple or compounded floating coupon's bond ratio.
@@ -717,50 +752,6 @@ pub fn hw1f_cap_floor_price(
         .sum()
 }
 
-/// Price a cap or floor under scheduled Hull-White volatility.
-///
-/// # Arguments
-///
-/// * `params` - Validated mean reversion and piecewise volatility schedule.
-/// * `discount_df` - Discount-factor function for payment discounting.
-/// * `forward_df` - Projection-curve discount-factor function.
-/// * `periods` - Coupon periods as `(fixing_time, start_time, end_time,
-///   accrual)` in years.
-/// * `strike` - Cap or floor strike as a decimal rate.
-/// * `is_cap` - `true` for a cap and `false` for a floor.
-///
-/// # Errors
-///
-/// Returns an error when any caplet input is invalid or scheduled volatility
-/// integration fails.
-pub fn hw1f_cap_floor_price_with_model(
-    params: &HullWhiteParams,
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
-    periods: &[(f64, f64, f64, f64)],
-    strike: f64,
-    is_cap: bool,
-) -> Result<f64> {
-    periods
-        .iter()
-        .map(|&(t_fix, t_start, t_end, accrual)| {
-            hw1f_term_caplet_price_from_dfs_with_model(
-                params,
-                forward_df(t_start),
-                forward_df(t_end),
-                discount_df(t_end),
-                t_fix,
-                t_start,
-                t_end,
-                t_end,
-                accrual,
-                strike,
-                is_cap,
-            )
-        })
-        .sum()
-}
-
 /// Convert constant Hull-White σ to the approximate caplet normal volatility.
 ///
 /// # Arguments
@@ -809,26 +800,59 @@ pub fn hw1f_caplet_forward_rate_normal_vol(
 ///
 /// # Returns
 ///
-/// `None` when a sampled discount factor is not strictly positive (a
-/// corrupted or badly extrapolated curve), so callers choose their own
-/// fallback instead of receiving a silent `NaN`.
+/// `None` when `t`, a sampled discount factor, or the estimated forward is
+/// non-finite, or a factor is non-positive. Callers must propagate a curve
+/// validation failure when the forward is required for pricing.
 #[must_use]
 pub fn fd_instantaneous_forward(df: &dyn Fn(f64) -> f64, t: f64) -> Option<f64> {
+    if !t.is_finite() {
+        return None;
+    }
     let h = (t * 1e-3).clamp(1e-6, 1e-3);
-    if t > h {
+    let forward = if t > h {
         let dfp = df(t + h);
         let dfm = df(t - h);
-        (dfp > 0.0 && dfm > 0.0).then(|| -(dfp.ln() - dfm.ln()) / (2.0 * h))
+        if !dfp.is_finite() || dfp <= 0.0 || !dfm.is_finite() || dfm <= 0.0 {
+            return None;
+        }
+        -(dfp.ln() - dfm.ln()) / (2.0 * h)
     } else {
         let dfh = df(h);
-        (dfh > 0.0).then(|| -dfh.ln() / h)
-    }
+        if !dfh.is_finite() || dfh <= 0.0 {
+            return None;
+        }
+        -dfh.ln() / h
+    };
+    forward.is_finite().then_some(forward)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use finstack_quant_core::math::special_functions::norm_cdf;
+
+    #[test]
+    fn affine_coefficients_reject_invalid_discount_factors_and_forward_samples() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -0.1] {
+            assert!(fd_instantaneous_forward(&|_| bad, 0.0).is_none());
+            assert!(fd_instantaneous_forward(&|_| bad, 1.0).is_none());
+            assert!(hw_ln_a(0.1, 0.01, 1.0, 2.0, &|_| bad).is_err());
+            let bad_neighbors = |time: f64| if time == 1.0 || time == 2.0 { 1.0 } else { bad };
+            assert!(hw_ln_a(0.1, 0.01, 1.0, 2.0, &bad_neighbors).is_err());
+        }
+        assert!(fd_instantaneous_forward(&|_| 1.0, f64::NAN).is_none());
+        assert!(fd_instantaneous_forward(&|_| 1.0, f64::INFINITY).is_none());
+    }
+
+    #[test]
+    fn affine_log_discount_ratio_avoids_overflow_and_preserves_ho_lee_limit() {
+        let df = |time: f64| if time < 1.5 { 1e-300 } else { 1e300 };
+        let actual = hw_ln_a(0.1, 0.0, 1.0, 2.0, &df).expect("finite log coefficient");
+        assert!((actual - 600.0 * 10.0_f64.ln()).abs() < 1e-12);
+        let flat = |time: f64| (-0.03 * time).exp();
+        let ho_lee = hw_ln_a(0.0, 0.01, 2.0, 5.0, &flat).expect("Ho-Lee limit");
+        assert!((ho_lee + 0.0009).abs() < 1e-10);
+    }
 
     #[test]
     fn scalar_and_scheduled_variance_agree() {

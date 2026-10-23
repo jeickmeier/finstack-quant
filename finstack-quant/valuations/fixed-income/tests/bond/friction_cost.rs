@@ -79,14 +79,26 @@ fn call_friction_raises_callable_price_toward_straight() {
     straight.call_put = None;
     let valuator_straight =
         BondValuator::new(straight, &market, as_of, time_to_maturity, steps).unwrap();
-    let price_straight = tree.price(oas_bp, &valuator_straight).unwrap();
+    let price_straight = tree
+        .price(
+            oas_bp,
+            finstack_quant_core::math::Compounding::Continuous,
+            &valuator_straight,
+        )
+        .unwrap();
 
     // Callable with friction = 0
     let mut callable0 = callable_bond(as_of);
     callable0.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_call_friction_cents(0.0);
     let valuator0 = BondValuator::new(callable0, &market, as_of, time_to_maturity, steps).unwrap();
-    let price0 = tree.price(oas_bp, &valuator0).unwrap();
+    let price0 = tree
+        .price(
+            oas_bp,
+            finstack_quant_core::math::Compounding::Continuous,
+            &valuator0,
+        )
+        .unwrap();
 
     // Callable with friction = 200 cents (= 2.00 points)
     let mut callable200 = callable_bond(as_of);
@@ -94,7 +106,13 @@ fn call_friction_raises_callable_price_toward_straight() {
         InstrumentPricingOverrides::default().with_call_friction_cents(200.0);
     let valuator200 =
         BondValuator::new(callable200, &market, as_of, time_to_maturity, steps).unwrap();
-    let price200 = tree.price(oas_bp, &valuator200).unwrap();
+    let price200 = tree
+        .price(
+            oas_bp,
+            finstack_quant_core::math::Compounding::Continuous,
+            &valuator200,
+        )
+        .unwrap();
 
     assert!(
         price200 >= price0,
@@ -144,7 +162,15 @@ fn callable_bond_tree_prices_are_bit_pinned() {
             steps,
         )
         .unwrap();
-        bits.push(tree.price(oas_bp, &valuator).unwrap().to_bits());
+        bits.push(
+            tree.price(
+                oas_bp,
+                finstack_quant_core::math::Compounding::Continuous,
+                &valuator,
+            )
+            .unwrap()
+            .to_bits(),
+        );
     }
     // Through the bond tree pricer: Black-Derman-Toy lattice, then the
     // Hull-White trinomial lattice.
