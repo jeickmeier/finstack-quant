@@ -202,11 +202,6 @@ pub(crate) fn build_schedule_period(
             "a schedule period requires start strictly before end".into(),
         ));
     }
-    if payment_lag_days < 0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "payment_lag_days must be non-negative; got {payment_lag_days}"
-        )));
-    }
     let adjusted_end = adjust(accrual_end, business_day_convention, cal)?;
     let adjusted_start = if adjust_accrual_dates {
         adjust(accrual_start, business_day_convention, cal)?
