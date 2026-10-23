@@ -614,14 +614,9 @@ impl CashFlowSchedule {
     fn validate_principal_balance(&self) -> finstack_quant_core::Result<()> {
         let initial = self.notional.initial;
         if let Some(anchor) = self.funding_anchor() {
-            let replay = self.replay_balances(anchor)?;
             let epsilon = (initial.amount().abs() * 1e-8).max(1e-6);
-            for (position, (index, _, balance)) in replay.iter().enumerate() {
-                let date = self.flows[*index].get_balance_date();
-                let date_finished = replay
-                    .get(position + 1)
-                    .is_none_or(|(next, _, _)| self.flows[*next].get_balance_date() != date);
-                if date_finished && initial.amount() >= 0.0 && balance.amount() < -epsilon {
+            for (date, balance) in self.replay_balances(anchor)? {
+                if initial.amount() >= 0.0 && balance.amount() < -epsilon {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "principal repayments exceed outstanding on {date}: {}",
                         balance.amount()
@@ -824,19 +819,7 @@ impl CashFlowSchedule {
                     .into(),
             )
         })?;
-        let replay = self.replay_balances(issue)?;
-        let mut result = Vec::with_capacity(replay.len());
-        for (idx, _, after) in replay {
-            let date = self.flows[idx].get_balance_date();
-            if let Some((last_date, last_balance)) = result.last_mut() {
-                if *last_date == date {
-                    *last_balance = after;
-                    continue;
-                }
-            }
-            result.push((date, after));
-        }
-        Ok(result)
+        self.replay_balances(issue)
     }
 
     /// Extract currency-tagged settlement cashflows `(Date, Money)` from this schedule.
@@ -931,19 +914,25 @@ impl CashFlowSchedule {
         Ok(balances)
     }
 
+    /// Closing balance after each balance date, in replay order.
     fn replay_balances(
         &self,
         funding_anchor: Date,
-    ) -> finstack_quant_core::Result<Vec<(usize, Money, Money)>> {
+    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let order = self.balance_replay_order(funding_anchor, |_| true);
         let mut outstanding = self.notional.initial;
-        let mut replay = Vec::with_capacity(order.len());
+        let mut closing: Vec<(Date, Money)> = Vec::new();
         for (idx, is_initial_funding) in order {
-            let before = outstanding;
             apply_flow_to_outstanding(&mut outstanding, &self.flows[idx], is_initial_funding)?;
-            replay.push((idx, before, outstanding));
+            let date = self.flows[idx].get_balance_date();
+            match closing.last_mut() {
+                Some((last_date, last_balance)) if *last_date == date => {
+                    *last_balance = outstanding;
+                }
+                _ => closing.push((date, outstanding)),
+            }
         }
-        Ok(replay)
+        Ok(closing)
     }
 
     /// Issue date, else the first flow date: where the issue funding row sits.
