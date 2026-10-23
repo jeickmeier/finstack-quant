@@ -55,7 +55,7 @@ fn kind_rank(kind: CFKind) -> u8 {
 /// 5. **Reset and principal dates** — `Option<Date>` ordering, with `None` first.
 /// 6. **Accrual factor** — `f64::total_cmp`.
 /// 7. **Rate** — `Option<f64>` ordering, with `None` first, then `total_cmp`.
-/// 8. **Accrual metadata** — period, day-count rank, then projected index rate.
+/// 8. **Accrual metadata** — period, day count, then projected index rate.
 /// 9. **Principal delta** — currency, then exact Decimal value.
 /// 10. **Representation ties** — actual kind, day-count variant, and Decimal
 ///     encodings distinguish rows whose preceding comparison keys are equal.
@@ -133,7 +133,7 @@ fn compare_accrual(
                 left.end_is_termination_date
                     .cmp(&right.end_is_termination_date)
             })
-            .then_with(|| day_count_rank(left.day_count).cmp(&day_count_rank(right.day_count)))
+            .then_with(|| (left.day_count as usize).cmp(&(right.day_count as usize)))
             .then_with(
                 || match (left.projected_index_rate, right.projected_index_rate) {
                     (None, None) => std::cmp::Ordering::Equal,
@@ -142,24 +142,6 @@ fn compare_accrual(
                     (Some(left), Some(right)) => left.total_cmp(&right),
                 },
             ),
-    }
-}
-
-fn day_count_rank(day_count: DayCount) -> u8 {
-    match day_count {
-        DayCount::Act360 => 0,
-        DayCount::Act365F => 1,
-        DayCount::Act365L => 2,
-        DayCount::Thirty360 => 3,
-        DayCount::ThirtyE360 => 4,
-        DayCount::ThirtyE360Isda => 5,
-        DayCount::Nl365 => 6,
-        DayCount::ActAct => 7,
-        DayCount::ActActIsma => 8,
-        DayCount::Bus252 => 9,
-        DayCount::ActActAfb => 10,
-        DayCount::Thirty360It => 11,
-        _ => 12,
     }
 }
 
