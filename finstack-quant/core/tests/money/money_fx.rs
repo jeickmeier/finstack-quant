@@ -2230,3 +2230,113 @@ fn fx_cold_and_warm_lookups_agree_bit_exactly() {
         assert_eq!(cold.triangulated, warm.triangulated, "{from}->{to}");
     }
 }
+
+// Moved from production_audit.rs: pinned FX quotes and snapshot restore.
+mod fx_pinned_precedence {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
+    use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxQuery, SimpleFxProvider};
+    use std::sync::Arc;
+    use time::macros::date;
+
+    #[test]
+    fn global_source_precedes_orientation_and_pinned_fixing() {
+        let on = date!(2025 - 01 - 02);
+        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+        matrix
+            .set_quotes(&[(Currency::USD, Currency::EUR, 0.8)])
+            .expect("global");
+        matrix
+            .set_quote_on(
+                Currency::EUR,
+                Currency::USD,
+                on,
+                FxConversionPolicy::CashflowDate,
+                1.3,
+            )
+            .expect("pinned");
+        let forward = matrix
+            .rate(FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                on,
+                Default::default(),
+            ))
+            .expect("forward")
+            .rate;
+        let reverse = matrix
+            .rate(FxQuery::new(
+                Currency::USD,
+                Currency::EUR,
+                on,
+                Default::default(),
+            ))
+            .expect("reverse")
+            .rate;
+        assert_eq!(forward, 1.25);
+        assert!((forward * reverse - 1.0).abs() < 1e-12);
+        matrix
+            .set_quotes(&[(Currency::USD, Currency::GBP, 0.8)])
+            .expect("pivot leg");
+        let cross = matrix
+            .rate(FxQuery::new(
+                Currency::EUR,
+                Currency::GBP,
+                on,
+                Default::default(),
+            ))
+            .expect("cross");
+        assert!(
+            (cross.rate - 1.0).abs() < 1e-12,
+            "pivot legs must use global source first: {}",
+            cross.rate
+        );
+        assert!(cross.triangulated);
+    }
+
+    #[test]
+    fn snapshot_preserves_provider_below_pinned_source() {
+        let on = date!(2025 - 01 - 02);
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quotes(&[(Currency::USD, Currency::EUR, 0.8)])
+            .expect("provider quote");
+        let matrix = FxMatrix::new(Arc::new(provider));
+        matrix
+            .set_quote_on(
+                Currency::EUR,
+                Currency::USD,
+                on,
+                FxConversionPolicy::CashflowDate,
+                1.3,
+            )
+            .expect("pinned");
+        let market = MarketContext::new().insert_fx(matrix);
+        let state = MarketContextState::try_from(&market).expect("coherent market snapshot");
+        let restored = MarketContext::try_from(state).expect("restore");
+        for (from, to, expected) in [
+            (Currency::EUR, Currency::USD, 1.3),
+            (Currency::USD, Currency::EUR, 1.0 / 1.3),
+        ] {
+            let rate = restored
+                .fx_required()
+                .expect("fx")
+                .rate(FxQuery::new(from, to, on, Default::default()))
+                .expect("restored rate")
+                .rate;
+            assert!((rate - expected).abs() < 1e-12, "{from}/{to}: {rate}");
+        }
+        let other = restored
+            .fx_required()
+            .expect("fx")
+            .rate(FxQuery::new(
+                Currency::USD,
+                Currency::EUR,
+                date!(2025 - 01 - 03),
+                Default::default(),
+            ))
+            .expect("provider remains available")
+            .rate;
+        assert_eq!(other, 0.8);
+    }
+}

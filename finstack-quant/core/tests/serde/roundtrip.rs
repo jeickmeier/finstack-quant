@@ -235,3 +235,26 @@ fn schedule_spec_imm_setters_match_builder_semantics() {
             .dates
     );
 }
+
+// Moved from phase2_strictness.rs: nested strictness.
+mod period_strictness {
+    use finstack_quant_core::dates::{build_periods, Period};
+
+    #[test]
+    fn period_rejects_unknown_fields() {
+        let period = build_periods("2025Q1..Q1", None)
+            .expect("valid period plan")
+            .periods
+            .into_iter()
+            .next()
+            .expect("one period");
+        let mut value = serde_json::to_value(period).expect("period serializes");
+        value
+            .as_object_mut()
+            .expect("period is an object")
+            .insert("__nonexistent__".into(), serde_json::json!(true));
+
+        let error = serde_json::from_value::<Period>(value).expect_err("unknown fields must fail");
+        assert!(error.to_string().contains("unknown field"), "{error}");
+    }
+}

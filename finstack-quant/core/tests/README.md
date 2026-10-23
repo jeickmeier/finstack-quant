@@ -6,10 +6,9 @@ crate the way a downstream caller would.
 
 ## Layout
 
-Each integration target is a single root `.rs` file. Targets that grew past one
-file keep a same-named directory beside them and pull submodules in with
-`#[path = "..."]` (Rust's `tests/` discovery only treats top-level files as
-targets, so the directory is not compiled twice).
+Every root `.rs` file is a module of one `core` test target, `tests/main.rs`
+(`autotests = false`). Domains that grew past one file keep a same-named
+directory beside them and pull submodules in with `#[path = "..."]`.
 
 ```
 tests/
@@ -26,7 +25,6 @@ tests/
 ├── types.rs                + types/       Rate / Bps
 ├── golden_tests.rs         + golden/      reference-value fixtures (see golden/README.md)
 ├── canonical_api.rs                       npv/irr/quadrature result and error consistency
-├── phase2_strictness.rs                   nested serde strictness + finite-value regressions
 ├── sobol_golden.rs                        Sobol direction numbers vs Joe & Kuo (2008)
 └── data/                                  fixture data (see data/README_sobol.md)
     ├── canonical/                         MarketContextState canonical bytes + sha256 pin
