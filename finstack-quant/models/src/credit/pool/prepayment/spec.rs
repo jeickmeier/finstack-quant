@@ -6,7 +6,6 @@
 use super::{
     FactorCorrelatedPrepay, RegimeSwitchingPrepay, RichardRollPrepay, StochasticPrepayment,
 };
-use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
 /// Stochastic prepayment model specification.
@@ -218,26 +217,6 @@ impl StochasticPrepaySpec {
             StochasticPrepaySpec::FactorCorrelated { factor_loading, .. }
             | StochasticPrepaySpec::RichardRoll { factor_loading, .. }
             | StochasticPrepaySpec::RegimeSwitching { factor_loading, .. } => Some(*factor_loading),
-        }
-    }
-
-    /// Get the base SMM (single monthly mortality rate) for this specification.
-    ///
-    /// Returns the first-month baseline SMM before factor shocks are applied. A
-    /// regime-switching model starts in its low regime at origination; use
-    /// [`StochasticPrepayment::expected_smm`] for its seasoning-dependent mean.
-    pub fn base_smm(&self) -> f64 {
-        match self {
-            StochasticPrepaySpec::Deterministic(spec)
-            | StochasticPrepaySpec::FactorCorrelated {
-                base_spec: spec, ..
-            } => spec.smm(1).unwrap_or(0.0),
-            StochasticPrepaySpec::RichardRoll { base_cpr, .. } => {
-                annual_to_monthly_clamped(*base_cpr)
-            }
-            StochasticPrepaySpec::RegimeSwitching { low_cpr, .. } => {
-                annual_to_monthly_clamped(*low_cpr)
-            }
         }
     }
 }
