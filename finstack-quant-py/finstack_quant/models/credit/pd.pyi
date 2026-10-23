@@ -195,7 +195,7 @@ class MasterScaleResult:
     Examples
     --------
     >>> from finstack_quant.models.credit import pd as pdm
-    >>> result = pdm.MasterScale.sp_assumptions().map_pd(0.003)
+    >>> result = pdm.MasterScale.default_calibration().map_pd(0.003)
     >>> (result.grade, result.grade_index, result.central_pd)
     ('BBB', 3, 0.002)
 
@@ -285,7 +285,7 @@ class MasterScaleResult:
         Examples
         --------
         >>> from finstack_quant.models.credit import pd
-        >>> value = pd.MasterScale.sp_assumptions().map_pd(0.003)
+        >>> value = pd.MasterScale.default_calibration().map_pd(0.003)
         >>> pd.MasterScaleResult.from_json(value.to_json()) == value
         True
         """
@@ -363,7 +363,7 @@ class MasterScale:
     Examples
     --------
     >>> from finstack_quant.models.credit import pd as pdm
-    >>> scale = pdm.MasterScale.sp_assumptions()
+    >>> scale = pdm.MasterScale.default_calibration()
     >>> (scale.n_grades, scale.map_pd(0.003).grade)
     (8, 'BBB')
 
@@ -387,54 +387,24 @@ class MasterScale:
         ...
 
     @staticmethod
-    def sp_assumptions() -> MasterScale:
+    def default_calibration() -> MasterScale:
         """
-        Library PD-band assumptions using S&P-style labels.
-
-        The labels resemble S&P notation as a reporting convention only;
-        the boundaries and central PDs are library assumptions, not
-        agency-published statistics.
+        Load the calibration selected by the embedded registry's default ID.
 
         Returns
         -------
         MasterScale
-            Eight-grade scale from ``AAA`` to ``CC/C``.
+            Validated calibration selected by the current registry data.
 
         Raises
         ------
         ValueError
-            If the embedded credit registry is invalid.
+            If the embedded registry or its configured default is malformed.
 
         Examples
         --------
-        >>> from finstack_quant.models.credit import pd as pdm
-        >>> pdm.MasterScale.sp_assumptions().n_grades
-        8
-        """
-        ...
-
-    @staticmethod
-    def moodys_assumptions() -> MasterScale:
-        """
-        Library PD-band assumptions using Moody's-style labels.
-
-        As with :meth:`sp_assumptions`, the labels are a reporting
-        convention rather than an agency calibration.
-
-        Returns
-        -------
-        MasterScale
-            Moody's-labelled library scale.
-
-        Raises
-        ------
-        ValueError
-            If the embedded credit registry is invalid.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.credit import pd as pdm
-        >>> pdm.MasterScale.moodys_assumptions().n_grades > 0
+        >>> from finstack_quant.models.credit.pd import MasterScale
+        >>> isinstance(MasterScale.default_calibration(), MasterScale)
         True
         """
         ...
@@ -607,7 +577,7 @@ class MasterScale:
         Examples
         --------
         >>> from finstack_quant.models.credit import pd
-        >>> value = pd.MasterScale.sp_assumptions()
+        >>> value = pd.MasterScale.default_calibration()
         >>> pd.MasterScale.from_json(value.to_json()).to_json() == value.to_json()
         True
         """

@@ -194,7 +194,7 @@ def test_multi_factor_result_rows_follow_the_supplied_factor_order() -> None:
 
 
 def test_master_scale_result_to_dataframe_is_one_row() -> None:
-    result = credit_pd.MasterScale.sp_assumptions().map_pd(0.003)
+    result = credit_pd.MasterScale.default_calibration().map_pd(0.003)
     df = result.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -206,7 +206,7 @@ def test_master_scale_result_to_dataframe_is_one_row() -> None:
 
 
 def test_master_scale_results_concat_into_a_grading_table() -> None:
-    scale = credit_pd.MasterScale.sp_assumptions()
+    scale = credit_pd.MasterScale.default_calibration()
     pds = [0.0005, 0.003, 0.05]
     table = pd.concat([scale.map_pd(value).to_dataframe() for value in pds], ignore_index=True)
     assert len(table) == len(pds)

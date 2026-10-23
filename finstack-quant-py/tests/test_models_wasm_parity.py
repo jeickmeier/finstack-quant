@@ -373,8 +373,8 @@ def _merton_cases() -> dict[str, Callable[[], Any]]:
         ],
         "rating_factors": lambda: [
             moodys_warf_factor("B2"),
-            RatingFactorTable.moodys_standard().get_factor("Baa3"),
-            RatingFactorTable.moodys_standard().default_factor,
+            RatingFactorTable.default_calibration().get_factor("Baa3"),
+            RatingFactorTable.default_calibration().default_factor,
         ],
         "liability_management.hurdle": lambda: liability_management.TENDER_RECOMMENDATION_HURDLE,
     }
@@ -408,9 +408,9 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             list(lgd.BetaRecovery(0.4, 0.2).sample_seeded(4, 42)),
         ],
         "lgd.seniority_recovery_stats": lambda: [
-            lgd.seniority_recovery_stats("senior_unsecured").mean,
-            lgd.seniority_recovery_stats("senior_unsecured").std_dev,
-            lgd.seniority_recovery_stats("senior_secured", "sp").mean,
+            lgd.seniority_recovery_stats("senior_unsecured", "moodys_recovery_1982_2023").mean,
+            lgd.seniority_recovery_stats("senior_unsecured", "moodys_recovery_1982_2023").std_dev,
+            lgd.seniority_recovery_stats("senior_secured", "sp_recovery_historical").mean,
         ],
         "lgd.workout": lambda: [
             _json(workout().evaluate(1_000_000.0)),
@@ -423,8 +423,8 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             lgd.DownturnLgd.regulatory_floor(0.08, 0.1).adjust(0.35),
             lgd.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
             lgd.DownturnLgd.regulatory_floor(0.08, 0.1).adjust(0.35),
-            lgd.DownturnLgd.basel_secured().adjust(0.2),
-            lgd.DownturnLgd.basel_unsecured().adjust(0.2),
+            lgd.DownturnLgd.default_calibration().adjust(0.2),
+            lgd.DownturnLgd.from_registry_id("basel_unsecured").adjust(0.2),
         ],
         "lgd.ead": lambda: [
             lgd.EadCalculator(600.0, 400.0, 0.75).ead,
@@ -447,8 +447,8 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             _json(_master_scale().map_pd(0.02)),
             list(_master_scale().map_pds([0.5, 0.001, 0.05])["grade"]),
             _master_scale().map_score(scoring.zmijewski_score(0.05, 0.6, 1.5)).grade,
-            pd_models.MasterScale.sp_assumptions().n_grades,
-            pd_models.MasterScale.moodys_assumptions().n_grades,
+            pd_models.MasterScale.default_calibration().n_grades,
+            pd_models.MasterScale.from_registry_id("moodys_assumptions").n_grades,
         ],
         "scoring": lambda: [
             _json(scoring.altman_z_score(0.1, 0.2, 0.15, 1.5, 1.1)),

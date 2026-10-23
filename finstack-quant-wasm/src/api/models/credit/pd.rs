@@ -120,28 +120,15 @@ impl JsMasterScale {
             .map_err(to_js_err)
     }
 
-    /// S&P-style master scale from the embedded credit-assumption registry.
-    /// @returns The S&P assumptions master scale.
+    /// Load the calibration selected by the embedded registry's default ID.
+    /// @returns The registry-selected calibration handle.
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if the registry cannot supply the scale.
-    #[wasm_bindgen(js_name = spAssumptions)]
-    pub fn sp_assumptions() -> Result<JsMasterScale, JsValue> {
-        MasterScale::sp_assumptions()
-            .map(|inner| Self { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Moody's-style master scale from the embedded credit-assumption registry.
-    /// @returns The Moody's assumptions master scale.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if the registry cannot supply the scale.
-    #[wasm_bindgen(js_name = moodysAssumptions)]
-    pub fn moodys_assumptions() -> Result<JsMasterScale, JsValue> {
-        MasterScale::moodys_assumptions()
+    /// Throws a `validation` error if the registry or its configured default is malformed.
+    #[wasm_bindgen(js_name = defaultCalibration)]
+    pub fn default_calibration() -> Result<JsMasterScale, JsValue> {
+        MasterScale::default_calibration()
             .map(|inner| Self { inner })
             .map_err(to_js_err)
     }

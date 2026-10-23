@@ -29,28 +29,24 @@ pub use workout::{
 
 use finstack_quant_core::wire::serde_parse;
 
-/// Return historical recovery distribution parameters for a seniority class.
+/// Return recovery distribution parameters for a class and exact calibration ID.
 ///
 /// # Arguments
 ///
-/// * `seniority` - Debt-seniority label accepted by [`SeniorityClass`], such as
-///   `senior_secured`.
-/// * `rating_agency` - Optional calibration-provider name accepted by
-///   [`SeniorityCalibration::from_agency`]. `None` uses the registry default
-///   calibration ([`SeniorityCalibration::moodys_historical`]).
+/// * `seniority` - Debt-seniority label accepted by [`SeniorityClass`], such as `senior_secured`.
+/// * `calibration_id` - Exact registry methodology ID, such as `moodys_recovery_1982_2023`
+///   or `sp_recovery_historical`; aliases, whitespace and case variants are rejected.
 ///
 /// # Errors
-/// Returns an error if the seniority class or rating agency name is unknown,
-/// or the class is absent from the selected calibration.
+///
+/// Returns a validation error for an unknown seniority class or absent class,
+/// and a not-found error for an unknown calibration ID.
 pub fn seniority_recovery_stats(
     seniority: &str,
-    rating_agency: Option<&str>,
+    calibration_id: &str,
 ) -> finstack_quant_core::Result<BetaRecovery> {
     let class = serde_parse::<SeniorityClass>(seniority)?;
-    let calibration = match rating_agency {
-        Some(agency) => SeniorityCalibration::from_agency(agency)?,
-        None => SeniorityCalibration::moodys_historical()?,
-    };
+    let calibration = SeniorityCalibration::from_registry_id(calibration_id)?;
     calibration.get(class).copied().ok_or_else(|| {
         finstack_quant_core::Error::Validation("seniority not in calibration".into())
     })
@@ -107,16 +103,8 @@ mod tests {
 
     #[test]
     fn seniority_recovery_stats_accepts_binding_strings() {
-        let stats = seniority_recovery_stats("senior_secured", Some("s&p")).unwrap();
+        let stats = seniority_recovery_stats("senior_secured", "sp_recovery_historical").unwrap();
         assert!((stats.mean() - 0.53).abs() < 1e-12);
-    }
-
-    #[test]
-    fn seniority_recovery_stats_without_agency_uses_registry_default() {
-        let stats = seniority_recovery_stats("senior_secured", None).unwrap();
-        let explicit = seniority_recovery_stats("senior_secured", Some("moodys")).unwrap();
-        assert!((stats.mean() - explicit.mean()).abs() < 1e-12);
-        assert!((stats.std_dev() - explicit.std_dev()).abs() < 1e-12);
     }
 
     #[test]

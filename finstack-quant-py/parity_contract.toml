@@ -1033,7 +1033,9 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #   - credit::market_anchored (CreditVolatilityConversion; consumed inside the
 #     callable-lattice and revolver pricers)
 #   - credit::registry (embedded credit-assumptions registry; hosts reach it
-#     through the `*_assumptions()` / `from_registry_id()` constructors)
+#     through `default_calibration()` / exact `from_registry_id()` lookups;
+#     provider aliases and literal preset constructors are removed.
+#     `seniority_recovery_stats` requires an exact calibration ID in both hosts.)
 #   - merton::RawMertonModel (serde `try_from` funnel, not a public constructor)
 #   - migration::MigrationError, pd::PdCalibrationError,
 #     scoring::CreditScoringError (mapped to Python exceptions in errors.rs)

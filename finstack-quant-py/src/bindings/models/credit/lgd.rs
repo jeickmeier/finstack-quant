@@ -157,22 +157,19 @@ wire_methods!(PyBetaRecovery, BetaRecovery, "BetaRecovery");
 /// seniority : str
 ///     One of ``1st_lien_secured``, ``2nd_lien_secured``, ``senior_secured``,
 ///     ``senior_unsecured``, ``subordinated``, ``junior_subordinated``.
-/// rating_agency : str | None
-///     ``"moodys"`` (canonical) or ``"sp"``. ``None`` selects the registry
-///     default calibration (Moody's historical).
+/// calibration_id : str
+///     Exact registry methodology ID, such as ``"moodys_recovery_1982_2023"``
+///     or ``"sp_recovery_historical"``. Aliases are rejected.
 ///
 /// Returns a ``BetaRecovery``.
 ///
-/// Raises ``ValueError`` when the seniority or agency is unknown, or the
-/// selected calibration has no entry for the class.
+/// Raises ``KeyError`` for an unknown calibration ID and ``ValueError`` when
+/// the seniority is unknown or absent from the selected calibration.
 #[pyfunction]
-#[pyo3(signature = (seniority, rating_agency = None))]
-#[pyo3(text_signature = "(seniority, rating_agency=None)")]
-fn seniority_recovery_stats(
-    seniority: &str,
-    rating_agency: Option<&str>,
-) -> PyResult<PyBetaRecovery> {
-    lgd::seniority_recovery_stats(seniority, rating_agency)
+#[pyo3(signature = (seniority, calibration_id))]
+#[pyo3(text_signature = "(seniority, calibration_id)")]
+fn seniority_recovery_stats(seniority: &str, calibration_id: &str) -> PyResult<PyBetaRecovery> {
+    lgd::seniority_recovery_stats(seniority, calibration_id)
         .map(|inner| PyBetaRecovery { inner })
         .map_err(core_to_py)
 }
@@ -703,20 +700,13 @@ impl PyDownturnLgd {
             .map_err(core_to_py)
     }
 
-    /// Registry default secured-exposure floor (Basel).
+    /// Load the calibration selected by the embedded registry's default ID.
+    ///
+    /// Raises ``ValueError`` if the registry or its configured default is malformed.
     #[staticmethod]
     #[pyo3(text_signature = "()")]
-    fn basel_secured() -> PyResult<Self> {
-        DownturnLgd::basel_secured()
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Registry ``basel_unsecured`` floor preset.
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn basel_unsecured() -> PyResult<Self> {
-        DownturnLgd::basel_unsecured()
+    fn default_calibration() -> PyResult<Self> {
+        DownturnLgd::default_calibration()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }

@@ -99,7 +99,7 @@ fn migration_contracts_validate_against_their_schemas() {
     assert_wire_matches_schema("GeneratorMatrix", &generator);
     let simulator = MigrationSimulator::new(generator, 1.0).expect("simulator");
     assert_wire_matches_schema("MigrationSimulator", &simulator);
-    let master = MasterScale::sp_assumptions().expect("embedded master scale");
+    let master = MasterScale::default_calibration().expect("embedded master scale");
     assert_wire_matches_schema("MasterScale", &master);
 }
 

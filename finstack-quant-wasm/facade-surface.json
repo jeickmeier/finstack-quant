@@ -2691,7 +2691,7 @@
   "models.credit.RatingFactorTable": {
     "kind": "class",
     "constructor": false,
-    "statics": ["fromJson", "fromRegistryId", "moodysStandard"],
+    "statics": ["defaultCalibration", "fromJson", "fromRegistryId"],
     "methods": ["free", "getFactor", "toJson"],
     "getters": ["agency", "defaultFactor", "methodology"]
   },
@@ -2751,14 +2751,7 @@
   "models.credit.lgd.DownturnLgd": {
     "kind": "class",
     "constructor": false,
-    "statics": [
-      "baselSecured",
-      "baselUnsecured",
-      "fromJson",
-      "fromRegistryId",
-      "regulatoryFloor",
-      "stressed"
-    ],
+    "statics": ["defaultCalibration", "fromJson", "fromRegistryId", "regulatoryFloor", "stressed"],
     "methods": ["adjust", "free", "toJson"],
     "getters": ["method", "params"]
   },
@@ -2890,7 +2883,7 @@
   "models.credit.pd.MasterScale": {
     "kind": "class",
     "constructor": true,
-    "statics": ["fromJson", "fromRegistryId", "moodysAssumptions", "spAssumptions"],
+    "statics": ["defaultCalibration", "fromJson", "fromRegistryId"],
     "methods": ["free", "mapPd", "mapPds", "mapScore", "toJson"],
     "getters": ["grades", "nGrades"]
   },
