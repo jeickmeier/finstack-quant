@@ -41,32 +41,26 @@ impl InterpolationStrategy for LinearStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => values.first().copied().unwrap_or(f64::NAN),
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => values.first().copied().unwrap_or(f64::NAN),
+                Extension::FlatForward => {
                     let slope = segment_slope(knots, values, 0, 1);
                     values.first().copied().unwrap_or(f64::NAN) + slope * (x - knots[0])
                 }
-                _ => f64::NAN,
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => values.last().copied().unwrap_or(f64::NAN),
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => values.last().copied().unwrap_or(f64::NAN),
+                Extension::FlatForward => {
                     let n = knots.len();
                     let slope = segment_slope(knots, values, n - 2, n - 1);
                     values.last().copied().unwrap_or(f64::NAN) + slope * (x - knots[n - 1])
                 }
-                _ => f64::NAN,
             },
         ) {
             return val;
@@ -90,28 +84,22 @@ impl InterpolationStrategy for LinearStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => segment_slope(knots, values, 0, 1),
-                _ => f64::NAN,
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => segment_slope(knots, values, 0, 1),
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => {
                     let n = knots.len();
                     segment_slope(knots, values, n - 2, n - 1)
                 }
-                _ => f64::NAN,
             },
         ) {
             return val;
@@ -165,40 +153,30 @@ impl InterpolationStrategy for LogLinearStrategy {
         _values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => {
-                    self.log_values.first().copied().unwrap_or(f64::NAN).exp()
-                }
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => self.log_values.first().copied().unwrap_or(f64::NAN).exp(),
+                Extension::FlatForward => {
                     let slope = segment_slope(knots, &self.log_values, 0, 1);
                     let first_log = self.log_values.first().copied().unwrap_or(f64::NAN);
                     let extrapolated_log = first_log + slope * (x - knots[0]);
                     extrapolated_log.exp()
                 }
-                _ => f64::NAN,
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => {
-                    self.log_values.last().copied().unwrap_or(f64::NAN).exp()
-                }
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => self.log_values.last().copied().unwrap_or(f64::NAN).exp(),
+                Extension::FlatForward => {
                     let n = knots.len();
                     let slope = segment_slope(knots, &self.log_values, n - 2, n - 1);
                     let last_log = self.log_values.last().copied().unwrap_or(f64::NAN);
                     let extrapolated_log = last_log + slope * (x - knots[n - 1]);
                     extrapolated_log.exp()
                 }
-                _ => f64::NAN,
             },
         ) {
             return val;
@@ -223,34 +201,28 @@ impl InterpolationStrategy for LogLinearStrategy {
         // For log-linear interpolation: f(x) = exp(y0 + w*(y1-y0)) where w = (x-x0)/(x1-x0)
         // The derivative is: df/dx = f(x) * (y1-y0)/(x1-x0)
 
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => {
                     let slope = segment_slope(knots, &self.log_values, 0, 1);
                     let extrapolated_log = self.log_values[0] + slope * (x - knots[0]);
                     extrapolated_log.exp() * slope
                 }
-                _ => f64::NAN,
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => {
                     let n = knots.len();
                     let slope = segment_slope(knots, &self.log_values, n - 2, n - 1);
                     let extrapolated_log = self.log_values[n - 1] + slope * (x - knots[n - 1]);
                     extrapolated_log.exp() * slope
                 }
-                _ => f64::NAN,
             },
         ) {
             return val;
@@ -376,25 +348,19 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
         _values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => self.boundary_df(knots, 0),
-                ExtrapolationPolicy::FlatForward => self.flat_forward_df(x, knots, 0),
-                _ => f64::NAN,
+                Extension::FlatZero => self.boundary_df(knots, 0),
+                Extension::FlatForward => self.flat_forward_df(x, knots, 0),
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => self.boundary_df(knots, knots.len() - 1),
-                ExtrapolationPolicy::FlatForward => self.flat_forward_df(x, knots, knots.len() - 1),
-                _ => f64::NAN,
+                Extension::FlatZero => self.boundary_df(knots, knots.len() - 1),
+                Extension::FlatForward => self.flat_forward_df(x, knots, knots.len() - 1),
             },
         ) {
             return val;
@@ -413,27 +379,19 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
         _values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => self.flat_forward_df_prime(x, knots, 0),
-                _ => f64::NAN,
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => self.flat_forward_df_prime(x, knots, 0),
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => {
-                    self.flat_forward_df_prime(x, knots, knots.len() - 1)
-                }
-                _ => f64::NAN,
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => self.flat_forward_df_prime(x, knots, knots.len() - 1),
             },
         ) {
             return val;
@@ -529,35 +487,29 @@ impl InterpolationStrategy for CubicHermiteStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => values.first().copied().unwrap_or(f64::NAN),
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => values.first().copied().unwrap_or(f64::NAN),
+                Extension::FlatForward => {
                     let x0 = knots[0];
                     let slope = self.ms.first().copied().unwrap_or(0.0);
                     let dx = x - x0;
                     values.first().copied().unwrap_or(f64::NAN) + slope * dx
                 }
-                _ => f64::NAN,
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => values.last().copied().unwrap_or(f64::NAN),
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => values.last().copied().unwrap_or(f64::NAN),
+                Extension::FlatForward => {
                     let x_last = knots.last().copied().unwrap_or(0.0);
                     let slope = self.ms.last().copied().unwrap_or(0.0);
                     let dx = x - x_last;
                     values.last().copied().unwrap_or(f64::NAN) + slope * dx
                 }
-                _ => f64::NAN,
             },
         ) {
             return val;
@@ -591,25 +543,19 @@ impl InterpolationStrategy for CubicHermiteStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => self.ms[0],
-                _ => f64::NAN,
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => self.ms[0],
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => self.ms[self.ms.len() - 1],
-                _ => f64::NAN,
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => self.ms[self.ms.len() - 1],
             },
         ) {
             return val;
@@ -773,19 +719,15 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => values.first().copied().unwrap_or(f64::NAN),
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => values.first().copied().unwrap_or(f64::NAN),
+                Extension::FlatForward => {
                     // Extrapolate using f[0] as constant forward rate
                     let dt = x - knots[0];
                     let f0 = self.f.first().copied().unwrap_or(0.0);
@@ -793,11 +735,10 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
                     let extra_integral = f0 * dt;
                     (-(log_df0 + extra_integral)).exp()
                 }
-                _ => f64::NAN,
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => values.last().copied().unwrap_or(f64::NAN),
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => values.last().copied().unwrap_or(f64::NAN),
+                Extension::FlatForward => {
                     // Extrapolate using f[n-1] as constant forward rate
                     let x_last = knots.last().copied().unwrap_or(0.0);
                     let dt = x - x_last;
@@ -806,7 +747,6 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
                     let extra_integral = f_last * dt;
                     (-(log_df_last + extra_integral)).exp()
                 }
-                _ => f64::NAN,
             },
         ) {
             return val;
@@ -823,37 +763,31 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         _values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::check_extrapolation;
-
-        if !x.is_finite() {
-            return f64::NAN;
-        }
+        use super::utils::{check_extrapolation, Extension};
 
         if let Some(val) = check_extrapolation(
             x,
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => {
                     // d/dx[DF] = -f * DF for constant forward rate
                     let dt = x - knots[0];
                     let extra_integral = self.f[0] * dt;
                     let df = (-(self.log_df[0] + extra_integral)).exp();
                     -self.f[0] * df
                 }
-                _ => f64::NAN,
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => {
+                Extension::FlatZero => 0.0,
+                Extension::FlatForward => {
                     let n = knots.len();
                     let dt = x - knots[n - 1];
                     let extra_integral = self.f[n - 1] * dt;
                     let df = (-(self.log_df[n - 1] + extra_integral)).exp();
                     -self.f[n - 1] * df
                 }
-                _ => f64::NAN,
             },
         ) {
             return val;

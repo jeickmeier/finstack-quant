@@ -6,13 +6,27 @@
 use super::types::ExtrapolationPolicy;
 use crate::InputError;
 
+/// Extension rule applied outside the knot range.
+///
+/// [`check_extrapolation`] resolves [`ExtrapolationPolicy::None`] to `NaN`
+/// before any rule runs, so the rules only ever see the two flat extensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Extension {
+    /// Hold the boundary value constant.
+    FlatZero,
+    /// Extend the boundary slope.
+    FlatForward,
+}
+
 /// Helper to check and apply extrapolation if x is out of bounds.
 ///
-/// If `x` is before the first knot, calls `on_left`.
-/// If `x` is after the last knot, calls `on_right`.
-/// Otherwise returns `None`.
+/// A non-finite `x` returns `NaN` before any knot checks, so interpolators
+/// do not repeat the finiteness check. If `x` is before the first knot, calls
+/// `on_left` with the extension rule; if `x` is after the last knot, calls
+/// `on_right`. [`ExtrapolationPolicy::None`] returns `NaN` for out-of-range
+/// `x` without calling either closure. Otherwise returns `None`.
 #[inline]
-pub(crate) fn check_extrapolation<F1, F2>(
+pub(super) fn check_extrapolation<F1, F2>(
     x: f64,
     knots: &[f64],
     extrapolation: ExtrapolationPolicy,
@@ -20,32 +34,42 @@ pub(crate) fn check_extrapolation<F1, F2>(
     on_right: F2,
 ) -> Option<f64>
 where
-    F1: FnOnce(ExtrapolationPolicy) -> f64,
-    F2: FnOnce(ExtrapolationPolicy) -> f64,
+    F1: FnOnce(Extension) -> f64,
+    F2: FnOnce(Extension) -> f64,
 {
+    if !x.is_finite() {
+        return Some(f64::NAN);
+    }
+
     if knots.is_empty() {
         return None;
     }
 
     // Left extrapolation
     if x < knots[0] {
-        return match extrapolation {
-            ExtrapolationPolicy::None => Some(f64::NAN),
-            _ => Some(on_left(extrapolation)),
-        };
+        return Some(apply_extension(extrapolation, on_left));
     }
 
     // Right extrapolation
     if let Some(&last_knot) = knots.last() {
         if x > last_knot {
-            return match extrapolation {
-                ExtrapolationPolicy::None => Some(f64::NAN),
-                _ => Some(on_right(extrapolation)),
-            };
+            return Some(apply_extension(extrapolation, on_right));
         }
     }
 
     None
+}
+
+/// Resolve an out-of-range policy: `None` is `NaN`, the flat rules call `on_flat`.
+fn apply_extension<F>(policy: ExtrapolationPolicy, on_flat: F) -> f64
+where
+    F: FnOnce(Extension) -> f64,
+{
+    match policy {
+        ExtrapolationPolicy::None => f64::NAN,
+        ExtrapolationPolicy::FlatZero => on_flat(Extension::FlatZero),
+        ExtrapolationPolicy::FlatForward => on_flat(Extension::FlatForward),
+    }
 }
 
 /// Validate a finite, strictly increasing interpolation knot axis.
