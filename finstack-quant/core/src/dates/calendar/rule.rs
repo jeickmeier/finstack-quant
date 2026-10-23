@@ -644,6 +644,38 @@ impl Rule {
 }
 
 impl Rule {
+    /// Append the dates in `year` that this rule marks as holidays into `out`.
+    ///
+    /// Observance and spans can place a holiday in a neighbouring year's
+    /// materialization, so every base year that can reach `year` is evaluated and
+    /// only the dates landing in `year` are kept. `Effective` gates on `year`,
+    /// the date's own year. No deduplication is performed.
+    #[cfg(test)]
+    pub(crate) fn dates_in_year<A: smallvec::Array<Item = Date>>(
+        &self,
+        year: i32,
+        out: &mut smallvec::SmallVec<A>,
+    ) {
+        if let Rule::Effective {
+            from_year,
+            to_year,
+            inner,
+        } = self
+        {
+            if year_in_effective_range(year, *from_year, *to_year) {
+                inner.dates_in_year(year, out);
+            }
+            return;
+        }
+        let mut candidates = smallvec::SmallVec::<[Date; 64]>::new();
+        for base in [year - 1, year, year + 1] {
+            self.materialize_year(base, &mut candidates);
+        }
+        out.extend(candidates.into_iter().filter(|date| date.year() == year));
+    }
+}
+
+impl Rule {
     /// Append all dates in `year` that this rule marks as a holiday into `out`.
     /// No deduplication is performed.
     pub fn materialize_year<A: smallvec::Array<Item = Date>>(
