@@ -42,30 +42,21 @@ fn format_with_default_matches_display() {
 #[test]
 fn format_with_controls_grouping_and_currency() {
     let amt = Money::new(1_042_315.67, Currency::USD).expect("valid money fixture");
-    let via_opts = amt.format_with(FormatOpts {
-        decimals: Some(2),
-        show_currency: true,
-        group: None,
-        rounding: Default::default(),
-    });
+    let via_opts = amt.format_with(
+        FormatOpts::new(Some(2), Some(true), None, None).expect("valid format options"),
+    );
     assert_eq!(via_opts, "USD 1042315.67");
 
-    let no_currency = amt.format_with(FormatOpts {
-        decimals: Some(2),
-        show_currency: false,
-        group: None,
-        rounding: Default::default(),
-    });
+    let no_currency = amt.format_with(
+        FormatOpts::new(Some(2), Some(false), None, None).expect("valid format options"),
+    );
     assert_eq!(no_currency, "1042315.67");
 }
 
 #[test]
 fn format_with_handles_negative_amounts() {
     let amt = Money::new(-1_234.5, Currency::USD).expect("valid money fixture");
-    let grouped = FormatOpts {
-        group: Some(','),
-        ..FormatOpts::default()
-    };
+    let grouped = FormatOpts::new(None, None, Some(","), None).expect("valid format options");
     assert_eq!(amt.format_with(grouped), "USD -1,234.50");
 }
 

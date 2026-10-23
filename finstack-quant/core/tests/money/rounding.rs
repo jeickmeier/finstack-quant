@@ -19,12 +19,15 @@ fn money_preserves_nonzero_amount_at_maximum_configured_scale() {
     let money = Money::from_decimal_with_config(exact_amount, Currency::USD, &cfg);
     assert_eq!(money.amount_decimal(), exact_amount);
     assert_eq!(
-        money.format_with(FormatOpts {
-            decimals: Some(cfg.output_scale(Currency::USD) as usize),
-            show_currency: true,
-            group: None,
-            rounding: cfg.rounding.mode,
-        }),
+        money.format_with(
+            FormatOpts::new(
+                Some(cfg.output_scale(Currency::USD) as usize),
+                Some(true),
+                None,
+                Some(cfg.rounding.mode),
+            )
+            .expect("valid format options")
+        ),
         "USD 0.0000000000000000000000000001"
     );
     assert!(
@@ -50,12 +53,15 @@ fn money_display_respects_output_scale() {
     cfg.rounding.output_scale =
         CurrencyScalePolicy::new(std::collections::BTreeMap::from([(Currency::USD, 3)]))
             .expect("supported decimal scale");
-    let s = m.format_with(FormatOpts {
-        decimals: Some(cfg.output_scale(Currency::USD) as usize),
-        show_currency: true,
-        group: None,
-        rounding: cfg.rounding.mode,
-    });
+    let s = m.format_with(
+        FormatOpts::new(
+            Some(cfg.output_scale(Currency::USD) as usize),
+            Some(true),
+            None,
+            Some(cfg.rounding.mode),
+        )
+        .expect("valid format options"),
+    );
     assert_eq!(s, "USD 1.235");
 }
 
