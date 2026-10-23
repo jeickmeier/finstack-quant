@@ -850,6 +850,10 @@ export type DynamicRecoveryModel =
       };
     };
 /**
+ * Finite JSON number greater than or equal to zero.
+ */
+export type NonNegativeF64Wire = number;
+/**
  * Map from leverage to hazard rate.
  */
 export type LeverageHazardMap =
@@ -924,44 +928,44 @@ export type FbmSpec =
 export type LatentFactorSpec =
   | {
       /**
-       * Mean reversion speed (0 = random walk)
+       * Finite non-negative mean-reversion speed per year.
        */
-      mean_reversion: number;
+      mean_reversion: NonNegativeF64Wire;
       type: "single_factor";
       /**
-       * Factor volatility (std dev of innovations)
+       * Finite non-negative decimal factor volatility.
        */
-      volatility: number;
+      volatility: NonNegativeF64Wire;
     }
   | {
       /**
-       * Correlation between prepayment and credit factors
+       * Gaussian correlation in [-1, 1], including endpoints.
        */
-      correlation: number;
+      correlation: CorrelationWire;
       /**
-       * Credit factor volatility
+       * Finite non-negative decimal credit-factor volatility.
        */
-      credit_vol: number;
+      credit_vol: NonNegativeF64Wire;
       /**
-       * Prepayment factor volatility
+       * Finite non-negative decimal prepayment-factor volatility.
        */
-      prepay_vol: number;
+      prepay_vol: NonNegativeF64Wire;
       type: "two_factor";
     }
   | {
       /**
-       * Correlation matrix (flattened row-major)
+       * Row-major square Gaussian correlation matrix with entries in [-1, 1].
        */
-      correlations: number[];
+      correlations: CorrelationWire[];
       /**
-       * Number of factors
+       * Positive number of factors.
        */
       num_factors: number;
       type: "multi_factor";
       /**
-       * Factor volatilities
+       * One finite non-negative decimal volatility per factor.
        */
-      volatilities: number[];
+      volatilities: NonNegativeF64Wire[];
     };
 /**
  * How [`LiquidityProfile::spread_volatility`] should be interpreted.
@@ -1101,10 +1105,6 @@ export type NonFiniteF64Wire = number | NonFiniteSentinel;
  * Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
  */
 export type NonFiniteSentinel = "inf" | "-inf" | "nan";
-/**
- * Finite JSON number greater than or equal to zero.
- */
-export type NonNegativeF64Wire = number;
 /**
  * Option payoff direction used by analytical and numerical model engines.
  */
@@ -1533,12 +1533,12 @@ export type PrepaymentModelSpec =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
-      factor_correlation: number;
-      mean_recovery: number;
+      factor_correlation: CorrelationWire;
+      mean_recovery: ClosedUnitIntervalF64Wire;
       recovery_volatility: number;
       type: "market_correlated";
     };
@@ -2667,11 +2667,7 @@ export interface IssuerTags {
  * at the time of default.
  */
 export interface CreditConversionFactor {
-  /**
-   * CCF value in \[0, 1\]. Basel IRB: typically 0.75 for revolvers.
-   */
-  ccf: number;
-  [k: string]: unknown;
+  ccf: ClosedUnitIntervalF64Wire;
 }
 /**
  * One name in a finite credit portfolio.
@@ -3346,19 +3342,9 @@ export interface DynamicRecoverySpec {
  * Exposure at Default calculator.
  */
 export interface EadCalculator {
-  /**
-   * Credit conversion factor for the undrawn portion.
-   */
   ccf: CreditConversionFactor;
-  /**
-   * Currently drawn amount.
-   */
-  drawn: number;
-  /**
-   * Undrawn (available) commitment.
-   */
-  undrawn: number;
-  [k: string]: unknown;
+  drawn: NonNegativeF64Wire;
+  undrawn: NonNegativeF64Wire;
 }
 /**
  * Specification for endogenous (leverage-dependent) hazard rate.

@@ -405,7 +405,7 @@ pub fn simulate_portfolio_loss(
     config: &PortfolioLossConfig,
     recovery: Option<&RecoverySpec>,
 ) -> Result<PortfolioLossResult> {
-    let recovery = recovery.map(RecoverySpec::build);
+    let recovery = recovery.map(RecoverySpec::build).transpose()?;
     simulate(exposures, config, recovery.as_deref())
 }
 

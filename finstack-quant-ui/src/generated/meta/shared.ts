@@ -26567,7 +26567,8 @@ export default [
   {
     "path": "#/$defs/RecoverySpec/oneOf/0/properties/rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/0/properties/rate",
-    "format": "double"
+    "ref": "#/$defs/ClosedUnitIntervalF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClosedUnitIntervalF64Wire"
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/0/properties/type",
@@ -26581,17 +26582,21 @@ export default [
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/factor_correlation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/1/properties/factor_correlation",
-    "format": "double"
+    "ref": "#/$defs/CorrelationWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CorrelationWire"
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/mean_recovery",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/1/properties/mean_recovery",
-    "format": "double"
+    "ref": "#/$defs/ClosedUnitIntervalF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClosedUnitIntervalF64Wire"
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
-    "format": "double"
+    "format": "double",
+    "maximum": 0.5,
+    "minimum": 0
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/type",

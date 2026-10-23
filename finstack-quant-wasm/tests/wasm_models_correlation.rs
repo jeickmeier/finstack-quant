@@ -153,7 +153,7 @@ fn wasm_copula_from_gaussian_spec() {
 fn wasm_recovery_spec_and_model() {
     let c = JsRecoverySpec::constant(JsValue::from(0.4)).expect("0.4 is a valid recovery rate");
     assert!((c.expected_recovery() - 0.4).abs() < 1e-12);
-    let m = c.build();
+    let m = c.build().expect("valid constant recovery");
     assert!((m.expected_recovery() - 0.4).abs() < 1e-12);
     assert!((m.conditional_recovery(JsValue::from(0.0)).unwrap() - 0.4).abs() < 1e-12);
     assert!((m.lgd() - 0.6).abs() < 1e-12);
@@ -166,7 +166,8 @@ fn wasm_recovery_spec_and_model() {
         JsValue::from(0.3),
     )
     .expect("valid market-correlated spec")
-    .build();
+    .build()
+    .expect("valid market-correlated recovery");
     assert!(mc.is_stochastic());
     assert!(mc.recovery_volatility() > 0.0);
     assert!(
@@ -177,7 +178,10 @@ fn wasm_recovery_spec_and_model() {
         "conditional_lgd must complement conditional_recovery"
     );
 
-    let std = JsRecoverySpec::market_standard_stochastic().build();
+    let std = JsRecoverySpec::market_standard_stochastic()
+        .expect("valid standard spec")
+        .build()
+        .expect("valid standard recovery");
     assert!(std.is_stochastic());
     assert!((std.recovery_volatility() - 0.25).abs() < 1e-12);
 }

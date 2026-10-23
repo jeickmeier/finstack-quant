@@ -10425,7 +10425,8 @@ export interface RecoverySpec extends WasmOwned {
   readonly expectedRecovery: number;
   /**
    * Build a concrete recovery model from this specification.
-   * @returns A concrete `RecoveryModel` handle.
+   * @returns The validated recovery-model handle.
+   * @throws Error - Throws a `validation` error for invalid recovery inputs, or a `computation` error if expected-recovery integration fails.
    */
   build(): RecoveryModel;
   /**
@@ -10468,9 +10469,9 @@ export interface RecoverySpecConstructor {
    * `correlation` are not finite.
    * @returns A `RecoverySpec` handle for deferred construction.
    * @param mean - Mean recovery rate expressed as a fraction from 0 through 1.
-   * @param vol - Recovery-rate volatility; finite values are clamped to `[0, 0.5]`.
-   * @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are clamped.
-   * @throws Error - Throws a JavaScript exception if `mean` is not finite or lies outside `[0, 1]`, or if `vol` or `correlation` is non-finite. Finite volatility and correlation inputs are clamped to their supported ranges.
+   * @param vol - Recovery-rate volatility; finite and in `[0, 0.5]`.
+   * @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are rejected.
+   * @throws Error - Throws a JavaScript exception if `mean` is not finite or lies outside `[0, 1]`, or if `vol` or `correlation` is non-finite or outside its supported range.
    */
   marketCorrelated(mean: number, vol: number, correlation: number): RecoverySpec;
   /**
@@ -10745,7 +10746,7 @@ export interface LatentFactorSpec extends WasmOwned {
   /**
    * Build the concrete latent-factor model.
    * @returns The `LatentFactorKind` handle.
-   * @throws Error - Throws a `validation` error if a multi-factor specification has an invalid correlation matrix or volatility vector.
+   * @throws Error - Throws a `validation` error if the specification contains an invalid volatility, mean-reversion speed, correlation, count or matrix.
    */
   build(): LatentFactorKind;
   /**
@@ -10775,7 +10776,7 @@ export interface LatentFactorSpecConstructor {
    * @param volatility - Annualized factor volatility as a decimal; non-negative.
    * @param meanReversion - Mean-reversion speed per year; non-negative.
    * @returns The single-factor specification.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   singleFactor(volatility: number, meanReversion: number): LatentFactorSpec;
   /**
@@ -10784,7 +10785,7 @@ export interface LatentFactorSpecConstructor {
    * @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
    * @param correlation - Correlation between the two factors, from -1 through 1.
    * @returns The two-factor specification.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   twoFactor(prepayVol: number, creditVol: number, correlation: number): LatentFactorSpec;
 }
@@ -10845,10 +10846,10 @@ export interface LatentMultiFactorConstructor {
   ): LatentMultiFactor;
   /**
    * Model with independent factors (identity correlation).
-   * @param numFactors - Number of systematic factors; a non-negative safe integer, with zero resolving to one.
+   * @param numFactors - Positive number of systematic factors; zero is rejected.
    * @param volatilities - Annualized factor volatilities, one per factor; must be finite, non-negative and match the factor count.
    * @returns The uncorrelated multi-factor model.
-   * @throws Error - Throws a `TypeError` if `numFactors` is not a safe non-negative integer or `volatilities` is not an array of numbers. Throws a validation error for a length mismatch, negative or non-finite volatility.
+   * @throws Error - Throws a `TypeError` if `numFactors` is not a safe non-negative integer or `volatilities` is not an array of numbers. Throws a validation error for a zero factor count, a length mismatch, or negative or non-finite volatility.
    */
   uncorrelated(numFactors: number, volatilities: NumericArray): LatentMultiFactor;
 }
@@ -10892,7 +10893,7 @@ export interface LatentSingleFactorConstructor {
    * @returns Returns a `LatentSingleFactor` handle.
    * @param volatility - Annualized factor volatility as a decimal; non-negative.
    * @param meanReversion - Mean-reversion speed per year; non-negative.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   new (volatility: number, meanReversion: number): LatentSingleFactor;
 }
@@ -10949,7 +10950,7 @@ export interface LatentTwoFactorConstructor {
    * @param prepayVol - Annualized prepayment-factor volatility as a decimal; non-negative.
    * @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
    * @param correlation - Correlation between the two factors, from -1 through 1.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   new (prepayVol: number, creditVol: number, correlation: number): LatentTwoFactor;
   /**

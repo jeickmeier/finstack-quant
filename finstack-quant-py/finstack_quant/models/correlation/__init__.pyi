@@ -1423,11 +1423,11 @@ class RecoverySpec:
         Parameters
         ----------
         mean : float
-            Expected recovery rate.
+            Finite zero-factor recovery location in ``[0, 1]``; endpoints are constant.
         vol : float
-            Recovery rate volatility.
+            Finite recovery volatility scale in ``[0, 0.5]``.
         correlation : float
-            Correlation with market factor.
+            Finite Gaussian correlation with the market factor in ``[-1, 1]``.
 
         Returns
         -------
@@ -1438,8 +1438,8 @@ class RecoverySpec:
         ------
         ValueError
             If ``mean`` is non-finite or outside ``[0, 1]``, or if ``vol`` or
-            ``correlation`` is non-finite. Finite volatility and correlation
-            values are clamped to their supported ranges.
+            ``correlation`` is non-finite, ``vol`` lies outside ``[0, 0.5]``,
+            or ``correlation`` lies outside ``[-1, 1]``.
 
         Examples
         --------
@@ -1508,9 +1508,12 @@ class RecoverySpec:
         RecoveryModel
             Concrete recovery model.
 
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If a recovery parameter is non-finite or outside its documented range.
+        RuntimeError
+            If numerical integration of expected recovery fails to converge.
         """
         ...
 
@@ -1737,18 +1740,19 @@ class LatentFactorSpec:
         Parameters
         ----------
         volatility : float
-            Annualized volatility of the single latent factor.
+            Finite, non-negative decimal volatility of the single latent factor; no upper cap.
         mean_reversion : float
-            Mean-reversion speed of the single latent factor, per year.
+            Finite, non-negative mean-reversion speed per year; no upper cap.
 
         Returns
         -------
         LatentFactorSpec
             Single-factor specification.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If the volatility or mean-reversion speed is negative or non-finite.
 
         Examples
         --------
@@ -1767,20 +1771,22 @@ class LatentFactorSpec:
         Parameters
         ----------
         prepay_vol : float
-            Prepayment factor volatility.
+            Finite, non-negative decimal prepayment-factor volatility.
         credit_vol : float
-            Credit factor volatility.
+            Finite, non-negative decimal credit-factor volatility.
         correlation : float
-            Inter-factor correlation.
+            Finite Gaussian inter-factor correlation in ``[-1, 1]``, including endpoints.
 
         Returns
         -------
         LatentFactorSpec
             Two-factor specification.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If either volatility is negative or non-finite, or the correlation is
+            non-finite or outside ``[-1, 1]``.
 
         Examples
         --------
@@ -1968,25 +1974,26 @@ class LatentSingleFactor:
         Parameters
         ----------
         volatility : float
-            Annualized volatility of the single latent factor.
+            Finite, non-negative decimal volatility of the single latent factor; no upper cap.
         mean_reversion : float
-            Mean-reversion speed of the single latent factor, per year.
+            Finite, non-negative mean-reversion speed per year; no upper cap.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        ValueError
+            If a volatility or mean-reversion speed is negative or non-finite.
         """
         ...
 
     @property
     def volatility(self) -> float:
         """
-        Annualized volatility of the single latent factor.
+        Finite, non-negative decimal volatility of the single latent factor; no upper cap.
 
         Returns
         -------
         float
-            Annualized volatility of the single latent factor.
+            Finite, non-negative decimal volatility of the single latent factor; no upper cap.
 
         Notes
         -----
@@ -1997,12 +2004,12 @@ class LatentSingleFactor:
     @property
     def mean_reversion(self) -> float:
         """
-        Mean-reversion speed of the single latent factor, per year.
+        Finite, non-negative mean-reversion speed per year; no upper cap.
 
         Returns
         -------
         float
-            Mean-reversion speed of the single latent factor, per year.
+            Finite, non-negative mean-reversion speed per year; no upper cap.
 
         Notes
         -----
@@ -2053,15 +2060,17 @@ class LatentTwoFactor:
         Parameters
         ----------
         prepay_vol : float
-            Prepayment factor volatility.
+            Finite, non-negative decimal prepayment-factor volatility.
         credit_vol : float
-            Credit factor volatility.
+            Finite, non-negative decimal credit-factor volatility.
         correlation : float
-            Inter-factor correlation.
+            Finite Gaussian inter-factor correlation in ``[-1, 1]``, including endpoints.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        ValueError
+            If either volatility is negative or non-finite, or correlation is
+            non-finite or outside ``[-1, 1]``.
         """
         ...
 
@@ -2114,12 +2123,12 @@ class LatentTwoFactor:
     @property
     def prepay_vol(self) -> float:
         """
-        Prepayment factor volatility.
+        Finite, non-negative decimal prepayment-factor volatility.
 
         Returns
         -------
         float
-            Prepayment factor volatility.
+            Finite, non-negative decimal prepayment-factor volatility.
 
         Notes
         -----
@@ -2130,12 +2139,12 @@ class LatentTwoFactor:
     @property
     def credit_vol(self) -> float:
         """
-        Credit factor volatility.
+        Finite, non-negative decimal credit-factor volatility.
 
         Returns
         -------
         float
-            Credit factor volatility.
+            Finite, non-negative decimal credit-factor volatility.
 
         Notes
         -----
@@ -2264,10 +2273,10 @@ class LatentMultiFactor:
         Parameters
         ----------
         num_factors : int
-            Count of latent factors; zero resolves to one.
+            Positive count of latent factors; zero is rejected.
         volatilities : list[float]
-            One finite, non-negative decimal volatility per factor; valid values
-            are clamped to ``[0.01, 10.0]``.
+            One finite, non-negative decimal volatility per factor; zero and large
+            finite values are preserved without an upper cap.
 
         Returns
         -------

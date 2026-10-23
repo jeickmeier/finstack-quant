@@ -2565,15 +2565,29 @@ export type PrepaymentModelSpec3 =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
-      factor_correlation: number;
-      mean_recovery: number;
+      factor_correlation: CorrelationWire;
+      mean_recovery: ClosedUnitIntervalF64Wire;
       recovery_volatility: number;
       type: "market_correlated";
     };
+/**
+ * Finite JSON number in the closed interval `[0, 1]`.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "ClosedUnitIntervalF64Wire".
+ */
+export type ClosedUnitIntervalF64Wire = number;
+/**
+ * Finite correlation coefficient in the closed interval `[-1, 1]`.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "CorrelationWire".
+ */
+export type CorrelationWire = number;
 /**
  * Asset type classification for pool composition (flattened hierarchy)
  *
@@ -13925,13 +13939,6 @@ export type ClearingStatus =
  */
 export type CliquetPayoffType = "additive" | "multiplicative";
 /**
- * Finite JSON number in the closed interval `[0, 1]`.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "ClosedUnitIntervalF64Wire".
- */
-export type ClosedUnitIntervalF64Wire = number;
-/**
  * CMO tranche type enumeration.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -14108,13 +14115,6 @@ export type CopulaSpec =
   | {
       type: "multi_factor";
     };
-/**
- * Finite correlation coefficient in the closed interval `[-1, 1]`.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "CorrelationWire".
- */
-export type CorrelationWire = number;
 /**
  * Coupon cashflow type for fixed/floating coupons.
  *
@@ -35490,7 +35490,7 @@ export interface SabrParameters {
    */
   alpha: number;
   /**
-   * CEV exponent (beta) - typically 0 to 1
+   * Finite JSON number in the closed interval `[0, 1]`.
    */
   beta: number;
   /**
@@ -35498,7 +35498,7 @@ export interface SabrParameters {
    */
   nu: number;
   /**
-   * Correlation between asset and volatility (rho)
+   * Finite correlation coefficient in the closed interval `[-1, 1]`.
    */
   rho: number;
   /**
@@ -46112,7 +46112,7 @@ export interface Tenor21 {
 export interface CommoditySpreadOption {
   attributes?: Attributes55;
   /**
-   * Correlation between the two commodity prices, in [-1, 1].
+   * Finite correlation coefficient in the closed interval `[-1, 1]`.
    */
   correlation: number;
   currency: Currency37;
@@ -47029,8 +47029,7 @@ export interface QuantoSpec {
   asset_currency: Currency39;
   asset_discount_curve_id: Id194;
   /**
-   * Correlation between the asset price and payoff-currency units per asset-currency unit.
-   * Must be in [-1, 1].
+   * Finite correlation coefficient in the closed interval `[-1, 1]`.
    */
   correlation: number;
   fx_spot_id: Id195;
@@ -48905,7 +48904,7 @@ export interface ScenarioPricingOverrides65 {
 export interface CmsSpreadOption {
   attributes: Attributes67;
   /**
-   * Gaussian-copula correlation between the two CMS rates, a decimal in `[-1, 1]`.
+   * Finite correlation coefficient in the closed interval `[-1, 1]`.
    */
   correlation: number;
   day_count: DayCount51;

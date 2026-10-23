@@ -1847,7 +1847,8 @@ mod tests {
         let market = MarketContext::new().insert((*test_discount_curve()).clone());
         let price_with_kappa = |kappa: f64| {
             let mut tree_config = ScenarioTreeConfig::new(24);
-            tree_config.factor_spec = LatentFactorSpec::single_factor(1.0, kappa);
+            tree_config.factor_spec =
+                LatentFactorSpec::single_factor(1.0, kappa).expect("valid model inputs");
             tree_config.default_spec =
                 StochasticDefaultSpec::intensity_process(0.10, 1.0, 0.5, 0.8);
             let config = StochasticPricerConfig::new(
@@ -1887,7 +1888,8 @@ mod tests {
     fn mc_engine_defaults_and_recoveries_co_move_negatively() {
         let mut rmbs = ScenarioTreeConfig::new(24);
         rmbs.default_spec = rmbs_default_spec();
-        rmbs.recovery_spec = RecoverySpec::market_standard_stochastic();
+        rmbs.recovery_spec =
+            RecoverySpec::market_standard_stochastic().expect("valid model inputs");
 
         let mut clo = ScenarioTreeConfig::new(24);
         clo.default_spec = clo_default_spec();
@@ -2526,7 +2528,8 @@ mod per_name_copula_tests {
     #[test]
     fn zero_correlation_is_independent_not_shared() {
         let mut two = copula_config(0.06, 0.20, 12, PoolGranularity::PerName, 16);
-        two.tree_config.factor_spec = LatentFactorSpec::two_factor(0.20, 0.25, 0.0);
+        two.tree_config.factor_spec =
+            LatentFactorSpec::two_factor(0.20, 0.25, 0.0).expect("valid model inputs");
         assert_eq!(
             StochasticPricer::new(two)
                 .factor_correlation()
@@ -2570,7 +2573,8 @@ mod per_name_copula_tests {
         const PATHS: usize = 20_000;
 
         let mut cfg = copula_config(0.06, 0.20, 12, PoolGranularity::PerName, 16);
-        cfg.tree_config.factor_spec = LatentFactorSpec::two_factor(0.20, 0.25, RHO);
+        cfg.tree_config.factor_spec =
+            LatentFactorSpec::two_factor(0.20, 0.25, RHO).expect("valid model inputs");
         let pricer = StochasticPricer::new(cfg);
 
         let rho = pricer
@@ -2649,7 +2653,8 @@ mod per_name_copula_tests {
                 .sum()
         };
 
-        let two_factor = smm_for(LatentFactorSpec::two_factor(0.20, 0.25, RHO));
+        let two_factor =
+            smm_for(LatentFactorSpec::two_factor(0.20, 0.25, RHO).expect("valid model inputs"));
         let single_factor = smm_for(LatentFactorSpec::SingleFactor {
             volatility: 1.0,
             mean_reversion: 0.0,
@@ -2672,7 +2677,8 @@ mod per_name_copula_tests {
     #[test]
     fn antithetic_pair_prepayment_factors_sum_to_zero() {
         let mut cfg = copula_config(0.06, 0.20, 12, PoolGranularity::PerName, 16);
-        cfg.tree_config.factor_spec = LatentFactorSpec::two_factor(0.20, 0.25, -0.30);
+        cfg.tree_config.factor_spec =
+            LatentFactorSpec::two_factor(0.20, 0.25, -0.30).expect("valid model inputs");
         let pricer = StochasticPricer::new(cfg);
         let prepared = pricer
             .prepare_run(&clo_deal(10), &MarketContext::new())

@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/ead_calculator.schema.json",
-      "bytes": 1232,
+      "bytes": 1406,
       "kind": "component",
       "path": "schemas/models/1/ead_calculator.schema.json",
       "summary": "Exposure at Default calculator.",
@@ -371,7 +371,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/latent_factor_spec.schema.json",
-      "bytes": 2779,
+      "bytes": 3052,
       "kind": "input",
       "path": "schemas/models/1/latent_factor_spec.schema.json",
       "summary": "Factor model specification for configuration and serialization.",
@@ -650,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/recovery_spec.schema.json",
-      "bytes": 1237,
+      "bytes": 1713,
       "kind": "input",
       "path": "schemas/models/1/recovery_spec.schema.json",
       "summary": "Recovery model specification for configuration and serialization.",

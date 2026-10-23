@@ -127,3 +127,68 @@ def test_pca_has_no_host_only_free_twins_or_invented_component_count() -> None:
     assert pca.truncated(4).num_components == 4
     two_tenor = [row[:2] for row in changes]
     assert dtsm.YieldPca.fit_yield_changes(two_tenor).truncated(2).num_components == 2
+
+
+def test_factor_construction_preserves_valid_inputs_and_rejects_invalid_values() -> None:
+    for vol in [0.0, 0.001, 3.0]:
+        model = correlation.LatentSingleFactor(vol, 20.0)
+        assert (model.volatility, model.mean_reversion) == (vol, 20.0)
+        spec = correlation.LatentFactorSpec.single_factor(vol, 20.0)
+        assert list(spec.build().volatilities) == [vol]
+        multi = correlation.LatentMultiFactor.uncorrelated(1, [vol])
+        assert list(multi.volatilities) == [vol]
+    for rho in [-1.0, 1.0]:
+        model = correlation.LatentTwoFactor(0.0, 3.0, rho)
+        assert (model.prepay_vol, model.credit_vol, model.correlation) == (0.0, 3.0, rho)
+        assert model.cholesky_l11 == 0.0
+    for bad in [-0.1, float("nan"), float("inf"), -float("inf")]:
+        for construct in [correlation.LatentSingleFactor, correlation.LatentFactorSpec.single_factor]:
+            with pytest.raises(
+                ValueError, match=r"finite|volatility|correlation|factor|Volatility|Correlation|Invalid"
+            ):
+                construct(bad, 0.0)
+            with pytest.raises(
+                ValueError, match=r"finite|volatility|correlation|factor|Volatility|Correlation|Invalid"
+            ):
+                construct(0.0, bad)
+    for bad in [-1.1, 1.1, float("nan"), float("inf")]:
+        for construct in [correlation.LatentTwoFactor, correlation.LatentFactorSpec.two_factor]:
+            with pytest.raises(
+                ValueError, match=r"finite|volatility|correlation|factor|Volatility|Correlation|Invalid"
+            ):
+                construct(0.2, 0.3, bad)
+
+
+def test_recovery_construction_and_json_share_strict_bounds() -> None:
+    for mean, vol, rho in [
+        (-0.1, 0.2, 0.4),
+        (1.1, 0.2, 0.4),
+        (0.4, -0.1, 0.4),
+        (0.4, 0.6, 0.4),
+        (0.4, 0.2, -1.1),
+        (0.4, 0.2, 1.1),
+    ]:
+        with pytest.raises(ValueError, match=r"recovery|Recovery"):
+            correlation.RecoverySpec.market_correlated(mean, vol, rho)
+    for rho in [-1.0, 1.0]:
+        spec = correlation.RecoverySpec.market_correlated(0.4, 0.5, rho)
+        assert correlation.RecoverySpec.from_json(spec.to_json()) == spec
+        assert 0.0 <= spec.build().expected_recovery <= 1.0
+    with pytest.raises(ValueError, match=r"recovery|Recovery"):
+        correlation.RecoverySpec.from_json(
+            '{"type":"market_correlated","mean_recovery":0.4,"recovery_volatility":0.6,"factor_correlation":0.4}'
+        )
+
+
+def test_exposure_json_cannot_bypass_checked_construction() -> None:
+    from finstack_quant.models.credit import lgd
+
+    for wire in [
+        '{"drawn":-1,"undrawn":2,"ccf":{"ccf":0.75}}',
+        '{"drawn":1,"undrawn":-2,"ccf":{"ccf":0.75}}',
+        '{"drawn":1,"undrawn":2,"ccf":{"ccf":1.1}}',
+    ]:
+        with pytest.raises(ValueError, match=r"negative|non-negative|conversion factor"):
+            lgd.EadCalculator.from_json(wire)
+    wire = '{"drawn":100,"undrawn":20,"ccf":{"ccf":0.75}}'
+    assert lgd.EadCalculator.from_json(wire).ead == 115.0
