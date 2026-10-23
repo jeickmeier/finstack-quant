@@ -416,7 +416,7 @@
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack-quant/analytics/src/benchmark.rs",
+      "path": "finstack-quant/analytics/src/multi_factor.rs",
       "category": "binding_default",
       "contains": "#[tracing::instrument(level = \"debug\", skip(returns, factors), fields(n = returns.len(), k = factors.len(), ann_factor = ann_factor))]",
       "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."

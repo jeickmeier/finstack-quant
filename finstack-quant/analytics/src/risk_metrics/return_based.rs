@@ -1018,7 +1018,8 @@ mod tests {
     /// through [`crate::performance::Performance`].
     mod fixture_tests {
         use super::{cagr_from_factor, sharpe, sortino};
-        use crate::benchmark::{multi_factor_greeks, rolling_greeks, ReturnKind};
+        use crate::benchmark::rolling_greeks;
+        use crate::multi_factor::{multi_factor_greeks, ReturnKind};
         use crate::risk_metrics::{expected_shortfall, value_at_risk};
         use finstack_quant_core::dates::Date;
         use serde::Deserialize;

@@ -63,7 +63,7 @@ Method families on `Performance`:
 | Panels and periods | [`performance/aggregation.rs`](src/performance/aggregation.rs) | `get_returns`, `cumulative_returns`, `excess_returns`, `correlation_matrix`, `periodic_returns`, `period_stats`, `lookback_returns`, `cumulative_returns_outperformance`, `drawdown_difference` |
 | Window and benchmark reset | [`performance/mod.rs`](src/performance/mod.rs) | `reset_date_range`, `reset_bench_ticker`, `get_active_dates`, `get_active_dates_for_ticker`, `get_returns_for_ticker` |
 
-The per-domain modules `aggregation`, `benchmark`, `defaults`, `drawdown`,
+The per-domain modules `aggregation`, `benchmark`, `defaults`, `drawdown`, `multi_factor`,
 `performance`, `returns`, and `risk_metrics` are `pub(crate)`;
 `regression` and `schema` (behind the default `json-schema` feature) are
 public. The crate root re-exports the result and config types `Performance`
@@ -78,7 +78,8 @@ below.
 | `LookbackReturns` | `performance` | `mtd` / `qtd` / `ytd` / `fytd`, one entry per ticker |
 | `PeriodStats` | `aggregation` | Best/worst, win rate, streaks, payoff and profit factors, CPC index |
 | `DrawdownEpisode` | `drawdown` | Returned by `Performance::drawdown_details` |
-| `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult`, `ReturnKind` | `benchmark` | Returned / consumed by benchmark methods |
+| `BetaResult`, `GreeksResult`, `RollingGreeks` | `benchmark` | Returned by benchmark methods |
+| `MultiFactorResult`, `ReturnKind` | `multi_factor` | Returned / consumed by `Performance::multi_factor_greeks` |
 | `CagrDayCount` | `risk_metrics` | Act/365.25 default or a wrapped core `DayCount` |
 | `DatedSeries` | `risk_metrics` | Returned by `Performance::rolling_*` |
 | `PeriodicReturn` | `aggregation` | `{date, value}` point returned by `Performance::periodic_returns` |
