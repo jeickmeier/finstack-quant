@@ -1796,3 +1796,40 @@ fn tiny_annual_zero_rate_avoids_subtractive_cancellation() {
         );
     }
 }
+
+// Moved from production_audit.rs: negative-rate stress and serde round trip.
+mod negative_rate_stress {
+    use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use time::macros::date;
+
+    #[test]
+    fn negative_rate_stress_keeps_mathematical_validation_and_roundtrips() {
+        let base = date!(2025 - 01 - 02);
+        let curve = DiscountCurve::builder("STRICT")
+            .base_date(base)
+            .knots([
+                (0.0, 1.0),
+                (1.0, (-0.01_f64).exp()),
+                (2.0, (-0.02_f64).exp()),
+            ])
+            .build()
+            .expect("positive-rate construction");
+        let shocked = curve
+            .apply_bump(BumpSpec::parallel_bp(-200.0))
+            .expect("negative-rate stress");
+        assert!((shocked.df(2.0) - 0.02_f64.exp()).abs() < 1e-12);
+        let roundtrip: DiscountCurve =
+            serde_json::from_str(&serde_json::to_string(&shocked).expect("serialize"))
+                .expect("stress roundtrip");
+        assert_eq!(roundtrip.df(2.0), shocked.df(2.0));
+        assert!(curve.apply_bump(BumpSpec::parallel_bp(f64::NAN)).is_err());
+        assert!(curve.apply_bump(BumpSpec::parallel_bp(-1e308)).is_err());
+        assert!((curve.df(2.0) - (-0.02_f64).exp()).abs() < 1e-12);
+        assert!(DiscountCurve::builder("STRICT")
+            .base_date(base)
+            .knots([(0.0, 1.0), (1.0, 1.01)])
+            .build()
+            .is_err());
+    }
+}

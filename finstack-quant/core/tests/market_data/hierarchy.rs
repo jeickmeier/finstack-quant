@@ -577,3 +577,30 @@ fn resolve_most_specific_wins_with_tag_filter() {
     assert!(ids.contains(&CurveId::from("SHARED-RATE")));
     assert!(ids.contains(&CurveId::from("USD-OIS")));
 }
+
+// Moved from phase2_strictness.rs: unknown raw hierarchy fields.
+mod strict_raw_fields {
+    use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
+
+    #[test]
+    fn market_hierarchy_rejects_unknown_raw_fields_recursively() {
+        let top_level = serde_json::json!({
+            "roots": {},
+            "__nonexistent__": true
+        });
+        let nested = serde_json::json!({
+            "roots": {
+                "Rates": {
+                    "curves": [],
+                    "__nonexistent__": true
+                }
+            }
+        });
+
+        for value in [top_level, nested] {
+            let error = serde_json::from_value::<MarketDataHierarchy>(value)
+                .expect_err("unknown raw hierarchy fields must fail");
+            assert!(error.to_string().contains("unknown field"), "{error}");
+        }
+    }
+}
