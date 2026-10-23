@@ -525,121 +525,15 @@ fn push_china_bridge_block<A: smallvec::Array<Item = Date>>(
     }
 }
 
-// Core implementation – applies()
 impl Rule {
     /// Returns `true` when the rule marks `date` a holiday.
-    #[inline]
+    ///
+    /// A membership test over [`Rule::dates_in_year`] for `date`'s year, so
+    /// every rule shape has one evaluator.
     pub fn applies(&self, date: Date) -> bool {
-        match self {
-            Rule::ExactDate { year, month, day } => {
-                Date::from_calendar_date(*year, *month, *day).ok() == Some(date)
-            }
-            Rule::Fixed {
-                month,
-                day,
-                observed,
-            } => {
-                // Observance can cross a year boundary: e.g. Jan-1-on-Saturday
-                // observed Friday Dec 31 of the PRIOR year under
-                // FriIfSatMonIfSun. Reconstructing the base only from
-                // `date.year()` made `applies()` diverge from
-                // `materialize_year()` for those dates (2026-06-09 core quant
-                // review, Moderate/Dates), so test the rule materialized from
-                // the adjacent years as well (observance shifts at most 2
-                // days, so ±1 year is sufficient).
-                //
-                // Fast path: the current year matches almost every query. An
-                // adjacent-year base can only land on `date` within 2 days of a
-                // year boundary, so skip those two date constructions otherwise.
-                let check = |y: i32| {
-                    Date::from_calendar_date(y, *month, *day)
-                        .ok()
-                        .map(|base| apply_observed(base, *observed) == date)
-                        .unwrap_or(false)
-                };
-                check(date.year())
-                    || (date.month() == time::Month::January
-                        && date.day() <= 2
-                        && check(date.year() - 1))
-                    || (date.month() == time::Month::December
-                        && date.day() >= 30
-                        && check(date.year() + 1))
-            }
-            Rule::NthWeekday { n, weekday, month } => {
-                // Month guard first: `nth_weekday_of_month` only ever returns a date
-                // inside `month`, so a query in any other month cannot match. This
-                // skips the computation for ~11/12 of queries without changing the
-                // answer.
-                date.month() == *month
-                    && crate::dates::calendar::algo::nth_weekday_of_month(
-                        date.year(),
-                        *month,
-                        *weekday,
-                        *n,
-                    ) == Some(date)
-            }
-            Rule::WeekdayShift {
-                weekday,
-                month,
-                day,
-                dir,
-            } => Date::from_calendar_date(date.year(), *month, *day)
-                .ok()
-                .map(|base| shift_to_weekday(base, *weekday, *dir) == date)
-                .unwrap_or(false),
-            Rule::EasterOffset(offset) => {
-                algo::easter_monday(date.year()).and_then(|easter_mon| {
-                    easter_mon.checked_add(Duration::days(i64::from(*offset)))
-                }) == Some(date)
-            }
-            Rule::Span { start, len, offset } => {
-                // Pre-compute start dates for this and previous year, then range-check.
-                // Previous year is needed for spans that cross year boundaries.
-                let y = date.year();
-                let mut starts = smallvec::SmallVec::<[Date; 64]>::new();
-                start.materialize_year(y, &mut starts);
-                if *len > 1 || *offset != 0 {
-                    start.materialize_year(y - 1, &mut starts);
-                }
-                let span_days = *len as i64;
-                for sd in starts {
-                    let base = sd + Duration::days(*offset as i64);
-                    if date >= base && date < base + Duration::days(span_days) {
-                        return true;
-                    }
-                }
-                false
-            }
-            Rule::ChineseNewYear => algo::cny_date(date.year()) == Some(date),
-            Rule::DragonBoat => algo::dragon_boat_date(date.year()) == Some(date),
-            Rule::MidAutumn => algo::mid_autumn_date(date.year()) == Some(date),
-            Rule::QingMing => algo::qing_ming_date(date.year()) == Some(date),
-            Rule::HongKongPublicHolidays | Rule::JapanPublicHolidays => {
-                let mut holidays = smallvec::SmallVec::<[Date; 32]>::new();
-                self.materialize_year(date.year(), &mut holidays);
-                holidays.contains(&date)
-            }
-            Rule::Effective {
-                from_year,
-                to_year,
-                inner,
-            } => year_in_effective_range(date.year(), *from_year, *to_year) && inner.applies(date),
-            Rule::ChinaBridge { festival } => {
-                // Compute the festival's bridge block for the current year and,
-                // when `date` is near a year boundary, the adjacent year (a
-                // Tuesday New Year's Day bridges back to the preceding Dec 31).
-                let mut block = smallvec::SmallVec::<[Date; 4]>::new();
-                let mut fdates = smallvec::SmallVec::<[Date; 2]>::new();
-                festival.materialize_year(date.year(), &mut fdates);
-                if date.month() == Month::December && date.day() >= 29 {
-                    festival.materialize_year(date.year() + 1, &mut fdates);
-                }
-                for fd in fdates {
-                    push_china_bridge_block(&mut block, fd);
-                }
-                block.contains(&date)
-            }
-        }
+        let mut holidays = smallvec::SmallVec::<[Date; 32]>::new();
+        self.dates_in_year(date.year(), &mut holidays);
+        holidays.contains(&date)
     }
 }
 
@@ -650,7 +544,6 @@ impl Rule {
     /// materialization, so every base year that can reach `year` is evaluated and
     /// only the dates landing in `year` are kept. `Effective` gates on `year`,
     /// the date's own year. No deduplication is performed.
-    #[cfg(test)]
     pub(crate) fn dates_in_year<A: smallvec::Array<Item = Date>>(
         &self,
         year: i32,
