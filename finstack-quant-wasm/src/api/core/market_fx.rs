@@ -9,13 +9,11 @@ use crate::utils::to_js_err;
 use crate::utils::wire::js_date;
 use finstack_quant_core::currency::Currency as RustCurrency;
 use finstack_quant_core::money::fx::{
-    fx_market_pair as rust_fx_market_pair, fx_pair_convention as rust_fx_pair_convention,
-    fx_pip_size as rust_fx_pip_size, invert_fx_rate as rust_invert_fx_rate, CurrencyPair,
-    FxConversionPolicy as RustFxConversionPolicy, FxMatrix as RustFxMatrix,
+    fx_pair_convention as rust_fx_pair_convention, invert_fx_rate as rust_invert_fx_rate,
+    CurrencyPair, FxConversionPolicy as RustFxConversionPolicy, FxMatrix as RustFxMatrix,
     FxPairConvention as RustFxPairConvention, FxQuery, FxQuoteConvention as RustFxQuoteConvention,
     FxRateResult as RustFxRateResult,
 };
-use js_sys::Array;
 use wasm_bindgen::prelude::*;
 
 /// Typed FX conversion policy wrapper for WASM callers.
@@ -243,27 +241,6 @@ impl JsFxPairConvention {
     }
 }
 
-/// Order two currencies into the market CCY1/CCY2 pair.
-///
-/// Priority is EUR > GBP > AUD > NZD > USD > other, with a stable ISO-4217
-/// alphabetic tie-break when both sides share the same rank.
-/// @param a - First currency ISO code of the unordered pair. Need not be market CCY1.
-/// @param b - Second currency ISO code of the unordered pair. Need not be market CCY2.
-/// @returns A two-element array `[CCY1, CCY2]` of `Currency` handles in market order.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if either code is not a recognized ISO-4217
-/// alphabetic currency.
-#[wasm_bindgen(js_name = fxMarketPair)]
-pub fn fx_market_pair(a: JsValue, b: JsValue) -> Result<Array, JsValue> {
-    let (base, quote) = rust_fx_market_pair(js_currency(&a, "a")?, js_currency(&b, "b")?);
-    let out = Array::new();
-    out.push(&JsCurrency { inner: base }.into());
-    out.push(&JsCurrency { inner: quote }.into());
-    Ok(out)
-}
-
 /// Market convention for an unordered currency pair.
 ///
 /// Returned `base` / `quote` are always the market CCY1/CCY2, even when the
@@ -283,25 +260,6 @@ pub fn fx_pair_convention(base: JsValue, quote: JsValue) -> Result<JsFxPairConve
     Ok(JsFxPairConvention {
         inner: rust_fx_pair_convention(base, quote),
     })
-}
-
-/// Pip size in outright-rate units for a currency pair.
-///
-/// Returns `0.01` when either side is JPY, KRW, or HUF; otherwise `0.0001`.
-/// Argument order does not matter.
-/// @param base - One currency ISO code of the pair. Order is not significant.
-/// @param quote - The other currency ISO code of the pair. Order is not significant.
-/// @returns Pip size as a decimal increment of the outright FX rate.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if either code is not a recognized ISO-4217
-/// alphabetic currency.
-#[wasm_bindgen(js_name = fxPipSize)]
-pub fn fx_pip_size(base: JsValue, quote: JsValue) -> Result<f64, JsValue> {
-    let base = js_currency(&base, "base")?;
-    let quote = js_currency(&quote, "quote")?;
-    Ok(rust_fx_pip_size(base, quote))
 }
 
 /// Reciprocal of a strictly positive finite FX rate.

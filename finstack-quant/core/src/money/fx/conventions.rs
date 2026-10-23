@@ -9,18 +9,12 @@
 //!
 //! ```rust
 //! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_core::money::fx::{
-//!     fx_market_pair, fx_pair_convention, fx_pip_size, invert_fx_rate, FxQuoteConvention,
-//! };
+//! use finstack_quant_core::money::fx::{fx_pair_convention, invert_fx_rate, FxQuoteConvention};
 //!
-//! assert_eq!(
-//!     fx_market_pair(Currency::USD, Currency::EUR),
-//!     (Currency::EUR, Currency::USD)
-//! );
 //! let conv = fx_pair_convention(Currency::USD, Currency::JPY);
 //! assert_eq!(conv.base, Currency::USD);
 //! assert_eq!(conv.usd_quotation, FxQuoteConvention::Indirect);
-//! assert_eq!(fx_pip_size(Currency::USD, Currency::JPY), 0.01);
+//! assert_eq!(conv.pip_size, 0.01);
 //! assert!((invert_fx_rate(1.10).expect("positive rate") - 1.0 / 1.10).abs() < 1e-12);
 //! ```
 
@@ -115,7 +109,7 @@ fn usd_quotation_for_market_pair(base: Currency, quote: Currency) -> FxQuoteConv
 /// # Returns
 ///
 /// `(CCY1, CCY2)` in market order. `fx_market_pair(USD, EUR)` is `(EUR, USD)`.
-pub fn fx_market_pair(a: Currency, b: Currency) -> (Currency, Currency) {
+fn fx_market_pair(a: Currency, b: Currency) -> (Currency, Currency) {
     match market_ccy1_rank(a).cmp(&market_ccy1_rank(b)) {
         Ordering::Less => (a, b),
         Ordering::Greater => (b, a),
@@ -167,7 +161,7 @@ pub fn fx_pair_convention(base: Currency, quote: Currency) -> FxPairConvention {
 /// # Returns
 ///
 /// Pip size as a decimal increment of the outright FX rate (`0.01` or `0.0001`).
-pub fn fx_pip_size(base: Currency, quote: Currency) -> f64 {
+fn fx_pip_size(base: Currency, quote: Currency) -> f64 {
     if matches!(base, Currency::JPY | Currency::KRW | Currency::HUF)
         || matches!(quote, Currency::JPY | Currency::KRW | Currency::HUF)
     {

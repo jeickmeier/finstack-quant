@@ -31,7 +31,7 @@ test('one Rust currency parser: case-insensitive, not trimmed, error names the c
   for (const [build, code] of [
     [() => new core.Currency(' USD '), ' USD '],
     [() => new core.Currency('XXX'), 'XXX'],
-    [() => core.fxPipSize(' usd', 'EUR'), ' usd'],
+    [() => core.fxPairConvention(' usd', 'EUR'), ' usd'],
   ]) {
     assert.throws(
       build,

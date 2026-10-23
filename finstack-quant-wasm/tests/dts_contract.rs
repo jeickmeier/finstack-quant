@@ -1596,15 +1596,7 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
     ));
     assert!(contains_signature(
         core_ns,
-        "fxMarketPair(a: string, b: string): Currency[];"
-    ));
-    assert!(contains_signature(
-        core_ns,
         "fxPairConvention(base: string, quote: string): FxPairConvention;"
-    ));
-    assert!(contains_signature(
-        core_ns,
-        "fxPipSize(base: string, quote: string): number;"
     ));
     assert!(contains_signature(
         core_ns,

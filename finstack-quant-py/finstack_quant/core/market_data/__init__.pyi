@@ -54,9 +54,7 @@ __all__ = [
     "VolCube",
     "VolCubeExpirySlice",
     "VolSurface",
-    "fx_market_pair",
     "fx_pair_convention",
-    "fx_pip_size",
     "invert_fx_rate",
 ]
 
@@ -4603,45 +4601,6 @@ class FxPairConvention:
 
     def __repr__(self) -> str: ...
 
-def fx_market_pair(
-    a: Union[Currency, str],
-    b: Union[Currency, str],
-) -> tuple[Currency, Currency]:
-    """
-    Order two currencies into the market CCY1/CCY2 pair.
-
-    Priority is EUR > GBP > AUD > NZD > USD > other, with a stable ISO-4217
-    alphabetic tie-break when both sides share the same rank.
-
-    Parameters
-    ----------
-    a : Currency or str
-        First currency of the unordered pair. Need not be market CCY1.
-    b : Currency or str
-        Second currency of the unordered pair. Need not be market CCY2.
-
-    Returns
-    -------
-    tuple[Currency, Currency]
-        ``(CCY1, CCY2)`` in market order. ``fx_market_pair("USD", "EUR")``
-        is ``(EUR, USD)``.
-
-    Raises
-    ------
-    TypeError
-        If *a* or *b* is not a :class:`Currency` or ISO code string.
-    ValueError
-        If either value is an unrecognized currency code.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import fx_market_pair
-    >>> [str(c) for c in fx_market_pair("USD", "EUR")]
-    ['EUR', 'USD']
-
-    """
-    ...
-
 def fx_pair_convention(
     base: Union[Currency, str],
     quote: Union[Currency, str],
@@ -4677,44 +4636,6 @@ def fx_pair_convention(
     >>> conv = fx_pair_convention("USD", "JPY")
     >>> (str(conv.base), str(conv.quote), str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
     ('USD', 'JPY', 'indirect', 0.01, 2)
-
-    """
-    ...
-
-def fx_pip_size(
-    base: Union[Currency, str],
-    quote: Union[Currency, str],
-) -> float:
-    """
-    Pip size in outright-rate units for a currency pair.
-
-    Returns ``0.01`` when either side is JPY, KRW, or HUF; otherwise
-    ``0.0001``. Argument order does not matter.
-
-    Parameters
-    ----------
-    base : Currency or str
-        One currency of the pair. Order is not significant.
-    quote : Currency or str
-        The other currency of the pair. Order is not significant.
-
-    Returns
-    -------
-    float
-        Pip size as a decimal increment of the outright FX rate.
-
-    Raises
-    ------
-    TypeError
-        If *base* or *quote* is not a :class:`Currency` or ISO code string.
-    ValueError
-        If either value is an unrecognized currency code.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import fx_pip_size
-    >>> fx_pip_size("USD", "JPY")
-    0.01
 
     """
     ...

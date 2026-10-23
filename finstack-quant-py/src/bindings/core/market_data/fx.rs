@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use finstack_quant_core::money::fx::{
-    fx_market_pair as rust_fx_market_pair, fx_pair_convention as rust_fx_pair_convention,
-    fx_pip_size as rust_fx_pip_size, invert_fx_rate as rust_invert_fx_rate, CurrencyPair,
-    FxConversionPolicy, FxMatrix, FxPairConvention, FxQuery, FxQuoteConvention, FxRateResult,
+    fx_pair_convention as rust_fx_pair_convention, invert_fx_rate as rust_invert_fx_rate,
+    CurrencyPair, FxConversionPolicy, FxMatrix, FxPairConvention, FxQuery, FxQuoteConvention,
+    FxRateResult,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
@@ -402,24 +402,6 @@ impl PyFxPairConvention {
     }
 }
 
-/// Order two currencies into the market CCY1/CCY2 pair.
-///
-/// Priority is EUR > GBP > AUD > NZD > USD > other, with an ISO-code tie-break.
-///
-/// # Arguments
-///
-/// * `a` - First currency of the unordered pair (`Currency` or ISO code).
-/// * `b` - Second currency of the unordered pair (`Currency` or ISO code).
-#[pyfunction]
-#[pyo3(text_signature = "(a, b)")]
-fn fx_market_pair(
-    a: &Bound<'_, PyAny>,
-    b: &Bound<'_, PyAny>,
-) -> PyResult<(PyCurrency, PyCurrency)> {
-    let (base, quote) = rust_fx_market_pair(extract_currency(a)?, extract_currency(b)?);
-    Ok((PyCurrency::from_inner(base), PyCurrency::from_inner(quote)))
-}
-
 /// Market convention for an unordered currency pair.
 ///
 /// Returned ``base`` / ``quote`` are always market CCY1/CCY2.
@@ -442,25 +424,6 @@ fn fx_pair_convention(
     )))
 }
 
-/// Pip size in outright-rate units for a currency pair.
-///
-/// ``0.01`` when either side is JPY, KRW, or HUF; otherwise ``0.0001``.
-///
-/// # Arguments
-///
-/// * `base` - One currency of the pair (`Currency` or ISO code). Order is not
-///   significant.
-/// * `quote` - The other currency of the pair (`Currency` or ISO code). Order
-///   is not significant.
-#[pyfunction]
-#[pyo3(text_signature = "(base, quote)")]
-fn fx_pip_size(base: &Bound<'_, PyAny>, quote: &Bound<'_, PyAny>) -> PyResult<f64> {
-    Ok(rust_fx_pip_size(
-        extract_currency(base)?,
-        extract_currency(quote)?,
-    ))
-}
-
 /// Reciprocal of a strictly positive finite FX rate.
 ///
 /// # Arguments
@@ -479,9 +442,7 @@ pub(super) const EXPORTS: &[&str] = &[
     "FxPairConvention",
     "FxQuoteConvention",
     "FxRateResult",
-    "fx_market_pair",
     "fx_pair_convention",
-    "fx_pip_size",
     "invert_fx_rate",
 ];
 
@@ -492,9 +453,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFxMatrix>()?;
     m.add_class::<PyFxQuoteConvention>()?;
     m.add_class::<PyFxPairConvention>()?;
-    m.add_function(wrap_pyfunction!(fx_market_pair, m)?)?;
     m.add_function(wrap_pyfunction!(fx_pair_convention, m)?)?;
-    m.add_function(wrap_pyfunction!(fx_pip_size, m)?)?;
     m.add_function(wrap_pyfunction!(invert_fx_rate, m)?)?;
     Ok(())
 }
