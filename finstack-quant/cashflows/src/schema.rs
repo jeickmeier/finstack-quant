@@ -384,7 +384,7 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Cashflow default-model specification."
     )
     .with_packager(package_cashflow_schema)
-    .with_summary("Hazard or CDR assumption driving credit losses.")
+    .with_summary("CDR curve, cumulative-loss or timing assumption driving defaults.")
     .with_examples(default_model_examples),
     finstack_quant_core::schema_artifact!(
         FeeSpec,
@@ -456,7 +456,7 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Cashflow schedule construction parameters."
     )
     .with_packager(package_cashflow_schema)
-    .with_summary("Start, end, frequency, calendar and roll rules for a payment schedule.")
+    .with_summary("Frequency, day count, calendar, roll rules and stub for a payment schedule.")
     .with_examples(schedule_params_examples),
     finstack_quant_core::schema_artifact!(
         StepUpCouponSpec,

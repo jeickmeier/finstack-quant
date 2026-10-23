@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
-      "bytes": 78298,
+      "bytes": 78389,
       "kind": "input",
       "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
       "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",
@@ -50,7 +50,7 @@
       "bytes": 4168,
       "kind": "component",
       "path": "schemas/cashflow/1/default_model_spec.schema.json",
-      "summary": "Hazard or CDR assumption driving credit losses.",
+      "summary": "CDR curve, cumulative-loss or timing assumption driving defaults.",
       "title": "DefaultModelSpec",
       "type_name": "DefaultModelSpec"
     },
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
-      "bytes": 30076,
+      "bytes": 30167,
       "kind": "component",
       "path": "schemas/cashflow/1/floating_coupon_spec.schema.json",
       "summary": "Index, spread, caps and floors, reset rules and schedule for one floating leg.",
@@ -113,7 +113,7 @@
       "bytes": 8914,
       "kind": "component",
       "path": "schemas/cashflow/1/schedule_params.schema.json",
-      "summary": "Start, end, frequency, calendar and roll rules for a payment schedule.",
+      "summary": "Frequency, day count, calendar, roll rules and stub for a payment schedule.",
       "title": "ScheduleParams",
       "type_name": "ScheduleParams"
     },
