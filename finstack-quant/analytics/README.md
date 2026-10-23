@@ -64,7 +64,7 @@ Method families on `Performance`:
 | Window and benchmark reset | [`performance/mod.rs`](src/performance/mod.rs) | `reset_date_range`, `reset_bench_ticker`, `get_active_dates`, `get_active_dates_for_ticker`, `get_returns_for_ticker` |
 
 The per-domain modules `aggregation`, `benchmark`, `defaults`, `drawdown`,
-`lookback`, `performance`, `returns`, and `risk_metrics` are `pub(crate)`;
+`performance`, `returns`, and `risk_metrics` are `pub(crate)`;
 `regression` and `schema` (behind the default `json-schema` feature) are
 public. The crate root re-exports the result and config types `Performance`
 takes or returns, the `DEFAULT_*` constants, and the free functions listed

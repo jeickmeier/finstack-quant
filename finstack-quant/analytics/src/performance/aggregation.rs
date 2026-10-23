@@ -4,14 +4,14 @@
 use super::{invalid_return_series, LookbackReturns, Performance};
 use crate::aggregation::{group_period_buckets, period_stats_inner, PeriodStats, PeriodicReturn};
 use crate::drawdown::{drawdown_details, to_drawdown_series, DrawdownEpisode};
-use crate::lookback;
 use crate::returns::{comp_sum, comp_total, excess_returns};
-use finstack_quant_core::dates::{Date, FiscalConfig, PeriodKind};
+use finstack_quant_core::dates::{Date, DateExt, FiscalConfig, PeriodKind};
 use finstack_quant_core::math::linalg::{
     nearest_correlation, unflatten_square, validate_correlation_matrix, NearestCorrelationOpts,
 };
 use finstack_quant_core::math::stats::{correlation, mean_var};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
+use time::Month;
 
 impl Performance {
     /// Per-period simple returns for each ticker over the active window.
@@ -216,6 +216,9 @@ impl Performance {
 
     /// Compounded returns for each lookback period (MTD, QTD, YTD, FYTD) at `ref_date`.
     ///
+    /// MTD, QTD and YTD start on the first calendar day of `ref_date`'s month,
+    /// calendar quarter (January, April, July, October) and year.
+    ///
     /// FYTD is the first observation on or after the fiscal calendar start
     /// through `ref_date`. Holidays are not skipped. The first included
     /// simple return still spans the prior close.
@@ -235,27 +238,36 @@ impl Performance {
         ref_date: Date,
         fiscal_config: Option<FiscalConfig>,
     ) -> LookbackReturns {
-        let fiscal_config = fiscal_config.unwrap_or_default();
+        // MTD/QTD/YTD starts are total over the representable range; FYTD falls
+        // back to ref_date only when its fiscal start precedes Date::MIN.
+        let month_start =
+            |month: Month| Date::from_calendar_date(ref_date.year(), month, 1).unwrap_or(ref_date);
+        let fiscal_start = |config: FiscalConfig| {
+            config
+                .year_start(ref_date.fiscal_year(config))
+                .unwrap_or(ref_date)
+        };
         let compute = |period_start: Date| -> Vec<f64> {
             self.map_tickers(|i| {
-                let range = lookback::select_range(
-                    self.active_dates_for_ticker_unchecked(i),
-                    period_start,
-                    ref_date,
-                );
+                let dates = self.active_dates_for_ticker_unchecked(i);
                 let r = self.active_returns(i);
-                let start = range.start.min(r.len());
-                let end = range.end.min(r.len()).max(start);
+                let start = dates.partition_point(|&d| d < period_start).min(r.len());
+                let end = dates
+                    .partition_point(|&d| d <= ref_date)
+                    .min(r.len())
+                    .max(start);
                 comp_total(&r[start..end])
             })
         };
 
         LookbackReturns {
             ticker_names: self.get_ticker_names().to_vec(),
-            mtd: compute(lookback::mtd_start_date(ref_date)),
-            qtd: compute(lookback::qtd_start_date(ref_date)),
-            ytd: compute(lookback::ytd_start_date(ref_date)),
-            fytd: compute(lookback::fytd_start_date(ref_date, fiscal_config)),
+            mtd: compute(month_start(ref_date.month())),
+            qtd: compute(month_start(
+                Month::January.nth_next((ref_date.quarter() - 1) * 3),
+            )),
+            ytd: compute(fiscal_start(FiscalConfig::calendar_year())),
+            fytd: compute(fiscal_start(fiscal_config.unwrap_or_default())),
         }
     }
 
@@ -454,6 +466,49 @@ mod tests {
             PeriodKind::Daily,
         )
         .expect("ragged panel")
+    }
+
+    #[test]
+    fn lookback_windows_start_on_calendar_and_fiscal_boundaries() {
+        let on = |year: i32, month: Month, day: u8| {
+            Date::from_calendar_date(year, month, day).expect("valid date")
+        };
+        let dates = vec![
+            on(2024, Month::December, 31),
+            on(2025, Month::January, 1),
+            on(2025, Month::February, 27),
+            on(2025, Month::February, 28),
+            on(2025, Month::March, 31),
+            on(2025, Month::April, 1),
+            on(2025, Month::April, 30),
+            on(2025, Month::May, 1),
+            on(2025, Month::May, 15),
+            on(2025, Month::May, 16),
+        ];
+        let r = [
+            0.01, 0.02, -0.03, 0.04, 0.05, -0.06, 0.07, 0.08, -0.09, 0.10,
+        ];
+        let perf = Performance::from_returns(
+            dates,
+            vec![r.to_vec()],
+            vec!["A".to_string()],
+            None,
+            PeriodKind::Daily,
+        )
+        .expect("panel");
+        let ref_date = on(2025, Month::May, 15);
+
+        let us_federal = perf.lookback_returns(ref_date, Some(FiscalConfig::us_federal()));
+        assert_eq!(us_federal.mtd, vec![comp_total(&r[7..9])]);
+        assert_eq!(us_federal.qtd, vec![comp_total(&r[5..9])]);
+        assert_eq!(us_federal.ytd, vec![comp_total(&r[1..9])]);
+        assert_eq!(us_federal.fytd, vec![comp_total(&r[0..9])]);
+
+        let clamped = perf.lookback_returns(
+            ref_date,
+            Some(FiscalConfig::new(2, 30).expect("day 30 clamps")),
+        );
+        assert_eq!(clamped.fytd, vec![comp_total(&r[3..9])]);
     }
 
     #[test]

@@ -84,7 +84,6 @@ pub(crate) mod aggregation;
 pub(crate) mod benchmark;
 pub(crate) mod defaults;
 pub(crate) mod drawdown;
-pub(crate) mod lookback;
 pub(crate) mod performance;
 pub mod regression;
 pub(crate) mod returns;
