@@ -11,6 +11,10 @@
 - The `multi_factor_greeks` tracing span and events carry the target `finstack_quant_analytics::multi_factor` instead of `finstack_quant_analytics::benchmark`.
 - Python `Performance.lookback_returns` and `period_stats`, and WASM `lookbackReturns` and `periodStats`, take the core `FiscalConfig` handle (`fiscal_config` / `fiscalConfig`) instead of the `fiscal_year_start_month` / `fiscal_year_start_day` integers. An omitted config is Rust `None`: a calendar-year FYTD window, and Gregorian periods with ISO weeks for `period_stats`. An out-of-range fiscal start is now a `ValueError` from the `FiscalConfig` constructor, not an `AnalyticsError`.
 
+#### Removed
+
+- Core `FiscalConfig::from_parts(start_month, start_day)`, which filled an omitted half of the fiscal start. The bindings take the `FiscalConfig` handle now; build one with `FiscalConfig::new` or use `FiscalConfig::default()` (calendar year).
+
 ### Valuations: one path per capability
 
 #### Changed
