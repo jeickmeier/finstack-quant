@@ -15,9 +15,7 @@
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
 use crate::api::valuations::pricing::parse_market;
-use crate::utils::input::{
-    from_js_json, js_f64, js_opt_f64, js_opt_string_seq, js_string, json_text, opt_json_text,
-};
+use crate::utils::input::{from_js_json, js_f64, js_opt_f64, js_opt_string_seq, js_string};
 use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::RateSpec;
@@ -26,15 +24,6 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 };
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
-
-/// Decode a JSON host argument into its typed Rust input.
-fn parse_json_arg<T: serde::de::DeserializeOwned>(json: &str, label: &str) -> Result<T, JsValue> {
-    serde_json::from_str(json).map_err(|e| {
-        to_js_err(finstack_quant_core::Error::Validation(format!(
-            "invalid {label} JSON: {e}"
-        )))
-    })
-}
 
 /// Z-spread-equivalent discount margin for a floating-rate tranche, returned in
 /// decimal units (`0.015` = 150 bp).
@@ -129,12 +118,13 @@ pub fn tranche_oas(
 ) -> Result<JsValue, JsValue> {
     let market_price_pct = js_f64(&market_price_pct, "marketPricePct")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
-    let config: OasConfig = match config_json.as_deref() {
-        Some(json) => parse_json_arg(json, "OAS config")?,
-        None => OasConfig::default(),
+    let config: OasConfig = match config_json.as_ref() {
+        Some(value) if !(value.is_null() || value.is_undefined()) => {
+            from_js_json(value, "OAS config")?
+        }
+        _ => OasConfig::default(),
     };
     let result = sc::tranche_oas(
         &deal.inner,
@@ -179,10 +169,9 @@ pub fn tranche_scenario_table(
     grid_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let grid_json: &str = &json_text(&grid_json, "gridJson")?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
-    let grid: ScenarioGrid = parse_json_arg(grid_json, "scenario grid")?;
+    let grid: ScenarioGrid = from_js_json(&grid_json, "scenario grid")?;
     let result = sc::tranche_scenario_table(&deal.inner, tranche_id, &market, as_of, &grid)
         .map_err(to_js_err)?;
     to_js_value(&result)
