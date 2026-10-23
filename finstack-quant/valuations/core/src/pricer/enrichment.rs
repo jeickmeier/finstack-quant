@@ -336,4 +336,58 @@ mod tests {
             vec![MetricId::ZSpread, MetricId::Dv01, MetricId::ExpectedLoss]
         );
     }
+
+    #[test]
+    fn failed_scratch_calculation_discards_unreverted_market_changes() {
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+
+        let market =
+            Arc::new(MarketContext::new().insert_price("SPOT", MarketScalar::Unitless(100.0)));
+        let mut context = MetricContext::new(
+            Arc::new(Probe::default()),
+            Arc::clone(&market),
+            date!(2026 - 01 - 01),
+            Money::new(123.0, Currency::USD).expect("money"),
+            MetricContext::default_config(),
+        );
+        // A successful calculation may retain harmless request-local state.
+        context
+            .with_market_scratch(|_, scratch| {
+                *scratch = scratch
+                    .clone()
+                    .insert_price("CACHE", MarketScalar::Unitless(1.0));
+                Ok(())
+            })
+            .expect("successful scratch calculation");
+        let failed: finstack_quant_core::Result<()> = context.with_market_scratch(|_, scratch| {
+            assert!(
+                scratch.get_price("CACHE").is_ok(),
+                "successful scratch is reused"
+            );
+            *scratch = scratch
+                .clone()
+                .insert_price("SPOT", MarketScalar::Unitless(999.0));
+            Err(finstack_quant_core::Error::Validation(
+                "failed before restoring bump".into(),
+            ))
+        });
+        assert!(failed.is_err());
+        context
+            .with_market_scratch(|_, scratch| {
+                assert!(matches!(
+                    scratch.get_price("SPOT"),
+                    Ok(MarketScalar::Unitless(100.0))
+                ));
+                assert!(
+                    scratch.get_price("CACHE").is_err(),
+                    "failed scratch is discarded completely"
+                );
+                Ok(())
+            })
+            .expect("fresh scratch calculation");
+        assert!(matches!(
+            market.get_price("SPOT"),
+            Ok(MarketScalar::Unitless(100.0))
+        ));
+    }
 }
