@@ -76,14 +76,7 @@ fn test_tranche_duration_is_true_modified_duration() {
     // first order; the calculator must reproduce the bump value exactly.
     let expected_duration = -(shifted_pv - pv) / (pv * shift);
     let macaulay = weighted_pv / pv;
-    let duration = calculate_tranche_duration(
-        &flows,
-        &curve,
-        as_of,
-        Money::new(pv, Currency::USD).expect("valid money fixture"),
-        1.0,
-    )
-    .unwrap();
+    let duration = calculate_tranche_duration(&flows, &curve, as_of, 1.0).unwrap();
 
     assert!(
         (duration - expected_duration).abs() < 1e-10,

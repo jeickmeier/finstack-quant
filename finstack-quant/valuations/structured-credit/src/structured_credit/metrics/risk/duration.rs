@@ -98,17 +98,10 @@ impl MetricCalculator for ModifiedDurationCalculator {
         let curve = context
             .curves
             .get_discount(deal.discount_curve_id.as_str())?;
-        let base = quote.model_dirty(flows, &curve)?;
         let ytm_bump_bp = sens_config::resolve(context)?
             .ytm_bump_bp
             .unwrap_or(DEFAULT_DURATION_YTM_BUMP_BP);
-        calculate_tranche_duration(
-            flows,
-            &curve,
-            quote.settlement,
-            Money::new(base, deal.pool.get_currency())?,
-            ytm_bump_bp,
-        )
+        calculate_tranche_duration(flows, &curve, quote.settlement, ytm_bump_bp)
     }
 }
 
@@ -125,10 +118,11 @@ pub(crate) const DEFAULT_DURATION_YTM_BUMP_BP: f64 = 1.0;
 ///
 /// # Arguments
 ///
-/// * `cashflows` - The dated cashflows for the tranche
-/// * `discount_curve` - The discount curve for PV calculation
-/// * `as_of` - The valuation date
-/// * `pv` - The present value of the tranche (guards the degenerate case)
+/// * `cashflows` - Dated tranche payments in currency units. Payments on or
+///   before `as_of` are excluded from both the base and shifted present values.
+/// * `discount_curve` - Curve used to discount payments from their dates to
+///   `as_of`; its day count does not change the Act/365F yield-shock clock.
+/// * `as_of` - Settlement date and origin of the Act/365F yield-shock clock.
 /// * `ytm_bump_bp` - Continuously compounded yield shock in basis points
 ///   (1.0 = 1bp); must be finite and positive. The registry `DurationMod`
 ///   metric passes `metric_pricing_overrides.bump_config.ytm_bump_bp`, defaulting to
@@ -136,12 +130,12 @@ pub(crate) const DEFAULT_DURATION_YTM_BUMP_BP: f64 = 1.0;
 ///
 /// # Returns
 ///
-/// Modified duration in years
+/// Modified duration in years, or zero if the included cashflows have a
+/// nonpositive base present value.
 pub fn calculate_tranche_duration(
     cashflows: &[(Date, Money)],
     discount_curve: &DiscountCurve,
     as_of: Date,
-    pv: Money,
     ytm_bump_bp: f64,
 ) -> Result<f64> {
     if !ytm_bump_bp.is_finite() || ytm_bump_bp <= 0.0 {
@@ -149,10 +143,6 @@ pub fn calculate_tranche_duration(
             "tranche duration ytm_bump_bp must be finite and positive, got {ytm_bump_bp}"
         )));
     }
-    if pv.amount() <= 0.0 {
-        return Ok(0.0);
-    }
-
     let yield_shift = ytm_bump_bp / BASIS_POINTS_PER_UNIT;
 
     let mut base_pv = 0.0;
@@ -212,6 +202,34 @@ mod time_basis_tests {
             .collect()
     }
 
+    #[test]
+    fn duration_excludes_settled_flows_and_uses_its_own_positive_denominator() {
+        let disc = curve(DayCount::Act360);
+        let future_date = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let future = (future_date, Money::from((100_i64, Currency::USD)));
+        let included = [future];
+        let with_settled = [(as_of(), Money::from((-10_000_i64, Currency::USD))), future];
+        let expected =
+            calculate_tranche_duration(&included, &disc, as_of(), 1.0).expect("positive duration");
+        assert!(expected > 0.0);
+        assert_eq!(
+            calculate_tranche_duration(&with_settled, &disc, as_of(), 1.0)
+                .expect("settled flow excluded"),
+            expected
+        );
+        for amount in [0_i64, -100] {
+            let flows = [(future_date, Money::from((amount, Currency::USD)))];
+            assert_eq!(
+                calculate_tranche_duration(&flows, &disc, as_of(), 1.0)
+                    .expect("nonpositive denominator"),
+                0.0
+            );
+        }
+        for bump in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(calculate_tranche_duration(&[], &disc, as_of(), bump).is_err());
+        }
+    }
+
     /// Duration and convexity must be measured on the SAME time
     /// basis, so the second-order price expansion is self-consistent:
     ///
@@ -255,8 +273,7 @@ mod time_basis_tests {
         };
 
         let p0 = pv_at(0.0);
-        let pv = Money::new(p0, Currency::USD).expect("valid money fixture");
-        let d = calculate_tranche_duration(&cf, &disc, as_of(), pv, 1.0).expect("duration");
+        let d = calculate_tranche_duration(&cf, &disc, as_of(), 1.0).expect("duration");
         let c = calculate_tranche_convexity(&cf, &disc, as_of(), 10.0).expect("convexity");
 
         // 10bp. Sizing matters here: a mismatched basis biases `D` by the
