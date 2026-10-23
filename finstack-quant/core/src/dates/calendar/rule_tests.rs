@@ -757,3 +757,31 @@ fn japan_public_holidays_match_cabinet_office_1970_through_2027() {
         }
     }
 }
+
+/// Transitional check: `applies` agrees with `dates_in_year` for every rule of
+/// every built-in calendar across a wide year range.
+#[test]
+fn dates_in_year_agrees_with_applies_for_every_builtin_rule() {
+    let mut checked_days = 0_usize;
+    for calendar in super::calendars_generated::ALL_CALENDARS {
+        for rule in calendar.rules {
+            for year in 1990..=2040 {
+                let mut expected = SmallVec::<[Date; 16]>::new();
+                rule.dates_in_year(year, &mut expected);
+                let mut day = Date::from_calendar_date(year, time::Month::January, 1)
+                    .expect("valid year start");
+                while day.year() == year {
+                    assert_eq!(
+                        rule.applies(day),
+                        expected.contains(&day),
+                        "calendar {} rule {rule:?} on {day}",
+                        calendar.id,
+                    );
+                    checked_days += 1;
+                    day = day.next_day().expect("in range");
+                }
+            }
+        }
+    }
+    assert!(checked_days > 1_000_000, "checked {checked_days} rule-days");
+}

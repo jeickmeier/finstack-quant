@@ -456,6 +456,13 @@ pub(crate) fn generate() -> io::Result<()> {
         ));
     }
 
+    // Test-only list of every built-in calendar, so rule tests reach the rules.
+    output.push_str("#[cfg(test)]\npub(crate) static ALL_CALENDARS: &[&Calendar] = &[\n");
+    for (_, const_name) in &calendar_names {
+        output.push_str(&format!("    &{},\n", const_name));
+    }
+    output.push_str("];\n\n");
+
     output.push_str("pub(in crate::dates) mod registry {\n");
     output.push_str("    use super::*;\n\n");
 
