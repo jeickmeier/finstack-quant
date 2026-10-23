@@ -31,6 +31,8 @@ def price_panel() -> Performance:
 
 def test_from_arrays_matches_the_shared_golden() -> None:
     assert list(price_panel().sharpe()) == pytest.approx(GOLDEN["prices"]["sharpe"], rel=1e-12)
+    with pytest.raises(KeyError, match="missing"):
+        Performance.from_arrays(GOLDEN["prices"]["dates"], GOLDEN["prices"]["values"], NAMES, "missing")
 
 
 def test_from_returns_arrays_matches_the_shared_golden() -> None:
