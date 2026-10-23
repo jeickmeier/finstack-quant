@@ -2045,6 +2045,8 @@ js = "models.credit.liabilityManagement"
 types = { ExchangeOfferAnalysis = "ExchangeOfferAnalysis", LeverageImpact = "LeverageImpact", LmeAnalysis = "LmeAnalysis" }
 
 [parity.modules."finstack_quant.models.credit.migration"]
+# TransitionMatrix.from_labeled <-> fromLabeled owns ordered-label validation;
+# Python's from_dataframe only converts pandas labels and values to that API.
 js = "models.credit.migration"
 
 [parity.modules."finstack_quant.models.credit.pd"]

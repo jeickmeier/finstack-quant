@@ -4,7 +4,8 @@
 //! Mirrors `finstack-quant-py/src/bindings/models/credit/migration.rs`.
 
 use crate::utils::input::{
-    js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_string, js_string_seq, js_u64, js_uint,
+    from_js_json, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_string, js_string_seq, js_u64,
+    js_uint,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::math::linalg::flatten_square_matrix;
@@ -214,6 +215,45 @@ impl JsTransitionMatrix {
         TransitionMatrix::new(scale.inner.clone(), &data, js_f64(&horizon, "horizon")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
+    }
+
+    /// Construct a transition matrix from ordered origin and destination labels.
+    /// @param row_labels - Ordered origin labels, one per row.
+    /// @param column_labels - Ordered destination labels; must equal `rowLabels` exactly.
+    /// @param data - Flat row-major probabilities or square nested rows; each row sums to one.
+    /// @param horizon - Positive finite horizon in years covered by the probabilities.
+    /// @param scale - Optional `RatingScale` JSON text or plain object, such as `scale.toJson()`; its labels must match both vectors in order. Omit to infer a custom scale with the last label absorbing.
+    /// @returns The validated transition-matrix handle; no entries are reordered.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` for invalid host input types, or a `validation`
+    /// error for differing label orders, invalid labels, matrix dimensions,
+    /// probabilities, horizon or absorbing default row.
+    #[wasm_bindgen(js_name = fromLabeled)]
+    pub fn from_labeled(
+        row_labels: JsValue,
+        column_labels: JsValue,
+        data: JsValue,
+        horizon: JsValue,
+        scale: Option<JsValue>,
+    ) -> Result<JsTransitionMatrix, JsValue> {
+        let row_labels = js_string_seq(&row_labels, "rowLabels")?;
+        let column_labels = js_string_seq(&column_labels, "columnLabels")?;
+        let data = js_matrix_data(&data, row_labels.len(), "data")?;
+        let scale = scale
+            .filter(|value| !value.is_null() && !value.is_undefined())
+            .map(|value| from_js_json::<RatingScale>(&value, "scale"))
+            .transpose()?;
+        TransitionMatrix::from_labeled(
+            &row_labels,
+            &column_labels,
+            &data,
+            js_f64(&horizon, "horizon")?,
+            scale,
+        )
+        .map(|inner| Self { inner })
+        .map_err(to_js_err)
     }
 
     /// Transition probability between two labelled states.

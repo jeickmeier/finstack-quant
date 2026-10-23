@@ -119,3 +119,44 @@ def test_simulation_validation_maps_to_python_errors() -> None:
         sim.simulate(2, 1, 7)
     with pytest.raises(Exception, match=r"paths per state|positive"):
         sim.empirical_matrix(0, 7)
+
+
+def test_labeled_transition_matrix_validates_label_order_in_rust() -> None:
+    labels = ["A", "B", "D"]
+    rows = [[0.90, 0.08, 0.02], [0.10, 0.80, 0.10], [0.0, 0.0, 1.0]]
+    inferred = migration.TransitionMatrix.from_labeled(labels, labels, rows, 1.0)
+    scale = migration.RatingScale.custom(labels)
+    explicit = migration.TransitionMatrix.from_labeled(labels, labels, rows, 1.0, scale)
+    assert inferred.to_rows() == explicit.to_rows() == rows
+    assert inferred.probability("A", "B") == 0.08
+    assert inferred.scale.labels() == labels
+    assert inferred.scale.default_state() == 2
+    permuted = ["B", "A", "D"]
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_labeled(labels, permuted, rows, 1.0)
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_labeled(permuted, permuted, rows, 1.0, scale)
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_labeled(["A", "D"], ["A", "D"], [[0.9, 0.1], [0, 1]], 1.0, scale)
+    duplicate = ["A", "A", "D"]
+    with pytest.raises(ValueError, match="duplicate"):
+        migration.TransitionMatrix.from_labeled(duplicate, duplicate, rows, 1.0)
+
+
+def test_dataframe_transition_matrix_cannot_relabel_an_explicit_scale() -> None:
+    import pandas
+
+    labels = ["A", "B", "D"]
+    permuted = ["B", "A", "D"]
+    rows = [[0.90, 0.08, 0.02], [0.10, 0.80, 0.10], [0.0, 0.0, 1.0]]
+    frame = pandas.DataFrame(rows, index=permuted, columns=permuted)
+    scale = migration.RatingScale.custom(labels)
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_dataframe(frame, 1.0, scale)
+    inferred = migration.TransitionMatrix.from_dataframe(frame, 1.0)
+    assert inferred.scale.labels() == permuted
+    assert inferred.to_rows() == rows
+    assert inferred.probability("B", "A") == 0.08
+    frame.columns = labels
+    with pytest.raises(ValueError, match="scale mismatch"):
+        migration.TransitionMatrix.from_dataframe(frame, 1.0)

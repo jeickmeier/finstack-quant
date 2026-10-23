@@ -932,3 +932,72 @@ mod serde_invariant_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod labeled_matrix_tests {
+    use crate::credit::migration::{MigrationError, RatingScale, TransitionMatrix};
+
+    #[test]
+    fn labeled_matrix_preserves_probabilities_and_infers_last_absorbing_state() {
+        let labels = vec!["IG".into(), "HY".into(), "Loss".into()];
+        let data = [0.90, 0.08, 0.02, 0.10, 0.80, 0.10, 0.0, 0.0, 1.0];
+        let matrix = TransitionMatrix::from_labeled(&labels, &labels, &data, 1.0, None)
+            .expect("valid labels");
+        assert_eq!(matrix.scale().labels(), labels);
+        assert_eq!(matrix.scale().default_state(), Some(2));
+        assert_eq!(matrix.probability("IG", "HY").expect("known labels"), 0.08);
+        assert_eq!(
+            matrix.to_rows(),
+            vec![
+                vec![0.90, 0.08, 0.02],
+                vec![0.10, 0.80, 0.10],
+                vec![0.0, 0.0, 1.0]
+            ]
+        );
+        let explicit = TransitionMatrix::from_labeled(
+            &labels,
+            &labels,
+            &data,
+            1.0,
+            Some(matrix.scale().clone()),
+        )
+        .expect("matching scale");
+        assert_eq!(explicit.to_rows(), matrix.to_rows());
+    }
+
+    #[test]
+    fn labeled_matrix_rejects_every_label_order_mismatch() {
+        let labels = vec!["A".into(), "B".into(), "D".into()];
+        let permuted = vec!["B".into(), "A".into(), "D".into()];
+        let data = [0.90, 0.08, 0.02, 0.10, 0.80, 0.10, 0.0, 0.0, 1.0];
+        assert!(matches!(
+            TransitionMatrix::from_labeled(&labels, &permuted, &data, 1.0, None),
+            Err(MigrationError::ScaleMismatch)
+        ));
+        let scale = RatingScale::custom(labels.clone()).expect("scale");
+        assert!(matches!(
+            TransitionMatrix::from_labeled(&permuted, &permuted, &data, 1.0, Some(scale)),
+            Err(MigrationError::ScaleMismatch)
+        ));
+        let short = vec!["A".into(), "D".into()];
+        let scale = RatingScale::custom(labels.clone()).expect("full scale");
+        assert!(matches!(
+            TransitionMatrix::from_labeled(&short, &short, &[0.9, 0.1, 0.0, 1.0], 1.0, Some(scale)),
+            Err(MigrationError::ScaleMismatch)
+        ));
+        let duplicate = vec!["A".into(), "A".into(), "D".into()];
+        assert!(matches!(
+            TransitionMatrix::from_labeled(&duplicate, &duplicate, &data, 1.0, None),
+            Err(MigrationError::DuplicateLabel { .. })
+        ));
+        assert!(TransitionMatrix::from_labeled(&labels, &labels, &data[..8], 1.0, None).is_err());
+        assert!(TransitionMatrix::from_labeled(&labels, &labels, &data, f64::NAN, None).is_err());
+        let mut nonabsorbing = data;
+        nonabsorbing[6] = 0.1;
+        nonabsorbing[8] = 0.9;
+        assert!(matches!(
+            TransitionMatrix::from_labeled(&labels, &labels, &nonabsorbing, 1.0, None),
+            Err(MigrationError::NonAbsorbingDefault { .. })
+        ));
+    }
+}
