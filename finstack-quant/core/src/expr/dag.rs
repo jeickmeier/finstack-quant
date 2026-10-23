@@ -131,10 +131,21 @@ pub(crate) fn build_plan(expr: Expr) -> crate::Result<ExecutionPlan> {
         }
     }
 
-    Ok(ExecutionPlan {
-        nodes,
-        root: results[0],
-    })
+    let root = results[0];
+    debug_assert!(
+        nodes
+            .iter()
+            .enumerate()
+            .all(|(index, node)| node.id == index as u64
+                && node.dependencies.iter().all(|&dep| dep < node.id)),
+        "plan ids must be dense positions with dependencies emitted first"
+    );
+    debug_assert_eq!(
+        root as usize,
+        nodes.len() - 1,
+        "the root must be the last emitted node"
+    );
+    Ok(ExecutionPlan { nodes, root })
 }
 
 /// Drain rejected owned trees without recursive `Expr` destruction.
