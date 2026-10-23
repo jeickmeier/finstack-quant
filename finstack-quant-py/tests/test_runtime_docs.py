@@ -39,6 +39,7 @@ PACKAGE_DIR = Path(finstack_quant.__file__).parent
 _SCHEMA_REGISTRY = ("get", "index", "validate")
 
 CONVERTED: dict[str, tuple[str, ...] | None] = {
+    "finstack_quant.models.volatility": None,
     "finstack_quant.models": None,
     "finstack_quant.calibration": (
         "validate_surface",
@@ -166,6 +167,8 @@ def _stub_docstrings(module: str) -> dict[str, str]:
     def walk(body: list[ast.stmt], prefix: str) -> None:
         for node in body:
             if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name.startswith("_") and not (node.name.startswith("__") and node.name.endswith("__")):
+                    continue
                 doc = ast.get_docstring(node)
                 if doc is not None:
                     docs.setdefault(prefix + node.name, doc)
@@ -266,3 +269,25 @@ def test_runtime_class_help_explains_constructor(
         assert re.search(rf"(?m)^{re.escape(parameter)} :", doc), f"{name}: missing {parameter} guidance"
     for phrase in guidance:
         assert phrase in doc, f"{name}: missing {phrase!r} guidance"
+
+
+def test_private_stub_helpers_are_not_runtime_owners(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Private typing declarations retain IDE docs without requiring runtime exports."""
+    fixture = tmp_path / "models" / "__init__.pyi"
+    fixture.parent.mkdir()
+    fixture.write_text(
+        '"""Public models namespace."""\n'
+        "class _PrivateShape:\n"
+        '    """Internal record shape."""\n'
+        "class Public:\n"
+        '    """Public model guidance."""\n'
+        "    def __reduce__(self):\n"
+        '        """Reconstruct the public model."""\n'
+        "        ...\n"
+    )
+    monkeypatch.setattr(importlib.import_module(__name__), "PACKAGE_DIR", tmp_path)
+    assert _stub_docstrings("finstack_quant.models") == {
+        "__module__": "Public models namespace.",
+        "Public": "Public model guidance.",
+        "Public.__reduce__": "Reconstruct the public model.",
+    }
