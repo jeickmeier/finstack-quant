@@ -272,6 +272,38 @@ def fabricated_doc_messages(docstring: str) -> list[str]:
     return [message for message, pattern in FABRICATED_DOC_PATTERNS if pattern.search(normalized) is not None]
 
 
+def delegated_module_docstring(path: Path, tree: ast.Module) -> str | None:
+    """Read a matching stub for an explicit compiled-extension doc delegation."""
+    if path.suffix != ".py":
+        return None
+    native_aliases = {
+        alias.asname or alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module == "finstack_quant.finstack_quant"
+        for alias in node.names
+    }
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "__doc__"
+            and isinstance(node.value, ast.Attribute)
+            and node.value.attr == "__doc__"
+        ):
+            continue
+        owner = node.value.value
+        while isinstance(owner, ast.Attribute):
+            owner = owner.value
+        if not (isinstance(owner, ast.Name) and owner.id in native_aliases):
+            continue
+        stub = path.with_suffix(".pyi")
+        if not stub.is_file():
+            return None
+        return ast.get_docstring(ast.parse(stub.read_text(encoding="utf-8")))
+    return None
+
+
 class PublicCallableVisitor:
     """Collect complete API-documentation errors without visiting private helpers."""
 
@@ -289,6 +321,8 @@ class PublicCallableVisitor:
     def inspect_module(self, tree: ast.Module) -> None:
         """Inspect module-level docs and every public class or callable."""
         docstring = ast.get_docstring(tree)
+        if docstring is None:
+            docstring = delegated_module_docstring(self.path, tree)
         if docstring is None:
             self.errors.append(DocumentationError(self.path, 1, "module", "missing module docstring"))
         elif not has_summary(docstring):
