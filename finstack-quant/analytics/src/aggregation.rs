@@ -8,6 +8,7 @@ use finstack_quant_core::dates::{Date, FiscalConfig, PeriodId, PeriodKind};
 use finstack_quant_core::wire::NonFiniteFields;
 
 use super::returns::comp_total;
+use crate::risk_metrics::ratio_or_sign_infinity;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 /// One calendar bucket of a periodic-return series.
@@ -234,28 +235,8 @@ pub(crate) fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodSt
         loss_sum / loss_count as f64
     };
 
-    let payoff_ratio = if avg_loss == 0.0 {
-        if avg_win > 0.0 {
-            f64::INFINITY
-        } else {
-            0.0
-        }
-    } else {
-        avg_win / avg_loss.abs()
-    };
-
-    let total_profit = win_sum;
-    let total_loss = loss_sum.abs();
-
-    let profit_factor = if total_loss == 0.0 {
-        if total_profit > 0.0 {
-            f64::INFINITY
-        } else {
-            0.0
-        }
-    } else {
-        total_profit / total_loss
-    };
+    let payoff_ratio = ratio_or_sign_infinity(avg_win, avg_loss.abs());
+    let profit_factor = ratio_or_sign_infinity(win_sum, loss_sum.abs());
 
     let cpc_ratio = profit_factor * win_rate * payoff_ratio;
 
@@ -381,6 +362,15 @@ mod tests {
         assert!(stats.profit_factor.is_infinite());
         assert!(stats.cpc_ratio.is_infinite());
         assert_eq!(stats.kelly_criterion, 1.0);
+    }
+
+    #[test]
+    fn period_stats_without_gains_or_losses_reports_zero_ratios() {
+        let stats = period_stats_inner([0.0, 0.0].into_iter());
+        assert_eq!(stats.payoff_ratio, 0.0);
+        assert_eq!(stats.profit_factor, 0.0);
+        assert_eq!(stats.cpc_ratio, 0.0);
+        assert_eq!(stats.kelly_criterion, 0.0);
     }
 
     #[test]
