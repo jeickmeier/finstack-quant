@@ -249,7 +249,6 @@ CASES: dict[str, Callable[[], Any]] = {
     # --- math ---------------------------------------------------------------------
     "symmetric_eigen": _eigen,
     "ledoit_wolf_shrinkage": _ledoit_wolf,
-    "linalg_constants": lambda: [linalg.SINGULAR_THRESHOLD, linalg.DIAGONAL_TOLERANCE, linalg.SYMMETRY_TOLERANCE],
     "mean_var": lambda: list(stats.mean_var(SERIES)),
     "stats_or_nan": lambda: [
         stats.mean_or_nan(SERIES),

@@ -239,11 +239,6 @@ const CASES = {
     );
     return { covariance: Array.from(covariance), shrinkage };
   },
-  linalg_constants: () => [
-    core.singularThreshold(),
-    core.diagonalTolerance(),
-    core.symmetryTolerance(),
-  ],
   mean_var: () => Array.from(core.meanVar(SERIES)),
   stats_or_nan: () => [
     core.meanOrNan(SERIES),

@@ -28,29 +28,12 @@ from finstack_quant.core import FinstackError
 
 __all__ = [
     "CholeskyError",
-    "DIAGONAL_TOLERANCE",
-    "SINGULAR_THRESHOLD",
-    "SYMMETRY_TOLERANCE",
     "apply_lower_triangular",
     "cholesky_decomposition",
     "cholesky_solve",
     "ledoit_wolf_shrinkage",
     "symmetric_eigen",
 ]
-
-SINGULAR_THRESHOLD: float
-"""Relative factor-diagonal cutoff for numerical singularity.
-
-Decomposition scales this fraction by the square root of the largest
-input diagonal magnitude; substitution scales it by the largest factor
-diagonal magnitude.
-"""
-
-DIAGONAL_TOLERANCE: float
-"""Tolerance for diagonal element checks in correlation matrices."""
-
-SYMMETRY_TOLERANCE: float
-"""Tolerance for symmetry checks in correlation matrices."""
 
 class CholeskyError(FinstackError):
     """

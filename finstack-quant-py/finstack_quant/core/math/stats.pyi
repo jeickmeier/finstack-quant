@@ -29,7 +29,6 @@ __all__ = [
     "finite_max_or_nan",
     "finite_min_or_nan",
     "log_returns",
-    "longest_positive_run",
     "mean",
     "mean_or_nan",
     "mean_var",
@@ -42,36 +41,6 @@ __all__ = [
     "sample_variance_or_nan",
     "variance",
 ]
-
-def longest_positive_run(values: Sequence[float] | npt.NDArray[np.float64]) -> int:
-    """
-    Length of the longest run of strictly positive values.
-
-    Parameters
-    ----------
-    values : Sequence[float] or numpy.ndarray
-        Ordered numeric observations; only values strictly greater than zero
-        extend a run, while zero, negative and NaN values reset it.
-
-    Returns
-    -------
-    int
-        Longest positive run length; ``0`` for an empty series.
-
-    Raises
-    ------
-    TypeError
-        If a series is not one-dimensional or contains values that cannot
-        be converted to float.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.math.stats import longest_positive_run
-    >>> longest_positive_run([1.0, 2.0, -1.0, 3.0])
-    2
-
-    """
-    ...
 
 def mean_var(data: Sequence[float] | npt.NDArray[np.float64]) -> tuple[float, float]:
     """

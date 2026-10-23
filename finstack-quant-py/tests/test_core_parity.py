@@ -1020,9 +1020,6 @@ class TestLinalgParity:
 
         assert hasattr(linalg, "CholeskyError")
         assert hasattr(linalg, "cholesky_solve")
-        assert pytest.approx(1e-10) == linalg.SINGULAR_THRESHOLD
-        assert pytest.approx(1e-10) == linalg.DIAGONAL_TOLERANCE
-        assert pytest.approx(1e-10) == linalg.SYMMETRY_TOLERANCE
 
     def test_cholesky_decomposition(self) -> None:
         """Cholesky decomposition of a 2x2 SPD matrix."""

@@ -45,9 +45,6 @@ class TestCoreNamespace:
     def test_core_math_linalg_exports(self) -> None:
         """Math.linalg should export Cholesky functions and constants."""
         from finstack_quant.core.math.linalg import (  # noqa: F401
-            DIAGONAL_TOLERANCE,
-            SINGULAR_THRESHOLD,
-            SYMMETRY_TOLERANCE,
             CholeskyError,
             cholesky_decomposition,
             cholesky_solve,

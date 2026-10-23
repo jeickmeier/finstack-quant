@@ -326,10 +326,6 @@ fn core_dts_exposes_typed_array_math() {
         &dts,
         "kahanSum(values: NumericArray): number;"
     ));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "longestPositiveRun(values: NumericArray): number;",
-    ));
     for gone in [
         "meanArray(",
         "kahanSumArray(",

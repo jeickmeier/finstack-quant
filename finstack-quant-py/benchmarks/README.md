@@ -47,7 +47,7 @@ Every class is marked `perf`. Selection within the suite is by class or by the
 | Class | Covers |
 |-------|--------|
 | `TestCoreBenchmarks` | `Currency`, `Money` arithmetic, `DayCount.year_fraction`, `DiscountCurve.df`, `ForwardCurve.rate`, `FxMatrix.rate`, `Tenor.parse`, `Rate` conversions, `linalg.cholesky_decomposition`, `stats.mean`/`variance` |
-| `TestAnalyticsBenchmarks` | `Performance` over a 10,000-point two-series panel: `sharpe`, `sortino`, `calmar`, `volatility`, `returns`, `cumulative_returns`, drawdown series and details, VaR/ES, moments, `beta`, `tracking_error`, `rolling_sharpe`, `period_stats`, `longest_positive_run`. Construction (`Performance.from_arrays`) is benched separately on a 252-point single-series panel |
+| `TestAnalyticsBenchmarks` | `Performance` over a 10,000-point two-series panel: `sharpe`, `sortino`, `calmar`, `volatility`, `returns`, `cumulative_returns`, drawdown series and details, VaR/ES, moments, `beta`, `tracking_error`, `rolling_sharpe`, `period_stats`. Construction (`Performance.from_arrays`) is benched separately on a 252-point single-series panel |
 | `TestCorrelationBenchmarks` | `models.correlation`: `CopulaSpec`, `CorrelatedBernoulli`, `RecoverySpec`, `LatentFactorSpec`/`LatentSingleFactor`, `correlation_bounds`, `validate_correlation_matrix` |
 | `TestMonteCarloBenchmarks` | Closed-form `models.bs_price`, plus `EuropeanPricer`, `LsmcPricer`, and `PathDependentPricer` at 5,000–10,000 paths |
 | `TestMarginBenchmarks` | `CsaSpec.usd_regulatory`, `VmCalculator.calculate`, `NettingSetId`, `XvaConfig`, `FundingConfig`, `MarginUtilization` |

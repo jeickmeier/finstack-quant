@@ -220,17 +220,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add("CholeskyError", py.get_type::<CholeskyError>())?;
 
-    m.add("SINGULAR_THRESHOLD", linalg::SINGULAR_THRESHOLD)?;
-    m.add("DIAGONAL_TOLERANCE", linalg::DIAGONAL_TOLERANCE)?;
-    m.add("SYMMETRY_TOLERANCE", linalg::SYMMETRY_TOLERANCE)?;
-
     let all = PyList::new(
         py,
         [
             "CholeskyError",
-            "DIAGONAL_TOLERANCE",
-            "SINGULAR_THRESHOLD",
-            "SYMMETRY_TOLERANCE",
             "apply_lower_triangular",
             "cholesky_decomposition",
             "cholesky_solve",

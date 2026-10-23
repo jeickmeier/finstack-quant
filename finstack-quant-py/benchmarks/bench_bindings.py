@@ -586,9 +586,6 @@ class TestAnalyticsBenchmarks:
     def test_period_stats(self, benchmark) -> None:
         benchmark(_PERFORMANCE_10K.period_stats, 0, "monthly")
 
-    def test_longest_positive_run(self, benchmark) -> None:
-        benchmark(stats.longest_positive_run, RETURNS_10K)
-
 
 # Correlation domain
 
