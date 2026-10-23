@@ -1,12 +1,24 @@
 //! Private markets fund metrics: IRR, DPI, TVPI, carry calculations, and theta.
 
 use crate::pe_fund::waterfall::{FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche};
-use crate::pe_fund::PrivateMarketsFund;
+use crate::pe_fund::{AllocationLedger, PrivateMarketsFund};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
+use std::sync::Arc;
+
+/// Run the allocation once for the current instrument view of this request.
+fn allocation_ledger(context: &mut MetricContext) -> Result<Arc<AllocationLedger>> {
+    if let Some(ledger) = context.ext::<Arc<AllocationLedger>>() {
+        return Ok(Arc::clone(ledger));
+    }
+    let pe: &PrivateMarketsFund = context.instrument_as()?;
+    let ledger = Arc::new(pe.run_waterfall()?);
+    context.set_ext(Arc::clone(&ledger));
+    Ok(ledger)
+}
 
 /// Total LP contributions (paid-in capital) on or before `as_of`, in
 /// currency units.
@@ -44,8 +56,8 @@ struct LpIrrCalculator;
 
 impl MetricCalculator for LpIrrCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let ledger = allocation_ledger(context)?;
         let pe: &PrivateMarketsFund = context.instrument_as()?;
-        let ledger = pe.run_waterfall()?;
 
         let mut flows: Vec<(Date, Money)> = ledger
             .lp_cashflows()?
@@ -73,8 +85,7 @@ struct GpCarryTotalCalculator;
 
 impl MetricCalculator for GpCarryTotalCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let pe: &PrivateMarketsFund = context.instrument_as()?;
-        let ledger = pe.run_waterfall()?;
+        let ledger = allocation_ledger(context)?;
 
         let total_gp_carry: f64 = ledger
             .rows
@@ -95,8 +106,8 @@ struct DpiLpCalculator;
 
 impl MetricCalculator for DpiLpCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let ledger = allocation_ledger(context)?;
         let pe: &PrivateMarketsFund = context.instrument_as()?;
-        let ledger = pe.run_waterfall()?;
 
         let total_contributions = paid_in_to_date(pe, context.as_of);
         let total_lp_distributions = realized_lp_to_date(&ledger, context.as_of);
@@ -117,8 +128,8 @@ struct TvpiLpCalculator;
 
 impl MetricCalculator for TvpiLpCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let ledger = allocation_ledger(context)?;
         let pe: &PrivateMarketsFund = context.instrument_as()?;
-        let ledger = pe.run_waterfall()?;
 
         let total_contributions = paid_in_to_date(pe, context.as_of);
         let realized_lp_distributions = realized_lp_to_date(&ledger, context.as_of);
@@ -144,8 +155,7 @@ struct CarryAccruedCalculator;
 
 impl MetricCalculator for CarryAccruedCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let pe: &PrivateMarketsFund = context.instrument_as()?;
-        let ledger = pe.run_waterfall()?;
+        let ledger = allocation_ledger(context)?;
 
         Ok(ledger
             .rows
@@ -645,5 +655,123 @@ mod tests {
             (lp_irr - 0.1487).abs() < 0.01,
             "LpIrr should equal the realized IRR, got {lp_irr}"
         );
+    }
+
+    #[test]
+    fn allocation_is_shared_per_request_without_changing_metric_outputs() {
+        use crate::pe_fund::types::WATERFALL_CALLS;
+        let fund = PrivateMarketsFund::example().expect("fund");
+        let calculators: [&dyn MetricCalculator; 5] = [
+            &LpIrrCalculator,
+            &GpCarryTotalCalculator,
+            &DpiLpCalculator,
+            &TvpiLpCalculator,
+            &CarryAccruedCalculator,
+        ];
+        for as_of in [test_date(2026, 6, 15), test_date(2028, 1, 1)] {
+            let nav = Money::from((1_500_000_i64, test_currency()));
+            let ledger = fund.run_waterfall().expect("reference allocation");
+            let paid_in = paid_in_to_date(&fund, as_of);
+            let realized = realized_lp_to_date(&ledger, as_of);
+            let mut flows: Vec<_> = ledger
+                .lp_cashflows()
+                .expect("reference flows")
+                .into_iter()
+                .filter(|(date, _)| *date <= as_of)
+                .collect();
+            flows.push((as_of, nav));
+            let expected = [
+                calculate_irr(&flows, fund.waterfall_spec.day_count).expect("reference IRR"),
+                ledger
+                    .rows
+                    .iter()
+                    .filter(|row| row.date <= as_of)
+                    .map(|row| row.to_gp.amount())
+                    .sum(),
+                realized / paid_in,
+                (realized + nav.amount()) / paid_in,
+                ledger
+                    .rows
+                    .iter()
+                    .rfind(|row| row.date <= as_of)
+                    .map_or(0.0, |row| row.gp_carry_cum.amount()),
+            ];
+            for order in [[0, 1, 2, 3, 4], [4, 3, 2, 1, 0], [2, 0, 4, 1, 3]] {
+                let mut context = MetricContext::new(
+                    Arc::new(fund.clone()),
+                    Arc::new(finstack_quant_core::market_data::context::MarketContext::new()),
+                    as_of,
+                    nav,
+                    MetricContext::default_config(),
+                );
+                WATERFALL_CALLS.with(|count| count.set(0));
+                for index in order {
+                    assert_eq!(
+                        calculators[index].calculate(&mut context).expect("metric"),
+                        expected[index]
+                    );
+                }
+                WATERFALL_CALLS.with(|count| assert_eq!(count.get(), 1));
+
+                // NAV is read from the request, not frozen in the allocation cache.
+                context.set_base_value(Money::from((3_000_000_i64, test_currency())));
+                assert_eq!(
+                    TvpiLpCalculator
+                        .calculate(&mut context)
+                        .expect("updated NAV"),
+                    (realized + 3_000_000.0) / paid_in
+                );
+                WATERFALL_CALLS.with(|count| assert_eq!(count.get(), 1));
+
+                // Replacing the instrument view must discard the ledger.
+                let mut changed = fund.clone();
+                for event in &mut changed.events {
+                    event.amount = Money::new(event.amount.amount() * 2.0, test_currency())
+                        .expect("scaled event");
+                }
+                context.set_instrument(Arc::new(changed.clone()));
+                assert!(context.ext::<Arc<AllocationLedger>>().is_none());
+                let changed_carry = GpCarryTotalCalculator
+                    .calculate(&mut context)
+                    .expect("changed fund");
+                WATERFALL_CALLS.with(|count| assert_eq!(count.get(), 2));
+                let mut fresh = MetricContext::new(
+                    Arc::new(changed),
+                    Arc::new(finstack_quant_core::market_data::context::MarketContext::new()),
+                    as_of,
+                    nav,
+                    MetricContext::default_config(),
+                );
+                assert_eq!(
+                    changed_carry,
+                    GpCarryTotalCalculator
+                        .calculate(&mut fresh)
+                        .expect("fresh fund")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn allocation_errors_are_not_cached_or_hidden_by_paid_in_guard() {
+        use crate::pe_fund::types::WATERFALL_CALLS;
+        let mut fund = PrivateMarketsFund::example().expect("fund");
+        fund.events[0].amount = Money::from((1_i64, finstack_quant_core::currency::Currency::EUR));
+        let mut context = MetricContext::new(
+            Arc::new(fund),
+            Arc::new(finstack_quant_core::market_data::context::MarketContext::new()),
+            test_date(2020, 1, 1),
+            Money::from((0_i64, test_currency())),
+            MetricContext::default_config(),
+        );
+        WATERFALL_CALLS.with(|count| count.set(0));
+        for calculator in [&DpiLpCalculator as &dyn MetricCalculator, &TvpiLpCalculator] {
+            assert!(matches!(
+                calculator.calculate(&mut context),
+                Err(finstack_quant_core::Error::CurrencyMismatch { .. })
+            ));
+            assert!(context.ext::<Arc<AllocationLedger>>().is_none());
+        }
+        WATERFALL_CALLS.with(|count| assert_eq!(count.get(), 2));
     }
 }
