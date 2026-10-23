@@ -301,26 +301,11 @@ pub enum BusinessDayConvention {
     Nearest,
 }
 
-impl BusinessDayConvention {
-    /// Stable snake_case wire name, identical to the serde representation.
-    #[inline]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            BusinessDayConvention::Unadjusted => "unadjusted",
-            BusinessDayConvention::Following => "following",
-            BusinessDayConvention::ModifiedFollowing => "modified_following",
-            BusinessDayConvention::Preceding => "preceding",
-            BusinessDayConvention::ModifiedPreceding => "modified_preceding",
-            BusinessDayConvention::Nearest => "nearest",
-        }
-    }
-}
-
 /// `Display` emits the snake_case serde name so `to_string()` round-trips
 /// through `FromStr` and matches the JSON wire form.
 impl core::fmt::Display for BusinessDayConvention {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(self.as_str())
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| core::fmt::Error)?)
     }
 }
 
@@ -330,11 +315,10 @@ impl core::str::FromStr for BusinessDayConvention {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        crate::wire::serde_parse(&s.trim().to_ascii_lowercase()).map_err(|_| {
-            crate::Error::Validation(format!(
-                "Unknown business day convention: '{s}'; expected one of unadjusted, following, modified_following, preceding, modified_preceding, nearest"
-            ))
-        })
+        crate::wire::serde_parse_with_context(
+            "Unknown business day convention",
+            &s.trim().to_ascii_lowercase(),
+        )
     }
 }
 

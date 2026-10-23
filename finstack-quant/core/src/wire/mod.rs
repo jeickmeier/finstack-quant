@@ -65,6 +65,26 @@ impl From<SchemaVersion> for u32 {
     }
 }
 
+/// Parse a serde label, reporting a failure as `context`, the quoted label, and
+/// serde's own message (which names every accepted label).
+///
+/// # Arguments
+///
+/// * `context` - What is being parsed, such as `"unknown period kind"`.
+/// * `label` - Candidate label, read exactly as serde reads it; callers that
+///   accept surrounding whitespace or case trim and fold it first.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] when serde rejects `label`.
+pub fn serde_parse_with_context<T: serde::de::DeserializeOwned>(
+    context: &str,
+    label: &str,
+) -> crate::Result<T> {
+    serde_json::from_value(serde_json::Value::String(label.to_string()))
+        .map_err(|e| crate::Error::Validation(format!("{context} '{label}': {e}")))
+}
+
 /// Serde name of a unit-variant enum value (the `rename_all` form).
 ///
 /// Lets hosts label enums with the exact string serde owns instead of keeping
