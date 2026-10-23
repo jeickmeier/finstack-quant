@@ -28,7 +28,7 @@
 //! Result and config types ([`PeriodStats`], [`DrawdownEpisode`],
 //! [`BetaResult`], [`GreeksResult`], [`RollingGreeks`], [`MultiFactorResult`],
 //! [`ReturnKind`], [`DatedSeries`], [`RollingMetric`], [`PeriodicReturn`],
-//! [`LookbackReturns`]) are re-exported here because `Performance` returns them.
+//! [`LookbackReturns`], [`CagrDayCount`]) are re-exported here because `Performance` takes or returns them.
 //!
 //! The `DEFAULT_*` constants ([`DEFAULT_CONFIDENCE`], [`DEFAULT_ROLLING_WINDOW`],
 //! [`DEFAULT_PERIODS_PER_YEAR`], ...) are the values the Python and WebAssembly
@@ -42,6 +42,8 @@
 //!   equality-constrained least-squares solver exposed through the bindings.
 //!   It fits the factor returns that `finstack-quant-portfolio`'s
 //!   factor-Brinson attribution takes as caller-supplied input.
+//! - `schema` (default `json-schema` feature) registers the serde contracts
+//!   the bindings exchange as JSON Schema artifacts.
 //!
 //! Key conventions:
 //! - returns are simple decimal returns

@@ -2,7 +2,8 @@
 //!
 //! Crate-internal: callers use these through [`crate::Performance`].
 //!
-//! All functions operate on `&[f64]` return slices and return scalar `f64`.
+//! All functions operate on `&[f64]` return slices and return scalar `f64`,
+//! except `value_at_risk_and_es`, which returns the `(VaR, ES)` pair.
 //!
 //! Conventions:
 //! - returns are simple decimal returns (`-0.05` for a 5% loss)

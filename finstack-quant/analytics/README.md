@@ -19,7 +19,7 @@ regression and the constrained least-squares solver. Consumed by:
 |----------|--------------|
 | `finstack-quant-factor` | `beta` (OLS slope in the credit peel) |
 | `finstack-quant` (umbrella) | re-exported as `finstack_quant::analytics` |
-| `finstack-quant-py`, `finstack-quant-wasm` | `Performance`, `regression::constrained_least_squares` |
+| `finstack-quant-py`, `finstack-quant-wasm` | `Performance`, the scalar `sharpe` / `sortino` / `volatility` / `max_drawdown`, `regression::constrained_least_squares`, the result and config types, and the `DEFAULT_*` constants |
 
 ## Entry point
 
@@ -63,10 +63,12 @@ Method families on `Performance`:
 | Panels and periods | [`performance/aggregation.rs`](src/performance/aggregation.rs) | `get_returns`, `cumulative_returns`, `excess_returns`, `correlation_matrix`, `periodic_returns`, `period_stats`, `lookback_returns`, `cumulative_returns_outperformance`, `drawdown_difference` |
 | Window and benchmark reset | [`performance/mod.rs`](src/performance/mod.rs) | `reset_date_range`, `reset_bench_ticker`, `get_active_dates`, `get_active_dates_for_ticker`, `get_returns_for_ticker` |
 
-The per-domain modules `returns`, `risk_metrics`, `drawdown`, `benchmark`,
-`aggregation`, and `lookback` are `pub(crate)`; only the result and config
-types they define are re-exported at the crate root, because `Performance`
-returns them.
+The per-domain modules `aggregation`, `benchmark`, `defaults`, `drawdown`,
+`lookback`, `performance`, `returns`, and `risk_metrics` are `pub(crate)`;
+`regression` and `schema` (behind the default `json-schema` feature) are
+public. The crate root re-exports the result and config types `Performance`
+takes or returns, the `DEFAULT_*` constants, and the free functions listed
+below.
 
 ## Public surface
 
@@ -79,6 +81,10 @@ returns them.
 | `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult`, `ReturnKind` | `benchmark` | Returned / consumed by benchmark methods |
 | `CagrDayCount` | `risk_metrics` | Act/365.25 default or a wrapped core `DayCount` |
 | `DatedSeries` | `risk_metrics` | Returned by `Performance::rolling_*` |
+| `PeriodicReturn` | `aggregation` | `{date, value}` point returned by `Performance::periodic_returns` |
+| `RollingMetric` | `risk_metrics` | Names the metric in `DatedSeries::value_column` |
+| `DEFAULT_*` constants | `defaults` | Values the bindings substitute for omitted arguments |
+| `schema::ARTIFACTS` | `schema` | JSON Schema registry (default `json-schema` feature) |
 | `sharpe`, `sortino`, `volatility`, `max_drawdown` | crate root | Single-series metrics without panel construction |
 | `beta` | `benchmark` | Freestanding OLS slope; consumed by `finstack-quant-factor` |
 | `regression` | `regression` | Public module: `constrained_least_squares` |
@@ -98,8 +104,9 @@ link against this crate.
 - Annualization is derived from `finstack_quant_core::dates::PeriodKind`.
 - Risk-free rates that enter Sharpe, Treynor, M², modified Sharpe, Jensen,
   and `ReturnKind::Total` are geometrically decompounded:
-  `rf_period = (1 + rf_annual)^{1/N} − 1`. Sterling, Calmar, and pain keep
-  `CAGR − rf_annual` (both already annual).
+  `rf_period = (1 + rf_annual)^{1/N} − 1`. Sterling, Burke, and pain ratios
+  subtract the annual rate from CAGR directly (`CAGR − rf_annual`, both
+  already annual); Calmar and Martin take no risk-free rate.
 - `excess_returns` subtracts a panel-aligned `rf` series (`rf.len()` must
   equal the active date grid). `nperiods: None` decompounds at `self.ann()`.
 - CAGR defaults to Act/365.25 via `CagrDayCount`. Wrap a core `DayCount`
@@ -147,7 +154,7 @@ link against this crate.
 matrices, column counts that disagree with `ticker_names`, an unknown
 `benchmark_ticker`, and non-ascending dates. Per ticker, leading and trailing
 `NaN` padding is allowed but the finite span must be contiguous; an interior
-`NaN` or an active return `< -1.0` is an error. `multi_factor_greeks` also
+`NaN` or an active return `<= -1.0` is an error. `multi_factor_greeks` also
 rejects mismatched factor lengths, non-finite factors, non-positive
 annualization factors, an unknown or non-finite `ReturnKind::Total` rate,
 and singular or near-singular factor matrices. `correlation_matrix` and
@@ -173,8 +180,9 @@ are required. The `PeriodStats` fields that can legitimately be
 - **Python** — flat surface under `finstack_quant.analytics`: `Performance`
   plus the result wrappers (`BetaResult`, `DatedSeries`, `DrawdownEpisode`,
   `GreeksResult`, `LookbackReturns`, `MultiFactorResult`, `PeriodStats`,
-  `RollingGreeks`), `constrained_least_squares`, and the `AnalyticsError`
-  exception. `Performance` gains DataFrame-first constructors
+  `RollingGreeks`), the single-series functions `sharpe`, `sortino`,
+  `volatility` and `max_drawdown`, `constrained_least_squares`, and the
+  `AnalyticsError` exception. `Performance` gains DataFrame-first constructors
   (`Performance(prices_df, ...)`, `Performance.from_returns(df, ...)`) with the
   Rust-shaped array constructors available as `Performance.from_arrays` and
   `Performance.from_returns_arrays`, plus result `to_dataframe` methods.
@@ -216,7 +224,8 @@ mise run rust-bench-crate -- finstack-quant-analytics analytics_hot_paths
 mise run rust-bench-crate -- finstack-quant-analytics analytics_scaling
 ```
 
-Workspace gates (`mise run rust-lint`, `mise run rust-test`, `mise run rust-doc`
-— the last one runs doctests) are what CI enforces. The scoped tasks above
-route through the project's supported lint, nextest, and Criterion tooling;
-see [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
+Workspace gates (`mise run rust-lint`, `mise run rust-test`, `mise run rust-doc`)
+are what CI enforces; `mise run rust-test --doctest` runs the doctests,
+including the README samples. The scoped tasks above route through the
+project's supported lint, nextest, and Criterion tooling; see
+[`CONTRIBUTING.md`](../../CONTRIBUTING.md).

@@ -849,11 +849,8 @@ impl Performance {
 
     /// Per-period simple returns for one ticker over the active window.
     ///
-    /// This is the canonical way to read back the raw return series a
-    /// [`Performance`] was built from (or derived from prices). Prefer it over
-    /// calling [`Self::excess_returns`] with an all-zero risk-free vector or
-    /// un-compounding [`Self::cumulative_returns`]; both reproduce this series
-    /// only up to floating-point noise and are easy to get wrong.
+    /// The one-column form of [`Self::get_returns`]: the same values as its
+    /// row `ticker_idx`, without copying the other tickers.
     ///
     /// The series is span-aware: on edge-ragged panels it excludes the
     /// leading/trailing missing observations for this ticker, so its length

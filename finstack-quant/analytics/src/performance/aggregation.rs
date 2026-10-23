@@ -14,12 +14,14 @@ use finstack_quant_core::math::stats::{correlation, mean_var};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 impl Performance {
-    /// Per-period simple returns for each ticker.
+    /// Per-period simple returns for each ticker over the active window.
     ///
-    /// This is the canonical accessor for the raw return panel over the active
-    /// window. Prefer it over calling [`Performance::excess_returns`] with an
-    /// all-zero risk-free vector or hand-un-compounding
-    /// [`Performance::cumulative_returns`].
+    /// Reads back the raw return panel the [`Performance`] was built from (or
+    /// derived from prices). Prefer it over [`Performance::excess_returns`]
+    /// with an all-zero risk-free vector, which returns the same values but
+    /// needs a panel-length `rf` argument, or over un-compounding
+    /// [`Performance::cumulative_returns`], which matches only up to
+    /// floating-point noise.
     ///
     /// Series are span-aware and therefore ragged across tickers on
     /// edge-ragged panels: row `i` has the length of
