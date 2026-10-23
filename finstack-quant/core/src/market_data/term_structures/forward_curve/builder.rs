@@ -192,6 +192,11 @@ impl ForwardCurveBuilder {
         } else {
             (knots.clone(), forwards.clone())
         };
+        if self.style == InterpStyle::MonotoneConvex {
+            return Err(crate::Error::Validation(
+                "MonotoneConvex interpolation is only supported on DiscountCurve".to_string(),
+            ));
+        }
         let interp = self.style.build_enum(
             source_knots,
             source_forwards,
