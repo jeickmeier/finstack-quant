@@ -566,9 +566,11 @@ mod tests {
             let base = flat_vol(id, strike, 0.2);
             let incompatible = [
                 (
-                    base.clone()
-                        .with_quote_type(VolQuoteType::Normal)
-                        .expect("normal surface"),
+                    finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+                        &base,
+                        VolQuoteType::Normal,
+                    )
+                    .expect("normal surface"),
                     "black_lognormal",
                 ),
                 (

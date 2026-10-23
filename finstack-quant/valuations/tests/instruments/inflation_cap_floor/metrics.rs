@@ -84,9 +84,11 @@ fn risk_uses_selected_model_and_declared_bump_units() {
                 ))
                 .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, inflation).unwrap())
                 .insert_surface(
-                    flat_vol_surface("US-CPI-VOL", &[1.0, 5.0], &[strike], vol)
-                        .with_quote_type(quote_type)
-                        .expect("valid quote convention"),
+                    finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+                        &flat_vol_surface("US-CPI-VOL", &[1.0, 5.0], &[strike], vol),
+                        quote_type,
+                    )
+                    .expect("valid quote convention"),
                 )
         };
         let market = market_at_vol(sigma);
@@ -195,9 +197,11 @@ fn risk_retains_custom_registered_pricing_dispatch() {
 
     let as_of = date!(2025 - 01 - 02);
     let market = build_market(as_of, 0.02).insert_surface(
-        flat_vol_surface("US-CPI-VOL", &[1.0, 5.0], &[0.025], 0.02)
-            .with_quote_type(VolQuoteType::Normal)
-            .expect("valid quote convention"),
+        finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+            &flat_vol_surface("US-CPI-VOL", &[1.0, 5.0], &[0.025], 0.02),
+            VolQuoteType::Normal,
+        )
+        .expect("valid quote convention"),
     );
     let option = build_caplet();
     let metrics = [MetricId::Vega, MetricId::Inflation01, MetricId::Gamma];

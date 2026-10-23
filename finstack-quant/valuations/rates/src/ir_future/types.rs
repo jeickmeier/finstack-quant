@@ -1134,7 +1134,11 @@ mod tests {
                 )
                 .is_err());
         }
-        let normal = base.with_quote_type(VolQuoteType::Normal).unwrap();
+        let normal = finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+            &base,
+            VolQuoteType::Normal,
+        )
+        .unwrap();
         let adjusted = future
             .calculate_convexity_adjusted_rate(
                 &MarketContext::new().insert_surface(normal),

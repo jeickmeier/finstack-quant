@@ -32,7 +32,7 @@ use crate::validation::attach_validation_result;
 use crate::CalibrationReport;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
+use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolInterpolationMode, VolSurface};
 use finstack_quant_core::Result;
 use std::collections::BTreeMap;
 
@@ -200,10 +200,12 @@ pub(crate) fn solve(
         &params.target_expiries,
         &params.target_strikes,
         &grid,
-        Default::default(),
+        VolGridOpts {
+            interpolation_mode: VolInterpolationMode::TotalVariance,
+            ..VolGridOpts::default()
+        },
         None,
-    )?
-    .with_interpolation_mode(VolInterpolationMode::TotalVariance);
+    )?;
 
     let residuals = surface_quote_residuals(
         &surface,

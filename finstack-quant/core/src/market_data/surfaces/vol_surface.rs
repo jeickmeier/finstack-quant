@@ -140,7 +140,7 @@ pub enum VolInterpolationMode {
     /// arbitrage-free. For arbitrage-sensitive workflows (Dupire local vol,
     /// no-arb checks, term-structure interpolation) select
     /// [`TotalVariance`](Self::TotalVariance) via
-    /// [`VolSurface::with_interpolation_mode`]. Use this default when
+    /// [`VolSurfaceBuilder::interpolation_mode`]. Use this default when
     /// quote-space fidelity at the pillars is the governing convention.
     #[default]
     Vol,
@@ -322,42 +322,6 @@ impl VolSurface {
     /// Interpolation contract used when evaluating between grid points.
     pub fn interpolation_mode(&self) -> VolInterpolationMode {
         self.interpolation_mode
-    }
-
-    /// Return a copy of this surface with an explicit quote-type contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `quote_type` - Units and pricing convention assigned to the stored quotes; this changes metadata without converting values.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error when shifted Black is requested without
-    /// displacement rows. Use [`Self::with_displacements`] to attach those rows.
-    pub fn with_quote_type(mut self, quote_type: VolQuoteType) -> crate::Result<Self> {
-        if quote_type == VolQuoteType::ShiftedBlackLognormal {
-            validate_displacements(quote_type, self.displacements(), self.expiries.len())?;
-        }
-        self.quote_type = quote_type;
-        if quote_type != VolQuoteType::ShiftedBlackLognormal {
-            self.displacements = None;
-        }
-        Ok(self)
-    }
-
-    /// Return a copy of this surface with an explicit interpolation contract.
-    ///
-    /// Use [`VolInterpolationMode::TotalVariance`] when the surface should
-    /// interpolate linearly in total variance rather than directly in implied
-    /// volatility.
-    ///
-    /// # Arguments
-    ///
-    /// * `interpolation_mode` - Interpolation policy used between volatility grid nodes.
-    #[must_use]
-    pub fn with_interpolation_mode(mut self, interpolation_mode: VolInterpolationMode) -> Self {
-        self.interpolation_mode = interpolation_mode;
-        self
     }
 
     /// Require the semantic axis before a caller uses the surface.
@@ -686,6 +650,10 @@ impl VolSurfaceBuilder {
     }
 
     /// Set the interpolation contract used for off-grid evaluation.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode` - Interpolation contract used between grid nodes: direct volatility or total variance.
     pub fn interpolation_mode(mut self, mode: VolInterpolationMode) -> Self {
         self.interpolation_mode = mode;
         self
@@ -903,18 +871,18 @@ mod displacement_tests {
             Some(&[0.02])
         )
         .is_err());
-        let unshifted = VolSurface::from_grid(
+        assert!(VolSurface::from_grid(
             "UNSHIFTED",
             &[1.0],
             &[0.03],
             &[0.2],
-            Default::default(),
+            VolGridOpts {
+                quote_type: VolQuoteType::ShiftedBlackLognormal,
+                ..VolGridOpts::default()
+            },
             None,
         )
-        .unwrap();
-        assert!(unshifted
-            .with_quote_type(VolQuoteType::ShiftedBlackLognormal)
-            .is_err());
+        .is_err());
 
         let surface = VolSurface::from_grid(
             "SHIFT",

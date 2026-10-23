@@ -903,9 +903,11 @@ mod tests {
 
         let incompatible = [
             (
-                base.clone()
-                    .with_quote_type(VolQuoteType::Normal)
-                    .expect("normal surface"),
+                finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+                    &base,
+                    VolQuoteType::Normal,
+                )
+                .expect("normal surface"),
                 "black_lognormal",
             ),
             (

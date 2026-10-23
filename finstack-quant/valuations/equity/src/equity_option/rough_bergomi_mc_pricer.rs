@@ -479,11 +479,11 @@ mod variance_strip_tests {
                 .clone()
                 .with_displacements(&[20.0; 3])
                 .unwrap(),
-            surface
-                .as_ref()
-                .clone()
-                .with_quote_type(VolQuoteType::Normal)
-                .unwrap(),
+            finstack_quant_valuations_test_support::volatility::relabel_quote_type(
+                surface.as_ref(),
+                VolQuoteType::Normal,
+            )
+            .unwrap(),
             finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
                 surface.id(),
                 surface.expiries(),
