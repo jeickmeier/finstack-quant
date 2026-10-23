@@ -822,7 +822,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 213059
+            "bytes": 213199
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
@@ -871,7 +871,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
             "type_name": "StepParams",
             "kind": "component",
-            "bytes": 61599
+            "bytes": 61739
           },
           {
             "path": "schemas/market/1/cds_quote.schema.json",
@@ -3600,7 +3600,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 213059
+            "bytes": 213199
           },
           {
             "domain": "calibration",
@@ -3656,7 +3656,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
             "type_name": "StepParams",
             "kind": "component",
-            "bytes": 61599
+            "bytes": 61739
           },
           {
             "domain": "calibration",

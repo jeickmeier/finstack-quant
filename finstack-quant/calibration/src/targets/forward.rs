@@ -20,7 +20,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{ForwardCurve, RateCalibrationCurveRole};
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_rates::deposit::Deposit;
@@ -350,6 +350,10 @@ impl ForwardCurveTarget {
             .knots(full_knots)
             .projection_grid(projection_grid)
             .interp(self.params.solve_interp)
+            // Hold the last forward rate constant past the final reset: on a
+            // forward-rate curve that is the flat-forward convention, whereas
+            // `FlatForward` would extend the last segment's slope.
+            .extrapolation(ExtrapolationPolicy::FlatZero)
             .day_count(self.params.time_day_count)
             .build()
             .map_err(|error| finstack_quant_core::Error::Calibration {

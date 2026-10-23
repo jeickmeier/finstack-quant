@@ -797,10 +797,11 @@ pub struct ForwardCurveParams {
     pub method: CalibrationMethod,
     /// Interpolation style for the constructed forward curve.
     ///
-    /// Defaults to Hagan-West monotone-convex interpolation for a smooth,
-    /// shape-preserving forward term structure. `Linear` remains explicitly
-    /// opt-in.
-    #[serde(default = "default_interp_monotone_convex")]
+    /// Defaults to monotone cubic Hermite (Fritsch-Carlson) interpolation for a
+    /// smooth, shape-preserving forward term structure that admits zero and
+    /// negative rates. `Linear` remains explicitly opt-in; `MonotoneConvex` is
+    /// rejected because it is defined on discount factors, not forward rates.
+    #[serde(default = "default_interp_cubic_hermite")]
     pub interpolation: InterpStyle,
 
     /// Step-level conventions for pricing and curve time axis.
@@ -1314,8 +1315,8 @@ fn default_interp_log_linear() -> InterpStyle {
     InterpStyle::LogLinear
 }
 
-fn default_interp_monotone_convex() -> InterpStyle {
-    InterpStyle::MonotoneConvex
+fn default_interp_cubic_hermite() -> InterpStyle {
+    InterpStyle::CubicHermite
 }
 
 fn default_par_interp_linear() -> ParInterp {
@@ -1432,7 +1433,7 @@ mod interpolation_default_tests {
             "discount_curve_id": "USD-OIS"
         }))
         .expect("forward params");
-        assert_eq!(forward.interpolation, InterpStyle::MonotoneConvex);
+        assert_eq!(forward.interpolation, InterpStyle::CubicHermite);
 
         let xccy: XccyBasisParams = serde_json::from_value(serde_json::json!({
             "curve_id": "EUR-OIS",

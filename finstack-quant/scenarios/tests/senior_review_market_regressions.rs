@@ -310,7 +310,7 @@ fn vol_index_interpolated_shocks_deliver_all_overlapping_tenors_on_native_interp
     for interp in [
         InterpStyle::Linear,
         InterpStyle::LogLinear,
-        InterpStyle::MonotoneConvex,
+        InterpStyle::CubicHermite,
     ] {
         let base = PriceCurve::builder("VIX")
             .kind(PriceCurveKind::VolIndex)

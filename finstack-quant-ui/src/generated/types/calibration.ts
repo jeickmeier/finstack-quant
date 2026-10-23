@@ -1748,9 +1748,10 @@ export type D_08Aea844Abd10Cb00E40 =
       /**
        * Interpolation style for the constructed forward curve.
        *
-       * Defaults to Hagan-West monotone-convex interpolation for a smooth,
-       * shape-preserving forward term structure. `Linear` remains explicitly
-       * opt-in.
+       * Defaults to monotone cubic Hermite (Fritsch-Carlson) interpolation for a
+       * smooth, shape-preserving forward term structure that admits zero and
+       * negative rates. `Linear` remains explicitly opt-in; `MonotoneConvex` is
+       * rejected because it is defined on discount factors, not forward rates.
        */
       interpolation?: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       kind: "forward";

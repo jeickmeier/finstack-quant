@@ -240,7 +240,7 @@
           "use_analytical_jacobian": false
         }
       },
-      "interpolation": "monotone_convex",
+      "interpolation": "cubic_hermite",
       "conventions": {
         "curve_day_count": null,
         "ois_compounding": null

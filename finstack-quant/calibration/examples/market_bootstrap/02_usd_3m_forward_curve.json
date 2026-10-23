@@ -52,7 +52,7 @@
             "use_analytical_jacobian": false
           }
         },
-        "interpolation": "monotone_convex",
+        "interpolation": "cubic_hermite",
         "conventions": {}
       }
     ],

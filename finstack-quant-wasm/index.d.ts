@@ -30003,7 +30003,7 @@ export interface CalibrationNamespace {
    * @param discountCurveId - Identifier of the discount curve used to price the quotes.
    * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
    * @param curveId - Identifier of the produced curve; defaults to `id`.
-   * @param params - Optional object (or JSON) of further wire fields: `method`, `interpolation` (default `"monotone_convex"`), `conventions`. An entry named like another argument is replaced by that argument.
+   * @param params - Optional object (or JSON) of further wire fields: `method`, `interpolation` (default `"cubic_hermite"`), `conventions`. An entry named like another argument is replaced by that argument.
    * @returns A `CalibrationStep` object with `kind: "forward"`.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
    */
