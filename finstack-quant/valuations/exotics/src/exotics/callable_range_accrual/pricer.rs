@@ -458,11 +458,11 @@ fn build_schedule(
         if t > 0.0 {
             if event.is_observation {
                 // Term reference rate over [t, t + index_tenor].
-                event.forward_coeffs = term_forward.period_coeffs(t, index_tenor);
+                event.forward_coeffs = term_forward.period_coeffs(t, index_tenor)?;
             }
             if eligible_call_dates.contains(&date) {
                 event.exercise_slot = Some(next_exercise_slot);
-                event.to_final_payment = term_forward.period_coeffs(t, final_payment_time - t);
+                event.to_final_payment = term_forward.period_coeffs(t, final_payment_time - t)?;
                 next_exercise_slot += 1;
             }
             if date == final_payment_date {

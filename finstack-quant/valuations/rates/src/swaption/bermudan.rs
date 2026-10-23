@@ -535,13 +535,13 @@ impl BermudanSwaptionPricer {
                 )
             })?;
             let t = time_grid.time(step);
-            Ok(exercise_cashflows[slot].evaluate(
+            exercise_cashflows[slot].evaluate(
                 t,
                 hw_params.model.kappa,
                 hw_params.sigma_at_time(t),
                 |maturity| hw_bond_price(&hw_params, short_rate, t, maturity, discount_fn),
                 terms,
-            ))
+            )
         };
         let hw_process = HullWhite1FProcess::new(hw_params.clone());
 
