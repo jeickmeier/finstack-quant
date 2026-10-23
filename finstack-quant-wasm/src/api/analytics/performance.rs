@@ -1,10 +1,12 @@
 //! WASM `Performance` class — the analytics panel entry point.
 //!
 //! Mirrors the Python `Performance` API (price- or return-panel construction,
-//! every metric exposed as an instance method). Complex result types are
-//! serialized to plain JS objects via `crate::utils::to_js_value` rather than
-//! exposed as classes, keeping the JS facade simple. Omitted arguments resolve
-//! to the Rust-owned `finstack_quant_analytics::DEFAULT_*` constants.
+//! every metric exposed as an instance method). Complex results are plain JS
+//! objects rather than classes: serde-shaped results go through the
+//! `crate::utils` serializers, while `DatedSeries`, `RollingGreeks` and the
+//! `correlationMatrix` result are assembled by hand so their numeric columns
+//! arrive as `Float64Array`. Omitted arguments resolve to the Rust-owned
+//! `finstack_quant_analytics::DEFAULT_*` constants.
 
 use crate::utils::input::{
     js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_opt_string, js_opt_uint, js_string,
