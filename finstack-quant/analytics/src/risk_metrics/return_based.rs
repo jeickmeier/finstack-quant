@@ -497,10 +497,7 @@ pub(crate) fn gain_to_pain(returns: &[f64]) -> f64 {
     }
     let total: f64 = kahan_sum(returns.iter().copied());
     let abs_losses: f64 = kahan_sum(returns.iter().filter(|&&r| r < 0.0).map(|&r| r.abs()));
-    if abs_losses == 0.0 {
-        return if total > 0.0 { f64::INFINITY } else { 0.0 };
-    }
-    total / abs_losses
+    super::ratio_or_sign_infinity(total, abs_losses)
 }
 
 /// Modified Sharpe ratio: excess return divided by corresponding-horizon
@@ -886,6 +883,11 @@ mod tests {
     #[test]
     fn gain_to_pain_empty() {
         assert!(gain_to_pain(&[]).is_nan());
+    }
+
+    #[test]
+    fn gain_to_pain_without_gains_or_losses_is_zero() {
+        assert_eq!(gain_to_pain(&[0.0, 0.0]), 0.0);
     }
 
     #[test]
