@@ -451,9 +451,12 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
 
 #[test]
 fn lookback_returns_includes_maximum_reference_date_without_overflow() {
+    let last = Date::MAX;
+    let mid = last.previous_day().expect("prior date");
+    let first = mid.previous_day().expect("prior date");
     let perf = Performance::new(
-        vec![Date::MAX.previous_day().expect("prior date"), Date::MAX],
-        vec![vec![100.0, 110.0]],
+        vec![first, mid, last],
+        vec![vec![100.0, 110.0, 121.0]],
         vec!["A".into()],
         None,
         PeriodKind::Daily,
@@ -463,7 +466,7 @@ fn lookback_returns_includes_maximum_reference_date_without_overflow() {
         let lookbacks = perf.lookback_returns(Date::MAX, Some(fiscal_config));
         for values in [lookbacks.mtd, lookbacks.qtd, lookbacks.ytd, lookbacks.fytd] {
             assert_eq!(values.len(), 1);
-            assert!((values[0] - 0.1).abs() < 1.0e-14);
+            assert!((values[0] - 0.21).abs() < 1.0e-14);
         }
     }
 }
