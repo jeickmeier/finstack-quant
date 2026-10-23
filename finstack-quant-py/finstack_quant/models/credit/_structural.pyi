@@ -1838,9 +1838,11 @@ class DynamicRecoverySpec:
         ...
 
     @staticmethod
-    def linear_decline(base_recovery: float, base_notional: float, slope: float, floor: float) -> DynamicRecoverySpec:
+    def linear_decline(
+        base_recovery: float, base_notional: float, sensitivity: float, floor: float
+    ) -> DynamicRecoverySpec:
         """
-        Recovery declining linearly with accretion: ``max(R_0 - slope * (N - N_0) / N_0, floor)``.
+        Recovery declining linearly with accretion: ``clamp(R_0 * (1 - sensitivity * (N / N_0 - 1)), floor, R_0)``.
 
         Parameters
         ----------
@@ -1848,8 +1850,8 @@ class DynamicRecoverySpec:
             Reference recovery ``R_0`` as a decimal in ``[0, 1]``.
         base_notional : float
             Reference notional ``N_0`` (strictly positive), in the instrument's currency.
-        slope : float
-            Non-negative recovery decline per unit of relative accretion.
+        sensitivity : float
+            Dimensionless, non-negative relative recovery sensitivity to ``N / N_0 - 1``.
         floor : float
             Minimum recovery as a decimal in ``[0, base_recovery]``.
 
@@ -1866,8 +1868,9 @@ class DynamicRecoverySpec:
         Examples
         --------
         >>> from finstack_quant.models.credit import DynamicRecoverySpec
-        >>> DynamicRecoverySpec.linear_decline(0.4, 100.0, 0.1, 0.2).kind
-        'linear_decline'
+        >>> spec = DynamicRecoverySpec.linear_decline(0.4, 100.0, sensitivity=0.5, floor=0.1)
+        >>> round(spec.recovery_at_notional(120.0), 2)
+        0.36
         """
         ...
 
@@ -2109,7 +2112,8 @@ class EndogenousHazardSpec:
         Parameters
         ----------
         leverage_points : list[float]
-            Strictly increasing leverage ratios (at least two).
+            One or more finite non-negative leverage ratios, strictly increasing
+            when multiple points are supplied; one point gives constant hazard.
         hazard_points : list[float]
             Non-negative annualized hazard rates, one per leverage point; the
             base leverage and base hazard are taken from the first point.
@@ -2122,7 +2126,7 @@ class EndogenousHazardSpec:
         Raises
         ------
         ValueError
-            If the lists differ in length, have fewer than two points, are not
+            If the lists differ in length, are empty, are not
             strictly increasing in leverage, or contain non-finite or negative
             values.
 
@@ -2131,6 +2135,8 @@ class EndogenousHazardSpec:
         >>> from finstack_quant.models.credit import EndogenousHazardSpec
         >>> EndogenousHazardSpec.tabular([2.0, 6.0], [0.01, 0.05]).hazard_at_leverage(4.0)
         0.03
+        >>> EndogenousHazardSpec.tabular([2.0], [0.01]).hazard_at_leverage(8.0)
+        0.01
         """
         ...
 

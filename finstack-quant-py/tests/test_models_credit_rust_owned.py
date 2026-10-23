@@ -122,3 +122,25 @@ def test_optimal_toggle_wire_has_only_decision_parameters() -> None:
     wire["optimal_exercise"]["equity_discount_rate"] = 1000.0
     with pytest.raises(ValueError, match=r"unknown field.*equity_discount_rate"):
         ToggleExerciseModel.from_json(json.dumps(wire))
+
+
+def test_recovery_relative_sensitivity_and_single_point_hazard() -> None:
+    spec = DynamicRecoverySpec.linear_decline(0.4, 100.0, sensitivity=0.5, floor=0.1)
+    assert spec.recovery_at_notional(120.0) == pytest.approx(0.36)
+    with pytest.raises(TypeError):
+        DynamicRecoverySpec.linear_decline(0.4, 100.0, slope=0.5, floor=0.1)  # type: ignore[call-arg]
+    table = EndogenousHazardSpec.tabular([2.0], [0.01])
+    for leverage in (0.0, 2.0, 8.0):
+        assert table.hazard_at_leverage(leverage) == 0.01
+
+
+def test_simulated_path_dataframe_uses_validated_times() -> None:
+    from finstack_quant.models.credit import SimulatedPaths
+
+    paths = MertonModel(100.0, 0.25, 80.0, 0.05).simulate_paths(2, 4, 1.0, 7, True)
+    frame = paths.to_dataframe()
+    assert frame["time"].to_list() == paths.times * 2
+    wire = json.loads(paths.to_json())
+    wire["times"].pop()
+    with pytest.raises(ValueError, match="times length"):
+        SimulatedPaths.from_json(json.dumps(wire))

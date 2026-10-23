@@ -831,9 +831,9 @@ impl PySimulatedPaths {
         let mut path_col = Vec::with_capacity(n);
         let mut time_col = Vec::with_capacity(n);
         for p in 0..self.inner.num_paths {
-            for t in 0..per_path {
+            for &time in &self.inner.times {
                 path_col.push(p as u64);
-                time_col.push(self.inner.times.get(t).copied().unwrap_or(f64::NAN));
+                time_col.push(time);
             }
         }
         let columns = PyDict::new(py);
@@ -979,7 +979,7 @@ impl PyDynamicRecoverySpec {
     }
 
     /// Recovery declining linearly with accretion:
-    /// ``R(N) = max(R_0 - slope * (N - N_0) / N_0, floor)``.
+    /// ``R(N) = clamp(R_0 * (1 - sensitivity * (N / N_0 - 1)), floor, R_0)``.
     ///
     /// Parameters
     /// ----------
@@ -987,23 +987,28 @@ impl PyDynamicRecoverySpec {
     ///     Reference recovery ``R_0`` as a decimal in ``[0, 1]``.
     /// base_notional : float
     ///     Reference notional ``N_0`` (strictly positive).
-    /// slope : float
-    ///     Non-negative recovery decline per unit of relative accretion.
+    /// sensitivity : float
+    ///     Dimensionless, non-negative relative recovery sensitivity to ``N / N_0 - 1``.
     /// floor : float
     ///     Minimum recovery as a decimal in ``[0, base_recovery]``.
     ///
     /// Raises ``ValueError`` on non-finite or out-of-range inputs.
     #[staticmethod]
-    #[pyo3(text_signature = "(base_recovery, base_notional, slope, floor)")]
+    #[pyo3(text_signature = "(base_recovery, base_notional, sensitivity, floor)")]
     fn linear_decline(
         base_recovery: f64,
         base_notional: f64,
-        slope: f64,
+        sensitivity: f64,
         floor: f64,
     ) -> PyResult<Self> {
         Ok(Self {
-            inner: DynamicRecoverySpec::linear_decline(base_recovery, base_notional, slope, floor)
-                .map_err(core_to_py)?,
+            inner: DynamicRecoverySpec::linear_decline(
+                base_recovery,
+                base_notional,
+                sensitivity,
+                floor,
+            )
+            .map_err(core_to_py)?,
         })
     }
 
@@ -1137,7 +1142,8 @@ impl PyEndogenousHazardSpec {
     /// Parameters
     /// ----------
     /// leverage_points : list[float]
-    ///     Strictly increasing leverage ratios (at least two).
+    ///     One or more finite non-negative leverage ratios, strictly increasing
+    ///     when multiple points are supplied. A single point gives constant hazard.
     /// hazard_points : list[float]
     ///     Non-negative annualized hazard rates, one per leverage point. The
     ///     base leverage and base hazard are taken from the first point.

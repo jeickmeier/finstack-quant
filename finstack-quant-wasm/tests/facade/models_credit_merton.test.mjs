@@ -355,3 +355,17 @@ test('optimal toggle wire rejects the removed equity discount rate', () => {
     model.free();
   }
 });
+
+test('relative recovery sensitivity and single-point hazard match Rust', () => {
+  const spec = credit.DynamicRecoverySpec.linearDecline(0.4, 100, 0.5, 0.1);
+  assert.ok(Math.abs(spec.recoveryAtNotional(120) - 0.36) < 1e-15);
+  const hazard = credit.EndogenousHazardSpec.tabular([2], [0.01]);
+  for (const leverage of [0, 2, 8]) assert.equal(hazard.hazardAtLeverage(leverage), 0.01);
+  const paths = model.simulatePaths(2, 4, 1, 7, true);
+  const malformed = JSON.parse(paths.toJson());
+  malformed.times.pop();
+  assert.throws(
+    () => credit.SimulatedPaths.fromJson(malformed),
+    (e) => e.kind === 'validation'
+  );
+});
