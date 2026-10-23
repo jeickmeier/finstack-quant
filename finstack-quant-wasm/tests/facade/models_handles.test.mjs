@@ -527,7 +527,7 @@ test('rates handles expose their accessors and reject bad input', () => {
     () => hullWhite.HullWhiteParams.piecewise(0.05, [0], [0.01, 0.02]),
     kind('validation')
   );
-  // The forward curve defaults to the discount curve, as in Python.
+  // Both curve roles are explicit; the same handle gives single-curve pricing.
   const curve = new core.DiscountCurve({
     id: 'USD-OIS',
     baseDate: '2025-01-15',
@@ -538,12 +538,49 @@ test('rates handles expose their accessors and reject bad input', () => {
     [0.25, 0.5, 0.25],
     [0.5, 0.75, 0.25],
   ];
-  assert.equal(
-    hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve),
-    hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve, curve)
+  const cap = hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve, curve);
+  const floor = hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, false, curve, curve);
+  const parity = periods.reduce(
+    (sum, [fix, pay, accrual]) =>
+      sum + curve.df(pay) * (curve.df(fix) / curve.df(pay) - 1 - accrual * 0.03),
+    0
   );
+  assert.ok(Math.abs(cap - floor - parity) < 1e-12);
+  const projection = new core.DiscountCurve({
+    id: 'USD-FWD',
+    baseDate: '2025-01-15',
+    knots: [0, 1, 1, 0.95, 2, 0.9],
+    dayCount: 'act_365f',
+  });
+  const projectedCap = hullWhite.hw1fCapFloorPrice(
+    0.05,
+    0.01,
+    periods,
+    0.03,
+    true,
+    curve,
+    projection
+  );
+  const projectedFloor = hullWhite.hw1fCapFloorPrice(
+    0.05,
+    0.01,
+    periods,
+    0.03,
+    false,
+    curve,
+    projection
+  );
+  const projectedParity = periods.reduce(
+    (sum, [fix, pay, accrual]) =>
+      sum + curve.df(pay) * (projection.df(fix) / projection.df(pay) - 1 - accrual * 0.03),
+    0
+  );
+  assert.ok(Math.abs(projectedCap - projectedFloor - projectedParity) < 1e-12);
+  assert.ok(projectedCap > cap);
+  assert.throws(() => hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve));
+  assert.throws(() => hullWhite.hw1fCapFloorPrice(0.05, 0.01, periods, 0.03, true, curve, null));
   assert.throws(
-    () => hullWhite.hw1fCapFloorPrice(0.05, 0.01, [[0.25, 0.5]], 0.03, true, curve),
+    () => hullWhite.hw1fCapFloorPrice(0.05, 0.01, [[0.25, 0.5]], 0.03, true, curve, curve),
     kind('validation')
   );
   assert.throws(() => hullWhite.hw1fZcbOptionPrice(0.95, 0.8, 0.84, 0.02, 1), invalidType);

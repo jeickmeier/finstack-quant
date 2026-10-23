@@ -466,7 +466,7 @@ def hw1f_cap_floor_price(
     strike: float,
     is_cap: bool,
     discount_curve: DiscountCurve,
-    forward_curve: DiscountCurve | None = None,
+    forward_curve: DiscountCurve,
 ) -> float:
     """Price a cap or floor as a sum of Hull-White caplets/floorlets.
 
@@ -485,9 +485,9 @@ def hw1f_cap_floor_price(
         ``True`` prices a cap, ``False`` a floor.
     discount_curve : DiscountCurve
         Discounting curve queried at ``t_pay``.
-    forward_curve : DiscountCurve or None, default None
-        Projection curve for the forward rates; ``None`` reuses
-        ``discount_curve`` (single-curve).
+    forward_curve : DiscountCurve
+        Projection curve for forward rates. Pass ``discount_curve`` explicitly
+        for single-curve pricing, or a distinct projection curve for two-curve pricing.
 
     Returns
     -------
@@ -499,6 +499,8 @@ def hw1f_cap_floor_price(
     ------
     ValueError
         If ``kappa`` or ``sigma`` is non-finite or not strictly positive.
+    TypeError
+        If either required curve is omitted, ``None``, or not a ``DiscountCurve``.
 
     Examples
     --------
@@ -506,8 +508,8 @@ def hw1f_cap_floor_price(
     >>> from finstack_quant.core.market_data import DiscountCurve
     >>> from finstack_quant.models.rates.hull_white import hw1f_cap_floor_price
     >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03)
-    >>> cap = hw1f_cap_floor_price(0.05, 0.01, [(1.0, 2.0, 1.0)], 0.03, True, curve)
-    >>> floor = hw1f_cap_floor_price(0.05, 0.01, [(1.0, 2.0, 1.0)], 0.03, False, curve)
+    >>> cap = hw1f_cap_floor_price(0.05, 0.01, [(1.0, 2.0, 1.0)], 0.03, True, curve, curve)
+    >>> floor = hw1f_cap_floor_price(0.05, 0.01, [(1.0, 2.0, 1.0)], 0.03, False, curve, curve)
     >>> cap > 0.0 and floor > 0.0
     True
     """

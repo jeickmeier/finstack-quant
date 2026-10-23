@@ -682,7 +682,15 @@ const CASES = {
     hullWhite.hwBondVol(0.05, 0.01, 0.0, 1.0, 5.0),
     hullWhite.hw1fZcbOptionPrice(0.95, 0.8, 0.84, 0.02, true),
     hullWhite.hw1fCapletForwardRateNormalVol(0.05, 0.01, 1.0, 0.25),
-    hullWhite.hw1fCapFloorPrice(0.05, 0.01, CAP_PERIODS, 0.03, true, discountCurve(0.03)),
+    hullWhite.hw1fCapFloorPrice(
+      0.05,
+      0.01,
+      CAP_PERIODS,
+      0.03,
+      true,
+      discountCurve(0.03),
+      discountCurve(0.03)
+    ),
     hullWhite.hw1fCapFloorPrice(
       0.05,
       0.01,
