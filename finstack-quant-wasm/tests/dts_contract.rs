@@ -332,6 +332,12 @@ fn core_dts_exposes_typed_array_math() {
         "countConsecutive(",
         "choleskyDecompositionFlat(",
         "validateCorrelationMatrixFlat(",
+        "longestPositiveRun(",
+        "singularThreshold(",
+        "diagonalTolerance(",
+        "symmetryTolerance(",
+        "fxMarketPair(",
+        "fxPipSize(",
     ] {
         assert!(!dts.contains(gone), "{gone} should no longer be exported");
     }

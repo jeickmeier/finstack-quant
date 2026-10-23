@@ -19,7 +19,7 @@
 //! # Rule Evaluation
 //!
 //! Each rule implements two core methods:
-//! - `applies(&self, date)`: O(1) check if date matches the rule
+//! - `applies(&self, date)`: membership test over `dates_in_year` for the date's year
 //! - `materialize_year(&self, year, out)`: Generate all matching dates for a year
 //!
 //! # See Also
@@ -541,8 +541,9 @@ impl Rule {
     /// Append the dates in `year` that this rule marks as holidays into `out`.
     ///
     /// Observance and spans can place a holiday in a neighbouring year's
-    /// materialization, so every base year that can reach `year` is evaluated and
-    /// only the dates landing in `year` are kept. `Effective` gates on `year`,
+    /// materialization, so the base years either side of `year` are evaluated too
+    /// and only the dates landing in `year` are kept. A rule whose offset reaches
+    /// further than one year boundary is not covered. `Effective` gates on `year`,
     /// the date's own year. No deduplication is performed.
     pub(crate) fn dates_in_year<A: smallvec::Array<Item = Date>>(
         &self,

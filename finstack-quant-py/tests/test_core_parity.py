@@ -336,6 +336,8 @@ class TestFxConventionParity:
     """FX pair-convention helpers match Rust market order, pips, and invert."""
 
     def test_fx_market_order_and_convention(self) -> None:
+        eur = fx_pair_convention("USD", "EUR")
+        assert [str(eur.base), str(eur.quote)] == ["EUR", "USD"]
         conv = fx_pair_convention("USD", "JPY")
         assert str(conv.base) == "USD"
         assert str(conv.quote) == "JPY"
@@ -344,7 +346,7 @@ class TestFxConventionParity:
         assert conv.pip_size == 0.01
         assert conv.settlement_days == 2
 
-    def test_fx_pip_size_and_invert(self) -> None:
+    def test_fx_convention_pip_size_and_invert(self) -> None:
         assert fx_pair_convention("USD", "JPY").pip_size == 0.01
         assert fx_pair_convention("EUR", "USD").pip_size == 0.0001
         assert invert_fx_rate(1.10) == pytest.approx(1.0 / 1.10)

@@ -317,6 +317,7 @@ impl core::str::FromStr for BusinessDayConvention {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         crate::wire::serde_parse_with_context(
             "Unknown business day convention",
+            s,
             &s.trim().to_ascii_lowercase(),
         )
     }

@@ -252,6 +252,7 @@ impl std::str::FromStr for CFKind {
     fn from_str(s: &str) -> crate::Result<Self> {
         crate::wire::serde_parse_with_context(
             "unknown cashflow kind",
+            s,
             &s.trim().to_ascii_lowercase(),
         )
     }

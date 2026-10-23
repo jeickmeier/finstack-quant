@@ -117,12 +117,14 @@ impl FormatOpts {
     ///
     /// # Examples
     /// ```rust
-    /// use finstack_quant_core::money::FormatOpts;
     /// use finstack_quant_core::config::RoundingMode;
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::{FormatOpts, Money};
     ///
     /// let opts = FormatOpts::new(Some(2), Some(true), Some(","), Some(RoundingMode::Bankers))
     ///     .expect("bounded precision");
-    /// # let _ = opts;
+    /// let amount = Money::new(1234.5, Currency::USD).expect("valid amount");
+    /// assert_eq!(amount.format_with(opts), "USD 1,234.50");
     /// assert!(FormatOpts::new(None, None, Some(", "), None).is_err());
     /// ```
     pub fn new(

@@ -330,6 +330,9 @@ test('core FX delta surface absent wings use omitted arguments, not empty arrays
 });
 
 test('core FX pair convention helpers', () => {
+  const eur = core.fxPairConvention('USD', 'EUR');
+  assert.equal(eur.base.toString(), 'EUR');
+  assert.equal(eur.quote.toString(), 'USD');
   const conv = core.fxPairConvention('USD', 'JPY');
   assert.equal(conv.base.toString(), 'USD');
   assert.equal(conv.quote.toString(), 'JPY');

@@ -90,7 +90,7 @@ fn statistics_of_known_values() {
 // ---- Summation ----
 
 #[wasm_bindgen_test]
-fn summation_and_positive_run() {
+fn compensated_summation() {
     assert!(
         (kahan_sum(JsValue::from([1.0, 2.0, 3.0, 4.0].to_vec())).unwrap() - 10.0).abs() < 1e-10
     );

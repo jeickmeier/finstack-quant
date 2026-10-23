@@ -657,6 +657,7 @@ impl std::str::FromStr for DayCount {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         crate::wire::serde_parse_with_context(
             "unknown day-count convention",
+            s,
             &s.trim().to_ascii_lowercase(),
         )
     }

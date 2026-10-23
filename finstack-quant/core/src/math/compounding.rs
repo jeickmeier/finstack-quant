@@ -10,7 +10,6 @@
 //! | Convention | Common Usage | Formula (rate from DF) |
 //! |------------|--------------|------------------------|
 //! | Continuous | Internal calculations, curve construction | r = -ln(DF) / t |
-//! | Annual | Bond markets (UK, Europe) | r = DF^(-1/t) - 1 |
 //! | Semi-Annual | US Treasury, corporate bonds | r = 2 × (DF^(-1/(2t)) - 1) |
 //! | Quarterly | Some floating rate notes | r = 4 × (DF^(-1/(4t)) - 1) |
 //! | Simple | Money market (< 1Y), deposits | r = (1/DF - 1) / t |

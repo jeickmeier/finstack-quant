@@ -75,7 +75,7 @@ impl FromStr for PeriodKind {
     ///
     /// * `s` - One of daily, weekly, monthly, quarterly, semi_annual, or annual; aliases, case variants and padding are rejected.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        crate::wire::serde_parse_with_context("unknown period kind", s)
+        crate::wire::serde_parse_with_context("unknown period kind", s, s)
     }
 }
 

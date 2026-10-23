@@ -487,11 +487,17 @@ pub fn calendar_year_ladder(
 
     calendar_year_ladder_rows(dates.iter().zip(kind_labels).zip(amounts).zip(pvs).map(
         |(((&date, kind_label), &amount), &pv)| {
-            let kind = kind_label.trim().parse::<CFKind>().map_err(|err| {
-                finstack_quant_core::Error::Validation(format!(
-                    "calendar_year_ladder unknown cashflow kind '{kind_label}': {err}"
-                ))
-            });
+            let kind = kind_label
+                .trim()
+                .parse::<CFKind>()
+                .map_err(|err| match err {
+                    finstack_quant_core::Error::Validation(message) => {
+                        finstack_quant_core::Error::Validation(format!(
+                            "calendar_year_ladder {message}"
+                        ))
+                    }
+                    other => other,
+                });
             (date, kind, amount, pv)
         },
     ))

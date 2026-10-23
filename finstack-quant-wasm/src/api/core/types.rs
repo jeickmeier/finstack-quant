@@ -360,59 +360,6 @@ impl JsBps {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // -- Boundary tests ------------------------------------------------
-    // Error paths through wasm-bindgen create JsValue, which panics on
-    // native targets.  Test the underlying Rust types instead.
-
-    #[test]
-    fn rate_rejects_nan() {
-        assert!(RustRate::from_decimal(f64::NAN).is_err());
-    }
-
-    #[test]
-    fn rate_rejects_infinity() {
-        assert!(RustRate::from_decimal(f64::INFINITY).is_err());
-    }
-
-    #[test]
-    fn bp_rejects_nan() {
-        assert!(RustBps::try_new(f64::NAN).is_err());
-    }
-
-    #[test]
-    fn bp_rejects_fractional() {
-        assert!(RustBps::try_new(62.5).is_err());
-    }
-
-    #[test]
-    fn cross_conversions_use_the_rust_from_impls() {
-        let bps = JsBps {
-            inner: RustBps::try_new(-1995.0).expect("bps"),
-        };
-        assert!((bps.as_percent() + 19.95).abs() < 1e-12);
-        assert!((bps.as_rate().as_decimal() + 0.1995).abs() < 1e-12);
-        assert!(bps.is_negative() && bps.checked_abs().expect("representable").is_positive());
-        let rate = JsRate {
-            inner: "12.5bp".parse::<RustRate>().expect("fractional bp quote"),
-        };
-        assert!((rate.as_decimal() - 0.00125).abs() < 1e-15);
-        assert!((rate.as_percent() - 0.125).abs() < 1e-12);
-    }
-
-    #[test]
-    fn json_round_trips_through_rust_serde() {
-        let rate = JsRate {
-            inner: RustRate::from_decimal(0.0525).expect("rate"),
-        };
-        let back: RustRate = serde_json::from_str(&rate.to_json().expect("json")).expect("parse");
-        assert_eq!(back, rate.inner);
-    }
-}
-
 /// Agency credit rating on the 23-step S&P/Fitch scale (`AAA` … `D`, plus `NR`).
 ///
 /// @example
@@ -892,5 +839,58 @@ impl JsAttributes {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsAttributes, JsValue> {
         from_js_json::<Attributes>(&json, "json").map(|inner| Self { inner })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- Boundary tests ------------------------------------------------
+    // Error paths through wasm-bindgen create JsValue, which panics on
+    // native targets.  Test the underlying Rust types instead.
+
+    #[test]
+    fn rate_rejects_nan() {
+        assert!(RustRate::from_decimal(f64::NAN).is_err());
+    }
+
+    #[test]
+    fn rate_rejects_infinity() {
+        assert!(RustRate::from_decimal(f64::INFINITY).is_err());
+    }
+
+    #[test]
+    fn bp_rejects_nan() {
+        assert!(RustBps::try_new(f64::NAN).is_err());
+    }
+
+    #[test]
+    fn bp_rejects_fractional() {
+        assert!(RustBps::try_new(62.5).is_err());
+    }
+
+    #[test]
+    fn cross_conversions_use_the_rust_from_impls() {
+        let bps = JsBps {
+            inner: RustBps::try_new(-1995.0).expect("bps"),
+        };
+        assert!((bps.as_percent() + 19.95).abs() < 1e-12);
+        assert!((bps.as_rate().as_decimal() + 0.1995).abs() < 1e-12);
+        assert!(bps.is_negative() && bps.checked_abs().expect("representable").is_positive());
+        let rate = JsRate {
+            inner: "12.5bp".parse::<RustRate>().expect("fractional bp quote"),
+        };
+        assert!((rate.as_decimal() - 0.00125).abs() < 1e-15);
+        assert!((rate.as_percent() - 0.125).abs() < 1e-12);
+    }
+
+    #[test]
+    fn json_round_trips_through_rust_serde() {
+        let rate = JsRate {
+            inner: RustRate::from_decimal(0.0525).expect("rate"),
+        };
+        let back: RustRate = serde_json::from_str(&rate.to_json().expect("json")).expect("parse");
+        assert_eq!(back, rate.inner);
     }
 }
