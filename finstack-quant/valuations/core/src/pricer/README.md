@@ -205,11 +205,12 @@ load-bearing; change it and results change.
 
 Enrichment has two shapes:
 
-- `model == Discounting`, or the instrument has no custom metrics equivalent:
+- `model == Discounting`, no spread metrics are requested, or the optional
+  equivalent hook returns `None`:
   one `compute_metrics_dyn` pass over the instrument itself.
 - Otherwise: metrics are partitioned. Those in
   `MetricId::SPREAD_EQUIVALENT_METRICS` (z-spread, YTM, ASW, …) are computed on
-  `instrument.metrics_equivalent()` — a cash-normalized copy, e.g. PIK coupons
+  `instrument.metrics_equivalent()` returns `Some` — a cash-normalized copy, e.g. PIK coupons
   converted to Cash — so spreads are on a cash-equivalent basis. Everything else
   (duration, DV01, convexity, CS01) is computed on the original instrument's
   actual cashflows.
