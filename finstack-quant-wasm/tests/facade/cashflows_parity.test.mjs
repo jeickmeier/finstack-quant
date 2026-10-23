@@ -697,7 +697,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     kind('invalid_type', /^seasoningMonths: /)
   );
   assert.throws(
-    () => new cashflows.CashFlowBuilder().fee({ periodic_bp: { bp: '10' } }),
+    () => cashflows.CashFlowSchedule.builder().fee({ periodic_bp: { bp: '10' } }),
     kind('validation', /missing field `base`/)
   );
   assert.throws(
