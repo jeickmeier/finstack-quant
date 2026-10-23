@@ -2816,7 +2816,7 @@
   "models.credit.migration.TransitionMatrix": {
     "kind": "class",
     "constructor": true,
-    "statics": ["fromJson"],
+    "statics": ["fromJson", "fromLabeled"],
     "methods": [
       "compose",
       "defaultProbabilities",

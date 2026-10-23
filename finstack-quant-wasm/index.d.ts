@@ -26807,6 +26807,26 @@ export interface TransitionMatrixConstructor {
    */
   new (scale: RatingScale, data: NumericArray | NumericArray[], horizon: number): TransitionMatrix;
   /**
+   * Build a transition matrix whose row, column and optional scale labels agree in order.
+   * @example
+   * const matrix = models.credit.migration.TransitionMatrix.fromLabeled(['A', 'D'], ['A', 'D'], [[0.9, 0.1], [0, 1]], 1);
+   * console.log(matrix.probability('A', 'D')); // 0.1
+   * @param rowLabels - Ordered origin labels, one per row.
+   * @param columnLabels - Ordered destination labels; must equal `rowLabels` exactly.
+   * @param data - Flat row-major probabilities or square nested rows; each row sums to one.
+   * @param horizon - Positive finite horizon in years covered by the probabilities.
+   * @param scale - Optional `RatingScale` JSON text or plain object, such as `scale.toJson()`; its labels must match both vectors in order. Omit to infer a custom scale with the last label absorbing.
+   * @returns The validated transition-matrix handle; no entries are reordered.
+   * @throws Error - Throws a `TypeError` for invalid host input types, or a `validation` error for differing label orders, invalid labels, matrix dimensions, probabilities, horizon or absorbing default row.
+   */
+  fromLabeled(
+    rowLabels: readonly string[],
+    columnLabels: readonly string[],
+    data: NumericArray | readonly NumericArray[],
+    horizon: number,
+    scale?: JsonInput
+  ): TransitionMatrix;
+  /**
    * Load a handle from its canonical JSON wire form, the same form
    * Python `from_json` reads.
    *

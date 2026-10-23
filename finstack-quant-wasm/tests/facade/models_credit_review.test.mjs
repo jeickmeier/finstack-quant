@@ -52,3 +52,63 @@ test('near-boundary recovery expectation resolves the steep Gaussian curve', () 
     spec.free();
   }
 });
+
+test('labeled transition matrices preserve probabilities and validate every label order', () => {
+  const migration = models.credit.migration;
+  const labels = ['A', 'B', 'D'];
+  const rows = [
+    [0.9, 0.08, 0.02],
+    [0.1, 0.8, 0.1],
+    [0, 0, 1],
+  ];
+  const scale = migration.RatingScale.custom(labels);
+  const inferred = migration.TransitionMatrix.fromLabeled(labels, labels, rows, 1);
+  assert.deepEqual(inferred.toRows(), rows);
+  assert.deepEqual(inferred.scale.labels(), labels);
+  assert.equal(inferred.scale.defaultState(), 2);
+  assert.equal(inferred.probability('A', 'B'), 0.08);
+  for (const suppliedScale of [scale.toJson(), JSON.parse(scale.toJson())]) {
+    const matrix = migration.TransitionMatrix.fromLabeled(
+      labels,
+      labels,
+      rows.flat(),
+      1,
+      suppliedScale
+    );
+    assert.deepEqual(matrix.toRows(), rows);
+    assert.equal(matrix.probability('A', 'B'), 0.08);
+    assert.throws(
+      () =>
+        migration.TransitionMatrix.fromLabeled(
+          ['B', 'A', 'D'],
+          ['B', 'A', 'D'],
+          rows,
+          1,
+          suppliedScale
+        ),
+      /scale mismatch/
+    );
+  }
+  assert.throws(
+    () => migration.TransitionMatrix.fromLabeled(labels, ['B', 'A', 'D'], rows, 1),
+    /scale mismatch/
+  );
+  assert.throws(
+    () =>
+      migration.TransitionMatrix.fromLabeled(
+        ['A', 'D'],
+        ['A', 'D'],
+        [
+          [0.9, 0.1],
+          [0, 1],
+        ],
+        1,
+        scale.toJson()
+      ),
+    /scale mismatch/
+  );
+  assert.throws(
+    () => migration.TransitionMatrix.fromLabeled(['A', 'A', 'D'], ['A', 'A', 'D'], rows, 1),
+    /duplicate/
+  );
+});
