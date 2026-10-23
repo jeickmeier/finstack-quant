@@ -1,10 +1,8 @@
 //! Benchmarks for cashflow NPV and discounting operations.
 //!
 //! Tests performance of:
-//! - Curve-based NPV with Money-typed cashflows (single and batch)
-//! - Scalar NPV with flat discount rates
-//! - `Discounting` trait dispatch
-//! - Neumaier compensated summation at scale
+//! - Curve-based NPV with Money-typed cashflows on a flat curve
+//! - Curve-based NPV with Money-typed cashflows on a shaped curve
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::cashflow::npv;
