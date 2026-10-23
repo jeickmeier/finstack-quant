@@ -165,8 +165,7 @@ impl PyMarketContext {
     ///     Identifier for the scalar.
     /// value : float | int | decimal.Decimal
     ///     Price or unitless value. Monetary ``Decimal`` values keep full
-    ///     precision; a unitless ``Decimal`` converts to ``float`` (Rust
-    ///     ``decimal_to_f64``).
+    ///     precision; a unitless ``Decimal`` converts to ``float``.
     /// currency : Currency | str, optional
     ///     When given, the scalar is a monetary price in this currency;
     ///     otherwise it is unitless.
@@ -487,8 +486,8 @@ impl PyMarketContext {
             .map_err(core_to_py)
     }
 
-    /// Whether any object (curve, surface, scalar, series, index, credit index
-    /// or collateral mapping) is stored under ``id``.
+    /// Whether any object (curve, surface, scalar, series, index, credit index)
+    /// is stored under ``id``.
     ///
     /// Parameters
     /// ----------
@@ -522,7 +521,7 @@ impl PyMarketContext {
     }
 
     /// Whether nothing has been inserted (``len(ctx) == 0``): no curves,
-    /// surfaces, scalars, series, indices, dividends, FX or collateral mappings.
+    /// surfaces, scalars, series, indices, dividends or FX.
     ///
     /// Returns
     /// -------
@@ -577,14 +576,14 @@ impl PyMarketContext {
     /// Number of stored market-data objects (Rust ``MarketContext::len``).
     ///
     /// Counts curves, surfaces, cubes, scalars, series, inflation and credit
-    /// indices, dividend schedules, FX delta-vol surfaces and collateral
-    /// mappings, plus one for an attached FX matrix.
+    /// indices, dividend schedules, FX delta-vol surfaces, plus one for an
+    /// attached FX matrix.
     fn __len__(&self) -> usize {
         self.inner.len()
     }
 
     /// ``True`` when anything has been inserted (``not is_empty()``), so an
-    /// FX-only or collateral-only context is truthy.
+    /// FX-only context is truthy.
     fn __bool__(&self) -> bool {
         !self.inner.is_empty()
     }

@@ -2121,7 +2121,7 @@ class PriceDatum:
         ------
         ValueError
             If ``value`` is non-finite or the currency is unknown. A unitless
-            ``Decimal`` converts to ``float`` (Rust ``decimal_to_f64``).
+            ``Decimal`` converts to ``float``.
 
         """
 

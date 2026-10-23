@@ -1021,7 +1021,7 @@ pub fn max_portfolio_loss_paths() -> usize {
 /// Cholesky factor of a correlation matrix.
 /// @param matrix - Flat row-major `n * n` correlation matrix; symmetric with unit diagonal.
 /// @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
-/// @returns The lower-triangular factor `L` with `L * L^T = matrix`, flat row-major.
+/// @returns A factor `F` in original variable order with `F * F^T = matrix`, flat row-major. It is generally not lower-triangular, so apply it with a full matrix product, not `applyLowerTriangular`.
 ///
 /// # Errors
 ///

@@ -1105,7 +1105,7 @@ impl PyPriceDatum {
     /// ------
     /// ValueError
     ///     If ``value`` is non-finite or the currency is unknown. A unitless
-    ///     ``Decimal`` converts to ``float`` (Rust ``decimal_to_f64``).
+    ///     ``Decimal`` converts to ``float``.
     #[new]
     #[pyo3(signature = (id, value, currency = None))]
     #[pyo3(text_signature = "(id, value, currency=None)")]

@@ -100,7 +100,7 @@ impl PyScalarTimeSeries {
     /// id : str
     ///     Series identifier.
     /// observations : list[tuple[datetime.date | str, float | int | decimal.Decimal]]
-    ///     Dated values; a ``Decimal`` converts to ``float`` (Rust ``decimal_to_f64``).
+    ///     Dated values; a ``Decimal`` converts to ``float``.
     ///     Dates must be unique; any order is accepted.
     /// currency : Currency | str, optional
     ///     Currency tag for monetary series; ``None`` for unitless values.
@@ -291,7 +291,7 @@ impl PyInflationIndex {
     /// id : str
     ///     Index identifier (e.g. ``"US-CPI-U"``).
     /// observations : list[tuple[datetime.date | str, float | int | decimal.Decimal]]
-    ///     Dated index levels; a ``Decimal`` converts to ``float`` (Rust ``decimal_to_f64``).
+    ///     Dated index levels; a ``Decimal`` converts to ``float``.
     /// currency : Currency | str
     ///     Currency of the index.
     /// interpolation : str, optional
