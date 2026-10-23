@@ -25,18 +25,7 @@ use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_p
 
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBondBuilder;
 
-/// Conversion terms of a convertible bond (typed wrapper for Rust ``ConversionSpec``).
-///
-/// At least one of ``ratio`` (shares per bond) and ``price`` (conversion
-/// price per share) must be given; when both are, they must agree with
-/// ``notional / price``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import ConversionSpec
-/// >>> spec = ConversionSpec(ratio=25.0, policy="voluntary", anti_dilution="none", dividend_adjustment="none")
-/// >>> (spec.ratio, spec.policy, spec.anti_dilution)
-/// (25.0, 'voluntary', 'none')
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ConversionSpec",
@@ -51,51 +40,7 @@ pub struct PyConversionSpec {
 
 #[pymethods]
 impl PyConversionSpec {
-    /// Describe the conversion terms.
-    ///
-    /// Parameters
-    /// ----------
-    /// ratio : float | None
-    ///     Conversion ratio (shares per bond); derived from ``price`` when ``None``.
-    /// price : float | None
-    ///     Conversion price per share; derived from ``ratio`` when ``None``.
-    /// policy : str | dict
-    ///     Conversion policy (keyword-only, required as in Rust): the bare label
-    ///     ``"voluntary"`` (not JSON text), or a
-    ///     tagged dict such as ``{"mandatory_on": "2027-03-15"}``,
-    ///     ``{"window": {"start": ..., "end": ...}}``,
-    ///     ``{"upon_event": "qualified_ipo"}`` or
-    ///     ``{"mandatory_variable": {"conversion_date": ..., "upper_conversion_price": ..., "lower_conversion_price": ...}}``.
-    /// anti_dilution : {"none", "full_ratchet", "weighted_average"}
-    ///     Anti-dilution protection (keyword-only, required as in Rust).
-    /// dividend_adjustment : {"none", "adjust_price", "adjust_ratio"}
-    ///     Dividend protection (keyword-only, required as in Rust).
-    /// dilution_events : list[dict] | str | None
-    ///     Dilution events (``date``, ``new_issue_price``, ``new_shares_issued``,
-    ///     ``shares_outstanding_before``) in chronological order; pricing raises
-    ///     ``ValueError`` for out-of-order events. A string must be a JSON array. Default empty.
-    ///
-    /// Returns
-    /// -------
-    /// ConversionSpec
-    ///     The conversion terms (validated when the bond is built).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``policy`` / ``anti_dilution`` / ``dividend_adjustment`` are not
-    ///     recognized, a label is JSON-encoded, or a dilution event does not match the schema.
-    /// TypeError
-    ///     If ``policy`` is neither a bare label string nor a tagged dict.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import ConversionSpec
-    /// >>> spec = ConversionSpec(
-    /// ...     price=50.0, policy="voluntary", anti_dilution="none", dividend_adjustment="adjust_ratio"
-    /// ... )
-    /// >>> spec.dividend_adjustment
-    /// 'adjust_ratio'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.__init__")]
     #[new]
     #[pyo3(signature = (ratio=None, price=None, *, policy, anti_dilution, dividend_adjustment, dilution_events=None))]
     #[pyo3(
@@ -137,13 +82,13 @@ impl PyConversionSpec {
         })
     }
 
-    /// Conversion policy: ``"voluntary"`` or the tagged dict form.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.policy")]
     #[getter]
     fn policy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.policy)
     }
 
-    /// Dilution events as dicts.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.dilution_events")]
     #[getter]
     fn dilution_events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.dilution_events)
@@ -164,32 +109,20 @@ impl PyConversionSpec {
 }
 
 crate::bindings::macros::py_getters!(PyConversionSpec |s| {
-    /// Conversion ratio (shares per bond), if given explicitly.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.ratio")]
     ratio -> Option<f64> = s.inner.ratio;
 
-    /// Conversion price per share, if given explicitly.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.price")]
     price -> Option<f64> = s.inner.price;
 
-    /// Anti-dilution policy (serde name).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.anti_dilution")]
     anti_dilution -> PyResult<String> = enum_to_py_string(&s.inner.anti_dilution);
 
-    /// Dividend adjustment policy (serde name).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.dividend_adjustment")]
     dividend_adjustment -> PyResult<String> = enum_to_py_string(&s.inner.dividend_adjustment);
 });
 
-/// Issuer call and holder put windows (typed wrapper for Rust ``CallPutSchedule``).
-///
-/// Each window is a dict ``{"start", "end", "price_pct_of_par",
-/// "make_whole"?}`` with prices in percent of par (``101.0`` = 101%).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import CallPutSchedule
-/// >>> sched = CallPutSchedule(
-/// ...     calls=[{"start": "2026-03-15", "end": "2027-03-15", "price_pct_of_par": 101.0}]
-/// ... )
-/// >>> (len(sched.calls), len(sched.puts))
-/// (1, 0)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallPutSchedule")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CallPutSchedule",
@@ -213,31 +146,7 @@ fn windows_from_py(
 
 #[pymethods]
 impl PyCallPutSchedule {
-    /// Describe the call and put windows.
-    ///
-    /// Parameters
-    /// ----------
-    /// calls : list[dict] | str | None
-    ///     Issuer call windows (``start``, ``end``,
-    ///     ``price_pct_of_par``, optional ``make_whole``); default none.
-    /// puts : list[dict] | str | None
-    ///     Holder put windows of the same shape; default none.
-    ///
-    /// Returns
-    /// -------
-    /// CallPutSchedule
-    ///     The schedule.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a window does not match the schema.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import CallPutSchedule
-    /// >>> CallPutSchedule().calls
-    /// []
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallPutSchedule.__init__")]
     #[new]
     #[pyo3(signature = (calls=None, puts=None))]
     #[pyo3(text_signature = "(calls=None, puts=None)")]
@@ -254,13 +163,13 @@ impl PyCallPutSchedule {
         })
     }
 
-    /// Issuer call windows as dicts.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallPutSchedule.calls")]
     #[getter]
     fn calls<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.calls)
     }
 
-    /// Holder put windows as dicts.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallPutSchedule.puts")]
     #[getter]
     fn puts<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.puts)
@@ -276,28 +185,7 @@ impl PyCallPutSchedule {
     }
 }
 
-/// Convertible bond (typed wrapper for Rust ``ConvertibleBond``).
-///
-/// Debt with an embedded equity conversion option, priced on a
-/// defaultable-equity tree with fractional recovery of live principal.
-/// Default extinguishes equity and pays ``recovery_rate`` times the recovery
-/// basis; survival-conditioned equity drift compensates for jump-to-zero risk.
-/// ``credit_curve_id`` is the issuer hazard curve; without it default is absent.
-/// Conversion, call/put, soft-call and
-/// coupon terms are typed (``ConversionSpec``, ``CallPutSchedule``) or
-/// dict/JSON inputs.
-///
-/// Build with ``ConvertibleBond.builder()`` or start from
-/// ``ConvertibleBond.example()`` / ``example_mandatory()``; instances are
-/// accepted directly by ``price_instrument`` and expose ``price`` /
-/// ``metric`` / ``parity`` / ``conversion_premium`` themselves.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import ConvertibleBond
-/// >>> cb = ConvertibleBond.example()
-/// >>> (cb.id, cb.conversion_ratio, cb.spot_id)
-/// ('CB-TECH-5Y', 25.0, 'TECH')
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ConvertibleBond",
@@ -323,21 +211,7 @@ instrument_pricing_methods!(PyConvertibleBond, "ConvertibleBond");
 
 #[pymethods]
 impl PyConvertibleBond {
-    /// Canonical example: 5-year USD 1,000,000 2% semi-annual convertible.
-    ///
-    /// Mirrors Rust ``ConvertibleBond::example()``: ratio 25 shares per
-    /// bond, voluntary conversion, underlying ``"TECH"``, curves ``USD-IG`` /
-    /// ``USD-CREDIT-BBB``, issue 2024-01-15, maturity 2029-01-15.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBond
-    ///     The validated example bond.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the canonical example fails validation (never for a released build).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -347,22 +221,7 @@ impl PyConvertibleBond {
         .map_err(core_to_py)
     }
 
-    /// Mandatory (PERCS/DECS-style) convertible example.
-    ///
-    /// Mirrors Rust ``ConvertibleBond::example_mandatory()``: 3-year 5%
-    /// semi-annual, mandatory-variable conversion at maturity (upper
-    /// conversion price 60, lower 40), 130% soft call, call at 101% after
-    /// year 2 and put at 100% after year 1.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBond
-    ///     The validated example bond.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the canonical example fails validation (never for a released build).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.example_mandatory")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_mandatory() -> PyResult<Self> {
@@ -371,57 +230,14 @@ impl PyConvertibleBond {
             .map_err(core_to_py)
     }
 
-    /// Policy-specific conversion value divided by notional.
-    ///
-    /// Mirrors Rust ``ConvertibleBond::parity``. Ordinary conversion uses the
-    /// effective ratio times spot; mandatory-variable contracts use their
-    /// lower-price, variable-share and upper-price delivery regimes.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market carrying the underlying equity price.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Dimensionless conversion-value-to-notional ratio; 1.0 means par.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If the ``spot_id`` price is missing from ``market``.
-    /// ValueError
-    ///     If conversion terms or the nonnegative finite equity price are invalid.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.parity")]
     #[pyo3(text_signature = "($self, market)")]
     fn parity(&self, py: Python<'_>, market: &Bound<'_, PyAny>) -> PyResult<f64> {
         let market = extract_market(py, market)?;
         self.inner.parity(&market).map_err(core_to_py)
     }
 
-    /// Conversion premium over parity.
-    ///
-    /// Mirrors Rust ``ConvertibleBond::conversion_premium``:
-    /// ``bond_price / conversion_value - 1``, using policy-specific share delivery.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market carrying the underlying equity price.
-    /// bond_price : float
-    ///     Observed bond price in notional currency units per bond.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Conversion premium as a decimal fraction (``0.15`` = 15%).
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If the ``spot_id`` price is missing from ``market``.
-    /// ValueError
-    ///     If conversion value is nonpositive/non-finite or bond price is negative/non-finite.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.conversion_premium")]
     #[pyo3(text_signature = "($self, market, bond_price)")]
     fn conversion_premium(
         &self,
@@ -435,36 +251,7 @@ impl PyConvertibleBond {
             .map_err(core_to_py)
     }
 
-    /// Tree Greeks of the convertible.
-    ///
-    /// Mirrors Rust ``ConvertibleBond::greeks`` with the default tree.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Curves, equity price and volatility. Active volatility overrides take
-    ///     precedence; surfaces are sampled at conversion strike. Floating
-    ///     coupons require the forward curve and realized historical fixings.
-    /// as_of : datetime.date | str
-    ///     Valuation date.
-    ///
-    /// Bump sizes come from the bond's ``metric_pricing_overrides.bump_config``
-    /// (``spot_bump_decimal``, ``vol_bump_decimal``, ``rate_bump_bp``), defaulting to
-    /// 1% of spot, 1 vol point and 1bp.
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, float]
-    ///     ``price``, ``delta``, ``gamma``, ``vega``, ``theta``, ``rho``.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If required market data is missing.
-    /// RuntimeError
-    ///     If the tree pricer fails.
-    /// ValueError
-    ///     If inputs violate the selected lattice's admissible numerical domain.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.greeks")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn greeks<'py>(
         &self,
@@ -478,19 +265,19 @@ impl PyConvertibleBond {
         serde_to_py(py, &greeks)
     }
 
-    /// Issue date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.issue_date)
     }
 
-    /// Maturity date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Soft-call trigger as ``{"threshold_pct", "observation_days", "required_days_above"}``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.soft_call_trigger")]
     #[getter]
     fn soft_call_trigger<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -500,7 +287,7 @@ impl PyConvertibleBond {
             .transpose()
     }
 
-    /// Recorded exercise and delayed cash/share delivery in canonical serde form, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.resolved_settlement")]
     #[getter]
     fn resolved_settlement<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -510,16 +297,13 @@ impl PyConvertibleBond {
             .transpose()
     }
 
-    /// Coupon/cashflow specification in serde form (``{"fixed": {...}}``,
-    /// ``{"floating": {...}}``, ``{"step_up": {...}}`` or
-    /// ``{"amortizing": {...}}``), the same shape as ``Bond.cashflow_spec``; a
-    /// zero-coupon convertible is a fixed spec with rate ``"0"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.cashflow_spec")]
     #[getter]
     fn cashflow_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.cashflow_spec)
     }
 
-    /// Maturity as seen by the pricer, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         Instrument::expiry(&self.inner)
@@ -542,48 +326,45 @@ impl PyConvertibleBond {
 }
 
 crate::bindings::macros::py_getters!(PyConvertibleBond |s| {
-    /// Principal amount.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    /// Discount curve identifier for the debt component.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Issuer hazard curve identifier, or ``None`` (risk-free cash discounting).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.credit_curve_id")]
     credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(|id| id.to_string());
 
-    /// Conversion terms.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.conversion")]
     conversion -> PyConversionSpec = PyConversionSpec { inner: s.inner.conversion.clone() };
 
-    /// Base conversion ratio (shares per bond), derived from ratio or price.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.conversion_ratio")]
     conversion_ratio -> Option<f64> = s.inner.conversion_ratio();
 
-    /// Conversion ratio after anti-dilution adjustments.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.effective_conversion_ratio")]
     effective_conversion_ratio -> Option<f64> = s.inner.effective_conversion_ratio();
 
-    /// Market-scalar id of the underlying share price.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.spot_id")]
     spot_id -> String = s.inner.spot_id.to_string();
 
-    /// Equity volatility id: a surface, or a unitless flat-vol scalar.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
-    /// Unitless continuous dividend-yield scalar id, or ``None`` (zero yield).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.div_yield_id")]
     div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(|id| id.to_string());
 
-    /// Call/put schedule, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.call_put")]
     call_put -> Option<PyCallPutSchedule> =
         s.inner.call_put.as_ref().map(|inner| PyCallPutSchedule { inner: inner.clone() });
 
-    /// Settlement lag in business days, or ``None`` for same-day.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.settlement_days")]
     settlement_days -> Option<u32> = s.inner.settlement_days;
 
-    /// Assumed recovery rate on default as a fraction, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.recovery_rate")]
     recovery_rate -> Option<f64> = s.inner.recovery_rate;
 });
 
-/// Fluent builder for ``ConvertibleBond``; wraps the Rust
-/// ``FinancialBuilder``-generated builder (consuming setters).
-///
-/// Builders are consumed by ``build()``; create a new builder per instrument.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ConvertibleBondBuilder",
@@ -596,17 +377,7 @@ pub struct PyConvertibleBondBuilder {
 
 #[pymethods]
 impl PyConvertibleBondBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the convertible bond.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -617,17 +388,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the principal amount.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money
-    ///     Principal amount.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -642,17 +403,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the issue date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     Issue date (date-like or ISO 8601 string).
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.issue_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn issue_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -667,17 +418,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the maturity date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     Maturity date (date-like or ISO 8601 string).
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -692,18 +433,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the discount curve identifier for the debt component.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve identifier for the debt component (risk-free or
-    ///     funding).
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -717,20 +447,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the issuer hazard curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     ``HazardCurve`` identifier; the zero-recovery risky discount
-    ///     factor is the risk-free discount factor times its survival
-    ///     probability. If never set, the cash component discounts at the
-    ///     risk-free curve. Requires an explicit ``recovery_rate``.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.credit_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -744,25 +461,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the conversion terms.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : ConversionSpec | dict | str
-    ///     Conversion terms as a typed ``ConversionSpec``, a dict, or a JSON
-    ///     object string with fields ``ratio``, ``price``, ``policy``,
-    ///     ``anti_dilution``, ``dividend_adjustment`` and ``dilution_events``.
-    ///     At least one of ``ratio`` / ``price`` must be set.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``ConversionSpec`` shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.conversion")]
     #[pyo3(text_signature = "($self, value)")]
     fn conversion<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -782,18 +481,7 @@ impl PyConvertibleBondBuilder {
             .conversion(conversion))
     }
 
-    /// Set the market-scalar id of the underlying share price.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     ``MarketContext`` price id holding the share price in the bond's
-    ///     currency (or a unitless level). Required.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.spot_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn spot_id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -804,18 +492,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the equity volatility id.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Volatility surface id (read at the conversion strike and maturity),
-    ///     or the id of a unitless scalar holding a flat volatility. Required.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -829,18 +506,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the continuous dividend-yield scalar id.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Id of a unitless decimal dividend yield (``0.02`` = 2%). When never
-    ///     set, the dividend yield is zero; a set id must exist in the market.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.div_yield_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn div_yield_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -854,23 +520,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the call/put schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : CallPutSchedule | dict | str
-    ///     Schedule as a typed ``CallPutSchedule``, a dict, or a JSON object
-    ///     string with ``calls`` and ``puts`` arrays of windows.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``CallPutSchedule`` shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.call_put")]
     #[pyo3(text_signature = "($self, value)")]
     fn call_put<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -891,24 +541,7 @@ impl PyConvertibleBondBuilder {
             .call_put(call_put))
     }
 
-    /// Set the soft-call trigger condition.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``PriceTrigger`` as a dict or JSON object string with fields
-    ///     ``threshold_pct`` (percent of conversion price, e.g. ``130.0``),
-    ///     ``observation_days`` and ``required_days_above``.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``PriceTrigger`` shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.soft_call_trigger")]
     #[pyo3(text_signature = "($self, value)")]
     fn soft_call_trigger<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -930,19 +563,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the settlement lag.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : int
-    ///     Number of business days from trade date to settlement date
-    ///     (e.g. ``2`` for US corporate convertibles). If never set,
-    ///     settlement is assumed same-day.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.settlement_days")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement_days<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -956,19 +577,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the assumed recovery rate on default.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Recovery rate as a fraction (e.g. ``0.40`` = 40%). Used in the
-    ///     fractional recovery of live principal model; only relevant when
-    ///     ``credit_curve_id`` is set.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.recovery_rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn recovery_rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -982,25 +591,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Record the claim remaining after exercise extinguishes the debt.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Canonical ``ConvertibleSettlement``: ISO ``exercise_date`` and
-    ///     ``delivery_date``, nonnegative ``shares``, and currency-tagged ``cash``
-    ///     and ``recovery_basis``. Cash includes retained coupons; recovery basis
-    ///     excludes uncapitalized coupon accrual. Omission leaves debt unresolved.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     This builder for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was consumed or the record cannot be deserialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.resolved_settlement")]
     #[pyo3(text_signature = "($self, value)")]
     fn resolved_settlement<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1016,25 +607,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the coupon/cashflow specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     Rust ``CashflowSpec`` in serde form, e.g.
-    ///     ``{"fixed": {"coupon_type": "cash", "rate": "0.05", ...schedule}}``
-    ///     (the same shape as ``Bond.cashflow_spec``); a zero-coupon
-    ///     convertible uses a fixed spec with rate ``"0"``.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not deserialize as a ``CashflowSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.cashflow_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn cashflow_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1051,26 +624,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set free-form instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

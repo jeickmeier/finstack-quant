@@ -21,7 +21,7 @@ use super::super::typed_macros::builder_set;
 
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder;
 
-/// Typed wrapper for the Rust `Tranche`.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "Tranche",
@@ -36,19 +36,7 @@ pub struct PyTranche {
 
 #[pymethods]
 impl PyTranche {
-    /// Create a fluent builder (mirrors Rust ``Tranche::builder()``).
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     A builder with fluent, consuming setter methods.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Tranche
-    /// >>> builder = Tranche.builder()
-    /// >>> builder.id("EXAMPLE") is builder
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.builder")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn builder() -> PyTrancheBuilder {
@@ -59,17 +47,7 @@ impl PyTranche {
         }
     }
 
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     Strict JSON object with exactly the fields ``to_json`` writes.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or has the wrong shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -78,25 +56,25 @@ impl PyTranche {
         Ok(Self { inner })
     }
 
-    /// Serialize to the canonical JSON wire form.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
     }
 
-    /// Return every field as a plain ``dict`` (canonical serde shape).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Credit rating (serde name) or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.rating")]
     #[getter]
     fn rating(&self) -> PyResult<Option<String>> {
         self.inner
@@ -106,20 +84,19 @@ impl PyTranche {
             .transpose()
     }
 
-    /// Coupon definition as a plain ``dict`` (``RateSpec`` serde shape).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.coupon")]
     #[getter]
     fn coupon<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.coupon)
     }
 
-    /// Legal final maturity as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Per-tranche overcollateralization trigger as its ``CoverageTrigger``
-    /// serde ``dict``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.oc_trigger")]
     #[getter]
     fn oc_trigger<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -129,8 +106,7 @@ impl PyTranche {
             .transpose()
     }
 
-    /// Per-tranche interest-coverage trigger as its ``CoverageTrigger``
-    /// serde ``dict``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.ic_trigger")]
     #[getter]
     fn ic_trigger<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -156,62 +132,51 @@ impl PyTranche {
 }
 
 crate::bindings::macros::py_getters!(PyTranche |s| {
-    /// Tranche identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.id")]
     id -> String = s.inner.id.to_string();
 
-    /// Attachment point in percent of the capital structure (0-100 scale),
-    /// or ``None`` for a note built without points that has not yet joined
-    /// a ``TrancheStructure`` (which derives it from the balance shares).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.attach_pct")]
     attach_pct -> Option<f64> = s.inner.attach_pct;
 
-    /// Detachment point in percent of the capital structure (0-100 scale),
-    /// or ``None`` until derived (see ``attach_pct``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.detach_pct")]
     detach_pct -> Option<f64> = s.inner.detach_pct;
 
-    /// Seniority (serde name, e.g. ``"Senior"``, ``"Mezzanine"``, ``"Equity"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.seniority")]
     seniority -> PyResult<String> = enum_to_py_string(&s.inner.seniority);
 
-    /// Original (issuance) balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.original_balance")]
     original_balance -> PyMoney = money_to_py(s.inner.original_balance);
 
-    /// Current outstanding balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.current_balance")]
     current_balance -> PyMoney = money_to_py(s.inner.current_balance);
 
-    /// Payment frequency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    /// Accrual day-count convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    /// Accumulated deferred (PIK) interest.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.deferred_interest")]
     deferred_interest -> PyMoney = money_to_py(s.inner.deferred_interest);
 
-    /// Whether interest may be deferred (PIK).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.pik_enabled")]
     pik_enabled -> bool = s.inner.pik_enabled;
 
-    /// Explicit non-deferrable flag, or ``None`` for the seniority
-    /// convention (senior notes non-deferrable, every other class defers).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.non_deferrable")]
     non_deferrable -> Option<bool> = s.inner.non_deferrable;
 
-    /// Whether the coupon is a non-deferrable claim the template pays from
-    /// principal proceeds when interest falls short.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.is_non_deferrable")]
     is_non_deferrable -> bool = s.inner.is_non_deferrable();
 
-    /// Payment priority rank (1 = most senior), assigned by
-    /// ``TrancheStructure``; ``0`` on a standalone tranche.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.payment_priority")]
     payment_priority -> u32 = s.inner.payment_priority;
 
-    /// User attributes (tags and metadata).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.attributes")]
     attributes -> crate::bindings::core::types::PyAttributes =
         attributes_to_py(&s.inner.attributes);
 });
 
-/// Fluent builder for [`PyTranche`]; wraps the hand-written Rust
-/// `TrancheBuilder` (consuming setters).
-///
-/// ``attach_pct`` and ``detach_pct`` are forwarded to the Rust builder, which
-/// requires both or neither on :meth:`build`; the copies kept here only feed
-/// ``repr``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TrancheBuilder",
@@ -225,46 +190,13 @@ pub struct PyTrancheBuilder {
 
 #[pymethods]
 impl PyTrancheBuilder {
-    /// Set the tranche identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the tranche.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, |b: TrancheBuilder| b.id(value))
     }
 
-    /// Set the attachment point.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Attachment point quoted in percent on a 0-100 scale (e.g. ``0.0``
-    ///     for equity, ``10.0`` for a tranche attaching at 10%).
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.attach_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn attach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
@@ -273,24 +205,7 @@ impl PyTrancheBuilder {
         Ok(slf)
     }
 
-    /// Set the detachment point.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Detachment point quoted in percent on a 0-100 scale (e.g.
-    ///     ``100.0`` for the most senior tranche).
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.detach_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn detach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
@@ -299,49 +214,14 @@ impl PyTrancheBuilder {
         Ok(slf)
     }
 
-    /// Set the tranche seniority.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"senior", "mezzanine", "subordinated", "equity"}
-    ///     Structural seniority of the tranche.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized seniority.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.seniority")]
     #[pyo3(text_signature = "($self, value)")]
     fn seniority<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let seniority: TrancheSeniority = enum_from_str(value, "seniority")?;
         builder_set!(slf, |b: TrancheBuilder| b.seniority(seniority))
     }
 
-    /// Set the original tranche balance.
-    ///
-    /// Maps to the Rust ``TrancheBuilder::balance`` setter; named
-    /// ``original_balance`` here to match the ``Tranche::original_balance``
-    /// field it populates.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money
-    ///     Original tranche balance. Must be positive.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.original_balance")]
     #[pyo3(text_signature = "($self, value)")]
     fn original_balance<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -350,23 +230,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.balance(value.inner))
     }
 
-    /// Set a fixed-rate coupon.
-    ///
-    /// Parameters
-    /// ----------
-    /// rate : float
-    ///     Fixed interest rate as an annual decimal (e.g. ``0.05`` = 5%).
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.coupon_fixed")]
     #[pyo3(text_signature = "($self, rate)")]
     fn coupon_fixed<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -376,27 +240,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.coupon(RateSpec::Fixed { rate }))
     }
 
-    /// Set a floating-rate coupon from a JSON ``RateSpec::Floating`` payload.
-    ///
-    /// The floating-rate spec (``FloatingRateSpec``: index, spread, gearing,
-    /// floors/caps, reset conventions) stays JSON per the nested-spec rule —
-    /// the typed cashflows plan owns that shape.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     JSON-encoded, externally-tagged ``RateSpec`` value, e.g.
-    ///     ``{"floating": {...FloatingRateSpec fields...}}``.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not valid JSON for the ``RateSpec`` shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.coupon_floating")]
     #[pyo3(text_signature = "($self, value)")]
     fn coupon_floating<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -407,23 +251,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.coupon(coupon))
     }
 
-    /// Set the legal final maturity date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Legal final maturity date (date-like or ISO-8601 string).
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -433,23 +261,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.maturity(maturity))
     }
 
-    /// Set the payment frequency.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Tenor | str
-    ///     Payment frequency. Defaults to quarterly when never set.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`, or a string ``value`` is not a recognized tenor string.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -459,23 +271,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.frequency(frequency))
     }
 
-    /// Set the day count convention for interest accrual.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : DayCount | str
-    ///     Day count convention. Defaults to Act/360 when never set.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`, or a string ``value`` is not a recognized day-count name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -486,24 +282,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.day_count(day_count))
     }
 
-    /// Set the current (factored) balance.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money
-    ///     Outstanding principal today, at most the original balance.
-    ///     Defaults to the original balance when never set.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.current_balance")]
     #[pyo3(text_signature = "($self, value)")]
     fn current_balance<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -512,24 +291,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.current_balance(value.inner))
     }
 
-    /// Set interest already deferred (unpaid, still owed) at closing.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money
-    ///     Deferred interest carried into the projection; zero when never
-    ///     set.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.deferred_interest")]
     #[pyo3(text_signature = "($self, value)")]
     fn deferred_interest<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -538,24 +300,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.deferred_interest(value.inner))
     }
 
-    /// Enable payment-in-kind accretion of interest shortfalls.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : bool
-    ///     ``True`` capitalizes unpaid interest into the balance; ``False``
-    ///     (the default) defers it as a claim.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.pik_enabled")]
     #[pyo3(text_signature = "($self, value)")]
     fn pik_enabled<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -564,26 +309,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.pik_enabled(value))
     }
 
-    /// Mark the coupon non-deferrable or deferrable, overriding the
-    /// seniority convention.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : bool
-    ///     ``True`` for a coupon the template pays from principal proceeds
-    ///     when interest falls short (the senior default); ``False`` for one
-    ///     that defers (the default for every other class).
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`TrancheBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.non_deferrable")]
     #[pyo3(text_signature = "($self, value)")]
     fn non_deferrable<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -592,46 +318,14 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.non_deferrable(value))
     }
 
-    /// Set the credit rating.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Rating string (``"AAA"``, ``"BBB"``, ``"NR"`` ...).
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a known rating or the builder was consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.rating")]
     #[pyo3(text_signature = "($self, value)")]
     fn rating<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let rating: CreditRating = value.parse().map_err(core_to_py)?;
         builder_set!(slf, |b: TrancheBuilder| b.rating(rating))
     }
 
-    /// Attach a per-tranche overcollateralization trigger.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``CoverageTrigger`` serde object: ``trigger_level`` (ratio),
-    ///     optional ``cure_level``, ``consequence`` (``"divert_interest"``,
-    ///     ``"pay_down_senior"`` ...) and breach memory fields.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``CoverageTrigger`` shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.oc_trigger")]
     #[pyo3(text_signature = "($self, value)")]
     fn oc_trigger<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -643,22 +337,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.oc_trigger(trigger))
     }
 
-    /// Attach a per-tranche interest-coverage trigger.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``CoverageTrigger`` serde object (see :meth:`oc_trigger`).
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``CoverageTrigger`` shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.ic_trigger")]
     #[pyo3(text_signature = "($self, value)")]
     fn ic_trigger<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -670,26 +349,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.ic_trigger(trigger))
     }
 
-    /// Set free-form attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -699,19 +359,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.attributes(attributes))
     }
 
-    /// Build the validated tranche.
-    ///
-    /// Returns
-    /// -------
-    /// Tranche
-    ///     The validated tranche.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a required field is missing, or attachment/detachment points
-    ///     are invalid (negative, out of the ``[0, 100]`` range, or
-    ///     detachment not strictly above attachment).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.build")]
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyTranche> {
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;

@@ -13,36 +13,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetType, BalloonSpec, LiquidationSpec, PoolAsset, PrepaymentPenalty, SpecialServicingSpec,
 };
 
-/// One loan-level collateral row of an [`AssetPool`](super::PyAssetPool):
-/// the contractual terms (balance, coupon or index + spread, maturity, day
-/// count, amortization type), the credit state (rating, default, recovery,
-/// purchase price) and the behavioural overrides (SMM / MDR / recovery
-/// overrides, delinquency buckets, commercial-mortgage balloon, prepayment
-/// penalty, special servicing, NOI).
-///
-/// Percent fields (`market_price_pct`) are percent values; `rate`,
-/// `smm_override`, `mdr_override` and `recovery_rate` are decimals;
-/// `spread_bp` is in basis points.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.core.currency import Currency
-/// >>> from finstack_quant.core.dates import DayCount
-/// >>> from finstack_quant.core.money import Money
-/// >>> from finstack_quant.valuations.instruments import PoolAsset
-/// >>> loan = PoolAsset(
-/// ...     "LOAN-1",
-/// ...     {"type": "first_lien_loan"},
-/// ...     Money(10_000_000.0, Currency("USD")),
-/// ...     0.08,
-/// ...     datetime.date(2031, 1, 15),
-/// ...     day_count=DayCount.ACT_360,
-/// ...     rating="B",
-/// ...     balloon={"extension_prob": 0.3, "extension_months": 24},
-/// ... )
-/// >>> loan.rating, loan.balloon["extension_months"]
-/// ('B', 24)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "PoolAsset",
@@ -67,117 +38,17 @@ fn opt_date(
     value.map(py_to_date).transpose()
 }
 
-crate::bindings::macros::wire_methods!(PyPoolAsset, PoolAsset, "PoolAsset", to_dict);
+crate::bindings::macros::wire_methods!(
+    PyPoolAsset,
+    PoolAsset,
+    "PoolAsset",
+    module = "finstack_quant.valuations.instruments",
+    to_dict
+);
 
 #[pymethods]
 impl PyPoolAsset {
-    /// Construct a collateral row from its contractual terms.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Stable asset identifier, unique within the pool.
-    /// asset_type : dict | str
-    ///     ``AssetType`` serde object such as ``{"type": "first_lien_loan"}`` or
-    ///     ``{"type": "commercial_mortgage", "ltv": 0.6}``; the type decides
-    ///     whether the row amortizes (level pay) or pays as a bullet. The
-    ///     obligor industry is the separate ``industry`` keyword.
-    /// balance : Money
-    ///     Current principal balance in the pool currency.
-    /// rate : float
-    ///     Annual coupon as a decimal (``0.08`` = 8%). For floating rows the
-    ///     engine adds ``spread_bp`` to the ``forward_curve_id`` projection.
-    /// maturity : datetime.date
-    ///     Contractual maturity (balloon date for commercial mortgages).
-    /// day_count : DayCount
-    ///     Accrual convention of the row (keyword-only, required as in Rust).
-    /// spread_bp : float, optional
-    ///     Floating spread over ``forward_curve_id`` in basis points.
-    /// forward_curve_id : str, optional
-    ///     Forward-curve identifier of the floating index; ``None`` for a
-    ///     fixed-rate row.
-    /// index_floor_bp : float, optional
-    ///     Floor on the floating index in basis points (``100`` = 1%),
-    ///     applied before ``spread_bp`` is added; ignored on fixed-rate rows.
-    /// rating : str, optional
-    ///     Credit rating (``"BB"``, ``"CCC"``, ``"NR"`` ...), used by the
-    ///     coverage-test haircuts and the CCC bucket.
-    /// industry : str, optional
-    ///     Industry label for concentration reporting.
-    /// obligor_id : str, optional
-    ///     Obligor identifier for exposure aggregation.
-    /// defaulted : bool, optional
-    ///     ``True`` marks the row defaulted at closing; ``recovery_amount``
-    ///     and ``default_date`` describe its state.
-    /// recovery_amount : Money, optional
-    ///     Recovery still expected on a defaulted row.
-    /// default_date : datetime.date, optional
-    ///     Date of default for a defaulted row.
-    /// purchase_price : Money, optional
-    ///     Price paid for the row (discount-obligation test).
-    /// acquisition_date : datetime.date, optional
-    ///     Date the row entered the pool (anchors non-performing-loan
-    ///     timelines).
-    /// origination_date : datetime.date, optional
-    ///     Date the loan was originated; anchors the seasoning-dependent
-    ///     prepayment/default curves (PSA, SDA, ABS, vector) and the
-    ///     amortization schedule. Falls back to ``acquisition_date``, then to
-    ///     the deal closing date.
-    /// smm_override : float, optional
-    ///     Row-level single-month mortality (decimal) overriding the deal
-    ///     prepayment model.
-    /// mdr_override : float, optional
-    ///     Row-level monthly default rate (decimal) overriding the deal
-    ///     default model.
-    /// recovery_rate : float, optional
-    ///     Row-level recovery rate (decimal) overriding the deal recovery
-    ///     model.
-    /// commitment : Money, optional
-    ///     Total commitment for revolving rows (drawn balance is ``balance``).
-    /// contractual_payment : Money, optional
-    ///     Monthly level payment of an amortizing row; derived from the
-    ///     terms when omitted.
-    /// amortization_term_months : int, optional
-    ///     Schedule length in months from origination (``origination_date``,
-    ///     else ``acquisition_date``, else closing) for level-pay rows; the unamortized balance pays as
-    ///     the balloon at maturity. ``None`` amortizes fully by maturity.
-    /// io_months : int, optional
-    ///     Interest-only window in months from origination: no scheduled
-    ///     principal while the loan is younger than this.
-    /// market_price_pct : float, optional
-    ///     Market price in percent of par for market-value coverage rules.
-    /// delinquency_buckets : list[Money], optional
-    ///     Seeded delinquent balances per bucket (30/60/90 ...); requires
-    ///     a ``credit_model.delinquency`` model on the deal.
-    /// balloon : dict | str, optional
-    ///     ``BalloonSpec`` (``extension_prob`` decimal, ``extension_months``,
-    ///     optional ``extension_rate`` decimal, and ``loss_prob`` decimal,
-    ///     ``severity_pct`` percent, ``workout_months`` for the share that
-    ///     defaults at maturity) for balloon extension and workout.
-    /// prepayment_penalty : dict | str, optional
-    ///     ``PrepaymentPenalty``: ``{"kind": "lockout", "through":
-    ///     "2025-12-31"}`` (no voluntary prepayment inside the window),
-    ///     ``{"kind": "fixed", "pct": 3.0, "through": "2026-01-01"}``,
-    ///     ``{"kind": "step_down", "schedule": [{"through": "2025-12-31",
-    ///     "pct": 5.0}, ...]}`` or ``{"kind": "yield_maintenance",
-    ///     "reinvestment_rate": 0.05, "discount_curve_id": "USD-OIS",
-    ///     "floor_pct": 1.0, "through": None}`` (the curve discounts the lost
-    ///     coupons and supplies the reinvestment rate when it is omitted).
-    /// special_servicing : dict | str, optional
-    ///     ``SpecialServicingSpec`` (``appraisal_reduction_pct`` percent).
-    /// noi : Money, optional
-    ///     Annual net operating income of the property for the CMBS DSCR.
-    /// liquidation : dict | str, optional
-    ///     ``LiquidationSpec`` for a non-performing loan
-    ///     (``months_to_resolution``, ``proceeds_pct`` and ``carry_cost_pct``
-    ///     percents, ``reperformance_prob`` decimal, optional
-    ///     ``modified_rate`` decimal); leave ``defaulted`` false.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a sub-spec does not match its serde shape, a date is invalid
-    ///     or ``rating`` is not a known rating.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.__init__")]
     #[new]
     #[pyo3(signature = (
         id, asset_type, balance, rate, maturity, *, day_count, spread_bp=None, forward_curve_id=None,
@@ -278,41 +149,7 @@ impl PyPoolAsset {
         Ok(Self { inner })
     }
 
-    /// Fixed-rate bullet bond row (mirrors Rust ``PoolAsset::fixed_rate_bond``).
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Stable asset identifier.
-    /// balance : Money
-    ///     Current principal balance.
-    /// rate : float
-    ///     Annual fixed coupon as a decimal.
-    /// maturity : datetime.date
-    ///     Bullet maturity.
-    /// day_count : DayCount
-    ///     Accrual convention.
-    ///
-    /// Returns
-    /// -------
-    /// PoolAsset
-    ///     A performing, unrated bond row.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``maturity`` is not a valid date.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.dates import DayCount
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import PoolAsset
-    /// >>> bond = PoolAsset.fixed_rate_bond("B1", Money(1_000_000.0, Currency("USD")), 0.06, datetime.date(2030, 1, 1), DayCount.THIRTY_360)
-    /// >>> bond.asset_type["type"], bond.rate
-    /// ('high_yield_bond', 0.06)
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.fixed_rate_bond")]
     #[staticmethod]
     #[pyo3(text_signature = "(id, balance, rate, maturity, day_count)")]
     fn fixed_rate_bond(
@@ -333,45 +170,7 @@ impl PyPoolAsset {
         })
     }
 
-    /// Floating-rate first-lien loan row (mirrors Rust
-    /// ``PoolAsset::floating_rate_loan``).
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Stable asset identifier.
-    /// balance : Money
-    ///     Current principal balance.
-    /// forward_curve_id : str
-    ///     Forward-curve identifier of the floating index (e.g.
-    ///     ``"USD-SOFR-3M"``).
-    /// spread_bp : float
-    ///     Spread over the index in basis points.
-    /// maturity : datetime.date
-    ///     Loan maturity.
-    /// day_count : DayCount
-    ///     Accrual convention.
-    ///
-    /// Returns
-    /// -------
-    /// PoolAsset
-    ///     A performing first-lien loan row.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``maturity`` is not a valid date.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.dates import DayCount
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import PoolAsset
-    /// >>> loan = PoolAsset.floating_rate_loan("L1", Money(1_000_000.0, Currency("USD")), "USD-SOFR-3M", 350.0, datetime.date(2030, 1, 1), DayCount.ACT_360)
-    /// >>> loan.forward_curve_id, loan.spread_bp
-    /// ('USD-SOFR-3M', 350.0)
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.floating_rate_loan")]
     #[staticmethod]
     #[pyo3(text_signature = "(id, balance, forward_curve_id, spread_bp, maturity, day_count)")]
     fn floating_rate_loan(
@@ -394,19 +193,19 @@ impl PyPoolAsset {
         })
     }
 
-    /// ``AssetType`` serde object (``{"type": ..., ...}``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.asset_type")]
     #[getter]
     fn asset_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.asset_type)
     }
 
-    /// Contractual maturity as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Credit rating string, or ``None`` when unrated.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.rating")]
     #[getter]
     fn rating(&self) -> PyResult<Option<String>> {
         self.inner
@@ -416,7 +215,7 @@ impl PyPoolAsset {
             .transpose()
     }
 
-    /// Default date as ``datetime.date``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.default_date")]
     #[getter]
     fn default_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -425,7 +224,7 @@ impl PyPoolAsset {
             .transpose()
     }
 
-    /// Acquisition date as ``datetime.date``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.acquisition_date")]
     #[getter]
     fn acquisition_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -434,8 +233,7 @@ impl PyPoolAsset {
             .transpose()
     }
 
-    /// Origination date as ``datetime.date``, or ``None`` (the row then ages
-    /// from ``acquisition_date``, else the closing date).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.origination_date")]
     #[getter]
     fn origination_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -444,7 +242,7 @@ impl PyPoolAsset {
             .transpose()
     }
 
-    /// ``BalloonSpec`` serde dict, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.balloon")]
     #[getter]
     fn balloon<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -454,7 +252,7 @@ impl PyPoolAsset {
             .transpose()
     }
 
-    /// ``PrepaymentPenalty`` serde dict, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.prepayment_penalty")]
     #[getter]
     fn prepayment_penalty<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -464,7 +262,7 @@ impl PyPoolAsset {
             .transpose()
     }
 
-    /// ``SpecialServicingSpec`` serde dict, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.special_servicing")]
     #[getter]
     fn special_servicing<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -474,7 +272,7 @@ impl PyPoolAsset {
             .transpose()
     }
 
-    /// ``LiquidationSpec`` serde dict, or ``None`` for a performing loan.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.liquidation")]
     #[getter]
     fn liquidation<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -497,73 +295,72 @@ impl PyPoolAsset {
 }
 
 crate::bindings::macros::py_getters!(PyPoolAsset |s| {
-    /// Asset identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.id")]
     id -> String = s.inner.id.to_string();
 
-    /// Current principal balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.balance")]
     balance -> PyMoney = money_to_py(s.inner.balance);
 
-    /// Annual coupon as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.rate")]
     rate -> f64 = s.inner.rate;
 
-    /// Floating spread in basis points, or ``None`` for a fixed-rate row.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.spread_bp")]
     spread_bp -> Option<f64> = s.inner.spread_bp;
 
-    /// Floating index curve identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.forward_curve_id")]
     forward_curve_id -> Option<String> = s.inner.forward_curve_id.clone();
 
-    /// Floor on the floating index in basis points, applied before the
-    /// spread, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.index_floor_bp")]
     index_floor_bp -> Option<f64> = s.inner.index_floor_bp;
 
-    /// Industry label, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.industry")]
     industry -> Option<String> = s.inner.industry.clone();
 
-    /// Obligor identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.obligor_id")]
     obligor_id -> Option<String> = s.inner.obligor_id.clone();
 
-    /// ``True`` when the row is defaulted.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.defaulted")]
     defaulted -> bool = s.inner.defaulted;
 
-    /// Expected recovery on a defaulted row, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.recovery_amount")]
     recovery_amount -> Option<PyMoney> = s.inner.recovery_amount.map(money_to_py);
 
-    /// Purchase price, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.purchase_price")]
     purchase_price -> Option<PyMoney> = s.inner.purchase_price.map(money_to_py);
 
-    /// Accrual day count.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.day_count")]
     day_count -> PyDayCount = PyDayCount { inner: s.inner.day_count };
 
-    /// Row-level SMM override (decimal), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.smm_override")]
     smm_override -> Option<f64> = s.inner.smm_override;
 
-    /// Row-level MDR override (decimal), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.mdr_override")]
     mdr_override -> Option<f64> = s.inner.mdr_override;
 
-    /// Row-level recovery rate (decimal), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.recovery_rate")]
     recovery_rate -> Option<f64> = s.inner.recovery_rate;
 
-    /// Total commitment of a revolving row, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.commitment")]
     commitment -> Option<PyMoney> = s.inner.commitment.map(money_to_py);
 
-    /// Monthly level payment, or ``None`` when derived from the terms.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.contractual_payment")]
     contractual_payment -> Option<PyMoney> = s.inner.contractual_payment.map(money_to_py);
 
-    /// Amortization schedule length in months from origination, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.amortization_term_months")]
     amortization_term_months -> Option<u32> = s.inner.amortization_term_months;
 
-    /// Interest-only window in months from origination, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.io_months")]
     io_months -> Option<u32> = s.inner.io_months;
 
-    /// Market price in percent of par, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.market_price_pct")]
     market_price_pct -> Option<f64> = s.inner.market_price_pct;
 
-    /// Seeded delinquent balances per bucket, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.delinquency_buckets")]
     delinquency_buckets -> Option<Vec<PyMoney>> = s.inner
         .delinquency_buckets
         .as_ref()
         .map(|buckets| buckets.iter().copied().map(money_to_py).collect());
 
-    /// Annual net operating income, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PoolAsset.noi")]
     noi -> Option<PyMoney> = s.inner.noi.map(money_to_py);
 });

@@ -646,3 +646,18 @@ class ValuationResult:
             ``ValuationResult(id=..., price=..., currency=..., metrics=...)`` text.
         """
         ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...

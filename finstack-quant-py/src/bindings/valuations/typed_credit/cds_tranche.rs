@@ -27,23 +27,7 @@ use crate::bindings::extract::extract_basis_points;
 
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheBuilder;
 
-/// Economic terms of an index tranche (typed wrapper for Rust ``CdsTrancheParams``).
-///
-/// Attachment and detachment are quoted in percent points (``3.0`` = 3%),
-/// the running coupon in basis points. Pass to ``CdsTranche.standard`` for a
-/// tranche on the standard quarterly ACT/360 schedule.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.core.currency import Currency
-/// >>> from finstack_quant.core.money import Money
-/// >>> from finstack_quant.valuations.instruments import CdsTrancheParams
-/// >>> params = CdsTrancheParams.mezzanine_tranche(
-/// ...     "CDX.NA.IG", 42, Money(10_000_000.0, Currency("USD")), datetime.date(2029, 12, 20), 100.0
-/// ... )
-/// >>> (params.attach_pct, params.detach_pct)
-/// (3.0, 7.0)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsTrancheParams",
@@ -58,51 +42,7 @@ pub struct PyCdsTrancheParams {
 
 #[pymethods]
 impl PyCdsTrancheParams {
-    /// Describe a tranche on a credit index.
-    ///
-    /// Parameters
-    /// ----------
-    /// index_name : str
-    ///     Underlying index name, e.g. ``"CDX.NA.IG"``.
-    /// series : int
-    ///     Index series number.
-    /// attach_pct : float
-    ///     Attachment point in percent (``3.0`` = 3%).
-    /// detach_pct : float
-    ///     Detachment point in percent (``7.0`` = 7%); must exceed ``attach_pct``.
-    /// notional : Money
-    ///     Tranche notional.
-    /// maturity : datetime.date | str
-    ///     Scheduled maturity (an IMM date for standard tranches).
-    /// coupon_bp : float | Bps
-    ///     Running coupon in basis points (``100.0`` = 1%).
-    /// realized_loss : float
-    ///     Realized portfolio loss so far as a fraction of the original
-    ///     portfolio notional, in ``[0, 1]``; default ``0.0``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheParams
-    ///     The tranche terms.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``realized_loss`` is outside ``[0, 1]``.
-    /// TypeError
-    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import CdsTrancheParams
-    /// >>> params = CdsTrancheParams(
-    /// ...     "CDX.NA.IG", 42, 7.0, 15.0, Money(5_000_000.0, Currency("USD")), "2029-12-20", 100.0
-    /// ... )
-    /// >>> params.coupon_bp
-    /// 100.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.__init__")]
     #[new]
     #[pyo3(signature = (index_name, series, attach_pct, detach_pct, notional, maturity, coupon_bp, realized_loss=0.0))]
     #[pyo3(
@@ -134,40 +74,7 @@ impl PyCdsTrancheParams {
         Ok(Self { inner })
     }
 
-    /// Standard equity tranche (0%–3%).
-    ///
-    /// Parameters
-    /// ----------
-    /// index_name : str
-    ///     Underlying index name.
-    /// series : int
-    ///     Index series number.
-    /// notional : Money
-    ///     Tranche notional.
-    /// maturity : datetime.date | str
-    ///     Scheduled maturity.
-    /// coupon_bp : float | Bps
-    ///     Running coupon in basis points.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheParams
-    ///     Tranche terms with ``attach_pct=0.0`` and ``detach_pct=3.0``.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import CdsTrancheParams
-    /// >>> CdsTrancheParams.equity_tranche(
-    /// ...     "CDX.NA.IG", 42, Money(1e7, Currency("USD")), "2029-12-20", 500.0
-    /// ... ).detach_pct
-    /// 3.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.equity_tranche")]
     #[staticmethod]
     #[pyo3(text_signature = "(index_name, series, notional, maturity, coupon_bp)")]
     fn equity_tranche(
@@ -188,40 +95,7 @@ impl PyCdsTrancheParams {
         })
     }
 
-    /// Standard mezzanine tranche (3%–7%).
-    ///
-    /// Parameters
-    /// ----------
-    /// index_name : str
-    ///     Underlying index name.
-    /// series : int
-    ///     Index series number.
-    /// notional : Money
-    ///     Tranche notional.
-    /// maturity : datetime.date | str
-    ///     Scheduled maturity.
-    /// coupon_bp : float | Bps
-    ///     Running coupon in basis points.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheParams
-    ///     Tranche terms with ``attach_pct=3.0`` and ``detach_pct=7.0``.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import CdsTrancheParams
-    /// >>> CdsTrancheParams.mezzanine_tranche(
-    /// ...     "CDX.NA.IG", 42, Money(1e7, Currency("USD")), "2029-12-20", 100.0
-    /// ... ).attach_pct
-    /// 3.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.mezzanine_tranche")]
     #[staticmethod]
     #[pyo3(text_signature = "(index_name, series, notional, maturity, coupon_bp)")]
     fn mezzanine_tranche(
@@ -242,7 +116,7 @@ impl PyCdsTrancheParams {
         })
     }
 
-    /// Scheduled maturity.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
@@ -265,46 +139,29 @@ impl PyCdsTrancheParams {
 }
 
 crate::bindings::macros::py_getters!(PyCdsTrancheParams |s| {
-    /// Underlying index name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.index_name")]
     index_name -> String = s.inner.index_name.clone();
 
-    /// Index series number.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.series")]
     series -> u16 = s.inner.series;
 
-    /// Attachment point in percent.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.attach_pct")]
     attach_pct -> f64 = s.inner.attach_pct;
 
-    /// Detachment point in percent.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.detach_pct")]
     detach_pct -> f64 = s.inner.detach_pct;
 
-    /// Tranche notional.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    /// Running coupon in basis points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.coupon_bp")]
     coupon_bp -> f64 = s.inner.coupon_bp;
 
-    /// Realized portfolio loss so far (fraction of original notional).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.realized_loss")]
     realized_loss -> f64 = s.inner.realized_loss;
 });
 
-/// Synthetic CDO / index tranche (typed wrapper for Rust ``CdsTranche``).
-///
-/// Protection on portfolio losses between ``attach_pct`` and ``detach_pct``
-/// (percent points), paying ``coupon_bp`` on the surviving tranche
-/// notional. Priced with the one-factor Gaussian copula against the
-/// ``credit_index_id`` loss distribution.
-///
-/// Build with ``CdsTranche.builder()`` or ``CdsTranche.standard(...)``; start
-/// from ``CdsTranche.example()``. Instances are accepted directly by
-/// ``price_instrument`` and expose ``price`` / ``metric`` /
-/// ``expected_loss`` / ``jump_to_default`` themselves.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import CdsTranche
-/// >>> tranche = CdsTranche.example()
-/// >>> (tranche.attach_pct, tranche.detach_pct, tranche.side)
-/// (0.0, 3.0, 'pay')
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsTranche",
@@ -328,20 +185,7 @@ instrument_pricing_methods!(PyCdsTranche, "CdsTranche");
 
 #[pymethods]
 impl PyCdsTranche {
-    /// Canonical example: CDX.NA.IG 42 equity (0–3%) tranche, USD 10,000,000.
-    ///
-    /// Mirrors Rust ``CdsTranche::example()``: buy protection, 100bp running,
-    /// maturity 2029-12-20, curves ``USD-OIS`` / ``CDX.NA.IG.HAZARD``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTranche
-    ///     The example tranche.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the example instrument fails validation.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -351,34 +195,7 @@ impl PyCdsTranche {
         })
     }
 
-    /// Build a tranche on the standard schedule.
-    ///
-    /// Mirrors Rust ``CdsTranche::standard``: quarterly, ACT/360, Following,
-    /// weekends-only calendar, short-front stub.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// params : CdsTrancheParams
-    ///     Economic terms (attach/detach, notional, maturity, coupon).
-    /// discount_curve_id : str
-    ///     Discount curve identifier.
-    /// credit_index_id : str
-    ///     Credit index identifier for the loss distribution.
-    /// side : {"pay", "receive"}
-    ///     Tranche side: ``"pay"`` buys protection, ``"receive"`` sells it.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTranche
-    ///     The validated tranche.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``side`` is unknown or the parameters fail validation
-    ///     (``attach_pct >= detach_pct``, fractional attach/detach, …).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.standard")]
     #[staticmethod]
     #[pyo3(text_signature = "(id, params, discount_curve_id, credit_index_id, side)")]
     fn standard(
@@ -400,19 +217,19 @@ impl PyCdsTranche {
         Ok(Self { inner })
     }
 
-    /// Scheduled maturity.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Explicit contract start (effective) date for schedule anchoring, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.start_date")]
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner.start_date.map(|d| date_to_py(py, d)).transpose()
     }
 
-    /// Upfront payment as ``(payment_date, amount)``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.upfront")]
     #[getter]
     fn upfront<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -421,7 +238,7 @@ impl PyCdsTranche {
             .transpose()
     }
 
-    /// Maturity as seen by the pricer, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         Instrument::expiry(&self.inner)
@@ -447,65 +264,57 @@ impl PyCdsTranche {
 }
 
 crate::bindings::macros::py_getters!(PyCdsTranche |s| {
-    /// Underlying index name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.index_name")]
     index_name -> String = s.inner.index_name.clone();
 
-    /// Index series number.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.series")]
     series -> u16 = s.inner.series;
 
-    /// Attachment point in percent.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.attach_pct")]
     attach_pct -> f64 = s.inner.attach_pct;
 
-    /// Detachment point in percent.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.detach_pct")]
     detach_pct -> f64 = s.inner.detach_pct;
 
-    /// Tranche notional.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    /// Running coupon in basis points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.coupon_bp")]
     coupon_bp -> f64 = s.inner.coupon_bp;
 
-    /// Payment frequency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    /// Accrual day-count convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    /// Business day convention (serde name, default ``"modified_following"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    /// Holiday calendar identifier, if any.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Credit index identifier for the loss distribution.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.credit_index_id")]
     credit_index_id -> String = s.inner.credit_index_id.to_string();
 
-    /// ``"pay"`` (buy protection) or ``"receive"`` (sell protection).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.side")]
     side -> PyResult<String> = enum_to_py_string(&s.inner.side);
 
-    /// Realized portfolio loss so far (fraction of original notional).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.realized_loss")]
     realized_loss -> f64 = s.inner.realized_loss;
 
-    /// Coupon roll-date grid: ``RollRule.CDS_IMM`` (CDS roll dates, 20th of
-    /// Mar/Jun/Sep/Dec) or ``RollRule.NONE`` (bespoke ``frequency``/``stub``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.roll_rule")]
     roll_rule -> PyRollRule = PyRollRule { inner: s.inner.roll_rule };
 
-    /// Stub convention for a bespoke (``RollRule.NONE``) coupon schedule.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 });
 
-/// Fluent builder for ``CdsTranche``; wraps the Rust
-/// ``FinancialBuilder``-generated builder (consuming setters).
-///
-/// The builder pre-seeds ``realized_loss(0.0)``; ``roll_rule`` defaults to
-/// ``RollRule.NONE``, ``stub`` to ``"short_front"`` and
-/// ``business_day_convention`` to
-/// ``"modified_following"``. Builders are consumed by ``build()``; create a
-/// new builder per instrument.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsTrancheBuilder",
@@ -518,34 +327,14 @@ pub struct PyCdsTrancheBuilder {
 
 #[pymethods]
 impl PyCdsTrancheBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the tranche trade.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, id, format!("{value:?}"), |b: CdsTrancheBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    /// Set the underlying index name.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Index name, e.g. ``"CDX.NA.IG"``, ``"CDX.NA.HY"``, ``"iTraxx EUR"``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.index_name")]
     #[pyo3(text_signature = "($self, value)")]
     fn index_name<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -556,35 +345,14 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the series number.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : int
-    ///     Series number, e.g. ``42``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.series")]
     #[pyo3(text_signature = "($self, value)")]
     fn series<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, series, value.to_string(), |b: CdsTrancheBuilder| b
             .series(value))
     }
 
-    /// Set the attachment point.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Attachment point quoted in percent (e.g. ``0.0`` for equity;
-    ///     ``3.0`` for a tranche attaching at 3%).
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.attach_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn attach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -595,18 +363,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the detachment point.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Detachment point quoted in percent (e.g. ``3.0`` for a 0-3%
-    ///     tranche).
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.detach_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn detach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -617,17 +374,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the notional amount of the tranche.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money
-    ///     Notional amount of the tranche.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -638,17 +385,7 @@ impl PyCdsTrancheBuilder {
             .notional(money))
     }
 
-    /// Set the maturity date of the tranche.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     Maturity date (date-like or ISO 8601 string).
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -663,22 +400,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the running coupon.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float | Bps
-    ///     Running coupon in basis points (e.g. ``100.0`` = 1.00%).
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither a number nor ``Bps``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.coupon_bp")]
     #[pyo3(text_signature = "($self, value)")]
     fn coupon_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -689,22 +411,7 @@ impl PyCdsTrancheBuilder {
             .coupon_bp(bp))
     }
 
-    /// Set the payment frequency.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Tenor | str
-    ///     Payment frequency (typically quarterly, ``"3M"``).
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a tenor string cannot be parsed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -719,22 +426,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the day count convention.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : DayCount | str
-    ///     Day count convention (typically ``DayCount.ACT_360`` / ``"act_360"``).
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a string name is not a recognized day count.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -749,22 +441,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the business day convention for coupon dates.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : BusinessDayConvention | str
-    ///     Roll rule (``"modified_following"`` when never set).
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a string name is not a recognized convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.business_day_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -780,17 +457,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the holiday calendar identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Holiday calendar identifier.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -804,17 +471,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the discount curve identifier (by quote currency).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -828,17 +485,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the credit index identifier for survival/loss modeling.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Credit index identifier.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.credit_index_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_index_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -852,22 +499,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the tranche side (``"pay"`` buys protection, ``"receive"`` sells it).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"pay", "receive"}
-    ///     Tranche side: ``"pay"`` buys protection, ``"receive"`` sells it.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized side.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.side")]
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side: PayReceive = enum_from_str(value, "side")?;
@@ -875,18 +507,7 @@ impl PyCdsTrancheBuilder {
             .side(side))
     }
 
-    /// Set the contract start (effective) date for schedule anchoring.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     Effective date. If never set, uses the as-of date (or the prior CDS
-    ///     roll date when ``roll_rule`` is ``RollRule.CDS_IMM``).
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.start_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn start_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -901,18 +522,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the realized (settled) loss.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Realized loss as a fraction of the original portfolio
-    ///     notional. Defaults to ``0.0`` when never set explicitly.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.realized_loss")]
     #[pyo3(text_signature = "($self, value)")]
     fn realized_loss<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -926,20 +536,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the coupon roll-date grid.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : RollRule
-    ///     ``RollRule.CDS_IMM`` for the standard CDS roll dates (20th of Mar,
-    ///     Jun, Sep, Dec) or ``RollRule.NONE`` (the default) for a schedule
-    ///     generated from ``frequency`` and ``stub``. ``RollRule.IMM`` is
-    ///     rejected by ``build()``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.roll_rule")]
     #[pyo3(text_signature = "($self, value)")]
     fn roll_rule<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -954,23 +551,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    /// Set the stub convention for a bespoke coupon schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str | StubKind
-    ///     Stub rule used when ``roll_rule`` is ``RollRule.NONE``. Defaults to
-    ///     ``"short_front"``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a known stub rule.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.stub")]
     #[pyo3(text_signature = "($self, value)")]
     fn stub<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -981,23 +562,7 @@ impl PyCdsTrancheBuilder {
             .stub(stub))
     }
 
-    /// Set the upfront payment.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : tuple[datetime.date | str, Money]
-    ///     ``(payment_date, amount)``; the amount currency must match the
-    ///     tranche notional.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is not a ``(date, Money)`` pair.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.upfront")]
     #[pyo3(text_signature = "($self, value)")]
     fn upfront<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1009,26 +574,7 @@ impl PyCdsTrancheBuilder {
             .upfront((date, money)))
     }
 
-    /// Set free-form instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTrancheBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

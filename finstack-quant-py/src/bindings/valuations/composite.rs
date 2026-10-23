@@ -489,7 +489,7 @@ impl PyCompositeInstrument {
         serialize_typed_instrument_json(InstrumentJson::from(self.inner.clone()), "composite")
     }
 
-    /// Support pickle through the canonical JSON round-trip.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.composite", "CompositeInstrument.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -791,7 +791,7 @@ impl PyCompositeHistoryResult {
         serialize_json_with_context(&self.inner, "failed to serialize composite history")
     }
 
-    /// Support pickle through the canonical JSON round-trip.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.composite", "CompositeHistoryResult.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)

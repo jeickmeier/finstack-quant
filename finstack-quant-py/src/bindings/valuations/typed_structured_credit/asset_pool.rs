@@ -36,7 +36,7 @@ fn tagged_enum_from_py<T: serde::de::DeserializeOwned + Send>(
     crate::bindings::module_utils::py_to_serde(py, value, label)
 }
 
-/// Typed wrapper for the Rust `AssetPool` (structured-credit collateral pool).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "AssetPool",
@@ -51,35 +51,7 @@ pub struct PyAssetPool {
 
 #[pymethods]
 impl PyAssetPool {
-    /// Structured-credit collateral pool.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Pool identifier.
-    /// deal_type : {"clo", "cbo", "abs", "rmbs", "cmbs", "auto", "card"}
-    ///     Deal classification for pool-level assumptions.
-    /// currency : Currency | str
-    ///     Currency every asset and pool-level account is denominated in.
-    ///
-    /// Returns
-    /// -------
-    /// AssetPool
-    ///     A new, empty asset pool. Use :meth:`with_rep_lines` and/or
-    ///     :meth:`assets` to attach collateral.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``deal_type`` is not a recognized deal type.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.valuations.instruments import AssetPool
-    /// >>> pool = AssetPool("POOL-1", "abs", Currency("USD"))
-    /// >>> "POOL-1" in repr(pool)
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.__init__")]
     #[new]
     #[pyo3(text_signature = "(id, deal_type, currency)")]
     fn new(id: &str, deal_type: &str, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -89,39 +61,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    /// Attach representative pool lines, returning a new pool.
-    ///
-    /// Parameters
-    /// ----------
-    /// rep_lines : list[RepLine]
-    ///     Aggregated representative lines the pricing engine will use
-    ///     instead of individual assets.
-    ///
-    /// Returns
-    /// -------
-    /// AssetPool
-    ///     A new pool with ``rep_lines`` set (the original is unchanged).
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If an element of ``rep_lines`` is not a ``RepLine``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.dates import DayCount
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import AssetPool, RepLine
-    /// >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
-    /// ...     RepLine(
-    /// ...         "LINE-1", Money(80_000_000.0, Currency("USD")), 0.07,
-    /// ...         datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan"},
-    /// ...     )
-    /// ... ])
-    /// >>> "POOL-1" in repr(pool)
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_rep_lines")]
     #[pyo3(text_signature = "($self, rep_lines)")]
     fn with_rep_lines(&self, rep_lines: Vec<PyRef<'_, PyRepLine>>) -> Self {
         let mut inner = self.inner.clone();
@@ -129,23 +69,7 @@ impl PyAssetPool {
         Self { inner }
     }
 
-    /// Attach loan-level assets, returning a new pool.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[PoolAsset | dict] | str
-    ///     Typed :class:`PoolAsset` rows, their serde dicts, or a JSON
-    ///     array string (mixing typed rows and dicts is allowed).
-    ///
-    /// Returns
-    /// -------
-    /// AssetPool
-    ///     A new pool with ``assets`` set (the original is unchanged).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``PoolAsset`` list shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_assets")]
     #[pyo3(text_signature = "($self, value)")]
     fn with_assets(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         let assets = typed_list_from_py(py, value, "assets", |asset: &PyPoolAsset| {
@@ -156,56 +80,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    /// Attach real instruments as the collateral, returning a new pool.
-    ///
-    /// The pool then holds ``Bond``, ``TermLoan`` and ``RevolvingCredit``
-    /// instruments instead of asset rows or representative lines; each
-    /// instrument's own cashflow schedule drives the deal, defaults come from
-    /// the instrument's credit curve when present, and collateral draws are
-    /// funded from the reserve account (see :meth:`with_reserve`).
-    ///
-    /// Parameters
-    /// ----------
-    /// bonds : list[Bond], optional
-    ///     Bonds in any form (fixed, floating, step-up, amortizing, callable).
-    /// term_loans : list[TermLoan], optional
-    ///     Term loans, including delayed-draw facilities.
-    /// revolvers : list[RevolvingCredit], optional
-    ///     Revolving facilities; stochastic ones simulate draws on the paths.
-    /// call_exercise : str | dict, optional
-    ///     Default issuer-call policy: ``"contractual"`` (never, the
-    ///     default), ``"first_call"``, ``"worst"`` (yield-to-worst, needs a
-    ///     quoted clean price) or ``{"policy": "refinancing_incentive",
-    ///     "threshold_bp": 50.0}``.
-    /// put_exercise : str, optional
-    ///     Default holder-put policy: ``"never"`` (default), ``"first_put"``, or the
-    ///     dict ``{"policy": "reinvestment_incentive", "threshold_bp": 50.0}`` (put
-    ///     when the reinvestment rate exceeds the coupon by more than the threshold).
-    /// overrides : list[dict], optional
-    ///     Per-instrument overrides ``{"id": ..., "call": {...}, "put": {...}}``.
-    ///
-    /// Returns
-    /// -------
-    /// AssetPool
-    ///     A new pool with ``instruments`` set (the original is unchanged).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a policy or override does not match its serde shape.
-    /// TypeError
-    ///     If a list element is not the expected typed instrument.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.valuations.instruments import AssetPool, Bond, RevolvingCredit
-    /// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_instruments(
-    /// ...     bonds=[Bond.example()], revolvers=[RevolvingCredit.example()],
-    /// ...     call_exercise="first_call",
-    /// ... )
-    /// >>> sorted(pool.instruments)
-    /// ['bonds', 'call_exercise', 'overrides', 'put_exercise', 'revolvers', 'term_loans']
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_instruments")]
     #[pyo3(signature = (bonds=None, term_loans=None, revolvers=None, call_exercise=None, put_exercise=None, overrides=None))]
     #[pyo3(
         text_signature = "($self, bonds=None, term_loans=None, revolvers=None, call_exercise=None, put_exercise=None, overrides=None)"
@@ -259,54 +134,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    /// Configure the reserve account, returning a new pool.
-    ///
-    /// The reserve funds collateral draws (revolver utilization increases,
-    /// delayed draws and loan-equivalent draws at default), is replenished by
-    /// revolver repayments up to ``reserve_target``, and earns
-    /// ``reserve_account_rate`` routed per ``reserve_interest_destination``.
-    ///
-    /// Parameters
-    /// ----------
-    /// reserve_account : Money | float
-    ///     Opening reserve balance; a bare number needs ``currency``.
-    /// reserve_account_rate : float, default 0.0
-    ///     Annual interest rate earned by the reserve, as a decimal
-    ///     (simple ACT/360 on the opening balance each period).
-    /// reserve_target : Money | float, optional
-    ///     Balance revolver repayments replenish toward; ``None`` disables
-    ///     replenishment.
-    /// reserve_interest_destination : str | dict, optional
-    ///     ``"waterfall"`` (default, interest proceeds), ``"retain"``
-    ///     (capitalized into the reserve) or ``{"kind": "tranche",
-    ///     "tranche_id": "EQ"}`` (paid directly to that tranche).
-    /// currency : str, optional
-    ///     ISO-4217 code applied when a bare number is passed.
-    ///
-    /// Returns
-    /// -------
-    /// AssetPool
-    ///     A new pool with the reserve configured (the original is unchanged).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an amount is not finite, a bare number has no currency, or the
-    ///     destination does not match its serde shape.
-    /// TypeError
-    ///     If an amount is neither ``Money`` nor a number.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import AssetPool
-    /// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_reserve(
-    /// ...     Money(5_000_000.0, Currency("USD")), reserve_account_rate=0.03,
-    /// ...     reserve_interest_destination={"kind": "tranche", "tranche_id": "EQ"},
-    /// ... )
-    /// >>> (pool.reserve_account_rate, pool.reserve_interest_destination["kind"])
-    /// (0.03, 'tranche')
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_reserve")]
     #[pyo3(signature = (reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None))]
     #[pyo3(
         text_signature = "($self, reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None)"
@@ -333,50 +161,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    /// Configure the deal-level reinvestment period, returning a new pool.
-    ///
-    /// Principal proceeds collected while the period is active are recycled
-    /// into collateral instead of repaying the notes; every note is held flat
-    /// except those listed in ``amortizing_tranches``, which are paid down
-    /// first. Instrument-collateral pools cannot reinvest.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict[str, Any] | str
-    ///     ``ReinvestmentPeriod`` in its serde shape, or that JSON as a
-    ///     string: ISO ``end`` (inclusive), ``is_active``, ``criteria``
-    ///     (``max_price_pct`` percent of par, ``min_yield`` annual decimal current
-    ///     yield below which a surviving asset is skipped), optional
-    ///     ``amortizing_tranches`` (note ids paid down inside the window) and
-    ///     optional ``assumptions`` (``spread_bp``, ``price_pct``,
-    ///     ``maturity_months``, ``forward_curve_id``, ``all_in_floor_bp``) describing the
-    ///     replacement collateral; omitted assumptions clone the surviving
-    ///     pool pro rata.
-    ///
-    /// Returns
-    /// -------
-    /// AssetPool
-    ///     A new pool with the reinvestment period set (the original is
-    ///     unchanged).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``ReinvestmentPeriod`` serde shape.
-    ///     Tranche ids, dates and assumption ranges are validated when the
-    ///     deal is built or priced.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.valuations.instruments import AssetPool
-    /// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_reinvestment_period({
-    /// ...     "end": "2028-01-01", "is_active": True,
-    /// ...     "criteria": {"max_price_pct": 100.0, "min_yield": 0.0},
-    /// ...     "amortizing_tranches": ["A"],
-    /// ... })
-    /// >>> pool.reinvestment_period["amortizing_tranches"]
-    /// ['A']
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_reinvestment_period")]
     #[pyo3(text_signature = "($self, value)")]
     fn with_reinvestment_period(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         let period: ReinvestmentPeriod = if let Ok(text) = value.extract::<String>() {
@@ -390,33 +175,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    /// Set the pool's historical tallies and cash accounts, returning a new
-    /// pool (seasoned-deal inputs).
-    ///
-    /// Parameters
-    /// ----------
-    /// cumulative_defaults : Money, optional
-    ///     Defaulted par to date; unchanged when omitted.
-    /// cumulative_recoveries : Money, optional
-    ///     Recoveries received to date; unchanged when omitted.
-    /// cumulative_prepayments : Money, optional
-    ///     Prepayments received to date; unchanged when omitted.
-    /// cumulative_scheduled_amortization : Money, optional
-    ///     Scheduled principal received to date; unchanged when omitted.
-    /// collection_account : Money, optional
-    ///     Undistributed collections held at closing; unchanged when omitted.
-    /// excess_spread_account : Money, optional
-    ///     Trapped excess spread held at closing; unchanged when omitted.
-    /// original_balance : Money, optional
-    ///     Original (cut-off) pool balance the cumulative-loss triggers,
-    ///     clean-up call factor and loss curves are stated against; when
-    ///     omitted the engine reconstructs it from the current balance plus
-    ///     the cumulative tallies. Must be at least the current balance.
-    ///
-    /// Returns
-    /// -------
-    /// AssetPool
-    ///     A new pool with the supplied balances (the original is unchanged).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_accounts")]
     #[pyo3(signature = (*, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None))]
     #[pyo3(
         text_signature = "($self, *, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None)"
@@ -458,17 +217,7 @@ impl PyAssetPool {
         Self { inner }
     }
 
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     Strict JSON object with exactly the fields ``to_json`` writes.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or has the wrong shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -477,32 +226,31 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    /// Serialize to the canonical JSON wire form.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
     }
 
-    /// Return every field as a plain ``dict`` (canonical serde shape).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Loan-level assets as a list of dicts (``PoolAsset`` serde shape).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.asset_records")]
     #[getter]
     fn asset_records<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.assets)
     }
 
-    /// Loan-level assets as typed :class:`PoolAsset` rows (empty when rep
-    /// lines or instruments are used).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.assets")]
     #[getter]
     fn assets(&self) -> Vec<PyPoolAsset> {
         self.inner
@@ -514,7 +262,7 @@ impl PyAssetPool {
             .collect()
     }
 
-    /// Representative lines, or ``None`` when the pool is modelled loan-level.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.rep_lines")]
     #[getter]
     fn rep_lines(&self) -> Option<Vec<PyRepLine>> {
         self.inner.rep_lines.as_ref().map(|lines| {
@@ -527,18 +275,13 @@ impl PyAssetPool {
         })
     }
 
-    /// Destination of the reserve interest as its serde ``dict``
-    /// (``{"kind": "waterfall"}``, ``{"kind": "retain"}`` or
-    /// ``{"kind": "tranche", "tranche_id": ...}``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reserve_interest_destination")]
     #[getter]
     fn reserve_interest_destination<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.reserve_interest_destination)
     }
 
-    /// Instrument collateral as its serde ``dict`` (``bonds``, ``term_loans``,
-    /// ``revolvers``, ``call_exercise``, ``put_exercise``, ``overrides``), or
-    /// ``None`` when the pool is modelled with asset rows or representative
-    /// lines.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.instruments")]
     #[getter]
     fn instruments<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -548,7 +291,7 @@ impl PyAssetPool {
             .transpose()
     }
 
-    /// Reinvestment period as its serde ``dict``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reinvestment_period")]
     #[getter]
     fn reinvestment_period<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -558,28 +301,7 @@ impl PyAssetPool {
             .transpose()
     }
 
-    /// Current balance of the whole pool (mirrors Rust ``AssetPool::total_balance``).
-    ///
-    /// Sums the loan-level assets, the representative lines or the instrument
-    /// collateral, whichever represents the pool; defaulted assets are
-    /// included.
-    ///
-    /// Returns
-    /// -------
-    /// Money
-    ///     Pool balance in the pool currency.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the pool carries both asset rows and representative lines, or
-    ///     balances in more than one currency.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
-    /// >>> StructuredCredit.example().pool.total_balance().amount
-    /// 100000000.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.total_balance")]
     #[pyo3(text_signature = "($self)")]
     fn total_balance(&self) -> PyResult<PyMoney> {
         self.inner
@@ -588,25 +310,7 @@ impl PyAssetPool {
             .map_err(crate::errors::core_to_py)
     }
 
-    /// Balance of the performing (non-defaulted) collateral (mirrors Rust
-    /// ``AssetPool::performing_balance``).
-    ///
-    /// Returns
-    /// -------
-    /// Money
-    ///     Performing balance in the pool currency; equals ``total_balance()``
-    ///     when the pool has no loan-level assets.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the pool representation or currencies are inconsistent.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
-    /// >>> StructuredCredit.example().pool.performing_balance().amount
-    /// 100000000.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.performing_balance")]
     #[pyo3(text_signature = "($self)")]
     fn performing_balance(&self) -> PyResult<PyMoney> {
         self.inner
@@ -615,69 +319,19 @@ impl PyAssetPool {
             .map_err(crate::errors::core_to_py)
     }
 
-    /// Weighted-average coupon of the performing fixed-rate collateral
-    /// (mirrors Rust ``AssetPool::wac``).
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Balance-weighted coupon as an annual decimal (``0.07`` = 7%);
-    ///     ``0.0`` when no performing fixed-rate collateral exists.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
-    /// >>> StructuredCredit.example().pool.wac()
-    /// 0.07
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.wac")]
     #[pyo3(text_signature = "($self)")]
     fn wac(&self) -> f64 {
         self.inner.wac()
     }
 
-    /// Weighted-average spread of the performing collateral that carries an
-    /// explicit spread (mirrors Rust ``AssetPool::weighted_avg_spread_bp``).
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Balance-weighted spread in basis points; ``0.0`` when no
-    ///     performing asset carries a spread.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
-    /// >>> StructuredCredit.example().pool.weighted_avg_spread_bp()
-    /// 0.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.weighted_avg_spread_bp")]
     #[pyo3(text_signature = "($self)")]
     fn weighted_avg_spread_bp(&self) -> f64 {
         self.inner.weighted_avg_spread_bp()
     }
 
-    /// Balance-weighted average remaining maturity (mirrors Rust
-    /// ``AssetPool::weighted_avg_maturity``).
-    ///
-    /// Parameters
-    /// ----------
-    /// as_of : datetime.date | str
-    ///     Date the remaining maturities are measured from, either a
-    ///     date-like object or an ISO 8601 string.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Weighted average maturity in years (ACT/365F from ``as_of``);
-    ///     ``0.0`` for an empty pool.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``as_of`` is not a date or the pool balances are inconsistent.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
-    /// >>> round(StructuredCredit.example().pool.weighted_avg_maturity("2024-01-01"), 1)
-    /// 10.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.weighted_avg_maturity")]
     #[pyo3(text_signature = "($self, as_of)")]
     fn weighted_avg_maturity(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
@@ -686,44 +340,13 @@ impl PyAssetPool {
             .map_err(crate::errors::core_to_py)
     }
 
-    /// Moody's diversity score of the pool (mirrors Rust
-    /// ``AssetPool::diversity_score``).
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Diversity score from the obligor and industry concentrations;
-    ///     ``0.0`` when the pool balance cannot be computed.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
-    /// >>> StructuredCredit.example().pool.diversity_score() >= 0.0
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.diversity_score")]
     #[pyo3(text_signature = "($self)")]
     fn diversity_score(&self) -> f64 {
         self.inner.diversity_score()
     }
 
-    /// Loan-level assets of one obligor (mirrors Rust
-    /// ``AssetPool::assets_by_obligor``).
-    ///
-    /// Parameters
-    /// ----------
-    /// obligor_id : str
-    ///     Obligor identifier matched exactly against each asset's
-    ///     ``obligor_id``.
-    ///
-    /// Returns
-    /// -------
-    /// list[PoolAsset]
-    ///     Copies of the matching assets in pool order; empty when none match.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
-    /// >>> StructuredCredit.example().pool.assets_by_obligor("NOBODY")
-    /// []
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.assets_by_obligor")]
     #[pyo3(text_signature = "($self, obligor_id)")]
     fn assets_by_obligor(&self, obligor_id: &str) -> Vec<PyPoolAsset> {
         self.inner
@@ -735,24 +358,7 @@ impl PyAssetPool {
             .collect()
     }
 
-    /// Loan-level assets in one industry (mirrors Rust
-    /// ``AssetPool::assets_by_industry``).
-    ///
-    /// Parameters
-    /// ----------
-    /// industry : str
-    ///     Industry label matched exactly against each asset's ``industry``.
-    ///
-    /// Returns
-    /// -------
-    /// list[PoolAsset]
-    ///     Copies of the matching assets in pool order; empty when none match.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
-    /// >>> StructuredCredit.example().pool.assets_by_industry("Utilities")
-    /// []
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.assets_by_industry")]
     #[pyo3(text_signature = "($self, industry)")]
     fn assets_by_industry(&self, industry: &str) -> Vec<PyPoolAsset> {
         self.inner
@@ -787,45 +393,43 @@ impl PyAssetPool {
 }
 
 crate::bindings::macros::py_getters!(PyAssetPool |s| {
-    /// Pool identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.id")]
     id -> String = s.inner.id.to_string();
 
-    /// Deal classification (serde name).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.deal_type")]
     deal_type -> PyResult<String> = enum_to_py_string(&s.inner.deal_type);
 
-    /// ISO-4217 currency code every pool amount is denominated in.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    /// Cumulative defaults to date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.cumulative_defaults")]
     cumulative_defaults -> PyMoney = money_to_py(s.inner.cumulative_defaults);
 
-    /// Cumulative recoveries to date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.cumulative_recoveries")]
     cumulative_recoveries -> PyMoney = money_to_py(s.inner.cumulative_recoveries);
 
-    /// Cumulative prepayments to date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.cumulative_prepayments")]
     cumulative_prepayments -> PyMoney = money_to_py(s.inner.cumulative_prepayments);
 
-    /// Cumulative scheduled amortization to date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.cumulative_scheduled_amortization")]
     cumulative_scheduled_amortization -> PyMoney =
         money_to_py(s.inner.cumulative_scheduled_amortization);
 
-    /// Original (cut-off) pool balance when supplied, else ``None`` (the
-    /// engine then reconstructs it from the current balance and the
-    /// cumulative tallies).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.original_balance")]
     original_balance -> Option<PyMoney> = s.inner.original_balance.map(money_to_py);
 
-    /// Collection account balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.collection_account")]
     collection_account -> PyMoney = money_to_py(s.inner.collection_account);
 
-    /// Reserve account balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reserve_account")]
     reserve_account -> PyMoney = money_to_py(s.inner.reserve_account);
 
-    /// Annual interest rate earned by the reserve account, as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reserve_account_rate")]
     reserve_account_rate -> f64 = s.inner.reserve_account_rate;
 
-    /// Reserve balance revolver repayments replenish toward, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reserve_target")]
     reserve_target -> Option<PyMoney> = s.inner.reserve_target.map(money_to_py);
 
-    /// Excess-spread account balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.excess_spread_account")]
     excess_spread_account -> PyMoney = money_to_py(s.inner.excess_spread_account);
 });

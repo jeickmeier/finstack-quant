@@ -7,20 +7,7 @@ use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::valuations::convert::opt_repr;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::EquityMetrics;
 
-/// Residual-class return analytics of one deterministic projection
-/// (:meth:`StructuredCredit.equity_metrics`'s return value): the XIRR of the
-/// invested amount against every projected equity distribution, the
-/// multiple on invested capital, the NAV and the cash-on-cash series.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import EquityMetrics
-/// >>> metrics = EquityMetrics.from_json(
-/// ...     '{"tranche_id": "E", "currency": "USD", "invested": 100.0, "irr": 0.12,'
-/// ...     ' "moic": 1.5, "nav_pct": 90.0, "cash_on_cash": [["2025-01-15", 0.1]]}'
-/// ... )
-/// >>> metrics.moic, list(metrics.to_dataframe().columns)
-/// (1.5, ['date', 'cash_on_cash'])
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "EquityMetrics",
@@ -33,12 +20,17 @@ pub struct PyEquityMetrics {
     pub(crate) inner: EquityMetrics,
 }
 
-crate::bindings::macros::wire_methods!(PyEquityMetrics, EquityMetrics, "EquityMetrics", to_dict);
+crate::bindings::macros::wire_methods!(
+    PyEquityMetrics,
+    EquityMetrics,
+    "EquityMetrics",
+    module = "finstack_quant.valuations.instruments",
+    to_dict
+);
 
 #[pymethods]
 impl PyEquityMetrics {
-    /// Per-distribution cash-on-cash yield (distribution over ``invested``) as
-    /// ``(datetime.date, float)`` pairs.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.cash_on_cash")]
     #[getter]
     fn cash_on_cash<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
         self.inner
@@ -48,20 +40,7 @@ impl PyEquityMetrics {
             .collect()
     }
 
-    /// Cash-on-cash series as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``date`` (ISO 8601 string) and ``cash_on_cash`` (decimal
-    /// share of the invested amount distributed on that date).
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    ///     One row per distribution date.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the rows cannot be serialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self
@@ -95,24 +74,21 @@ impl PyEquityMetrics {
 }
 
 crate::bindings::macros::py_getters!(PyEquityMetrics |s| {
-    /// Identifier of the residual class.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.tranche_id")]
     tranche_id -> String = s.inner.tranche_id.clone();
 
-    /// ISO-4217 code of the currency ``invested`` is denominated in.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    /// Amount invested on the valuation date (balance × purchase price), in
-    /// currency units.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.invested")]
     invested -> f64 = s.inner.invested;
 
-    /// Annualized XIRR of the equity flows as a decimal, or ``None`` when no
-    /// rate solves (for example no positive distribution).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.irr")]
     irr -> Option<f64> = s.inner.irr;
 
-    /// Multiple on invested capital: total distributions over ``invested``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.moic")]
     moic -> f64 = s.inner.moic;
 
-    /// Discounted value of the distributions as a percent of the invested
-    /// balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.nav_pct")]
     nav_pct -> f64 = s.inner.nav_pct;
 });

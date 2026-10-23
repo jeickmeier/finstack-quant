@@ -7,45 +7,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Wat
 
 use super::PyCoverageRules;
 
-/// The deal's priority of payments: ordered tiers (fees, interest, coverage
-/// tests, principal, residual) with their recipients, allocation mode,
-/// funding source and the coverage rules the tests use.
-///
-/// Obtain one from :meth:`StructuredCredit.create_waterfall` (the effective
-/// template or custom waterfall) or :meth:`Waterfall.from_json`; pass a
-/// ``Waterfall`` (or its dict) to :meth:`StructuredCreditBuilder.waterfall`
-/// to run a custom priority of payments.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.core.currency import Currency
-/// >>> from finstack_quant.core.dates import DayCount
-/// >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
-/// >>> from finstack_quant.core.money import Money
-/// >>> from finstack_quant.valuations.instruments import (
-/// ...     AssetPool, PoolAsset, StandardDealParams, StructuredCredit, Tranche, TrancheStructure,
-/// ... )
-/// >>> as_of, maturity = datetime.date(2024, 1, 15), datetime.date(2031, 1, 15)
-/// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_assets([
-/// ...     PoolAsset.fixed_rate_bond("LOAN-1", Money(80_000_000.0, Currency("USD")), 0.07, maturity, DayCount.ACT_360)
-/// ... ])
-/// >>> note = (
-/// ...     Tranche.builder().id("A").attach_pct(0.0).detach_pct(100.0)
-/// ...     .seniority("senior").original_balance(Money(80_000_000.0, Currency("USD")))
-/// ...     .coupon_fixed(0.05).maturity(maturity).build()
-/// ... )
-/// >>> deal = StructuredCredit.new_standard(
-/// ...     "clo",
-/// ...     StandardDealParams(
-/// ...         "CLO-1", pool, TrancheStructure([note]), as_of, maturity,
-/// ...         "USD-SOFR-DISC", calendar_id="nyse",
-/// ...     ),
-/// ... )
-/// >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
-/// >>> waterfall = deal.create_waterfall()
-/// >>> waterfall.currency, len(waterfall.tiers) > 0
-/// ('USD', True)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "Waterfall",
@@ -58,31 +20,23 @@ pub struct PyWaterfall {
     pub(crate) inner: Waterfall,
 }
 
-crate::bindings::macros::wire_methods!(PyWaterfall, Waterfall, "Waterfall", to_dict);
+crate::bindings::macros::wire_methods!(
+    PyWaterfall,
+    Waterfall,
+    "Waterfall",
+    module = "finstack_quant.valuations.instruments",
+    to_dict
+);
 
 #[pymethods]
 impl PyWaterfall {
-    /// Ordered tiers as ``WaterfallTier`` serde dicts (``id``, ``priority``,
-    /// ``payment_type``, ``allocation_mode``, ``recipients``, ``tests``,
-    /// ``funding``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall.tiers")]
     #[getter]
     fn tiers<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.tiers)
     }
 
-    /// Every coverage test placed in the waterfall as ``CoverageTestSpec``
-    /// serde dicts, in tier order.
-    ///
-    /// Returns
-    /// -------
-    /// list[dict]
-    ///     One dict per test (``id``, ``tranche_id``, ``kind``,
-    ///     ``trigger_level``, ``action`` ...).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the specs cannot be serialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall.coverage_tests")]
     #[pyo3(text_signature = "($self)")]
     fn coverage_tests<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let specs: Vec<_> = self.inner.coverage_tests().cloned().collect();
@@ -100,10 +54,10 @@ impl PyWaterfall {
 }
 
 crate::bindings::macros::py_getters!(PyWaterfall |s| {
-    /// ISO-4217 currency code every waterfall amount is denominated in.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    /// Collateral valuation rules attached to the coverage tests, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall.coverage_rules")]
     coverage_rules -> Option<PyCoverageRules> =
         s.inner.coverage_rules.clone().map(|inner| PyCoverageRules { inner });
 });

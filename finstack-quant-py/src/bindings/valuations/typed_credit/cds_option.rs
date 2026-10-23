@@ -24,24 +24,7 @@ use crate::bindings::module_utils::spec_from_py;
 
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionBuilder;
 
-/// European option on a single-name or index CDS (typed wrapper for Rust ``CdsOption``).
-///
-/// The strike is either a forward spread (``{"spread": "0.0325"}``, decimal
-/// rate) or a clean index price in percentage points
-/// (``{"clean_price_pct": "107.0"}``). A call is the right to buy protection
-/// (payer), a put the right to sell it (receiver). Pricing uses the
-/// Bloomberg CDSO numerical-quadrature model; ``delta``, ``gamma``, ``vega``,
-/// ``theta`` and ``implied_vol`` are metric ids of ``price``/``metric``.
-///
-/// Build with ``CdsOption.builder()`` or start from ``CdsOption.example()``;
-/// instances are accepted directly by ``price_instrument``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import CdsOption
-/// >>> option = CdsOption.example()
-/// >>> (option.id, option.option_type, option.strike, option.vol_surface_id)
-/// ('CDSOPT-CALL-CORP-5Y', 'call', {'spread': '0.01'}, 'CDSOPT-VOL')
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsOption",
@@ -75,21 +58,7 @@ fn opt_date_to_py<'py>(
 
 #[pymethods]
 impl PyCdsOption {
-    /// Canonical example: 100bp-strike call on a 5-year USD 10,000,000 corporate CDS.
-    ///
-    /// Mirrors Rust ``CdsOption::example()``: expiry 2025-06-20, CDS maturity
-    /// 2030-06-20, cash settlement, 40% recovery, curves ``USD-OIS`` /
-    /// ``CORP-HAZARD`` and vol surface ``CDSOPT-VOL``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOption
-    ///     The validated example option.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the example option fails validation.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -99,26 +68,25 @@ impl PyCdsOption {
         })
     }
 
-    /// Strike as a dict: ``{"spread": "<decimal rate>"}`` or
-    /// ``{"clean_price_pct": "<price points>"}`` (decimal strings).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.strike")]
     #[getter]
     fn strike<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.strike)
     }
 
-    /// Option expiry date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.expiry)
     }
 
-    /// Maturity date of the underlying CDS.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.underlying_maturity")]
     #[getter]
     fn underlying_maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.underlying_maturity)
     }
 
-    /// Exercise proceeds payment date, or ``None`` for legal expiry.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.exercise_settlement_date")]
     #[getter]
     fn exercise_settlement_date<'py>(
         &self,
@@ -127,14 +95,13 @@ impl PyCdsOption {
         opt_date_to_py(py, self.inner.exercise_settlement_date)
     }
 
-    /// Explicit accrual-effective date of the underlying CDS, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.underlying_start_date")]
     #[getter]
     fn underlying_start_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_date_to_py(py, self.inner.underlying_start_date)
     }
 
-    /// Running coupon of the underlying CDS in basis points as ``decimal.Decimal``,
-    /// or ``None`` (the strike spread is then the coupon).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.coupon_bp")]
     #[getter]
     fn coupon_bp<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -156,73 +123,51 @@ impl PyCdsOption {
 }
 
 crate::bindings::macros::py_getters!(PyCdsOption |s| {
-    /// ``"call"`` (right to buy protection) or ``"put"`` (right to sell protection).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.option_type")]
     option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
 
-    /// Option notional.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    /// Settlement type: ``"cash"`` or ``"physical"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.settlement")]
     settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
 
-    /// Underlying accrual-start convention: ``"spot"`` or ``"forward"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.protection_start_convention")]
     protection_start_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.protection_start_convention);
 
-    /// Whether the option knocks out if the reference entity defaults before expiry.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.knockout")]
     knockout -> bool = s.inner.knockout;
 
-    /// Recovery rate assumption as a decimal (``0.4`` = 40%).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.recovery_rate")]
     recovery_rate -> f64 = s.inner.recovery_rate;
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Hazard (credit) curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.credit_curve_id")]
     credit_curve_id -> String = s.inner.credit_curve_id.to_string();
 
-    /// Volatility surface identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
-    /// ISDA convention of the underlying CDS (``"isda_na"``, ``"isda_eu"``, ...).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.underlying_convention")]
     underlying_convention -> PyResult<String> = enum_to_py_string(&s.inner.underlying_convention);
 
-    /// ``True`` when the underlying is a CDS index rather than a single name.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.underlying_is_index")]
     underlying_is_index -> bool = s.inner.underlying_is_index;
 
-    /// Current index factor ``f`` in ``(0, 1]``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.index_factor")]
     index_factor -> f64 = s.inner.index_factor;
 
-    /// Original index factor ``f0`` of a clean-price strike, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.strike_index_factor")]
     strike_index_factor -> Option<f64> = s.inner.strike_index_factor;
 
-    /// Settled cumulative index loss since inception, as a decimal of original notional.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOption.realized_loss")]
     realized_loss -> f64 = s.inner.realized_loss;
 });
 
-/// Fluent builder for ``CdsOption``; wraps the Rust ``FinancialBuilder``
-/// builder (consuming setters).
-///
-/// Required: ``id``, ``strike``, ``option_type``, ``expiry``,
-/// ``underlying_maturity``, ``notional``, ``settlement``,
-/// ``recovery_rate``, ``discount_curve_id``, ``credit_curve_id``,
-/// ``vol_surface_id`` and ``underlying_is_index``. Builders are consumed by
-/// ``build()``; create a new builder per instrument.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.core.currency import Currency
-/// >>> from finstack_quant.core.money import Money
-/// >>> from finstack_quant.valuations.instruments import CdsOption
-/// >>> option = (CdsOption.builder().id("CDSO-1").strike({"spread": "0.0125"})
-/// ...     .option_type("put")
-/// ...     .expiry(datetime.date(2025, 6, 20)).underlying_maturity(datetime.date(2030, 6, 20))
-/// ...     .notional(Money(5_000_000, Currency("USD"))).settlement("physical")
-/// ...     .recovery_rate(0.4).discount_curve_id("USD-OIS").credit_curve_id("CORP-HAZARD")
-/// ...     .vol_surface_id("CDSOPT-VOL").underlying_is_index(False).build())
-/// >>> (option.option_type, option.settlement, option.strike)
-/// ('put', 'physical', {'spread': '0.0125'})
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsOptionBuilder",
@@ -244,41 +189,14 @@ fn decimal_arg(value: &Bound<'_, PyAny>) -> PyResult<Decimal> {
 
 #[pymethods]
 impl PyCdsOptionBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the option.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, id, format!("{value:?}"), |b: CdsOptionBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    /// Set the option strike as a forward spread or a clean index price.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``{"spread": "0.0325"}`` (forward spread as a decimal rate) or
-    ///     ``{"clean_price_pct": "107.0"}`` (clean price in percentage
-    ///     points), as a dict or JSON text.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not one of the two strike forms.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.strike")]
     #[pyo3(text_signature = "($self, value)")]
     fn strike<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -290,22 +208,7 @@ impl PyCdsOptionBuilder {
         builder_set!(slf, strike, shown, |b: CdsOptionBuilder| b.strike(strike))
     }
 
-    /// Set the option type.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"call", "put"}
-    ///     ``"call"`` buys protection at expiry, ``"put"`` sells it.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized option type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.option_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn option_type<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -320,17 +223,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the option expiry date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     Legal expiry; must precede ``underlying_maturity``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.expiry")]
     #[pyo3(text_signature = "($self, value)")]
     fn expiry<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -341,17 +234,7 @@ impl PyCdsOptionBuilder {
             .expiry(date))
     }
 
-    /// Set the underlying CDS maturity date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     Maturity of the CDS delivered or cash-settled at exercise.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.underlying_maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -366,17 +249,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the option notional.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money
-    ///     Positive notional of the underlying CDS.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -387,22 +260,7 @@ impl PyCdsOptionBuilder {
             .notional(money))
     }
 
-    /// Set the settlement type.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"cash", "physical"}
-    ///     Settlement of the exercise proceeds.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized settlement type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.settlement")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = enum_from_str(value, "settlement")?;
@@ -414,18 +272,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the exercise proceeds payment date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     On or after expiry and before CDS maturity; when never set, legal
-    ///     expiry is used.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.exercise_settlement_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn exercise_settlement_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -440,18 +287,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the underlying CDS accrual-effective date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     Accrual start used for the forward spread and risky annuity; when
-    ///     never set, ``protection_start_convention`` selects it.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.underlying_start_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_start_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -466,23 +302,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the underlying accrual-start convention.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"spot", "forward"}
-    ///     ``"spot"`` (default) accrues from the prior CDS roll date;
-    ///     ``"forward"`` accrues from option expiry.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.protection_start_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn protection_start_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -497,17 +317,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set whether the option knocks out on default before expiry.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : bool
-    ///     ``True`` for knock-out single-name options; default ``False``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.knockout")]
     #[pyo3(text_signature = "($self, value)")]
     fn knockout<'py>(mut slf: PyRefMut<'py, Self>, value: bool) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -518,17 +328,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the recovery rate assumption.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Recovery as a decimal in ``[0, 1]`` (``0.4`` = 40%).
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.recovery_rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn recovery_rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -542,17 +342,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the discount curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve id in the market context.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -566,17 +356,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the hazard (credit) curve identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Hazard curve id in the market context.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.credit_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -590,17 +370,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the volatility surface identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Spread (or price) volatility surface id in the market context.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -614,22 +384,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the ISDA convention of the underlying CDS.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     ``"isda_na"`` (default), ``"isda_eu"``, ``"isda_as"`` or ``"custom"``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.underlying_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -644,18 +399,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set whether the underlying is a CDS index.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : bool
-    ///     ``True`` for an index option (no knock-out, index factor applies),
-    ///     ``False`` for a single-name option.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.underlying_is_index")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_is_index<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -669,18 +413,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the current index factor.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Surviving fraction of the original index notional, in ``(0, 1]``;
-    ///     default ``1.0``.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.index_factor")]
     #[pyo3(text_signature = "($self, value)")]
     fn index_factor<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -694,18 +427,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the original index factor of a clean-price strike.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     ``f0`` the clean-price strike is quoted on; required for
-    ///     clean-price strikes and rejected for spread strikes.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.strike_index_factor")]
     #[pyo3(text_signature = "($self, value)")]
     fn strike_index_factor<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -719,18 +441,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the settled cumulative index loss since option inception.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Decimal fraction of original index notional in ``[0, 1]``; default
-    ///     ``0.0`` (single-name options must keep ``0.0``).
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.realized_loss")]
     #[pyo3(text_signature = "($self, value)")]
     fn realized_loss<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -744,24 +455,7 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the running coupon of the underlying CDS.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : decimal.Decimal | str | int | float
-    ///     Coupon in basis points (``100`` for CDX.NA.IG, ``500`` for
-    ///     CDX.NA.HY), parsed exactly from its string form. When never set
-    ///     the strike spread is the coupon (single-name SNAC).
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a decimal number.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.coupon_bp")]
     #[pyo3(text_signature = "($self, value)")]
     fn coupon_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -772,26 +466,7 @@ impl PyCdsOptionBuilder {
             .coupon_bp(coupon))
     }
 
-    /// Set free-form instrument attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsOptionBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

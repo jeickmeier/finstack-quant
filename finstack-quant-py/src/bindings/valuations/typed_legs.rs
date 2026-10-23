@@ -38,11 +38,7 @@ pub(crate) fn compounding_from_py(
     crate::bindings::module_utils::py_to_serde(py, obj, "compounding")
 }
 
-/// Typed wrapper for the Rust `FixedLegSpec` (fixed leg of an IRS/swaption).
-///
-/// Immutable; every constructor argument is readable back through a property
-/// of the same name, and the wire form round-trips via ``to_json`` /
-/// ``from_json`` (which also backs ``pickle``).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FixedLegSpec",
@@ -64,57 +60,7 @@ impl PyFixedLegSpec {
 
 #[pymethods]
 impl PyFixedLegSpec {
-    /// Fixed leg of an interest-rate swap.
-    ///
-    /// Parameters
-    /// ----------
-    /// discount_curve_id : str
-    ///     Discount curve identifier for pricing this leg.
-    /// rate : float | Rate
-    ///     Fixed rate as a decimal (``0.04`` = 4%) or a ``Rate``.
-    /// frequency : Tenor
-    ///     Payment frequency.
-    /// day_count : DayCount
-    ///     Day count convention for accrual.
-    /// start : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Start date of the fixed leg (ISO 8601 strings accepted).
-    /// end : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     End date of the fixed leg (ISO 8601 strings accepted).
-    /// business_day_convention : str, default "modified_following"
-    ///     Business day convention for payment dates.
-    /// calendar_id : str, optional
-    ///     Calendar used for business day adjustments.
-    /// stub : str | StubKind, default "short_front"
-    ///     Stub period handling rule.
-    /// payment_lag_days : int, default 0
-    ///     Payment lag in business days after period end.
-    /// end_of_month : bool, default False
-    ///     End-of-month roll convention.
-    ///
-    /// Returns
-    /// -------
-    /// FixedLegSpec
-    ///     The validated fixed-leg specification.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an enum value is invalid, ``rate`` is not finite, or the accrual
-    ///     period is malformed (``start >= end``).
-    /// TypeError
-    ///     If ``rate`` is neither a number nor a ``Rate``, or a date cannot be
-    ///     interpreted.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.dates import DayCount, Tenor
-    /// >>> from finstack_quant.valuations.instruments import FixedLegSpec
-    /// >>> leg = FixedLegSpec(
-    /// ...     "USD-OIS", 0.04, Tenor.semi_annual(), DayCount.THIRTY_360,
-    /// ...     "2024-01-15", "2029-01-15",
-    /// ... )
-    /// >>> leg.rate
-    /// 0.04
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.__init__")]
     #[new]
     #[pyo3(signature = (discount_curve_id, rate, frequency, day_count, start, end, *,
                         business_day_convention = "modified_following", calendar_id = None,
@@ -162,29 +108,13 @@ payment_lag_days=0, end_of_month=False)"
         Ok(Self { inner })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize a fixed-leg spec from its serde JSON object.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON object with the same fields as the Rust ``FixedLegSpec``
-    ///     (the ``fixed`` sub-object of an ``interest_rate_swap`` envelope).
-    ///
-    /// Returns
-    /// -------
-    /// FixedLegSpec
-    ///     The validated leg.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed, has unknown fields, or ``start >= end``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -194,30 +124,25 @@ payment_lag_days=0, end_of_month=False)"
         Ok(Self { inner })
     }
 
-    /// Serialize to the serde JSON object accepted by ``FixedLegSpec.from_json``.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON object (not an instrument envelope).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Serde form of the leg as a Python ``dict``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    /// Accrual start date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.start")]
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start)
     }
 
-    /// Accrual end date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.end")]
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end)
@@ -245,40 +170,36 @@ payment_lag_days={}, end_of_month={})",
 }
 
 crate::bindings::macros::py_getters!(PyFixedLegSpec |s| {
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Fixed rate as a decimal (``0.04`` = 4%).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.rate")]
     rate -> f64 = s.inner.rate.to_f64().unwrap_or(f64::NAN);
 
-    /// Payment frequency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    /// Accrual day-count convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    /// Business day convention (serde string, e.g. ``"modified_following"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    /// Payment calendar identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    /// Stub rule.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    /// Payment lag in business days after period end.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.payment_lag_days")]
     payment_lag_days -> i32 = s.inner.payment_lag_days;
 
-    /// End-of-month roll convention flag.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.end_of_month")]
     end_of_month -> bool = s.inner.end_of_month;
 });
 
-/// Typed wrapper for the Rust `FloatLegSpec` (floating leg of an IRS/swaption).
-///
-/// Immutable; every constructor argument is readable back through a property
-/// of the same name, and the wire form round-trips via ``to_json`` /
-/// ``from_json`` (which also backs ``pickle``).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FloatLegSpec",
@@ -300,75 +221,7 @@ impl PyFloatLegSpec {
 
 #[pymethods]
 impl PyFloatLegSpec {
-    /// Floating leg of an interest-rate swap.
-    ///
-    /// Parameters
-    /// ----------
-    /// discount_curve_id : str
-    ///     Discount curve identifier for pricing this leg.
-    /// forward_curve_id : str
-    ///     Forward curve identifier for rate projections.
-    /// spread_bp : float | Bps
-    ///     Spread over the index in basis points (``25.0`` = 25bp) or a ``Bps``.
-    /// frequency : Tenor
-    ///     Payment frequency.
-    /// day_count : DayCount
-    ///     Day count convention for accrual.
-    /// start : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Start date of the floating leg (ISO 8601 strings accepted).
-    /// end : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     End date of the floating leg (ISO 8601 strings accepted).
-    /// business_day_convention : str, default "modified_following"
-    ///     Business day convention for payment dates.
-    /// calendar_id : str, optional
-    ///     Calendar used for business day adjustments.
-    /// stub : str | StubKind, default "short_front"
-    ///     Stub period handling rule.
-    /// reset_lag_days : int, default 0
-    ///     Reset lag in business days before each accrual start. ``0`` (the
-    ///     Rust default) fixes on the accrual start date, so a swap whose
-    ///     first period starts on or after the valuation date prices off the
-    ///     forward curve without historical fixings. Use ``2`` for a T-2
-    ///     term index; ``InterestRateSwap.from_conventions`` applies the
-    ///     registered market default for an index.
-    /// fixing_calendar_id : str, optional
-    ///     Calendar used for rate fixing (reset lag).
-    /// compounding : str | dict, default "simple"
-    ///     Coupon compounding. ``"simple"`` for term indices (LIBOR-style);
-    ///     for overnight RFR legs pass a struct variant, e.g.
-    ///     ``{"compounded_in_arrears": {"lookback_days": 0}}``,
-    ///     ``{"compounded_with_observation_shift": {"shift_days": 0}}`` or
-    ///     ``{"compounded_with_rate_cutoff": {"cutoff_days": 0}}``.
-    /// payment_lag_days : int, default 0
-    ///     Payment lag in business days after period end.
-    /// end_of_month : bool, default False
-    ///     End-of-month roll convention.
-    ///
-    /// Returns
-    /// -------
-    /// FloatLegSpec
-    ///     The validated floating-leg specification.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an enum value is invalid, ``compounding`` does not name a
-    ///     variant, ``spread_bp`` is not finite, or the accrual period is
-    ///     malformed (``start >= end``).
-    /// TypeError
-    ///     If ``spread_bp`` is neither a number nor a ``Bps``, or a date
-    ///     cannot be interpreted.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.core.dates import DayCount, Tenor
-    /// >>> from finstack_quant.valuations.instruments import FloatLegSpec
-    /// >>> leg = FloatLegSpec(
-    /// ...     "USD-OIS", "USD-SOFR-3M", 0.0, Tenor.quarterly(), DayCount.ACT_360,
-    /// ...     "2024-01-15", "2029-01-15",
-    /// ... )
-    /// >>> leg.reset_lag_days
-    /// 0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.__init__")]
     #[new]
     #[pyo3(signature = (discount_curve_id, forward_curve_id, spread_bp, frequency, day_count,
                         start, end, *, business_day_convention = "modified_following", calendar_id = None,
@@ -432,29 +285,13 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
         Ok(Self { inner })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize a floating-leg spec from its serde JSON object.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON object with the same fields as the Rust ``FloatLegSpec``
-    ///     (the ``float`` sub-object of an ``interest_rate_swap`` envelope).
-    ///
-    /// Returns
-    /// -------
-    /// FloatLegSpec
-    ///     The validated leg.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed, has unknown fields, or ``start >= end``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -464,37 +301,31 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
         Ok(Self { inner })
     }
 
-    /// Serialize to the serde JSON object accepted by ``FloatLegSpec.from_json``.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON object (not an instrument envelope).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Serde form of the leg as a Python ``dict``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    /// Accrual start date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.start")]
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start)
     }
 
-    /// Accrual end date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.end")]
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end)
     }
 
-    /// Coupon compounding in serde form: ``"simple"`` or a one-key ``dict``
-    /// for the compounded variants.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.compounding")]
     #[getter]
     fn compounding<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.compounding)
@@ -537,49 +368,46 @@ reset_lag_days={}, fixing_calendar_id={}, compounding={}, payment_lag_days={}, e
 }
 
 crate::bindings::macros::py_getters!(PyFloatLegSpec |s| {
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Forward (projection) curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.forward_curve_id")]
     forward_curve_id -> String = s.inner.forward_curve_id.to_string();
 
-    /// Spread over the index in basis points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.spread_bp")]
     spread_bp -> f64 = s.inner.spread_bp.to_f64().unwrap_or(f64::NAN);
 
-    /// Payment frequency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    /// Accrual day-count convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    /// Business day convention (serde string).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    /// Payment calendar identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    /// Stub rule.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    /// Reset lag in business days before each accrual start.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.reset_lag_days")]
     reset_lag_days -> i32 = s.inner.reset_lag_days;
 
-    /// Fixing calendar identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.fixing_calendar_id")]
     fixing_calendar_id -> Option<String> =
         s.inner.fixing_calendar_id.as_ref().map(ToString::to_string);
 
-    /// Payment lag in business days after period end.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.payment_lag_days")]
     payment_lag_days -> i32 = s.inner.payment_lag_days;
 
-    /// End-of-month roll convention flag.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.end_of_month")]
     end_of_month -> bool = s.inner.end_of_month;
 });
 
-/// Typed wrapper for the Rust `PremiumLegSpec` (CDS/CDS-index premium leg).
-///
-/// Immutable; fields are readable through properties and the wire form
-/// round-trips via ``to_json`` / ``from_json`` (which also backs ``pickle``).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "PremiumLegSpec",
@@ -594,58 +422,7 @@ pub struct PyPremiumLegSpec {
 
 #[pymethods]
 impl PyPremiumLegSpec {
-    /// Premium (fixed coupon) leg of a CDS or CDS index.
-    ///
-    /// Parameters
-    /// ----------
-    /// start : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Start date of protection / premium accrual.
-    /// end : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     End date of protection / premium accrual.
-    /// frequency : Tenor
-    ///     Payment frequency.
-    /// day_count : DayCount
-    ///     Day count convention for accrual.
-    /// coupon_bp : float | Bps
-    ///     Contractual running coupon in basis points (``100.0`` = 100bp = 1%).
-    /// discount_curve_id : str
-    ///     Discount curve identifier for pricing this leg.
-    /// roll_rule : RollRule
-    ///     ``RollRule.CDS_IMM`` for the prescribed quarterly CDS 20th dates
-    ///     (requires quarterly frequency and a short-front stub when the leg is
-    ///     priced); ``RollRule.NONE`` for bespoke frequency/stub schedules.
-    ///     ``RollRule.IMM`` is rejected when the leg is priced.
-    /// stub : str | StubKind, default "short_front"
-    ///     Stub period handling rule.
-    /// business_day_convention : str, default "modified_following"
-    ///     Business day convention for payment dates.
-    /// calendar_id : str, optional
-    ///     Calendar used for business day adjustments.
-    ///
-    /// Returns
-    /// -------
-    /// PremiumLegSpec
-    ///     The premium-leg specification.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an enum value is invalid or ``coupon_bp`` is not finite.
-    /// TypeError
-    ///     If ``coupon_bp`` is neither a number nor a ``Bps``, or a date
-    ///     cannot be interpreted.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.cashflows.builder import RollRule
-    /// >>> from finstack_quant.core.dates import DayCount, Tenor
-    /// >>> from finstack_quant.valuations.instruments import PremiumLegSpec
-    /// >>> leg = PremiumLegSpec(
-    /// ...     "2024-03-20", "2029-06-20", Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS",
-    /// ...     roll_rule=RollRule.CDS_IMM,
-    /// ... )
-    /// >>> leg.coupon_bp
-    /// 100.0
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.__init__")]
     #[new]
     #[pyo3(signature = (start, end, frequency, day_count, coupon_bp, discount_curve_id, *, roll_rule,
                         stub = None, business_day_convention = "modified_following", calendar_id = None))]
@@ -688,28 +465,13 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         Ok(Self { inner })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize a premium-leg spec from its serde JSON object.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON object with the same fields as the Rust ``PremiumLegSpec``.
-    ///
-    /// Returns
-    /// -------
-    /// PremiumLegSpec
-    ///     The leg.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or has unknown fields.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -718,30 +480,25 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         Ok(Self { inner })
     }
 
-    /// Serialize to the serde JSON object accepted by ``PremiumLegSpec.from_json``.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON object (not an instrument envelope).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Serde form of the leg as a Python ``dict``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    /// Protection / accrual start date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.start")]
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start)
     }
 
-    /// Protection / accrual end date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.end")]
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end)
@@ -766,36 +523,33 @@ discount_curve_id={:?}, stub={:?}, business_day_convention={:?}, calendar_id={})
 }
 
 crate::bindings::macros::py_getters!(PyPremiumLegSpec |s| {
-    /// Premium roll-date grid (``RollRule.CDS_IMM`` or ``RollRule.NONE``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.roll_rule")]
     roll_rule -> PyRollRule = PyRollRule { inner: s.inner.roll_rule };
 
-    /// Payment frequency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    /// Stub rule.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    /// Business day convention (serde string).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    /// Payment calendar identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    /// Accrual day-count convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    /// Contractual running coupon in basis points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.coupon_bp")]
     coupon_bp -> f64 = s.inner.coupon_bp.to_f64().unwrap_or(f64::NAN);
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 });
 
-/// Typed wrapper for the Rust `ProtectionLegSpec` (CDS/CDS-index protection leg).
-///
-/// Immutable; fields are readable through properties and the wire form
-/// round-trips via ``to_json`` / ``from_json`` (which also backs ``pickle``).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ProtectionLegSpec",
@@ -810,37 +564,7 @@ pub struct PyProtectionLegSpec {
 
 #[pymethods]
 impl PyProtectionLegSpec {
-    /// Protection (default-contingent) leg of a CDS or CDS index.
-    ///
-    /// Parameters
-    /// ----------
-    /// credit_curve_id : str
-    ///     Hazard/credit curve identifier for default probabilities.
-    /// recovery_rate : float
-    ///     Recovery rate in ``[0.0, 1.0)`` (e.g. 0.4 = 40%).
-    /// settlement_delay : int
-    ///     Settlement delay in business days between the credit event and the
-    ///     protection payment. Required: the lag is a contract term (ISDA North
-    ///     America uses 3, ISDA Europe uses 1); read it from
-    ///     ``ConventionRegistry().resolve_cds(...).settlement_days`` when the
-    ///     contract follows a standard convention.
-    ///
-    /// Returns
-    /// -------
-    /// ProtectionLegSpec
-    ///     The validated protection-leg specification.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``recovery_rate`` is outside ``[0.0, 1.0)``.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import ProtectionLegSpec
-    /// >>> leg = ProtectionLegSpec("ACME-CDS", 0.4, 3)
-    /// >>> leg.recovery_rate
-    /// 0.4
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.__init__")]
     #[new]
     #[pyo3(text_signature = "(credit_curve_id, recovery_rate, settlement_delay)")]
     fn new(credit_curve_id: &str, recovery_rate: f64, settlement_delay: u16) -> PyResult<Self> {
@@ -853,29 +577,13 @@ impl PyProtectionLegSpec {
         Ok(Self { inner })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize a protection-leg spec from its serde JSON object.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON object with the same fields as the Rust ``ProtectionLegSpec``.
-    ///
-    /// Returns
-    /// -------
-    /// ProtectionLegSpec
-    ///     The validated leg.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed, has unknown fields, or the recovery rate
-    ///     is outside ``[0.0, 1.0)``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -886,18 +594,13 @@ impl PyProtectionLegSpec {
         Ok(Self { inner })
     }
 
-    /// Serialize to the serde JSON object accepted by ``ProtectionLegSpec.from_json``.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON object (not an instrument envelope).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Serde form of the leg as a Python ``dict``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
@@ -915,13 +618,13 @@ impl PyProtectionLegSpec {
 }
 
 crate::bindings::macros::py_getters!(PyProtectionLegSpec |s| {
-    /// Hazard / credit curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.credit_curve_id")]
     credit_curve_id -> String = s.inner.credit_curve_id.to_string();
 
-    /// Recovery rate as a decimal in ``[0.0, 1.0)``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.recovery_rate")]
     recovery_rate -> f64 = s.inner.recovery_rate;
 
-    /// Settlement delay in business days.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.settlement_delay")]
     settlement_delay -> u16 = s.inner.settlement_delay;
 });
 

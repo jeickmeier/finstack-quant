@@ -34,25 +34,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Dea
 
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacilityBuilder;
 
-/// Committed asset-backed facility (warehouse line) against a collateral
-/// pool: advance rates, concentration limits and a borrowing-base test drive
-/// mandatory repayments, collateral principal recycles while revolving and
-/// repays the facility sequentially afterwards, the undrawn commitment
-/// accrues a fee, and a term-out ends in a collateral liquidation.
-///
-/// The engine runs a synthetic two-class structured-credit deal
-/// (``synthesized_deal()``); ``project()`` returns the lender's and
-/// residual's flows. Rates are decimals or basis points (``*_bp``),
-/// percentages are percent values.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import AssetBackedFacility
-/// >>> facility = AssetBackedFacility.example()
-/// >>> facility.id, facility.drawn.amount, facility.commitment.amount
-/// ('ABF-EXAMPLE', 70000000.0, 80000000.0)
-/// >>> facility.borrowing_base()["borrowing_base"]["currency"]
-/// 'USD'
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "AssetBackedFacility",
@@ -74,25 +56,7 @@ instrument_pricing_methods!(PyAssetBackedFacility, "AssetBackedFacility");
 
 #[pymethods]
 impl PyAssetBackedFacility {
-    /// The canonical example: the example CLO pool financed by a USD 80M
-    /// commitment drawn USD 70M at a fixed 6%, 80% advance rate, 20% obligor
-    /// limit, two-year revolving period and a 24-month term-out.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacility
-    ///     The example facility.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (should not occur).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import AssetBackedFacility
-    /// >>> AssetBackedFacility.example().rate
-    /// {'fixed': {'rate': 0.06}}
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -101,62 +65,21 @@ impl PyAssetBackedFacility {
             .map_err(core_to_py)
     }
 
-    /// Borrowing base on the closing collateral.
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, Any]
-    ///     ``BorrowingBaseReport`` serde dict: ``eligible_collateral``,
-    ///     ``concentration_excess`` and ``borrowing_base`` Money values.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the borrowing-base rules are malformed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.borrowing_base")]
     #[pyo3(text_signature = "($self)")]
     fn borrowing_base<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let report = self.inner.borrowing_base().map_err(core_to_py)?;
         serde_to_py(py, &report)
     }
 
-    /// The two-class structured-credit deal the engine runs for this
-    /// facility (facility note + residual, borrowing-base test, reinvestment
-    /// window, early-amortization rules and the term-out call).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCredit
-    ///     The synthetic deal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the facility or the synthetic deal fails validation.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.synthesized_deal")]
     #[pyo3(text_signature = "($self)")]
     fn synthesized_deal(&self) -> PyResult<PyStructuredCredit> {
         let inner = self.inner.synthesized_deal().map_err(core_to_py)?;
         Ok(PyStructuredCredit { inner })
     }
 
-    /// Project the facility through the engine.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext
-    ///     Curves and fixings for the note and the collateral.
-    /// as_of : datetime.date
-    ///     Valuation date the projection starts from.
-    ///
-    /// Returns
-    /// -------
-    /// FacilityProjection
-    ///     Facility and residual flows, commitment fees and the period record.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the facility fails validation, ``as_of`` is invalid or market
-    ///     data is missing.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.project")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn project(
         &self,
@@ -173,25 +96,7 @@ impl PyAssetBackedFacility {
         Ok(PyFacilityProjection { inner })
     }
 
-    /// Lender IRR: XIRR of ``-drawn`` on ``as_of`` against every projected
-    /// interest, principal and fee receipt, as an annual decimal.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext
-    ///     Curves and fixings for the projection.
-    /// as_of : datetime.date
-    ///     Valuation date the investment is dated on.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     The internal rate of return.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the projection fails or no rate solves.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.facility_irr")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn facility_irr(
         &self,
@@ -204,63 +109,55 @@ impl PyAssetBackedFacility {
         self.inner.facility_irr(&market, as_of).map_err(core_to_py)
     }
 
-    /// ``BorrowingBaseRules`` serde dict (``advance_rates`` and
-    /// ``concentration_limits``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.borrowing_base_rules")]
     #[getter]
     fn borrowing_base_rules<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.borrowing_base_rules)
     }
 
-    /// Facility coupon as its ``RateSpec`` serde ``dict``: ``{"fixed":
-    /// {"rate": r}}`` with a decimal all-in rate, or ``{"floating": {...}}``
-    /// with a ``FloatingRateSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.rate")]
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.rate)
     }
 
-    /// Closing date as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.closing_date")]
     #[getter]
     fn closing_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.closing_date)
     }
 
-    /// Scheduled end of the revolving period as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.revolving_end")]
     #[getter]
     fn revolving_end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.revolving_end)
     }
 
-    /// Effective revolving end (the scheduled end or the earliest dated
-    /// amortization event) as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.effective_revolving_end")]
     #[getter]
     fn effective_revolving_end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.effective_revolving_end())
     }
 
-    /// Final repayment date (maturity, or the revolving end plus the term-out
-    /// window) as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.repayment_date")]
     #[getter]
-    ///
-    /// Raises ``ValueError`` if the term-out window exceeds the supported calendar range.
     fn repayment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.repayment_date().map_err(core_to_py)?)
     }
 
-    /// Legal final maturity as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Amortization events as ``AmortizationEvent`` serde dicts (``kind`` =
-    /// ``"date"`` / ``"cumulative_loss"`` / ``"excess_spread"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.amortization_events")]
     #[getter]
     fn amortization_events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.amortization_events)
     }
 
-    /// Term-out window as its serde dict (``{"months": ...}``), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.term_out")]
     #[getter]
     fn term_out<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -270,8 +167,7 @@ impl PyAssetBackedFacility {
             .transpose()
     }
 
-    /// Transaction fees paid ahead of the facility's interest as the
-    /// ``DealFees`` serde dict, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.fees")]
     #[getter]
     fn fees<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -281,13 +177,13 @@ impl PyAssetBackedFacility {
             .transpose()
     }
 
-    /// Scheduled draws as a list of ``{"date": ..., "amount": Money}`` dicts.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.draws")]
     #[getter]
     fn draws<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.draws)
     }
 
-    /// Collateral behavior as its ``CreditModelConfig`` serde ``dict``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.credit_model")]
     #[getter]
     fn credit_model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.credit_model)
@@ -307,70 +203,54 @@ impl PyAssetBackedFacility {
 }
 
 crate::bindings::macros::py_getters!(PyAssetBackedFacility |s| {
-    /// Collateral pool the facility lends against.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.collateral")]
     collateral -> PyAssetPool = PyAssetPool { inner: s.inner.collateral.clone() };
 
-    /// Total commitment.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.commitment")]
     commitment -> PyMoney = money_to_py(s.inner.commitment);
 
-    /// Amount drawn at closing.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.drawn")]
     drawn -> PyMoney = money_to_py(s.inner.drawn);
 
-    /// Undrawn commitment at closing.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.undrawn")]
     undrawn -> PyResult<PyMoney> = s.inner.undrawn().map(money_to_py).map_err(core_to_py);
 
-    /// Commitment fee on the undrawn commitment, in basis points per annum.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.commitment_fee_bp")]
     commitment_fee_bp -> f64 =
         rust_decimal::prelude::ToPrimitive::to_f64(&s.inner.commitment_fee_bp).unwrap_or_default();
 
-    /// Payment frequency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.frequency")]
     frequency -> PyTenor = PyTenor { inner: s.inner.frequency };
 
-    /// Accrual day count of the facility interest and commitment fee.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.day_count")]
     day_count -> PyDayCount = PyDayCount { inner: s.inner.day_count };
 
-    /// Payment calendar identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    /// Collateral liquidation price at the term-out end in percent of par,
-    /// or ``None`` for par.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.liquidation_price_pct")]
     liquidation_price_pct -> Option<f64> = s.inner.liquidation_price_pct;
 
-    /// Whether the line is re-advanced up to the borrowing base each
-    /// revolving period.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.readvance_to_borrowing_base")]
     readvance_to_borrowing_base -> bool = s.inner.readvance_to_borrowing_base;
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Deterministic prepayment model as a typed ``PrepaymentModelSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.prepayment_spec")]
     prepayment_spec -> PyPrepaymentModelSpec =
         PyPrepaymentModelSpec { inner: s.inner.credit_model.prepayment_spec.clone() };
 
-    /// Deterministic default model as a typed ``DefaultModelSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.default_spec")]
     default_spec -> PyDefaultModelSpec =
         PyDefaultModelSpec { inner: s.inner.credit_model.default_spec.clone() };
 
-    /// Recovery model as a typed ``RecoveryModelSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.recovery_spec")]
     recovery_spec -> PyRecoveryModelSpec =
         PyRecoveryModelSpec { inner: s.inner.credit_model.recovery_spec.clone() };
 });
 
-/// Facility and residual projection (``AssetBackedFacility.project``'s
-/// return value): the lender's interest and principal, the commitment fees,
-/// the residual's flows and the synthetic deal's period record.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
-/// >>> from finstack_quant.valuations.instruments import AssetBackedFacility
-/// >>> facility = AssetBackedFacility.example()
-/// >>> as_of = facility.closing_date
-/// >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
-/// >>> projection = facility.project(market, as_of)
-/// >>> list(projection.to_dataframe().columns)
-/// ['date', 'interest', 'principal', 'commitment_fee', 'draw', 'lender_total', 'residual']
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FacilityProjection",
@@ -384,31 +264,7 @@ pub struct PyFacilityProjection {
 
 #[pymethods]
 impl PyFacilityProjection {
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON-encoded ``FacilityProjection``.
-    ///
-    /// Returns
-    /// -------
-    /// FacilityProjection
-    ///     The decoded projection.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or carries unknown fields.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import FacilityProjection
-    /// >>> try:
-    /// ...     FacilityProjection.from_json("{}")
-    /// ... except ValueError:
-    /// ...     print("rejected")
-    /// rejected
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -417,45 +273,25 @@ impl PyFacilityProjection {
         Ok(Self { inner })
     }
 
-    /// Serialize to the JSON shape ``from_json`` accepts.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON-encoded projection.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Return every field as a plain ``dict`` (canonical serde shape).
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, Any]
-    ///     Serde form of the projection.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Commitment fee per payment date as ``(datetime.date, Money)`` pairs.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.commitment_fees")]
     #[getter]
     fn commitment_fees<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -465,9 +301,7 @@ impl PyFacilityProjection {
             .collect()
     }
 
-    /// Lender draws applied (scheduled draws and re-advances) per payment
-    /// date as ``(datetime.date, Money)`` pairs; outflows in the lender's
-    /// cashflows.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.draws")]
     #[getter]
     fn draws<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -477,8 +311,7 @@ impl PyFacilityProjection {
             .collect()
     }
 
-    /// Every cashflow to the lender (interest, principal and fees, less
-    /// draws) per date, as ``(datetime.date, Money)`` pairs.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.lender_cashflows")]
     #[getter]
     fn lender_cashflows<'py>(
         &self,
@@ -492,25 +325,7 @@ impl PyFacilityProjection {
             .collect()
     }
 
-    /// One row per payment date as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``date`` (ISO 8601 string), ``interest``, ``principal``,
-    /// ``commitment_fee``, ``draw``, ``lender_total`` and ``residual``
-    /// (cash to the residual class), all in currency units. The component
-    /// columns pivot the projection's flow lists by date; ``lender_total`` is
-    /// the Rust ``lender_cashflows`` amount on that date (the same flows the
-    /// ``lender_cashflows`` property and the facility IRR use).
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    ///     The projection in date order.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a component carries a different currency from the facility, or the
-    ///     rows cannot be serialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::core::table::envelope_to_pandas(
@@ -532,19 +347,18 @@ impl PyFacilityProjection {
 }
 
 crate::bindings::macros::py_getters!(PyFacilityProjection |s| {
-    /// Interest and principal paid to the facility note.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.facility")]
     facility -> PyTrancheCashflows = PyTrancheCashflows { inner: s.inner.facility.clone() };
 
-    /// Cash paid to the residual class.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.residual")]
     residual -> PyTrancheCashflows = PyTrancheCashflows { inner: s.inner.residual.clone() };
 
-    /// Per-period record of the synthetic deal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.diagnostics")]
     diagnostics -> PySimulationDiagnostics =
         PySimulationDiagnostics { inner: s.inner.diagnostics.clone() };
 });
 
-/// Fluent builder for [`PyAssetBackedFacility`]; wraps the Rust
-/// `FinancialBuilder`-generated builder (consuming setters).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "AssetBackedFacilityBuilder",
@@ -556,44 +370,14 @@ pub struct PyAssetBackedFacilityBuilder {
 
 #[pymethods]
 impl PyAssetBackedFacilityBuilder {
-    /// Set the facility identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Stable facility identifier.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let converted = InstrumentId::new(value.to_string());
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.id(converted))
     }
 
-    /// Set the collateral pool.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : AssetPool
-    ///     Collateral pool (asset rows, rep lines or instrument collateral).
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.collateral")]
     #[pyo3(text_signature = "($self, value)")]
     fn collateral<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -603,26 +387,7 @@ impl PyAssetBackedFacilityBuilder {
             .collateral(value.inner.clone()))
     }
 
-    /// Set the advance rates, eligibility and concentration limits.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``BorrowingBaseRules`` serde object: ``advance_rates`` (each
-    ///     ``asset_class`` wire name or ``"*"``, decimal ``rate`` and an
-    ///     optional ``eligibility``) and ``concentration_limits`` (``scope``
-    ///     ``"obligor"`` / ``"industry"`` / ``"asset_class"``, ``max_pct``).
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``BorrowingBaseRules`` shape or
-    ///     this builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.borrowing_base_rules")]
     #[pyo3(text_signature = "($self, value)")]
     fn borrowing_base_rules<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -635,27 +400,7 @@ impl PyAssetBackedFacilityBuilder {
             .borrowing_base_rules(rules))
     }
 
-    /// Set the total commitment.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float
-    ///     Commitment; a bare amount is tagged with ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code for a bare amount (ignored for ``Money``).
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a bare amount has no currency or this builder was already
-    ///     consumed by ``build``.
-    /// TypeError
-    ///     If ``value`` is neither ``Money`` nor a number.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.commitment")]
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn commitment<'py>(
@@ -667,28 +412,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.commitment(money))
     }
 
-    /// Set the amount drawn at closing.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Money | float
-    ///     Drawn balance (at most the commitment and below the collateral);
-    ///     a bare amount is tagged with ``currency``.
-    /// currency : str, optional
-    ///     ISO-4217 code for a bare amount (ignored for ``Money``).
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a bare amount has no currency or this builder was already
-    ///     consumed by ``build``.
-    /// TypeError
-    ///     If ``value`` is neither ``Money`` nor a number.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.drawn")]
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn drawn<'py>(
@@ -700,26 +424,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.drawn(money))
     }
 
-    /// Set the facility coupon.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float | dict | str
-    ///     A bare decimal builds a fixed all-in rate (``0.06`` = 6%); a
-    ///     ``dict`` or JSON ``str`` in the ``RateSpec`` serde shape
-    ///     (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
-    ///     ``FloatingRateSpec``) is used verbatim.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the spec does not match the serde shape or this builder was
-    ///     already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -734,23 +439,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.rate(spec))
     }
 
-    /// Set the commitment fee on the undrawn commitment.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Basis points per annum (``50.0`` = 0.50%).
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not finite or this builder was already consumed by
-    ///     ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.commitment_fee_bp")]
     #[pyo3(text_signature = "($self, value)")]
     fn commitment_fee_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -762,22 +451,7 @@ impl PyAssetBackedFacilityBuilder {
             .commitment_fee_bp(converted))
     }
 
-    /// Set the closing date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date
-    ///     Closing date; the first payment date is one frequency later.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the date is invalid or this builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.closing_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn closing_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -787,22 +461,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.closing_date(date))
     }
 
-    /// Set the scheduled end of the revolving period.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date
-    ///     Revolving end; after it, collateral principal repays the facility.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the date is invalid or this builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.revolving_end")]
     #[pyo3(text_signature = "($self, value)")]
     fn revolving_end<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -812,22 +471,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.revolving_end(date))
     }
 
-    /// Set the legal final maturity.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date
-    ///     Legal final maturity.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the date is invalid or this builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -837,24 +481,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.maturity(date))
     }
 
-    /// Set the payment frequency.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Tenor | str
-    ///     Payment frequency of interest, fees and the borrowing-base test
-    ///     (``Tenor`` or a string such as ``"3M"``).
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the string is not a tenor or this builder was already consumed
-    ///     by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -864,24 +491,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.frequency(tenor))
     }
 
-    /// Set the accrual day count.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : DayCount | str
-    ///     Accrual convention (``DayCount`` or a name such as ``"act_360"``);
-    ///     Act/360 when never set.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the string is not a day count or this builder was already
-    ///     consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -891,23 +501,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.day_count(day_count))
     }
 
-    /// Set the payment calendar.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Holiday calendar identifier (e.g. ``"nyse"``); required for
-    ///     pricing.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -918,25 +512,7 @@ impl PyAssetBackedFacilityBuilder {
             .calendar_id(converted.into()))
     }
 
-    /// Set the events that end revolving early.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[dict] | str
-    ///     ``AmortizationEvent`` objects: ``{"kind": "date", "date": ...}``,
-    ///     ``{"kind": "cumulative_loss", "max_cumulative_loss": ...}`` or
-    ///     ``{"kind": "excess_spread", "min_excess_spread_3m": ...}``.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the event shape or this builder was
-    ///     already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.amortization_events")]
     #[pyo3(text_signature = "($self, value)")]
     fn amortization_events<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -949,50 +525,14 @@ impl PyAssetBackedFacilityBuilder {
             .amortization_events(events))
     }
 
-    /// Set the term-out window after revolving.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : int
-    ///     Months after the revolving end at which the remaining
-    ///     collateral is liquidated to repay the facility.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.term_out")]
     #[pyo3(text_signature = "($self, value)")]
     fn term_out<'py>(mut slf: PyRefMut<'py, Self>, value: u32) -> PyResult<PyRefMut<'py, Self>> {
         let converted = TermOutSpec { months: value };
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.term_out(converted))
     }
 
-    /// Set the transaction fees paid through the waterfall ahead of the
-    /// facility's interest.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``DealFees`` serde object (``trustee_fee`` Money per annum,
-    ///     ``senior_mgmt_fee_bp``, ``subordinated_mgmt_fee_bp``,
-    ///     ``servicing_fee_bp``, optional ``master_servicer_fee_bp`` /
-    ///     ``special_servicer_fee_bp`` / ``incentive_fee``).
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``DealFees`` shape or this builder
-    ///     was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.fees")]
     #[pyo3(text_signature = "($self, value)")]
     fn fees<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1003,25 +543,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.fees(fees))
     }
 
-    /// Set the scheduled draws after closing.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[dict] | str
-    ///     ``DrawEvent`` serde objects ``{"date": "2025-01-01", "amount":
-    ///     {"amount": 10000000.0, "currency": "USD"}}``, ascending by date;
-    ///     each is applied on the first payment date at or after its date.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``DrawEvent`` shape or this
-    ///     builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.draws")]
     #[pyo3(text_signature = "($self, value)")]
     fn draws<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1032,24 +554,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.draws(draws))
     }
 
-    /// Set whether the line is re-advanced up to the borrowing base each
-    /// revolving period.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : bool
-    ///     ``True`` draws ``min(commitment, borrowing base) − balance`` every
-    ///     revolving period.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.readvance_to_borrowing_base")]
     #[pyo3(text_signature = "($self, value)")]
     fn readvance_to_borrowing_base<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1059,22 +564,7 @@ impl PyAssetBackedFacilityBuilder {
             .readvance_to_borrowing_base(value))
     }
 
-    /// Set the collateral liquidation price at the term-out end.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Percent of par (``100.0`` = par).
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.liquidation_price_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn liquidation_price_pct<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1085,22 +575,7 @@ impl PyAssetBackedFacilityBuilder {
             .liquidation_price_pct(converted))
     }
 
-    /// Set the discount curve.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1111,24 +586,7 @@ impl PyAssetBackedFacilityBuilder {
             .discount_curve_id(converted))
     }
 
-    /// Replace the whole collateral behavior model.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``CreditModelConfig`` serde object; the per-field setters
-    ///     (:meth:`prepayment_spec` ...) then modify it.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the shape or this builder was already
-    ///     consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.credit_model")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_model<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1140,23 +598,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.credit_model(model))
     }
 
-    /// Set the deterministic prepayment model of the collateral.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : PrepaymentModelSpec | dict | str
-    ///     Typed spec or its serde form.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the shape or this builder was already
-    ///     consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.prepayment_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn prepayment_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1171,23 +613,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.prepayment_spec(spec))
     }
 
-    /// Set the deterministic default model of the collateral.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : DefaultModelSpec | dict | str
-    ///     Typed spec or its serde form.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the shape or this builder was already
-    ///     consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.default_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn default_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1202,23 +628,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.default_spec(spec))
     }
 
-    /// Set the recovery model of the collateral.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : RecoveryModelSpec | dict | str
-    ///     Typed spec or its serde form.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the shape or this builder was already
-    ///     consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.recovery_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn recovery_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1233,27 +643,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.recovery_spec(spec))
     }
 
-    /// Set free-form attributes (tags and metadata).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or
-    ///     value, or this builder was already consumed by ``build``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
