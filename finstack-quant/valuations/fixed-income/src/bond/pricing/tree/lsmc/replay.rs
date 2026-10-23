@@ -771,12 +771,16 @@ impl ReplayTemplate {
             } else {
                 let forward = market.get_forward(&spec.rate_spec.forward_curve_id).ok();
                 let fixing_id = fixing_series_id(spec.rate_spec.forward_curve_id.as_str());
-                let published_same_day = reset == as_of
-                    && market
-                        .get_series(&fixing_id)
-                        .ok()
-                        .is_some_and(|series| series.value_on_exact(reset).is_ok());
-                let known_reset = reset < as_of || published_same_day;
+                let fixings = market.get_series(&fixing_id).ok();
+                let known_reset = !matches!(
+                    observed_index_fixing(
+                        reset,
+                        fixings,
+                        spec.rate_spec.forward_curve_id.as_str(),
+                        as_of,
+                    ),
+                    Ok(None)
+                );
                 let source = match forward.as_ref() {
                     Some(curve) if !known_reset => {
                         let tenor_years = curve.tenor();

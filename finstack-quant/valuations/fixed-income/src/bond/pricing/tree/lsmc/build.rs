@@ -64,15 +64,13 @@ pub(super) fn build_overnight_coupon(
             continue;
         }
         let observation_date = observation.observation_date;
-        let published_same_day = observation_date == as_of
-            && fixings.is_some_and(|series| series.value_on_exact(observation_date).is_ok());
-        let source = if observation_date < as_of || published_same_day {
-            match require_fixing_value_exact(fixings, forward_curve_id, observation_date, as_of) {
-                Ok(rate) => OvernightRateSource::Fixed(rate),
-                Err(error) => {
-                    OvernightRateSource::Fixed(spec.rate_spec.fallback.index_rate(error)?)
-                }
-            }
+        let observed =
+            match observed_index_fixing(observation_date, fixings, forward_curve_id, as_of) {
+                Ok(rate) => rate,
+                Err(error) => Some(spec.rate_spec.fallback.index_rate(error)?),
+            };
+        let source = if let Some(rate) = observed {
+            OvernightRateSource::Fixed(rate)
         } else if let Some(forward) = forward.as_ref() {
             if observation_date < forward.base_date() {
                 OvernightRateSource::Fixed(spec.rate_spec.fallback.index_rate(Error::Validation(format!(
