@@ -8,22 +8,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CallAssumption, CallScope,
 };
 
-/// Assumed optional redemption for price-to-call analytics.
-///
-/// A deal-scope call liquidates the collateral on the first payment date at
-/// or after ``date`` and redeems every note at ``price_pct`` of its balance;
-/// a tranche-scope call (``tranche_id`` given) leaves the deal's cashflows
-/// unchanged and only truncates that class's ``*_to_call`` metrics.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.valuations.instruments import CallAssumption
-/// >>> call = CallAssumption(datetime.date(2027, 1, 15), 100.0)
-/// >>> call.scope, call.tranche_id
-/// ('deal', None)
-/// >>> CallAssumption(datetime.date(2027, 1, 15), 101.0, tranche_id="B").tranche_id
-/// 'B'
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CallAssumption",
@@ -36,28 +21,17 @@ pub struct PyCallAssumption {
     pub(crate) inner: CallAssumption,
 }
 
-crate::bindings::macros::wire_methods!(PyCallAssumption, CallAssumption, "CallAssumption", to_dict);
+crate::bindings::macros::wire_methods!(
+    PyCallAssumption,
+    CallAssumption,
+    "CallAssumption",
+    module = "finstack_quant.valuations.instruments",
+    to_dict
+);
 
 #[pymethods]
 impl PyCallAssumption {
-    /// Construct a call assumption.
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date
-    ///     Assumed call date; the redemption happens on the first payment
-    ///     date at or after it.
-    /// price_pct : float
-    ///     Redemption price as a percent of the note balance (``100.0`` =
-    ///     par; a premium is paid as interest, a discount is a write-down).
-    /// tranche_id : str, optional
-    ///     Restrict the call to one class (tranche-scope). ``None`` calls the
-    ///     whole deal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``date`` is not a valid date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.__init__")]
     #[new]
     #[pyo3(signature = (date, price_pct, tranche_id=None))]
     #[pyo3(text_signature = "(date, price_pct, tranche_id=None)")]
@@ -70,13 +44,13 @@ impl PyCallAssumption {
         Ok(Self { inner })
     }
 
-    /// Assumed call date as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.date")]
     #[getter]
     fn date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.date)
     }
 
-    /// ``CallScope`` serde value (``"deal"`` or ``{"tranche": id}``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.scope_spec")]
     #[getter]
     fn scope_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.scope)
@@ -95,14 +69,14 @@ impl PyCallAssumption {
 }
 
 crate::bindings::macros::py_getters!(PyCallAssumption |s| {
-    /// Redemption price as a percent of balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.price_pct")]
     price_pct -> f64 = s.inner.price_pct;
 
-    /// ``"deal"`` or ``"tranche"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.scope")]
     scope -> &'static str =
         match s.inner.scope { CallScope::Deal => "deal", CallScope::Tranche(_) => "tranche" };
 
-    /// The called class for a tranche-scope call, else ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.tranche_id")]
     tranche_id -> Option<String> = match &s.inner.scope {
         CallScope::Deal => None,
         CallScope::Tranche(id) => Some(id.clone()),

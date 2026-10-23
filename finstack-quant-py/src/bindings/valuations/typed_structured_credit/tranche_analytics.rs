@@ -43,44 +43,7 @@ fn extract_structured_credit(
         .map_err(core_to_py)
 }
 
-/// Solve a z-spread-equivalent discount margin for a floating-rate tranche.
-///
-/// Contractual cashflows are projected without changing coupon projection, then
-/// a constant additive spread is applied to the discount curve. The result is
-/// zero at the model price, negative for a richer (higher) price, and positive
-/// for a cheaper (lower) price; it is not the contractual quoted margin.
-///
-/// Parameters
-/// ----------
-/// instrument : StructuredCredit | str
-///     Tagged JSON for a ``StructuredCredit`` deal, or a typed
-///     ``StructuredCredit`` instance.
-/// tranche_id : str
-///     Identifier of the floating-rate tranche whose contractual cashflows are
-///     spread-discounted.
-/// market : MarketContext
-///     Market context supplying the discount curve and any forward curves or
-///     historical fixings required for cashflow projection.
-/// as_of : datetime.date | str
-///     Valuation date used for projection and discounting, either a date-like
-///     object (``datetime.date``, ``pandas.Timestamp``) or an ISO 8601 string.
-/// market_price_pct : float
-///     Clean settlement price as a percentage of the tranche's current
-///     balance (100.0 = par). Accrued interest is added once at the deal's
-///     ``quote_settlement_date`` (valuation date when omitted); payments on
-///     or before settlement belong to the seller.
-///
-/// Returns
-/// -------
-/// float
-///     Z-spread-equivalent discount margin in decimal (``0.015`` = 150 bp).
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the JSON or date is malformed, the deal is invalid, the tranche is
-///     missing or fixed-rate, ``market_price_pct`` is not finite and positive, required market data
-///     is unavailable, or the spread solve fails or exceeds ±5000 bp.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_discount_margin")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_discount_margin",
@@ -104,25 +67,7 @@ fn tranche_discount_margin(
     .map_err(core_to_py)
 }
 
-/// Solve the constant default rate at which a tranche first takes a writedown.
-///
-/// Parameters
-/// ----------
-/// instrument : StructuredCredit | str
-///     Tagged JSON for a ``StructuredCredit`` deal, or a typed
-///     ``StructuredCredit`` instance.
-/// tranche_id : str
-///     Identifier of the tranche.
-/// market : MarketContext
-///     Market context supplying curves and fixings.
-/// as_of : datetime.date | str
-///     Valuation date, either a date-like object (``datetime.date``,
-///     ``pandas.Timestamp``) or an ISO 8601 string.
-///
-/// Returns
-/// -------
-/// float
-///     Break-even annual CDR in decimal.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_breakeven_cdr")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_breakeven_cdr",
@@ -143,32 +88,7 @@ fn tranche_breakeven_cdr(
         .map_err(core_to_py)
 }
 
-/// Compute the option-adjusted spread for a tranche at a market price.
-///
-/// Parameters
-/// ----------
-/// instrument : StructuredCredit | str
-///     Tagged JSON for a ``StructuredCredit`` deal, or a typed
-///     ``StructuredCredit`` instance.
-/// tranche_id : str
-///     Identifier of the tranche.
-/// market : MarketContext
-///     Market context supplying curves and fixings.
-/// as_of : datetime.date | str
-///     Valuation date, either a date-like object (``datetime.date``,
-///     ``pandas.Timestamp``) or an ISO 8601 string.
-/// market_price_pct : float
-///     Clean settlement price as a percentage of current balance (100.0 = par).
-///     Accrued interest is added once at the deal's ``quote_settlement_date``
-///     (valuation date when omitted).
-/// config : dict | str, optional
-///     ``OasConfig`` as a dict or JSON string. All fields are currently
-///     required when supplied.
-///
-/// Returns
-/// -------
-/// OasResult
-///     Typed OAS result. Call ``to_json`` on it for the wire payload.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_oas")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_oas",
@@ -211,46 +131,7 @@ fn tranche_oas(
     Ok(PyOasResult { inner })
 }
 
-/// Compute the per-tranche valuation, yield, spread and risk metrics.
-///
-/// The one per-note analytics entry point: prices, accrued, yield, spreads
-/// and durations come from the tranche's own to-maturity cashflows, and
-/// ``metrics`` adds registry metrics (DV01, Default01, …) valued on the note
-/// so tranche sensitivities sum to the deal's.
-///
-/// Parameters
-/// ----------
-/// instrument : StructuredCredit | str
-///     Tagged JSON for a ``StructuredCredit`` deal, or a typed
-///     ``StructuredCredit`` instance.
-/// tranche_id : str
-///     Identifier of the tranche.
-/// market : MarketContext
-///     Market context supplying curves and fixings.
-/// as_of : datetime.date | str
-///     Valuation date, either a date-like object (``datetime.date``,
-///     ``pandas.Timestamp``) or an ISO 8601 string.
-/// market_price_pct : float, optional
-///     Clean settlement price as a percentage of current balance. When omitted,
-///     the deal's market quote is used, or its model clean settlement price
-///     if no quote is supplied. PV remains measured at valuation.
-/// metrics : list[str], optional
-///     Registry metric ids (for example ``"dv01"``, ``"default01"``) to value
-///     on this note; returned in ``TrancheMetrics.metrics``. Omitted or empty
-///     computes none.
-///
-/// Returns
-/// -------
-/// TrancheMetrics
-///     Typed metrics bundle. Call ``to_json`` on it for the wire payload.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If a metric id is unknown, the deal fails validation, the tranche is
-///     missing, or a solve fails.
-/// KeyError
-///     If a required curve is missing from ``market``.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_metrics")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_metrics",
@@ -291,28 +172,7 @@ fn tranche_metrics(
     Ok(PyTrancheMetrics { inner })
 }
 
-/// Price a tranche across a CPR x CDR x severity scenario grid.
-///
-/// Parameters
-/// ----------
-/// instrument : StructuredCredit | str
-///     Tagged JSON for a ``StructuredCredit`` deal, or a typed
-///     ``StructuredCredit`` instance.
-/// tranche_id : str
-///     Identifier of the tranche.
-/// market : MarketContext
-///     Market context supplying curves and fixings.
-/// as_of : datetime.date | str
-///     Valuation date, either a date-like object (``datetime.date``,
-///     ``pandas.Timestamp``) or an ISO 8601 string.
-/// grid : dict | str
-///     ``ScenarioGrid`` as a dict or JSON string. The grid is capped at 10,000
-///     cells because each cell reprices the entire deal.
-///
-/// Returns
-/// -------
-/// ScenarioTable
-///     Typed scenario table. Call ``to_json`` on it for the wire payload.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_scenario_table")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_scenario_table",
@@ -339,8 +199,7 @@ fn tranche_scenario_table(
     Ok(PyScenarioTable { inner })
 }
 
-/// Result of an option-adjusted-spread calculation for a structured-credit
-/// tranche ([`tranche_oas`]'s return value).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "OasResult",
@@ -359,44 +218,13 @@ impl PyOasResult {
         self.to_dataframe(py)?.call_method0("_repr_html_")
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON-encoded ``OasResult``.
-    ///
-    /// Returns
-    /// -------
-    /// OasResult
-    ///     The decoded result.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not valid JSON for the ``OasResult`` shape.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import json
-    /// >>> from finstack_quant.valuations.instruments import OasResult
-    /// >>> payload = json.dumps({
-    /// ...     "oas": 0.0125, "model_price": 99.5, "market_price": 98.75,
-    /// ...     "num_paths": 256, "price_std_error": 0.05,
-    /// ... })
-    /// >>> result = OasResult.from_json(payload)
-    /// >>> result.oas
-    /// 0.0125
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -404,25 +232,13 @@ impl PyOasResult {
         Ok(Self { inner })
     }
 
-    /// Serialize back to the same JSON shape ``from_json`` accepts.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON-encoded ``OasResult``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``oas`` (annual decimal), ``model_price`` and ``market_price``
-    /// (percentage of current balance), ``num_paths``, ``price_std_error``
-    /// (percentage of current balance).
-    ///
-    /// One row, so a book of tranches stacks with
-    /// ``pd.concat([r.to_dataframe() for r in results])``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe_with_schema(
@@ -448,25 +264,23 @@ impl PyOasResult {
 }
 
 crate::bindings::macros::py_getters!(PyOasResult |s| {
-    /// Option-adjusted spread, as an annual decimal (``0.01`` = 100 bp).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.oas")]
     oas -> f64 = s.inner.oas;
 
-    /// Model price at the solved OAS, as a percentage of current balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.model_price")]
     model_price -> f64 = s.inner.model_price;
 
-    /// Target market price, as a percentage of current balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.market_price")]
     market_price -> f64 = s.inner.market_price;
 
-    /// Number of Monte-Carlo scenarios used.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.num_paths")]
     num_paths -> usize = s.inner.num_paths;
 
-    /// Monte-Carlo standard error of the mean price, as a percentage of
-    /// current balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.price_std_error")]
     price_std_error -> f64 = s.inner.price_std_error;
 });
 
-/// Summary risk/pricing metrics for a structured-credit tranche
-/// ([`tranche_metrics`]'s return value).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TrancheMetrics",
@@ -485,48 +299,13 @@ impl PyTrancheMetrics {
         self.to_dataframe(py)?.call_method0("_repr_html_")
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON-encoded ``TrancheMetrics``.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheMetrics
-    ///     The decoded metrics bundle.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not valid JSON for the ``TrancheMetrics`` shape.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import json
-    /// >>> from finstack_quant.valuations.instruments import TrancheMetrics
-    /// >>> payload = json.dumps({
-    /// ...     "tranche_id": "A", "currency": "USD", "pv": 1000.0,
-    /// ...     "clean_price_pct": 100.0, "dirty_price_pct": 100.0, "accrued": 0.0,
-    /// ...     "factor": 1.0, "wal": 3.0, "ytm": 0.05, "z_spread_bp": 0.0,
-    /// ...     "cs01": -1.0, "spread_duration": 3.0, "spread_convexity": 12.0,
-    /// ...     "effective_duration": 3.0, "effective_convexity": 12.0,
-    /// ...     "target_price_pct": 100.0,
-    /// ... })
-    /// >>> metrics = TrancheMetrics.from_json(payload)
-    /// >>> metrics.tranche_id
-    /// 'A'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -534,19 +313,13 @@ impl PyTrancheMetrics {
         Ok(Self { inner })
     }
 
-    /// Serialize back to the same JSON shape ``from_json`` accepts.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON-encoded ``TrancheMetrics``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Requested registry metrics valued on this note, keyed by metric id
-    /// (empty when none were requested); units follow each metric.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.metrics")]
     #[getter]
     fn metrics(&self) -> BTreeMap<String, f64> {
         self.inner
@@ -556,22 +329,7 @@ impl PyTrancheMetrics {
             .collect()
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``tranche_id``, ``currency``, ``pv``, ``clean_price_pct``,
-    /// ``dirty_price_pct``, ``accrued``, ``factor``, ``wal``, ``ytm``,
-    /// ``z_spread_bp``, ``cs01``, ``spread_duration``, ``spread_convexity``,
-    /// ``effective_duration``, ``effective_convexity``, ``target_price_pct``,
-    /// ``wal_to_call``, ``z_spread_to_call_bp``, ``dm_to_call_bp``, ``dm_bp``
-    /// — the same fields and units as the getters of the same name (``ytm``
-    /// is ``NaN`` for an impaired note, the ``*_to_call`` columns without a
-    /// call, ``dm_bp`` for fixed-rate tranches). Requested registry metrics
-    /// stay in the ``metrics`` getter.
-    ///
-    /// One row per tranche, so a capital structure stacks with
-    /// ``pd.concat([m.to_dataframe() for m in metrics])``. ``pv`` and ``cs01``
-    /// are in ``currency`` units and are only additive across tranches sharing
-    /// one currency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe_with_schema(
@@ -612,85 +370,68 @@ impl PyTrancheMetrics {
 }
 
 crate::bindings::macros::py_getters!(PyTrancheMetrics |s| {
-    /// Identifier of the tranche.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.tranche_id")]
     tranche_id -> &str = &s.inner.tranche_id;
 
-    /// ISO-4217 code of the currency ``pv``, ``accrued`` and ``cs01`` are
-    /// denominated in.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    /// Present value of the tranche, in ``currency`` units.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.pv")]
     pv -> f64 = s.inner.pv;
 
-    /// Model clean settlement price, as a percentage of the tranche's current
-    /// balance (the factor-adjusted secondary-market quote basis).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.clean_price_pct")]
     clean_price_pct -> f64 = s.inner.clean_price_pct;
 
-    /// Model dirty settlement price (clean plus accrued), as a percentage of
-    /// the tranche's current balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.dirty_price_pct")]
     dirty_price_pct -> f64 = s.inner.dirty_price_pct;
 
-    /// Accrued coupon at buyer settlement, in ``currency`` units.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.accrued")]
     accrued -> f64 = s.inner.accrued;
 
-    /// Pool factor of the note: current balance over original balance, so a
-    /// price on original face is ``clean_price_pct * factor``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.factor")]
     factor -> f64 = s.inner.factor;
 
-    /// Weighted-average life, in years.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.wal")]
     wal -> f64 = s.inner.wal;
 
-    /// Decimal yield reproducing the ``target_price_pct`` dirty value,
-    /// compounded at the note's coupon frequency in its own day count;
-    /// ``None`` for an impaired note.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.ytm")]
     ytm -> Option<f64> = s.inner.ytm;
 
-    /// Z-spread to ``target_price_pct``, in basis points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.z_spread_bp")]
     z_spread_bp -> f64 = s.inner.z_spread_bp;
 
-    /// Credit-spread DV01 — currency change for a +1 bp z-spread shock,
-    /// in ``currency`` units. Negative for a long tranche.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.cs01")]
     cs01 -> f64 = s.inner.cs01;
 
-    /// Spread duration, in years (``-cs01 / (pv * 1bp)``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.spread_duration")]
     spread_duration -> f64 = s.inner.spread_duration;
 
-    /// Spread convexity at the solved z-spread, in years squared.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.spread_convexity")]
     spread_convexity -> f64 = s.inner.spread_convexity;
 
-    /// Effective (rate) duration, in years: the cashflows are re-projected
-    /// with every rate curve bumped ±1 bp, so a floater's coupon resets move
-    /// with the curve and its duration is short.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.effective_duration")]
     effective_duration -> f64 = s.inner.effective_duration;
 
-    /// Effective convexity from the same ±1 bp re-projection, in years
-    /// squared.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.effective_convexity")]
     effective_convexity -> f64 = s.inner.effective_convexity;
 
-    /// Discount margin to maturity at ``target_price_pct`` for a
-    /// floating-rate tranche, in basis points; ``None`` for fixed-rate
-    /// tranches.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.dm_bp")]
     dm_bp -> Option<f64> = s.inner.dm_bp;
 
-    /// Price the yield, z-spread and CS01 were solved against, as a
-    /// percentage of current balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.target_price_pct")]
     target_price_pct -> f64 = s.inner.target_price_pct;
 
-    /// Weighted-average life to the assumed call, in years, or ``None`` when
-    /// the deal carries no call covering this tranche.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.wal_to_call")]
     wal_to_call -> Option<f64> = s.inner.wal_to_call;
 
-    /// Z-spread of the to-call flows to ``target_price_pct``, in basis
-    /// points, or ``None`` without a call.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.z_spread_to_call_bp")]
     z_spread_to_call_bp -> Option<f64> = s.inner.z_spread_to_call_bp;
 
-    /// Discount margin to call for a floating-rate tranche, in basis points,
-    /// or ``None`` for fixed-rate tranches or without a call.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.dm_to_call_bp")]
     dm_to_call_bp -> Option<f64> = s.inner.dm_to_call_bp;
 });
 
-/// Scenario/yield table for a single structured-credit tranche
-/// ([`tranche_scenario_table`]'s return value).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ScenarioTable",
@@ -709,45 +450,13 @@ impl PyScenarioTable {
         self.to_dataframe(py)?.call_method0("_repr_html_")
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON-encoded ``ScenarioTable``.
-    ///
-    /// Returns
-    /// -------
-    /// ScenarioTable
-    ///     The decoded scenario table.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not valid JSON for the ``ScenarioTable`` shape.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import json
-    /// >>> from finstack_quant.valuations.instruments import ScenarioTable
-    /// >>> payload = json.dumps({
-    /// ...     "tranche_id": "A",
-    /// ...     "cells": [{"cpr": 0.06, "cdr": 0.02, "severity": 0.6,
-    /// ...                "price": 98.2, "wal": 4.1, "writedown": 0.0}],
-    /// ... })
-    /// >>> table = ScenarioTable.from_json(payload)
-    /// >>> table.tranche_id
-    /// 'A'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -755,29 +464,13 @@ impl PyScenarioTable {
         Ok(Self { inner })
     }
 
-    /// Serialize back to the same JSON shape ``from_json`` accepts.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON-encoded ``ScenarioTable``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Evaluated cells, in CPR-major, then CDR, then severity order.
-    ///
-    /// Each cell is a dict with keys ``cpr`` (annual decimal), ``cdr``
-    /// (annual decimal), ``severity`` (decimal), ``price`` (percentage of
-    /// original balance), ``wal`` (years), and ``writedown`` (currency
-    /// units).
-    ///
-    /// Returns
-    /// -------
-    /// list[dict[str, float]]
-    ///     A copy of each stored scenario cell; mutating the returned list does
-    ///     not change this read-only property.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.cells")]
     #[getter]
     fn cells(&self) -> Vec<BTreeMap<String, f64>> {
         self.inner
@@ -796,18 +489,7 @@ impl PyScenarioTable {
             .collect()
     }
 
-    /// Export the evaluated cells as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``tranche_id``, ``cpr``, ``cdr``, ``severity`` (all annual
-    /// decimals except ``severity``, which is a plain decimal), ``price``
-    /// (percentage of current balance), ``wal`` (years), ``writedown``
-    /// (currency units).
-    ///
-    /// One row per cell of the grid, in CPR-major then CDR then severity
-    /// order — the same cells and order as ``cells``. ``tranche_id`` repeats on
-    /// every row so tables for several tranches concatenate and pivot. A grid
-    /// that evaluated no cells yields a zero-row frame that still carries the
-    /// columns above.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self
@@ -840,7 +522,7 @@ impl PyScenarioTable {
 }
 
 crate::bindings::macros::py_getters!(PyScenarioTable |s| {
-    /// Identifier of the tranche evaluated.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.tranche_id")]
     tranche_id -> &str = &s.inner.tranche_id;
 });
 

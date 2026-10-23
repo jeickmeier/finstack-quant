@@ -31,7 +31,7 @@ use super::{
 
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditBuilder;
 
-/// Typed wrapper for the Rust `StructuredCredit` instrument (ABS/CLO/CMBS/RMBS).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "StructuredCredit",
@@ -67,46 +67,7 @@ impl PyStructuredCredit {
             .map_err(core_to_py)
     }
 
-    /// Price the deal with the scenario-waterfall Monte Carlo engine.
-    ///
-    /// Every path runs the full period loop and waterfall on simulated
-    /// prepayment, default and recovery paths (and, for pools of real
-    /// instruments, per-name defaults and simulated revolver draws).
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext | str
-    ///     Market context with the deal's discount curve and every curve
-    ///     the collateral references.
-    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation date.
-    /// num_paths : int, optional
-    ///     Number of independent Monte Carlo estimators; must be at least two.
-    ///     Defaults to the deal's configured ``mc_paths`` override or 5,000.
-    ///     With ``antithetic`` each estimator averages a mirrored pair, so
-    ///     ``2 * num_paths`` physical paths run while the statistical sample
-    ///     size remains ``num_paths``.
-    /// antithetic : bool, optional
-    ///     Pair each estimator's path with its sign-flipped mirror; defaults
-    ///     to the deal's configured ``mc_antithetic`` override or ``True``.
-    ///
-    /// Returns
-    /// -------
-    /// StochasticPricingResult
-    ///     Deal and tranche present values, loss statistics, Monte Carlo
-    ///     error, draw diagnostics and the draw option cost. Sampling error
-    ///     uses the sample standard deviation and a 95% Student-t confidence
-    ///     interval with ``num_paths - 1`` degrees of freedom.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the deal fails validation or the resolved ``num_paths`` is less
-    ///     than two independent estimators.
-    /// KeyError
-    ///     If a required curve is missing from ``market``.
-    /// RuntimeError
-    ///     If the simulation fails.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.price_stochastic")]
     #[pyo3(signature = (market, as_of, num_paths=None, antithetic=None))]
     #[pyo3(text_signature = "($self, market, as_of, num_paths=None, antithetic=None)")]
     fn price_stochastic(
@@ -143,19 +104,19 @@ impl PyStructuredCredit {
         Ok(PySimulationRun { inner })
     }
 
-    /// Deal closing date as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.closing_date")]
     #[getter]
     fn closing_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.closing_date)
     }
 
-    /// First tranche payment date as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.first_payment_date")]
     #[getter]
     fn first_payment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.first_payment_date)
     }
 
-    /// Buyer quote settlement date as ``datetime.date``, or ``None`` for valuation date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.quote_settlement_date")]
     #[getter]
     fn quote_settlement_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -164,20 +125,13 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Legal final maturity as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Return a copy carrying the deal-type standard fee schedule (mirrors
-    /// Rust ``StructuredCredit::with_standard_fees``).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCredit
-    ///     A new deal with ``fees`` set to the CLO / CMBS / RMBS / ABS
-    ///     standard.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.with_standard_fees")]
     #[pyo3(text_signature = "($self)")]
     fn with_standard_fees(&self) -> Self {
         Self {
@@ -185,19 +139,7 @@ impl PyStructuredCredit {
         }
     }
 
-    /// Return a copy with the deal-type stochastic prepayment, default and
-    /// correlation specifications enabled for ``price_stochastic``.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCredit
-    ///     A new deal with the stochastic specs attached.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the deal-type defaults cannot be built (for example an empty
-    ///     pool for the RMBS coupon-driven incentive).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.enable_stochastic")]
     #[pyo3(text_signature = "($self)")]
     fn enable_stochastic(&self) -> PyResult<Self> {
         let mut deal = self.inner.clone();
@@ -205,49 +147,14 @@ impl PyStructuredCredit {
         Ok(Self { inner: deal })
     }
 
-    /// Effective priority of payments: the custom waterfall when one is
-    /// set, otherwise the deal-type template with fees, coverage tests and
-    /// hedges placed.
-    ///
-    /// Returns
-    /// -------
-    /// Waterfall
-    ///     The waterfall the deterministic engine executes.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the template cannot be synthesized (invalid tranches, tests or
-    ///     fees).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.create_waterfall")]
     #[pyo3(text_signature = "($self)")]
     fn create_waterfall(&self) -> PyResult<PyWaterfall> {
         let inner = self.inner.create_waterfall().map_err(core_to_py)?;
         Ok(PyWaterfall { inner })
     }
 
-    /// Project one tranche's cashflows through the deterministic engine.
-    ///
-    /// Parameters
-    /// ----------
-    /// tranche_id : str
-    ///     Identifier of the class.
-    /// market : MarketContext
-    ///     Curves and fixings for floating coupons and collateral.
-    /// as_of : datetime.date
-    ///     Valuation date the projection starts from.
-    ///
-    /// Returns
-    /// -------
-    /// TrancheCashflows
-    ///     The class's projected flows and components.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``tranche_id`` is not a class of the deal.
-    /// ValueError
-    ///     If the deal fails pricing validation, ``as_of`` is invalid or
-    ///     required market data is missing.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.tranche_cashflows")]
     #[pyo3(text_signature = "($self, tranche_id, market, as_of)")]
     fn tranche_cashflows(
         &self,
@@ -266,27 +173,7 @@ impl PyStructuredCredit {
         Ok(PyTrancheCashflows { inner })
     }
 
-    /// Residual-class return analytics of the deterministic projection.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext
-    ///     Curves and fixings for the projection and the NAV discounting.
-    /// as_of : datetime.date
-    ///     Valuation date; the invested amount is dated here.
-    /// purchase_price_pct : float, optional
-    ///     Entry price as a percent of the equity balance; par when omitted.
-    ///
-    /// Returns
-    /// -------
-    /// EquityMetrics
-    ///     IRR, MOIC, NAV and cash-on-cash series of the residual class.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the deal has no residual class, fails pricing validation, or
-    ///     ``as_of`` is invalid.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.equity_metrics")]
     #[pyo3(signature = (market, as_of, purchase_price_pct=None))]
     #[pyo3(text_signature = "($self, market, as_of, purchase_price_pct=None)")]
     fn equity_metrics(
@@ -305,7 +192,7 @@ impl PyStructuredCredit {
         Ok(PyEquityMetrics { inner })
     }
 
-    /// Payment business-day convention string, or ``None`` for the default.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.business_day_convention")]
     #[getter]
     fn business_day_convention(&self) -> PyResult<Option<String>> {
         self.inner
@@ -315,13 +202,13 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Credit model as its ``CreditModelConfig`` serde ``dict``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.credit_model")]
     #[getter]
     fn credit_model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.credit_model)
     }
 
-    /// Stochastic prepayment specification as its serde ``dict``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.stochastic_prepay_spec")]
     #[getter]
     fn stochastic_prepay_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -332,7 +219,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Stochastic default specification as its serde ``dict``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.stochastic_default_spec")]
     #[getter]
     fn stochastic_default_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -343,11 +230,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Stochastic recovery specification (``RecoverySpec`` serde ``dict``:
-    /// ``{"type": "constant", "rate": ...}`` or ``{"type":
-    /// "market_correlated", "mean_recovery": ..., "recovery_volatility": ...,
-    /// "factor_correlation": ...}``), or ``None`` for constant recoveries at
-    /// the deterministic rate.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.stochastic_recovery_spec")]
     #[getter]
     fn stochastic_recovery_spec<'py>(
         &self,
@@ -361,7 +244,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Default correlation structure as its serde ``dict``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.correlation_structure")]
     #[getter]
     fn correlation_structure<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -372,7 +255,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Delinquency model as its ``DelinquencyModel`` serde ``dict``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.delinquency")]
     #[getter]
     fn delinquency<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -383,7 +266,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Card portfolio model as its ``CardPortfolioSpec`` serde ``dict``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.card")]
     #[getter]
     fn card<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -394,19 +277,19 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Market conditions as their serde ``dict``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.market_conditions")]
     #[getter]
     fn market_conditions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.market_conditions)
     }
 
-    /// Deal metadata as its serde ``dict``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.deal_metadata")]
     #[getter]
     fn deal_metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.deal_metadata)
     }
 
-    /// Hedges settled through the waterfall as typed ``HedgeSwap`` objects.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.hedge_swaps")]
     #[getter]
     fn hedge_swaps(&self) -> Vec<PyHedgeSwap> {
         self.inner
@@ -418,8 +301,7 @@ impl PyStructuredCredit {
             .collect()
     }
 
-    /// Senior transaction fees as their ``DealFees`` serde ``dict``, or
-    /// ``None`` when no fee tier is attached.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.fees")]
     #[getter]
     fn fees<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -429,14 +311,13 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Deal-level coverage tests as ``CoverageTestSpec`` serde dicts.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.coverage_triggers")]
     #[getter]
     fn coverage_triggers<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.coverage_triggers)
     }
 
-    /// Explicit loss-allocation policy (``"write_down"`` /
-    /// ``"par_preserving"``), or ``None`` for the deal-type default.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.loss_allocation")]
     #[getter]
     fn loss_allocation(&self) -> PyResult<Option<String>> {
         self.inner
@@ -446,15 +327,13 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Scheduled lender draws on notes as a list of ``TrancheDraw`` serde
-    /// dicts (``tranche_id``, ``date``, ``amount``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.tranche_draws")]
     #[getter]
     fn tranche_draws<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.tranche_draws)
     }
 
-    /// Per-period re-advance rule as its ``TrancheReadvance`` serde dict
-    /// (``tranche_id``, ``commitment``), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.tranche_readvance")]
     #[getter]
     fn tranche_readvance<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -464,8 +343,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Explicit loss-recognition timing (``"at_default"`` /
-    /// ``"at_liquidation"``), or ``None`` for the deal-type default.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.loss_recognition")]
     #[getter]
     fn loss_recognition(&self) -> PyResult<Option<String>> {
         self.inner
@@ -475,7 +353,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Declarative waterfall rules as their serde ``dict``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.waterfall_rules")]
     #[getter]
     fn waterfall_rules<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -485,26 +363,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    /// Canonical example deal: a USD 100M CLO with one 7% fixed-rate
-    /// collateral bond and one 6% senior note, closing 2024-01-01, legal
-    /// final 2034-01-01, discounted on ``USD-OIS`` with the ``nyse`` calendar
-    /// (mirrors Rust ``StructuredCredit::example``).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCredit
-    ///     The example deal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If construction fails (does not occur for a released build).
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
-    /// >>> StructuredCredit.example().id
-    /// 'CLO-EXAMPLE'
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -513,21 +372,13 @@ impl PyStructuredCredit {
             .map_err(core_to_py)
     }
 
-    /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
     }
 
-    /// Return a copy with every stochastic specification cleared (mirrors
-    /// Rust ``StructuredCredit::disable_stochastic``); the inverse of
-    /// ``enable_stochastic``.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCredit
-    ///     A new deal without stochastic prepayment, default, recovery or
-    ///     correlation specifications.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.disable_stochastic")]
     #[pyo3(text_signature = "($self)")]
     fn disable_stochastic(&self) -> Self {
         let mut deal = self.inner.clone();
@@ -546,83 +397,73 @@ impl PyStructuredCredit {
 }
 
 crate::bindings::macros::py_getters!(PyStructuredCredit |s| {
-    /// Deal classification (serde name: ``"abs"``, ``"clo"``, ``"cmbs"``, ``"rmbs"`` ...).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.deal_type")]
     deal_type -> PyResult<String> = enum_to_py_string(&s.inner.deal_type);
 
-    /// Collateral pool.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.pool")]
     pool -> PyAssetPool = PyAssetPool { inner: s.inner.pool.clone() };
 
-    /// Capital structure.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.tranches")]
     tranches -> PyTrancheStructure = PyTrancheStructure { inner: s.inner.tranches.clone() };
 
-    /// Discount curve identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    /// Payment frequency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.frequency")]
     frequency -> PyTenor = PyTenor { inner: s.inner.frequency };
 
-    /// Payment calendar identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    /// Deterministic prepayment model as a typed ``PrepaymentModelSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.prepayment_spec")]
     prepayment_spec -> PyPrepaymentModelSpec =
         PyPrepaymentModelSpec { inner: s.inner.credit_model.prepayment_spec.clone() };
 
-    /// Deterministic default model as a typed ``DefaultModelSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.default_spec")]
     default_spec -> PyDefaultModelSpec =
         PyDefaultModelSpec { inner: s.inner.credit_model.default_spec.clone() };
 
-    /// Recovery model as a typed ``RecoveryModelSpec``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.recovery_spec")]
     recovery_spec -> PyRecoveryModelSpec =
         PyRecoveryModelSpec { inner: s.inner.credit_model.recovery_spec.clone() };
 
-    /// Clean-up call pool-factor threshold (decimal), or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.cleanup_call_decimal")]
     cleanup_call_decimal -> Option<f64> = s.inner.cleanup_call_decimal;
 
-    /// Assumed optional redemption, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.call_assumption")]
     call_assumption -> Option<PyCallAssumption> =
         s.inner.call_assumption.clone().map(|inner| PyCallAssumption { inner });
 
-    /// Collateral liquidation price in percent of par, or ``None`` for par.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.liquidation_price_pct")]
     liquidation_price_pct -> Option<f64> = s.inner.liquidation_price_pct;
 
-    /// Explicit principal-covers-senior-interest flag, or ``None`` for the
-    /// deal-type default.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.principal_covers_senior_interest")]
     principal_covers_senior_interest -> Option<bool> = s.inner.principal_covers_senior_interest;
 
-    /// Collateral valuation rules for the coverage tests, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.coverage_rules")]
     coverage_rules -> Option<PyCoverageRules> =
         s.inner.coverage_rules.clone().map(|inner| PyCoverageRules { inner });
 
-    /// Custom priority of payments, or ``None`` when the template applies.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.waterfall")]
     waterfall -> Option<PyWaterfall> = s.inner.waterfall.clone().map(|inner| PyWaterfall { inner });
 
-    /// ``True`` when a stochastic prepayment, default, recovery or correlation spec is set
-    /// (mirrors Rust ``StructuredCredit::is_stochastic``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.is_stochastic")]
     is_stochastic -> bool = s.inner.is_stochastic();
 
-    /// Loss-allocation policy in force for pricing: ``loss_allocation`` when
-    /// set, otherwise the deal-type convention (``"write_down"`` /
-    /// ``"par_preserving"``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.effective_loss_allocation")]
     effective_loss_allocation -> PyResult<String> =
         enum_to_py_string(&s.inner.effective_loss_allocation());
 
-    /// Loss-recognition timing in force: ``loss_recognition`` when set,
-    /// otherwise the deal-type convention (``"at_liquidation"`` for RMBS and
-    /// CMBS, ``"at_default"`` otherwise).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.effective_loss_recognition")]
     effective_loss_recognition -> PyResult<String> =
         enum_to_py_string(&s.inner.effective_loss_recognition());
 
-    /// Whether the template waterfall pays senior fees and senior note
-    /// interest from principal when interest proceeds fall short:
-    /// ``principal_covers_senior_interest`` when set, otherwise ``True`` for
-    /// CLO/CBO and ``False`` for every other deal type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.effective_principal_covers_senior_interest")]
     effective_principal_covers_senior_interest -> bool =
         s.inner.effective_principal_covers_senior_interest();
 });
 
-/// Fluent builder for [`PyStructuredCredit`]; wraps the Rust
-/// `FinancialBuilder`-generated builder (consuming setters).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "StructuredCreditBuilder",
@@ -634,68 +475,21 @@ pub struct PyStructuredCreditBuilder {
 
 #[pymethods]
 impl PyStructuredCreditBuilder {
-    /// Set the instrument identifier.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Unique identifier for the deal.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, |b: StructuredCreditBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    /// Set the deal-type classification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"clo", "cbo", "abs", "rmbs", "cmbs", "auto", "card"}
-    ///     Deal classification.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized deal type.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.deal_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn deal_type<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let deal_type: DealType = enum_from_str(value, "deal_type")?;
         builder_set!(slf, |b: StructuredCreditBuilder| b.deal_type(deal_type))
     }
 
-    /// Set the asset pool.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : AssetPool
-    ///     Asset pool definition.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.pool")]
     #[pyo3(text_signature = "($self, value)")]
     fn pool<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -705,23 +499,7 @@ impl PyStructuredCreditBuilder {
             .pool(value.inner.clone()))
     }
 
-    /// Set the tranche capital structure.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : TrancheStructure
-    ///     Tranche capital structure.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.tranches")]
     #[pyo3(text_signature = "($self, value)")]
     fn tranches<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -731,23 +509,7 @@ impl PyStructuredCreditBuilder {
             .tranches(value.inner.clone()))
     }
 
-    /// Set the deal closing (issuance) date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date
-    ///     Deal closing date.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.closing_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn closing_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -757,23 +519,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.closing_date(date))
     }
 
-    /// Set the first payment date to tranches.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date
-    ///     First payment date.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.first_payment_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn first_payment_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -783,24 +529,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.first_payment_date(date))
     }
 
-    /// Set buyer settlement for clean/dirty price, yield and spread metrics.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date
-    ///     Buyer settlement date, on or after valuation and closing. Payments
-    ///     on or before this date belong to the seller. When omitted, metrics
-    ///     settle on the valuation date; model PV retains its valuation date.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     This builder for further configuration.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the date is invalid or the builder was already consumed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.quote_settlement_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn quote_settlement_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -811,23 +540,7 @@ impl PyStructuredCreditBuilder {
             .quote_settlement_date(date))
     }
 
-    /// Set the legal final maturity date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date
-    ///     Legal final maturity date.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -837,23 +550,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.maturity(date))
     }
 
-    /// Set the payment frequency for the structure.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Tenor | str
-    ///     Payment frequency.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`, or a string ``value`` is not a recognized tenor string.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -863,24 +560,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.frequency(frequency))
     }
 
-    /// Set the payment calendar identifier for schedule adjustments.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Holiday calendar identifier (e.g. ``"nyse"``). Required for
-    ///     accurate schedule generation.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -890,24 +570,7 @@ impl PyStructuredCreditBuilder {
             .calendar_id(value.into()))
     }
 
-    /// Set the business day convention for tranche payments.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Business day convention (e.g. ``"following"``,
-    ///     ``"modified_following"``). Defaults to ``"following"`` when
-    ///     never set.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized business day convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.business_day_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -919,23 +582,7 @@ impl PyStructuredCreditBuilder {
             .business_day_convention(business_day_convention))
     }
 
-    /// Set the discount curve identifier for valuation.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Discount curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -945,24 +592,7 @@ impl PyStructuredCreditBuilder {
             .discount_curve_id(CurveId::new(value.to_string())))
     }
 
-    /// Set market conditions from a JSON object.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``MarketConditions`` object containing finite annual decimal ``refi_rate``
-    ///     for Richard-Roll refinancing incentives; negative rates are accepted.
-    ///     This replaces the registry default. Unknown macro-factor fields fail.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``MarketConditions`` shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.market_conditions")]
     #[pyo3(text_signature = "($self, value)")]
     fn market_conditions<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -975,24 +605,7 @@ impl PyStructuredCreditBuilder {
             .market_conditions(market_conditions))
     }
 
-    /// Set declarative waterfall rules from a JSON object.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``WaterfallRules`` object as a dict or JSON string (available-funds caps,
-    ///     step-down, shifting interest, controlled accumulation), layered
-    ///     onto the base waterfall.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``WaterfallRules`` shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.waterfall_rules")]
     #[pyo3(text_signature = "($self, value)")]
     fn waterfall_rules<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1005,27 +618,7 @@ impl PyStructuredCreditBuilder {
             .waterfall_rules(waterfall_rules))
     }
 
-    /// Set senior transaction fees from a JSON object.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``DealFees`` object as a dict or JSON string (trustee, senior management,
-    ///     servicing, and optional master/special servicer fees), paid
-    ///     ahead of every note. Optional ``workout_fee_pct`` (percent of the
-    ///     P&I collected on specially serviced loans) and
-    ///     ``liquidation_fee_pct`` (percent of liquidation proceeds) are taken
-    ///     inside the collateral flows. Skipped (``None``) by default.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``DealFees`` shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.fees")]
     #[pyo3(text_signature = "($self, value)")]
     fn fees<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1036,25 +629,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.fees(fees))
     }
 
-    /// Replace the whole credit model (prepayment, default, recovery,
-    /// stochastic and correlation specs, delinquency and card models).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``CreditModelConfig`` serde object. Later per-field setters
-    ///     (:meth:`prepayment_spec` ...) modify this model.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.credit_model")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_model<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1066,24 +641,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.credit_model(converted))
     }
 
-    /// Set the deterministic prepayment model.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : PrepaymentModelSpec | dict | str
-    ///     Typed spec (``PrepaymentModelSpec.constant_cpr`` / ``psa`` /
-    ///     ``abs`` / ``vector`` / ``cmbs_with_lockout``) or its serde form.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.prepayment_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn prepayment_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1100,24 +658,7 @@ impl PyStructuredCreditBuilder {
             .prepayment_spec(converted))
     }
 
-    /// Set the deterministic default model.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : DefaultModelSpec | dict | str
-    ///     Typed spec (``DefaultModelSpec.constant_cdr`` / ``sda`` / ``vector``
-    ///     / ``cumulative_loss`` / ``timing``) or its serde form.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.default_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn default_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1132,23 +673,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.default_spec(converted))
     }
 
-    /// Set the recovery model.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : RecoveryModelSpec | dict | str
-    ///     Typed spec (rate, lag, optional severity vector) or its serde form.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.recovery_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn recovery_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1163,25 +688,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.recovery_spec(converted))
     }
 
-    /// Set the stochastic prepayment specification used by
-    /// ``price_stochastic``.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``StochasticPrepaySpec`` serde object (Richard-Roll or factor
-    ///     parameters).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.stochastic_prepay_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn stochastic_prepay_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1194,24 +701,7 @@ impl PyStructuredCreditBuilder {
             .stochastic_prepay_spec(converted))
     }
 
-    /// Set the stochastic default specification used by
-    /// ``price_stochastic``.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``StochasticDefaultSpec`` serde object.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.stochastic_default_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn stochastic_default_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1224,28 +714,7 @@ impl PyStructuredCreditBuilder {
             .stochastic_default_spec(converted))
     }
 
-    /// Set the stochastic recovery specification used by
-    /// ``price_stochastic``.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``RecoverySpec`` serde object: ``{"type": "constant", "rate":
-    ///     0.4}`` or ``{"type": "market_correlated", "mean_recovery": 0.4,
-    ///     "recovery_volatility": 0.25, "factor_correlation": 0.4}`` (recovery
-    ///     falls with the systematic factor, so heavy-default paths recover
-    ///     less).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``RecoverySpec`` shape or this
-    ///     builder was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.stochastic_recovery_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn stochastic_recovery_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1258,23 +727,7 @@ impl PyStructuredCreditBuilder {
             .stochastic_recovery_spec(converted))
     }
 
-    /// Set the default correlation structure used by ``price_stochastic``.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``CorrelationStructure`` serde object (factor loadings).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.correlation_structure")]
     #[pyo3(text_signature = "($self, value)")]
     fn correlation_structure<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1287,28 +740,7 @@ impl PyStructuredCreditBuilder {
             .correlation_structure(converted))
     }
 
-    /// Set the delinquency roll-rate, advancing and modification model
-    /// (ABS/RMBS asset and rep-line pools).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``DelinquencyModel`` serde object: ``roll_rates`` (per bucket,
-    ///     the last rolls to charge-off), ``cure_rates``, ``advancing``
-    ///     (``{"policy": "none"}`` or ``{"policy": "principal_and_interest",
-    ///     "recoverability_cap_pct": ..., "reimburse_from_collections":
-    ///     false}``) and optional ``modification``.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.delinquency")]
     #[pyo3(text_signature = "($self, value)")]
     fn delinquency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1320,28 +752,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.delinquency(converted))
     }
 
-    /// Set the card master-trust portfolio model.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``CardPortfolioSpec`` serde object: ``monthly_payment_rate``,
-    ///     ``portfolio_yield`` and ``charge_off_rate`` (annual decimals),
-    ///     plus the optional ``seller_interest`` (``Money`` serde object in
-    ///     the pool currency) and ``fixed_allocation_decimal`` (decimal in
-    ///     ``(0, 1]``) that fix the investor allocation of trust collections
-    ///     once the revolving period ends.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.card")]
     #[pyo3(text_signature = "($self, value)")]
     fn card<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1353,27 +764,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.card(converted))
     }
 
-    /// Set the deal-level OC / IC coverage tests.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[dict] | str
-    ///     ``CoverageTestSpec`` objects (``id``, ``tranche_id``, ``kind`` (``"oc"`` / ``"ic"``),
-    ///     ``trigger_level`` ratio, ``action``, optional ``placement``
-    ///     (``{"kind": "after_tranche", "tranche_id": ...}`` or
-    ///     ``{"kind": "after_junior_fees"}``), optional ``divert_pct`` and
-    ///     ``include_cash``).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.coverage_triggers")]
     #[pyo3(text_signature = "($self, value)")]
     fn coverage_triggers<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1386,23 +777,7 @@ impl PyStructuredCreditBuilder {
             .coverage_triggers(converted))
     }
 
-    /// Set the collateral valuation rules for the coverage tests.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : CoverageRules | dict | str
-    ///     Typed :class:`CoverageRules` or its serde form.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.coverage_rules")]
     #[pyo3(text_signature = "($self, value)")]
     fn coverage_rules<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1418,24 +793,7 @@ impl PyStructuredCreditBuilder {
             .coverage_rules(converted))
     }
 
-    /// Set the assumed optional redemption for price-to-call analytics.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : CallAssumption | dict | str
-    ///     Typed :class:`CallAssumption` or its serde form (``date``,
-    ///     ``price_pct``, ``scope``).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.call_assumption")]
     #[pyo3(text_signature = "($self, value)")]
     fn call_assumption<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1451,24 +809,7 @@ impl PyStructuredCreditBuilder {
             .call_assumption(converted))
     }
 
-    /// Set a custom priority of payments in place of the deal-type template.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Waterfall | dict | str
-    ///     Typed :class:`Waterfall` or its serde form (``tiers``,
-    ///     ``currency``, optional ``coverage_rules``).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.waterfall")]
     #[pyo3(text_signature = "($self, value)")]
     fn waterfall<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1483,24 +824,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.waterfall(converted))
     }
 
-    /// Set the interest-rate hedges settled through the waterfall.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[HedgeSwap | dict] | str
-    ///     Typed :class:`HedgeSwap` objects, their serde dicts, or a JSON
-    ///     array string.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.hedge_swaps")]
     #[pyo3(text_signature = "($self, value)")]
     fn hedge_swaps<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1513,25 +837,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.hedge_swaps(hedges))
     }
 
-    /// Set the clean-up call pool-factor threshold.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Pool factor (decimal in ``(0, 1)``, typically ``0.10``) below
-    ///     which the deal is redeemed when the liquidation proceeds cover
-    ///     the notes.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.cleanup_call_decimal")]
     #[pyo3(text_signature = "($self, value)")]
     fn cleanup_call_decimal<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1541,24 +847,7 @@ impl PyStructuredCreditBuilder {
             .cleanup_call_decimal(value))
     }
 
-    /// Set the collateral liquidation price used by deal calls and clean-up
-    /// calls.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Percent of par the collateral realizes (``100.0`` = par).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.liquidation_price_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn liquidation_price_pct<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1568,27 +857,7 @@ impl PyStructuredCreditBuilder {
             .liquidation_price_pct(value))
     }
 
-    /// Set how collateral losses reach the note balances.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"write_down", "par_preserving"}
-    ///     ``"write_down"`` allocates realized losses junior-first at
-    ///     default (RMBS/CMBS convention); ``"par_preserving"`` keeps note
-    ///     balances at par and realizes shortfalls at legal final
-    ///     (CLO/ABS convention). The deal type's default applies when never
-    ///     set.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.loss_allocation")]
     #[pyo3(text_signature = "($self, value)")]
     fn loss_allocation<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1598,27 +867,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.loss_allocation(policy))
     }
 
-    /// Set the scheduled lender draws on notes after closing.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : list[dict] | str
-    ///     ``TrancheDraw`` serde objects ``{"tranche_id": "A", "date":
-    ///     "2025-01-01", "amount": {"amount": 5000000.0, "currency":
-    ///     "USD"}}``, ascending by date; each is applied on the first payment
-    ///     date at or after its date, lifting the note's balance and adding
-    ///     the cash to principal proceeds.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``TrancheDraw`` shape or this
-    ///     builder was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.tranche_draws")]
     #[pyo3(text_signature = "($self, value)")]
     fn tranche_draws<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1630,26 +879,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.tranche_draws(draws))
     }
 
-    /// Set the per-period re-advance of one note up to its commitment and
-    /// the borrowing base while the deal revolves.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``TrancheReadvance`` serde object ``{"tranche_id": "A",
-    ///     "commitment": {"amount": 70000000.0, "currency": "USD"}}``;
-    ///     requires ``coverage_rules.borrowing_base``.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``TrancheReadvance`` shape or this
-    ///     builder was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.tranche_readvance")]
     #[pyo3(text_signature = "($self, value)")]
     fn tranche_readvance<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1661,27 +891,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.tranche_readvance(spec))
     }
 
-    /// Set when collateral losses are booked.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"at_default", "at_liquidation"}
-    ///     ``"at_default"`` books the expected net loss on the default date
-    ///     (CLO/ABS convention); ``"at_liquidation"`` books the realized
-    ///     loss when the claim settles after the recovery lag (RMBS/CMBS
-    ///     convention), which delays write-downs and every cumulative-loss
-    ///     trigger. The deal type's default applies when never set.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.loss_recognition")]
     #[pyo3(text_signature = "($self, value)")]
     fn loss_recognition<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1691,26 +901,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.loss_recognition(timing))
     }
 
-    /// Set whether principal proceeds cover senior fees and senior interest
-    /// shortfalls before any note is redeemed.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : bool
-    ///     ``True`` for the CLO principal-waterfall convention, ``False``
-    ///     for strictly separate accounts. The deal type's default applies
-    ///     when never set.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.principal_covers_senior_interest")]
     #[pyo3(text_signature = "($self, value)")]
     fn principal_covers_senior_interest<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1720,23 +911,7 @@ impl PyStructuredCreditBuilder {
             .principal_covers_senior_interest(value))
     }
 
-    /// Set deal metadata (counterparties, identifiers).
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``Metadata`` serde object.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.deal_metadata")]
     #[pyo3(text_signature = "($self, value)")]
     fn deal_metadata<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1748,28 +923,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.deal_metadata(metadata))
     }
 
-    /// Set free-form attributes (tags and metadata) on the deal.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : Attributes | dict | None
-    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
-    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
-    ///     ``None`` clears it.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
-    /// ValueError
-    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or
-    ///     value, or this builder was already consumed by
-    ///     :meth:`StructuredCreditBuilder.build`.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

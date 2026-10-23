@@ -13,7 +13,7 @@ use finstack_quant_valuations::instruments::{
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-/// Per-coupon PIK behavior for the Merton Monte Carlo engine.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode")]
 #[pyclass(
     name = "PikMode",
     module = "finstack_quant.valuations.instruments",
@@ -32,7 +32,7 @@ impl PyPikMode {
 
 #[pymethods]
 impl PyPikMode {
-    /// Coupon paid entirely in cash.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.cash")]
     #[staticmethod]
     fn cash() -> Self {
         Self {
@@ -40,7 +40,7 @@ impl PyPikMode {
         }
     }
 
-    /// Coupon accreted to notional (payment-in-kind).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.pik")]
     #[staticmethod]
     fn pik() -> Self {
         Self {
@@ -48,12 +48,7 @@ impl PyPikMode {
         }
     }
 
-    /// Coupon split between cash and PIK accretion.
-    ///
-    /// # Arguments
-    ///
-    /// * `cash_fraction` - Fraction paid in cash as a decimal (e.g. ``0.5`` for 50%).
-    /// * `pik_fraction` - Fraction accreted to notional as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.split")]
     #[staticmethod]
     fn split(cash_fraction: f64, pik_fraction: f64) -> Self {
         Self {
@@ -64,7 +59,7 @@ impl PyPikMode {
         }
     }
 
-    /// Defer PIK/cash decision to the toggle exercise model on the config.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.toggle")]
     #[staticmethod]
     fn toggle() -> Self {
         Self {
@@ -72,18 +67,7 @@ impl PyPikMode {
         }
     }
 
-    /// Deserialize a PIK mode from canonical JSON.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON produced by ``to_json`` (``'"cash"'``, ``'"pik"'``,
-    ///     ``'"toggle"'`` or the tagged ``split`` object).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or names an unknown mode.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -93,7 +77,7 @@ impl PyPikMode {
         })
     }
 
-    /// Serialize this PIK mode to compact JSON.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.to_json")]
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
@@ -114,14 +98,14 @@ impl PyPikMode {
         }
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
-/// Time-varying PIK schedule for the Merton Monte Carlo engine.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule")]
 #[pyclass(
     name = "PikSchedule",
     module = "finstack_quant.valuations.instruments",
@@ -134,11 +118,7 @@ pub(crate) struct PyPikSchedule {
 
 #[pymethods]
 impl PyPikSchedule {
-    /// Apply the same PIK mode at every coupon date.
-    ///
-    /// # Arguments
-    ///
-    /// * `mode` - PIK mode applied uniformly across the schedule.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.uniform")]
     #[staticmethod]
     fn uniform(mode: PyRef<'_, PyPikMode>) -> Self {
         Self {
@@ -146,14 +126,7 @@ impl PyPikSchedule {
         }
     }
 
-    /// Step-function PIK schedule keyed by year fraction.
-    ///
-    /// Each ``(t, mode)`` pair applies ``mode`` from time ``t`` onward.
-    /// Entries must be sorted by ``t`` ascending.
-    ///
-    /// # Arguments
-    ///
-    /// * `steps` - List of ``(year_fraction, PikMode)`` pairs.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.stepped")]
     #[staticmethod]
     fn stepped(steps: &Bound<'_, PyAny>) -> PyResult<Self> {
         let list = steps.cast::<PyList>()?;
@@ -167,26 +140,12 @@ impl PyPikSchedule {
         })
     }
 
-    /// Look up the active PIK mode at time ``t`` (year fraction from valuation date).
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Time in years from the valuation date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.mode_at")]
     fn mode_at(&self, t: f64) -> PyPikMode {
         PyPikMode::from_inner(self.inner.mode_at(t))
     }
 
-    /// Deserialize a PIK schedule from canonical JSON.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -196,7 +155,7 @@ impl PyPikSchedule {
         })
     }
 
-    /// Serialize this PIK schedule to compact JSON.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
@@ -218,14 +177,14 @@ impl PyPikSchedule {
         }
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
-/// Barrier-crossing detection policy for first-passage default simulation.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing")]
 #[pyclass(
     name = "BarrierCrossing",
     module = "finstack_quant.valuations.instruments",
@@ -238,7 +197,7 @@ pub(crate) struct PyBarrierCrossing {
 
 #[pymethods]
 impl PyBarrierCrossing {
-    /// Discrete monitoring: default if asset value is below the barrier at grid points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.discrete")]
     #[staticmethod]
     fn discrete() -> Self {
         Self {
@@ -246,7 +205,7 @@ impl PyBarrierCrossing {
         }
     }
 
-    /// Brownian-bridge correction for continuous barrier monitoring between grid points.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.brownian_bridge")]
     #[staticmethod]
     fn brownian_bridge() -> Self {
         Self {
@@ -254,17 +213,7 @@ impl PyBarrierCrossing {
         }
     }
 
-    /// Deserialize a barrier-crossing policy from canonical JSON.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     ``'"discrete"'`` or ``'"brownian_bridge"'``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or names an unknown policy.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -274,7 +223,7 @@ impl PyBarrierCrossing {
         })
     }
 
-    /// Serialize this barrier-crossing policy to compact JSON.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.to_json")]
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
@@ -288,14 +237,14 @@ impl PyBarrierCrossing {
         }
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
-/// Path-level statistics from a Merton Monte Carlo simulation.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics")]
 #[pyclass(
     name = "PathStatistics",
     module = "finstack_quant.valuations.instruments",
@@ -328,23 +277,23 @@ impl PyPathStatistics {
 }
 
 crate::bindings::macros::py_getters!(PyPathStatistics |s| {
-    /// Fraction of simulated paths that defaulted.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.default_rate")]
     default_rate -> f64 = s.inner.default_rate;
 
-    /// Average default time in years among defaulted paths.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.avg_default_time")]
     avg_default_time -> f64 = s.inner.avg_default_time;
 
-    /// Average terminal notional, reflecting PIK accretion.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.avg_terminal_notional")]
     avg_terminal_notional -> f64 = s.inner.avg_terminal_notional;
 
-    /// Average recovery rate (decimal fraction) among defaulted paths.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.avg_recovery_rate")]
     avg_recovery_rate -> f64 = s.inner.avg_recovery_rate;
 
-    /// Fraction of coupon dates where PIK was elected.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.pik_exercise_rate")]
     pik_exercise_rate -> f64 = s.inner.pik_exercise_rate;
 });
 
-/// Result from Merton Monte Carlo PIK bond pricing.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult")]
 #[pyclass(
     name = "MertonMcResult",
     module = "finstack_quant.valuations.instruments",
@@ -364,13 +313,7 @@ impl PyMertonMcResult {
 
 #[pymethods]
 impl PyMertonMcResult {
-    /// Export the headline results as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``clean_price_pct``, ``dirty_price_pct``, ``expected_loss``,
-    /// ``unexpected_loss``, ``expected_shortfall_95``, ``average_pik_fraction``,
-    /// ``effective_spread_bp``, ``num_paths``, ``standard_error``,
-    /// ``default_rate``, ``avg_default_time``, ``avg_terminal_notional``,
-    /// ``avg_recovery_rate``, ``pik_exercise_rate``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::core::table::envelope_to_pandas(
@@ -379,7 +322,7 @@ impl PyMertonMcResult {
         )
     }
 
-    /// Jupyter rich display: the ``to_dataframe()`` table.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult._repr_html_")]
     fn _repr_html_<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.to_dataframe(py)?.call_method0("_repr_html_")
     }
@@ -397,87 +340,39 @@ impl PyMertonMcResult {
 }
 
 crate::bindings::macros::py_getters!(PyMertonMcResult |s| {
-    /// Clean price as a percentage of par: the dirty price less accrued interest.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.clean_price_pct")]
     clean_price_pct -> f64 = s.inner.clean_price_pct;
 
-    /// Dirty price as a percentage of par: the mean simulated present value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.dirty_price_pct")]
     dirty_price_pct -> f64 = s.inner.dirty_price_pct;
 
-    /// Expected loss as a fraction of PIK-aware risk-free present value.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.expected_loss")]
     expected_loss -> f64 = s.inner.expected_loss;
 
-    /// Unexpected loss (standard deviation of path PVs divided by notional).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.unexpected_loss")]
     unexpected_loss -> f64 = s.inner.unexpected_loss;
 
-    /// Expected shortfall at the 95% confidence level.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.expected_shortfall_95")]
     expected_shortfall_95 -> f64 = s.inner.expected_shortfall_95;
 
-    /// Average PIK fraction across all coupon dates and paths.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.average_pik_fraction")]
     average_pik_fraction -> f64 = s.inner.average_pik_fraction;
 
-    /// Effective spread in basis points implied by the MC price versus risk-free PV.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.effective_spread_bp")]
     effective_spread_bp -> f64 = s.inner.effective_spread_bp;
 
-    /// Path-level simulation statistics.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.path_statistics")]
     path_statistics -> PyPathStatistics =
         PyPathStatistics::from_inner(s.inner.path_statistics.clone());
 
-    /// Number of independent Monte Carlo estimators (antithetic pairs count once).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.num_paths")]
     num_paths -> usize = s.inner.num_paths;
 
-    /// Standard error of the clean price estimate (percentage of par).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.standard_error")]
     standard_error -> f64 = s.inner.standard_error;
 });
 
-/// Market calibration of a Merton Monte Carlo configuration.
-///
-/// Set on a configuration with :meth:`MertonMcConfig.calibration`. The
-/// ``merton_mc`` pricing model (``Bond.price(..., model="merton_mc")`` with
-/// the configuration in the bond's
-/// ``instrument_pricing_overrides.model_config.merton_mc_config``) first
-/// solves ``parameter`` by low-path bisection so the cash base-case price
-/// matches ``target``, then re-prices with full paths and reports the
-/// solved value as the ``calibrated_debt_barrier`` / ``calibrated_asset_vol``
-/// measures. ``Bond.price_merton_mc`` prices the configuration as given and
-/// does not calibrate.
-///
-/// Parameters
-/// ----------
-/// target : dict | str
-///     Market quote to match, as a ``BondQuoteInput`` dict or JSON string
-///     with one key: ``clean_price_pct`` (percent of par), ``ytm``,
-///     ``ytw``, ``z_spread``, ``discount_margin``, ``oas``, ``asw_market``
-///     ... Spreads and yields are decimals (``0.02`` = 200bp).
-/// parameter : str
-///     Structural parameter to solve for: ``"debt_barrier"`` or
-///     ``"asset_vol"``.
-/// low_paths : int, optional
-///     Independent MC estimators per calibration iteration; ``None`` uses
-///     the Rust default (2,000).
-/// max_iterations : int, optional
-///     Maximum bisection iterations; ``None`` uses the Rust default (40).
-/// tolerance_pv : float, optional
-///     Absolute tolerance on the PV residual, in currency units at the
-///     valuation date; ``None`` uses the Rust default (``1e-4``).
-/// bracket : tuple[float, float], optional
-///     ``(low, high)`` search bracket for ``parameter``; ``None``
-///     auto-brackets from the parameter type.
-/// seed : int, optional
-///     Seed override for the calibration run; ``None`` uses the pricing
-///     seed.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``target`` is not a ``BondQuoteInput`` or ``parameter`` is not a
-///     calibration parameter.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import MertonMcCalibrationSpec
-/// >>> spec = MertonMcCalibrationSpec({"z_spread": 0.03}, "asset_vol", low_paths=500)
-/// >>> spec.parameter, spec.low_paths, spec.max_iterations, spec.target
-/// ('asset_vol', 500, 40, {'z_spread': 0.03})
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec")]
 #[pyclass(
     name = "MertonMcCalibrationSpec",
     module = "finstack_quant.valuations.instruments",
@@ -491,18 +386,7 @@ pub(crate) struct PyMertonMcCalibrationSpec {
 
 #[pymethods]
 impl PyMertonMcCalibrationSpec {
-    /// Create a calibration specification; omitted settings take the Rust
-    /// ``MertonMcCalibrationSpec::default()`` values.
-    ///
-    /// # Arguments
-    ///
-    /// * `target` - Market quote to match (``BondQuoteInput`` dict or JSON).
-    /// * `parameter` - ``"debt_barrier"`` or ``"asset_vol"``.
-    /// * `low_paths` - Estimators per calibration iteration.
-    /// * `max_iterations` - Maximum bisection iterations.
-    /// * `tolerance_pv` - Absolute PV-residual tolerance in currency units.
-    /// * `bracket` - ``(low, high)`` search bracket for the parameter.
-    /// * `seed` - Seed override for the calibration run.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.__init__")]
     #[new]
     #[pyo3(signature = (target, parameter, low_paths=None, max_iterations=None, tolerance_pv=None, bracket=None, seed=None))]
     #[pyo3(
@@ -539,24 +423,13 @@ impl PyMertonMcCalibrationSpec {
         })
     }
 
-    /// Market quote to match as its ``BondQuoteInput`` dict (one key, e.g.
-    /// ``{"z_spread": 0.03}``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.target")]
     #[getter]
     fn target<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.target)
     }
 
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     ``MertonMcCalibrationSpec`` JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or carries unknown fields.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -565,29 +438,19 @@ impl PyMertonMcCalibrationSpec {
             .map_err(|e| crate::errors::serde_json_to_py(e, "invalid MertonMcCalibrationSpec JSON"))
     }
 
-    /// Serialize to the JSON shape ``from_json`` accepts.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Return every field as a plain ``dict`` (canonical serde shape).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the value cannot be serialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -606,47 +469,26 @@ impl PyMertonMcCalibrationSpec {
 }
 
 crate::bindings::macros::py_getters!(PyMertonMcCalibrationSpec |s| {
-    /// Structural parameter solved for: ``"debt_barrier"`` or ``"asset_vol"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.parameter")]
     parameter -> PyResult<String> = super::convert::enum_to_py_string(&s.inner.parameter);
 
-    /// Independent MC estimators per calibration iteration.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.low_paths")]
     low_paths -> usize = s.inner.low_paths;
 
-    /// Maximum bisection iterations.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.max_iterations")]
     max_iterations -> usize = s.inner.max_iterations;
 
-    /// Absolute tolerance on the PV residual, in currency units.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.tolerance_pv")]
     tolerance_pv -> f64 = s.inner.tolerance_pv;
 
-    /// ``(low, high)`` search bracket, or ``None`` to auto-bracket.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.bracket")]
     bracket -> Option<(f64, f64)> = s.inner.bracket;
 
-    /// Seed override for the calibration run, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.seed")]
     seed -> Option<u64> = s.inner.seed;
 });
 
-/// Configuration for Merton Monte Carlo PIK bond pricing.
-///
-/// Built from a structural ``MertonModel`` plus a flat recovery rate; every
-/// setter returns a new configuration (the receiver is unchanged), so calls
-/// chain: ``MertonMcConfig(model, 0.4).steps_per_year(24)``. The path count,
-/// antithetic flag and seed label come from the bond's
-/// ``instrument_pricing_overrides.model_config`` (``mc_paths``,
-/// ``mc_antithetic``, ``mc_seed_scenario``).
-///
-/// Parameters
-/// ----------
-/// merton : MertonModel
-///     Structural credit model driving asset dynamics and default.
-/// recovery_rate : float
-///     Recovery on default as a decimal fraction in ``[0.0, 1.0]``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``recovery_rate`` is outside ``[0.0, 1.0]``.
-/// RuntimeError
-///     If the embedded Monte Carlo defaults cannot be loaded.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig")]
 #[pyclass(
     name = "MertonMcConfig",
     module = "finstack_quant.valuations.instruments",
@@ -659,13 +501,7 @@ pub(crate) struct PyMertonMcConfig {
 
 #[pymethods]
 impl PyMertonMcConfig {
-    /// Create a Merton MC configuration with explicit recovery.
-    ///
-    /// # Arguments
-    ///
-    /// * `merton` - Structural credit model driving asset dynamics and default.
-    /// * `recovery_rate` - Recovery on default as a decimal fraction in
-    ///   ``[0.0, 1.0]``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.__init__")]
     #[new]
     #[pyo3(text_signature = "(merton, recovery_rate)")]
     fn new(merton: PyRef<'_, PyMertonModel>, recovery_rate: f64) -> PyResult<Self> {
@@ -674,11 +510,7 @@ impl PyMertonMcConfig {
         })
     }
 
-    /// Set the PIK schedule controlling per-coupon cash/PIK/toggle behavior.
-    ///
-    /// # Arguments
-    ///
-    /// * `s` - PIK schedule applied across coupon dates.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.pik_schedule")]
     #[pyo3(text_signature = "($self, s)")]
     fn pik_schedule(&self, s: PyRef<'_, PyPikSchedule>) -> Self {
         Self {
@@ -686,11 +518,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    /// Set the number of time steps simulated per year.
-    ///
-    /// # Arguments
-    ///
-    /// * `n` - Grid density for asset evolution and barrier monitoring.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.steps_per_year")]
     #[pyo3(text_signature = "($self, n)")]
     fn steps_per_year(&self, n: usize) -> Self {
         Self {
@@ -698,11 +526,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    /// Set the barrier-crossing policy for first-passage default monitoring.
-    ///
-    /// # Arguments
-    ///
-    /// * `p` - Discrete grid checks or Brownian-bridge continuous correction.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.barrier_crossing")]
     #[pyo3(text_signature = "($self, p)")]
     fn barrier_crossing(&self, p: PyRef<'_, PyBarrierCrossing>) -> Self {
         Self {
@@ -710,11 +534,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    /// Set the flat recovery rate used when no dynamic recovery model is configured.
-    ///
-    /// # Arguments
-    ///
-    /// * `r` - Recovery rate as a decimal in ``[0, 1]``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.recovery_rate")]
     #[pyo3(text_signature = "($self, r)")]
     fn recovery_rate(&self, r: f64) -> PyResult<Self> {
         Ok(Self {
@@ -722,11 +542,7 @@ impl PyMertonMcConfig {
         })
     }
 
-    /// Set an endogenous (leverage-dependent) hazard rate model.
-    ///
-    /// # Arguments
-    ///
-    /// * `h` - Endogenous hazard specification applied pathwise at default.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.endogenous_hazard")]
     #[pyo3(text_signature = "($self, h)")]
     fn endogenous_hazard(&self, h: PyRef<'_, PyEndogenousHazardSpec>) -> Self {
         Self {
@@ -734,11 +550,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    /// Set a dynamic (notional-dependent) recovery rate model.
-    ///
-    /// # Arguments
-    ///
-    /// * `r` - Dynamic recovery specification evaluated at accreted notional.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.dynamic_recovery")]
     #[pyo3(text_signature = "($self, r)")]
     fn dynamic_recovery(&self, r: PyRef<'_, PyDynamicRecoverySpec>) -> Self {
         Self {
@@ -746,14 +558,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    /// Set the toggle exercise model for PIK/cash coupon decisions.
-    ///
-    /// Active only on coupon dates where the PIK schedule resolves to
-    /// ``PikMode.toggle()``.
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Toggle exercise model deciding cash versus PIK at each toggle date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.toggle_model")]
     #[pyo3(text_signature = "($self, t)")]
     fn toggle_model(&self, t: PyRef<'_, PyToggleExerciseModel>) -> Self {
         Self {
@@ -761,18 +566,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    /// Set the market-calibration specification.
-    ///
-    /// Honoured by the ``merton_mc`` pricing model (``Bond.price(...,
-    /// model="merton_mc")`` with this configuration in the bond's
-    /// ``instrument_pricing_overrides.model_config.merton_mc_config``), which
-    /// solves the structural parameter to the target quote before the
-    /// full-path price. ``Bond.price_merton_mc`` prices the configuration as
-    /// given and does not calibrate.
-    ///
-    /// # Arguments
-    ///
-    /// * `spec` - Calibration target, solved parameter and solver settings.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.calibration")]
     #[pyo3(text_signature = "($self, spec)")]
     fn calibration(&self, spec: PyRef<'_, PyMertonMcCalibrationSpec>) -> Self {
         Self {
@@ -780,17 +574,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    /// Set term-structure discount factors for cashflow discounting.
-    ///
-    /// When set, cashflows are discounted by log-linear interpolation of
-    /// these factors instead of the flat ``discount_rate``; the flat rate
-    /// still drives the risk-neutral asset drift. The ``merton_mc`` pricing
-    /// model fills them from the discount curve when they are not set.
-    ///
-    /// # Arguments
-    ///
-    /// * `dfs` - ``(year_fraction, discount_factor)`` pairs sorted by time,
-    ///   with year fractions measured from the valuation date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.cashflow_dfs")]
     #[pyo3(text_signature = "($self, dfs)")]
     fn cashflow_dfs(&self, dfs: Vec<(f64, f64)>) -> Self {
         Self {
@@ -798,31 +582,13 @@ impl PyMertonMcConfig {
         }
     }
 
-    /// Return every configuration field as a plain ``dict`` (canonical serde
-    /// shape: ``merton``, ``pik_schedule``, ``steps_per_year``,
-    /// ``barrier_crossing``, ``recovery_rate``, ``calibration``,
-    /// ``cashflow_dfs``, ...).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the configuration cannot be serialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    /// Deserialize a Merton MC configuration from canonical JSON.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     JSON produced by ``to_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed or carries unknown fields.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -832,7 +598,7 @@ impl PyMertonMcConfig {
         })
     }
 
-    /// Serialize this configuration to compact JSON.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
@@ -860,7 +626,7 @@ impl PyMertonMcConfig {
         )
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)

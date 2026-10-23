@@ -62,7 +62,7 @@ macro_rules! convention_record_methods {
                 serde_to_py(py, &self.inner)
             }
 
-            /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+            #[doc = pydoc!("finstack_quant.valuations.market", concat!($name, ".__reduce__"))]
             fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
                 let from_json = py.get_type::<Self>().getattr("from_json")?;
                 crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)

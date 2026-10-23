@@ -1286,6 +1286,21 @@ class Bond:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
+        """
+        ...
+
 class BondBuilder:
     """
     Fluent builder for :class:`Bond`; wraps the Rust ``FinancialBuilder``
@@ -1826,6 +1841,21 @@ class BarrierCrossing:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class MertonMcCalibrationSpec:
     """
     Market calibration of a Merton Monte Carlo configuration.
@@ -1839,6 +1869,37 @@ class MertonMcCalibrationSpec:
     value as the ``calibrated_debt_barrier`` / ``calibrated_asset_vol``
     measures. ``Bond.price_merton_mc`` prices the configuration as given and
     does not calibrate.
+
+    Parameters
+    ----------
+    target : dict[str, float] | str
+        Market quote to match, as a ``BondQuoteInput`` dict or JSON string
+        with one key: ``clean_price_pct`` (percent of par),
+        ``dirty_price_currency``, ``ytm``, ``ytw``, ``z_spread``,
+        ``discount_margin``, ``oas``, ``asw_market`` ... Spreads and
+        yields are decimals (``0.02`` = 200bp).
+    parameter : {"debt_barrier", "asset_vol"}
+        Structural parameter solved for.
+    low_paths : int, optional
+        Independent MC estimators per calibration iteration; ``None`` uses
+        the Rust default (2,000).
+    max_iterations : int, optional
+        Maximum bisection iterations; ``None`` uses the Rust default (40).
+    tolerance_pv : float, optional
+        Absolute tolerance on the PV residual in currency units at the
+        valuation date; ``None`` uses the Rust default (``1e-4``).
+    bracket : tuple[float, float], optional
+        ``(low, high)`` search bracket for ``parameter``; ``None``
+        auto-brackets from the parameter type.
+    seed : int, optional
+        Seed override for the calibration run; ``None`` uses the pricing
+        seed.
+
+    Raises
+    ------
+    ValueError
+        If ``target`` is not a ``BondQuoteInput`` or ``parameter`` is not
+        ``"debt_barrier"`` or ``"asset_vol"``.
 
     Examples
     --------
@@ -2402,6 +2463,21 @@ class MertonMcConfig:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class MertonMcResult:
     """
     Result from Merton Monte Carlo PIK bond pricing.
@@ -2954,6 +3030,21 @@ class PikMode:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class PikSchedule:
     """
     Time-varying PIK schedule for the Merton Monte Carlo engine.
@@ -3095,6 +3186,21 @@ class PikSchedule:
         -------
         str
             ``PikSchedule.uniform(PikMode.pik())`` text.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 
@@ -3782,6 +3888,21 @@ class TermLoan:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
         """
         ...
 
@@ -4727,6 +4848,21 @@ class FixedLegSpec:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class FloatLegSpec:
     """
     Floating leg of an interest-rate swap.
@@ -5160,6 +5296,21 @@ class FloatLegSpec:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class PremiumLegSpec:
     """
     Premium (fixed coupon) leg of a CDS or CDS index.
@@ -5202,98 +5353,98 @@ class PremiumLegSpec:
         calendar_id: str | None = None,
     ) -> None:
         """
-            Create a premium leg.
+        Create a premium leg.
 
-            Parameters
-            ----------
-            start : datetime.date | datetime.datetime | pd.Timestamp | str
-                Start date of protection / premium accrual (ISO strings accepted).
-            end : datetime.date | datetime.datetime | pd.Timestamp | str
-                End date of protection / premium accrual.
-            frequency : Tenor
-                Payment frequency.
-            day_count : DayCount
-                Day count convention for accrual.
-            coupon_bp : float | Bps
-                Contractual running coupon in basis points (``100.0`` = 100bp = 1%).
-            discount_curve_id : str
-                Discount curve identifier for pricing this leg.
-            roll_rule : RollRule
-                ``RollRule.CDS_IMM`` for the prescribed quarterly CDS 20th dates
-                (requires quarterly frequency and a short-front stub at pricing).
-                ``RollRule.NONE`` generates a bespoke schedule from ``frequency``
-                and ``stub``. ``RollRule.IMM`` is rejected at pricing.
-            stub : StubKind | str, default "short_front"
-                Stub period handling rule.
-            business_day_convention : str, default "modified_following"
-                Business day convention for payment dates.
-            calendar_id : str, optional
-                Calendar used for business day adjustments.
+        Parameters
+        ----------
+        start : datetime.date | datetime.datetime | pd.Timestamp | str
+            Start date of protection / premium accrual (ISO strings accepted).
+        end : datetime.date | datetime.datetime | pd.Timestamp | str
+            End date of protection / premium accrual.
+        frequency : Tenor
+            Payment frequency.
+        day_count : DayCount
+            Day count convention for accrual.
+        coupon_bp : float | Bps
+            Contractual running coupon in basis points (``100.0`` = 100bp = 1%).
+        discount_curve_id : str
+            Discount curve identifier for pricing this leg.
+        roll_rule : RollRule
+            ``RollRule.CDS_IMM`` for the prescribed quarterly CDS 20th dates
+            (requires quarterly frequency and a short-front stub at pricing).
+            ``RollRule.NONE`` generates a bespoke schedule from ``frequency``
+            and ``stub``. ``RollRule.IMM`` is rejected at pricing.
+        stub : StubKind | str, default "short_front"
+            Stub period handling rule.
+        business_day_convention : str, default "modified_following"
+            Business day convention for payment dates.
+        calendar_id : str, optional
+            Calendar used for business day adjustments.
 
-            Raises
-            ------
-            ValueError
-                If an enum value is invalid or ``coupon_bp`` is not finite.
-            TypeError
-                If ``coupon_bp`` is neither a number nor a ``Bps`` or a date
-                cannot be interpreted.
+        Raises
+        ------
+        ValueError
+            If an enum value is invalid or ``coupon_bp`` is not finite.
+        TypeError
+            If ``coupon_bp`` is neither a number nor a ``Bps`` or a date
+            cannot be interpreted.
 
-            Examples
-            --------
-            >>> from finstack_quant.cashflows.builder import RollRule
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import RollRule
         >>> from finstack_quant.core.dates import DayCount, Tenor
-            >>> from finstack_quant.valuations.instruments import PremiumLegSpec
-            >>> leg = PremiumLegSpec(
-            ...     "2024-03-20",
-            ...     "2029-06-20",
-            ...     Tenor.quarterly(),
-            ...     DayCount.ACT_360,
-            ...     100.0,
-            ...     "USD-OIS",
-            ...     roll_rule=RollRule.CDS_IMM,
-            ... )
-            >>> leg.discount_curve_id
-            'USD-OIS'
+        >>> from finstack_quant.valuations.instruments import PremiumLegSpec
+        >>> leg = PremiumLegSpec(
+        ...     "2024-03-20",
+        ...     "2029-06-20",
+        ...     Tenor.quarterly(),
+        ...     DayCount.ACT_360,
+        ...     100.0,
+        ...     "USD-OIS",
+        ...     roll_rule=RollRule.CDS_IMM,
+        ... )
+        >>> leg.discount_curve_id
+        'USD-OIS'
         """
         ...
 
     @classmethod
     def from_json(cls, json: str) -> PremiumLegSpec:
         """
-            Deserialize a premium-leg spec from its serde JSON object.
+        Deserialize a premium-leg spec from its serde JSON object.
 
-            Parameters
-            ----------
-            json : str
-                JSON object with the same fields as the Rust ``PremiumLegSpec`` (the value
-                ``PremiumLegSpec.to_json`` returns).
+        Parameters
+        ----------
+        json : str
+            JSON object with the same fields as the Rust ``PremiumLegSpec`` (the value
+            ``PremiumLegSpec.to_json`` returns).
 
-            Returns
-            -------
-            PremiumLegSpec
-                The validated leg.
+        Returns
+        -------
+        PremiumLegSpec
+            The validated leg.
 
-            Raises
-            ------
-            ValueError
-                If the JSON is malformed, has unknown fields, or fails validation.
+        Raises
+        ------
+        ValueError
+            If the JSON is malformed, has unknown fields, or fails validation.
 
-            Examples
-            --------
-            >>> from finstack_quant.cashflows.builder import RollRule
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import RollRule
         >>> from finstack_quant.core.dates import DayCount, Tenor
-            >>> from finstack_quant.valuations.instruments import PremiumLegSpec
-            >>> leg = PremiumLegSpec(
-            ...     "2024-03-20",
-            ...     "2029-06-20",
-            ...     Tenor.quarterly(),
-            ...     DayCount.ACT_360,
-            ...     100.0,
-            ...     "USD-OIS",
-            ...     roll_rule=RollRule.CDS_IMM,
-            ... )
-            >>> PremiumLegSpec.from_json(leg.to_json()).coupon_bp
-            100.0
+        >>> from finstack_quant.valuations.instruments import PremiumLegSpec
+        >>> leg = PremiumLegSpec(
+        ...     "2024-03-20",
+        ...     "2029-06-20",
+        ...     Tenor.quarterly(),
+        ...     DayCount.ACT_360,
+        ...     100.0,
+        ...     "USD-OIS",
+        ...     roll_rule=RollRule.CDS_IMM,
+        ... )
+        >>> PremiumLegSpec.from_json(leg.to_json()).coupon_bp
+        100.0
         """
         ...
     def to_json(self) -> str:
@@ -5493,6 +5644,21 @@ class PremiumLegSpec:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class ProtectionLegSpec:
     """
     Protection (default-contingent) leg of a CDS or CDS index.
@@ -5658,6 +5824,21 @@ class ProtectionLegSpec:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 
@@ -6204,6 +6385,21 @@ class InterestRateSwap:
         Notes
         -----
         This accessor does not raise. Payment-date adjustment remains independent.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
         """
         ...
 
@@ -7091,6 +7287,21 @@ class Swaption:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
         """
         ...
 
@@ -8138,6 +8349,21 @@ class CapFloor:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
         """
         ...
 
@@ -9313,6 +9539,21 @@ class CreditDefaultSwap:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
+        """
+        ...
+
 class CreditDefaultSwapBuilder:
     """
     Fluent builder for :class:`CreditDefaultSwap`; wraps the Rust
@@ -10358,6 +10599,21 @@ class CdsOption:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
         """
         ...
 
@@ -11665,6 +11921,21 @@ class CdsIndex:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
+        """
+        ...
+
 class CdsIndexBuilder:
     """
     Fluent builder for :class:`CdsIndex`; wraps the Rust ``FinancialBuilder``
@@ -12849,6 +13120,21 @@ class CdsTranche:
         Notes
         -----
         This method does not raise; it renders stored values.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
         """
         ...
 
@@ -14174,6 +14460,21 @@ class ConvertibleBond:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
+        """
+        ...
+
 class ConvertibleBondBuilder:
     """
     Fluent builder for :class:`ConvertibleBond`; wraps the Rust
@@ -15342,6 +15643,21 @@ class FxForward:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
+        """
+        ...
+
 class FxForwardBuilder:
     """
     Fluent builder for :class:`FxForward`; wraps the Rust ``FinancialBuilder``
@@ -16374,6 +16690,21 @@ class FxOption:
         Notes
         -----
         This method does not raise; it renders stored values.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
         """
         ...
 
@@ -17526,6 +17857,21 @@ class EquityOption:
         Notes
         -----
         This method does not raise; it renders stored values.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
         """
         ...
 
@@ -25209,6 +25555,21 @@ class StandardDealParams:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class StructuredCredit:
     """
     Structured-credit deal (ABS/CLO/CMBS/RMBS) with pool, tranches, and waterfall.
@@ -26508,6 +26869,21 @@ class StructuredCredit:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical instrument JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored instrument fails.
         """
         ...
 
@@ -32439,6 +32815,21 @@ class SimulationRun:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class SimulationDiagnostics:
     """
     Deal-level accounting of one deterministic simulation
@@ -32947,6 +33338,21 @@ class OasResult:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class TrancheMetrics:
     """
     Per-tranche valuation, yield, spread and risk metrics
@@ -33429,6 +33835,21 @@ class TrancheMetrics:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class ScenarioTable:
     """
     Scenario/yield table for a single structured-credit tranche
@@ -33554,6 +33975,21 @@ class ScenarioTable:
         ------
         ValueError
             If the result cannot be serialized into a pandas object.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 
@@ -34330,6 +34766,21 @@ class CdsIndexConstituent:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class CdsTrancheParams:
     """
     Economic terms of an index tranche (typed wrapper for the Rust
@@ -34857,6 +35308,21 @@ class ConversionSpec:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class CallPutSchedule:
     """
     Issuer call and holder put windows (typed wrapper for the Rust
@@ -34989,6 +35455,21 @@ class CallPutSchedule:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class MetricPricingOverrides:
     """
     Metric-time pricing overrides merged into an instrument before pricing.
@@ -34998,6 +35479,40 @@ class MetricPricingOverrides:
     :func:`validate_instrument_json`. Every field mirrors the Rust
     ``MetricPricingOverrides`` struct; omitted fields keep the instrument's
     own overrides. Instances are immutable and compare by value.
+
+    Parameters
+    ----------
+    bump_config : dict[str, Any], optional
+        Finite-difference bump sizes: ``spot_bump_decimal`` (``0.01`` = 1%),
+        ``vol_bump_decimal`` (absolute vol, ``0.01`` = 1 vol point),
+        ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_bp`` (basis
+        points) and ``adaptive_bumps`` (bool). ``None`` keeps the defaults.
+    theta_period : Tenor | str, optional
+        Theta / carry horizon as a ``Tenor`` or tenor string (``"1D"``,
+        ``"1W"``, ``"1M"``, ``"3M"``); day and week tenors roll fixed days,
+        month and year tenors roll calendar months. The default horizon is
+        one day. The JSON form is ``{"count": 1, "unit": "weeks"}``.
+    breakeven_config : dict[str, Any], optional
+        Breakeven solve configuration such as
+        ``{"target": "z_spread", "mode": "linear"}``.
+    bond_risk_basis : {"bullet_discountable", "callable_oas"}, optional
+        Basis for bond duration/convexity/DV01: Bloomberg-style workout
+        risk (default) or callable OAS repricing.
+    theta_day_basis : {"calendar_365", "trading_252"}, optional
+        Day basis for per-day analytic option theta (EquityOption,
+        FxOption, FxDigitalOption): annual theta / 365 (default) or / 252.
+    var_config : dict[str, Any], optional
+        Historical VaR / expected-shortfall configuration override
+        (confidence level, horizon, decay).
+
+    Raises
+    ------
+    ValueError
+        If a sub-document is malformed, ``bond_risk_basis`` or
+        ``theta_day_basis`` is not one of the accepted names, or
+        ``theta_period`` is not a valid positive tenor.
+    TypeError
+        If ``theta_period`` is neither a ``Tenor`` nor a string.
 
     Examples
     --------
@@ -35242,6 +35757,21 @@ class MetricPricingOverrides:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class MarketHistory:
     """
     Historical market shifts for historical VaR / expected shortfall.
@@ -35251,6 +35781,34 @@ class MarketHistory:
     list of risk-factor shifts relative to the base market; the ``"hvar"``
     and ``"expected_shortfall"`` metrics revalue the instrument under every
     scenario.
+
+    All three constructor arguments are required; ``window_days=0`` and
+    ``scenarios=[]`` represent an empty history.
+
+    Parameters
+    ----------
+    base_date : datetime.date | datetime.datetime | pd.Timestamp | str
+        Reference date of the base market the shifts are relative to.
+    window_days : int
+        Length of the historical lookback window in calendar days.
+    scenarios : list[dict[str, Any]]
+        Chronological scenarios, each ``{"date": "YYYY-MM-DD", "shifts":
+        [{"factor": {...}, "shift": float}, ...]}``. ``factor`` is a
+        tagged risk factor: ``{"type": "discount_rate" | "forward_rate" |
+        "credit_spread", "curve_id": str, "tenor_years": float}``,
+        ``{"type": "equity_spot", "ticker": str}``, ``{"type": "fx_spot",
+        "base": "EUR", "quote": "USD"}`` or ``{"type": "implied_vol",
+        "vol_surface_id": str, "expiry_years": float, "strike": float}``.
+        Rate and spread shifts are decimal (``0.0015`` = 15bp); spot
+        shifts are relative (``-0.025`` = -2.5%); vol shifts are absolute
+        vol points.
+
+    Raises
+    ------
+    ValueError
+        If a scenario document is malformed or carries unknown fields.
+    TypeError
+        If ``base_date`` is not a date-like value.
 
     Examples
     --------
@@ -35488,6 +36046,21 @@ class MarketHistory:
         -------
         str
             ``MarketHistory(base_date=2024-01-01, window_days=2, scenarios=<2 items>)`` text.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 
@@ -35879,6 +36452,21 @@ class InstrumentCashflowEnvelope:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 def calculate_var(
     instruments: list[Any],
     market: MarketContext | str,
@@ -36120,5 +36708,20 @@ class VarResult:
         ------
         ValueError
             If the result cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
