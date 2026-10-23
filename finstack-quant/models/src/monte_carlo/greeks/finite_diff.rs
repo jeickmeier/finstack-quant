@@ -257,8 +257,7 @@ where
 {
     if inputs.process.dim() != 1 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "finite_diff_delta_from_inputs requires a 1D spot process (process.dim() == 1, got {}); \
-             use finite_diff_delta_state for multi-dimensional processes",
+            "finite_diff_delta_from_inputs requires a 1D spot process (process.dim() == 1, got {})",
             inputs.process.dim()
         )));
     }
@@ -321,8 +320,7 @@ where
 {
     if inputs.process.dim() != 1 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "finite_diff_gamma_from_inputs requires a 1D spot process (process.dim() == 1, got {}); \
-             use finite_diff_gamma_state for multi-dimensional processes",
+            "finite_diff_gamma_from_inputs requires a 1D spot process (process.dim() == 1, got {})",
             inputs.process.dim()
         )));
     }
