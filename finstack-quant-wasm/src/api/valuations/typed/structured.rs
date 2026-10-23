@@ -6,7 +6,7 @@
 //!
 //! The tranche analytics mirror the Python `StructuredCredit` metric methods —
 //! discount margin, OAS, break-even CDR and the scenario table — as free
-//! functions that parse the canonical envelope and dispatch to the typed
+//! functions that borrow a typed deal handle and dispatch to the typed
 //! structured-credit domain API. The OAS, metrics, and scenario-table entry
 //! points return structured JavaScript objects with the same snake_case fields
 //! Python exposes through its `OasResult` / `TrancheMetrics` / `ScenarioTable`
@@ -27,11 +27,6 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
-fn parse_structured_credit(instrument_json: &str) -> Result<StructuredCredit, JsValue> {
-    finstack_quant_valuations::pricer::parse_typed_instrument_json(instrument_json)
-        .map_err(to_js_err)
-}
-
 /// Decode a JSON host argument into its typed Rust input.
 fn parse_json_arg<T: serde::de::DeserializeOwned>(json: &str, label: &str) -> Result<T, JsValue> {
     serde_json::from_str(json).map_err(|e| {
@@ -49,7 +44,7 @@ fn parse_json_arg<T: serde::de::DeserializeOwned>(json: &str, label: &str) -> Re
 /// is zero at the model price, negative for a richer (higher)
 /// `marketPricePct`, and positive for a cheaper (lower) `marketPricePct`; it is
 /// not the contractual quoted margin.
-/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
 /// @param tranche_id - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
 /// @param market_json - Canonical market-context JSON supplying the discount curve and any forward curves or historical fixings required for cashflow projection.
 /// @param as_of - ISO-8601 valuation date used for projection and discounting.
@@ -58,19 +53,17 @@ fn parse_json_arg<T: serde::de::DeserializeOwned>(json: &str, label: &str) -> Re
 /// @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, market_price_pct is not finite and positive, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
 #[wasm_bindgen(js_name = trancheDiscountMargin)]
 pub fn tranche_discount_margin(
-    instrument_json: JsValue,
+    deal: &JsStructuredCredit,
     tranche_id: JsValue,
     market_json: JsValue,
     as_of: JsValue,
     market_price_pct: JsValue,
 ) -> Result<f64, JsValue> {
     let market_price_pct = js_f64(&market_price_pct, "marketPricePct")?;
-    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
-    sc::tranche_discount_margin(&deal, tranche_id, &market, as_of, market_price_pct)
+    sc::tranche_discount_margin(&deal.inner, tranche_id, &market, as_of, market_price_pct)
         .map_err(to_js_err)
 }
 
@@ -79,27 +72,24 @@ pub fn tranche_discount_margin(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the instrument or market JSON is
-/// malformed; the instrument fails pricing validation or is not a
-/// structured-credit deal; `as_of` is invalid; the tranche or required market
+/// Throws a JavaScript exception if the market JSON is
+/// malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market
 /// data is missing; or the break-even calculation fails.
-/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 #[wasm_bindgen(js_name = trancheBreakevenCdr)]
 pub fn tranche_breakeven_cdr(
-    instrument_json: JsValue,
+    deal: &JsStructuredCredit,
     tranche_id: JsValue,
     market_json: JsValue,
     as_of: JsValue,
 ) -> Result<f64, JsValue> {
-    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
-    sc::tranche_breakeven_cdr(&deal, tranche_id, &market, as_of).map_err(to_js_err)
+    sc::tranche_breakeven_cdr(&deal.inner, tranche_id, &market, as_of).map_err(to_js_err)
 }
 
 /// Option-adjusted spread for a tranche; returns a typed `OasResult` object.
@@ -117,12 +107,12 @@ pub fn tranche_breakeven_cdr(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the instrument, market, or optional
+/// Throws a JavaScript exception if the market or optional
 /// configuration JSON is malformed; the instrument fails pricing validation;
 /// `as_of` is invalid; the tranche or discount curve is missing; the OAS solve
 /// fails or produces a non-finite result; or the result cannot be converted to
 /// a JavaScript value.
-/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -130,7 +120,7 @@ pub fn tranche_breakeven_cdr(
 /// @param config_json - Optional OasConfig JSON; omit to use the default OAS solver configuration.
 #[wasm_bindgen(js_name = trancheOas)]
 pub fn tranche_oas(
-    instrument_json: JsValue,
+    deal: &JsStructuredCredit,
     tranche_id: JsValue,
     market_json: JsValue,
     as_of: JsValue,
@@ -138,18 +128,23 @@ pub fn tranche_oas(
     config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let market_price_pct = js_f64(&market_price_pct, "marketPricePct")?;
-    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
     let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
-    let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
     let config: OasConfig = match config_json.as_deref() {
         Some(json) => parse_json_arg(json, "OAS config")?,
         None => OasConfig::default(),
     };
-    let result = sc::tranche_oas(&deal, tranche_id, &market, as_of, market_price_pct, &config)
-        .map_err(to_js_err)?;
+    let result = sc::tranche_oas(
+        &deal.inner,
+        tranche_id,
+        &market,
+        as_of,
+        market_price_pct,
+        &config,
+    )
+    .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -165,33 +160,31 @@ pub fn tranche_oas(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the instrument, market, or scenario-grid
+/// Throws a JavaScript exception if the market or scenario-grid
 /// JSON is malformed; the instrument fails pricing validation; `as_of` is
 /// invalid; the tranche or required market data is missing; a scenario fails
 /// or produces a non-finite result; or the table cannot be converted to a
 /// JavaScript value.
-/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param grid_json - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
 #[wasm_bindgen(js_name = trancheScenarioTable)]
 pub fn tranche_scenario_table(
-    instrument_json: JsValue,
+    deal: &JsStructuredCredit,
     tranche_id: JsValue,
     market_json: JsValue,
     as_of: JsValue,
     grid_json: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
     let grid_json: &str = &json_text(&grid_json, "gridJson")?;
-    let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
     let grid: ScenarioGrid = parse_json_arg(grid_json, "scenario grid")?;
-    let result =
-        sc::tranche_scenario_table(&deal, tranche_id, &market, as_of, &grid).map_err(to_js_err)?;
+    let result = sc::tranche_scenario_table(&deal.inner, tranche_id, &market, as_of, &grid)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -214,12 +207,12 @@ pub fn tranche_scenario_table(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the instrument or market JSON is
+/// Throws a JavaScript exception if the market JSON is
 /// malformed; a metric id is unknown; the instrument fails pricing
 /// validation; `as_of` is invalid; the tranche or discount curve is missing;
 /// a metric fails or is non-finite; or the result cannot be converted to a
 /// JavaScript value.
-/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -227,7 +220,7 @@ pub fn tranche_scenario_table(
 /// @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.
 #[wasm_bindgen(js_name = trancheMetrics)]
 pub fn tranche_metrics(
-    instrument_json: JsValue,
+    deal: &JsStructuredCredit,
     tranche_id: JsValue,
     market_json: JsValue,
     as_of: JsValue,
@@ -241,13 +234,11 @@ pub fn tranche_metrics(
         .map(|id| finstack_quant_valuations::metrics::MetricId::parse_strict(id))
         .collect::<finstack_quant_core::Result<Vec<_>>>()
         .map_err(to_js_err)?;
-    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
     let result = sc::tranche_metrics(
-        &deal,
+        &deal.inner,
         tranche_id,
         &market,
         as_of,

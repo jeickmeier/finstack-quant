@@ -23175,7 +23175,7 @@ export interface ValuationInstrumentsNamespace {
    * is zero at the model price, negative for a richer (higher)
    * `marketPricePct`, and positive for a cheaper (lower) `marketPricePct`; it is
    * not the contractual quoted margin.
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
    * @param marketJson - Canonical market-context JSON supplying the discount curve and any forward curves or historical fixings required for cashflow projection.
    * @param asOf - ISO-8601 valuation date used for projection and discounting.
@@ -23184,7 +23184,7 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, market_price_pct is not finite and positive, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
    */
   trancheDiscountMargin(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string,
@@ -23194,14 +23194,14 @@ export interface ValuationInstrumentsNamespace {
    * Break-even constant default rate (CDR, decimal) for a tranche — the highest
    * CDR at which the tranche takes no principal writedown.
    * @returns Break-even constant default rate as a decimal, such as `0.02` for 2% CDR.
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; the instrument fails pricing validation or is not a structured-credit deal; `as_of` is invalid; the tranche or required market data is missing; or the break-even calculation fails.
+   * @throws Error - Throws a JavaScript exception if the market JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; or the break-even calculation fails.
    */
   trancheBreakevenCdr(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string
@@ -23216,16 +23216,16 @@ export interface ValuationInstrumentsNamespace {
    * `marketPricePct` is the clean settlement quote as a percentage of CURRENT balance.
    * `config`, when present, is a JSON `OasConfig`; the default is used otherwise.
    * @returns Typed `OasResult` object for the tranche.
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param marketPricePct - Clean settlement quote as a percentage of CURRENT balance; accrued interest is added once.
    * @param config - Optional OasConfig JSON; omit to use the default OAS solver configuration.
-   * @throws Error - Throws a JavaScript exception if the instrument, market, or optional configuration JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; the OAS solve fails or produces a non-finite result; or the result cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if the market or optional configuration JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; the OAS solve fails or produces a non-finite result; or the result cannot be converted to a JavaScript value.
    */
   trancheOas(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string,
@@ -23241,15 +23241,15 @@ export interface ValuationInstrumentsNamespace {
    * Python exposes through its typed `ScenarioTable` wrapper. Pass it to
    * `JSON.stringify` if a wire string is needed.
    * @returns Typed `ScenarioTable` object over the CPR/CDR/severity grid.
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
-   * @throws Error - Throws a JavaScript exception if the instrument, market, or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if the market or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.
    */
   trancheScenarioTable(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string,
@@ -23268,16 +23268,16 @@ export interface ValuationInstrumentsNamespace {
    * Python exposes through its typed `TrancheMetrics` wrapper. Pass it to
    * `JSON.stringify` if a wire string is needed.
    * @returns Typed `TrancheMetrics` object (PV, clean/dirty price, accrued, WAL, yield, z-spread, CS01, effective duration and convexity, requested registry metrics).
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param marketPricePct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.
    * @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; a metric id is unknown; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if the market JSON is malformed; a metric id is unknown; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
    */
   trancheMetrics(
-    instrumentJson: JsonInput,
+    deal: StructuredCredit,
     trancheId: string,
     marketJson: JsonInput,
     asOf: string,

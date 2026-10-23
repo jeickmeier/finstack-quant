@@ -49,16 +49,22 @@ it("matches direct native cells for original and factor-adjusted tranches on cur
         .digest("hex"),
     ).toBe(hash);
   const market = readFileSync(resolve(root, fixture.marketSource), "utf8");
-  for (const c of fixture.cases)
-    expect(
-      native.trancheScenarioTable(
-        JSON.stringify(c.instrument),
-        fixture.trancheId,
-        market,
-        fixture.asOf,
-        JSON.stringify(fixture.grid),
-      ),
-    ).toEqual(c.table);
+  for (const c of fixture.cases) {
+    const deal = native.StructuredCredit.fromJson(JSON.stringify(c.instrument));
+    try {
+      expect(
+        native.trancheScenarioTable(
+          deal,
+          fixture.trancheId,
+          market,
+          fixture.asOf,
+          JSON.stringify(fixture.grid),
+        ),
+      ).toEqual(c.table);
+    } finally {
+      deal.free();
+    }
+  }
   const adjusted =
     fixture.cases[1]!.instrument.instrument.spec.tranches.tranches[0]!;
   expect(adjusted.current_balance.amount).toBe("50000000");
