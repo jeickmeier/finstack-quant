@@ -10,8 +10,8 @@ mod rolling;
 mod tail_risk;
 
 pub(crate) use return_based::{
-    cagr, downside_deviation, gain_to_pain, geometric_mean, invalid_annualization_factor,
-    mean_return, mean_vol_annualized, modified_sharpe, omega_ratio,
+    cagr, downside_deviation, gain_to_pain, geometric_mean, mean_return, mean_vol_annualized,
+    modified_sharpe, omega_ratio,
 };
 pub use return_based::{max_drawdown, sharpe, sortino, volatility, CagrDayCount};
 pub(crate) use rolling::{rolling_returns, rolling_sharpe, rolling_sortino, rolling_volatility};

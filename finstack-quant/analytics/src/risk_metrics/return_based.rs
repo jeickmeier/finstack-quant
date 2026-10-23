@@ -12,11 +12,13 @@ use finstack_quant_core::math::summation::kahan_sum;
 
 use super::tail_risk::cornish_fisher_var;
 
-/// True when annualization is requested but `ann_factor` is not a positive finite
-/// periods-per-year count (e.g. zero, negative, NaN, or infinity).
+/// True when `ann_factor` is not a positive finite periods-per-year count
+/// (e.g. zero, negative, NaN, or infinity). Guards the caller-supplied
+/// `periods_per_year` of the public `sharpe` (via `mean_vol_annualized`),
+/// `sortino` and `volatility`.
 #[inline]
-pub(crate) fn invalid_annualization_factor(annualize: bool, ann_factor: f64) -> bool {
-    annualize && (!ann_factor.is_finite() || ann_factor <= 0.0)
+fn invalid_annualization_factor(ann_factor: f64) -> bool {
+    !ann_factor.is_finite() || ann_factor <= 0.0
 }
 
 /// Day-count convention for CAGR annualization over explicit calendar dates.
@@ -178,13 +180,9 @@ fn annualized_years(
 /// # Returns
 ///
 /// Arithmetic mean return, annualized if requested. Returns `0.0` for an
-/// empty slice. When `annualize` is `true`, returns [`f64::NAN`] if `ann_factor`
-/// is not finite or is `<= 0`.
+/// empty slice.
 #[must_use]
 pub(crate) fn mean_return(returns: &[f64], annualize: bool, ann_factor: f64) -> f64 {
-    if invalid_annualization_factor(annualize, ann_factor) {
-        return f64::NAN;
-    }
     let m = mean(returns);
     if annualize {
         m * ann_factor
@@ -196,7 +194,7 @@ pub(crate) fn mean_return(returns: &[f64], annualize: bool, ann_factor: f64) -> 
 /// Annualized mean and volatility from one Welford pass.
 ///
 /// Equivalent to `(mean_return(returns, true, ann_factor),
-/// volatility(returns, true, ann_factor))` but walks the slice once instead
+/// volatility(returns, ann_factor))` but walks the slice once instead
 /// of twice. Used by callers (e.g. Sharpe / M²) that need both.
 ///
 /// # Arguments
@@ -206,11 +204,12 @@ pub(crate) fn mean_return(returns: &[f64], annualize: bool, ann_factor: f64) -> 
 ///
 /// # Returns
 ///
-/// `(annualized_mean, annualized_volatility)`. Returns `(NaN, NaN)` for the
-/// same invalid annualization-factor cases as the individual functions.
+/// `(annualized_mean, annualized_volatility)`. Returns `(NaN, NaN)` when
+/// `ann_factor` is not a positive finite number (reachable from the public
+/// `sharpe`).
 #[must_use]
 pub(crate) fn mean_vol_annualized(returns: &[f64], ann_factor: f64) -> (f64, f64) {
-    if invalid_annualization_factor(true, ann_factor) {
+    if invalid_annualization_factor(ann_factor) {
         return (f64::NAN, f64::NAN);
     }
     let (m, var) = mean_var(returns);
@@ -235,7 +234,7 @@ pub(crate) fn mean_vol_annualized(returns: &[f64], ann_factor: f64) -> (f64, f64
 /// and `NaN` when `periods_per_year` is not a positive finite number.
 #[must_use]
 pub fn volatility(returns: &[f64], periods_per_year: f64) -> f64 {
-    if invalid_annualization_factor(true, periods_per_year) {
+    if invalid_annualization_factor(periods_per_year) {
         return f64::NAN;
     }
     variance(returns).sqrt() * periods_per_year.sqrt()
@@ -325,8 +324,8 @@ pub fn max_drawdown(returns: &[f64]) -> f64 {
 /// # Returns
 ///
 /// The downside deviation (non-negative). Returns `0.0` for an empty
-/// slice or when no returns fall below `mar`. When `annualize` is `true`,
-/// returns [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
+/// slice or when no returns fall below `mar`, and [`f64::NAN`] when `mar`
+/// or any return is non-finite.
 ///
 /// # References
 ///
@@ -340,9 +339,6 @@ pub(crate) fn downside_deviation(
 ) -> f64 {
     if returns.is_empty() {
         return 0.0;
-    }
-    if invalid_annualization_factor(annualize, ann_factor) {
-        return f64::NAN;
     }
     if !mar.is_finite() || returns.iter().any(|r| !r.is_finite()) {
         return f64::NAN;
@@ -391,7 +387,7 @@ pub(crate) fn downside_deviation(
 /// - Sortino & van der Meer (1991): see docs/REFERENCES.md#sortinoVanDerMeer1991
 #[must_use]
 pub fn sortino(returns: &[f64], mar: f64, periods_per_year: f64) -> f64 {
-    if returns.len() < 2 || invalid_annualization_factor(true, periods_per_year) {
+    if returns.len() < 2 || invalid_annualization_factor(periods_per_year) {
         return f64::NAN;
     }
     let excess_mean = mean(returns) - mar;
@@ -408,9 +404,6 @@ pub fn sortino(returns: &[f64], mar: f64, periods_per_year: f64) -> f64 {
 /// ```
 ///
 /// Computed in log-space with compensated summation for numerical stability.
-/// An exact `-1.0` return produces `-1.0` (total wipeout); a return below
-/// `-1.0` produces [`f64::NEG_INFINITY`]. Positive growth factors are never
-/// classified as total wipeout, however close the return is to `-1.0`.
 ///
 /// # Arguments
 ///
@@ -425,22 +418,9 @@ pub(crate) fn geometric_mean(returns: &[f64]) -> f64 {
     if returns.is_empty() {
         return f64::NAN;
     }
-    let mut saw_total_wipeout = false;
     let mut engine = crate::returns::WealthEngine::new();
     for &r in returns {
-        if !r.is_finite() {
-            return f64::NAN;
-        }
-        if r < -1.0 {
-            return f64::NEG_INFINITY;
-        }
-        if r <= -1.0 {
-            saw_total_wipeout = true;
-        }
         engine.step(r);
-    }
-    if saw_total_wipeout {
-        return -1.0;
     }
     let n = returns.len() as f64;
     (engine.log_growth() / n).exp_m1()
@@ -670,23 +650,6 @@ mod tests {
     }
 
     #[test]
-    fn mean_return_volatility_nan_when_annualized_with_invalid_factor() {
-        let r = [0.01_f64, 0.02];
-        assert!(mean_return(&r, true, 0.0).is_nan());
-        assert!(mean_return(&r, true, -1.0).is_nan());
-        assert!(mean_return(&r, true, f64::NAN).is_nan());
-        assert!(volatility(&r, 0.0).is_nan());
-        assert!(volatility(&r, f64::INFINITY).is_nan());
-    }
-
-    #[test]
-    fn downside_deviation_and_sortino_nan_when_annualized_with_invalid_factor() {
-        let r = [0.01_f64, -0.02, 0.03];
-        assert!(downside_deviation(&r, 0.0, true, 0.0).is_nan());
-        assert!(sortino(&r, 0.0, 0.0).is_nan());
-    }
-
-    #[test]
     fn free_functions_agree_with_daily_panel() {
         let returns = [0.01, -0.02, 0.015, 0.003, -0.01, 0.02];
         let dates: Vec<finstack_quant_core::dates::Date> = (1..=6)
@@ -714,6 +677,9 @@ mod tests {
         let returns = [0.01, -0.02, 0.015, 0.003, -0.01, 0.02];
         assert!(sharpe(&returns, 0.0, 0.0).is_nan());
         assert!(volatility(&returns, f64::NAN).is_nan());
+        assert!(volatility(&returns, 0.0).is_nan());
+        assert!(volatility(&returns, f64::INFINITY).is_nan());
+        assert!(sortino(&returns, 0.0, 0.0).is_nan());
         assert_eq!(max_drawdown(&[]), 0.0);
     }
 
@@ -878,12 +844,6 @@ mod tests {
     #[test]
     fn geometric_mean_empty() {
         assert!(geometric_mean(&[]).is_nan());
-    }
-
-    #[test]
-    fn geometric_mean_total_wipeout_returns_minus_one() {
-        assert_eq!(geometric_mean(&[0.10, -1.0]), -1.0);
-        assert_eq!(geometric_mean(&[-1.5]), f64::NEG_INFINITY);
     }
 
     #[test]

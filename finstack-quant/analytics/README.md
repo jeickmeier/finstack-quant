@@ -155,9 +155,9 @@ matrices, column counts that disagree with `ticker_names`, an unknown
 `benchmark_ticker`, and non-ascending dates. Per ticker, leading and trailing
 `NaN` padding is allowed but the finite span must be contiguous; an interior
 `NaN` or an active return `<= -1.0` is an error. `multi_factor_greeks` also
-rejects mismatched factor lengths, non-finite factors, non-positive
-annualization factors, an unknown or non-finite `ReturnKind::Total` rate,
-and singular or near-singular factor matrices. `correlation_matrix` and
+rejects mismatched factor lengths, non-finite factors, an unknown or
+non-finite `ReturnKind::Total` rate, and singular or near-singular factor
+matrices. `correlation_matrix` and
 `excess_returns` return `Err` on length mismatch, degenerate pairs, or
 Higham failure.
 

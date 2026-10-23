@@ -146,7 +146,6 @@ fn active_return_stats(returns: &[f64], benchmark: &[f64]) -> OnlineStats {
 /// # Returns
 ///
 /// Tracking error (non-negative). Returns `0.0` for empty or mismatched series.
-/// Returns [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
 ///
 /// # References
 ///
@@ -156,9 +155,6 @@ pub(crate) fn tracking_error(returns: &[f64], benchmark: &[f64], ann_factor: f64
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
-    }
-    if crate::risk_metrics::invalid_annualization_factor(true, ann_factor) {
-        return f64::NAN;
     }
     active_return_stats(returns, benchmark).std_dev() * ann_factor.sqrt()
 }
@@ -188,8 +184,7 @@ pub(crate) fn tracking_error(returns: &[f64], benchmark: &[f64], ann_factor: f64
 /// tracking error is zero and mean active return is also zero. When the
 /// tracking error is zero but mean active return is nonzero, returns
 /// `+∞` or `-∞` matching the sign of the excess (consistent with
-/// [`crate::risk_metrics::sharpe`]). Returns [`f64::NAN`] if `ann_factor`
-/// is not finite or is `<= 0`.
+/// [`crate::risk_metrics::sharpe`]).
 ///
 /// # References
 ///
@@ -199,9 +194,6 @@ pub(crate) fn information_ratio(returns: &[f64], benchmark: &[f64], ann_factor: 
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
-    }
-    if crate::risk_metrics::invalid_annualization_factor(true, ann_factor) {
-        return f64::NAN;
     }
     let active = active_return_stats(returns, benchmark);
     crate::risk_metrics::annualized_ratio_or_sign_infinity(
@@ -294,7 +286,7 @@ pub struct BetaResult {
 }
 
 /// Two-sided confidence level of the [`BetaResult`] interval (95%).
-pub(crate) const BETA_CONFIDENCE_LEVEL: f64 = 0.95;
+const BETA_CONFIDENCE_LEVEL: f64 = 0.95;
 
 impl NonFiniteFields for BetaResult {
     const NON_FINITE_FIELDS: &'static [&'static str] = &["beta", "std_err", "ci_lower", "ci_upper"];
@@ -582,12 +574,11 @@ pub struct RollingGreeks {
 /// # Returns
 ///
 /// A [`RollingGreeks`] with `dates`, `alphas`, and `betas` of equal length.
-/// Returns empty vectors if `window` is zero or exceeds the series length.
+/// Returns empty vectors if `window` exceeds the series length; callers
+/// guarantee `window >= 1` (`Performance::ensure_window`).
 /// Windows containing a non-finite input emit sentinel `NaN` values; windows
 /// consisting only of finite data are unaffected (the kernel recomputes its
-/// running sums as soon as a non-finite value exits the window). Use
-/// [`multi_factor_greeks`] when strict regression input validation is
-/// required.
+/// running sums as soon as a non-finite value exits the window).
 ///
 /// Updates take constant time between full-window rebuilds, which occur at
 /// least every 64 windows and when cancellation or non-finite sums require
@@ -602,7 +593,7 @@ pub(crate) fn rolling_greeks(
     risk_free_rate: f64,
 ) -> RollingGreeks {
     let n = returns.len().min(benchmark.len()).min(dates.len());
-    if n < window || window == 0 {
+    if n < window {
         tracing::debug!(
             n,
             window,
@@ -948,10 +939,6 @@ fn geometric_capture<F>(returns: &[f64], benchmark: &[f64], ann_factor: f64, inc
 where
     F: Fn(f64) -> bool,
 {
-    if !ann_factor.is_finite() || ann_factor <= 0.0 {
-        return f64::NAN;
-    }
-
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
@@ -964,13 +951,6 @@ where
         if include(benchmark[i]) {
             let port_growth = 1.0 + returns[i];
             let bench_growth = 1.0 + benchmark[i];
-            if !port_growth.is_finite()
-                || !bench_growth.is_finite()
-                || port_growth <= 0.0
-                || bench_growth <= 0.0
-            {
-                return f64::NAN;
-            }
             port_logs.add(port_growth.ln());
             bench_logs.add(bench_growth.ln());
             selected += 1;
@@ -1038,11 +1018,10 @@ where
 ///
 /// Returns an error when:
 ///
-/// - `ann_factor` is not finite or is `<= 0`
 /// - [`ReturnKind::Total`] has a non-finite risk-free rate
 /// - no factors are supplied
 /// - there are too few observations for the requested number of factors
-/// - any portfolio or factor return is non-finite
+/// - any factor return is non-finite
 /// - any factor length differs from `returns.len()`
 /// - the factor matrix is singular or numerically rank deficient
 /// - a coefficient, annualized intercept, or residual volatility is non-finite
@@ -1058,17 +1037,6 @@ pub(crate) fn multi_factor_greeks(
     ann_factor: f64,
     return_kind: ReturnKind,
 ) -> finstack_quant_core::Result<MultiFactorResult> {
-    if !ann_factor.is_finite() || ann_factor <= 0.0 {
-        tracing::debug!(
-            ann_factor,
-            reason = "invalid_annualization_factor",
-            "multi-factor greeks rejected input"
-        );
-        return Err(finstack_quant_core::Error::Validation(
-            "annualization factor must be finite and positive".to_string(),
-        ));
-    }
-
     let adjusted_y;
     let y = match return_kind {
         ReturnKind::Excess => returns,
@@ -1100,16 +1068,6 @@ pub(crate) fn multi_factor_greeks(
             "multi-factor greeks need at least {} observations, got {n}",
             p + 1
         )));
-    }
-    if returns.iter().any(|r| !r.is_finite()) {
-        tracing::debug!(
-            n,
-            reason = "non_finite_returns",
-            "multi-factor greeks rejected input"
-        );
-        return Err(finstack_quant_core::Error::Validation(
-            "returns must be finite".to_string(),
-        ));
     }
     if factors
         .iter()
@@ -1412,28 +1370,11 @@ mod tests {
     }
 
     #[test]
-    fn tracking_error_nan_when_annualized_with_invalid_ann_factor() {
-        let r = [0.01, 0.02];
-        let b = [0.01, 0.01];
-        assert!(tracking_error(&r, &b, 0.0).is_nan());
-        assert!(tracking_error(&r, &b, -1.0).is_nan());
-        assert!(tracking_error(&r, &b, f64::NAN).is_nan());
-    }
-
-    #[test]
     fn information_ratio_basic() {
         let r = [0.02, 0.03, 0.01, 0.04];
         let b = [0.01, 0.01, 0.01, 0.01];
         let ir = information_ratio(&r, &b, 252.0);
         assert!(ir > 0.0);
-    }
-
-    #[test]
-    fn information_ratio_nan_when_annualized_with_invalid_ann_factor() {
-        let r = [0.02, 0.03, 0.01, 0.04];
-        let b = [0.01, 0.01, 0.01, 0.01];
-        assert!(information_ratio(&r, &b, 0.0).is_nan());
-        assert!(information_ratio(&r, &b, f64::INFINITY).is_nan());
     }
 
     #[test]
@@ -2160,15 +2101,6 @@ mod tests {
         let result =
             multi_factor_greeks(&returns, &[&factor_a, &factor_b], 252.0, ReturnKind::Excess);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn standalone_multi_factor_greeks_errors_on_non_positive_ann_factor() {
-        let returns = [0.02, 0.04, 0.06, 0.08, 0.10];
-        let factor = [0.01, 0.02, 0.03, 0.04, 0.05];
-
-        assert!(multi_factor_greeks(&returns, &[&factor], 0.0, ReturnKind::Excess).is_err());
-        assert!(multi_factor_greeks(&returns, &[&factor], -252.0, ReturnKind::Excess).is_err());
     }
 
     #[test]
