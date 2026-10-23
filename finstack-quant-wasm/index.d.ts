@@ -26563,7 +26563,6 @@ export interface ToggleExerciseModelConstructor {
   /**
    * Nested-Monte-Carlo optimal exercise rule.
    * @param nestedPaths - Inner simulation paths per decision date; a positive safe integer.
-   * @param equityDiscountRate - Continuously compounded equity discount rate, as a decimal.
    * @param assetVol - Annualized asset volatility as a decimal; non-negative.
    * @param riskFreeRate - Continuously compounded risk-free rate, as a decimal.
    * @param horizon - Inner simulation horizon in years; positive and finite.
@@ -26572,7 +26571,6 @@ export interface ToggleExerciseModelConstructor {
    */
   optimal(
     nestedPaths: number,
-    equityDiscountRate: number,
     assetVol: number,
     riskFreeRate: number,
     horizon: number

@@ -1049,6 +1049,8 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #     lgd::DownturnMethod (string / float / `method` + `params` on the host side)
 #   - credit::{ThresholdToggle, StochasticToggle, OptimalToggle}
 #     (reached through ToggleExerciseModel.kind / .params)
+# OptimalExercise uses undiscounted common-path payoff sums; optimal has
+# nested_paths, asset_vol, risk_free_rate and horizon in both hosts.
 #   - credit::{DynamicRecoveryModel, LeverageHazardMap}
 #     (reached through DynamicRecoverySpec.kind / .model and
 #     EndogenousHazardSpec.kind / .leverage_hazard_map)

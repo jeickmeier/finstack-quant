@@ -812,7 +812,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/toggle_exercise_model.schema.json",
-      "bytes": 5904,
+      "bytes": 5434,
       "kind": "input",
       "path": "schemas/models/1/toggle_exercise_model.schema.json",
       "summary": "Toggle exercise model for PIK/cash decision.",

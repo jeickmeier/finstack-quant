@@ -369,7 +369,7 @@ def _merton_cases() -> dict[str, Callable[[], Any]]:
             ToggleExerciseModel.threshold("leverage", 0.7, "above").should_pik(_state(), 0.5),
             ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik(_state(), 0.5),
             ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik(_state(), 0.9),
-            ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).should_pik(_state(), 0.5),
+            ToggleExerciseModel.optimal(100, 0.2, 0.03, 1.0).should_pik(_state(), 0.5),
         ],
         "rating_factors": lambda: [
             moodys_warf_factor("B2"),

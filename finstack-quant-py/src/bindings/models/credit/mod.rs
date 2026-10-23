@@ -1436,8 +1436,6 @@ impl PyToggleExerciseModel {
     /// ----------
     /// nested_paths : int
     ///     Inner simulation paths per decision date.
-    /// equity_discount_rate : float
-    ///     Continuously compounded equity discount rate (decimal).
     /// asset_vol : float
     ///     Annualized asset volatility (decimal).
     /// risk_free_rate : float
@@ -1449,25 +1447,16 @@ impl PyToggleExerciseModel {
     /// non-finite, ``asset_vol`` is negative or non-finite, or ``horizon`` is
     /// not finite and positive.
     #[staticmethod]
-    #[pyo3(
-        text_signature = "(nested_paths, equity_discount_rate, asset_vol, risk_free_rate, horizon)"
-    )]
+    #[pyo3(text_signature = "(nested_paths, asset_vol, risk_free_rate, horizon)")]
     fn optimal(
         nested_paths: usize,
-        equity_discount_rate: f64,
         asset_vol: f64,
         risk_free_rate: f64,
         horizon: f64,
     ) -> PyResult<Self> {
-        ToggleExerciseModel::optimal(
-            nested_paths,
-            equity_discount_rate,
-            asset_vol,
-            risk_free_rate,
-            horizon,
-        )
-        .map(|inner| Self { inner })
-        .map_err(core_to_py)
+        ToggleExerciseModel::optimal(nested_paths, asset_vol, risk_free_rate, horizon)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Which exercise rule this model carries.

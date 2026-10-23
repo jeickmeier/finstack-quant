@@ -2574,20 +2574,17 @@ class ToggleExerciseModel:
     @staticmethod
     def optimal(
         nested_paths: int,
-        equity_discount_rate: float,
         asset_vol: float,
         risk_free_rate: float,
         horizon: float,
     ) -> ToggleExerciseModel:
         """
-        Create an optimal exercise model from nested-path parameters.
+        Create an optimal exercise model comparing common-path undiscounted payoff sums.
 
         Parameters
         ----------
         nested_paths : int
             Number of nested Monte Carlo paths for the inner optimization.
-        equity_discount_rate : float
-            Equity-holder discount rate as a decimal.
         asset_vol : float
             Asset volatility as a decimal.
         risk_free_rate : float
@@ -2610,7 +2607,7 @@ class ToggleExerciseModel:
         --------
         >>> import json
         >>> from finstack_quant.models.credit import ToggleExerciseModel
-        >>> model = ToggleExerciseModel.optimal(100, 0.12, 0.3, 0.05, 1.0)
+        >>> model = ToggleExerciseModel.optimal(100, 0.3, 0.05, 1.0)
         >>> json.loads(model.to_json())["optimal_exercise"]["nested_paths"]
         100
         """

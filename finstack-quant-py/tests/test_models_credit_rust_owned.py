@@ -9,6 +9,7 @@ live in ``finstack_quant_models::credit``.
 from __future__ import annotations
 
 import datetime
+import json
 import math
 
 import pytest
@@ -73,9 +74,9 @@ def test_constructors_reject_values_json_cannot_carry() -> None:
     with pytest.raises(ValueError, match="must be finite"):
         ToggleExerciseModel.stochastic("leverage", 1.0, math.inf)
     with pytest.raises(ValueError, match="nested_paths"):
-        ToggleExerciseModel.optimal(0, 0.05, 0.3, 0.03, 1.0)
+        ToggleExerciseModel.optimal(0, 0.3, 0.03, 1.0)
     with pytest.raises(ValueError, match="must be finite"):
-        ToggleExerciseModel.optimal(100, math.nan, 0.3, 0.03, 1.0)
+        ToggleExerciseModel.optimal(100, 0.3, math.nan, 1.0)
     with pytest.raises(ValueError, match="must be finite"):
         EndogenousHazardSpec.power_law(0.05, 1.5, math.nan)
 
@@ -107,3 +108,17 @@ def test_unknown_registry_ids_raise_key_error() -> None:
         pd.MasterScale.from_registry_id(scale_id="nope")
     with pytest.raises(KeyError, match="downturn LGD preset 'nope'"):
         lgd.DownturnLgd.from_registry_id(id="nope")
+
+
+def test_optimal_toggle_wire_has_only_decision_parameters() -> None:
+    with pytest.raises(TypeError):
+        ToggleExerciseModel.optimal(100, 0.05, 0.3, 0.03, 1.0)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        ToggleExerciseModel.optimal(100, 0.3, 0.03, 1.0, equity_discount_rate=0.05)  # type: ignore[call-arg]
+    model = ToggleExerciseModel.optimal(nested_paths=100, asset_vol=0.3, risk_free_rate=0.03, horizon=1.0)
+    wire = json.loads(model.to_json())
+    assert set(wire["optimal_exercise"]) == {"nested_paths", "asset_vol", "risk_free_rate", "horizon"}
+    assert ToggleExerciseModel.from_json(model.to_json()).to_json() == model.to_json()
+    wire["optimal_exercise"]["equity_discount_rate"] = 1000.0
+    with pytest.raises(ValueError, match=r"unknown field.*equity_discount_rate"):
+        ToggleExerciseModel.from_json(json.dumps(wire))

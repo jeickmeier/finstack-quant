@@ -1599,12 +1599,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_8a837e6f142b34e8cfd4/properties/equity_discount_rate",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/equity_discount_rate",
-    "description": "Equity holder discount rate applied to the nested-MC payoff.\n\nNote: the nested simulation drifts under the risk-neutral measure\n(`risk_free_rate`) but discounts here, so the intermediate equity\nfigures are decision inputs, not measure-consistent prices. The\nrate cancels in the cash-vs-PIK comparison and does not bias the\nelected branch.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_8a837e6f142b34e8cfd4/properties/horizon",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/OptimalToggle/properties/horizon",
     "description": "Forward-looking horizon in years for the nested simulation (e.g. 1.0).",
