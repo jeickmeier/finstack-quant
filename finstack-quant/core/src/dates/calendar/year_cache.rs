@@ -45,10 +45,7 @@ fn cache() -> &'static RwLock<FxHashMap<YearKey, YearBits>> {
 impl YearBits {
     #[inline]
     fn is_holiday(self, ordinal: u16) -> bool {
-        let i = usize::from(ordinal.saturating_sub(1));
-        let word = i / 64;
-        let bit = i % 64;
-        self.holiday.get(word).is_some_and(|w| (*w >> bit) & 1 == 1)
+        holiday_bit_set(&self.holiday, ordinal)
     }
 
     #[inline]
@@ -62,6 +59,13 @@ impl YearBits {
     }
 }
 
+fn holiday_bit_set(bits: &[u64; 6], ordinal: u16) -> bool {
+    let i = usize::from(ordinal.saturating_sub(1));
+    let word = i / 64;
+    let bit = i % 64;
+    bits.get(word).is_some_and(|w| (*w >> bit) & 1 == 1)
+}
+
 fn set_holiday_bit(bits: &mut [u64; 6], ordinal: u16) {
     let i = usize::from(ordinal.saturating_sub(1));
     let word = i / 64;
@@ -72,7 +76,14 @@ fn set_holiday_bit(bits: &mut [u64; 6], ordinal: u16) {
 }
 
 fn materialize(cal: &Calendar, year: i32) -> YearBits {
+    let mut holidays = smallvec::SmallVec::<[Date; 64]>::new();
+    for rule in cal.rules {
+        rule.dates_in_year(year, &mut holidays);
+    }
     let mut holiday = [0_u64; 6];
+    for date in holidays {
+        set_holiday_bit(&mut holiday, date.ordinal());
+    }
     let mut bd_prefix = [0_u16; 367];
     let mut bd = 0_u16;
     let mut last_ordinal = 0_u16;
@@ -82,10 +93,7 @@ fn materialize(cal: &Calendar, year: i32) -> YearBits {
             break;
         };
         last_ordinal = ordinal;
-        let is_hol = cal.holiday_from_rules(date);
-        if is_hol {
-            set_holiday_bit(&mut holiday, ordinal);
-        }
+        let is_hol = holiday_bit_set(&holiday, ordinal);
         if !date.is_weekend() && !is_hol {
             bd = bd.saturating_add(1);
         }
