@@ -1090,14 +1090,14 @@ impl FxMatrix {
         };
         if let Some(rate) = authoritative {
             return Ok(Some(FxRateResult {
-                rate: validate_fx_rate(from, to, rate)?,
+                rate,
                 triangulated: false,
             }));
         }
 
         if let Some(q) = self.read_observed(from, to, on, policy)? {
             return Ok(Some(FxRateResult {
-                rate: validate_fx_rate(from, to, q.rate)?,
+                rate: q.rate,
                 triangulated: q.triangulated,
             }));
         }
@@ -1126,7 +1126,7 @@ impl FxMatrix {
         let Some(observed) = quotes.get(&key).copied() else {
             return Ok(None);
         };
-        if observed.revision != revision || !observed.rate.is_finite() || observed.rate <= 0.0 {
+        if observed.revision != revision {
             let _ = quotes.pop(&key);
             return Ok(None);
         }
