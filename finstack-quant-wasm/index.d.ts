@@ -8681,7 +8681,7 @@ declare class Performance {
    * @param tickerNames - Ticker labels aligned with the outer elements of `prices`.
    * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
    * @param frequency - Optional observation frequency token; defaults to daily.
-   * @throws Error - Rejects malformed dates or matrices, invalid prices, unsupported frequencies, and an unknown benchmark ticker.
+   * @throws Error - Rejects malformed dates or matrices, invalid prices, unsupported frequencies, a non-string benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker (kind `not_found`).
    */
   constructor(
     dates: string[],
@@ -8699,7 +8699,7 @@ declare class Performance {
    * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
    * @param frequency - Optional observation frequency token; defaults to daily.
    * @returns A `Performance` handle over the supplied return panel.
-   * @throws Error - Rejects malformed dates or matrices and invalid benchmark or frequency inputs.
+   * @throws Error - Rejects malformed dates or matrices, unsupported frequencies, a non-string benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker (kind `not_found`).
    */
   static fromReturns(
     dates: string[],
@@ -8737,7 +8737,7 @@ declare class Performance {
   /**
    * Change the benchmark ticker.
    * @param ticker - Existing ticker label to use as the benchmark return series.
-   * @throws Error - Rejects `ticker` when it does not match a loaded ticker name.
+   * @throws Error - Rejects a non-string `ticker` (kind `invalid_type`) or one that does not match a loaded ticker name (kind `not_found`).
    */
   resetBenchTicker(ticker: string): void;
   /**
@@ -8750,7 +8750,7 @@ declare class Performance {
    * Resolve an exact, case-sensitive ticker label.
    * @param ticker - Case-sensitive ticker label supplied when the panel was constructed.
    * @returns Zero-based column index for the loaded ticker.
-   * @throws Error - Rejects a non-string value or a name absent from the panel.
+   * @throws Error - Rejects a non-string value (kind `invalid_type`) or a name absent from the panel (kind `not_found`).
    */
   getTickerIndex(ticker: string): number;
   /**
@@ -9213,34 +9213,29 @@ declare class Performance {
   /**
    * Period-to-date lookback returns.
    *
-   * FYTD is the first observation on or after the fiscal calendar start
-   * through `refDate`. Holidays are not skipped. The first included
-   * simple return still spans the prior close.
+   * MTD, QTD and YTD start on the first calendar day of `refDate`'s month,
+   * calendar quarter and year. FYTD is the first observation on or after the
+   * fiscal calendar start of `fiscalConfig` through `refDate`. Holidays are not
+   * skipped. The first included simple return still spans the prior close.
    * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
-   * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; defaults to January. With both parts omitted the fiscal year is the calendar year.
-   * @param fiscalYearStartDay - Optional fiscal-year start day; defaults to the first day of the month (Rust `FiscalConfig::from_parts`).
+   * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` is the calendar year (`FiscalConfig::default`).
    * @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
-   * @throws Error - Rejects an invalid ISO `ref_date`, a fiscal month outside `1..=12`, a fiscal day outside `1..=31`, or a result that cannot be serialized to JavaScript.
+   * @throws Error - Rejects an invalid ISO `ref_date` or a result that cannot be serialized to JavaScript.
    */
-  lookbackReturns(
-    refDate: string,
-    fiscalYearStartMonth?: number,
-    fiscalYearStartDay?: number
-  ): LookbackReturns;
+  lookbackReturns(refDate: string, fiscalConfig?: FiscalConfig | null): LookbackReturns;
   /**
-   * Aggregated period statistics for one asset at the given frequency.
+   * Aggregated period statistics for one asset at the given frequency. Without
+   * a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param aggregationFrequency - Optional aggregation frequency token; defaults to monthly.
-   * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; when only the day is given the month is January.
-   * @param fiscalYearStartDay - Optional fiscal-year start day from 1 through 31, clamped to the selected month end; when only the month is given the day is the 1st.
+   * @param fiscalConfig - Optional FiscalConfig handle; omitted or null buckets Gregorian periods with ISO weeks.
    * @returns Period statistics object for the selected ticker at the requested frequency.
-   * @throws Error - Rejects an unsupported `aggregation_frequency`, a fiscal month outside `1..=12`, a fiscal day outside `1..=31`, an out-of-range `ticker_idx`, an unrepresentable period boundary, or period statistics that cannot be serialized to JavaScript.
+   * @throws Error - Rejects an unsupported `aggregation_frequency`, an out-of-range `ticker_idx`, an unrepresentable period boundary, or period statistics that cannot be serialized to JavaScript.
    */
   periodStats(
     tickerIdx: number,
     aggregationFrequency?: string,
-    fiscalYearStartMonth?: number,
-    fiscalYearStartDay?: number
+    fiscalConfig?: FiscalConfig | null
   ): PeriodStats;
   /**
    * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.

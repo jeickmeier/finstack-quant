@@ -434,9 +434,7 @@ fn multi_factor_greeks_resolves_to_struct() {
 #[wasm_bindgen_test]
 fn lookback_returns_emit_mtd_qtd_ytd_fytd_arrays() {
     let perf = build_perf();
-    let raw = perf
-        .lookback_returns(JsValue::from("2025-01-12"), None, None)
-        .unwrap();
+    let raw = perf.lookback_returns(JsValue::from("2025-01-12")).unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert_eq!(value["mtd"].as_array().unwrap().len(), 2);
     assert_eq!(value["qtd"].as_array().unwrap().len(), 2);
@@ -451,8 +449,6 @@ fn period_stats_emit_win_rate() {
         .period_stats(
             JsValue::from(0.0),
             Some(JsValue::from("weekly".to_string())),
-            None,
-            None,
         )
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();

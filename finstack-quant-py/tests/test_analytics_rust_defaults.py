@@ -1,7 +1,7 @@
 """Analytics results keep Rust shapes and omitted arguments use Rust defaults.
 
 Omitted arguments resolve to the Rust ``finstack_quant_analytics::DEFAULT_*``
-constants, ``ReturnKind::default()`` and ``FiscalConfig::from_parts``. The
+constants, ``ReturnKind::default()`` and ``FiscalConfig::default``. The
 same cases run against WASM in
 ``finstack-quant-wasm/tests/facade/analytics_rust_defaults.test.mjs``.
 """
@@ -15,6 +15,7 @@ import math
 import pytest
 
 from finstack_quant.analytics import DatedSeries, Performance, sharpe, sortino, volatility
+from finstack_quant.core.dates import FiscalConfig
 
 RETURNS = [0.004 * math.sin(i) + 0.0005 * (i % 7) - 0.001 for i in range(120)]
 BENCH = [0.003 * math.cos(i) + 0.0002 for i in range(120)]
@@ -67,15 +68,12 @@ def test_omitted_arguments_equal_the_rust_defaults(perf: Performance) -> None:
     assert Performance.from_arrays(_dates(3), [[100.0, 101.0, 102.0]], ["A"]).get_frequency() == "daily"
 
 
-def test_partial_fiscal_start_follows_fiscal_config_from_parts(perf: Performance) -> None:
+def test_omitted_fiscal_config_is_rust_none(perf: Performance) -> None:
     ref = date(2024, 4, 29)
-
-    def lookback(*args: int | None) -> str:
-        return perf.lookback_returns(ref, *args).to_json()
-
-    assert lookback() == lookback(1, 1)
-    assert lookback(3) == lookback(3, 1)
-    assert lookback(None, 20) == lookback(1, 20)
-    assert perf.period_stats(0, "annual", 3).to_json() == perf.period_stats(0, "annual", 3, 1).to_json()
-    with pytest.raises(ValueError, match="start_month"):
-        perf.lookback_returns(ref, 13)
+    omitted = perf.lookback_returns(ref).to_json()
+    assert omitted == perf.lookback_returns(ref, None).to_json()
+    assert omitted == perf.lookback_returns(ref, FiscalConfig.calendar_year()).to_json()
+    with pytest.raises(TypeError, match="fiscal_config"):
+        perf.lookback_returns(ref, 4)
+    with pytest.raises(TypeError, match="fiscal_config"):
+        perf.period_stats(0, "annual", 4)
