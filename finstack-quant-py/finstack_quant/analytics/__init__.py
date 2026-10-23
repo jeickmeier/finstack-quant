@@ -2,9 +2,10 @@
 
 Bindings for the ``finstack-quant-analytics`` Rust crate. The main entry point is
 :class:`Performance`; the remaining names are value-object results surfaced by
-`Performance` methods plus four scalar free functions (:func:`sharpe`,
+`Performance` methods, four scalar free functions (:func:`sharpe`,
 :func:`sortino`, :func:`volatility`, :func:`max_drawdown`) for a single return
-series.
+series, :func:`constrained_least_squares` for factor-Brinson factor returns,
+and the :class:`AnalyticsError` exception.
 
 Examples:
 --------

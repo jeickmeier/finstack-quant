@@ -214,7 +214,9 @@ impl InterpStyle {
     #[inline]
     fn effective_validation(self, validation: ValidationPolicy) -> ValidationPolicy {
         match self {
-            InterpStyle::LogLinear | InterpStyle::MonotoneConvex => ValidationPolicy::Strict,
+            InterpStyle::LogLinear
+            | InterpStyle::MonotoneConvex
+            | InterpStyle::PiecewiseQuadraticForward => ValidationPolicy::Strict,
             _ => validation,
         }
     }

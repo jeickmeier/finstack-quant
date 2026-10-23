@@ -3,10 +3,14 @@
 //! Crate-internal except for [`DrawdownEpisode`] (re-exported at the crate root).
 //!
 //! Drawdown measures the peak-to-trough decline in cumulative wealth.
-//! This module provides four levels of granularity:
+//! This module provides three levels of granularity:
 //! - [`to_drawdown_series`]: per-period drawdown depth as a time series.
 //! - [`drawdown_details`]: structured episodes (start, valley, recovery).
 //! - [`mean_episode_drawdown`]: scalar average of the worst N episode minima.
+//!
+//! The scalar statistics (max depth, longest duration, ulcer and pain
+//! indices) and the drawdown-based ratios (Sterling, Burke, pain) are built
+//! on the per-period series and the episodes found in it.
 
 use crate::risk_metrics::ratio_or_sign_infinity;
 use finstack_quant_core::dates::Date;
@@ -224,7 +228,7 @@ fn make_episode(
 ///
 /// This is the **episode-based** average used in the Sterling ratio
 /// (Kestner, 1996). For the simple arithmetic mean of the full drawdown
-/// path, use [`mean_drawdown`] instead.
+/// path, use [`crate::Performance::mean_drawdown`] instead.
 ///
 /// # Arguments
 ///
@@ -246,8 +250,8 @@ pub(crate) fn mean_episode_drawdown(drawdown: &[f64], n: usize) -> f64 {
 }
 
 /// Extract the worst `n` episode depths from a drawdown series, sorted
-/// ascending (most severe first). Shared by [`mean_episode_drawdown`] and
-/// [`drawdown_details`]-derived callers.
+/// ascending (most severe first). Shared by [`mean_episode_drawdown`]
+/// (Sterling) and [`crate::Performance::burke_ratio`].
 ///
 /// # Arguments
 ///

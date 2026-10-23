@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { analytics, models } from '../../index.js';
+import init, { analytics, core, models } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
@@ -83,15 +83,16 @@ test('omitted arguments equal the Rust defaults', () => {
   assert.equal(fromPrices.getFrequency(), 'daily');
 });
 
-test('a partial fiscal-year start fills the other half per FiscalConfig::from_parts', () => {
+test('an omitted fiscalConfig is Rust None for FYTD', () => {
   const p = perf();
   const ref = '2024-04-29';
-  assert.deepEqual(p.lookbackReturns(ref), p.lookbackReturns(ref, 1, 1));
-  assert.deepEqual(p.lookbackReturns(ref, 3), p.lookbackReturns(ref, 3, 1));
-  assert.deepEqual(p.lookbackReturns(ref, undefined, 20), p.lookbackReturns(ref, 1, 20));
-  assert.deepEqual(p.periodStats(0, 'annual', 3), p.periodStats(0, 'annual', 3, 1));
-  assert.deepEqual(p.periodStats(0, 'annual', undefined, 20), p.periodStats(0, 'annual', 1, 20));
-  assert.throws(() => p.lookbackReturns(ref, 13), /start_month/);
+  const calendar = core.FiscalConfig.calendarYear();
+  assert.deepEqual(p.lookbackReturns(ref), p.lookbackReturns(ref, null));
+  assert.deepEqual(p.lookbackReturns(ref), p.lookbackReturns(ref, undefined));
+  assert.deepEqual(p.lookbackReturns(ref), p.lookbackReturns(ref, calendar));
+  assert.throws(() => p.lookbackReturns(ref, 4), /expected instance of FiscalConfig/);
+  assert.throws(() => p.periodStats(0, 'monthly', 4), /expected instance of FiscalConfig/);
+  calendar.free();
 });
 
 test('non-finite result fields named by Rust NonFiniteFields stay numeric', () => {

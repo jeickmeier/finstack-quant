@@ -2,7 +2,8 @@
 //!
 //! Crate-internal: callers use these through [`crate::Performance`].
 //!
-//! All functions operate on `&[f64]` return slices and return scalar `f64`.
+//! All functions operate on `&[f64]` return slices and return scalar `f64`,
+//! except `value_at_risk_and_es`, which returns the `(VaR, ES)` pair.
 //!
 //! Conventions:
 //! - returns are simple decimal returns (`-0.05` for a 5% loss)
@@ -11,15 +12,11 @@
 //! - confidence levels are in `(0, 1)`, e.g. `0.95` for 95% VaR
 //! - sample skewness uses Fisher's `G_1`; sample excess kurtosis uses `G_2`
 //!   (matching Excel `SKEW()` / `KURT()`)
-//! - empty or invalid VaR / ES / tail-ratio / parametric / Cornish-Fisher
-//!   inputs return [`f64::NAN`] (matching Sharpe when `n < 2`)
+//! - empty inputs, and a non-positive or non-finite parametric /
+//!   Cornish-Fisher horizon, return [`f64::NAN`] (matching Sharpe when `n < 2`)
 
 use finstack_quant_core::math::stats::mean_var;
 use finstack_quant_core::math::stats::quantile;
-
-fn has_strict_confidence(confidence: f64) -> bool {
-    confidence.is_finite() && confidence > 0.0 && confidence < 1.0
-}
 
 fn valid_horizon(ann_factor: Option<f64>) -> bool {
     ann_factor.is_none_or(|af| af.is_finite() && af > 0.0)
@@ -35,18 +32,8 @@ fn horizon_quantile(mean: f64, vol: f64, z: f64, ann_factor: Option<f64>) -> f64
     }
 }
 
-fn historical_sample(returns: &[f64], confidence: f64) -> Option<Vec<f64>> {
-    if returns.is_empty() || !has_strict_confidence(confidence) {
-        return None;
-    }
-    let mut data = Vec::with_capacity(returns.len());
-    for &value in returns {
-        if !value.is_finite() {
-            return None;
-        }
-        data.push(value);
-    }
-    Some(data)
+fn historical_sample(returns: &[f64]) -> Option<Vec<f64>> {
+    (!returns.is_empty()).then(|| returns.to_vec())
 }
 
 fn expected_shortfall_from_data(data: &mut [f64], confidence: f64) -> f64 {
@@ -94,10 +81,10 @@ fn expected_shortfall_from_data(data: &mut [f64], confidence: f64) -> f64 {
 /// # Returns
 ///
 /// The VaR as a non-positive scalar. Returns [`f64::NAN`] for an empty
-/// slice or an invalid confidence level.
+/// slice.
 #[must_use]
 pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> f64 {
-    let Some(mut data) = historical_sample(returns, confidence) else {
+    let Some(mut data) = historical_sample(returns) else {
         return f64::NAN;
     };
     quantile(&mut data, 1.0 - confidence)
@@ -133,14 +120,14 @@ pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> f64 {
 /// # Returns
 ///
 /// The signed mean tail return (negative for losses). Returns [`f64::NAN`]
-/// for an empty slice or an invalid confidence level.
+/// for an empty slice.
 ///
 /// # References
 ///
 /// - Artzner et al. (1999): `docs/REFERENCES.md#artzner1999CoherentRisk`
 #[must_use]
 pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> f64 {
-    let Some(mut data) = historical_sample(returns, confidence) else {
+    let Some(mut data) = historical_sample(returns) else {
         return f64::NAN;
     };
     expected_shortfall_from_data(&mut data, confidence)
@@ -148,17 +135,16 @@ pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> f64 {
 
 /// Compute historical VaR and Expected Shortfall together.
 ///
-/// Shares one validated finite-return copy and one quantile calculation
+/// Shares one copy of the returns and one quantile calculation
 /// between the two metrics, which is the common case for summary outputs
 /// that report both.
 ///
 /// Returns `(value_at_risk, expected_shortfall)`. Sentinel rules match the
 /// standalone [`value_at_risk`] / [`expected_shortfall`] functions:
-/// `(NaN, NaN)` for an empty slice, non-finite inputs, or out-of-range
-/// `confidence`.
+/// `(NaN, NaN)` for an empty slice.
 #[must_use]
 pub(crate) fn value_at_risk_and_es(returns: &[f64], confidence: f64) -> (f64, f64) {
-    let Some(mut data) = historical_sample(returns, confidence) else {
+    let Some(mut data) = historical_sample(returns) else {
         return (f64::NAN, f64::NAN);
     };
     let var_threshold = quantile(&mut data, 1.0 - confidence);
@@ -190,7 +176,7 @@ pub(crate) fn value_at_risk_and_es(returns: &[f64], confidence: f64) -> (f64, f6
 /// upper tail is positive, and [`f64::NAN`] when both tails are zero.
 #[must_use]
 pub(crate) fn tail_ratio(returns: &[f64], confidence: f64) -> f64 {
-    let Some(mut data) = historical_sample(returns, confidence) else {
+    let Some(mut data) = historical_sample(returns) else {
         return f64::NAN;
     };
     let upper = quantile(&mut data, confidence).abs();
@@ -285,16 +271,13 @@ pub(crate) fn kurtosis(returns: &[f64]) -> f64 {
 /// # Returns
 ///
 /// The parametric VaR (typically negative). Returns [`f64::NAN`] for an
-/// empty slice or an invalid confidence / horizon.
+/// empty slice or a non-positive or non-finite horizon.
 ///
 /// This is equal-weight Gaussian VaR (sample mean and sample volatility),
 /// not an EWMA / RiskMetrics estimator.
 #[must_use]
 pub(crate) fn parametric_var(returns: &[f64], confidence: f64, ann_factor: Option<f64>) -> f64 {
     if returns.is_empty() {
-        return f64::NAN;
-    }
-    if !has_strict_confidence(confidence) {
         return f64::NAN;
     }
     if !valid_horizon(ann_factor) {
@@ -358,9 +341,6 @@ pub(crate) fn cornish_fisher_var(returns: &[f64], confidence: f64, ann_factor: O
     if returns.is_empty() {
         return f64::NAN;
     }
-    if !has_strict_confidence(confidence) {
-        return f64::NAN;
-    }
     if !valid_horizon(ann_factor) {
         return f64::NAN;
     }
@@ -403,7 +383,7 @@ pub(crate) fn cornish_fisher_var(returns: &[f64], confidence: f64, ann_factor: O
 /// Uses a one-pass algorithm accumulating central moments (Pebay 2008, Terriberry 2007).
 /// Returns `(mean, std_dev, skewness, excess_kurtosis)` matching the bias-corrected
 /// formulas used by `skewness()` and `kurtosis()`.
-pub(super) fn moments4(returns: &[f64]) -> (f64, f64, f64, f64) {
+fn moments4(returns: &[f64]) -> (f64, f64, f64, f64) {
     let n = returns.len();
     if n == 0 {
         return (0.0, 0.0, 0.0, 0.0);
@@ -497,31 +477,13 @@ mod tests {
     fn combined_var_and_es_exactly_match_standalone_metrics() {
         let finite = [-0.08, 0.03, -0.02, 0.01, -0.05, 0.04];
         let tied_threshold = [-3.0, -1.0, -1.0, 10.0];
-        let non_finite_nan = [-0.03, f64::NAN, 0.01];
-        let non_finite_infinity = [-0.03, f64::INFINITY, 0.01];
-        let cases: &[(&[f64], f64)] = &[
-            (&finite, 0.95),
-            (&tied_threshold, 0.5),
-            (&finite, 1.0),
-            (&non_finite_nan, 0.95),
-            (&non_finite_infinity, 0.95),
-            (&[], 0.95),
-        ];
+        let cases: &[(&[f64], f64)] = &[(&finite, 0.95), (&tied_threshold, 0.5), (&[], 0.95)];
 
         for &(returns, confidence) in cases {
             let (combined_var, combined_es) = value_at_risk_and_es(returns, confidence);
             assert_f64_eq_nan_aware(combined_var, value_at_risk(returns, confidence));
             assert_f64_eq_nan_aware(combined_es, expected_shortfall(returns, confidence));
         }
-    }
-
-    #[test]
-    fn tail_risk_metrics_reject_non_finite_inputs() {
-        let data = [-0.03, f64::NAN, 0.01, 0.02];
-
-        assert!(value_at_risk(&data, 0.95).is_nan());
-        assert!(expected_shortfall(&data, 0.95).is_nan());
-        assert!(tail_ratio(&data, 0.95).is_nan());
     }
 
     #[test]
@@ -730,13 +692,6 @@ mod tests {
         assert!(tail_ratio(&empty, 0.95).is_nan());
         let (var, es) = value_at_risk_and_es(&empty, 0.95);
         assert!(var.is_nan() && es.is_nan());
-    }
-
-    #[test]
-    fn value_at_risk_requires_strict_confidence_bounds() {
-        let returns = [-0.03, -0.01, 0.01, 0.02];
-        assert!(value_at_risk(&returns, 0.0).is_nan());
-        assert!(value_at_risk(&returns, 1.0).is_nan());
     }
 
     #[test]

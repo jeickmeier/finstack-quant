@@ -45,7 +45,7 @@ test('Performance constructor matches the shared Python price golden', () => {
   assert.equal('fromArrays' in Performance, false);
   assert.throws(
     () => new Performance(PRICES.dates, PRICES.values, NAMES, 'missing'),
-    (error) => error.name === 'FinstackError'
+    (error) => error.name === 'FinstackError' && error.kind === 'not_found'
   );
   panel.free();
 });

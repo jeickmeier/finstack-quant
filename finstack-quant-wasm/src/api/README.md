@@ -44,7 +44,6 @@ enforces.
 | `analytics/performance.rs`              | `analytics`                         | `JsPerformance` → JS `Performance`; the only class in the analytics namespace                                                                                                                                                                                                                                                                                   |
 | `analytics/regression.rs`               | `analytics`                         | `constrainedLeastSquares`                                                                                                                                                                                                                                                                                                                                       |
 | `analytics/scalar.rs`                   | `analytics`                         | `sharpe`, `sortino`, `volatility`, `maxDrawdown` over one return series                                                                                                                                                                                                                                                                                         |
-| `analytics/support.rs`                  | —                                   | `pub(super)` re-export of the ISO date helpers                                                                                                                                                                                                                                                                                                                  |
 | `attribution/mod.rs`                    | `attribution`                       | `attributePnl` (canonical spec input), `attributePnlMany`, `attributePnlEnvelope` and their `*Json` twins, waterfall/metric defaults, schema validation                                                                                                                                                                                                         |
 | `cashflows/`                            | `cashflows`                         | `mod.rs`: JSON bridge (schedule build/validate, dated flows, CPR↔SMM / CDR↔MDR). `schedule.rs`: `CashFlowSchedule`, `CashFlowBuilder`, typed schedule constructors. `accrual.rs`: `AccrualIndex`. `aggregation.rs`, `fixings.rs`, `specs.rs`: free functions over wire values                                                                                   |
 | `covenants/`                            | `covenants`                         | `mod.rs`: JSON bridge (validation, `evaluateEngine`, `*Json` presets). `engine.rs`: `CovenantEngine`, typed presets. `forecast.rs`: `forecastCovenant`, `forecastBreaches`. `spec.rs`: covenant definition constructors and modifiers over wire values                                                                                                          |
@@ -104,9 +103,8 @@ enforces.
 | `calibration/mod.rs`                    | `calibration`                       | `calibrate`, `validateCalibration`, `dryRun`, `calibrateBermudanLmmBaseVol`                                                                                                                                                                                                                                                                                     |
 | `calibration/*.rs`                      | `calibration`                       | Hull-White calibration (`hull_white.rs`), quote and step factories (`quotes.rs`, `steps.rs`), result accessors (`result.rs`)                                                                                                                                                                                                                                    |
 
-The table lists binding-bearing files plus the root wiring and analytics
-conversion helper. The remaining `mod.rs` files only declare submodules or
-re-export their children.
+The table lists binding-bearing files plus the root wiring. The remaining
+`mod.rs` files only declare submodules or re-export their children.
 
 Shared conversion helpers are one level up in [`../utils/`](../utils): `to_js_value`,
 `to_js_err`, `structured_js_error`, `materialization_to_js_error`, and the date helpers `parse_iso_date`,
@@ -157,7 +155,8 @@ export that is not in it is invisible to TypeScript users, and
 - **No glob re-exports in `mod.rs`, and `../lib.rs` does not `pub use api::*`.**
   A glob would pull `api::core` into the crate root and shadow `std::core`. This is
   why no `core_ns` rename is needed anywhere. The only `pub use` lines in this tree
-  are the three narrow ones in `analytics/mod.rs` and `statements_analytics/mod.rs`.
+  are the five narrow ones in `analytics/mod.rs`, `statements/mod.rs` and
+  `statements_analytics/mod.rs`.
   (The "Module Initialization" snippet in
   [`../../../.agents/rules/wasm/code-standards.md`](../../../.agents/rules/wasm/code-standards.md)
   still shows `pub use api::*` — the real `lib.rs` does not, and must not.)
