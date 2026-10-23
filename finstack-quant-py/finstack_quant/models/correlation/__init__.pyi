@@ -1380,7 +1380,7 @@ class RecoverySpec:
     --------
     >>> from finstack_quant.models.correlation import RecoverySpec
     >>> spec = RecoverySpec.constant(0.4)
-    >>> (spec.expected_recovery, spec.build().lgd)
+    >>> (spec.build().expected_recovery, spec.build().lgd)
     (0.4, 0.6)
 
     """
@@ -1409,7 +1409,7 @@ class RecoverySpec:
         --------
         >>> from finstack_quant.models.correlation import RecoverySpec
         >>> spec = RecoverySpec.constant(0.4)
-        >>> (spec.expected_recovery, spec.build().conditional_recovery(0.0))
+        >>> (spec.build().expected_recovery, spec.build().conditional_recovery(0.0))
         (0.4, 0.4)
 
         """
@@ -1423,9 +1423,9 @@ class RecoverySpec:
         Parameters
         ----------
         mean : float
-            Finite zero-factor recovery location in ``[0, 1]``; endpoints are constant.
+            Finite zero-total-shock recovery location (not the unconditional mean) in ``[0, 1]``; endpoints are constant.
         vol : float
-            Finite recovery volatility scale in ``[0, 0.5]``.
+            Finite local shock scale (not realized recovery standard deviation) in ``[0, 0.5]``.
         correlation : float
             Finite Gaussian correlation with the market factor in ``[-1, 1]``.
 
@@ -1473,29 +1473,7 @@ class RecoverySpec:
         >>> from finstack_quant.models.correlation import RecoverySpec
         >>> model = RecoverySpec.market_standard_stochastic().build()
         >>> (model.model_name, round(model.expected_recovery, 3))
-        ('Market-Correlated Stochastic Recovery', 0.404)
-        """
-        ...
-
-    @property
-    def expected_recovery(self) -> float:
-        """
-        Location-parameter recovery rate of this spec.
-        For a constant spec this is the constant rate. For a
-        market-correlated spec this returns the ``mean`` input — the target
-        recovery at factor ``Z = 0`` — which differs from the
-        Jensen-corrected unconditional mean ``E_Z[R(Z)]`` whenever the
-        factor sensitivity is non-zero. For the true unconditional mean call
-        ``build().expected_recovery``.
-
-        Returns
-        -------
-        float
-            Location-parameter recovery rate of this spec.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        ('Market-Correlated Stochastic Recovery', 0.418)
         """
         ...
 
@@ -1564,7 +1542,7 @@ class RecoverySpec:
         Examples
         --------
         >>> from finstack_quant.models.correlation import RecoverySpec
-        >>> RecoverySpec.from_json('{"type":"constant","rate":0.4}').expected_recovery
+        >>> RecoverySpec.from_json('{"type":"constant","rate":0.4}').build().expected_recovery
         0.4
 
         """
@@ -1580,7 +1558,12 @@ class RecoveryModel:
     """
     Concrete recovery model for credit portfolio pricing.
 
-    Obtain an instance via :meth:`RecoverySpec.build`.
+    Obtain an instance via :meth:`RecoverySpec.build`. The stochastic law is
+    ``sigmoid(logit(m) + sigma/(m*(1-m)) * (rho*z + sqrt(1-rho**2)*e))``
+    for independent standard normals ``z`` and ``e``. The location ``m`` is
+    recovery at zero total shock, not the unconditional mean; ``sigma`` is a
+    local scale, not realized standard deviation. Conditional recovery averages
+    over ``e``. Endpoint locations and zero scale give exact constants.
 
     Examples
     --------
@@ -1609,21 +1592,24 @@ class RecoveryModel:
 
     def conditional_recovery(self, market_factor: float) -> float:
         """
-        Recovery conditional on the systematic market factor.
+        Expected recovery conditional on the systematic factor, averaging over the independent obligor shock.
 
         Parameters
         ----------
         market_factor : float
-            Realization of the market factor.
+            Finite systematic standard-normal realization; low values represent stress.
 
         Returns
         -------
         float
             Conditional recovery rate.
 
-        Notes
-        -----
-        This method does not raise; out-of-domain or non-finite inputs yield ``NaN`` or ``inf`` rather than an exception.
+        Raises
+        ------
+        ValueError
+            If the systematic factor is non-finite.
+        RuntimeError
+            If numerical integration of conditional recovery fails.
         """
         ...
 
@@ -1650,28 +1636,69 @@ class RecoveryModel:
         Parameters
         ----------
         market_factor : float
-            Realization of the market factor.
+            Finite systematic standard-normal realization; low values represent stress.
 
         Returns
         -------
         float
             Conditional LGD.
 
+        Raises
+        ------
+        ValueError
+            If the systematic factor is non-finite.
+        RuntimeError
+            If numerical integration of conditional recovery fails.
+        """
+        ...
+
+    def sample_recovery(self, market_factor: float, idiosyncratic_normal: float) -> float:
+        """Sample bounded recovery from the canonical logistic-normal law.
+
+        Parameters
+        ----------
+        market_factor : float
+            Finite systematic standard-normal shock; low values represent stress.
+        idiosyncratic_normal : float
+            Finite independent obligor standard-normal shock; ignored for constant
+            distributions and perfect systematic correlation.
+
+        Returns
+        -------
+        float
+            Sampled recovery in ``[0, 1]`` as a decimal fraction of notional.
+
+        Raises
+        ------
+        ValueError
+            If either shock is non-finite.
+        """
+        ...
+
+    @property
+    def has_idiosyncratic_dispersion(self) -> bool:
+        """Whether sampling needs an independent obligor recovery draw.
+
+        Returns
+        -------
+        bool
+            False for constant distributions and perfect systematic correlation.
+
         Notes
         -----
-        This method does not raise; out-of-domain or non-finite inputs yield ``NaN`` or ``inf`` rather than an exception.
+        This accessor does not raise.
         """
         ...
 
     @property
     def recovery_volatility(self) -> float:
         """
-        Recovery-rate volatility scale (0 for constant models).
+        Local recovery shock scale in decimals, not realized recovery standard deviation.
 
         Returns
         -------
         float
-            Recovery-rate volatility scale (0 for constant models).
+            Local recovery shock scale in decimals, not realized recovery standard deviation.
 
         Notes
         -----
@@ -1682,7 +1709,7 @@ class RecoveryModel:
     @property
     def is_stochastic(self) -> bool:
         """
-        Whether recovery varies with the market factor.
+        Whether the recovery distribution is nonconstant, including obligor-only variation.
 
         Returns
         -------

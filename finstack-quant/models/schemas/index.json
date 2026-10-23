@@ -650,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/recovery_spec.schema.json",
-      "bytes": 1713,
+      "bytes": 2030,
       "kind": "input",
       "path": "schemas/models/1/recovery_spec.schema.json",
       "summary": "Recovery model specification for configuration and serialization.",

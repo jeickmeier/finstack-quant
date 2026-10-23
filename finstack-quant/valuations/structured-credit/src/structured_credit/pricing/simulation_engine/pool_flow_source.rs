@@ -1,5 +1,6 @@
 use super::*;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
+use finstack_quant_models::correlation::RecoveryModel;
 
 /// Source of pool-level prepayment/default/recovery assumptions for each period.
 pub(crate) trait PoolFlowSource {
@@ -443,6 +444,9 @@ pub(crate) struct PeriodPoolShock {
     pub(crate) mdr: f64,
     /// Recovery rate applied to defaults in the payment period.
     pub(crate) recovery_rate: f64,
+    /// Mean monthly raw credit factor after the stochastic gate, used by
+    /// both conditional recovery and obligor samples (not the copula z-score).
+    pub(crate) recovery_factor: f64,
     /// Per-name copula inputs. `Some` ⇒ realize defaults name-by-name;
     /// `None` ⇒ apply the pool-wide LHP MDR.
     pub(crate) per_name: Option<PerNamePeriodInput>,
@@ -459,6 +463,7 @@ impl PeriodPoolShock {
             smm,
             mdr,
             recovery_rate,
+            recovery_factor: 0.0,
             per_name: None,
             systematic_z: 0.0,
         }
@@ -549,11 +554,8 @@ pub(crate) struct PerNameDefaultEngine {
     rng: PhiloxRng,
     /// `true` ⇒ second member of an antithetic pair; negate idiosyncratic draws.
     antithetic: bool,
-    /// Idiosyncratic (name-specific) recovery volatility. When `> 0`, each
-    /// defaulted name recovers at its own rate scattered around the period
-    /// systematic recovery; `0` ⇒ every default recovers at the period rate
-    /// (no per-name dispersion, e.g. constant recovery).
-    idiosyncratic_recovery_vol: f64,
+    /// Shared canonical recovery distribution.
+    recovery_model: Arc<dyn RecoveryModel>,
 }
 
 impl PerNameDefaultEngine {
@@ -562,14 +564,14 @@ impl PerNameDefaultEngine {
         simulator: Arc<PerNameCopulaDefault>,
         granularity: PoolGranularity,
         rng: PhiloxRng,
-        idiosyncratic_recovery_vol: f64,
+        recovery_model: Arc<dyn RecoveryModel>,
     ) -> Self {
         Self {
             simulator,
             granularity,
             rng,
             antithetic: false,
-            idiosyncratic_recovery_vol,
+            recovery_model,
         }
     }
 
@@ -582,14 +584,14 @@ impl PerNameDefaultEngine {
         simulator: Arc<PerNameCopulaDefault>,
         granularity: PoolGranularity,
         rng: PhiloxRng,
-        idiosyncratic_recovery_vol: f64,
+        recovery_model: Arc<dyn RecoveryModel>,
     ) -> Self {
         Self {
             simulator,
             granularity,
             rng,
             antithetic: true,
-            idiosyncratic_recovery_vol,
+            recovery_model,
         }
     }
 }
@@ -604,6 +606,25 @@ pub(super) enum PerNameResolution {
 }
 
 impl PerNameDefaultEngine {
+    /// Sample recovery for one live name, consuming a separate Gaussian only
+    /// when the canonical distribution has residual dispersion. Antithetic
+    /// partners negate the same recovery draw, including for surviving names.
+    pub(super) fn sample_recovery(&mut self, recovery_factor: f64) -> Result<f64> {
+        let eps = if self.recovery_model.has_idiosyncratic_dispersion() {
+            let raw = self.rng.next_std_normal();
+            if self.antithetic {
+                -raw
+            } else {
+                raw
+            }
+        } else {
+            0.0
+        };
+        self.recovery_model
+            .sample_recovery(recovery_factor, eps)
+            .map_err(Into::into)
+    }
+
     /// Realize one period's per-name default indicators into `defaults`;
     /// the antithetic partner negates its idiosyncratic draws.
     ///
@@ -758,27 +779,11 @@ impl PoolFlowSource for StochasticPathFlowSource {
                         &mut self.default_scratch,
                     )?;
 
-                    // Per-name idiosyncratic recovery dispersion: each name
-                    // recovers at its own rate, scattered around the period
-                    // systematic recovery `shock.recovery_rate`. A draw is
-                    // taken for every name (not only defaulters) so the RNG
-                    // stream stays order-stable; the antithetic partner negates
-                    // the recovery shock, mirroring the default-shock negation.
-                    // When the recovery model has no idiosyncratic volatility
-                    // no draw is consumed, so a constant-recovery scenario is
-                    // bit-identical to the pre-dispersion engine.
                     self.recovery_scratch.clear();
                     self.recovery_scratch.reserve(self.default_scratch.len());
-                    let sigma = engine.idiosyncratic_recovery_vol;
                     for _ in 0..self.default_scratch.len() {
-                        let recovery = if sigma > 0.0 {
-                            let raw = engine.rng.next_std_normal();
-                            let eps = if engine.antithetic { -raw } else { raw };
-                            (shock.recovery_rate + sigma * eps).clamp(0.0, 1.0)
-                        } else {
-                            shock.recovery_rate
-                        };
-                        self.recovery_scratch.push(recovery);
+                        self.recovery_scratch
+                            .push(engine.sample_recovery(shock.recovery_factor)?);
                     }
 
                     Some(PeriodDefaultOutcome::PerName {
@@ -832,5 +837,103 @@ impl PoolFlowSource for StochasticPathFlowSource {
             special_servicing: SpecialServicingFees::from_deal(request.instrument.fees.as_ref()),
             card: request.instrument.credit_model.card.as_ref(),
         })
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+    use finstack_quant_models::correlation::{CopulaSpec, RecoverySpec};
+
+    #[test]
+    fn finite_gaussian_and_student_t_losses_converge_to_canonical_conditional_loss() {
+        for spec in [
+            CopulaSpec::Gaussian,
+            CopulaSpec::StudentT {
+                degrees_of_freedom: 6.0,
+            },
+        ] {
+            let simulator = Arc::new(PerNameCopulaDefault::new(&spec, 0.3).expect("copula"));
+            let recovery: Arc<dyn RecoveryModel> = Arc::from(
+                RecoverySpec::market_correlated(0.4, 0.25, 0.4)
+                    .expect("spec")
+                    .build()
+                    .expect("model"),
+            );
+            for z in [-1.0, 0.0, 1.0] {
+                let mut reference_rng = PhiloxRng::new(1921);
+                let probability = simulator
+                    .conditional_default_prob(z, 0.2, &mut reference_rng)
+                    .expect("probability");
+                let expected = probability
+                    * (1.0 - recovery.conditional_recovery(z).expect("conditional mean"));
+                let mut engine = PerNameDefaultEngine::new(
+                    Arc::clone(&simulator),
+                    PoolGranularity::PerName,
+                    PhiloxRng::new(1921),
+                    Arc::clone(&recovery),
+                );
+                let n = 200_000;
+                let mut defaults = Vec::new();
+                engine
+                    .realize(z, &vec![0.2; n], &mut defaults)
+                    .expect("defaults");
+                let mut loss = 0.0;
+                for defaulted in defaults {
+                    let rate = engine.sample_recovery(z).expect("sample");
+                    if defaulted {
+                        loss += 1.0 - rate;
+                    }
+                }
+                let realized = loss / n as f64;
+                assert!(
+                    (realized - expected).abs() < 0.002,
+                    "{spec:?}/{z}: {realized} vs {expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn antithetic_recovery_draws_and_constant_stream_positions_are_exact() {
+        let simulator =
+            Arc::new(PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.3).expect("copula"));
+        for spec in [
+            RecoverySpec::constant(0.4).expect("spec"),
+            RecoverySpec::market_correlated(0.4, 0.25, 0.4).expect("spec"),
+            RecoverySpec::market_correlated(0.4, 0.25, 1.0).expect("spec"),
+            RecoverySpec::market_correlated(0.0, 0.25, 0.4).expect("spec"),
+        ] {
+            let model: Arc<dyn RecoveryModel> = Arc::from(spec.build().expect("model"));
+            let mut rng = PhiloxRng::new(1921);
+            let mut ordinary = PerNameDefaultEngine::new(
+                Arc::clone(&simulator),
+                PoolGranularity::PerName,
+                rng.clone(),
+                Arc::clone(&model),
+            );
+            let mut antithetic = PerNameDefaultEngine::new_antithetic(
+                Arc::clone(&simulator),
+                PoolGranularity::PerName,
+                rng.clone(),
+                Arc::clone(&model),
+            );
+            for _ in 0..20 {
+                let eps = if model.has_idiosyncratic_dispersion() {
+                    rng.next_std_normal()
+                } else {
+                    0.0
+                };
+                assert_eq!(
+                    ordinary.sample_recovery(0.7).expect("sample"),
+                    model.sample_recovery(0.7, eps).expect("reference")
+                );
+                assert_eq!(
+                    antithetic.sample_recovery(-0.7).expect("sample"),
+                    model.sample_recovery(-0.7, -eps).expect("reference")
+                );
+            }
+            assert_eq!(ordinary.rng.next_u01(), rng.next_u01());
+        }
     }
 }

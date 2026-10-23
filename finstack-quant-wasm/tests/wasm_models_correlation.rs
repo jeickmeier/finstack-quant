@@ -152,7 +152,7 @@ fn wasm_copula_from_gaussian_spec() {
 #[wasm_bindgen_test]
 fn wasm_recovery_spec_and_model() {
     let c = JsRecoverySpec::constant(JsValue::from(0.4)).expect("0.4 is a valid recovery rate");
-    assert!((c.expected_recovery() - 0.4).abs() < 1e-12);
+    assert!((c.build().unwrap().expected_recovery() - 0.4).abs() < 1e-12);
     let m = c.build().expect("valid constant recovery");
     assert!((m.expected_recovery() - 0.4).abs() < 1e-12);
     assert!((m.conditional_recovery(JsValue::from(0.0)).unwrap() - 0.4).abs() < 1e-12);

@@ -40,12 +40,15 @@
       "additionalProperties": false,
       "properties": {
         "factor_correlation": {
-          "$ref": "#/$defs/CorrelationWire"
+          "$ref": "#/$defs/CorrelationWire",
+          "description": "Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress."
         },
         "mean_recovery": {
-          "$ref": "#/$defs/ClosedUnitIntervalF64Wire"
+          "$ref": "#/$defs/ClosedUnitIntervalF64Wire",
+          "description": "Zero-total-shock recovery location in [0, 1], not the unconditional mean."
         },
         "recovery_volatility": {
+          "description": "Local shock scale in [0, 0.5], not realized recovery standard deviation.",
           "format": "double",
           "maximum": 0.5,
           "minimum": 0.0,

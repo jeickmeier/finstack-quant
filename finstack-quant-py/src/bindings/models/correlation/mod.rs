@@ -259,19 +259,6 @@ impl PyRecoverySpec {
             .map_err(correlation_to_py)
     }
 
-    /// Location-parameter recovery rate of this spec.
-    ///
-    /// For a constant spec this is the constant rate. For a
-    /// market-correlated spec this returns the ``mean`` input — the target
-    /// recovery at factor ``Z = 0`` — which differs from the
-    /// Jensen-corrected unconditional mean ``E_Z[R(Z)]`` whenever the factor
-    /// sensitivity is non-zero. For the true unconditional mean call
-    /// ``build().expected_recovery``.
-    #[getter]
-    fn expected_recovery(&self) -> f64 {
-        self.inner.expected_recovery()
-    }
-
     /// Build a concrete `RecoveryModel` from this specification.
     ///
     /// Raises ``ValueError`` for invalid inputs and ``RuntimeError`` if
@@ -313,8 +300,10 @@ impl PyRecoveryModel {
 
     /// Recovery conditional on the systematic market factor.
     #[pyo3(text_signature = "(self, market_factor)")]
-    fn conditional_recovery(&self, market_factor: f64) -> f64 {
-        self.inner.conditional_recovery(market_factor)
+    fn conditional_recovery(&self, market_factor: f64) -> PyResult<f64> {
+        self.inner
+            .conditional_recovery(market_factor)
+            .map_err(correlation_to_py)
     }
 
     /// Loss given default (1 − recovery).
@@ -325,8 +314,24 @@ impl PyRecoveryModel {
 
     /// Conditional LGD given market factor.
     #[pyo3(text_signature = "(self, market_factor)")]
-    fn conditional_lgd(&self, market_factor: f64) -> f64 {
-        self.inner.conditional_lgd(market_factor)
+    fn conditional_lgd(&self, market_factor: f64) -> PyResult<f64> {
+        self.inner
+            .conditional_lgd(market_factor)
+            .map_err(correlation_to_py)
+    }
+
+    /// Sample bounded recovery for one obligor using two finite Gaussian shocks.
+    #[pyo3(text_signature = "(self, market_factor, idiosyncratic_normal)")]
+    fn sample_recovery(&self, market_factor: f64, idiosyncratic_normal: f64) -> PyResult<f64> {
+        self.inner
+            .sample_recovery(market_factor, idiosyncratic_normal)
+            .map_err(correlation_to_py)
+    }
+
+    /// Whether the recovery distribution needs an independent obligor draw.
+    #[getter]
+    fn has_idiosyncratic_dispersion(&self) -> bool {
+        self.inner.has_idiosyncratic_dispersion()
     }
 
     /// Recovery-rate volatility scale (0 for constant models).

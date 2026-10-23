@@ -10383,11 +10383,11 @@ export interface RecoveryModel extends WasmOwned {
    */
   readonly lgd: number;
   /**
-   * Recovery-rate volatility scale (0 for constant models).
+   * Local recovery shock scale in decimals, not realized recovery standard deviation.
    */
   readonly recoveryVolatility: number;
   /**
-   * Whether recovery varies with the market factor.
+   * Whether the recovery distribution is nonconstant, including obligor-only variation.
    */
   readonly isStochastic: boolean;
   /**
@@ -10396,33 +10396,36 @@ export interface RecoveryModel extends WasmOwned {
   readonly modelName: string;
   /**
    * Recovery conditional on the systematic market factor.
-   * @returns Conditional recovery rate as a fraction of par in `[0, 1]`.
    * @param marketFactor - Realized standardized market factor used to condition recovery or loss given default.
+   * @returns Conditional mean recovery in `[0, 1]`.
+   * @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
    */
   conditionalRecovery(marketFactor: number): number;
   /**
    * Conditional LGD given market factor.
-   * @returns Conditional loss-given-default as a fraction of par in `[0, 1]`.
    * @param marketFactor - Realized standardized market factor used to condition recovery or loss given default.
+   * @returns One minus conditional mean recovery.
+   * @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
    */
   conditionalLgd(marketFactor: number): number;
+  /**
+   * Whether sampling needs an independent obligor recovery draw.
+   */
+  readonly hasIdiosyncraticDispersion: boolean;
+  /**
+   * Sample bounded recovery from the canonical logistic-normal law.
+   * @param marketFactor - Finite systematic standard-normal shock; low values represent credit stress.
+   * @param idiosyncraticNormal - Finite independent obligor standard-normal shock; ignored for constant or perfectly systematic models.
+   * @returns Sampled recovery as a decimal fraction of notional in `[0, 1]`.
+   * @throws Throws a `validation` error if either shock is non-finite.
+   */
+  sampleRecovery(marketFactor: number, idiosyncraticNormal: number): number;
 }
 
 /**
  * Recovery model specification for configuration and deferred construction.
  */
 export interface RecoverySpec extends WasmOwned {
-  /**
-   * Location-parameter recovery rate of this spec.
-   *
-   * For a constant spec this is the constant rate. For a
-   * market-correlated spec this returns the `mean` input — the target
-   * recovery at factor `Z = 0` — which differs from the Jensen-corrected
-   * unconditional mean `E_Z[R(Z)]` whenever the factor sensitivity is
-   * non-zero. For the true unconditional mean call
-   * `build().expectedRecovery`.
-   */
-  readonly expectedRecovery: number;
   /**
    * Build a concrete recovery model from this specification.
    * @returns The validated recovery-model handle.
@@ -10468,8 +10471,8 @@ export interface RecoverySpecConstructor {
    * Throws if `mean` is not finite or lies outside `[0, 1]`, or if `vol` /
    * `correlation` are not finite.
    * @returns A `RecoverySpec` handle for deferred construction.
-   * @param mean - Mean recovery rate expressed as a fraction from 0 through 1.
-   * @param vol - Recovery-rate volatility; finite and in `[0, 0.5]`.
+   * @param mean - Zero-total-shock recovery location in `[0, 1]`; this is not the unconditional mean.
+   * @param vol - Local shock scale, finite in `[0, 0.5]`; this is not the realized recovery standard deviation.
    * @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are rejected.
    * @throws Error - Throws a JavaScript exception if `mean` is not finite or lies outside `[0, 1]`, or if `vol` or `correlation` is non-finite or outside its supported range.
    */

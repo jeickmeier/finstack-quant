@@ -26582,18 +26582,21 @@ export default [
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/factor_correlation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/1/properties/factor_correlation",
+    "description": "Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress.",
     "ref": "#/$defs/CorrelationWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CorrelationWire"
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/mean_recovery",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/1/properties/mean_recovery",
+    "description": "Zero-total-shock recovery location in [0, 1], not the unconditional mean.",
     "ref": "#/$defs/ClosedUnitIntervalF64Wire",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClosedUnitIntervalF64Wire"
   },
   {
     "path": "#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RecoverySpec/oneOf/1/properties/recovery_volatility",
+    "description": "Local shock scale in [0, 0.5], not realized recovery standard deviation.",
     "format": "double",
     "maximum": 0.5,
     "minimum": 0
