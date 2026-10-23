@@ -3,13 +3,8 @@
 //! These tests validate that build-time generated calendars are exposed through the
 //! public `finstack_quant_core::dates` API (without relying on internal bitset helpers).
 
-use super::common::by_id;
-use finstack_quant_core::dates::{calendar_by_id_strict, Date};
-use time::Month;
-
-fn make_date(y: i32, m: u8, d: u8) -> Date {
-    Date::from_calendar_date(y, Month::try_from(m).unwrap(), d).unwrap()
-}
+use super::common::{by_id, make_date};
+use finstack_quant_core::dates::calendar_by_id_strict;
 
 #[test]
 fn generated_calendar_constants_exist_and_work() {

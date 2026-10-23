@@ -1,12 +1,7 @@
 //! Tests for date extension traits
 
-use super::common::by_id;
+use super::common::{by_id, make_date};
 use finstack_quant_core::dates::{Date, DateExt, FiscalConfig};
-use time::Month;
-
-fn make_date(y: i32, m: u8, d: u8) -> Date {
-    Date::from_calendar_date(y, Month::try_from(m).unwrap(), d).unwrap()
-}
 
 #[test]
 fn date_arithmetic_rejects_range_overflow() {
