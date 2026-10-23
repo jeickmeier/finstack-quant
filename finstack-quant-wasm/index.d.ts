@@ -8679,7 +8679,7 @@ declare class Performance {
    * @param tickerNames - Ticker labels aligned with the outer elements of `prices`.
    * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
    * @param frequency - Optional observation frequency token; defaults to daily.
-   * @throws Error - Rejects malformed dates or matrices, invalid prices, unsupported frequencies, and an unknown benchmark ticker.
+   * @throws Error - Rejects malformed dates or matrices, invalid prices, unsupported frequencies, a non-string benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker (kind `not_found`).
    */
   constructor(
     dates: string[],
@@ -8697,7 +8697,7 @@ declare class Performance {
    * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
    * @param frequency - Optional observation frequency token; defaults to daily.
    * @returns A `Performance` handle over the supplied return panel.
-   * @throws Error - Rejects malformed dates or matrices and invalid benchmark or frequency inputs.
+   * @throws Error - Rejects malformed dates or matrices, unsupported frequencies, a non-string benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker (kind `not_found`).
    */
   static fromReturns(
     dates: string[],
@@ -8735,7 +8735,7 @@ declare class Performance {
   /**
    * Change the benchmark ticker.
    * @param ticker - Existing ticker label to use as the benchmark return series.
-   * @throws Error - Rejects `ticker` when it does not match a loaded ticker name.
+   * @throws Error - Rejects a non-string `ticker` (kind `invalid_type`) or one that does not match a loaded ticker name (kind `not_found`).
    */
   resetBenchTicker(ticker: string): void;
   /**
@@ -8748,7 +8748,7 @@ declare class Performance {
    * Resolve an exact, case-sensitive ticker label.
    * @param ticker - Case-sensitive ticker label supplied when the panel was constructed.
    * @returns Zero-based column index for the loaded ticker.
-   * @throws Error - Rejects a non-string value or a name absent from the panel.
+   * @throws Error - Rejects a non-string value (kind `invalid_type`) or a name absent from the panel (kind `not_found`).
    */
   getTickerIndex(ticker: string): number;
   /**

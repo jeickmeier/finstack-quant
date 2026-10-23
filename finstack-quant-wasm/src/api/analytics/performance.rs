@@ -172,7 +172,8 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects malformed dates or matrices, invalid prices, unsupported
-    /// frequencies, and an unknown benchmark ticker.
+    /// frequencies, a non-string benchmark ticker (kind `invalid_type`), and an
+    /// unknown benchmark ticker (kind `not_found`).
     /// @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner price series.
     /// @param prices - Ticker-major, column-oriented matrix where `prices[tickerIdx][dateIdx]` is the price for `tickerIdx` at `dates[dateIdx]`.
     /// @param ticker_names - Ticker labels aligned with the outer elements of `prices`.
@@ -204,8 +205,9 @@ impl JsPerformance {
     /// element selects a ticker, and each inner series is aligned to `dates`.
     /// # Errors
     ///
-    /// Rejects malformed dates or matrices and invalid benchmark or
-    /// frequency inputs.
+    /// Rejects malformed dates or matrices, unsupported frequencies, a non-string
+    /// benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker
+    /// (kind `not_found`).
     /// @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner return series.
     /// @param returns - Ticker-major, column-oriented simple decimal return matrix where `returns[tickerIdx][dateIdx]` is the return for `tickerIdx` at `dates[dateIdx]`.
     /// @param ticker_names - Ticker labels aligned with the outer elements of `returns`.
@@ -254,7 +256,8 @@ impl JsPerformance {
     ///
     /// # Errors
     ///
-    /// Rejects `ticker` when it does not match a loaded ticker name.
+    /// Rejects a non-string `ticker` (kind `invalid_type`) or one that does not
+    /// match a loaded ticker name (kind `not_found`).
     /// @param ticker - Existing ticker label to use as the benchmark return series.
     #[wasm_bindgen(js_name = resetBenchTicker)]
     pub fn reset_bench_ticker(&mut self, ticker: JsValue) -> Result<(), JsValue> {
@@ -281,7 +284,8 @@ impl JsPerformance {
     ///
     /// # Errors
     ///
-    /// Rejects a non-string value or a name absent from the panel.
+    /// Rejects a non-string value (kind `invalid_type`) or a name absent from the
+    /// panel (kind `not_found`).
     /// @returns Zero-based column index for the loaded ticker.
     #[wasm_bindgen(js_name = getTickerIndex)]
     pub fn get_ticker_index(&self, ticker: JsValue) -> Result<usize, JsValue> {

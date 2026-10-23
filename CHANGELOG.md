@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Analytics: one path per capability
+
+#### Changed
+
+- Python and WASM: an unknown `benchmark_ticker` in the `Performance` constructors (Python `Performance()`, `from_arrays`, `from_returns`, `from_returns_arrays`; WASM `new Performance`, `fromReturns`) and in `reset_bench_ticker` / `resetBenchTicker` raises `KeyError` (WASM kind `not_found`), not `AnalyticsError` (kind `validation`). A failed `reset_bench_ticker` leaves the benchmark unchanged.
+- `gain_to_pain` and the `PeriodStats` payoff and profit ratios return `NaN` when a sum or a compounded bucket growth overflows `f64`; they previously returned `+inf` or `0.0`.
+- The `multi_factor_greeks` tracing span and events carry the target `finstack_quant_analytics::multi_factor` instead of `finstack_quant_analytics::benchmark`.
+
 ### Valuations: one path per capability
 
 #### Changed

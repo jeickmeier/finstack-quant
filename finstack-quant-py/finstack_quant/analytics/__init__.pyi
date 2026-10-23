@@ -1856,6 +1856,8 @@ class Performance:
         AnalyticsError
             If ``prices`` is invalid or empty, or dates are not strictly
             ascending.
+        KeyError
+            If ``benchmark_ticker`` is given but is not one of the column labels.
         TypeError
             If ``prices`` is not a pandas ``DataFrame`` or ``Series`` (use
             :meth:`from_arrays` for raw lists), or its column labels are not
@@ -1901,6 +1903,8 @@ class Performance:
         AnalyticsError
             If dimensions are inconsistent, dates are invalid, or ``frequency`` is
             unrecognized.
+        KeyError
+            If ``benchmark_ticker`` is given but is not in ``ticker_names``.
 
         Examples
         --------
@@ -1945,6 +1949,8 @@ class Performance:
         TypeError
             If ``returns`` is not a pandas ``DataFrame`` or ``Series`` (use
             :meth:`from_returns_arrays` for raw lists).
+        KeyError
+            If ``benchmark_ticker`` is given but is not one of the column labels.
 
         Returns
         -------
@@ -1999,6 +2005,8 @@ class Performance:
         ------
         AnalyticsError
             If dimensions are inconsistent or ``frequency`` is unrecognized.
+        KeyError
+            If ``benchmark_ticker`` is given but is not in ``ticker_names``.
 
         Examples
         --------
@@ -2041,8 +2049,8 @@ class Performance:
 
         Raises
         ------
-        AnalyticsError
-            If ``ticker`` does not match a loaded ticker name.
+        KeyError
+            If ``ticker`` is not a loaded ticker name; the benchmark is unchanged.
         """
 
     # -- Getters --
