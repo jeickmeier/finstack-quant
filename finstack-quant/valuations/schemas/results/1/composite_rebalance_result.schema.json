@@ -19021,8 +19021,7 @@
           "additionalProperties": false,
           "properties": {
             "rate": {
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/ClosedUnitIntervalF64Wire"
             },
             "type": {
               "const": "constant",
@@ -19039,15 +19038,15 @@
           "additionalProperties": false,
           "properties": {
             "factor_correlation": {
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/CorrelationWire"
             },
             "mean_recovery": {
-              "format": "double",
-              "type": "number"
+              "$ref": "#/$defs/ClosedUnitIntervalF64Wire"
             },
             "recovery_volatility": {
               "format": "double",
+              "maximum": 0.5,
+              "minimum": 0.0,
               "type": "number"
             },
             "type": {

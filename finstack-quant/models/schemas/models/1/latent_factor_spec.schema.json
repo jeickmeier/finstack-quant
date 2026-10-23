@@ -1,25 +1,37 @@
 {
+  "$defs": {
+    "CorrelationWire": {
+      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": -1.0,
+      "type": "number"
+    },
+    "NonNegativeF64Wire": {
+      "description": "Finite JSON number greater than or equal to zero.",
+      "format": "double",
+      "minimum": 0.0,
+      "type": "number"
+    }
+  },
   "$id": "https://finstack_quant.dev/schemas/models/1/latent_factor_spec.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Factor model specification for configuration and serialization.",
   "oneOf": [
     {
       "additionalProperties": false,
-      "description": "Single factor model (common market factor).",
       "properties": {
         "mean_reversion": {
-          "description": "Mean reversion speed (0 = random walk)",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/NonNegativeF64Wire",
+          "description": "Finite non-negative mean-reversion speed per year."
         },
         "type": {
           "const": "single_factor",
           "type": "string"
         },
         "volatility": {
-          "description": "Factor volatility (std dev of innovations)",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/NonNegativeF64Wire",
+          "description": "Finite non-negative decimal factor volatility."
         }
       },
       "required": [
@@ -31,22 +43,18 @@
     },
     {
       "additionalProperties": false,
-      "description": "Two-factor model for prepayment and credit.",
       "properties": {
         "correlation": {
-          "description": "Correlation between prepayment and credit factors",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/CorrelationWire",
+          "description": "Gaussian correlation in [-1, 1], including endpoints."
         },
         "credit_vol": {
-          "description": "Credit factor volatility",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/NonNegativeF64Wire",
+          "description": "Finite non-negative decimal credit-factor volatility."
         },
         "prepay_vol": {
-          "description": "Prepayment factor volatility",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/NonNegativeF64Wire",
+          "description": "Finite non-negative decimal prepayment-factor volatility."
         },
         "type": {
           "const": "two_factor",
@@ -63,20 +71,18 @@
     },
     {
       "additionalProperties": false,
-      "description": "Multi-factor model with custom correlation matrix.",
       "properties": {
         "correlations": {
-          "description": "Correlation matrix (flattened row-major)",
+          "description": "Row-major square Gaussian correlation matrix with entries in [-1, 1].",
           "items": {
-            "format": "double",
-            "type": "number"
+            "$ref": "#/$defs/CorrelationWire"
           },
           "type": "array"
         },
         "num_factors": {
-          "description": "Number of factors",
+          "description": "Positive number of factors.",
           "format": "uint",
-          "minimum": 0,
+          "minimum": 1,
           "type": "integer"
         },
         "type": {
@@ -84,10 +90,9 @@
           "type": "string"
         },
         "volatilities": {
-          "description": "Factor volatilities",
+          "description": "One finite non-negative decimal volatility per factor.",
           "items": {
-            "format": "double",
-            "type": "number"
+            "$ref": "#/$defs/NonNegativeF64Wire"
           },
           "type": "array"
         }

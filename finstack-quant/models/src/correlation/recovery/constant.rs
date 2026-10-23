@@ -15,7 +15,7 @@
 //! - Recovery-rate empirical context: `docs/REFERENCES.md#altman-et-al-2005-recovery`
 //!
 
-use super::RecoveryModel;
+use super::{validate_recovery_input, RecoveryModel, Result};
 
 /// Constant recovery rate model.
 ///
@@ -35,26 +35,28 @@ impl ConstantRecovery {
     /// Create a constant recovery model.
     ///
     /// # Arguments
-    /// * `rate` - Recovery rate, clamped to [0, 1]
+    /// * `rate` - Recovery rate, finite and in [0, 1]
     ///
     /// # Returns
     ///
     /// A constant recovery model with the bounded recovery rate.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `rate` is non-finite or outside `[0, 1]`.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use finstack_quant_models::correlation::{ConstantRecovery, RecoveryModel};
     ///
-    /// let model = ConstantRecovery::new(0.40);
+    /// let model = ConstantRecovery::new(0.40).expect("valid model inputs");
     /// assert_eq!(model.expected_recovery(), 0.40);
     /// assert_eq!(model.conditional_recovery(-3.0), 0.40);
     /// ```
-    #[must_use]
-    pub fn new(rate: f64) -> Self {
-        Self {
-            rate: rate.clamp(0.0, 1.0),
-        }
+    pub fn new(rate: f64) -> Result<Self> {
+        validate_recovery_input("rate", rate, 0.0, 1.0)?;
+        Ok(Self { rate })
     }
 }
 
@@ -83,23 +85,21 @@ mod tests {
 
     #[test]
     fn test_constant_recovery_creation() {
-        let model = ConstantRecovery::new(0.40);
+        let model = ConstantRecovery::new(0.40).expect("valid model inputs");
         assert!((model.rate - 0.40).abs() < 1e-10);
         assert_eq!(model.model_name(), "Constant Recovery");
     }
 
     #[test]
-    fn test_constant_recovery_clamping() {
-        let high = ConstantRecovery::new(1.5);
-        assert!((high.rate - 1.0).abs() < 1e-10);
-
-        let low = ConstantRecovery::new(-0.1);
-        assert!((low.rate - 0.0).abs() < 1e-10);
+    fn invalid_constant_recovery_is_rejected() {
+        for rate in [-0.1, 1.5, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(ConstantRecovery::new(rate).is_err());
+        }
     }
 
     #[test]
     fn test_conditional_equals_unconditional() {
-        let model = ConstantRecovery::new(0.40);
+        let model = ConstantRecovery::new(0.40).expect("valid model inputs");
 
         for z in [-3.0, -1.0, 0.0, 1.0, 3.0] {
             assert!((model.conditional_recovery(z) - model.expected_recovery()).abs() < 1e-10);
@@ -108,13 +108,13 @@ mod tests {
 
     #[test]
     fn test_lgd_calculation() {
-        let model = ConstantRecovery::new(0.40);
+        let model = ConstantRecovery::new(0.40).expect("valid model inputs");
         assert!((model.lgd() - 0.60).abs() < 1e-10);
     }
 
     #[test]
     fn test_is_not_stochastic() {
-        let model = ConstantRecovery::new(0.40);
+        let model = ConstantRecovery::new(0.40).expect("valid model inputs");
         assert!(!model.is_stochastic());
         assert!((model.recovery_volatility()).abs() < 1e-10);
     }

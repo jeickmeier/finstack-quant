@@ -2152,15 +2152,23 @@ export type StochasticPrepaySpec =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
-      factor_correlation: number;
-      mean_recovery: number;
+      factor_correlation: CorrelationWire;
+      mean_recovery: ClosedUnitIntervalF64Wire;
       recovery_volatility: number;
       type: "market_correlated";
     };
+/**
+ * Finite JSON number in the closed interval `[0, 1]`.
+ */
+export type ClosedUnitIntervalF64Wire = number;
+/**
+ * Finite correlation coefficient in the closed interval `[-1, 1]`.
+ */
+export type CorrelationWire = number;
 /**
  * Controls where attribution repricing work spends parallelism.
  *
@@ -3049,17 +3057,9 @@ export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "
  */
 export type PositiveF64Wire = number;
 /**
- * Finite JSON number in the closed interval `[0, 1]`.
- */
-export type ClosedUnitIntervalF64Wire = number;
-/**
  * Finite JSON number greater than or equal to zero.
  */
 export type NonNegativeF64Wire = number;
-/**
- * Finite correlation coefficient in the closed interval `[-1, 1]`.
- */
-export type CorrelationWire = number;
 /**
  * Settlement type for options
  */

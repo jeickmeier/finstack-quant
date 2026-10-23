@@ -3408,12 +3408,12 @@ export type StochasticPrepaySpec =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
-      factor_correlation: number;
-      mean_recovery: number;
+      factor_correlation: CorrelationWire;
+      mean_recovery: ClosedUnitIntervalF64Wire;
       recovery_volatility: number;
       type: "market_correlated";
     };

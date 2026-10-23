@@ -44,7 +44,7 @@
 //! - Tranche calibration background: `docs/REFERENCES.md#krekel-stumpp-2006-correlation-products`
 //!
 
-use super::RecoveryModel;
+use super::{validate_correlated_inputs, RecoveryModel, Result};
 use finstack_quant_core::math::{
     integration::adaptive_simpson,
     special_functions::{norm_cdf, norm_pdf},
@@ -82,35 +82,40 @@ impl CorrelatedRecovery {
     /// Create a correlated recovery model.
     ///
     /// # Arguments
-    /// * `mean` - Recovery at zero factor, clamped to [0.0, 1.0]. Endpoints
+    /// * `mean` - Recovery at zero factor, finite and in [0.0, 1.0]. Endpoints
     ///   give constant zero or full recovery. Typical: 0.40.
-    /// * `vol` - Recovery volatility, clamped to [0.0, 0.50]. Typical: 0.20-0.30
-    /// * `corr` - Correlation with market factor, clamped to [-1.0, 1.0]. Typical: +0.30 to +0.50
+    /// * `vol` - Recovery volatility, finite and in [0.0, 0.50]. Typical: 0.20-0.30
+    /// * `corr` - Correlation with market factor, finite and in [-1.0, 1.0]. Typical: +0.30 to +0.50
     ///
     /// # Returns
     ///
     /// A stochastic recovery model bounded to `[0.0, 1.0]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an invalid recovery input, or a core
+    /// computation error if integration of expected recovery fails.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use finstack_quant_models::correlation::{CorrelatedRecovery, RecoveryModel};
     ///
-    /// let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
+    /// let model = CorrelatedRecovery::new(0.40, 0.25, 0.40).expect("valid model inputs");
     /// let mean_at_zero = model.conditional_recovery(0.0);
     ///
     /// assert!((mean_at_zero - 0.40).abs() < 1e-12);
     /// ```
-    #[must_use]
-    pub fn new(mean: f64, vol: f64, corr: f64) -> Self {
+    pub fn new(mean: f64, vol: f64, corr: f64) -> Result<Self> {
+        validate_correlated_inputs(mean, vol, corr)?;
         let mut model = Self {
-            mean_recovery: mean.clamp(0.0, 1.0),
-            recovery_volatility: vol.clamp(0.0, 0.50),
-            factor_correlation: corr.clamp(-1.0, 1.0),
+            mean_recovery: mean,
+            recovery_volatility: vol,
+            factor_correlation: corr,
             unconditional_expected_recovery: 0.0,
         };
-        model.unconditional_expected_recovery = model.compute_unconditional_expected_recovery();
-        model
+        model.unconditional_expected_recovery = model.compute_unconditional_expected_recovery()?;
+        Ok(model)
     }
 
     /// Compute `E_Z[R(Z)]` by adaptive integration against `N(0, 1)`.
@@ -118,11 +123,11 @@ impl CorrelatedRecovery {
     /// Steep curves near a recovery bound are integrated in logit coordinates
     /// so their transition remains resolved even as its Gaussian width tends
     /// to zero. The discarded logistic tails contribute less than `3e-16`.
-    fn compute_unconditional_expected_recovery(&self) -> f64 {
+    fn compute_unconditional_expected_recovery(&self) -> Result<f64> {
         let location = self.logistic_bounded_recovery(0.0);
         let shock_scale = (self.factor_correlation * self.recovery_volatility).abs();
         if shock_scale == 0.0 || location <= 0.0 || location >= 1.0 {
-            return location;
+            return Ok(location);
         }
 
         let p = self.mean_recovery;
@@ -137,7 +142,7 @@ impl CorrelatedRecovery {
                 1e-12,
                 24,
             )
-            .unwrap_or(f64::NAN);
+            .map_err(Into::into);
         }
 
         let center = (p / (1.0 - p)).ln();
@@ -152,7 +157,7 @@ impl CorrelatedRecovery {
             1e-12,
             24,
         );
-        integral.unwrap_or(f64::NAN) + norm_cdf((center - 36.0) / logit_slope)
+        Ok(integral? + norm_cdf((center - 36.0) / logit_slope))
     }
 
     fn logistic_bounded_recovery(&self, shock: f64) -> f64 {
@@ -210,7 +215,7 @@ mod tests {
     #[test]
     fn zero_and_full_recovery_are_constant_at_every_factor() {
         for mean in [0.0, 1.0] {
-            let model = CorrelatedRecovery::new(mean, 0.25, 0.4);
+            let model = CorrelatedRecovery::new(mean, 0.25, 0.4).expect("valid model inputs");
             for factor in [-10.0, 0.0, 10.0] {
                 assert_eq!(model.conditional_recovery(factor).to_bits(), mean.to_bits());
             }
@@ -221,7 +226,7 @@ mod tests {
     #[test]
     fn near_boundary_expected_recovery_matches_dense_gaussian_integration() {
         for mean in [0.01, 0.99] {
-            let model = CorrelatedRecovery::new(mean, 0.25, 0.4);
+            let model = CorrelatedRecovery::new(mean, 0.25, 0.4).expect("valid model inputs");
             let dense_mean = dense_gaussian_mean(&model);
             assert!((model.expected_recovery() - dense_mean).abs() < 1e-10);
         }
@@ -229,16 +234,17 @@ mod tests {
 
     #[test]
     fn extremely_steep_recovery_has_finite_symmetric_expectation() {
-        let lower = CorrelatedRecovery::new(f64::MIN_POSITIVE, 0.25, 0.4);
+        let lower =
+            CorrelatedRecovery::new(f64::MIN_POSITIVE, 0.25, 0.4).expect("valid model inputs");
         assert!((lower.expected_recovery() - 0.5).abs() < 1e-12);
-        let lower = CorrelatedRecovery::new(0.01, 0.25, 0.4);
-        let upper = CorrelatedRecovery::new(0.99, 0.25, 0.4);
+        let lower = CorrelatedRecovery::new(0.01, 0.25, 0.4).expect("valid model inputs");
+        let upper = CorrelatedRecovery::new(0.99, 0.25, 0.4).expect("valid model inputs");
         assert!((lower.expected_recovery() + upper.expected_recovery() - 1.0).abs() < 1e-12);
     }
 
     #[test]
     fn test_correlated_recovery_creation() {
-        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40).expect("valid model inputs");
         assert!((model.mean_recovery - 0.40).abs() < 1e-10);
         assert!((model.recovery_volatility - 0.25).abs() < 1e-10);
         assert!((model.factor_correlation - 0.40).abs() < 1e-10);
@@ -246,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_conditional_recovery_in_stress() {
-        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40).expect("valid model inputs");
 
         // Canonical convention: low latent factor = stress, so Z = -2 is a
         // stress scenario and recovery must FALL below R(0).
@@ -262,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_conditional_recovery_varies() {
-        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40).expect("valid model inputs");
 
         let r_neg = model.conditional_recovery(-2.0);
         let r_zero = model.conditional_recovery(0.0);
@@ -277,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_conditional_recovery_at_zero_equals_location() {
-        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40).expect("valid model inputs");
 
         // At Z=0, R(Z) equals the location parameter μ_R (median recovery).
         // This is *not* generally the same as the unconditional mean E[R(Z)]
@@ -295,7 +301,7 @@ mod tests {
         // integrating the logistic-bounded recovery against N(0,1). It should
         // differ from R(0) when ρ_R·σ_R ≠ 0, and match R(0) exactly when the
         // recovery is deterministic.
-        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40).expect("valid model inputs");
         let r_at_zero = model.mean_recovery;
         let e_r = model.expected_recovery();
 
@@ -308,7 +314,7 @@ mod tests {
         assert!((0.0..=1.0).contains(&e_r));
 
         // When correlation is zero, R is deterministic and E[R] = R(0).
-        let det_model = CorrelatedRecovery::new(0.40, 0.25, 0.0);
+        let det_model = CorrelatedRecovery::new(0.40, 0.25, 0.0).expect("valid model inputs");
         assert!(
             (det_model.expected_recovery() - det_model.mean_recovery).abs() < 1e-12,
             "Deterministic recovery: E[R] must equal R(0)"
@@ -324,7 +330,7 @@ mod tests {
 
     #[test]
     fn test_recovery_bounded() {
-        let model = CorrelatedRecovery::new(0.40, 0.30, 0.50);
+        let model = CorrelatedRecovery::new(0.40, 0.30, 0.50).expect("valid model inputs");
 
         // Even with extreme factors, recovery should be bounded
         let extreme_neg = model.conditional_recovery(-10.0);
@@ -352,14 +358,14 @@ mod tests {
 
     #[test]
     fn test_is_stochastic() {
-        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40).expect("valid model inputs");
         assert!(model.is_stochastic());
         assert!(model.recovery_volatility() > 0.0);
     }
 
     #[test]
     fn test_zero_volatility_is_constant() {
-        let model = CorrelatedRecovery::new(0.40, 0.0, 0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.0, 0.40).expect("valid model inputs");
 
         // With zero volatility, should behave like constant
         let r_neg = model.conditional_recovery(-2.0);
@@ -373,7 +379,7 @@ mod tests {
 
     #[test]
     fn test_zero_correlation_is_constant() {
-        let model = CorrelatedRecovery::new(0.40, 0.25, 0.0);
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.0).expect("valid model inputs");
 
         // With zero correlation, should behave like constant
         let r_neg = model.conditional_recovery(-2.0);
@@ -387,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_lgd_calculation() {
-        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40).expect("valid model inputs");
 
         // LGD = 1 - E[R(Z)]. The Jensen correction is small (a few bp), so
         // LGD should be close to but not exactly equal to 1 - R(0) = 0.60.

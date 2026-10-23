@@ -234,7 +234,8 @@ impl PyRecoverySpec {
     /// Market-correlated (Andersen-Sidenius) stochastic recovery.
     ///
     /// Raises ``ValueError`` if ``mean`` is not finite or lies outside
-    /// ``[0, 1]``, or if ``vol`` / ``correlation`` are not finite.
+    /// ``[0, 1]``, ``vol`` is non-finite or outside ``[0, 0.5]``, or
+    /// ``correlation`` is non-finite or outside ``[-1, 1]``.
     #[classmethod]
     #[pyo3(text_signature = "(cls, mean, vol, correlation)")]
     fn market_correlated(
@@ -252,8 +253,10 @@ impl PyRecoverySpec {
     /// recovery falls in stress under the canonical low-factor-stress
     /// convention).
     #[classmethod]
-    fn market_standard_stochastic(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(RecoverySpec::market_standard_stochastic())
+    fn market_standard_stochastic(_cls: &Bound<'_, PyType>) -> PyResult<Self> {
+        RecoverySpec::market_standard_stochastic()
+            .map(Self::from_inner)
+            .map_err(correlation_to_py)
     }
 
     /// Location-parameter recovery rate of this spec.
@@ -270,10 +273,14 @@ impl PyRecoverySpec {
     }
 
     /// Build a concrete `RecoveryModel` from this specification.
-    fn build(&self) -> PyRecoveryModel {
-        PyRecoveryModel {
-            inner: self.inner.build(),
-        }
+    ///
+    /// Raises ``ValueError`` for invalid inputs and ``RuntimeError`` if
+    /// numerical integration of expected recovery fails.
+    fn build(&self) -> PyResult<PyRecoveryModel> {
+        self.inner
+            .build()
+            .map(|inner| PyRecoveryModel { inner })
+            .map_err(correlation_to_py)
     }
 
     fn __repr__(&self) -> String {
@@ -374,8 +381,14 @@ impl PyLatentFactorSpec {
     /// Single-factor model specification.
     #[classmethod]
     #[pyo3(text_signature = "(cls, volatility, mean_reversion)")]
-    fn single_factor(_cls: &Bound<'_, PyType>, volatility: f64, mean_reversion: f64) -> Self {
-        Self::from_inner(LatentFactorSpec::single_factor(volatility, mean_reversion))
+    fn single_factor(
+        _cls: &Bound<'_, PyType>,
+        volatility: f64,
+        mean_reversion: f64,
+    ) -> PyResult<Self> {
+        LatentFactorSpec::single_factor(volatility, mean_reversion)
+            .map(Self::from_inner)
+            .map_err(correlation_to_py)
     }
 
     /// Two-factor model (prepayment + credit) specification.
@@ -386,12 +399,10 @@ impl PyLatentFactorSpec {
         prepay_vol: f64,
         credit_vol: f64,
         correlation: f64,
-    ) -> Self {
-        Self::from_inner(LatentFactorSpec::two_factor(
-            prepay_vol,
-            credit_vol,
-            correlation,
-        ))
+    ) -> PyResult<Self> {
+        LatentFactorSpec::two_factor(prepay_vol, credit_vol, correlation)
+            .map(Self::from_inner)
+            .map_err(correlation_to_py)
     }
 
     /// Number of factors implied by this specification.
@@ -402,8 +413,8 @@ impl PyLatentFactorSpec {
 
     /// Build a concrete factor model from this specification.
     ///
-    /// Raises ``ValueError`` if a multi-factor specification contains an
-    /// invalid volatility vector or correlation matrix.
+    /// Raises ``ValueError`` if the specification contains invalid volatility,
+    /// mean-reversion, correlation, factor count or matrix inputs.
     fn build(&self) -> PyResult<PyLatentFactorKind> {
         self.inner
             .build()
@@ -494,10 +505,10 @@ impl PyLatentSingleFactor {
     /// Create a single-factor model.
     #[new]
     #[pyo3(text_signature = "(volatility, mean_reversion)")]
-    fn new(volatility: f64, mean_reversion: f64) -> Self {
-        Self {
-            inner: LatentSingleFactor::new(volatility, mean_reversion),
-        }
+    fn new(volatility: f64, mean_reversion: f64) -> PyResult<Self> {
+        LatentSingleFactor::new(volatility, mean_reversion)
+            .map(|inner| Self { inner })
+            .map_err(correlation_to_py)
     }
 
     /// Factor volatility.
@@ -545,26 +556,26 @@ impl PyLatentTwoFactor {
     /// Create a two-factor model.
     #[new]
     #[pyo3(text_signature = "(prepay_vol, credit_vol, correlation)")]
-    fn new(prepay_vol: f64, credit_vol: f64, correlation: f64) -> Self {
-        Self {
-            inner: LatentTwoFactor::new(prepay_vol, credit_vol, correlation),
-        }
+    fn new(prepay_vol: f64, credit_vol: f64, correlation: f64) -> PyResult<Self> {
+        LatentTwoFactor::new(prepay_vol, credit_vol, correlation)
+            .map(|inner| Self { inner })
+            .map_err(correlation_to_py)
     }
 
     /// Standard RMBS calibration.
     #[classmethod]
-    fn rmbs_standard(_cls: &Bound<'_, PyType>) -> Self {
-        Self {
-            inner: LatentTwoFactor::rmbs_standard(),
-        }
+    fn rmbs_standard(_cls: &Bound<'_, PyType>) -> PyResult<Self> {
+        LatentTwoFactor::rmbs_standard()
+            .map(|inner| Self { inner })
+            .map_err(correlation_to_py)
     }
 
     /// Standard CLO calibration.
     #[classmethod]
-    fn clo_standard(_cls: &Bound<'_, PyType>) -> Self {
-        Self {
-            inner: LatentTwoFactor::clo_standard(),
-        }
+    fn clo_standard(_cls: &Bound<'_, PyType>) -> PyResult<Self> {
+        LatentTwoFactor::clo_standard()
+            .map(|inner| Self { inner })
+            .map_err(correlation_to_py)
     }
 
     /// Prepayment factor volatility.
