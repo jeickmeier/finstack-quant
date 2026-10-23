@@ -1,11 +1,13 @@
 //! Benchmark-relative metrics: tracking error, information ratio, beta, greeks.
 //!
-//! [`beta`] and the result types ([`BetaResult`], [`GreeksResult`],
-//! [`RollingGreeks`], [`MultiFactorResult`]) are re-exported at the crate
-//! root. Everything else is crate-internal.
+//! [`beta`], the result types ([`BetaResult`], [`GreeksResult`],
+//! [`RollingGreeks`], [`MultiFactorResult`]) and the [`ReturnKind`] input are
+//! re-exported at the crate root. Everything else is crate-internal.
 //!
-//! Delegates to `math::stats` for core statistics (correlation, covariance,
-//! variance, OnlineCovariance).
+//! Full-sample moments accumulate through
+//! `finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats}`; rolling
+//! greeks keep their own shifted window sums, and the multi-factor fit solves
+//! through `crate::regression::normalized_svd_least_squares`.
 
 use crate::regression::normalized_svd_least_squares;
 use finstack_quant_core::dates::Date;

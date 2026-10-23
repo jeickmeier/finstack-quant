@@ -1,8 +1,10 @@
 //! Return-based risk metrics: mean, volatility, Sharpe, Sortino, CAGR, and more.
 //!
-//! Crate-internal building blocks for [`crate::Performance`]. Functions take
-//! `&[f64]` return slices. Annualization uses the caller-supplied factor
-//! (typically from `PeriodKind::periods_per_year()`).
+//! [`sharpe`], [`sortino`], [`volatility`], [`max_drawdown`] and
+//! [`CagrDayCount`] are public and re-exported at the crate root; the other
+//! functions are crate-internal building blocks for [`crate::Performance`].
+//! Functions take `&[f64]` return slices. Annualization uses the
+//! caller-supplied factor (typically from `PeriodKind::periods_per_year()`).
 
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, HolidayCalendar};
 use finstack_quant_core::math::stats::{mean, mean_var, variance};
@@ -229,8 +231,8 @@ pub(crate) fn mean_vol_annualized(returns: &[f64], ann_factor: f64) -> (f64, f64
 ///
 /// # Returns
 ///
-/// Annualized volatility as a decimal; `0.0` for an empty slice and `NaN`
-/// when `periods_per_year` is not a positive finite number.
+/// Annualized volatility as a decimal; `0.0` for fewer than two observations
+/// and `NaN` when `periods_per_year` is not a positive finite number.
 #[must_use]
 pub fn volatility(returns: &[f64], periods_per_year: f64) -> f64 {
     if invalid_annualization_factor(true, periods_per_year) {

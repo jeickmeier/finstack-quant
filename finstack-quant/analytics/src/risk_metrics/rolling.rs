@@ -1,4 +1,4 @@
-//! Rolling risk metrics: Sharpe, Sortino, and volatility over a sliding window.
+//! Rolling metrics: compounded return, Sharpe, Sortino, and volatility over a sliding window.
 //!
 //! Crate-internal except for [`DatedSeries`] and [`RollingMetric`] (re-exported
 //! at the crate root).
