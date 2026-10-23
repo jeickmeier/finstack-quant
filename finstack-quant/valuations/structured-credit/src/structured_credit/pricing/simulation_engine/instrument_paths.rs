@@ -369,6 +369,15 @@ impl<S: PeriodShockSource> PoolFlowSource for InstrumentPathFlowSource<'_, S> {
                 PerNameResolution::Realized => {
                     for (slot, &i) in self.alive.iter().enumerate() {
                         self.inputs[i].pd = if self.default_scratch[slot] { 1.0 } else { 0.0 };
+                        let recovery = engine.sample_recovery(shock.recovery_factor)?;
+                        // Explicit instrument/hazard recovery remains authoritative.
+                        if matches!(
+                            self.prepared.schedules[i].default_source,
+                            PeriodDefaultSource::DealModel
+                        ) && self.prepared.schedules[i].recovery_rate.is_none()
+                        {
+                            self.inputs[i].recovery_rate = recovery;
+                        }
                     }
                 }
                 PerNameResolution::Conditional => {

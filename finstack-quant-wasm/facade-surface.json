@@ -2491,14 +2491,21 @@
     "constructor": false,
     "statics": ["constant", "fromJson", "marketCorrelated", "marketStandardStochastic"],
     "methods": ["build", "free", "toJson"],
-    "getters": ["expectedRecovery"]
+    "getters": []
   },
   "models.correlation.RecoveryModel": {
     "kind": "class",
     "constructor": false,
     "statics": [],
-    "methods": ["conditionalLgd", "conditionalRecovery", "free"],
-    "getters": ["expectedRecovery", "isStochastic", "lgd", "modelName", "recoveryVolatility"]
+    "methods": ["conditionalLgd", "conditionalRecovery", "free", "sampleRecovery"],
+    "getters": [
+      "expectedRecovery",
+      "hasIdiosyncraticDispersion",
+      "isStochastic",
+      "lgd",
+      "modelName",
+      "recoveryVolatility"
+    ]
   },
   "models.correlation.PortfolioLossResult": {
     "kind": "class",

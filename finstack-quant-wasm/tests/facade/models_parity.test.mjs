@@ -493,6 +493,30 @@ const CASES = {
     ];
   },
 
+  'correlation.recovery': () => {
+    const spec = correlation.RecoverySpec.marketCorrelated(0.4, 0.25, 0.4);
+    const model = spec.build();
+    const independentSpec = correlation.RecoverySpec.marketCorrelated(0.4, 0.25, 0);
+    const independent = independentSpec.build();
+    const perfectSpec = correlation.RecoverySpec.marketCorrelated(0.4, 0.25, 1);
+    const perfect = perfectSpec.build();
+    try {
+      return [
+        model.expectedRecovery,
+        ...[-2, 0, 2].map((z) => model.conditionalRecovery(z)),
+        ...[
+          [-2, 1],
+          [0, 0],
+          [2, -0.5],
+        ].map(([z, e]) => model.sampleRecovery(z, e)),
+        independent.hasIdiosyncraticDispersion,
+        perfect.hasIdiosyncraticDispersion,
+      ];
+    } finally {
+      for (const value of [model, spec, independent, independentSpec, perfect, perfectSpec])
+        value.free();
+    }
+  },
   'correlation.bernoulli': () => {
     const pair = new correlation.CorrelatedBernoulli(0.1, 0.2, 0.3);
     return [

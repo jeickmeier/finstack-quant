@@ -211,8 +211,8 @@ impl JsRecoverySpec {
     }
 
     /// Market-correlated (Andersen-Sidenius) stochastic recovery.
-    /// @param mean - Mean recovery rate expressed as a fraction from 0 through 1.
-    /// @param vol - Recovery-rate volatility; finite and in `[0, 0.5]`.
+    /// @param mean - Zero-total-shock recovery location in `[0, 1]`; this is not the unconditional mean.
+    /// @param vol - Local shock scale, finite in `[0, 0.5]`; this is not the realized recovery standard deviation.
     /// @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are rejected.
     ///
     /// # Errors
@@ -241,19 +241,6 @@ impl JsRecoverySpec {
         corr::RecoverySpec::market_standard_stochastic()
             .map(|inner| Self { inner })
             .map_err(to_js_err)
-    }
-
-    /// Location-parameter recovery rate of this spec.
-    ///
-    /// For a constant spec this is the constant rate. For a
-    /// market-correlated spec this returns the `mean` input — the target
-    /// recovery at factor `Z = 0` — which differs from the Jensen-corrected
-    /// unconditional mean `E_Z[R(Z)]` whenever the factor sensitivity is
-    /// non-zero. For the true unconditional mean call
-    /// `build().expectedRecovery`.
-    #[wasm_bindgen(getter, js_name = expectedRecovery)]
-    pub fn expected_recovery(&self) -> f64 {
-        self.inner.expected_recovery()
     }
 
     /// Build a concrete recovery model from this specification.
@@ -286,12 +273,16 @@ impl JsRecoveryModel {
         self.inner.expected_recovery()
     }
 
-    /// Recovery conditional on the systematic market factor.
+    /// Expected recovery conditional on the systematic market factor, integrating the independent obligor shock.
+    /// @returns Conditional mean recovery in `[0, 1]`.
+    /// @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
     /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
     #[wasm_bindgen(js_name = conditionalRecovery)]
     pub fn conditional_recovery(&self, market_factor: JsValue) -> Result<f64, JsValue> {
         let market_factor = js_f64(&market_factor, "marketFactor")?;
-        Ok(self.inner.conditional_recovery(market_factor))
+        self.inner
+            .conditional_recovery(market_factor)
+            .map_err(to_js_err)
     }
 
     /// Loss given default (1 − recovery).
@@ -300,21 +291,47 @@ impl JsRecoveryModel {
         self.inner.lgd()
     }
 
-    /// Conditional LGD given market factor.
+    /// Conditional expected LGD given the systematic market factor.
+    /// @returns One minus conditional mean recovery.
+    /// @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
     /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
     #[wasm_bindgen(js_name = conditionalLgd)]
     pub fn conditional_lgd(&self, market_factor: JsValue) -> Result<f64, JsValue> {
         let market_factor = js_f64(&market_factor, "marketFactor")?;
-        Ok(self.inner.conditional_lgd(market_factor))
+        self.inner.conditional_lgd(market_factor).map_err(to_js_err)
     }
 
-    /// Recovery-rate volatility scale (0 for constant models).
+    /// Sample bounded recovery from the canonical logistic-normal law.
+    /// @param market_factor - Finite systematic standard-normal shock; low values represent credit stress.
+    /// @param idiosyncratic_normal - Finite independent obligor standard-normal shock; ignored for constant or perfectly systematic models.
+    /// @returns Sampled recovery as a decimal fraction of notional in `[0, 1]`.
+    /// @throws Throws a `validation` error if either shock is non-finite.
+    #[wasm_bindgen(js_name = sampleRecovery)]
+    pub fn sample_recovery(
+        &self,
+        market_factor: JsValue,
+        idiosyncratic_normal: JsValue,
+    ) -> Result<f64, JsValue> {
+        let market_factor = js_f64(&market_factor, "marketFactor")?;
+        let idiosyncratic_normal = js_f64(&idiosyncratic_normal, "idiosyncraticNormal")?;
+        self.inner
+            .sample_recovery(market_factor, idiosyncratic_normal)
+            .map_err(to_js_err)
+    }
+
+    /// Whether sampling needs an independent obligor recovery draw.
+    #[wasm_bindgen(getter, js_name = hasIdiosyncraticDispersion)]
+    pub fn has_idiosyncratic_dispersion(&self) -> bool {
+        self.inner.has_idiosyncratic_dispersion()
+    }
+
+    /// Local recovery shock scale in decimals, not realized recovery standard deviation.
     #[wasm_bindgen(getter, js_name = recoveryVolatility)]
     pub fn recovery_volatility(&self) -> f64 {
         self.inner.recovery_volatility()
     }
 
-    /// Whether recovery varies with the market factor.
+    /// Whether the recovery distribution is nonconstant, including obligor-only variation.
     #[wasm_bindgen(getter, js_name = isStochastic)]
     pub fn is_stochastic(&self) -> bool {
         self.inner.is_stochastic()

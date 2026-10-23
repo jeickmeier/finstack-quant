@@ -499,6 +499,19 @@ def _correlation_cases() -> dict[str, Callable[[], Any]]:
     loss = lambda result: [result.expected_loss, result.var, result.expected_shortfall]  # noqa: E731
     pair = lambda: correlation.CorrelatedBernoulli(0.1, 0.2, 0.3)  # noqa: E731
     return {
+        "correlation.recovery": lambda: [
+            correlation.RecoverySpec.market_correlated(0.4, 0.25, 0.4).build().expected_recovery,
+            *[
+                correlation.RecoverySpec.market_correlated(0.4, 0.25, 0.4).build().conditional_recovery(z)
+                for z in [-2.0, 0.0, 2.0]
+            ],
+            *[
+                correlation.RecoverySpec.market_correlated(0.4, 0.25, 0.4).build().sample_recovery(z, e)
+                for z, e in [(-2.0, 1.0), (0.0, 0.0), (2.0, -0.5)]
+            ],
+            correlation.RecoverySpec.market_correlated(0.4, 0.25, 0.0).build().has_idiosyncratic_dispersion,
+            correlation.RecoverySpec.market_correlated(0.4, 0.25, 1.0).build().has_idiosyncratic_dispersion,
+        ],
         "correlation.bernoulli": lambda: [
             list(pair().joint_probabilities()),
             pair().conditional_p2_given_x1(),

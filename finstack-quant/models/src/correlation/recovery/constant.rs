@@ -15,7 +15,7 @@
 //! - Recovery-rate empirical context: `docs/REFERENCES.md#altman-et-al-2005-recovery`
 //!
 
-use super::{validate_recovery_input, RecoveryModel, Result};
+use super::{validate_finite_recovery_input, validate_recovery_input, RecoveryModel, Result};
 
 /// Constant recovery rate model.
 ///
@@ -52,7 +52,7 @@ impl ConstantRecovery {
     ///
     /// let model = ConstantRecovery::new(0.40).expect("valid model inputs");
     /// assert_eq!(model.expected_recovery(), 0.40);
-    /// assert_eq!(model.conditional_recovery(-3.0), 0.40);
+    /// assert_eq!(model.conditional_recovery(-3.0).expect("finite factor"), 0.40);
     /// ```
     pub fn new(rate: f64) -> Result<Self> {
         validate_recovery_input("rate", rate, 0.0, 1.0)?;
@@ -65,9 +65,19 @@ impl RecoveryModel for ConstantRecovery {
         self.rate
     }
 
-    fn conditional_recovery(&self, _market_factor: f64) -> f64 {
-        // Constant: recovery doesn't depend on market factor
-        self.rate
+    fn conditional_recovery(&self, market_factor: f64) -> Result<f64> {
+        validate_finite_recovery_input("market_factor", market_factor)?;
+        Ok(self.rate)
+    }
+
+    fn sample_recovery(&self, market_factor: f64, idiosyncratic_normal: f64) -> Result<f64> {
+        validate_finite_recovery_input("market_factor", market_factor)?;
+        validate_finite_recovery_input("idiosyncratic_normal", idiosyncratic_normal)?;
+        Ok(self.rate)
+    }
+
+    fn has_idiosyncratic_dispersion(&self) -> bool {
+        false
     }
 
     fn recovery_volatility(&self) -> f64 {
@@ -102,7 +112,11 @@ mod tests {
         let model = ConstantRecovery::new(0.40).expect("valid model inputs");
 
         for z in [-3.0, -1.0, 0.0, 1.0, 3.0] {
-            assert!((model.conditional_recovery(z) - model.expected_recovery()).abs() < 1e-10);
+            assert!(
+                (model.conditional_recovery(z).expect("finite factor") - model.expected_recovery())
+                    .abs()
+                    < 1e-10
+            );
         }
     }
 

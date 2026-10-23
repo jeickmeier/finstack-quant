@@ -852,7 +852,9 @@ public = [
 # structs (`GaussianCopula`, `StudentTCopula`, `RandomFactorLoadingCopula`,
 # `MultiFactorCopula`) and recovery structs (`ConstantRecovery`,
 # `CorrelatedRecovery`) are reached through `CopulaSpec.build()` /
-# `RecoverySpec.build()`; `NearestCorrelationOpts` is flattened into
+# `RecoverySpec.build()`; its removed location shortcut is replaced by the
+# built model mean; sample_recovery and has_idiosyncratic_dispersion map directly.
+# `NearestCorrelationOpts` is flattened into
 # `nearest_correlation(max_iter=, tol=)`. `PortfolioLossResult` deserializes
 # through `PortfolioLossResult::from_losses` in both hosts. Host input conversion: the Python matrix functions also read nested rows or
 # a 2-D NumPy array (shape-checked by the Rust `flatten_square_matrix`); WASM

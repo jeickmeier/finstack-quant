@@ -548,15 +548,24 @@ impl ValidatedSimulation {
                     "portfolio copula produced a non-finite latent default variable",
                 ));
             }
-            if latent <= *threshold {
-                let recovery_factor = if rho > 0.0 {
-                    systematic
+            let recovery_factor = if rho > 0.0 {
+                systematic
+            } else {
+                factors.first().copied().unwrap_or(0.0)
+            };
+            // Consume a separate recovery draw for every name, including
+            // survivors, whenever the model has residual dispersion.
+            let lgd = if let Some(model) = recovery {
+                let eps = if model.has_idiosyncratic_dispersion() {
+                    rng.next_std_normal()
                 } else {
-                    factors.first().copied().unwrap_or(0.0)
+                    0.0
                 };
-                let lgd = recovery
-                    .map(|model| model.conditional_lgd(recovery_factor))
-                    .unwrap_or(exposure.lgd);
+                1.0 - model.sample_recovery(recovery_factor, eps)?
+            } else {
+                exposure.lgd
+            };
+            if latent <= *threshold {
                 let contribution = exposure.notional * lgd;
                 let next_loss = total_loss + contribution;
                 if !contribution.is_finite() || !next_loss.is_finite() {
