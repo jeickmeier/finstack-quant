@@ -967,10 +967,10 @@ pub(crate) fn pv_by_period(
     recovery_rate: Option<f64>,
     as_of: Date,
 ) -> finstack_quant_core::Result<PeriodAggregation> {
+    validate_periods(periods)?;
     if sorted.is_empty() || periods.is_empty() {
         return Ok(PeriodAggregation::default());
     }
-    validate_periods(periods)?;
     let discounts: Vec<f64> = sorted
         .iter()
         .map(|cf| {
@@ -1282,6 +1282,19 @@ mod period_contract_tests {
         let err = result.expect_err("NaN df must error, not panic");
         assert!(
             format!("{err}").contains("Invalid discount factor"),
+            "got: {err}"
+        );
+    }
+
+    #[test]
+    fn pv_by_period_validates_periods_on_empty_flows() {
+        let base = d(2025, 1, 1);
+        let disc = NanDiscount { base };
+        let periods = vec![period(PeriodId::annual(2025), d(2026, 1, 1), d(2025, 1, 1))];
+        let err = pv_by_period(&[], &periods, &disc, None, None, base)
+            .expect_err("inverted period must be rejected even with no flows");
+        assert!(
+            format!("{err}").contains("strictly before end"),
             "got: {err}"
         );
     }
