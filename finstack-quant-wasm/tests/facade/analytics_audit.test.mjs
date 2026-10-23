@@ -194,7 +194,6 @@ test('integer arguments reject truncation, wrapping and non-finite values', () =
       () => perf.sterlingRatio(0, bad),
       () => perf.burkeRatio(0, bad),
       () => perf.periodStats(bad),
-      () => perf.periodStats(0, 'monthly', bad),
     ])
       assert.throws(call, (error) => error instanceof TypeError && error.kind === 'invalid_type');
   }

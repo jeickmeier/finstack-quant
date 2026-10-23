@@ -31,6 +31,8 @@ from __future__ import annotations
 import datetime
 from typing import Any, Sequence
 
+from finstack_quant.core.dates import FiscalConfig
+
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -3443,14 +3445,14 @@ class Performance:
     def lookback_returns(
         self,
         ref_date: object,
-        fiscal_year_start_month: int | None = None,
-        fiscal_year_start_day: int | None = None,
+        fiscal_config: FiscalConfig | None = None,
     ) -> LookbackReturns:
         """
         Period-to-date lookback returns.
 
-        Defaults to a January-1 fiscal-year start. FYTD is the first
-        observation on or after that fiscal calendar start through
+        MTD, QTD and YTD start on the first calendar day of ``ref_date``'s
+        month, calendar quarter and year. FYTD is the first observation on or
+        after the fiscal calendar start of *fiscal_config* through
         ``ref_date``. Holidays are not skipped. The first included simple
         return still spans the prior close.
 
@@ -3458,13 +3460,9 @@ class Performance:
         ----------
         ref_date : object
             Reference date (``datetime.date``, ``pd.Timestamp``, or ISO string).
-        fiscal_year_start_month : int, optional
-            Fiscal year start month in ``1..=12``. When only the day is given
-            the month is January; with both omitted the fiscal year is the
-            calendar year (Rust ``FiscalConfig::from_parts``).
-        fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``. When only the month is given
-            the day is the 1st.
+        fiscal_config : FiscalConfig, optional
+            Fiscal calendar that opens the FYTD window. ``None`` uses the
+            calendar year (Rust ``FiscalConfig::default``).
 
         Returns
         -------
@@ -3475,16 +3473,17 @@ class Performance:
         Raises
         ------
         ValueError
-            If *fiscal_year_start_month* is not in ``1..=12`` or
-            *fiscal_year_start_day* is not in ``1..=31``.
+            If *ref_date* is a string that is not ISO-8601.
+        TypeError
+            If *ref_date* is not date-like, or *fiscal_config* is neither a
+            ``FiscalConfig`` nor ``None``.
         """
 
     def period_stats(
         self,
         ticker_idx: int | str,
         aggregation_frequency: str | None = None,
-        fiscal_year_start_month: int | None = None,
-        fiscal_year_start_day: int | None = None,
+        fiscal_config: FiscalConfig | None = None,
     ) -> PeriodStats:
         """
         Period statistics for one ticker at a given aggregation frequency.
@@ -3498,14 +3497,10 @@ class Performance:
             Aggregation frequency (``"daily"``, ``"weekly"``, ``"monthly"``,
             ``"quarterly"``, ``"semi_annual"``, ``"annual"``); ``None`` uses the Rust default
             ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
-        fiscal_year_start_month : int, optional
-            Fiscal year start month in ``1..=12``. When only the day is given
-            the month is January (Rust ``FiscalConfig::from_parts``).
-        fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``, clamped to the month end.
-            When only the month is given
-            the day is the 1st. Supplying either fiscal argument applies fiscal
-            day, week, month, quarter, half-year and year boundaries.
+        fiscal_config : FiscalConfig, optional
+            ``None`` buckets Gregorian periods with ISO weeks. A ``FiscalConfig``
+            applies fiscal day, week, month, quarter, half-year and year
+            boundaries, clamping a start day past the month end.
 
         Returns
         -------
@@ -3515,10 +3510,12 @@ class Performance:
         Raises
         ------
         AnalyticsError
-            If the frequency or fiscal start is invalid, the ticker index is
-            out of range, or a containing period boundary cannot be represented.
+            If the frequency is invalid, the ticker index is out of range, or a
+            containing period boundary cannot be represented.
         KeyError
             If a ticker name is not present in the panel.
+        TypeError
+            If *fiscal_config* is neither a ``FiscalConfig`` nor ``None``.
         """
 
     def periodic_returns(
