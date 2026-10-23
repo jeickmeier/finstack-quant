@@ -22,10 +22,6 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::wire::DecimalWire;
 use wasm_bindgen::prelude::*;
 
-/// `[date, value]` pairs with ISO dates, as the coupon programs carry them.
-#[derive(serde::Deserialize)]
-struct DatedPair<T>(Date, T);
-
 /// Dated amounts as `{ date, amount }` objects.
 fn dated_flows_wire(flows: Vec<(Date, Money)>) -> Result<JsValue, JsValue> {
     to_js_value(
@@ -522,11 +518,7 @@ impl JsCashFlowBuilder {
     /// @throws If `steps` is not an array of `[isoDate, CouponType]` pairs (kind `validation`).
     #[wasm_bindgen(js_name = paymentSplitProgram)]
     pub fn payment_split_program(mut self, steps: JsValue) -> Result<JsCashFlowBuilder, JsValue> {
-        let steps: Vec<(Date, CouponType)> =
-            js_wire::<Vec<DatedPair<CouponType>>>(&steps, "steps")?
-                .into_iter()
-                .map(|DatedPair(date, split)| (date, split))
-                .collect();
+        let steps = js_wire::<Vec<(Date, CouponType)>>(&steps, "steps")?;
         let _ = self.inner.payment_split_program(&steps);
         Ok(self)
     }
@@ -565,9 +557,9 @@ impl JsCashFlowBuilder {
         steps: JsValue,
         base_spec: JsValue,
     ) -> Result<JsCashFlowBuilder, JsValue> {
-        let steps: Vec<_> = js_wire::<Vec<DatedPair<DecimalWire>>>(&steps, "steps")?
+        let steps: Vec<_> = js_wire::<Vec<(Date, DecimalWire)>>(&steps, "steps")?
             .into_iter()
-            .map(|DatedPair(date, margin)| (date, margin.0))
+            .map(|(date, margin)| (date, margin.0))
             .collect();
         let _ = self
             .inner
