@@ -8,10 +8,6 @@
 //! - Business day adjustment overhead
 //! - Long-tenor schedule scaling (5Y, 10Y, 30Y)
 
-#[path = "support/bench_utils.rs"]
-mod bench_utils;
-
-use bench_utils::bench_iter;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::dates::{BusinessDayConvention, Schedule, StubKind, Tenor};
 use std::hint::black_box;
@@ -38,13 +34,15 @@ fn bench_frequency_variants(c: &mut Criterion) {
     ];
 
     for (name, frequency) in frequencies {
-        bench_iter(&mut group, name, || {
-            let sched = Schedule::builder(start, end)
-                .unwrap()
-                .frequency(frequency)
-                .build()
-                .unwrap();
-            black_box(sched);
+        group.bench_function(name, |b| {
+            b.iter(|| {
+                let sched = Schedule::builder(start, end)
+                    .unwrap()
+                    .frequency(frequency)
+                    .build()
+                    .unwrap();
+                black_box(sched);
+            })
         });
     }
 
@@ -65,14 +63,16 @@ fn bench_stub_conventions(c: &mut Criterion) {
     ];
 
     for (name, stub) in stubs {
-        bench_iter(&mut group, name, || {
-            let sched = Schedule::builder(start, end)
-                .unwrap()
-                .frequency(Tenor::quarterly())
-                .stub_rule(stub)
-                .build()
-                .unwrap();
-            black_box(sched);
+        group.bench_function(name, |b| {
+            b.iter(|| {
+                let sched = Schedule::builder(start, end)
+                    .unwrap()
+                    .frequency(Tenor::quarterly())
+                    .stub_rule(stub)
+                    .build()
+                    .unwrap();
+                black_box(sched);
+            })
         });
     }
 
@@ -127,24 +127,28 @@ fn bench_end_of_month(c: &mut Criterion) {
     let start = Date::from_calendar_date(2025, Month::January, 31).expect("valid bench date");
     let end = Date::from_calendar_date(2035, Month::January, 31).expect("valid bench date");
 
-    bench_iter(&mut group, "eom_false", || {
-        let sched = Schedule::builder(start, end)
-            .unwrap()
-            .frequency(Tenor::monthly())
-            .end_of_month(false)
-            .build()
-            .unwrap();
-        black_box(sched);
+    group.bench_function("eom_false", |b| {
+        b.iter(|| {
+            let sched = Schedule::builder(start, end)
+                .unwrap()
+                .frequency(Tenor::monthly())
+                .end_of_month(false)
+                .build()
+                .unwrap();
+            black_box(sched);
+        })
     });
 
-    bench_iter(&mut group, "eom_true", || {
-        let sched = Schedule::builder(start, end)
-            .unwrap()
-            .frequency(Tenor::monthly())
-            .end_of_month(true)
-            .build()
-            .unwrap();
-        black_box(sched);
+    group.bench_function("eom_true", |b| {
+        b.iter(|| {
+            let sched = Schedule::builder(start, end)
+                .unwrap()
+                .frequency(Tenor::monthly())
+                .end_of_month(true)
+                .build()
+                .unwrap();
+            black_box(sched);
+        })
     });
 
     group.finish();
@@ -196,34 +200,40 @@ fn bench_business_day_adjustment(c: &mut Criterion) {
     let start = start_date();
     let end = end_date_years(10);
 
-    bench_iter(&mut group, "unadjusted", || {
-        let sched = Schedule::builder(start, end)
-            .unwrap()
-            .frequency(Tenor::quarterly())
-            .build()
-            .unwrap();
-        black_box(sched);
+    group.bench_function("unadjusted", |b| {
+        b.iter(|| {
+            let sched = Schedule::builder(start, end)
+                .unwrap()
+                .frequency(Tenor::quarterly())
+                .build()
+                .unwrap();
+            black_box(sched);
+        })
     });
 
     {
-        bench_iter(&mut group, "mod_following_nyse", || {
-            let sched = Schedule::builder(start, end)
-                .unwrap()
-                .frequency(Tenor::quarterly())
-                .adjust_with(BusinessDayConvention::ModifiedFollowing, "nyse")
-                .build()
-                .unwrap();
-            black_box(sched);
+        group.bench_function("mod_following_nyse", |b| {
+            b.iter(|| {
+                let sched = Schedule::builder(start, end)
+                    .unwrap()
+                    .frequency(Tenor::quarterly())
+                    .adjust_with(BusinessDayConvention::ModifiedFollowing, "nyse")
+                    .build()
+                    .unwrap();
+                black_box(sched);
+            })
         });
 
-        bench_iter(&mut group, "following_nyse", || {
-            let sched = Schedule::builder(start, end)
-                .unwrap()
-                .frequency(Tenor::quarterly())
-                .adjust_with(BusinessDayConvention::Following, "nyse")
-                .build()
-                .unwrap();
-            black_box(sched);
+        group.bench_function("following_nyse", |b| {
+            b.iter(|| {
+                let sched = Schedule::builder(start, end)
+                    .unwrap()
+                    .frequency(Tenor::quarterly())
+                    .adjust_with(BusinessDayConvention::Following, "nyse")
+                    .build()
+                    .unwrap();
+                black_box(sched);
+            })
         });
     }
 
@@ -241,14 +251,18 @@ fn bench_schedule_iteration(c: &mut Criterion) {
         .build()
         .unwrap();
 
-    bench_iter(&mut group, "iterate_30y_monthly", || {
-        let count = black_box(sched.clone()).into_iter().count();
-        black_box(count);
+    group.bench_function("iterate_30y_monthly", |b| {
+        b.iter(|| {
+            let count = black_box(sched.clone()).into_iter().count();
+            black_box(count);
+        })
     });
 
-    bench_iter(&mut group, "collect_30y_monthly", || {
-        let dates: Vec<_> = black_box(sched.clone()).into_iter().collect();
-        black_box(dates);
+    group.bench_function("collect_30y_monthly", |b| {
+        b.iter(|| {
+            let dates: Vec<_> = black_box(sched.clone()).into_iter().collect();
+            black_box(dates);
+        })
     });
 
     group.finish();

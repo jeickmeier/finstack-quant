@@ -6,10 +6,6 @@
 //! - ISMA vs ISDA ActAct variants
 //! - 30/360 family conventions
 
-#[path = "support/bench_utils.rs"]
-mod bench_utils;
-
-use bench_utils::bench_iter;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
 use std::hint::black_box;
@@ -33,11 +29,13 @@ fn bench_daycount_year_fraction(c: &mut Criterion) {
 
     for (name, convention) in conventions {
         for (suffix, end) in [("1y", end_1y), ("5y", end_5y), ("10y", end_10y)] {
-            bench_iter(&mut group, format!("{}_{}", name, suffix), || {
-                let yf = black_box(convention)
-                    .year_fraction(black_box(start), black_box(end), DayCountContext::default())
-                    .unwrap();
-                black_box(yf);
+            group.bench_function(format!("{}_{}", name, suffix), |b| {
+                b.iter(|| {
+                    let yf = black_box(convention)
+                        .year_fraction(black_box(start), black_box(end), DayCountContext::default())
+                        .unwrap();
+                    black_box(yf);
+                })
             });
         }
     }
@@ -57,21 +55,23 @@ fn bench_daycount_actact_isma(c: &mut Criterion) {
     ];
 
     for (name, frequency) in frequencies {
-        bench_utils::bench_with_criterion(c, format!("daycount_actact_isma_{}", name), || {
-            let yf = DayCount::ActActIsma
-                .year_fraction(
-                    black_box(start),
-                    black_box(end),
-                    DayCountContext {
-                        calendar: None,
-                        frequency: Some(frequency),
-                        bus_basis: None,
-                        coupon_period: Some((start, end)),
-                        end_is_termination_date: false,
-                    },
-                )
-                .unwrap();
-            black_box(yf);
+        c.bench_function(&format!("daycount_actact_isma_{}", name), |b| {
+            b.iter(|| {
+                let yf = DayCount::ActActIsma
+                    .year_fraction(
+                        black_box(start),
+                        black_box(end),
+                        DayCountContext {
+                            calendar: None,
+                            frequency: Some(frequency),
+                            bus_basis: None,
+                            coupon_period: Some((start, end)),
+                            end_is_termination_date: false,
+                        },
+                    )
+                    .unwrap();
+                black_box(yf);
+            })
         });
     }
 }
@@ -85,21 +85,23 @@ fn bench_daycount_bus252(c: &mut Criterion) {
         let start = Date::from_calendar_date(2025, Month::January, start_month).unwrap();
         let end = Date::from_calendar_date(2025, Month::January, end_month).unwrap();
 
-        bench_utils::bench_with_criterion(c, format!("daycount_bus252_{}", name), || {
-            let yf = DayCount::Bus252
-                .year_fraction(
-                    black_box(start),
-                    black_box(end),
-                    DayCountContext {
-                        calendar: Some(calendar),
-                        frequency: None,
-                        bus_basis: None,
-                        coupon_period: None,
-                        end_is_termination_date: false,
-                    },
-                )
-                .unwrap();
-            black_box(yf);
+        c.bench_function(&format!("daycount_bus252_{}", name), |b| {
+            b.iter(|| {
+                let yf = DayCount::Bus252
+                    .year_fraction(
+                        black_box(start),
+                        black_box(end),
+                        DayCountContext {
+                            calendar: Some(calendar),
+                            frequency: None,
+                            bus_basis: None,
+                            coupon_period: None,
+                            end_is_termination_date: false,
+                        },
+                    )
+                    .unwrap();
+                black_box(yf);
+            })
         });
     }
 }
