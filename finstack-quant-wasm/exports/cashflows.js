@@ -1,5 +1,6 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { schema } from './cashflows/schema.js';
+import { chain } from './chain.js';
 
 // Rust `CashFlowBuilder::build` and `CashflowScheduleBuildSpec::build` take an
 // optional market. wasm-bindgen cannot borrow an optional handle, so the
@@ -21,6 +22,23 @@ const scheduleJsonList = (schedules) =>
         schedule instanceof wasm.CashFlowSchedule ? schedule.toJson() : schedule
       )
     : schedules;
+
+chain(wasm.CashFlowBuilder, [
+  'principal',
+  'principalExchange',
+  'amortization',
+  'addPrincipalEvent',
+  'fixedCf',
+  'floatingCf',
+  'stepUpCf',
+  'fee',
+  'addFixedWindow',
+  'addFloatingWindow',
+  'addPaymentWindow',
+  'paymentSplitProgram',
+  'fixedToFloat',
+  'floatMarginSteps',
+]);
 
 export const cashflows = {
   AccrualIndex: wasm.AccrualIndex,

@@ -13570,9 +13570,10 @@ export interface CashFlowScheduleConstructor {
 /**
  * Fluent builder for a `CashFlowSchedule`.
  *
- * Created by `CashFlowSchedule.builder()`. Every setter consumes the builder
- * and returns it, so calls chain; a call on a builder that was already
- * consumed throws. Setter errors are recorded and reported by `build`.
+ * Created by `CashFlowSchedule.builder()`. Every setter updates the builder
+ * in place and returns it, so calls chain. A setter whose argument is
+ * rejected throws and leaves the builder unchanged. Setter errors are
+ * recorded and reported by `build`.
  */
 export interface CashFlowBuilder extends WasmOwned {
   /**
