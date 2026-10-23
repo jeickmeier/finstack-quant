@@ -8,6 +8,7 @@
 //! - Exposure-at-default for term loans and revolvers.
 
 use crate::bindings::macros::wire_methods;
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_models::credit::lgd::{
     self, BetaRecovery, CollateralPiece, CreditConversionFactor, DownturnLgd, EadCalculator,
     WorkoutCollateralType, WorkoutCosts, WorkoutLgd, WorkoutLgdBuilder, WorkoutLgdResult,
@@ -20,15 +21,7 @@ use crate::bindings::pandas_utils::{
 };
 use crate::errors::{core_to_py, value_error};
 
-/// Accepted `WorkoutCollateralType` strings, in canonical order.
-const COLLATERAL_TYPES: &str =
-    "cash, securities, receivables, inventory, equipment, real_estate, intellectual_property, other";
-
-/// Beta-distributed recovery rate parameterised by mean and standard deviation.
-///
-/// ``alpha`` / ``beta_param`` are the moment-matched Beta shape parameters.
-/// Obtain one from ``seniority_recovery_stats`` (agency calibration) or build
-/// it directly from ``(mean, std_dev)`` decimals in (0, 1).
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
     name = "BetaRecovery",
@@ -42,17 +35,7 @@ pub(crate) struct PyBetaRecovery {
 
 #[pymethods]
 impl PyBetaRecovery {
-    /// Build a Beta recovery distribution from its first two moments.
-    ///
-    /// Parameters
-    /// ----------
-    /// mean : float
-    ///     Mean recovery rate as a decimal in (0, 1).
-    /// std_dev : float
-    ///     Standard deviation; must satisfy ``std_dev**2 < mean * (1 - mean)``.
-    ///
-    /// Raises ``ValueError`` when the moments cannot parameterise a Beta
-    /// distribution.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.__init__")]
     #[new]
     #[pyo3(text_signature = "(mean, std_dev)")]
     fn new(mean: f64, std_dev: f64) -> PyResult<Self> {
@@ -61,79 +44,62 @@ impl PyBetaRecovery {
             .map_err(core_to_py)
     }
 
-    /// Mean recovery rate (decimal).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.mean")]
     #[getter]
     fn mean(&self) -> f64 {
         self.inner.mean()
     }
 
-    /// Standard deviation of the recovery rate.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.std_dev")]
     #[getter]
     fn std_dev(&self) -> f64 {
         self.inner.std_dev()
     }
 
-    /// Beta shape parameter alpha.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.alpha")]
     #[getter]
     fn alpha(&self) -> f64 {
         self.inner.alpha()
     }
 
-    /// Beta shape parameter beta.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.beta_param")]
     #[getter]
     fn beta_param(&self) -> f64 {
         self.inner.beta_param()
     }
 
-    /// Variance of the recovery rate (``std_dev**2``).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.variance")]
     #[getter]
     fn variance(&self) -> f64 {
         self.inner.variance()
     }
 
-    /// Mode of the distribution, or ``None`` when a shape parameter is <= 1.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.mode")]
     #[getter]
     fn mode(&self) -> Option<f64> {
         self.inner.mode()
     }
 
-    /// Expected loss given default, ``1 - mean``.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.mean_lgd")]
     #[getter]
     fn mean_lgd(&self) -> f64 {
         self.inner.mean_lgd()
     }
 
-    /// Recovery rate at probability ``p``.
-    ///
-    /// Parameters
-    /// ----------
-    /// p : float
-    ///     Probability in (0, 1).
-    ///
-    /// Raises ``ValueError`` when ``p`` is non-finite or outside (0, 1).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.quantile")]
     #[pyo3(text_signature = "($self, p)")]
     fn quantile(&self, p: f64) -> PyResult<f64> {
         self.inner.quantile(p).map_err(core_to_py)
     }
 
-    /// Draw ``n_samples`` recovery rates with a deterministic PCG64 RNG.
-    ///
-    /// Parameters
-    /// ----------
-    /// n_samples : int
-    ///     Number of draws.
-    /// seed : int
-    ///     RNG seed; the same seed yields the same sequence.
-    ///
-    /// Raises ``ValueError`` when sampling fails.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.sample_seeded")]
     #[pyo3(text_signature = "($self, n_samples, seed)")]
     fn sample_seeded(&self, py: Python<'_>, n_samples: usize, seed: u64) -> PyResult<Vec<f64>> {
         py.detach(|| self.inner.sample_seeded(n_samples, seed))
             .map_err(core_to_py)
     }
 
-    /// Export as a single-row pandas ``DataFrame``
-    /// (``mean``, ``std_dev``, ``alpha``, ``beta_param``).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe_with_schema(
             py,
@@ -142,29 +108,20 @@ impl PyBetaRecovery {
         )
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("BetaRecovery", &self.inner)
     }
 }
 
-wire_methods!(PyBetaRecovery, BetaRecovery, "BetaRecovery");
+wire_methods!(
+    PyBetaRecovery,
+    BetaRecovery,
+    "BetaRecovery",
+    module = "finstack_quant.models.credit.lgd"
+);
 
-/// Return the historical Beta recovery distribution for a seniority class.
-///
-/// Parameters
-/// ----------
-/// seniority : str
-///     One of ``1st_lien_secured``, ``2nd_lien_secured``, ``senior_secured``,
-///     ``senior_unsecured``, ``subordinated``, ``junior_subordinated``.
-/// calibration_id : str
-///     Exact registry methodology ID, such as ``"moodys_recovery_1982_2023"``
-///     or ``"sp_recovery_historical"``. Aliases are rejected.
-///
-/// Returns a ``BetaRecovery``.
-///
-/// Raises ``KeyError`` for an unknown calibration ID and ``ValueError`` when
-/// the seniority is unknown or absent from the selected calibration.
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "seniority_recovery_stats")]
 #[pyfunction]
 #[pyo3(signature = (seniority, calibration_id))]
 #[pyo3(text_signature = "(seniority, calibration_id)")]
@@ -174,7 +131,7 @@ fn seniority_recovery_stats(seniority: &str, calibration_id: &str) -> PyResult<P
         .map_err(core_to_py)
 }
 
-/// One collateral piece in a workout waterfall.
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
     name = "CollateralPiece",
@@ -188,20 +145,7 @@ pub(crate) struct PyCollateralPiece {
 
 #[pymethods]
 impl PyCollateralPiece {
-    /// Build a collateral piece.
-    ///
-    /// Parameters
-    /// ----------
-    /// collateral_type : str
-    ///     One of ``cash``, ``securities``, ``receivables``, ``inventory``,
-    ///     ``equipment``, ``real_estate``, ``intellectual_property``, ``other``.
-    /// book_value : float
-    ///     Pre-haircut book value (non-negative), in the exposure's currency.
-    /// haircut : float
-    ///     Liquidation haircut as a decimal in [0, 1].
-    ///
-    /// Raises ``ValueError`` for an unknown type, a negative value, or a
-    /// haircut outside [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.__init__")]
     #[new]
     #[pyo3(text_signature = "(collateral_type, book_value, haircut)")]
     fn new(collateral_type: &str, book_value: f64, haircut: f64) -> PyResult<Self> {
@@ -213,39 +157,44 @@ impl PyCollateralPiece {
             .map_err(core_to_py)
     }
 
-    /// Canonical collateral-type label.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.collateral_type")]
     #[getter]
     fn collateral_type(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_label(&self.inner.collateral_type).map_err(core_to_py)
     }
 
-    /// Pre-haircut book value.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.book_value")]
     #[getter]
     fn book_value(&self) -> f64 {
         self.inner.book_value
     }
 
-    /// Liquidation haircut as a decimal in [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.haircut")]
     #[getter]
     fn haircut(&self) -> f64 {
         self.inner.haircut
     }
 
-    /// ``book_value * (1 - haircut)``.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.liquidation_value")]
     #[getter]
     fn liquidation_value(&self) -> f64 {
         self.inner.liquidation_value()
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CollateralPiece", &self.inner)
     }
 }
 
-wire_methods!(PyCollateralPiece, CollateralPiece, "CollateralPiece");
+wire_methods!(
+    PyCollateralPiece,
+    CollateralPiece,
+    "CollateralPiece",
+    module = "finstack_quant.models.credit.lgd"
+);
 
-/// Direct and indirect workout cost rates as decimal fractions of EAD.
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
     name = "WorkoutCosts",
@@ -259,16 +208,7 @@ pub(crate) struct PyWorkoutCosts {
 
 #[pymethods]
 impl PyWorkoutCosts {
-    /// Build a cost specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// direct_cost_rate : float
-    ///     Direct (legal, administrative) costs as a decimal fraction of EAD (>= 0).
-    /// indirect_cost_rate : float
-    ///     Indirect (opportunity) costs as a decimal fraction of EAD (>= 0).
-    ///
-    /// Raises ``ValueError`` for negative or non-finite rates.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.__init__")]
     #[new]
     #[pyo3(text_signature = "(direct_cost_rate, indirect_cost_rate)")]
     fn new(direct_cost_rate: f64, indirect_cost_rate: f64) -> PyResult<Self> {
@@ -277,7 +217,7 @@ impl PyWorkoutCosts {
             .map_err(core_to_py)
     }
 
-    /// Zero workout costs.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.zero")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn zero() -> Self {
@@ -286,9 +226,7 @@ impl PyWorkoutCosts {
         }
     }
 
-    /// Registry-default workout costs.
-    ///
-    /// Raises ``ValueError`` if the embedded credit registry is invalid.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.standard")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn standard() -> PyResult<Self> {
@@ -297,33 +235,38 @@ impl PyWorkoutCosts {
             .map_err(core_to_py)
     }
 
-    /// Direct cost rate (decimal fraction of EAD).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.direct_cost_rate")]
     #[getter]
     fn direct_cost_rate(&self) -> f64 {
         self.inner.direct_cost_rate
     }
 
-    /// Indirect cost rate (decimal fraction of EAD).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.indirect_cost_rate")]
     #[getter]
     fn indirect_cost_rate(&self) -> f64 {
         self.inner.indirect_cost_rate
     }
 
-    /// ``direct_cost_rate + indirect_cost_rate``.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.total_rate")]
     #[getter]
     fn total_rate(&self) -> f64 {
         self.inner.total_rate()
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("WorkoutCosts", &self.inner)
     }
 }
 
-wire_methods!(PyWorkoutCosts, WorkoutCosts, "WorkoutCosts");
+wire_methods!(
+    PyWorkoutCosts,
+    WorkoutCosts,
+    "WorkoutCosts",
+    module = "finstack_quant.models.credit.lgd"
+);
 
-/// Net recovery, LGD, and recovery rate from a workout evaluation.
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
     name = "WorkoutLgdResult",
@@ -338,26 +281,25 @@ pub(crate) struct PyWorkoutLgdResult {
 
 #[pymethods]
 impl PyWorkoutLgdResult {
-    /// Post-cost, post-discount recovery amount (floored at zero), in EAD units.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.net_recovery")]
     #[getter]
     fn net_recovery(&self) -> f64 {
         self.inner.net_recovery
     }
 
-    /// Loss given default as a decimal in [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.lgd")]
     #[getter]
     fn lgd(&self) -> f64 {
         self.inner.lgd
     }
 
-    /// Recovery rate ``1 - lgd`` as a decimal in [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.recovery_rate")]
     #[getter]
     fn recovery_rate(&self) -> f64 {
         self.inner.recovery_rate
     }
 
-    /// Export as a single-row pandas ``DataFrame``
-    /// (``net_recovery``, ``lgd``, ``recovery_rate``).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe_with_schema(
             py,
@@ -366,20 +308,20 @@ impl PyWorkoutLgdResult {
         )
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("WorkoutLgdResult", &self.inner)
     }
 }
 
-wire_methods!(PyWorkoutLgdResult, WorkoutLgdResult, "WorkoutLgdResult");
+wire_methods!(
+    PyWorkoutLgdResult,
+    WorkoutLgdResult,
+    "WorkoutLgdResult",
+    module = "finstack_quant.models.credit.lgd"
+);
 
-/// Workout (collateral-waterfall) LGD model.
-///
-/// ``net_recovery = (min(sum liquidation values, EAD) - costs * EAD) * DF``
-/// and ``lgd = 1 - clamp(net_recovery / EAD, 0, 1)``, where ``DF`` discounts
-/// over the workout horizon (Basel workout-LGD methodology). Build with
-/// ``WorkoutLgd.builder()``.
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
     name = "WorkoutLgd",
@@ -393,7 +335,7 @@ pub(crate) struct PyWorkoutLgd {
 
 #[pymethods]
 impl PyWorkoutLgd {
-    /// Start a fluent builder (the only construction entry point).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.builder")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn builder() -> PyWorkoutLgdBuilder {
@@ -402,14 +344,7 @@ impl PyWorkoutLgd {
         }
     }
 
-    /// Evaluate net recovery, LGD, and recovery rate at ``ead``.
-    ///
-    /// Parameters
-    /// ----------
-    /// ead : float
-    ///     Exposure at default (> 0), in the collateral's currency.
-    ///
-    /// Raises ``ValueError`` when ``ead`` is non-finite or non-positive.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.evaluate")]
     #[pyo3(text_signature = "($self, ead)")]
     fn evaluate(&self, ead: f64) -> PyResult<PyWorkoutLgdResult> {
         self.inner
@@ -418,15 +353,13 @@ impl PyWorkoutLgd {
             .map_err(core_to_py)
     }
 
-    /// Net recovery amount at ``ead``.
-    ///
-    /// Raises ``ValueError`` when ``ead`` is non-finite or non-positive.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.net_recovery")]
     #[pyo3(text_signature = "($self, ead)")]
     fn net_recovery(&self, ead: f64) -> PyResult<f64> {
         self.inner.net_recovery(ead).map_err(core_to_py)
     }
 
-    /// Ordered collateral waterfall, highest priority first.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.collateral")]
     #[getter]
     fn collateral(&self) -> Vec<PyCollateralPiece> {
         self.inner
@@ -436,19 +369,19 @@ impl PyWorkoutLgd {
             .collect()
     }
 
-    /// Expected workout duration in years.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.workout_years")]
     #[getter]
     fn workout_years(&self) -> f64 {
         self.inner.workout_years()
     }
 
-    /// Annual decimal discount rate over the workout horizon.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.discount_rate")]
     #[getter]
     fn discount_rate(&self) -> f64 {
         self.inner.discount_rate()
     }
 
-    /// Direct and indirect cost rates.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.costs")]
     #[getter]
     fn costs(&self) -> PyWorkoutCosts {
         PyWorkoutCosts {
@@ -456,8 +389,7 @@ impl PyWorkoutLgd {
         }
     }
 
-    /// Export the collateral waterfall as a pandas ``DataFrame``
-    /// (``collateral_type``, ``book_value``, ``haircut``), one row per piece.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_rows_to_dataframe_with_schema(
             py,
@@ -470,18 +402,20 @@ impl PyWorkoutLgd {
         )
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("WorkoutLgd", &self.inner)
     }
 }
 
-wire_methods!(PyWorkoutLgd, WorkoutLgd, "WorkoutLgd");
+wire_methods!(
+    PyWorkoutLgd,
+    WorkoutLgd,
+    "WorkoutLgd",
+    module = "finstack_quant.models.credit.lgd"
+);
 
-/// Fluent builder for ``WorkoutLgd``; obtain via ``WorkoutLgd.builder()``.
-///
-/// Unset ``workout_years`` / ``discount_rate`` / ``costs`` fall back to the
-/// embedded registry defaults at ``build()``.
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdBuilder")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
     name = "WorkoutLgdBuilder",
@@ -507,12 +441,7 @@ impl PyWorkoutLgdBuilder {
 
 #[pymethods]
 impl PyWorkoutLgdBuilder {
-    /// Append one collateral piece to the waterfall (highest priority first).
-    ///
-    /// Parameters
-    /// ----------
-    /// piece : CollateralPiece
-    ///     Collateral to append.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdBuilder.collateral")]
     #[pyo3(text_signature = "($self, piece)")]
     fn collateral<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -522,12 +451,7 @@ impl PyWorkoutLgdBuilder {
         Ok(slf)
     }
 
-    /// Append several collateral pieces in order.
-    ///
-    /// Parameters
-    /// ----------
-    /// pieces : list[CollateralPiece]
-    ///     Collateral to append, highest priority first.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdBuilder.collateral_pieces")]
     #[pyo3(text_signature = "($self, pieces)")]
     fn collateral_pieces<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -538,21 +462,21 @@ impl PyWorkoutLgdBuilder {
         Ok(slf)
     }
 
-    /// Set the expected workout duration in years (>= 0).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdBuilder.workout_years")]
     #[pyo3(text_signature = "($self, years)")]
     fn workout_years(mut slf: PyRefMut<'_, Self>, years: f64) -> PyResult<PyRefMut<'_, Self>> {
         Self::with_inner(&mut slf, |b| b.workout_years(years))?;
         Ok(slf)
     }
 
-    /// Set the annual decimal discount rate over the workout horizon (>= 0).
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdBuilder.discount_rate")]
     #[pyo3(text_signature = "($self, rate)")]
     fn discount_rate(mut slf: PyRefMut<'_, Self>, rate: f64) -> PyResult<PyRefMut<'_, Self>> {
         Self::with_inner(&mut slf, |b| b.discount_rate(rate))?;
         Ok(slf)
     }
 
-    /// Set the workout cost rates.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdBuilder.costs")]
     #[pyo3(text_signature = "($self, costs)")]
     fn costs<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -562,10 +486,7 @@ impl PyWorkoutLgdBuilder {
         Ok(slf)
     }
 
-    /// Validate and build the ``WorkoutLgd`` model; the builder is consumed.
-    ///
-    /// Raises ``ValueError`` when ``workout_years`` or ``discount_rate`` is
-    /// negative or non-finite, or the builder was already consumed.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdBuilder.build")]
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyWorkoutLgd> {
         let builder = slf
@@ -579,31 +500,7 @@ impl PyWorkoutLgdBuilder {
     }
 }
 
-/// Compute workout net recovery, LGD, and recovery rate in one call.
-///
-/// One-shot twin of ``WorkoutLgd.builder()...build().evaluate(ead)``.
-///
-/// Parameters
-/// ----------
-/// ead : float
-///     Exposure at default (> 0).
-/// collateral : list[tuple[str, float, float]]
-///     ``(collateral_type, book_value, haircut)`` triples; ``collateral_type``
-///     is one of ``cash``, ``securities``, ``receivables``, ``inventory``,
-///     ``equipment``, ``real_estate``, ``intellectual_property``, ``other``
-///     and ``haircut`` is a decimal in [0, 1].
-/// direct_cost_pct : float
-///     Direct resolution costs as a decimal fraction of EAD (>= 0).
-/// indirect_cost_pct : float
-///     Indirect resolution costs as a decimal fraction of EAD (>= 0).
-/// time_to_resolution_years : float
-///     Expected workout duration in years (>= 0).
-/// discount_rate : float
-///     Annual decimal discount rate for the workout period (>= 0).
-///
-/// Returns a ``WorkoutLgdResult``.
-///
-/// Raises ``ValueError`` for an unknown collateral type or any invalid input.
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "workout_lgd")]
 #[pyfunction]
 #[pyo3(
     text_signature = "(ead, collateral, direct_cost_pct, indirect_cost_pct, time_to_resolution_years, discount_rate)"
@@ -628,10 +525,7 @@ fn workout_lgd(
     .map_err(core_to_py)
 }
 
-/// Downturn LGD adjuster (stressed approximation or regulatory floor).
-///
-/// ``method`` is ``"stressed_approximation"`` or ``"regulatory_floor"``;
-/// ``adjust(base_lgd)`` returns the downturn LGD clamped to [0, 1].
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
     name = "DownturnLgd",
@@ -645,19 +539,7 @@ pub(crate) struct PyDownturnLgd {
 
 #[pymethods]
 impl PyDownturnLgd {
-    /// Stressed approximation:
-    /// ``LGD_base + lgd_sensitivity * sqrt(rho) * Phi^-1(q) * sqrt(LGD_base * (1 - LGD_base))``.
-    ///
-    /// Parameters
-    /// ----------
-    /// asset_correlation : float
-    ///     Asset correlation rho in (0, 1). Basel: 0.12-0.24.
-    /// lgd_sensitivity : float
-    ///     LGD sensitivity to the systematic factor (>= 0). Typical: 0.3-0.5.
-    /// stress_quantile : float
-    ///     Downturn quantile in (0, 1), e.g. 0.999.
-    ///
-    /// Raises ``ValueError`` on out-of-range parameters.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.stressed")]
     #[staticmethod]
     #[pyo3(text_signature = "(asset_correlation, lgd_sensitivity, stress_quantile)")]
     fn stressed(
@@ -670,16 +552,7 @@ impl PyDownturnLgd {
             .map_err(core_to_py)
     }
 
-    /// Regulatory floor: ``max(LGD_base + add_on, floor)``.
-    ///
-    /// Parameters
-    /// ----------
-    /// add_on : float
-    ///     Flat add-on (>= 0). Typical: 0.05-0.10.
-    /// floor : float
-    ///     Absolute floor in [0, 1]. Typical: 0.10 secured / 0.25 unsecured.
-    ///
-    /// Raises ``ValueError`` on out-of-range parameters.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.regulatory_floor")]
     #[staticmethod]
     #[pyo3(text_signature = "(add_on, floor)")]
     fn regulatory_floor(add_on: f64, floor: f64) -> PyResult<Self> {
@@ -688,10 +561,7 @@ impl PyDownturnLgd {
             .map_err(core_to_py)
     }
 
-    /// Load a regulatory-floor preset by id from the embedded credit registry.
-    ///
-    /// Raises ``KeyError`` for an unknown id and ``ValueError`` for an
-    /// unsupported preset method.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.from_registry_id")]
     #[staticmethod]
     #[pyo3(text_signature = "(id)")]
     fn from_registry_id(id: &str) -> PyResult<Self> {
@@ -700,9 +570,7 @@ impl PyDownturnLgd {
             .map_err(core_to_py)
     }
 
-    /// Load the calibration selected by the embedded registry's default ID.
-    ///
-    /// Raises ``ValueError`` if the registry or its configured default is malformed.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.default_calibration")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn default_calibration() -> PyResult<Self> {
@@ -711,35 +579,39 @@ impl PyDownturnLgd {
             .map_err(core_to_py)
     }
 
-    /// Downturn LGD for ``base_lgd`` (decimal in [0, 1]), clamped to [0, 1].
-    ///
-    /// Raises ``ValueError`` when ``base_lgd`` is non-finite or outside [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.adjust")]
     #[pyo3(text_signature = "($self, base_lgd)")]
     fn adjust(&self, base_lgd: f64) -> PyResult<f64> {
         self.inner.adjust(base_lgd).map_err(core_to_py)
     }
 
-    /// Canonical method name: ``"stressed_approximation"`` or ``"regulatory_floor"``.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.method")]
     #[getter]
     fn method(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(self.inner.method()).map_err(core_to_py)
     }
 
-    /// Method parameters as a mapping in canonical JSON form.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.params")]
     #[getter]
     fn params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, self.inner.method())
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("DownturnLgd", &self.inner)
     }
 }
 
-wire_methods!(PyDownturnLgd, DownturnLgd, "DownturnLgd", validate);
+wire_methods!(
+    PyDownturnLgd,
+    DownturnLgd,
+    "DownturnLgd",
+    module = "finstack_quant.models.credit.lgd",
+    validate
+);
 
-/// Exposure-at-default calculator: ``EAD = drawn + undrawn * CCF``.
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
     name = "EadCalculator",
@@ -753,19 +625,7 @@ pub(crate) struct PyEadCalculator {
 
 #[pymethods]
 impl PyEadCalculator {
-    /// Build a calculator with an explicit credit conversion factor.
-    ///
-    /// Parameters
-    /// ----------
-    /// drawn : float
-    ///     Currently drawn amount (>= 0).
-    /// undrawn : float
-    ///     Undrawn commitment (>= 0).
-    /// ccf : float
-    ///     Credit conversion factor as a decimal in [0, 1].
-    ///
-    /// Raises ``ValueError`` for negative or non-finite amounts or a CCF
-    /// outside [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.__init__")]
     #[new]
     #[pyo3(text_signature = "(drawn, undrawn, ccf)")]
     fn new(drawn: f64, undrawn: f64, ccf: f64) -> PyResult<Self> {
@@ -775,9 +635,7 @@ impl PyEadCalculator {
             .map_err(core_to_py)
     }
 
-    /// Fully drawn term loan (no undrawn component, CCF 1.0).
-    ///
-    /// Raises ``ValueError`` when ``drawn`` is negative or non-finite.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.term_loan")]
     #[staticmethod]
     #[pyo3(text_signature = "(drawn)")]
     fn term_loan(drawn: f64) -> PyResult<Self> {
@@ -786,9 +644,7 @@ impl PyEadCalculator {
             .map_err(core_to_py)
     }
 
-    /// Revolver with the Basel IRB CCF of 0.75.
-    ///
-    /// Raises ``ValueError`` when an amount is negative or non-finite.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.revolver")]
     #[staticmethod]
     #[pyo3(text_signature = "(drawn, undrawn)")]
     fn revolver(drawn: f64, undrawn: f64) -> PyResult<Self> {
@@ -797,53 +653,49 @@ impl PyEadCalculator {
             .map_err(core_to_py)
     }
 
-    /// ``drawn + undrawn * ccf``.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.ead")]
     #[getter]
     fn ead(&self) -> f64 {
         self.inner.ead()
     }
 
-    /// ``drawn / (drawn + undrawn)``, or 0.0 when there is no commitment.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.utilization")]
     #[getter]
     fn utilization(&self) -> f64 {
         self.inner.utilization()
     }
 
-    /// ``drawn + undrawn``.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.total_commitment")]
     #[getter]
     fn total_commitment(&self) -> f64 {
         self.inner.total_commitment()
     }
 
-    /// Loan-equivalent exposure implied by an observed EAD:
-    /// ``(observed_ead - drawn) / undrawn``, or ``None`` with no undrawn amount.
-    ///
-    /// Parameters
-    /// ----------
-    /// observed_ead : float
-    ///     Realised exposure at default in the facility's currency.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.leq_from_observed_ead")]
     #[pyo3(text_signature = "($self, observed_ead)")]
     fn leq_from_observed_ead(&self, observed_ead: f64) -> Option<f64> {
         self.inner.leq_from_observed_ead(observed_ead)
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("EadCalculator", &self.inner)
     }
 }
 
-wire_methods!(PyEadCalculator, EadCalculator, "EadCalculator");
+wire_methods!(
+    PyEadCalculator,
+    EadCalculator,
+    "EadCalculator",
+    module = "finstack_quant.models.credit.lgd"
+);
 
 /// Build the `finstack_quant.models.credit.lgd` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "lgd")?;
     m.setattr(
         "__doc__",
-        format!(
-            "Loss-given-default modeling: seniority Beta recovery, workout LGD, downturn adjustments, EAD. \
-             Collateral types: {COLLATERAL_TYPES}."
-        ),
+        pydoc!("finstack_quant.models.credit.lgd", "__module__"),
     )?;
 
     m.add_class::<PyBetaRecovery>()?;

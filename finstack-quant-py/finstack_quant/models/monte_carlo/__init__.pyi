@@ -355,6 +355,22 @@ class MoneyEstimate:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class Estimate:
     """
     Scalar Monte Carlo estimate without currency tagging.
@@ -612,6 +628,22 @@ class Estimate:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 class LrmGreeks:
     """
     Monte Carlo price with likelihood-ratio delta and vega from the same paths.
@@ -753,6 +785,22 @@ class LrmGreeks:
         >>> frame = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True, num_steps=12).to_dataframe()
         >>> list(frame.columns)
         ['mean', 'stderr', 'ci_lower', 'ci_upper']
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...
 
@@ -957,6 +1005,22 @@ class PathSummary:
             If ``values`` does not hold ``num_simulated_paths * len(times) *
             len(factor_names)`` entries, which is only possible for a summary
             rebuilt from inconsistent JSON.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...
 

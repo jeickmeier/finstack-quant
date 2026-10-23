@@ -217,3 +217,21 @@ fn checked_exposure_recovery_and_factor_schemas_reject_out_of_range_wire_values(
         &LatentFactorSpec::single_factor(3.0, 20.0).expect("factors"),
     );
 }
+
+#[test]
+fn optimal_toggle_schema_and_serde_reject_the_removed_discount_rate() {
+    use finstack_quant_models::credit::{OptimalToggle, ToggleExerciseModel};
+    let model = ToggleExerciseModel::optimal(100, 0.3, 0.03, 1.0).expect("valid optimal toggle");
+    assert_wire_matches_schema("ToggleExerciseModel", &model);
+    let mut wire = serde_json::to_value(&model).expect("serialize");
+    assert!(wire["optimal_exercise"]
+        .get("equity_discount_rate")
+        .is_none());
+    wire["optimal_exercise"]["equity_discount_rate"] = json!(1000.0);
+    assert!(serde_json::from_value::<ToggleExerciseModel>(wire.clone()).is_err());
+    assert!(serde_json::from_value::<OptimalToggle>(wire["optimal_exercise"].clone()).is_err());
+    let validator = jsonschema::options()
+        .build(&schema_for("ToggleExerciseModel"))
+        .expect("schema");
+    assert!(!validator.is_valid(&wire));
+}

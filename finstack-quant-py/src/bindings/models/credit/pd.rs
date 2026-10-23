@@ -1,6 +1,7 @@
 //! Python bindings for `finstack_quant_models::credit::pd` (calibration subset).
 
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_models::credit::pd::{
     apply_basel_irb_pd_floor as core_apply_basel_irb_pd_floor,
     central_tendency as core_central_tendency, pit_to_ttc as core_pit_to_ttc,
@@ -26,25 +27,7 @@ const RESULT_COLUMNS: &[ColumnSchema<'static>] = &[
     ("central_pd", "float64"),
 ];
 
-/// Convert a Point-in-Time PD to a Through-the-Cycle PD.
-///
-/// Uses the Merton-Vasicek single-factor model (Basel II IRB):
-///
-///   PD_TtC = Phi( Phi^{-1}(PD_PiT) * sqrt(1 - rho) + sqrt(rho) * z )
-///
-/// Parameters
-/// ----------
-/// pd_pit : float
-///     Point-in-Time PD as a decimal in (0, 1).
-/// asset_correlation : float
-///     Asset correlation rho in (0, 1). Basel uses 0.12 - 0.24 for corporates.
-/// cycle_index : float
-///     Systematic risk factor z: 0 = average, < 0 = downturn, > 0 = benign.
-///
-/// Returns the Through-the-Cycle PD as a decimal.
-///
-/// Raises ``ValueError`` when ``pd_pit`` or ``asset_correlation`` is outside
-/// (0, 1) or any input is non-finite.
+#[doc = pydoc!("finstack_quant.models.credit.pd", "pit_to_ttc")]
 #[pyfunction]
 #[pyo3(text_signature = "(pd_pit, asset_correlation, cycle_index)")]
 fn pit_to_ttc(pd_pit: f64, asset_correlation: f64, cycle_index: f64) -> PyResult<f64> {
@@ -55,25 +38,7 @@ fn pit_to_ttc(pd_pit: f64, asset_correlation: f64, cycle_index: f64) -> PyResult
     core_pit_to_ttc(pd_pit, &params).map_err(kinded_to_py)
 }
 
-/// Convert a Through-the-Cycle PD to a Point-in-Time PD.
-///
-/// Uses the Merton-Vasicek single-factor model (Basel II IRB):
-///
-///   PD_PiT = Phi( (Phi^{-1}(PD_TtC) - sqrt(rho) * z) / sqrt(1 - rho) )
-///
-/// Parameters
-/// ----------
-/// pd_ttc : float
-///     Through-the-Cycle PD as a decimal in (0, 1).
-/// asset_correlation : float
-///     Asset correlation rho in (0, 1).
-/// cycle_index : float
-///     Systematic risk factor z: 0 = average, < 0 = downturn, > 0 = benign.
-///
-/// Returns the Point-in-Time PD as a decimal.
-///
-/// Raises ``ValueError`` when ``pd_ttc`` or ``asset_correlation`` is outside
-/// (0, 1) or any input is non-finite.
+#[doc = pydoc!("finstack_quant.models.credit.pd", "ttc_to_pit")]
 #[pyfunction]
 #[pyo3(text_signature = "(pd_ttc, asset_correlation, cycle_index)")]
 fn ttc_to_pit(pd_ttc: f64, asset_correlation: f64, cycle_index: f64) -> PyResult<f64> {
@@ -84,45 +49,21 @@ fn ttc_to_pit(pd_ttc: f64, asset_correlation: f64, cycle_index: f64) -> PyResult
     core_ttc_to_pit(pd_ttc, &params).map_err(kinded_to_py)
 }
 
-/// Calibrate a central tendency (long-run average PD) from annual default rates
-/// using the arithmetic mean (the standard regulatory TtC approach per
-/// Basel IRB / EBA GL/2017/16).
-///
-/// Zero-default years are valid observations and are included in the average.
-///
-/// Parameters
-/// ----------
-/// annual_default_rates : list[float]
-///     Observed annual default rates as decimals in [0, 1]; at least one.
-///
-/// Returns the arithmetic mean in [0, 1].
-///
-/// Raises ``ValueError`` when the list is empty or any rate is non-finite or
-/// outside [0, 1].
+#[doc = pydoc!("finstack_quant.models.credit.pd", "central_tendency")]
 #[pyfunction]
 #[pyo3(text_signature = "(annual_default_rates)")]
 fn central_tendency(annual_default_rates: Vec<f64>) -> PyResult<f64> {
     core_central_tendency(&annual_default_rates).map_err(kinded_to_py)
 }
 
-/// Apply the Basel IRB corporate PD floor: ``max(pd, BASEL_IRB_PD_FLOOR)``.
-///
-/// Parameters
-/// ----------
-/// pd : float
-///     Probability of default as a decimal.
-///
-/// Returns the floored PD (``0.0003`` when ``pd`` is below 3 bp).
+#[doc = pydoc!("finstack_quant.models.credit.pd", "apply_basel_irb_pd_floor")]
 #[pyfunction]
 #[pyo3(text_signature = "(pd)")]
 fn apply_basel_irb_pd_floor(pd: f64) -> f64 {
     core_apply_basel_irb_pd_floor(pd)
 }
 
-/// One PD band in a rating master scale.
-///
-/// ``upper_pd`` is the inclusive upper bound of the band and ``central_pd`` the
-/// representative PD assigned to anything mapped into it; both are decimals.
+#[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade")]
 #[pyclass(
     module = "finstack_quant.models.credit.pd",
     name = "MasterScaleGrade",
@@ -137,18 +78,7 @@ pub struct PyMasterScaleGrade {
 
 #[pymethods]
 impl PyMasterScaleGrade {
-    /// Construct one probability-of-default band on a master scale.
-    ///
-    /// Parameters
-    /// ----------
-    /// label : str
-    ///     Grade label (e.g. ``"BBB"``).
-    /// upper_pd : float
-    ///     Inclusive upper PD bound of the band, a decimal in (0, 1].
-    /// central_pd : float
-    ///     Representative PD assigned to the band, a decimal in (0, 1).
-    ///
-    /// Validation happens when the grade is placed in a ``MasterScale``.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.__init__")]
     #[new]
     #[pyo3(text_signature = "(label, upper_pd, central_pd)")]
     fn new(label: String, upper_pd: f64, central_pd: f64) -> Self {
@@ -161,33 +91,38 @@ impl PyMasterScaleGrade {
         }
     }
 
-    /// Grade label (e.g. ``"BBB"``).
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.label")]
     #[getter]
     fn label(&self) -> &str {
         &self.inner.label
     }
 
-    /// Inclusive upper PD bound of the band.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.upper_pd")]
     #[getter]
     fn upper_pd(&self) -> f64 {
         self.inner.upper_pd
     }
 
-    /// Representative PD assigned to anything falling in the band.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.central_pd")]
     #[getter]
     fn central_pd(&self) -> f64 {
         self.inner.central_pd
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MasterScaleGrade", &self.inner)
     }
 }
 
-wire_methods!(PyMasterScaleGrade, MasterScaleGrade, "MasterScaleGrade");
+wire_methods!(
+    PyMasterScaleGrade,
+    MasterScaleGrade,
+    "MasterScaleGrade",
+    module = "finstack_quant.models.credit.pd"
+);
 
-/// Result of mapping a PD onto a master scale.
+#[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult")]
 #[pyclass(
     module = "finstack_quant.models.credit.pd",
     name = "MasterScaleResult",
@@ -202,54 +137,51 @@ pub struct PyMasterScaleResult {
 
 #[pymethods]
 impl PyMasterScaleResult {
-    /// Label of the grade the PD mapped into.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.grade")]
     #[getter]
     fn grade(&self) -> &str {
         &self.inner.grade
     }
 
-    /// Central PD of the assigned grade — the notched value.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.central_pd")]
     #[getter]
     fn central_pd(&self) -> f64 {
         self.inner.central_pd
     }
 
-    /// The PD that was mapped, before notching.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.input_pd")]
     #[getter]
     fn input_pd(&self) -> f64 {
         self.inner.input_pd
     }
 
-    /// Zero-based index of the assigned grade in the scale.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.grade_index")]
     #[getter]
     fn grade_index(&self) -> usize {
         self.inner.grade_index
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``grade``, ``grade_index``, ``input_pd``, ``central_pd``.
-    ///
-    /// One mapping is one flat record, so a one-row frame is the right shape;
-    /// use ``MasterScale.map_pds`` for a whole obligor-level grading table.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let columns: Vec<&str> = RESULT_COLUMNS.iter().map(|(name, _)| *name).collect();
         serde_object_to_single_row_dataframe_with_schema(py, &self.inner, &columns)
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MasterScaleResult", &self.inner)
     }
 }
 
-wire_methods!(PyMasterScaleResult, MasterScaleResult, "MasterScaleResult");
+wire_methods!(
+    PyMasterScaleResult,
+    MasterScaleResult,
+    "MasterScaleResult",
+    module = "finstack_quant.models.credit.pd"
+);
 impl_repr_html_via_dataframe!(PyMasterScaleResult);
 
-/// Ordered PD bands mapping a continuous PD onto discrete rating grades.
-///
-/// Bands must be strictly increasing in ``upper_pd``, and each grade's
-/// ``central_pd`` must fall inside its own band. PDs are decimals in [0, 1].
+#[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale")]
 #[pyclass(
     module = "finstack_quant.models.credit.pd",
     name = "MasterScale",
@@ -263,15 +195,7 @@ pub struct PyMasterScale {
 
 #[pymethods]
 impl PyMasterScale {
-    /// Build a master scale from ordered grades.
-    ///
-    /// Parameters
-    /// ----------
-    /// grades : list[MasterScaleGrade]
-    ///     Bands in ascending ``upper_pd`` order, strongest grade first.
-    ///
-    /// Raises ``ValueError`` when the list is empty, a PD is outside its valid
-    /// range, or the bands are not strictly ascending.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.__init__")]
     #[new]
     #[pyo3(text_signature = "(grades)")]
     fn new(grades: Vec<PyMasterScaleGrade>) -> PyResult<Self> {
@@ -281,9 +205,7 @@ impl PyMasterScale {
             .map_err(kinded_to_py)
     }
 
-    /// Load the calibration selected by the embedded registry's default ID.
-    ///
-    /// Raises ``ValueError`` if the registry or its configured default is malformed.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.default_calibration")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn default_calibration() -> PyResult<Self> {
@@ -292,15 +214,7 @@ impl PyMasterScale {
             .map_err(core_to_py)
     }
 
-    /// Load a master scale by ID from the embedded credit registry.
-    ///
-    /// Parameters
-    /// ----------
-    /// scale_id : str
-    ///     Registry identifier of the scale.
-    ///
-    /// Raises ``KeyError`` when the id is unknown and ``ValueError`` when the
-    /// registry is invalid.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.from_registry_id")]
     #[staticmethod]
     #[pyo3(text_signature = "(scale_id)")]
     fn from_registry_id(scale_id: &str) -> PyResult<Self> {
@@ -309,48 +223,21 @@ impl PyMasterScale {
             .map_err(core_to_py)
     }
 
-    /// Map a PD onto its rating grade.
-    ///
-    /// Parameters
-    /// ----------
-    /// pd : float
-    ///     Probability of default as a decimal in [0, 1].
-    ///
-    /// Raises ``ValueError`` when ``pd`` is non-finite or outside [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.map_pd")]
     #[pyo3(text_signature = "($self, pd)")]
     fn map_pd(&self, pd: f64) -> PyResult<PyMasterScaleResult> {
         let result = self.inner.map_pd(pd).map_err(kinded_to_py)?;
         Ok(PyMasterScaleResult { inner: result })
     }
 
-    /// Map several PDs and return one grading table.
-    ///
-    /// Parameters
-    /// ----------
-    /// pds : list[float]
-    ///     Probabilities of default as decimals in [0, 1].
-    ///
-    /// Returns a pandas ``DataFrame`` with columns ``grade``, ``grade_index``,
-    /// ``input_pd``, ``central_pd``; one row per input, in input order (an
-    /// empty input yields a zero-row frame with the same columns).
-    ///
-    /// Raises ``ValueError`` when any PD is non-finite or outside [0, 1].
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.map_pds")]
     #[pyo3(text_signature = "($self, pds)")]
     fn map_pds<'py>(&self, py: Python<'py>, pds: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
         let rows = self.inner.map_pds(&pds).map_err(kinded_to_py)?;
         serde_rows_to_dataframe_with_schema(py, &rows, RESULT_COLUMNS)
     }
 
-    /// Map a scoring result's implied PD onto its rating grade.
-    ///
-    /// Parameters
-    /// ----------
-    /// result : ScoringResult
-    ///     Output of a ``models.credit.scoring`` model that carries an
-    ///     ``implied_pd`` (Ohlson, Zmijewski).
-    ///
-    /// Raises ``ValueError`` when the result has no implied PD (Altman
-    /// family) or the PD is non-finite.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.map_score")]
     #[pyo3(text_signature = "($self, result)")]
     fn map_score(&self, result: &PyScoringResult) -> PyResult<PyMasterScaleResult> {
         self.inner
@@ -359,13 +246,13 @@ impl PyMasterScale {
             .map_err(kinded_to_py)
     }
 
-    /// Number of grades in the scale.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.n_grades")]
     #[getter]
     fn n_grades(&self) -> usize {
         self.inner.n_grades()
     }
 
-    /// The scale's grades, in ascending PD order.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.grades")]
     #[getter]
     fn grades(&self) -> Vec<PyMasterScaleGrade> {
         self.inner
@@ -376,10 +263,7 @@ impl PyMasterScale {
             .collect()
     }
 
-    /// Export the bands as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``label``, ``upper_pd``, ``central_pd``; one row per grade in
-    /// ascending PD order.
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_rows_to_dataframe_with_schema(
             py,
@@ -392,10 +276,12 @@ impl PyMasterScale {
         )
     }
 
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.__len__")]
     fn __len__(&self) -> usize {
         self.inner.n_grades()
     }
 
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.__repr__")]
     fn __repr__(&self) -> String {
         let labels: Vec<String> = self
             .inner
@@ -411,14 +297,19 @@ impl PyMasterScale {
     }
 }
 
-wire_methods!(PyMasterScale, MasterScale, "MasterScale");
+wire_methods!(
+    PyMasterScale,
+    MasterScale,
+    "MasterScale",
+    module = "finstack_quant.models.credit.pd"
+);
 
 /// Build the `finstack_quant.models.credit.pd` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "pd")?;
     m.setattr(
         "__doc__",
-        "Probability of default: PiT/TtC conversion (Merton-Vasicek), central-tendency calibration, Basel IRB floor, and rating master scales.",
+        pydoc!("finstack_quant.models.credit.pd", "__module__"),
     )?;
 
     m.add("BASEL_IRB_PD_FLOOR", BASEL_IRB_PD_FLOOR)?;

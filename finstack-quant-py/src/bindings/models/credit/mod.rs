@@ -8,6 +8,7 @@ mod recovery_waterfall;
 mod scoring;
 
 use crate::bindings::macros::wire_methods;
+use crate::bindings::pydoc::pydoc;
 use std::sync::Arc;
 
 use crate::bindings::core::dates::daycount::extract_day_count;
@@ -27,27 +28,7 @@ use finstack_quant_models::credit::{
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
-/// Return the Moody's WARF factor for a canonical credit rating.
-///
-/// Parameters
-/// ----------
-/// rating : str | CreditRating
-///     Exact-notch rating, either a ``core.types.CreditRating`` or a rating
-///     string in S&P/Fitch (``"BBB-"``) or Moody's (``"Baa3"``) notation.
-///
-/// Returns
-/// -------
-/// float
-///     Moody's ordinal weighted-average rating factor (``B`` -> ``2720.0``).
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the string is not a recognised rating, the embedded
-///     credit-assumptions registry is invalid, or the rating has no factor in
-///     the configured Moody's table.
-/// TypeError
-///     If ``rating`` is neither a string nor a ``CreditRating``.
+#[doc = pydoc!("finstack_quant.models.credit", "moodys_warf_factor")]
 #[pyfunction]
 #[pyo3(text_signature = "(rating)")]
 fn moodys_warf_factor(rating: &Bound<'_, PyAny>) -> PyResult<f64> {
@@ -55,13 +36,7 @@ fn moodys_warf_factor(rating: &Bound<'_, PyAny>) -> PyResult<f64> {
     rust_moodys_warf_factor(rating).map_err(core_to_py)
 }
 
-/// Rating-factor table (Moody's WARF methodology) loaded from the embedded
-/// credit-assumptions registry.
-///
-/// Use ``RatingFactorTable.default_calibration()`` for the default table or
-/// ``RatingFactorTable.from_registry_id(id)`` for a named methodology. Exact
-/// rating notches map to factors via ``get_factor``; unrated or defaulted
-/// names take ``default_factor``.
+#[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable")]
 #[pyclass(
     name = "RatingFactorTable",
     module = "finstack_quant.models.credit",
@@ -75,9 +50,7 @@ pub(crate) struct PyRatingFactorTable {
 
 #[pymethods]
 impl PyRatingFactorTable {
-    /// Load the calibration selected by the embedded registry's default ID.
-    ///
-    /// Raises ``ValueError`` if the registry or its configured default is malformed.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.default_calibration")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn default_calibration() -> PyResult<Self> {
@@ -86,13 +59,7 @@ impl PyRatingFactorTable {
             .map_err(core_to_py)
     }
 
-    /// Load a named rating-factor table from the embedded registry.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Exact registry identifier of the methodology. An unknown id raises
-    ///     ``KeyError`` and never falls back to the default table.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.from_registry_id")]
     #[staticmethod]
     #[pyo3(text_signature = "(id)")]
     fn from_registry_id(id: &str) -> PyResult<Self> {
@@ -101,52 +68,45 @@ impl PyRatingFactorTable {
             .map_err(core_to_py)
     }
 
-    /// Rating factor for an exact rating notch.
-    ///
-    /// Parameters
-    /// ----------
-    /// rating : str | CreditRating
-    ///     Rating notch as a ``core.types.CreditRating`` or a rating string.
-    ///
-    /// Raises ``ValueError`` when the notch has no factor in this table or
-    /// the string is not a recognised rating.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.get_factor")]
     #[pyo3(text_signature = "($self, rating)")]
     fn get_factor(&self, rating: &Bound<'_, PyAny>) -> PyResult<f64> {
         let rating = extract_credit_rating(rating)?;
         self.inner.get_factor(rating).map_err(core_to_py)
     }
 
-    /// Agency the table is sourced from (e.g. ``"moodys"``).
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.agency")]
     #[getter]
     fn agency(&self) -> String {
         self.inner.agency().to_string()
     }
 
-    /// Methodology label recorded in the registry for this table.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.methodology")]
     #[getter]
     fn methodology(&self) -> String {
         self.inner.methodology().to_string()
     }
 
-    /// Factor assigned to unrated or defaulted names.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.default_factor")]
     #[getter]
     fn default_factor(&self) -> f64 {
         self.inner.default_factor()
     }
 
-    /// Identify this value in notebooks and logs.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RatingFactorTable", &self.inner)
     }
 }
 
-wire_methods!(PyRatingFactorTable, RatingFactorTable, "RatingFactorTable");
+wire_methods!(
+    PyRatingFactorTable,
+    RatingFactorTable,
+    "RatingFactorTable",
+    module = "finstack_quant.models.credit._structural"
+);
 
-/// Default-barrier monitoring convention for structural credit models.
-///
-/// ``MertonBarrierType.terminal()`` tests default only at maturity (Merton 1974);
-/// ``MertonBarrierType.first_passage(growth)`` tests continuously against a barrier
-/// growing at ``growth`` per year (Black-Cox 1976).
+#[doc = pydoc!("finstack_quant.models.credit._structural", "MertonBarrierType")]
 #[pyclass(
     name = "MertonBarrierType",
     module = "finstack_quant.models.credit",
@@ -167,7 +127,7 @@ impl PyBarrierType {
 
 #[pymethods]
 impl PyBarrierType {
-    /// Classic Merton barrier tested only at maturity.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonBarrierType.terminal")]
     #[staticmethod]
     fn terminal() -> Self {
         Self {
@@ -175,12 +135,7 @@ impl PyBarrierType {
         }
     }
 
-    /// Black-Cox first-passage barrier with optional growth rate.
-    ///
-    /// # Arguments
-    ///
-    /// * `barrier_growth_rate` - Continuous growth rate of the default barrier
-    ///   over time, as a decimal (e.g. ``0.02`` for 2% annual growth).
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonBarrierType.first_passage")]
     #[staticmethod]
     fn first_passage(barrier_growth_rate: f64) -> Self {
         Self {
@@ -190,19 +145,19 @@ impl PyBarrierType {
         }
     }
 
-    /// Identify this value in notebooks and logs (``MertonBarrierType.terminal()``,
-    /// ``MertonBarrierType.first_passage(barrier_growth_rate=0.02)``).
     fn __repr__(&self) -> String {
         variant_repr("MertonBarrierType", &self.inner)
     }
 }
 
-wire_methods!(PyBarrierType, MertonBarrierType, "MertonBarrierType");
+wire_methods!(
+    PyBarrierType,
+    MertonBarrierType,
+    "MertonBarrierType",
+    module = "finstack_quant.models.credit._structural"
+);
 
-/// Asset-return dynamics for structural credit models.
-///
-/// ``geometric_brownian()`` (lognormal diffusion), ``jump_diffusion(...)``
-/// (Merton 1976 jumps) or ``credit_grades(...)`` (stochastic barrier).
+#[doc = pydoc!("finstack_quant.models.credit._structural", "AssetDynamics")]
 #[pyclass(
     name = "AssetDynamics",
     module = "finstack_quant.models.credit",
@@ -223,7 +178,7 @@ impl PyAssetDynamics {
 
 #[pymethods]
 impl PyAssetDynamics {
-    /// Standard geometric Brownian motion (lognormal diffusion).
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "AssetDynamics.geometric_brownian")]
     #[staticmethod]
     fn geometric_brownian() -> Self {
         Self {
@@ -231,13 +186,7 @@ impl PyAssetDynamics {
         }
     }
 
-    /// Merton jump-diffusion asset dynamics.
-    ///
-    /// # Arguments
-    ///
-    /// * `jump_intensity` - Poisson jump arrival intensity (jumps per year).
-    /// * `jump_mean` - Mean log-jump size.
-    /// * `jump_vol` - Volatility of log-jump size.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "AssetDynamics.jump_diffusion")]
     #[staticmethod]
     fn jump_diffusion(jump_intensity: f64, jump_mean: f64, jump_vol: f64) -> Self {
         Self {
@@ -249,14 +198,7 @@ impl PyAssetDynamics {
         }
     }
 
-    /// CreditGrades stochastic-barrier dynamics.
-    ///
-    /// # Arguments
-    ///
-    /// * `barrier_uncertainty` - Log-barrier volatility ``lambda`` (lognormal
-    ///   standard deviation of the default barrier).
-    /// * `mean_recovery` - Mean recovery rate at default, as a decimal in
-    ///   ``[0, 1]``.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "AssetDynamics.credit_grades")]
     #[staticmethod]
     fn credit_grades(barrier_uncertainty: f64, mean_recovery: f64) -> Self {
         Self {
@@ -267,27 +209,19 @@ impl PyAssetDynamics {
         }
     }
 
-    /// Identify this value in notebooks and logs
-    /// (``AssetDynamics.geometric_brownian()``,
-    /// ``AssetDynamics.jump_diffusion(jump_intensity=..., ...)``).
     fn __repr__(&self) -> String {
         variant_repr("AssetDynamics", &self.inner)
     }
 }
 
-wire_methods!(PyAssetDynamics, AssetDynamics, "AssetDynamics");
+wire_methods!(
+    PyAssetDynamics,
+    AssetDynamics,
+    "AssetDynamics",
+    module = "finstack_quant.models.credit._structural"
+);
 
-/// Merton-family structural credit model (Merton 1974, Black-Cox 1976,
-/// CreditGrades) over firm asset value, volatility, and a debt barrier.
-///
-/// Construct directly from asset inputs, or calibrate with ``from_equity``
-/// (KMV), ``from_cds_spread``, ``from_target_pd`` or ``credit_grades``.
-/// Rates and volatilities are decimals (``0.05`` is 5%); spreads returned by
-/// ``implied_spread`` / ``debt_spread`` / ``cds_par_spread`` are decimals,
-/// not basis points.
-///
-/// Raises ``ValueError`` on invalid inputs and ``RuntimeError`` when a
-/// calibration root-finder fails to converge.
+#[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel")]
 #[pyclass(
     name = "MertonModel",
     module = "finstack_quant.models.credit",
@@ -302,31 +236,7 @@ pub(crate) struct PyMertonModel {
 
 #[pymethods]
 impl PyMertonModel {
-    /// Construct a Merton structural credit model from firm asset inputs.
-    ///
-    /// Parameters
-    /// ----------
-    /// asset_value : float
-    ///     Firm asset value ``V_0`` (positive, finite), in the issuer's
-    ///     reporting currency.
-    /// asset_vol : float
-    ///     Annualized asset volatility as a decimal (``0.25`` is 25%).
-    /// debt_barrier : float
-    ///     Default barrier ``B``, typically total debt face, same units as
-    ///     ``asset_value``.
-    /// risk_free_rate : float
-    ///     Continuously compounded risk-free rate as a decimal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     When inputs are non-finite or out of range.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.models.credit import MertonModel
-    /// >>> round(MertonModel(100.0, 0.25, 80.0, 0.05).default_probability(1.0), 6)
-    /// 0.166629
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.__init__")]
     #[new]
     #[pyo3(text_signature = "(asset_value, asset_vol, debt_barrier, risk_free_rate)")]
     fn new(
@@ -341,16 +251,7 @@ impl PyMertonModel {
         })
     }
 
-    /// KMV calibration: recover asset value and volatility from equity inputs.
-    ///
-    /// # Arguments
-    ///
-    /// * `equity_value` - Observed market equity value
-    /// * `equity_vol` - Observed equity volatility as a decimal
-    /// * `total_debt` - Face value of debt used as the default barrier
-    /// * `risk_free_rate` - Continuously compounded risk-free rate as a decimal
-    /// * `payout_rate` - Continuous dividend / payout yield on assets as a decimal
-    /// * `maturity` - Calibration horizon in years
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.from_equity")]
     #[staticmethod]
     fn from_equity(
         equity_value: f64,
@@ -373,17 +274,7 @@ impl PyMertonModel {
         })
     }
 
-    /// CDS spread calibration: find asset volatility matching a target spread.
-    ///
-    /// # Arguments
-    ///
-    /// * `cds_spread_bp` - Target CDS par spread in basis points
-    /// * `recovery` - Assumed recovery rate as a decimal in ``[0, 1]``
-    /// * `total_debt` - Face value of debt
-    /// * `risk_free_rate` - Continuously compounded risk-free rate as a decimal
-    /// * `maturity` - Calibration horizon in years
-    /// * `asset_value` - Assumed initial firm asset value
-    /// * `payout_rate` - Continuous payout rate on assets as a decimal
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.from_cds_spread")]
     #[staticmethod]
     fn from_cds_spread(
         cds_spread_bp: f64,
@@ -408,20 +299,7 @@ impl PyMertonModel {
         })
     }
 
-    /// Calibrate the debt barrier to match a target cumulative default probability.
-    ///
-    /// # Arguments
-    ///
-    /// * `asset_value` - Current firm asset value, strictly positive
-    /// * `asset_vol` - Annualized asset volatility as a decimal, strictly
-    ///   positive
-    /// * `risk_free_rate` - Continuously compounded risk-free rate as a
-    ///   decimal. Pass the expected physical asset return instead to
-    ///   calibrate against a real-world default rate
-    /// * `payout_rate` - Continuous payout rate on assets as a decimal; it
-    ///   enters the calibration drift and is carried on the returned model
-    /// * `target_pd` - Target cumulative default probability in ``(0, 1)``
-    /// * `maturity` - Calibration horizon in years, strictly positive
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.from_target_pd")]
     #[staticmethod]
     fn from_target_pd(
         asset_value: f64,
@@ -444,34 +322,13 @@ impl PyMertonModel {
         })
     }
 
-    /// Moody's KMV default point: short-term debt plus half of long-term debt.
-    ///
-    /// # Arguments
-    ///
-    /// * `short_term_debt` - Liabilities due within one year, non-negative
-    /// * `long_term_debt` - Liabilities maturing beyond one year,
-    ///   non-negative; half of it enters the default point
-    ///
-    /// # Errors
-    ///
-    /// Raises ``ValueError`` when either input is negative or non-finite, or
-    /// when the resulting default point is zero.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.kmv_default_point")]
     #[staticmethod]
     fn kmv_default_point(short_term_debt: f64, long_term_debt: f64) -> PyResult<f64> {
         MertonModel::kmv_default_point(short_term_debt, long_term_debt).map_err(core_to_py)
     }
 
-    /// Construct a Merton model with explicit barrier and dynamics specifications.
-    ///
-    /// # Arguments
-    ///
-    /// * `asset_value` - Current firm asset value
-    /// * `asset_vol` - Asset volatility as a decimal
-    /// * `debt_barrier` - Default barrier level
-    /// * `risk_free_rate` - Continuously compounded risk-free rate as a decimal
-    /// * `payout_rate` - Continuous payout rate on assets as a decimal
-    /// * `barrier_type` - Terminal or first-passage barrier monitoring
-    /// * `dynamics` - Asset return dynamics specification
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.new_with_dynamics")]
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
     fn new_with_dynamics(
@@ -497,10 +354,7 @@ impl PyMertonModel {
         })
     }
 
-    /// Build a CreditGrades-style structural model from equity inputs.
-    ///
-    /// Calibrates asset value and volatility implied by observed equity value
-    /// and equity volatility under the O'Kane CreditGrades barrier specification.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.credit_grades")]
     #[staticmethod]
     fn credit_grades(
         equity_value: f64,
@@ -523,96 +377,71 @@ impl PyMertonModel {
         })
     }
 
-    /// Current firm asset value ``V_0``, in the issuer's reporting currency.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.asset_value")]
     #[getter]
     fn asset_value(&self) -> f64 {
         self.inner.asset_value()
     }
 
-    /// Annualized asset volatility ``sigma_V`` as a decimal (``0.25`` is 25%).
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.asset_vol")]
     #[getter]
     fn asset_vol(&self) -> f64 {
         self.inner.asset_vol()
     }
 
-    /// Default barrier ``B``, in the same currency as ``asset_value``.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.debt_barrier")]
     #[getter]
     fn debt_barrier(&self) -> f64 {
         self.inner.debt_barrier()
     }
 
-    /// Continuously compounded risk-free rate ``r`` as a decimal.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.risk_free_rate")]
     #[getter]
     fn risk_free_rate(&self) -> f64 {
         self.inner.risk_free_rate()
     }
 
-    /// Continuous payout (dividend) rate ``q`` on assets, as a decimal.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.payout_rate")]
     #[getter]
     fn payout_rate(&self) -> f64 {
         self.inner.payout_rate()
     }
 
-    /// Barrier monitoring convention.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.barrier_type")]
     #[getter]
     fn barrier_type(&self) -> PyBarrierType {
         PyBarrierType::from_inner(*self.inner.barrier_type())
     }
 
-    /// Asset return dynamics specification.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.dynamics")]
     #[getter]
     fn dynamics(&self) -> PyAssetDynamics {
         PyAssetDynamics::from_inner(*self.inner.dynamics())
     }
 
-    /// Export the model parameters as a single-row :class:`pandas.DataFrame`.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    /// Risk-neutral distance to default at `horizon` years.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.distance_to_default")]
     fn distance_to_default(&self, horizon: f64) -> f64 {
         self.inner.distance_to_default(horizon)
     }
 
-    /// Physical-measure (Moody's KMV) distance to default at `horizon` years.
-    ///
-    /// # Arguments
-    ///
-    /// * `asset_drift` - Expected physical total return on the firm's assets
-    ///   as a continuously compounded decimal, replacing the risk-free rate
-    /// * `horizon` - Time horizon in years
-    ///
-    /// # Errors
-    ///
-    /// Raises ``ValueError`` when `asset_drift` is not finite or the model
-    /// uses driftless CreditGrades dynamics.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.distance_to_default_with_drift")]
     fn distance_to_default_with_drift(&self, asset_drift: f64, horizon: f64) -> PyResult<f64> {
         self.inner
             .distance_to_default_with_drift(asset_drift, horizon)
             .map_err(core_to_py)
     }
 
-    /// Risk-neutral default probability over `horizon` years.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.default_probability")]
     fn default_probability(&self, horizon: f64) -> f64 {
         self.inner.default_probability(horizon)
     }
 
-    /// Risk-neutral cumulative default probabilities over several horizons.
-    ///
-    /// A pandas convenience over :meth:`default_probability`: each horizon
-    /// follows the same Rust rule, so a non-positive horizon gives ``0.0``.
-    ///
-    /// Parameters
-    /// ----------
-    /// horizons : list[float]
-    ///     Horizons in years.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.Series
-    ///     Float series named ``default_probability`` indexed by the horizon
-    ///     labels (``str(horizon)``), in input order.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.default_probabilities")]
     #[pyo3(text_signature = "($self, horizons)")]
     fn default_probabilities<'py>(
         &self,
@@ -624,89 +453,38 @@ impl PyMertonModel {
         values_to_series(py, values, &labels, "default_probability")
     }
 
-    /// Physical-measure default probability (theoretical EDF) over `horizon` years.
-    ///
-    /// # Arguments
-    ///
-    /// * `asset_drift` - Expected physical total return on the firm's assets
-    ///   as a continuously compounded decimal, replacing the risk-free rate
-    /// * `horizon` - Time horizon in years
-    ///
-    /// # Errors
-    ///
-    /// Raises ``ValueError`` when `asset_drift` is not finite or the model
-    /// uses driftless CreditGrades dynamics.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.default_probability_with_drift")]
     fn default_probability_with_drift(&self, asset_drift: f64, horizon: f64) -> PyResult<f64> {
         self.inner
             .default_probability_with_drift(asset_drift, horizon)
             .map_err(core_to_py)
     }
 
-    /// Zero-coupon bond spread with exogenous `recovery` (decimal, not bp).
-    ///
-    /// # Errors
-    ///
-    /// Raises `ValueError` when `horizon` or `recovery` are invalid.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.implied_spread")]
     fn implied_spread(&self, horizon: f64, recovery: f64) -> PyResult<f64> {
         self.inner
             .implied_spread(horizon, recovery)
             .map_err(core_to_py)
     }
 
-    /// Merton (1974) endogenous debt spread at `horizon` years (decimal, not bp).
-    ///
-    /// # Errors
-    ///
-    /// Raises ``ValueError`` when `horizon` is not positive, the barrier type
-    /// is not terminal, or the implied debt value is non-positive.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.debt_spread")]
     fn debt_spread(&self, horizon: f64) -> PyResult<f64> {
         self.inner.debt_spread(horizon).map_err(core_to_py)
     }
 
-    /// ISDA-style CDS par spread at `maturity` years (decimal, not bp).
-    ///
-    /// # Arguments
-    ///
-    /// * `maturity` - CDS maturity in years, strictly positive
-    /// * `recovery` - Recovery rate as a decimal in ``[0, 1]``; must equal the
-    ///   model's ``mean_recovery`` under CreditGrades dynamics
-    ///
-    /// # Errors
-    ///
-    /// Raises ``ValueError`` when the inputs are out of range or the implied
-    /// survival curve cannot be bootstrapped.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.cds_par_spread")]
     fn cds_par_spread(&self, maturity: f64, recovery: f64) -> PyResult<f64> {
         self.inner
             .cds_par_spread(maturity, recovery)
             .map_err(core_to_py)
     }
 
-    /// Implied equity value and equity volatility at ``horizon`` years.
-    ///
-    /// # Arguments
-    ///
-    /// * `horizon` - Time horizon in years (must be positive and finite)
-    ///
-    /// # Errors
-    ///
-    /// Raises ``ValueError`` when the firm is economically in default or the
-    /// inversion is numerically ill-conditioned.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.implied_equity")]
     fn implied_equity(&self, horizon: f64) -> PyResult<(f64, f64)> {
         self.inner.implied_equity(horizon).map_err(core_to_py)
     }
 
-    /// Bootstrap a piecewise-constant hazard curve from structural default probabilities.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Curve identifier
-    /// * `base_date` - Valuation date for the curve
-    /// * `tenors` - Tenor grid in years (non-empty, strictly positive, distinct)
-    /// * `recovery` - Recovery rate assumption as a decimal in ``[0, 1]``;
-    ///   must equal the model's ``mean_recovery`` under CreditGrades dynamics
-    /// * `day_count` - Day-count convention the curve uses to turn dates into
-    ///   year fractions; pass the convention of the discount curve the hazard
-    ///   curve will be paired with (required, as in Rust and WASM)
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.to_hazard_curve")]
     #[pyo3(text_signature = "($self, id, base_date, tenors, recovery, day_count)")]
     fn to_hazard_curve(
         &self,
@@ -725,18 +503,7 @@ impl PyMertonModel {
         Ok(PyHazardCurve::from_inner(Arc::new(curve)))
     }
 
-    /// Simulate asset value paths using Monte Carlo.
-    ///
-    /// # Arguments
-    ///
-    /// * `num_paths` - Number of paths to simulate
-    /// * `num_steps` - Number of time steps per path (must be >= 1)
-    /// * `horizon` - Simulation horizon in years (must be > 0)
-    /// * `seed` - Seed for reproducible draws; the Rust
-    ///   ``MertonModel::simulate_paths`` owns the generator (PCG64), so
-    ///   equal seeds give equal paths in every host
-    /// * `antithetic` - When ``True``, use antithetic variates for variance
-    ///   reduction (required, as in Rust and WASM)
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.simulate_paths")]
     #[pyo3(text_signature = "($self, num_paths, num_steps, horizon, seed, antithetic)")]
     fn simulate_paths(
         &self,
@@ -753,23 +520,19 @@ impl PyMertonModel {
         Ok(PySimulatedPaths::from_inner(paths))
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MertonModel", &self.inner)
     }
 }
 
-wire_methods!(PyMertonModel, MertonModel, "MertonModel");
+wire_methods!(
+    PyMertonModel,
+    MertonModel,
+    "MertonModel",
+    module = "finstack_quant.models.credit._structural"
+);
 
-/// Monte Carlo asset-value paths from ``MertonModel.simulate_paths``.
-///
-/// ``asset_values`` is row-major: path ``p`` occupies indices
-/// ``p * values_per_path .. (p + 1) * values_per_path`` where
-/// ``values_per_path == num_steps + 1`` (the grid includes ``t = 0``).
+#[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths")]
 #[pyclass(
     name = "SimulatedPaths",
     module = "finstack_quant.models.credit",
@@ -789,51 +552,46 @@ impl PySimulatedPaths {
 
 #[pymethods]
 impl PySimulatedPaths {
-    /// Time grid from 0 to the simulation horizon.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.times")]
     #[getter]
     fn times(&self) -> Vec<f64> {
         self.inner.times.clone()
     }
 
-    /// Asset values in row-major order.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.asset_values")]
     #[getter]
     fn asset_values(&self) -> Vec<f64> {
         self.inner.asset_values.clone()
     }
 
-    /// Number of simulated paths.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths
     }
 
-    /// Number of time steps between grid points.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.num_steps")]
     #[getter]
     fn num_steps(&self) -> usize {
         self.inner.num_steps
     }
 
-    /// Number of stored values per path (``num_steps + 1``, including ``t = 0``).
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.values_per_path")]
     #[getter]
     fn values_per_path(&self) -> usize {
         self.inner.values_per_path()
     }
 
-    /// Export the paths as a long-format :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``path`` (int), ``time`` (float, years), ``asset_value``
-    /// (float); one row per path per grid point, ordered by path then time.
-    /// Pivot with ``df.pivot(index="time", columns="path", values="asset_value")``
-    /// for a wide time-by-path frame.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let per_path = self.inner.values_per_path();
         let n = self.inner.num_paths * per_path;
         let mut path_col = Vec::with_capacity(n);
         let mut time_col = Vec::with_capacity(n);
         for p in 0..self.inner.num_paths {
-            for t in 0..per_path {
+            for &time in &self.inner.times {
                 path_col.push(p as u64);
-                time_col.push(self.inner.times.get(t).copied().unwrap_or(f64::NAN));
+                time_col.push(time);
             }
         }
         let columns = PyDict::new(py);
@@ -843,50 +601,34 @@ impl PySimulatedPaths {
         dict_to_dataframe(py, &columns, None)
     }
 
-    /// Return one asset value by path and time-grid index.
-    ///
-    /// # Arguments
-    ///
-    /// * `path_idx` - Zero-based path index
-    /// * `time_idx` - Zero-based time-grid index (includes ``t = 0``)
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.get")]
     fn get(&self, path_idx: usize, time_idx: usize) -> Option<f64> {
         self.inner.get(path_idx, time_idx)
     }
 
-    /// Return the contiguous asset-value row for one path.
-    ///
-    /// # Arguments
-    ///
-    /// * `path_idx` - Zero-based path index
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.path")]
     fn path(&self, path_idx: usize) -> Option<Vec<f64>> {
         self.inner.path(path_idx).map(<[f64]>::to_vec)
     }
 
-    /// Materialize nested path storage as a list of path rows.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.to_nested")]
     fn to_nested(&self) -> Vec<Vec<f64>> {
         self.inner.to_nested()
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation; the path arrays are summarised
-    /// by length.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("SimulatedPaths", &self.inner)
     }
 }
 
-wire_methods!(PySimulatedPaths, SimulatedPaths, "SimulatedPaths");
+wire_methods!(
+    PySimulatedPaths,
+    SimulatedPaths,
+    "SimulatedPaths",
+    module = "finstack_quant.models.credit._structural"
+);
 
-/// Notional-dependent recovery curve for PIK-accreting instruments.
-///
-/// Maps the current (accreted) notional to a recovery rate. ``kind`` names
-/// the active model: ``"constant"``, ``"inverse_linear"``,
-/// ``"inverse_power"``, ``"floored_inverse"`` or ``"linear_decline"`` (the
-/// canonical serde tags, which are also the keys in ``to_json``).
-///
-/// All recovery inputs are decimals in ``[0, 1]``; notionals are in the
-/// instrument's currency and must be strictly positive.
+#[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec")]
 #[pyclass(
     name = "DynamicRecoverySpec",
     module = "finstack_quant.models.credit",
@@ -901,14 +643,7 @@ pub(crate) struct PyDynamicRecoverySpec {
 
 #[pymethods]
 impl PyDynamicRecoverySpec {
-    /// Constant recovery irrespective of notional.
-    ///
-    /// Parameters
-    /// ----------
-    /// recovery : float
-    ///     Recovery rate as a decimal in ``[0, 1]``.
-    ///
-    /// Raises ``ValueError`` when ``recovery`` is non-finite or outside ``[0, 1]``.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.constant")]
     #[staticmethod]
     #[pyo3(text_signature = "(recovery)")]
     fn constant(recovery: f64) -> PyResult<Self> {
@@ -917,16 +652,7 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    /// Recovery inversely proportional to notional: ``R(N) = R_0 * N_0 / N``.
-    ///
-    /// Parameters
-    /// ----------
-    /// base_recovery : float
-    ///     Reference recovery ``R_0`` as a decimal in ``[0, 1]``.
-    /// base_notional : float
-    ///     Reference notional ``N_0`` (strictly positive).
-    ///
-    /// Raises ``ValueError`` on non-finite or out-of-range inputs.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.inverse_linear")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_recovery, base_notional)")]
     fn inverse_linear(base_recovery: f64, base_notional: f64) -> PyResult<Self> {
@@ -936,18 +662,7 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    /// Recovery decaying as a power of notional: ``R(N) = R_0 * (N_0 / N)^exponent``.
-    ///
-    /// Parameters
-    /// ----------
-    /// base_recovery : float
-    ///     Reference recovery ``R_0`` as a decimal in ``[0, 1]``.
-    /// base_notional : float
-    ///     Reference notional ``N_0`` (strictly positive).
-    /// exponent : float
-    ///     Non-negative decay exponent (``1.0`` reproduces ``inverse_linear``).
-    ///
-    /// Raises ``ValueError`` on non-finite or out-of-range inputs.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.inverse_power")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_recovery, base_notional, exponent)")]
     fn inverse_power(base_recovery: f64, base_notional: f64, exponent: f64) -> PyResult<Self> {
@@ -957,18 +672,7 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    /// Inverse-linear recovery floored at a minimum: ``max(R_0 * N_0 / N, floor)``.
-    ///
-    /// Parameters
-    /// ----------
-    /// base_recovery : float
-    ///     Reference recovery ``R_0`` as a decimal in ``[0, 1]``.
-    /// base_notional : float
-    ///     Reference notional ``N_0`` (strictly positive).
-    /// floor : float
-    ///     Minimum recovery as a decimal in ``[0, base_recovery]``.
-    ///
-    /// Raises ``ValueError`` on non-finite or out-of-range inputs.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.floored_inverse")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_recovery, base_notional, floor)")]
     fn floored_inverse(base_recovery: f64, base_notional: f64, floor: f64) -> PyResult<Self> {
@@ -978,87 +682,61 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    /// Recovery declining linearly with accretion:
-    /// ``R(N) = max(R_0 - slope * (N - N_0) / N_0, floor)``.
-    ///
-    /// Parameters
-    /// ----------
-    /// base_recovery : float
-    ///     Reference recovery ``R_0`` as a decimal in ``[0, 1]``.
-    /// base_notional : float
-    ///     Reference notional ``N_0`` (strictly positive).
-    /// slope : float
-    ///     Non-negative recovery decline per unit of relative accretion.
-    /// floor : float
-    ///     Minimum recovery as a decimal in ``[0, base_recovery]``.
-    ///
-    /// Raises ``ValueError`` on non-finite or out-of-range inputs.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.linear_decline")]
     #[staticmethod]
-    #[pyo3(text_signature = "(base_recovery, base_notional, slope, floor)")]
+    #[pyo3(text_signature = "(base_recovery, base_notional, sensitivity, floor)")]
     fn linear_decline(
         base_recovery: f64,
         base_notional: f64,
-        slope: f64,
+        sensitivity: f64,
         floor: f64,
     ) -> PyResult<Self> {
         Ok(Self {
-            inner: DynamicRecoverySpec::linear_decline(base_recovery, base_notional, slope, floor)
-                .map_err(core_to_py)?,
+            inner: DynamicRecoverySpec::linear_decline(
+                base_recovery,
+                base_notional,
+                sensitivity,
+                floor,
+            )
+            .map_err(core_to_py)?,
         })
     }
 
-    /// Canonical name of the active recovery model.
-    ///
-    /// One of ``"constant"``, ``"inverse_linear"``, ``"inverse_power"``,
-    /// ``"floored_inverse"``, ``"linear_decline"``.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(self.inner.model()).map_err(core_to_py)
     }
 
-    /// Recovery rate (decimal) at the given current notional.
-    ///
-    /// Parameters
-    /// ----------
-    /// notional : float
-    ///     Current (accreted) notional in the instrument's currency.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.recovery_at_notional")]
     #[pyo3(text_signature = "($self, notional)")]
     fn recovery_at_notional(&self, notional: f64) -> f64 {
         self.inner.recovery_at_notional(notional)
     }
 
-    /// Base (reference) recovery rate ``R_0`` as a decimal in ``[0, 1]``.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.base_recovery")]
     #[getter]
     fn base_recovery(&self) -> f64 {
         self.inner.base_recovery()
     }
 
-    /// Base (reference) notional ``N_0`` the recovery mapping is anchored to.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.base_notional")]
     #[getter]
     fn base_notional(&self) -> f64 {
         self.inner.base_notional()
     }
 
-    /// Notional-to-recovery mapping, in canonical JSON form.
-    ///
-    /// ``"constant"`` / ``"inverse_linear"`` for the parameterless models, or a
-    /// single-key mapping (``inverse_power``, ``floored_inverse``,
-    /// ``linear_decline``) carrying that model's parameters.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.model")]
     #[getter]
     fn model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, self.inner.model())
     }
 
-    /// Export the recovery specification as a single-row :class:`pandas.DataFrame`.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("DynamicRecoverySpec", &self.inner)
     }
@@ -1067,15 +745,11 @@ impl PyDynamicRecoverySpec {
 wire_methods!(
     PyDynamicRecoverySpec,
     DynamicRecoverySpec,
-    "DynamicRecoverySpec"
+    "DynamicRecoverySpec",
+    module = "finstack_quant.models.credit._structural"
 );
 
-/// Leverage-dependent hazard-rate feedback for PIK-accreting instruments.
-///
-/// Maps leverage (debt / assets) to an annualized hazard rate. ``kind``
-/// names the active mapping: ``"power_law"``, ``"exponential"`` or
-/// ``"tabular"`` (the canonical serde tags, also the keys in ``to_json``).
-/// Hazard rates are annualized decimals; leverage is a ratio.
+#[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec")]
 #[pyclass(
     name = "EndogenousHazardSpec",
     module = "finstack_quant.models.credit",
@@ -1090,18 +764,7 @@ pub(crate) struct PyEndogenousHazardSpec {
 
 #[pymethods]
 impl PyEndogenousHazardSpec {
-    /// Power-law feedback: ``lambda(L) = lambda_0 * (L / L_0)^exponent``.
-    ///
-    /// Parameters
-    /// ----------
-    /// base_hazard : float
-    ///     Reference annualized hazard rate ``lambda_0`` (non-negative decimal).
-    /// base_leverage : float
-    ///     Reference leverage ``L_0`` (strictly positive ratio).
-    /// exponent : float
-    ///     Non-negative elasticity of hazard to leverage.
-    ///
-    /// Raises ``ValueError`` on non-finite or out-of-range inputs.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.power_law")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_hazard, base_leverage, exponent)")]
     fn power_law(base_hazard: f64, base_leverage: f64, exponent: f64) -> PyResult<Self> {
@@ -1111,18 +774,7 @@ impl PyEndogenousHazardSpec {
         })
     }
 
-    /// Exponential feedback: ``lambda(L) = lambda_0 * exp(sensitivity * (L - L_0))``.
-    ///
-    /// Parameters
-    /// ----------
-    /// base_hazard : float
-    ///     Reference annualized hazard rate ``lambda_0`` (non-negative decimal).
-    /// base_leverage : float
-    ///     Reference leverage ``L_0`` (strictly positive ratio).
-    /// sensitivity : float
-    ///     Non-negative exponential sensitivity per unit of leverage.
-    ///
-    /// Raises ``ValueError`` on non-finite or out-of-range inputs.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.exponential")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_hazard, base_leverage, sensitivity)")]
     fn exponential(base_hazard: f64, base_leverage: f64, sensitivity: f64) -> PyResult<Self> {
@@ -1132,19 +784,7 @@ impl PyEndogenousHazardSpec {
         })
     }
 
-    /// Piecewise-linear tabular feedback through ``(leverage, hazard)`` points.
-    ///
-    /// Parameters
-    /// ----------
-    /// leverage_points : list[float]
-    ///     Strictly increasing leverage ratios (at least two).
-    /// hazard_points : list[float]
-    ///     Non-negative annualized hazard rates, one per leverage point. The
-    ///     base leverage and base hazard are taken from the first point.
-    ///
-    /// Raises ``ValueError`` when the lists differ in length, have fewer than
-    /// two points, are not strictly increasing in leverage, or contain
-    /// non-finite or negative values.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.tabular")]
     #[staticmethod]
     #[pyo3(text_signature = "(leverage_points, hazard_points)")]
     fn tabular(leverage_points: Vec<f64>, hazard_points: Vec<f64>) -> PyResult<Self> {
@@ -1154,71 +794,48 @@ impl PyEndogenousHazardSpec {
         })
     }
 
-    /// Canonical name of the active leverage-to-hazard mapping.
-    ///
-    /// One of ``"power_law"``, ``"exponential"``, ``"tabular"``.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(self.inner.leverage_hazard_map()).map_err(core_to_py)
     }
 
-    /// Annualized hazard rate (decimal) at the given leverage ratio.
-    ///
-    /// Parameters
-    /// ----------
-    /// leverage : float
-    ///     Leverage ratio (debt / assets), non-negative.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.hazard_at_leverage")]
     #[pyo3(text_signature = "($self, leverage)")]
     fn hazard_at_leverage(&self, leverage: f64) -> f64 {
         self.inner.hazard_at_leverage(leverage)
     }
 
-    /// Annualized hazard rate after PIK accretion, with leverage
-    /// ``accreted_notional / asset_value``.
-    ///
-    /// Parameters
-    /// ----------
-    /// accreted_notional : float
-    ///     Notional outstanding after PIK accrual, in the instrument's currency.
-    /// asset_value : float
-    ///     Firm asset value in the same currency (strictly positive).
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.hazard_after_pik_accrual")]
     #[pyo3(text_signature = "($self, accreted_notional, asset_value)")]
     fn hazard_after_pik_accrual(&self, accreted_notional: f64, asset_value: f64) -> f64 {
         self.inner
             .hazard_after_pik_accrual(accreted_notional, asset_value)
     }
 
-    /// Base (reference) hazard rate ``lambda_0``, annualized.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.base_hazard_rate")]
     #[getter]
     fn base_hazard_rate(&self) -> f64 {
         self.inner.base_hazard_rate()
     }
 
-    /// Base (reference) leverage level ``L_0`` the hazard mapping is anchored to.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.base_leverage")]
     #[getter]
     fn base_leverage(&self) -> f64 {
         self.inner.base_leverage()
     }
 
-    /// Leverage-to-hazard mapping, in canonical JSON form.
-    ///
-    /// A single-key mapping (``power_law``, ``exponential``, ``tabular``)
-    /// carrying that model's parameters.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.leverage_hazard_map")]
     #[getter]
     fn leverage_hazard_map<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, self.inner.leverage_hazard_map())
     }
 
-    /// Export the hazard specification as a single-row :class:`pandas.DataFrame`.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("EndogenousHazardSpec", &self.inner)
     }
@@ -1227,14 +844,11 @@ impl PyEndogenousHazardSpec {
 wire_methods!(
     PyEndogenousHazardSpec,
     EndogenousHazardSpec,
-    "EndogenousHazardSpec"
+    "EndogenousHazardSpec",
+    module = "finstack_quant.models.credit._structural"
 );
 
-/// Snapshot of an obligor's credit state at a PIK toggle decision date.
-///
-/// Feeds ``ToggleExerciseModel.should_pik``. Hazard rates are
-/// annualized decimals, leverage is a ratio, and the monetary fields share
-/// the instrument's currency.
+#[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState")]
 #[pyclass(
     name = "CreditState",
     module = "finstack_quant.models.credit",
@@ -1248,24 +862,7 @@ pub(crate) struct PyCreditState {
 
 #[pymethods]
 impl PyCreditState {
-    /// Build a credit-state snapshot.
-    ///
-    /// Parameters
-    /// ----------
-    /// hazard_rate : float, default 0.0
-    ///     Annualized instantaneous default intensity (decimal).
-    /// distance_to_default : float | None, default None
-    ///     Distance to default in standard deviations, when available.
-    /// leverage : float, default 0.0
-    ///     Leverage ratio (debt / assets).
-    /// accreted_notional : float, default 0.0
-    ///     PIK-accreted notional outstanding.
-    /// coupon_due : float, default 0.0
-    ///     Cash coupon due at the decision date.
-    /// asset_value : float | None, default None
-    ///     Fair value of the firm's assets, when available.
-    ///
-    /// Raises ``ValueError`` if any supplied value is non-finite.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.__init__")]
     #[new]
     #[pyo3(signature = (hazard_rate=0.0, distance_to_default=None, leverage=0.0, accreted_notional=0.0, coupon_due=0.0, asset_value=None))]
     #[pyo3(
@@ -1291,65 +888,60 @@ impl PyCreditState {
         .map_err(core_to_py)
     }
 
-    /// Annualized instantaneous default intensity at this observation.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.hazard_rate")]
     #[getter]
     fn hazard_rate(&self) -> f64 {
         self.inner.hazard_rate
     }
 
-    /// Distance-to-default in standard deviations, or ``None`` when unavailable.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.distance_to_default")]
     #[getter]
     fn distance_to_default(&self) -> Option<f64> {
         self.inner.distance_to_default
     }
 
-    /// Leverage ratio (debt / assets).
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.leverage")]
     #[getter]
     fn leverage(&self) -> f64 {
         self.inner.leverage
     }
 
-    /// Accreted (PIK-augmented) notional outstanding.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.accreted_notional")]
     #[getter]
     fn accreted_notional(&self) -> f64 {
         self.inner.accreted_notional
     }
 
-    /// Cash coupon amount due at this decision date.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.coupon_due")]
     #[getter]
     fn coupon_due(&self) -> f64 {
         self.inner.coupon_due
     }
 
-    /// Fair value of the firm's assets, or ``None`` when unavailable.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.asset_value")]
     #[getter]
     fn asset_value(&self) -> Option<f64> {
         self.inner.asset_value
     }
 
-    /// Export the observed credit state as a single-row :class:`pandas.DataFrame`.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CreditState", &self.inner)
     }
 }
 
-wire_methods!(PyCreditState, CreditState, "CreditState");
+wire_methods!(
+    PyCreditState,
+    CreditState,
+    "CreditState",
+    module = "finstack_quant.models.credit._structural"
+);
 
-/// PIK toggle exercise rule: threshold, stochastic (logistic) or nested
-/// Monte Carlo optimal exercise.
-///
-/// ``kind`` is ``"threshold"``, ``"stochastic"`` or ``"optimal_exercise"``.
-/// Credit-state variables are ``"hazard_rate"``, ``"distance_to_default"``
-/// or ``"leverage"``; threshold directions are ``"above"`` or ``"below"``.
+#[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel")]
 #[pyclass(
     name = "ToggleExerciseModel",
     module = "finstack_quant.models.credit",
@@ -1364,22 +956,7 @@ pub(crate) struct PyToggleExerciseModel {
 
 #[pymethods]
 impl PyToggleExerciseModel {
-    /// Deterministic rule: PIK when ``variable`` is ``direction`` the threshold.
-    ///
-    /// Parameters
-    /// ----------
-    /// variable : str
-    ///     Credit-state variable observed: ``"hazard_rate"``,
-    ///     ``"distance_to_default"`` or ``"leverage"``.
-    /// threshold : float
-    ///     Trigger level in the variable's own units (annualized decimal
-    ///     hazard, standard deviations, or leverage ratio).
-    /// direction : str
-    ///     ``"above"`` to PIK when the variable exceeds the threshold,
-    ///     ``"below"`` to PIK when it falls under it.
-    ///
-    /// Raises ``ValueError`` for an unknown variable or direction string, or
-    /// a non-finite threshold.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.threshold")]
     #[staticmethod]
     #[pyo3(text_signature = "(variable, threshold, direction)")]
     fn threshold(variable: &str, threshold: f64, direction: &str) -> PyResult<Self> {
@@ -1390,20 +967,7 @@ impl PyToggleExerciseModel {
             .map_err(core_to_py)
     }
 
-    /// Stochastic rule: PIK with probability ``logistic(intercept + sensitivity * x)``.
-    ///
-    /// Parameters
-    /// ----------
-    /// variable : str
-    ///     Credit-state variable ``x`` observed: ``"hazard_rate"``,
-    ///     ``"distance_to_default"`` or ``"leverage"``.
-    /// intercept : float
-    ///     Logit intercept.
-    /// sensitivity : float
-    ///     Logit slope per unit of the variable.
-    ///
-    /// Raises ``ValueError`` for an unknown variable string or a non-finite
-    /// intercept or sensitivity.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.stochastic")]
     #[staticmethod]
     #[pyo3(text_signature = "(variable, intercept, sensitivity)")]
     fn stochastic(variable: &str, intercept: f64, sensitivity: f64) -> PyResult<Self> {
@@ -1413,79 +977,33 @@ impl PyToggleExerciseModel {
             .map_err(core_to_py)
     }
 
-    /// Whether the rule elects PIK for ``state`` given one uniform draw.
-    ///
-    /// Parameters
-    /// ----------
-    /// state : CreditState
-    ///     Observed credit state at the decision date.
-    /// u : float
-    ///     Uniform draw in ``[0, 1)``; ignored by threshold rules and used as
-    ///     the Bernoulli draw by stochastic rules (PIK when ``u`` is below the
-    ///     logistic probability). Optimal-exercise rules run their nested
-    ///     simulation with a seed derived from ``u``, so equal draws give equal
-    ///     decisions.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.should_pik")]
     #[pyo3(text_signature = "($self, state, u)")]
     fn should_pik(&self, state: &PyCreditState, u: f64) -> bool {
         self.inner.should_pik(&state.inner, u)
     }
 
-    /// Nested-Monte-Carlo optimal exercise rule.
-    ///
-    /// Parameters
-    /// ----------
-    /// nested_paths : int
-    ///     Inner simulation paths per decision date.
-    /// equity_discount_rate : float
-    ///     Continuously compounded equity discount rate (decimal).
-    /// asset_vol : float
-    ///     Annualized asset volatility (decimal).
-    /// risk_free_rate : float
-    ///     Continuously compounded risk-free rate (decimal).
-    /// horizon : float
-    ///     Inner simulation horizon in years.
-    ///
-    /// Raises ``ValueError`` if ``nested_paths`` is zero, a rate is
-    /// non-finite, ``asset_vol`` is negative or non-finite, or ``horizon`` is
-    /// not finite and positive.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.optimal")]
     #[staticmethod]
-    #[pyo3(
-        text_signature = "(nested_paths, equity_discount_rate, asset_vol, risk_free_rate, horizon)"
-    )]
+    #[pyo3(text_signature = "(nested_paths, asset_vol, risk_free_rate, horizon)")]
     fn optimal(
         nested_paths: usize,
-        equity_discount_rate: f64,
         asset_vol: f64,
         risk_free_rate: f64,
         horizon: f64,
     ) -> PyResult<Self> {
-        ToggleExerciseModel::optimal(
-            nested_paths,
-            equity_discount_rate,
-            asset_vol,
-            risk_free_rate,
-            horizon,
-        )
-        .map(|inner| Self { inner })
-        .map_err(core_to_py)
+        ToggleExerciseModel::optimal(nested_paths, asset_vol, risk_free_rate, horizon)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
-    /// Which exercise rule this model carries.
-    ///
-    /// One of ``"threshold"``, ``"stochastic"`` or ``"optimal_exercise"`` —
-    /// the canonical serde tag, so it also names the single key in the
-    /// ``to_json`` payload.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    /// Parameters of the active rule, as a mapping in canonical JSON form.
-    ///
-    /// The keys depend on :attr:`kind`: ``state_variable`` / ``threshold`` /
-    /// ``direction`` for a threshold rule, ``state_variable`` / ``intercept`` /
-    /// ``sensitivity`` for a stochastic one, and the nested-Monte-Carlo
-    /// settings for optimal exercise.
+    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.params")]
     #[getter]
     fn params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match &self.inner {
@@ -1495,11 +1013,6 @@ impl PyToggleExerciseModel {
         }
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ToggleExerciseModel", &self.inner)
     }
@@ -1508,7 +1021,8 @@ impl PyToggleExerciseModel {
 wire_methods!(
     PyToggleExerciseModel,
     ToggleExerciseModel,
-    "ToggleExerciseModel"
+    "ToggleExerciseModel",
+    module = "finstack_quant.models.credit._structural"
 );
 
 /// Render an externally-tagged enum as its Python constructor call:
@@ -1532,7 +1046,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     let module = crate::bindings::module_utils::new_submodule(parent, "credit")?;
     module.setattr(
         "__doc__",
-        "Product-independent credit models, scoring, migration, PD, LGD, recovery, and liability-management analytics.",
+        pydoc!("finstack_quant.models.credit", "__module__"),
     )?;
     module.add_class::<PyAssetDynamics>()?;
     module.add_class::<PyBarrierType>()?;

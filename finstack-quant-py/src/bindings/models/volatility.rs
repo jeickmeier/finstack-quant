@@ -43,14 +43,7 @@ use finstack_quant_models::volatility::VolatilityConvention;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-/// SABR model parameters ``(alpha, beta, nu, rho)`` with optional ``shift``.
-///
-/// Constructed with validation: ``alpha > 0``, ``beta in [0, 1]``,
-/// ``nu >= 0``, ``rho in [-1, 1]``, and when supplied ``shift > 0``.
-///
-/// Sources
-/// -------
-/// - Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr
+#[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters")]
 #[pyclass(
     name = "SabrParameters",
     module = "finstack_quant.models.volatility",
@@ -64,28 +57,7 @@ pub struct PySabrParameters {
 
 #[pymethods]
 impl PySabrParameters {
-    /// Create a new ``SabrParameters`` instance.
-    ///
-    /// Parameters
-    /// ----------
-    /// alpha : float
-    ///     Initial volatility level as a decimal (Black vol for ``beta > 0``,
-    ///     absolute normal vol for ``beta == 0``). Must be strictly positive.
-    /// beta : float
-    ///     CEV exponent. Must be in ``[0, 1]``.
-    /// nu : float
-    ///     Volatility of volatility as a decimal. Must be non-negative.
-    /// rho : float
-    ///     Correlation between asset and volatility. Must be in ``[-1, 1]``.
-    /// shift : float, optional
-    ///     Displacement for negative-rate support, in the same rate units as
-    ///     the forward (e.g. ``0.03`` for a 3% shift). When provided must be
-    ///     strictly positive.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If any parameter is outside its domain.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.__init__")]
     #[new]
     #[pyo3(signature = (alpha, beta, nu, rho, shift=None))]
     fn new(alpha: f64, beta: f64, nu: f64, rho: f64, shift: Option<f64>) -> PyResult<Self> {
@@ -97,7 +69,7 @@ impl PySabrParameters {
         Ok(Self { inner })
     }
 
-    /// Equity-standard defaults: ``alpha=0.20, beta=1.0, nu=0.30, rho=-0.20``.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.equity_default")]
     #[staticmethod]
     fn equity_default() -> Self {
         Self {
@@ -105,7 +77,7 @@ impl PySabrParameters {
         }
     }
 
-    /// Rates-standard defaults: ``alpha=0.02, beta=0.5, nu=0.30, rho=0.0``.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.rates_default")]
     #[staticmethod]
     fn rates_default() -> Self {
         Self {
@@ -113,9 +85,7 @@ impl PySabrParameters {
         }
     }
 
-    /// Rates market standard: ``beta = 0.5`` with the supplied ``alpha``, ``nu``, ``rho``.
-    ///
-    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.rates_standard")]
     #[staticmethod]
     fn rates_standard(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
         SabrParameters::rates_standard(alpha, nu, rho)
@@ -123,9 +93,7 @@ impl PySabrParameters {
             .map_err(core_to_py)
     }
 
-    /// Normal SABR: ``beta = 0``; ``alpha`` is an absolute normal vol.
-    ///
-    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.normal")]
     #[staticmethod]
     fn normal(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
         SabrParameters::normal(alpha, nu, rho)
@@ -133,9 +101,7 @@ impl PySabrParameters {
             .map_err(core_to_py)
     }
 
-    /// Lognormal SABR: ``beta = 1``.
-    ///
-    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.lognormal")]
     #[staticmethod]
     fn lognormal(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
         SabrParameters::lognormal(alpha, nu, rho)
@@ -143,9 +109,7 @@ impl PySabrParameters {
             .map_err(core_to_py)
     }
 
-    /// Shifted normal SABR: ``beta = 0`` with a positive displacement ``shift``.
-    ///
-    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.shifted_normal")]
     #[staticmethod]
     fn shifted_normal(alpha: f64, nu: f64, rho: f64, shift: f64) -> PyResult<Self> {
         SabrParameters::shifted_normal(alpha, nu, rho, shift)
@@ -153,9 +117,7 @@ impl PySabrParameters {
             .map_err(core_to_py)
     }
 
-    /// Shifted lognormal SABR: ``beta = 1`` with a positive displacement ``shift``.
-    ///
-    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.shifted_lognormal")]
     #[staticmethod]
     fn shifted_lognormal(alpha: f64, nu: f64, rho: f64, shift: f64) -> PyResult<Self> {
         SabrParameters::shifted_lognormal(alpha, nu, rho, shift)
@@ -163,70 +125,53 @@ impl PySabrParameters {
             .map_err(core_to_py)
     }
 
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.alpha")]
     #[getter]
     fn alpha(&self) -> f64 {
         self.inner.alpha
     }
 
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.beta")]
     #[getter]
     fn beta(&self) -> f64 {
         self.inner.beta
     }
 
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.nu")]
     #[getter]
     fn nu(&self) -> f64 {
         self.inner.nu
     }
 
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.rho")]
     #[getter]
     fn rho(&self) -> f64 {
         self.inner.rho
     }
 
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.shift")]
     #[getter]
     fn shift(&self) -> Option<f64> {
         self.inner.shift
     }
 
-    /// ``True`` if the parameters include a non-zero shift (negative-rate support).
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.is_shifted")]
     fn is_shifted(&self) -> bool {
         self.inner.is_shifted()
     }
 
-    /// ``True`` for normal beta=0 dynamics or a configured displacement.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.supports_negative_rates")]
     fn supports_negative_rates(&self) -> bool {
         self.inner.supports_negative_rates()
     }
 
-    /// Hagan-2002 implied volatility.
-    ///
-    /// Parameters
-    /// ----------
-    /// forward : float
-    ///     Forward price / rate.
-    /// strike : float
-    ///     Option strike.
-    /// t : float
-    ///     Time to expiry in years.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Implied volatility (annualised decimal Black vol, or absolute
-    ///     normal vol when ``beta == 0``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``t`` is not positive or the forward / strike is outside the
-    ///     (shifted) SABR domain.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.implied_vol")]
     fn implied_vol(&self, forward: f64, strike: f64, t: f64) -> PyResult<f64> {
         self.inner
             .implied_vol(forward, strike, t)
             .map_err(core_to_py)
     }
 
-    /// Exact equality of all parameters (Rust ``PartialEq``).
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
         other
             .extract::<PyRef<'_, PySabrParameters>>()
@@ -246,7 +191,12 @@ impl PySabrParameters {
     }
 }
 
-wire_methods!(PySabrParameters, SabrParameters, "SabrParameters");
+wire_methods!(
+    PySabrParameters,
+    SabrParameters,
+    "SabrParameters",
+    module = "finstack_quant.models.volatility"
+);
 
 #[pyclass(
     name = "SabrCalibrationOutcome",
@@ -313,11 +263,7 @@ impl PySabrCalibrationOutcome {
     }
 }
 
-/// Volatility smile generator for a fixed ``(forward, t)`` pair.
-///
-/// Sources
-/// -------
-/// - Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr
+#[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile")]
 #[pyclass(name = "SabrSmile", module = "finstack_quant.models.volatility")]
 pub struct PySabrSmile {
     inner: SabrSmile,
@@ -325,16 +271,7 @@ pub struct PySabrSmile {
 
 #[pymethods]
 impl PySabrSmile {
-    /// Construct a smile for the given forward and time-to-expiry.
-    ///
-    /// Parameters
-    /// ----------
-    /// params : SabrParameters
-    ///     Calibrated SABR parameters.
-    /// forward : float
-    ///     Forward price / rate.
-    /// t : float
-    ///     Time to expiry in years.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.__init__")]
     #[new]
     fn new(params: PySabrParameters, forward: f64, t: f64) -> Self {
         Self {
@@ -342,54 +279,22 @@ impl PySabrSmile {
         }
     }
 
-    /// At-the-money implied volatility.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.atm_vol")]
     fn atm_vol(&self) -> PyResult<f64> {
         self.inner.atm_vol().map_err(core_to_py)
     }
 
-    /// Implied volatility at a single strike.
-    ///
-    /// Normal (Bachelier) vol in absolute rate units when ``beta < 1e-4``,
-    /// Black decimal vol otherwise.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.implied_vol")]
     fn implied_vol(&self, strike: f64) -> PyResult<f64> {
         self.inner.implied_vol(strike).map_err(core_to_py)
     }
 
-    /// Generate implied volatilities for a vector of strikes.
-    ///
-    /// Returns
-    /// -------
-    /// list[float]
-    ///     Implied volatilities in strike order.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.generate_smile")]
     fn generate_smile(&self, strikes: Vec<f64>) -> PyResult<Vec<f64>> {
         self.inner.generate_smile(&strikes).map_err(core_to_py)
     }
 
-    /// Butterfly + strike-monotonicity static-arbitrage check across ``strikes``.
-    ///
-    /// Parameters
-    /// ----------
-    /// strikes : list[float]
-    ///     Finite strikes in strictly ascending order. Spacing may vary;
-    ///     convexity checks use the actual distances between strikes.
-    /// r : float
-    ///     Continuously compounded risk-free rate (decimal) that discounts the
-    ///     forward-based Black call prices compared against the 1e-6
-    ///     tolerance.
-    ///
-    /// Returns
-    /// -------
-    /// dict
-    ///     The Rust ``ArbitrageValidationResult``: ``{"arbitrage_free": bool,
-    ///     "butterfly_violations": [...], "monotonicity_violations": [...]}``.
-    ///     Violation lists contain dicts with strike, price, and severity
-    ///     fields.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If strikes are non-finite or not strictly ascending, ``r`` is
-    ///     non-finite, or smile generation or call-price evaluation is invalid.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.validate_no_arbitrage")]
     #[pyo3(signature = (strikes, r))]
     fn validate_no_arbitrage<'py>(
         &self,
@@ -404,54 +309,21 @@ impl PySabrSmile {
         serde_to_py(py, &result)
     }
 
-    /// Strike for an absolute forward delta, using the smile's ATM volatility.
-    ///
-    /// Bachelier delta for ``beta == 0``, Black delta on displaced coordinates
-    /// otherwise. An ATM-vol approximation, not a smile-consistent solve.
-    ///
-    /// Parameters
-    /// ----------
-    /// delta : float
-    ///     Absolute undiscounted forward delta strictly between 0 and 1.
-    /// is_call : bool
-    ///     ``True`` for call delta, ``False`` for absolute put delta.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``delta`` is outside ``(0, 1)`` or the smile coordinates are invalid.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.strike_from_delta")]
     fn strike_from_delta(&self, delta: f64, is_call: bool) -> PyResult<f64> {
         self.inner
             .strike_from_delta(delta, is_call)
             .map_err(core_to_py)
     }
 
-    /// Raise ``ValueError`` when the smile has static arbitrage on ``strikes``.
-    ///
-    /// Same checks as :meth:`validate_no_arbitrage`; the message counts the
-    /// butterfly and monotonicity violations.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.check_no_arbitrage")]
     fn check_no_arbitrage(&self, strikes: Vec<f64>, r: f64) -> PyResult<()> {
         self.inner
             .check_no_arbitrage(&strikes, r)
             .map_err(core_to_py)
     }
 
-    /// Smile vols on ``strikes`` after a greedy monotonicity/convexity repair.
-    ///
-    /// Parameters
-    /// ----------
-    /// strikes : list[float]
-    ///     Finite, strictly ascending strikes in the model domain.
-    /// r : float
-    ///     Continuously compounded risk-free rate (decimal) discounting the
-    ///     forward-based Black call prices.
-    /// max_iterations : int
-    ///     Maximum repair passes.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the grid, rate or smile coordinates are invalid.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.repair_arbitrage")]
     fn repair_arbitrage(
         &self,
         strikes: Vec<f64>,
@@ -463,26 +335,7 @@ impl PySabrSmile {
             .map_err(core_to_py)
     }
 
-    /// Tabulate the smile on a strike grid as a ``pandas.DataFrame``.
-    ///
-    /// Parameters
-    /// ----------
-    /// strikes : list[float]
-    ///     Strikes at which to evaluate the smile.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    ///     Columns ``strike``, ``vol`` (decimal Black vol, or absolute normal
-    ///     vol when ``beta == 0``) and ``log_moneyness``
-    ///     (``ln((K + s) / (F + s))`` with the SABR shift ``s``, ``0`` when
-    ///     unshifted; ``NaN`` when a shifted rate is not positive).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If any strike or the stored forward / expiry is outside the model
-    ///     domain.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>, strikes: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
         let vols = self.inner.generate_smile(&strikes).map_err(core_to_py)?;
         let log_moneyness: Vec<f64> = strikes
@@ -496,13 +349,13 @@ impl PySabrSmile {
         dict_to_dataframe(py, &data, None)
     }
 
-    /// Forward used by this smile.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.forward")]
     #[getter]
     fn forward(&self) -> f64 {
         self.inner.forward()
     }
 
-    /// Time to expiry in years used by this smile.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.time_to_expiry")]
     #[getter]
     fn time_to_expiry(&self) -> f64 {
         self.inner.time_to_expiry()
@@ -527,11 +380,7 @@ impl PySabrSmile {
     }
 }
 
-/// SABR calibrator using Levenberg-Marquardt with beta fixed.
-///
-/// Sources
-/// -------
-/// - Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr
+#[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator")]
 #[pyclass(name = "SabrCalibrator", module = "finstack_quant.models.volatility")]
 pub struct PySabrCalibrator {
     inner: SabrCalibrator,
@@ -547,15 +396,13 @@ impl Default for PySabrCalibrator {
 
 #[pymethods]
 impl PySabrCalibrator {
-    /// Construct a calibrator with production defaults (tolerance ``1e-4``
-    /// on the vega-weighted SSE objective, ``max_iter=2000``,
-    /// finite-difference gradients).
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.__init__")]
     #[new]
     fn new() -> Self {
         Self::default()
     }
 
-    /// High-precision calibrator (tolerance ``1e-8``, ``max_iter=200``).
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.high_precision")]
     #[staticmethod]
     fn high_precision() -> Self {
         Self {
@@ -563,64 +410,21 @@ impl PySabrCalibrator {
         }
     }
 
-    /// Override the maximum relative error accepted for any final volatility quote.
-    ///
-    /// Preserves all other previously-set fields (e.g. the ``max_iter=200``
-    /// from :meth:`high_precision`) by cloning the existing calibrator and
-    /// only adjusting the tolerance.
-    ///
-    /// Parameters
-    /// ----------
-    /// tolerance : float
-    ///     Positive finite relative quote-error limit; 1e-4 permits at most
-    ///     0.01% of each quoted volatility. Invalid settings fail at calibration.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.with_tolerance")]
     fn with_tolerance(&self, tolerance: f64) -> Self {
         Self {
             inner: self.inner.clone().with_tolerance(tolerance),
         }
     }
 
-    /// Override the solver iteration cap.
-    ///
-    /// Parameters
-    /// ----------
-    /// max_iterations : int
-    ///     Positive cap on Levenberg-Marquardt iterations before the fit is
-    ///     reported as non-converged. Pair a tight ``with_tolerance`` with a
-    ///     larger budget.
-    ///
-    /// Returns
-    /// -------
-    /// SabrCalibrator
-    ///     Copy of this calibrator with the iteration cap replaced.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.with_max_iterations")]
     fn with_max_iterations(&self, max_iterations: usize) -> Self {
         Self {
             inner: self.inner.clone().with_max_iterations(max_iterations),
         }
     }
 
-    /// Calibrate SABR parameters to a market vol smile.
-    ///
-    /// Parameters
-    /// ----------
-    /// forward : float
-    ///     Forward price / rate.
-    /// strikes : list[float]
-    ///     Strikes at which market vols are quoted.
-    /// market_vols : list[float]
-    ///     Decimal normal volatilities for beta near zero, or annual Black
-    ///     volatilities in relative decimals otherwise.
-    /// t : float
-    ///     Time to expiry in years.
-    /// beta : float
-    ///     Fixed CEV exponent (``1.0`` for equity lognormal, ``0.5`` for
-    ///     rates, ``0.0`` for normal vol). Required — matching the Rust and
-    ///     WASM signatures — so the convention is always an explicit choice.
-    ///
-    /// Returns
-    /// -------
-    /// SabrCalibrationOutcome
-    ///     Calibrated parameters, signed quote errors, and deterministic solver diagnostics.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.calibrate")]
     fn calibrate(
         &self,
         py: Python<'_>,
@@ -638,28 +442,7 @@ impl PySabrCalibrator {
         .map_err(core_to_py)
     }
 
-    /// Override the displacement policy applied before fitting.
-    ///
-    /// Parameters
-    /// ----------
-    /// shift : float | str | None
-    ///     ``None`` fits the quotes as-is; a float is a fixed additive shift in
-    ///     the forward's units (decimal rate or price); ``"auto"`` picks the
-    ///     smallest standardized shift (1-4%) that leaves 10bp of headroom
-    ///     above the most negative forward or strike, or none when every
-    ///     input is non-negative. The shift used is stored on the fitted
-    ///     :class:`SabrParameters`.
-    ///
-    /// Returns
-    /// -------
-    /// SabrCalibrator
-    ///     Copy of this calibrator with the shift policy replaced.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``shift`` is neither ``None``, a float, nor ``"auto"`` (a
-    ///     ``bool`` is rejected, not read as a 0/1 shift).
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.with_shift")]
     #[pyo3(signature = (shift))]
     fn with_shift(&self, py: Python<'_>, shift: &Bound<'_, PyAny>) -> PyResult<Self> {
         let shift: SabrShift = py_to_serde(py, shift, "shift")?;
@@ -668,44 +451,32 @@ impl PySabrCalibrator {
         })
     }
 
-    /// Enable or disable exact ATM pinning.
-    ///
-    /// Parameters
-    /// ----------
-    /// atm_pinning : bool
-    ///     When ``True``, ``alpha`` is solved analytically so the model
-    ///     reproduces the ATM volatility interpolated from the quotes
-    ///     exactly, and only ``nu`` and ``rho`` are fitted to the smile.
-    ///
-    /// Returns
-    /// -------
-    /// SabrCalibrator
-    ///     Copy of this calibrator with the pinning flag replaced. Does not raise.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.with_atm_pinning")]
     fn with_atm_pinning(&self, atm_pinning: bool) -> Self {
         Self {
             inner: self.inner.clone().with_atm_pinning(atm_pinning),
         }
     }
 
-    /// Maximum accepted relative error of every fitted volatility quote.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.tolerance")]
     #[getter]
     fn tolerance(&self) -> f64 {
         self.inner.tolerance()
     }
 
-    /// Iteration cap before the solver reports non-convergence.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.max_iterations")]
     #[getter]
     fn max_iterations(&self) -> usize {
         self.inner.max_iterations()
     }
 
-    /// Displacement policy: ``None``, a fixed float shift, or ``"auto"``.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.shift")]
     #[getter]
     fn shift<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.shift())
     }
 
-    /// Whether ``alpha`` is pinned to the interpolated ATM volatility.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.atm_pinning")]
     #[getter]
     fn atm_pinning(&self) -> bool {
         self.inner.atm_pinning()
@@ -731,14 +502,7 @@ impl PySabrCalibrator {
     }
 }
 
-/// Bachelier (normal) implied volatility from an undiscounted option price.
-///
-/// Inverts ``bachelier_price`` (per unit annuity, ``df = 1``). Forward and
-/// strike may be zero or negative. Returns an absolute normal vol in the
-/// forward's units.
-///
-/// Raises ``ValueError`` for non-finite forward/strike, non-positive ``t``,
-/// a negative price, a price below intrinsic, or solver non-convergence.
+#[doc = pydoc!("finstack_quant.models.volatility", "implied_vol_bachelier")]
 #[pyfunction]
 #[pyo3(signature = (price, forward, strike, t, is_call))]
 fn implied_vol_bachelier(
@@ -751,13 +515,7 @@ fn implied_vol_bachelier(
     vol::implied_vol_bachelier(price, forward, strike, t, is_call).map_err(core_to_py)
 }
 
-/// Black-76 (lognormal) implied volatility from an undiscounted option price.
-///
-/// Inverts the Black-76 price per unit annuity (``df = 1``). Forward and
-/// strike must be strictly positive. Returns a decimal Black vol.
-///
-/// Raises ``ValueError`` for non-positive forward/strike/``t``, a negative
-/// price, a price outside the no-arbitrage bounds, or solver non-convergence.
+#[doc = pydoc!("finstack_quant.models.volatility", "implied_vol_black")]
 #[pyfunction]
 #[pyo3(signature = (price, forward, strike, t, is_call))]
 fn implied_vol_black(
@@ -770,52 +528,43 @@ fn implied_vol_black(
     vol::implied_vol_black(price, forward, strike, t, is_call).map_err(core_to_py)
 }
 
-/// Evaluate a core volatility surface with checked grid bounds.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_surface_vol")]
 #[pyfunction]
 fn get_surface_vol(surface: &PyVolSurface, expiry: f64, strike: f64) -> PyResult<f64> {
     vol::get_surface_vol(&surface.inner, expiry, strike).map_err(core_to_py)
 }
 
-/// Evaluate a core volatility surface with flat coordinate extrapolation.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_surface_vol_clamped")]
 #[pyfunction]
 fn get_surface_vol_clamped(surface: &PyVolSurface, expiry: f64, strike: f64) -> f64 {
     vol::get_surface_vol_clamped(&surface.inner, expiry, strike)
 }
 
-/// Evaluate a core SABR cube with checked expiry and tenor bounds.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_cube_vol")]
 #[pyfunction]
 fn get_cube_vol(cube: &PyVolCube, expiry: f64, tenor: f64, strike: f64) -> PyResult<f64> {
     vol::get_cube_vol(&cube.inner, expiry, tenor, strike).map_err(core_to_py)
 }
 
-/// Evaluate a core SABR cube with clamped expiry and tenor coordinates.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_cube_vol_clamped")]
 #[pyfunction]
 fn get_cube_vol_clamped(cube: &PyVolCube, expiry: f64, tenor: f64, strike: f64) -> f64 {
     vol::get_cube_vol_clamped(&cube.inner, expiry, tenor, strike)
 }
 
-/// Evaluate normal/Bachelier volatility from a core SABR cube.
-///
-/// Returns an **absolute** normal volatility in the cube's rate units (e.g.
-/// ``0.0075`` for 75 bp on decimal rates), not a Black decimal vol.
-///
-/// Raises ``ValueError`` for out-of-grid coordinates or an invalid
-/// shifted-SABR domain.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_cube_normal_vol")]
 #[pyfunction]
 fn get_cube_normal_vol(cube: &PyVolCube, expiry: f64, tenor: f64, strike: f64) -> PyResult<f64> {
     vol::get_cube_normal_vol(&cube.inner, expiry, tenor, strike).map_err(core_to_py)
 }
 
-/// Evaluate clamped normal/Bachelier volatility from a core SABR cube.
-///
-/// Returns an absolute normal volatility in the cube's rate units; ``NaN``
-/// when the expansion is undefined. Does not raise.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_cube_normal_vol_clamped")]
 #[pyfunction]
 fn get_cube_normal_vol_clamped(cube: &PyVolCube, expiry: f64, tenor: f64, strike: f64) -> f64 {
     vol::get_cube_normal_vol_clamped(&cube.inner, expiry, tenor, strike)
 }
 
-/// Materialize a cube tenor slice as a lognormal core surface artifact.
+#[doc = pydoc!("finstack_quant.models.volatility", "materialize_cube_tenor_slice")]
 #[pyfunction]
 fn materialize_cube_tenor_slice(
     cube: &PyVolCube,
@@ -827,7 +576,7 @@ fn materialize_cube_tenor_slice(
         .map_err(core_to_py)
 }
 
-/// Materialize a cube tenor slice as a normal-volatility core surface artifact.
+#[doc = pydoc!("finstack_quant.models.volatility", "materialize_cube_tenor_slice_normal")]
 #[pyfunction]
 fn materialize_cube_tenor_slice_normal(
     cube: &PyVolCube,
@@ -839,7 +588,7 @@ fn materialize_cube_tenor_slice_normal(
         .map_err(core_to_py)
 }
 
-/// Materialize a cube expiry slice as a lognormal grid with an explicit fixed expiry and tenor axis.
+#[doc = pydoc!("finstack_quant.models.volatility", "materialize_cube_expiry_slice")]
 #[pyfunction]
 fn materialize_cube_expiry_slice(
     cube: &PyVolCube,
@@ -851,7 +600,7 @@ fn materialize_cube_expiry_slice(
         .map_err(core_to_py)
 }
 
-/// Materialize a cube expiry slice as a normal-volatility grid with an explicit fixed expiry and tenor axis.
+#[doc = pydoc!("finstack_quant.models.volatility", "materialize_cube_expiry_slice_normal")]
 #[pyfunction]
 fn materialize_cube_expiry_slice_normal(
     cube: &PyVolCube,
@@ -863,7 +612,7 @@ fn materialize_cube_expiry_slice_normal(
         .map_err(core_to_py)
 }
 
-/// Evaluate a fixed-expiry cube slice at an underlying tenor and strike.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_cube_expiry_slice_vol")]
 #[pyfunction]
 fn get_cube_expiry_slice_vol(
     slice: &PyVolCubeExpirySlice,
@@ -873,13 +622,13 @@ fn get_cube_expiry_slice_vol(
     vol::get_cube_expiry_slice_vol(&slice.inner, tenor, strike).map_err(core_to_py)
 }
 
-/// Evaluate a fixed-expiry cube slice with coordinates clamped to its stored axes.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_cube_expiry_slice_vol_clamped")]
 #[pyfunction]
 fn get_cube_expiry_slice_vol_clamped(slice: &PyVolCubeExpirySlice, tenor: f64, strike: f64) -> f64 {
     vol::get_cube_expiry_slice_vol_clamped(&slice.inner, tenor, strike)
 }
 
-/// Return ATM, 25-delta put, and 25-delta call vols at a stored FX expiry.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_fx_delta_pillar_vols")]
 #[pyfunction]
 fn get_fx_delta_pillar_vols(
     surface: &PyFxDeltaVolSurface,
@@ -888,7 +637,7 @@ fn get_fx_delta_pillar_vols(
     vol::get_fx_delta_pillar_vols(&surface.inner, expiry_index).map_err(core_to_py)
 }
 
-/// Evaluate an FX delta-quoted core surface at an expiry, strike, and forward.
+#[doc = pydoc!("finstack_quant.models.volatility", "get_fx_delta_vol")]
 #[pyfunction]
 fn get_fx_delta_vol(
     surface: &PyFxDeltaVolSurface,
@@ -899,7 +648,7 @@ fn get_fx_delta_vol(
     vol::get_fx_delta_vol(&surface.inner, expiry, strike, forward).map_err(core_to_py)
 }
 
-/// Materialize an FX delta-quoted artifact as a strike-axis core surface.
+#[doc = pydoc!("finstack_quant.models.volatility", "materialize_fx_delta_surface")]
 #[pyfunction]
 fn materialize_fx_delta_surface(
     surface: &PyFxDeltaVolSurface,
@@ -912,19 +661,13 @@ fn materialize_fx_delta_surface(
         .map_err(core_to_py)
 }
 
-/// Convert premium-unadjusted forward call delta to strike.
-///
-/// The convention is fixed: forward (not spot), premium-unadjusted, call
-/// delta in ``(0, 1)``. ``vol`` is a decimal Black vol. Does not raise;
-/// invalid inputs propagate IEEE non-finite results.
+#[doc = pydoc!("finstack_quant.models.volatility", "delta_to_strike")]
 #[pyfunction]
 fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
     vol::delta_to_strike(delta, forward, vol, expiry)
 }
 
-/// Convert strike to premium-unadjusted forward call delta.
-///
-/// Same fixed convention as ``delta_to_strike``. Does not raise.
+#[doc = pydoc!("finstack_quant.models.volatility", "strike_to_delta")]
 #[pyfunction]
 fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
     vol::strike_to_delta(strike, forward, vol, expiry)
@@ -960,54 +703,7 @@ fn grid_to_dataframe<'py>(
     dict_to_dataframe(py, &data, Some(index))
 }
 
-/// Convert an ATM volatility quote between normal, lognormal and shifted-lognormal conventions.
-///
-/// Prices are equated at the money (strike = forward) and the target-convention
-/// vol is solved by Brent bisection, so the conversion is deterministic and
-/// returns an explicit error rather than a guess.
-///
-/// Parameters
-/// ----------
-/// vol : float
-///     Input volatility in the source convention: decimal Black vol for
-///     ``"lognormal"`` / shifted-lognormal, absolute vol in the forward's rate
-///     units for ``"normal"`` (``0.0075`` = 75 bp on decimal rates). Must be
-///     positive.
-/// from_convention, to_convention : str or dict
-///     ``"normal"``, ``"lognormal"``, or ``{"shifted_lognormal": {"shift": s}}``
-///     with ``shift`` in the forward's rate units (the serde form of the Rust
-///     ``VolatilityConvention`` enum).
-/// forward_rate : float
-///     ATM forward rate or price used as both forward and strike. Must be
-///     positive for lognormal conventions and satisfy ``forward + shift > 0``
-///     for shifted ones.
-/// time_to_expiry : float
-///     Time to expiry in years (non-negative). At ``0`` the quote is returned
-///     unchanged.
-///
-/// Returns
-/// -------
-/// float
-///     Volatility in the target convention.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``vol`` / ``time_to_expiry`` / a convention string is invalid, or
-///     the forward is outside the convention domain.
-/// RuntimeError
-///     If the price-matching solver fails to converge.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.models.volatility import convert_atm_volatility
-/// >>> ln = convert_atm_volatility(0.01, "normal", "lognormal", 0.05, 1.0)
-/// >>> round(convert_atm_volatility(ln, "lognormal", "normal", 0.05, 1.0), 10)
-/// 0.01
-///
-/// Sources
-/// -------
-/// - Hagan-Lesniewski-Woodward (2002) normal/lognormal ATM equivalence; see docs/REFERENCES.md#hagan-2002-sabr
+#[doc = pydoc!("finstack_quant.models.volatility", "convert_atm_volatility")]
 #[pyfunction]
 #[pyo3(signature = (vol, from_convention, to_convention, forward_rate, time_to_expiry))]
 fn convert_atm_volatility(
@@ -1023,24 +719,7 @@ fn convert_atm_volatility(
     vol::convert_atm_volatility(vol, from, to, forward_rate, time_to_expiry).map_err(core_to_py)
 }
 
-/// Gatheral SVI ("stochastic volatility inspired") total-variance smile parameters.
-///
-/// ``w(k) = a + b * (rho * (k - m) + sqrt((k - m)^2 + sigma^2))`` in
-/// log-moneyness ``k = ln(K / F)``. Construction validates the Gatheral-Jacquier
-/// necessary no-arbitrage conditions (``b >= 0``, ``sigma > 0``, ``|rho| < 1``,
-/// non-negative minimum variance, Roger Lee moment bound).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.models.volatility import SviParams
-/// >>> p = SviParams(0.04, 0.1, -0.3, 0.0, 0.2)
-/// >>> round(p.implied_vol(0.0, 1.0), 6)
-/// 0.244949
-///
-/// Sources
-/// -------
-/// - Gatheral (2004): see docs/REFERENCES.md#gatheral-2004-svi
-/// - Gatheral-Jacquier (2014): see docs/REFERENCES.md#gatheral-jacquier-2014-svi
+#[doc = pydoc!("finstack_quant.models.volatility", "SviParams")]
 #[pyclass(
     name = "SviParams",
     module = "finstack_quant.models.volatility",
@@ -1054,26 +733,7 @@ pub struct PySviParams {
 
 #[pymethods]
 impl PySviParams {
-    /// Create validated SVI parameters.
-    ///
-    /// Parameters
-    /// ----------
-    /// a : float
-    ///     Overall total-variance level.
-    /// b : float
-    ///     Wing slope (``>= 0``).
-    /// rho : float
-    ///     Rotation / asymmetry in ``(-1, 1)``.
-    /// m : float
-    ///     Log-moneyness translation of the minimum-variance point.
-    /// sigma : float
-    ///     Vertex smoothing (``> 0``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a parameter is non-finite or violates the no-arbitrage
-    ///     conditions.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.__init__")]
     #[new]
     #[pyo3(signature = (a, b, rho, m, sigma))]
     fn new(a: f64, b: f64, rho: f64, m: f64, sigma: f64) -> PyResult<Self> {
@@ -1082,77 +742,47 @@ impl PySviParams {
             .map_err(core_to_py)
     }
 
-    /// Overall total-variance level ``a``.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.a")]
     #[getter]
     fn a(&self) -> f64 {
         self.inner.a
     }
 
-    /// Wing slope ``b``.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.b")]
     #[getter]
     fn b(&self) -> f64 {
         self.inner.b
     }
 
-    /// Rotation / asymmetry ``rho``.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.rho")]
     #[getter]
     fn rho(&self) -> f64 {
         self.inner.rho
     }
 
-    /// Translation ``m`` of the minimum-variance point (log-moneyness).
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.m")]
     #[getter]
     fn m(&self) -> f64 {
         self.inner.m
     }
 
-    /// Vertex smoothing ``sigma``.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.sigma")]
     #[getter]
     fn sigma(&self) -> f64 {
         self.inner.sigma
     }
 
-    /// Total implied variance ``w(k) = vol^2 * T`` at log-moneyness ``k = ln(K / F)``.
-    ///
-    /// Parameters
-    /// ----------
-    /// k : float
-    ///     Log-moneyness ``ln(K / F)``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Total variance (dimensionless). Does not raise.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.total_variance")]
     fn total_variance(&self, k: f64) -> f64 {
         self.inner.total_variance(k)
     }
 
-    /// Black implied volatility ``sqrt(w(k) / t)`` at log-moneyness ``k``.
-    ///
-    /// Parameters
-    /// ----------
-    /// k : float
-    ///     Log-moneyness ``ln(K / F)``.
-    /// t : float
-    ///     Time to expiry in years (``> 0``).
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Annualized Black volatility as a decimal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``t <= 0`` or the total variance at ``k`` is negative.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.implied_vol")]
     fn implied_vol(&self, k: f64, t: f64) -> PyResult<f64> {
         self.inner.implied_vol(k, t).map_err(core_to_py)
     }
 
-    /// Durrleman ``g(k)`` butterfly density function at log-moneyness ``k``.
-    ///
-    /// ``g(k) >= 0`` everywhere is the necessary and sufficient
-    /// butterfly-arbitrage-free condition. Does not raise.
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.durrleman_g")]
     fn durrleman_g(&self, k: f64) -> f64 {
         self.inner.durrleman_g(k)
     }
@@ -1162,28 +792,14 @@ impl PySviParams {
     }
 }
 
-wire_methods!(PySviParams, SviParams, "SviParams");
+wire_methods!(
+    PySviParams,
+    SviParams,
+    "SviParams",
+    module = "finstack_quant.models.volatility"
+);
 
-/// Dupire local volatility ``sigma_loc(T, K)`` on an expiry-by-strike grid.
-///
-/// Extracted from an implied volatility surface by ``from_implied_vol``. It
-/// is the volatility of the model ``dS = (r - q) S dt + sigma_loc(t, S) S dW``
-/// that reprices every European option of that surface. Off-grid queries are
-/// interpolated bilinearly and are flat outside the grid.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.core.market_data import VolSurface
-/// >>> from finstack_quant.models.volatility import LocalVolSurface
-/// >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
-/// >>> local = LocalVolSurface.from_implied_vol(implied, [100.0, 100.0])
-/// >>> round(local.value(0.75, 95.0), 10)
-/// 0.2
-///
-/// Sources
-/// -------
-/// - Dupire (1994): see docs/REFERENCES.md#dupire-1994
-/// - Gatheral (2006): see docs/REFERENCES.md#gatheral-volatility-surface
+#[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface")]
 #[pyclass(
     name = "LocalVolSurface",
     module = "finstack_quant.models.volatility",
@@ -1197,26 +813,7 @@ pub struct PyLocalVolSurface {
 
 #[pymethods]
 impl PyLocalVolSurface {
-    /// Build a local volatility surface from an explicit grid.
-    ///
-    /// Parameters
-    /// ----------
-    /// expiries : list[float]
-    ///     Expiry axis in years: finite, non-negative, strictly increasing.
-    /// strikes : list[float]
-    ///     Strike axis in price units of the underlying: finite, positive,
-    ///     strictly increasing.
-    /// local_vols : list[float]
-    ///     Local volatilities as annualized decimals, finite and
-    ///     non-negative, one per node in row-major order with the expiry as
-    ///     the slow axis (``len(expiries) * len(strikes)`` values).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an axis is empty, non-finite or not strictly increasing, an
-    ///     expiry is negative, a strike is not positive, the value count does
-    ///     not match the grid, or a volatility is negative or non-finite.
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.__init__")]
     #[new]
     #[pyo3(signature = (expiries, strikes, local_vols))]
     fn new(expiries: Vec<f64>, strikes: Vec<f64>, local_vols: Vec<f64>) -> PyResult<Self> {
@@ -1225,26 +822,7 @@ impl PyLocalVolSurface {
             .map_err(core_to_py)
     }
 
-    /// Extract local volatility from an implied volatility surface (Dupire).
-    ///
-    /// Parameters
-    /// ----------
-    /// surface : VolSurface
-    ///     Unshifted Black implied volatilities (decimals) on expiries in
-    ///     years and cash strikes; at least two expiries and three positive
-    ///     strikes.
-    /// forwards : list[float]
-    ///     Forward price of the underlying for each surface expiry, in strike
-    ///     units and in the order of ``surface.expiries``; finite and
-    ///     positive. For a flat carry, ``F(T) = S * exp((r - q) * T)``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the grid is too small, the surface is not an unshifted Black
-    ///     strike surface, ``forwards`` has the wrong length or a non-positive
-    ///     entry, or the surface has butterfly or calendar arbitrage at a
-    ///     node (the message names the node).
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.from_implied_vol")]
     #[staticmethod]
     #[pyo3(signature = (surface, forwards))]
     fn from_implied_vol(surface: &PyVolSurface, forwards: Vec<f64>) -> PyResult<Self> {
@@ -1253,24 +831,7 @@ impl PyLocalVolSurface {
             .map_err(core_to_py)
     }
 
-    /// Extract local volatility after Gaussian smoothing of the implied
-    /// volatilities along the strike axis.
-    ///
-    /// Parameters
-    /// ----------
-    /// surface : VolSurface
-    ///     Implied surface, as for ``from_implied_vol``.
-    /// forwards : list[float]
-    ///     One forward per surface expiry, as for ``from_implied_vol``.
-    /// sigma_strikes : float
-    ///     Standard deviation of the Gaussian kernel in strike (price) units,
-    ///     non-negative; zero disables smoothing.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``sigma_strikes`` is negative or non-finite, or for any error
-    ///     of ``from_implied_vol`` on the smoothed surface.
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.from_implied_vol_smoothed")]
     #[staticmethod]
     #[pyo3(signature = (surface, forwards, sigma_strikes))]
     fn from_implied_vol_smoothed(
@@ -1283,50 +844,37 @@ impl PyLocalVolSurface {
             .map_err(core_to_py)
     }
 
-    /// Local volatility at ``(expiry, strike)``: bilinear inside the grid,
-    /// flat outside it.
-    ///
-    /// Parameters
-    /// ----------
-    /// expiry : float
-    ///     Time in years from the valuation date.
-    /// strike : float
-    ///     Level of the underlying in price units.
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.value")]
     #[pyo3(signature = (expiry, strike))]
     fn value(&self, expiry: f64, strike: f64) -> f64 {
         self.inner.value(expiry, strike)
     }
 
-    /// Expiry axis in years.
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.expiries")]
     #[getter]
     fn expiries(&self) -> Vec<f64> {
         self.inner.expiries().to_vec()
     }
 
-    /// Strike axis in price units of the underlying.
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.strikes")]
     #[getter]
     fn strikes(&self) -> Vec<f64> {
         self.inner.strikes().to_vec()
     }
 
-    /// Local volatilities (annualized decimals) in row-major order, expiry as
-    /// the slow axis.
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.local_vols")]
     #[getter]
     fn local_vols(&self) -> Vec<f64> {
         self.inner.local_vols().to_vec()
     }
 
-    /// Grid shape as ``(n_expiries, n_strikes)``.
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.grid_shape")]
     #[getter]
     fn grid_shape(&self) -> (usize, usize) {
         self.inner.grid_shape()
     }
 
-    /// Tabulate the grid as a pandas ``DataFrame``.
-    ///
-    /// One row per expiry (index named ``"expiry"``, in years) and one
-    /// float64 column per strike: the ``expiry`` x ``strike`` pivot of
-    /// ``VolSurface.to_dataframe()`` for an implied surface.
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         grid_to_dataframe(
             py,
@@ -1342,48 +890,15 @@ impl PyLocalVolSurface {
     }
 }
 
-wire_methods!(PyLocalVolSurface, LocalVolSurface, "LocalVolSurface");
+wire_methods!(
+    PyLocalVolSurface,
+    LocalVolSurface,
+    "LocalVolSurface",
+    module = "finstack_quant.models.volatility"
+);
 impl_repr_html_via_dataframe!(PyLocalVolSurface);
 
-/// Calibrate SVI parameters to a market smile (Gatheral 2004).
-///
-/// Parameters
-/// ----------
-/// strikes : list[float]
-///     Positive strikes (at least five).
-/// vols : list[float]
-///     Black implied vols (decimal) aligned one-for-one with ``strikes``.
-/// forward : float
-///     Positive forward at ``expiry``.
-/// expiry : float
-///     Positive time to expiry in years.
-///
-/// Returns
-/// -------
-/// SviParams
-///     Fitted, validated parameters.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If lengths differ, fewer than five quotes are supplied, an input is
-///     outside its domain, or the fit violates the no-arbitrage conditions.
-/// RuntimeError
-///     If the optimizer fails to converge or the fit RMSE exceeds the
-///     acceptance threshold.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.models.volatility import calibrate_svi
-/// >>> strikes = [80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0]
-/// >>> vols = [0.30, 0.25, 0.22, 0.20, 0.21, 0.23, 0.28]
-/// >>> p = calibrate_svi(strikes, vols, 100.0, 1.0)
-/// >>> abs(p.implied_vol(0.0, 1.0) - 0.20) < 0.02
-/// True
-///
-/// Sources
-/// -------
-/// - Gatheral (2004): see docs/REFERENCES.md#gatheral-2004-svi
+#[doc = pydoc!("finstack_quant.models.volatility", "calibrate_svi")]
 #[pyfunction]
 #[pyo3(signature = (strikes, vols, forward, expiry))]
 fn calibrate_svi(
@@ -1403,7 +918,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "volatility")?;
     m.setattr(
         "__doc__",
-        "Product-independent volatility models, evaluators, fitting, and convention conversion.",
+        pydoc!("finstack_quant.models.volatility", "__module__"),
     )?;
     m.add_class::<PySabrParameters>()?;
     m.add_class::<PySabrSmile>()?;

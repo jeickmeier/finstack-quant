@@ -234,8 +234,8 @@ class RecoveryClaim:
         Parameters
         ----------
         json : str
-            JSON text produced by :meth:`to_json` (strict serde; unknown or
-            invalid fields are rejected).
+            JSON text with the canonical Rust fields and their stored units.
+            Required field names and types must match; extra fields are ignored.
 
         Returns
         -------
@@ -453,8 +453,8 @@ class RecoveryAllocation:
         Parameters
         ----------
         json : str
-            JSON text produced by :meth:`to_json` (strict serde; unknown or
-            invalid fields are rejected).
+            JSON text with the canonical Rust fields and their stored units.
+            Required field names and types must match; extra fields are ignored.
 
         Returns
         -------
@@ -629,6 +629,71 @@ class RecoveryWaterfallResult:
         ------
         ValueError
             If the result cannot be serialized into a pandas object.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> RecoveryWaterfallResult:
+        """Restore a stored waterfall result from its Rust JSON representation.
+
+        Parameters
+        ----------
+        json : str
+            JSON object containing ``total_distributed``, ``undistributed_estate``,
+            ``apr_satisfied``, and ``allocations``. Monetary values retain the
+            caller-defined estate units. Extra fields are ignored.
+
+        Returns
+        -------
+        RecoveryWaterfallResult
+            Stored aggregate values and per-claim records; allocation is not
+            recomputed by deserialization.
+
+        Raises
+        ------
+        ValueError
+            If JSON is malformed, a required field is missing, or a field has
+            the wrong Rust wire type.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.credit import recovery_waterfall as rw
+        >>> result = rw.allocate_recovery(0.0, [])
+        >>> restored = rw.RecoveryWaterfallResult.from_json(result.to_json())
+        >>> (restored.total_distributed, restored.allocations)
+        (0.0, [])
+        """
+        ...
+
+    def to_json(self) -> str:
+        """Serialize the stored aggregate values and allocations to compact JSON.
+
+        Returns
+        -------
+        str
+            Rust JSON representation accepted by :meth:`from_json`, preserving
+            the estate units and allocation order.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Rust serialization fails.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
         """
         ...
 

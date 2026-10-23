@@ -7,7 +7,7 @@ explicit cross-derivative term.
 
 The module is problem-agnostic — `PdeProblem1D` and `PdeProblem2D` supply raw
 coefficients, boundary conditions, and a terminal payoff — with three ready-made
-Feynman-Kac bridges (`BlackScholesPde`, `LocalVolPde`, `HestonPde`) so pricers do
+Feynman-Kac bridges (`BlackScholesPde`, `HestonPde`) so pricers do
 not implement the traits from scratch.
 
 ## Position in the stack
@@ -25,13 +25,12 @@ Three instrument pricers consume it, all in `crate::instruments`:
 
 Nothing here is bound in Python or WASM; the solvers are reached only through
 those pricers, selected via `ModelKey::PdeCrankNicolson1D` / `ModelKey::PdeAdi2D`
-(see [`../../pricer/README.md`](../../pricer/README.md)).
+(see [`../../../valuations/core/src/pricer/README.md`](../../../valuations/core/src/pricer/README.md)).
 [`models::closed_form`](../closed_form/README.md) is the convergence anchor for
 both dimensions.
 
-The module doc comment in [`mod.rs`](mod.rs) says the module "lives under
-`instruments/common/models/`". That path no longer exists; the module is at
-`models/src/pde/`.
+The reusable solvers live in `finstack-quant/models/src/pde/`; valuation
+pricers supply instrument terms and market data.
 
 ## Layout
 
@@ -50,7 +49,7 @@ The module doc comment in [`mod.rs`](mod.rs) says the module "lives under
 | [`exercise.rs`](exercise.rs) | `PenaltyExercise`, `ExerciseType::{American, Bermudan}` |
 | [`solver.rs`](solver.rs) | `Solver1D`, `Solver1DBuilder`, `PdeSolution`, `PdeSolverError` |
 | [`solver2d.rs`](solver2d.rs) | `Solver2D`, `PdeSolution2D`, `PdeSolver2DError` |
-| [`bridge.rs`](bridge.rs) | `BlackScholesPde` and the Dupire `LocalVolPde` in log-spot coordinates |
+| [`bridge.rs`](bridge.rs) | `BlackScholesPde` in log-spot coordinates |
 | [`bridge2d.rs`](bridge2d.rs) | `HestonPde` in (log-spot, variance) coordinates; the Fourier convergence anchors |
 
 Pipelines, as in the module doc:
@@ -65,7 +64,7 @@ PdeProblem2D → Operators2D     → McsStepper             → PdeSolution2D
 Implementation submodules are private. The supported surface is explicitly
 re-exported at the `pde` root:
 
-`McsStepper`, `BoundaryCondition`, `BlackScholesPde`, `LocalVolPde`, `HestonPde`,
+`McsStepper`, `BoundaryCondition`, `BlackScholesPde`, `HestonPde`,
 `ExerciseError`, `Grid1D`, `PdeGridError`, `Grid2D`, `PdeProblem1D`,
 `PdeProblem2D`, `PdeSolution`, `PdeSolverError`, `Solver1D`, `Solver1DBuilder`,
 `PdeSolution2D`, `PdeSolver2DError`, `Solver2D`, `StepperError`, and
@@ -364,16 +363,6 @@ reports `is_time_homogeneous() == true`. `bridge::tests` grades it against
 `finstack_quant_core::math::special_functions::norm_cdf`-based Black-Scholes at 301 sinh points and
 300 CN steps: relative error below 1e-3 for both a call and a put.
 
-`LocalVolPde` solves the same equation with `σ` replaced by the Dupire local
-volatility `σ_loc(t, eˣ)` of a `volatility::local_vol::LocalVolSurface`, read at
-the calendar time of each time level, and reports `is_time_homogeneous() == false`.
-`bridge::tests` checks that a flat surface reproduces `BlackScholesPde` (relative
-difference below 1e-10) and that the local volatility extracted from an
-arbitrage-free SSVI surface reprices that surface: 801 sinh points, 400 Rannacher
-steps per year, implied-volatility error below 5 basis points at fifteen
-strike/expiry points (measured worst 4.2), within 2 basis points of the Monte
-Carlo `LocalVolProcess`.
-
 `HestonPde` solves, in `x = ln S` and `y = v`,
 
 ```text
@@ -526,5 +515,5 @@ Full bibliography with stable anchors:
 - [`../closed_form/README.md`](../closed_form/README.md) — the analytic reference the PDE engines are graded against
 - [`../trees/README.md`](../trees/README.md) — the lattice alternative for early exercise
 - [`../credit/README.md`](../credit/README.md), [`../volatility/README.md`](../volatility/README.md) — sibling model families
-- [`../../pricer/README.md`](../../pricer/README.md) — `ModelKey::PdeCrankNicolson1D` / `PdeAdi2D` dispatch
+- [`../../../valuations/core/src/pricer/README.md`](../../../valuations/core/src/pricer/README.md) — `ModelKey::PdeCrankNicolson1D` / `PdeAdi2D` dispatch
 - [`../../instruments/README.md`](../../instruments/README.md) — the pricers that call in here

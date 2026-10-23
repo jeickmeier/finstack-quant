@@ -1,11 +1,5 @@
-"""Product-independent volatility models, evaluators, and fitting tools.
-
-Examples:
---------
->>> from finstack_quant.models.volatility import SabrParameters
->>> SabrParameters.rates_default().beta
-0.5
-"""
+# ruff: noqa: D104
+# Module help is compiled from the matching stub and delegated below.
 
 from finstack_quant.finstack_quant import models as _models
 
@@ -78,3 +72,5 @@ __all__ = [
     "materialize_fx_delta_surface",
     "strike_to_delta",
 ]
+
+__doc__ = _models.volatility.__doc__
