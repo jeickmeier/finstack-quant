@@ -217,10 +217,9 @@ pub enum CorrelationError {
 }
 
 impl From<CorrelationError> for crate::Error {
-    /// Fold a correlation failure into the core taxonomy, keeping its
-    /// [`CorrelationError::kind`]: iterative failures become
-    /// `InputError::SolverConvergenceFailed`, everything else a validation error
-    /// with the full message.
+    /// Fold a correlation failure into the core taxonomy: iterative failures
+    /// become `InputError::SolverConvergenceFailed`, and everything else becomes
+    /// a validation error with the full message.
     fn from(error: CorrelationError) -> Self {
         match error {
             CorrelationError::DidNotConverge { max_iter, tol } => {
