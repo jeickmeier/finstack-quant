@@ -148,7 +148,7 @@ pub(crate) fn excess_returns(returns: &[f64], rf: &[f64], nperiods: f64) -> Vec<
 /// Returns of exactly −100% (total wipeout) or worse would produce −∞ or NaN
 /// in log-space. Clamping to this floor keeps the accumulator valid while
 /// still representing an effectively total loss.
-pub(crate) const MIN_GROWTH_FACTOR: f64 = 1e-18;
+const MIN_GROWTH_FACTOR: f64 = 1e-18;
 
 /// Log-space wealth accumulator shared by compounding and drawdown.
 ///

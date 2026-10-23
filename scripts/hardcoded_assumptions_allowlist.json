@@ -422,21 +422,9 @@
       "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."
     },
     {
-      "path": "finstack-quant/analytics/src/benchmark.rs",
-      "category": "binding_default",
-      "contains": "if !ann_factor.is_finite() || ann_factor <= 0.0 {",
-      "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."
-    },
-    {
       "path": "finstack-quant/analytics/src/risk_metrics/return_based.rs",
       "category": "binding_default",
-      "contains": "annualize && (!ann_factor.is_finite() || ann_factor <= 0.0)",
-      "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."
-    },
-    {
-      "path": "finstack-quant/analytics/src/risk_metrics/return_based.rs",
-      "category": "binding_default",
-      "contains": "if !ann_factor.is_finite() || ann_factor <= 0.0 {",
+      "contains": "!ann_factor.is_finite() || ann_factor <= 0.0",
       "reason": "Binding metadata or validation around registry-backed defaults; not a separate mutable assumption."
     },
     {
