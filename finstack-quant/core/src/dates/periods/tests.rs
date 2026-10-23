@@ -325,6 +325,8 @@ fn build_periods_rejects_mixed_kinds_or_inverted_ranges() {
 fn fiscal_config_constructors_and_validation() {
     assert!(FiscalConfig::new(13, 1).is_err());
     assert!(FiscalConfig::new(1, 32).is_err());
+    assert!(FiscalConfig::new(0, 1).is_err());
+    assert!(FiscalConfig::new(1, 0).is_err());
     let uk = FiscalConfig::uk();
     assert_eq!(uk.start_month(), 4);
     let feb_edge = FiscalConfig::new(2, 30).expect("feb clamp path");
@@ -619,22 +621,7 @@ fn parse_id_rejects_bad_ranges() {
 }
 
 #[test]
-fn fiscal_config_from_parts_fills_the_omitted_half() {
-    assert_eq!(FiscalConfig::from_parts(None, None).expect("none"), None);
-    assert_eq!(
-        FiscalConfig::from_parts(Some(10), None).expect("month only"),
-        Some(FiscalConfig::us_federal())
-    );
-    assert_eq!(
-        FiscalConfig::from_parts(None, Some(6)).expect("day only"),
-        Some(FiscalConfig::new(1, 6).expect("jan 6"))
-    );
-    assert_eq!(
-        FiscalConfig::from_parts(Some(4), Some(6)).expect("both"),
-        Some(FiscalConfig::uk())
-    );
-    assert!(FiscalConfig::from_parts(Some(13), None).is_err());
-    assert!(FiscalConfig::from_parts(None, Some(0)).is_err());
+fn fiscal_config_default_is_calendar_year() {
     assert_eq!(FiscalConfig::default(), FiscalConfig::calendar_year());
 }
 
