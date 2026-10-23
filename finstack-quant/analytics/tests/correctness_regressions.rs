@@ -661,12 +661,18 @@ fn performance_tail_metrics_reject_confidence_outside_open_unit_interval() {
     };
 
     for confidence in [0.0, 1.0, 95.0, -0.05, f64::NAN, f64::INFINITY] {
-        assert!(is_validation(perf.value_at_risk(confidence)), "value_at_risk({confidence})");
+        assert!(
+            is_validation(perf.value_at_risk(confidence)),
+            "value_at_risk({confidence})"
+        );
         assert!(
             is_validation(perf.expected_shortfall(confidence)),
             "expected_shortfall({confidence})"
         );
-        assert!(is_validation(perf.tail_ratio(confidence)), "tail_ratio({confidence})");
+        assert!(
+            is_validation(perf.tail_ratio(confidence)),
+            "tail_ratio({confidence})"
+        );
         assert!(is_validation(perf.cdar(confidence)), "cdar({confidence})");
         assert!(
             is_validation(perf.parametric_var(confidence, None)),
