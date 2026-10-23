@@ -257,7 +257,6 @@ workspace runs only through `mise run rust-test --doctest`.
 
 MIT OR Apache-2.0
 
-
 # Quick Start Examples
 
 ## Example 1: Computing Bucketed DV01 for a Bond
