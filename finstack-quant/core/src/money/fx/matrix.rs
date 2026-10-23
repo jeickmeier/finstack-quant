@@ -98,8 +98,7 @@ fn pivot_cross(
 /// Note: `FxMatrix` cannot be directly serialized due to the trait object
 /// `Arc<dyn FxProvider>`. To persist FX state, use
 /// [`FxMatrix::get_serializable_state`] to extract the config and quotes, then
-/// recreate the matrix with [`FxMatrix::try_with_config`] and
-/// [`FxMatrix::load_from_state`].
+/// recreate the matrix with [`FxMatrix::try_from_state`].
 ///
 /// # Thread Safety
 ///
@@ -750,6 +749,31 @@ impl FxMatrix {
             self.set_quote_on(from, to, on, policy, rate)?;
         }
         Ok(())
+    }
+
+    /// Restore a matrix from a serialized FX snapshot, including the provider
+    /// quotes it was captured with.
+    ///
+    /// The snapshot's provider and provider-pinned quotes become a quote-only
+    /// provider, and the global and pinned fixings are then loaded on top, so
+    /// the restored matrix looks rates up as the captured one did.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Snapshot whose `config`, provider quotes, provider-pinned
+    ///   quotes, global `quotes`, and `pinned_quotes` are restored.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the configuration is invalid or any persisted rate
+    /// is non-finite or not strictly positive.
+    pub fn try_from_state(state: &FxMatrixState) -> crate::Result<Self> {
+        let provider = super::SimpleFxProvider::new();
+        provider.set_quotes(&state.provider_quotes)?;
+        provider.set_snapshot_pinned_quotes(&state.provider_pinned_quotes)?;
+        let matrix = Self::try_with_config(Arc::new(provider), state.config)?;
+        matrix.load_from_state(state)?;
+        Ok(matrix)
     }
 
     /// Create a new FX matrix with a relatively bumped rate for a currency pair.

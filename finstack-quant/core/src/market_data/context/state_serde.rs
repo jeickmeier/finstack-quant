@@ -26,7 +26,7 @@ use crate::market_data::{
         InflationCurve, ParametricCurve, PriceCurve,
     },
 };
-use crate::money::fx::{FxMatrix, FxMatrixState, SimpleFxProvider};
+use crate::money::fx::{FxMatrix, FxMatrixState};
 
 // Serde: CurveState and (De)Serialize impls
 
@@ -339,42 +339,6 @@ fn escape_json_pointer(segment: &str) -> String {
     segment.replace('~', "~0").replace('/', "~1")
 }
 
-/// Build a quote-only [`FxMatrix`] from an
-/// [`FxConfig`](crate::money::fx::FxConfig) and explicit `(from, to, rate)` quotes.
-///
-/// This is the same construction path used by [`MarketContext::try_from`] when
-/// restoring an FX matrix from a persisted [`FxMatrixState`]. Exposed publicly so
-/// that the v3 calibration envelope (which carries FX spots as a flat list of
-/// [`crate::market_data::context::MarketContextState::fx`]-style quotes) can
-/// materialize an explicit quote matrix without duplicating FX storage.
-///
-/// Each quote is units of `to` per one unit of `from`. The matrix contains
-/// only the supplied explicit quotes and their reciprocal lookup; it carries
-/// no live-feed, historical, or policy-date behavior. The resulting matrix uses
-/// `config` for cache, policy, and triangulation settings, while its initial
-/// global quotes come from `quotes`.
-///
-/// # Errors
-///
-/// Returns an error if the FX configuration is invalid or any quote cannot be
-/// loaded into the matrix (for example, it is non-finite or not strictly
-/// positive). No matrix is returned on failure.
-///
-/// # Arguments
-///
-/// * `config` - FX policy, caching, and triangulation configuration used by the
-///   reconstructed matrix.
-/// * `quotes` - Owned direct FX quotes as `(from, to, rate)`, with `rate` in
-///   units of `to` per one unit of `from`.
-pub fn build_snapshot_fx_matrix(
-    config: crate::money::fx::FxConfig,
-    quotes: Vec<(crate::currency::Currency, crate::currency::Currency, f64)>,
-) -> crate::Result<Arc<FxMatrix>> {
-    let matrix = FxMatrix::try_with_config(Arc::new(SimpleFxProvider::new()), config)?;
-    matrix.set_quotes(&quotes)?;
-    Ok(Arc::new(matrix))
-}
-
 /// Values of `map` in ascending key order, each mapped through `f`.
 ///
 /// Persisted snapshots must not depend on hash-map iteration order.
@@ -495,12 +459,7 @@ fn restore_market_context(
             explicit_quote_count = fx_state.quotes.len(),
             "restoring MarketContext FX as quote-only snapshot"
         );
-        let provider = SimpleFxProvider::new();
-        provider.set_quotes(&fx_state.provider_quotes)?;
-        provider.set_snapshot_pinned_quotes(&fx_state.provider_pinned_quotes)?;
-        let matrix = FxMatrix::try_with_config(Arc::new(provider), fx_state.config)?;
-        matrix.load_from_state(&fx_state)?;
-        ctx.insert_fx_mut(matrix);
+        ctx.insert_fx_mut(FxMatrix::try_from_state(&fx_state)?);
     }
 
     for (id_str, scalar) in state.prices {

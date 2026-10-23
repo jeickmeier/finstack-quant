@@ -19,9 +19,11 @@
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::config::CalibrationConfig;
-use finstack_quant_core::market_data::context::{build_snapshot_fx_matrix, MarketContext};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::PriceCurveKind;
+use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::types::CurveId;
+use std::sync::Arc;
 
 /// Materialize a [`MarketContext`] from the canonical envelope inputs.
 ///
@@ -30,8 +32,7 @@ use finstack_quant_core::types::CurveId;
 /// [`crate::api::schema::CalibrationEnvelope`].
 ///
 /// # Errors
-/// Returns any error surfaced by [`build_snapshot_fx_matrix`] (during FX matrix
-/// construction) or by `MarketContext::get_hazard` /
+/// Returns any error surfaced by FX matrix construction, or by `MarketContext::get_hazard` /
 /// `MarketContext::get_base_correlation` lookups when reconstructing credit
 /// indices.
 ///
@@ -155,7 +156,8 @@ pub(crate) fn build_initial_context(
             explicit_quote_count = fx_quotes.len(),
             "building MarketContext FX as quote-only snapshot (canonical envelope)"
         );
-        let matrix = build_snapshot_fx_matrix(settings.fx, fx_quotes)?;
+        let matrix = FxMatrix::try_with_config(Arc::new(SimpleFxProvider::new()), settings.fx)?;
+        matrix.set_quotes(&fx_quotes)?;
         ctx.insert_fx_mut(matrix);
     }
 
