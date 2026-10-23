@@ -15,6 +15,11 @@ use finstack_quant_models::types::OptionType;
 
 const STRIKE_ZERO_TOL: f64 = 1e-12;
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static COMPUTE_GREEKS_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
     inst.validate()?;
     if crate::shared::event_has_occurred(inst.expiry, as_of) {
@@ -130,6 +135,8 @@ pub(crate) fn compute_greeks(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<FxOptionGreeks> {
+    #[cfg(test)]
+    COMPUTE_GREEKS_CALLS.with(|count| count.set(count.get() + 1));
     if crate::shared::event_has_occurred(inst.expiry, as_of) {
         return Ok(FxOptionGreeks::default());
     }
