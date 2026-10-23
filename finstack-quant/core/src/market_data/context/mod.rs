@@ -134,7 +134,7 @@ pub enum ContextScratchBump {
     },
 }
 
-pub use state_serde::{build_snapshot_fx_matrix, CreditIndexState, CurveState, MarketContextState};
+pub use state_serde::{CreditIndexState, CurveState, MarketContextState};
 
 /// Unified market data context with enum-based storage.
 ///
