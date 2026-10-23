@@ -99,7 +99,7 @@ impl CompiledExpr {
     /// # Errors
     ///
     /// Returns an error when a referenced column is absent from `ctx` or
-    /// `cols`, or a planned dependency is unavailable.
+    /// `cols`.
     ///
     /// # Arguments
     ///

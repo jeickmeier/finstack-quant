@@ -432,6 +432,9 @@ fn fx_pair_convention_helpers() {
     assert_eq!(conv.usd_quotation().to_string(), "indirect");
     assert!((conv.pip_size() - 0.01).abs() < 1e-12);
     assert_eq!(conv.settlement_days(), 2);
+    let eurusd =
+        fx_pair_convention(JsValue::from("EUR"), JsValue::from("USD")).expect("EURUSD convention");
+    assert!((eurusd.pip_size() - 0.0001).abs() < 1e-12);
     let inverted = invert_fx_rate(JsValue::from(1.10)).expect("positive rate");
     assert!((inverted - 1.0 / 1.10).abs() < 1e-12);
     assert_eq!(

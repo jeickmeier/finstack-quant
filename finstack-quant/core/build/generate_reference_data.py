@@ -145,7 +145,10 @@ def sifma_rows(path: Path) -> list[SifmaRow]:
         fields = line.split(",")
         if len(fields) != 6:
             raise ValueError(f"{path}:{line_number}: expected six comma-separated fields")
-        year, month = int(fields[0]), int(fields[1])
+        try:
+            year, month = int(fields[0]), int(fields[1])
+        except ValueError as error:
+            raise ValueError(f"{path}:{line_number}: invalid year or month {fields[:2]!r}") from error
         if not 1 <= month <= 12:
             raise ValueError(f"{path}:{line_number}: month must be 1-12, got {month}")
         days = tuple(parse_sifma_day(value, path, line_number) for value in fields[2:])

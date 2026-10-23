@@ -202,7 +202,11 @@ impl std::str::FromStr for StubKind {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        crate::wire::serde_parse_with_context("unknown stub kind", &s.trim().to_ascii_lowercase())
+        crate::wire::serde_parse_with_context(
+            "Unknown stub kind",
+            s,
+            &s.trim().to_ascii_lowercase(),
+        )
     }
 }
 

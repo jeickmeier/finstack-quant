@@ -758,30 +758,75 @@ fn japan_public_holidays_match_cabinet_office_1970_through_2027() {
     }
 }
 
-/// Transitional check: `applies` agrees with `dates_in_year` for every rule of
-/// every built-in calendar across a wide year range.
+/// Golden digest of every built-in calendar's holidays, 1990 through 2040.
+///
+/// Pinned when holiday evaluation was consolidated onto [`Rule::dates_in_year`];
+/// at that point every rule of every built-in calendar was checked day by day
+/// against the previous `applies` implementation over the same years. A change
+/// to any built-in holiday table changes a count or a digest here.
 #[test]
-fn dates_in_year_agrees_with_applies_for_every_builtin_rule() {
-    let mut checked_days = 0_usize;
-    for calendar in super::calendars_generated::ALL_CALENDARS {
-        for rule in calendar.rules {
+fn builtin_holiday_tables_match_the_golden_digest() {
+    const EXPECTED: &[(&str, usize, u64)] = &[
+        ("asx", 407, 0x562f94d9a8395ae3),
+        ("auce", 509, 0xbeb88898d2c85e67),
+        ("brbd", 628, 0xfaf34cc79f97c0b0),
+        ("bse", 344, 0x4f6940e3aeb6d601),
+        ("cato", 563, 0x84a81d6ece4493e3),
+        ("chzh", 509, 0x69249a421ace77c3),
+        ("cme", 470, 0x81d6ac8cc43219e3),
+        ("cnbe", 1192, 0x83dae9caa3d8dc08),
+        ("defr", 306, 0xf4652cf9740900e2),
+        ("eurex", 408, 0x9a43f685f48d4bd9),
+        ("gblo", 412, 0x20ad8d358e2c4db6),
+        ("hkex", 871, 0x51f4ba82d3a2a091),
+        ("hkhk", 871, 0x51f4ba82d3a2a091),
+        ("jpto", 1024, 0xdfb9b3e2d779fd7c),
+        ("jpx", 1024, 0xdfb9b3e2d779fd7c),
+        ("nerc", 306, 0x81d04023aa563815),
+        ("nse", 344, 0x4f6940e3aeb6d601),
+        ("nyse", 471, 0x4f0bd994d4df809b),
+        ("nzau", 579, 0x53401325779bdc60),
+        ("sgsi", 376, 0x90955bf6d4c15387),
+        ("sifma", 571, 0xd0c8a7d84578e9fb),
+        ("six", 611, 0x25cc4746a8b03eec),
+        ("sofr", 581, 0x96bc3645207d7542),
+        ("sse", 1192, 0x83dae9caa3d8dc08),
+        ("target2", 306, 0xf4652cf9740900e2),
+        ("tsx", 492, 0xd575d1bc9c2c86a0),
+        ("usny", 530, 0xb5e7412dc21b815d),
+        ("weekends_only", 0, 0xcbf29ce484222325),
+    ];
+    let mut actual: Vec<(&str, usize, u64)> = super::calendars_generated::ALL_CALENDARS
+        .iter()
+        .map(|calendar| {
+            let mut holidays = Vec::new();
             for year in 1990..=2040 {
-                let mut expected = SmallVec::<[Date; 16]>::new();
-                rule.dates_in_year(year, &mut expected);
-                let mut day = Date::from_calendar_date(year, time::Month::January, 1)
-                    .expect("valid year start");
-                while day.year() == year {
-                    assert_eq!(
-                        rule.applies(day),
-                        expected.contains(&day),
-                        "calendar {} rule {rule:?} on {day}",
-                        calendar.id,
-                    );
-                    checked_days += 1;
-                    day = day.next_day().expect("in range");
+                let mut dates = SmallVec::<[Date; 64]>::new();
+                for rule in calendar.rules {
+                    rule.dates_in_year(year, &mut dates);
                 }
+                holidays.extend(dates);
             }
-        }
-    }
-    assert!(checked_days > 1_000_000, "checked {checked_days} rule-days");
+            holidays.sort_unstable();
+            holidays.dedup();
+            // FNV-1a over each holiday's Julian day number.
+            let digest = holidays
+                .iter()
+                .fold(0xcbf2_9ce4_8422_2325_u64, |hash, date| {
+                    date.to_julian_day()
+                        .to_le_bytes()
+                        .iter()
+                        .fold(hash, |h, byte| {
+                            (h ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
+                        })
+                });
+            (calendar.id, holidays.len(), digest)
+        })
+        .collect();
+    actual.sort_by_key(|row| row.0);
+    let rendered: String = actual
+        .iter()
+        .map(|(id, count, digest)| format!("        (\"{id}\", {count}, 0x{digest:016x}),\n"))
+        .collect();
+    assert_eq!(actual, EXPECTED, "current table:\n{rendered}");
 }

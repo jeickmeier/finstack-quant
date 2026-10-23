@@ -21,8 +21,6 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor, TenorUn
 use proptest::prelude::*;
 use time::Duration;
 
-// Short alias for tests
-
 const TOL: f64 = DAYCOUNT_TOLERANCE;
 
 /// ACT/ACT ICMA year fraction measured against an explicit regular coupon
