@@ -48,14 +48,16 @@ struct EvalNodeContext<'a> {
     ctx: &'a SimpleContext,
     cols: &'a [&'a [f64]],
     arena: &'a [f64],
-    offsets: &'a [Option<(usize, usize)>],
+    offsets: &'a [(usize, usize)],
 }
 
 impl<'a> EvalNodeContext<'a> {
+    /// Result slice of a dependency. The plan emits every dependency before
+    /// its dependents, so `id` always indexes an already-written arena segment.
     #[inline]
-    fn dep_slice(&self, id: u64) -> Option<&'a [f64]> {
-        let (start, end) = self.offsets.get(id as usize).copied().flatten()?;
-        Some(&self.arena[start..end])
+    fn dep_slice(&self, id: u64) -> &'a [f64] {
+        let (start, end) = self.offsets[id as usize];
+        &self.arena[start..end]
     }
 }
 
@@ -116,16 +118,10 @@ impl CompiledExpr {
         let arena_elements = len.checked_mul(plan.nodes.len()).ok_or_else(|| {
             crate::Error::Validation("expression arena size overflows usize".to_string())
         })?;
-        // DAG node ids are dense (assigned 0..next_id during plan build), so
-        // index offsets by id directly instead of hashing.
-        let id_capacity = plan
-            .nodes
-            .iter()
-            .map(|n| n.id as usize)
-            .max()
-            .map_or(0, |m| m + 1);
+        // DAG node ids are dense positions in `plan.nodes`, so offsets are
+        // indexed by id directly.
         let mut arena = vec![0.0; arena_elements];
-        let mut offsets: Vec<Option<(usize, usize)>> = vec![None; id_capacity];
+        let mut offsets = vec![(0, 0); plan.nodes.len()];
 
         let mut cursor = 0;
         for node in &plan.nodes {
@@ -143,16 +139,12 @@ impl CompiledExpr {
             };
             Self::eval_node_into(&env, node, out_slice)?;
 
-            offsets[node.id as usize] = Some((start, end));
+            offsets[node.id as usize] = (start, end);
             cursor = end;
         }
 
-        Ok(offsets
-            .get(plan.root as usize)
-            .copied()
-            .flatten()
-            .map(|(start, end)| arena[start..end].to_vec())
-            .unwrap_or_default())
+        let (start, end) = offsets[plan.root as usize];
+        Ok(arena[start..end].to_vec())
     }
 
     /// Evaluate a single DAG node directly into a provided output slice (arena-based).
@@ -186,82 +178,23 @@ impl CompiledExpr {
                 let arg_slices: SmallVec<[&[f64]; 4]> = node
                     .dependencies
                     .iter()
-                    .filter_map(|&dep_id| env.dep_slice(dep_id))
+                    .map(|&dep_id| env.dep_slice(dep_id))
                     .collect();
-
-                if arg_slices.len() != node.dependencies.len() {
-                    return Err(crate::Error::Validation(format!(
-                        "Expression DAG node {} is missing {} dependency results",
-                        node.id,
-                        node.dependencies.len() - arg_slices.len()
-                    )));
-                }
                 Self::eval_function_into(*func, &arg_slices, out)?;
             }
             Operation::BinOp(op) => {
-                // Binary operations should have exactly 2 dependencies
-                if node.dependencies.len() < 2 {
-                    return Err(crate::Error::Validation(format!(
-                        "Binary expression node {} is missing operands",
-                        node.id
-                    )));
-                }
-                let left = env.dep_slice(node.dependencies[0]).ok_or_else(|| {
-                    crate::Error::Validation(format!(
-                        "Binary expression node {} is missing its left dependency result",
-                        node.id
-                    ))
-                })?;
-                let right = env.dep_slice(node.dependencies[1]).ok_or_else(|| {
-                    crate::Error::Validation(format!(
-                        "Binary expression node {} is missing its right dependency result",
-                        node.id
-                    ))
-                })?;
+                let left = env.dep_slice(node.dependencies[0]);
+                let right = env.dep_slice(node.dependencies[1]);
                 Self::eval_bin_op_into(*op, left, right, out);
             }
             Operation::UnaryOp(op) => {
-                // Unary operations should have exactly 1 dependency
-                if node.dependencies.is_empty() {
-                    return Err(crate::Error::Validation(format!(
-                        "Unary expression node {} is missing its operand",
-                        node.id
-                    )));
-                }
-                let operand = env.dep_slice(node.dependencies[0]).ok_or_else(|| {
-                    crate::Error::Validation(format!(
-                        "Unary expression node {} is missing its operand result",
-                        node.id
-                    ))
-                })?;
+                let operand = env.dep_slice(node.dependencies[0]);
                 Self::eval_unary_op_into(*op, operand, out);
             }
             Operation::IfThenElse => {
-                // If-then-else should have exactly 3 dependencies
-                if node.dependencies.len() < 3 {
-                    return Err(crate::Error::Validation(format!(
-                        "If-then-else expression node {} is missing one or more branch dependencies",
-                        node.id
-                    )));
-                }
-                let condition = env.dep_slice(node.dependencies[0]).ok_or_else(|| {
-                    crate::Error::Validation(format!(
-                        "If-then-else node {} is missing its condition result",
-                        node.id
-                    ))
-                })?;
-                let then_vals = env.dep_slice(node.dependencies[1]).ok_or_else(|| {
-                    crate::Error::Validation(format!(
-                        "If-then-else node {} is missing its then-branch result",
-                        node.id
-                    ))
-                })?;
-                let else_vals = env.dep_slice(node.dependencies[2]).ok_or_else(|| {
-                    crate::Error::Validation(format!(
-                        "If-then-else node {} is missing its else-branch result",
-                        node.id
-                    ))
-                })?;
+                let condition = env.dep_slice(node.dependencies[0]);
+                let then_vals = env.dep_slice(node.dependencies[1]);
+                let else_vals = env.dep_slice(node.dependencies[2]);
                 Self::eval_if_then_else_into(condition, then_vals, else_vals, out);
             }
         }
