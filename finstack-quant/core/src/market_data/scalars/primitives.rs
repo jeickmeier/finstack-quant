@@ -199,10 +199,7 @@ impl TryFrom<MarketScalarWire> for MarketScalar {
     fn try_from(raw: MarketScalarWire) -> std::result::Result<Self, Self::Error> {
         match raw {
             MarketScalarWire::Unitless(value) => Self::unitless(value),
-            MarketScalarWire::Price(value) if value.amount().is_finite() => Ok(Self::Price(value)),
-            MarketScalarWire::Price(_) => Err(crate::Error::Validation(
-                "MarketScalar price amount must be finite".into(),
-            )),
+            MarketScalarWire::Price(value) => Ok(Self::Price(value)),
         }
     }
 }
@@ -379,10 +376,6 @@ impl ScalarTimeSeries {
         observations: Vec<(Date, f64)>,
         currency: Option<Currency>,
     ) -> Result<Self> {
-        if observations.is_empty() {
-            return Err(crate::Error::Input(InputError::TooFewPoints));
-        }
-
         let observations_i32: Vec<(i32, f64)> = observations
             .into_iter()
             .map(|(d, v)| (to_days(d), v))

@@ -477,7 +477,11 @@ impl MarketContext {
             builder =
                 builder.issuer_weights(weights.iter().map(|(key, value)| (key.clone(), *value)));
         }
-        self.insert_credit_index_mut(&state.id, builder.build()?)?;
+        // The curves were resolved above; insert directly rather than rebinding
+        // them a second time through `insert_credit_index_mut`.
+        let data = builder.build()?;
+        Arc::make_mut(&mut self.credit_indices)
+            .insert(CurveId::from(state.id.as_str()), Arc::new(data));
         Ok(())
     }
 
