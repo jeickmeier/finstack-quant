@@ -252,20 +252,6 @@ impl FloatingLegCompounding {
     }
 }
 
-impl std::fmt::Display for FloatingLegCompounding {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Simple => write!(f, "simple"),
-            Self::SimpleAverage => write!(f, "simple_average"),
-            Self::CompoundedInArrears { .. } => write!(f, "compounded_in_arrears"),
-            Self::CompoundedWithObservationShift { .. } => {
-                write!(f, "compounded_with_observation_shift")
-            }
-            Self::CompoundedWithRateCutoff { .. } => write!(f, "compounded_with_rate_cutoff"),
-        }
-    }
-}
-
 fn default_gearing() -> Decimal {
     FloatingRateSpec::DEFAULT_GEARING
 }
