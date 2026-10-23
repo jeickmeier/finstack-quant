@@ -119,7 +119,7 @@ const PIVOT_TOLERANCE_RELATIVE: f64 = 1e-10;
 /// unchecked `n * n`, which wraps in release builds and lets a wrong-length
 /// buffer pass the check.
 #[inline]
-pub(crate) fn square_len(n: usize) -> Option<usize> {
+fn square_len(n: usize) -> Option<usize> {
     n.checked_mul(n)
 }
 
@@ -214,28 +214,6 @@ pub enum CorrelationError {
     /// Symmetric eigendecomposition failed during a correlation operation.
     #[error("Symmetric eigendecomposition failed")]
     EigenDecompositionFailed,
-}
-
-impl CorrelationError {
-    /// Host-exception category: an exhausted iteration budget or a failed
-    /// eigendecomposition is a [`ErrorKind::Computation`](crate::ErrorKind::Computation)
-    /// failure; every other variant rejects the input matrix
-    /// ([`ErrorKind::Validation`](crate::ErrorKind::Validation)).
-    ///
-    /// Agrees with `crate::Error::from(self).kind()`.
-    #[must_use]
-    pub fn kind(&self) -> crate::ErrorKind {
-        match self {
-            Self::DidNotConverge { .. } | Self::EigenDecompositionFailed => {
-                crate::ErrorKind::Computation
-            }
-            Self::InvalidSize { .. }
-            | Self::DiagonalNotOne { .. }
-            | Self::NotSymmetric { .. }
-            | Self::NotPositiveSemiDefinite { .. }
-            | Self::OutOfBounds { .. } => crate::ErrorKind::Validation,
-        }
-    }
 }
 
 impl From<CorrelationError> for crate::Error {
@@ -1506,7 +1484,6 @@ mod tests {
             ),
         ];
         for (error, kind) in cases {
-            assert_eq!(error.kind(), kind, "{error}");
             let message = error.to_string();
             let core = crate::Error::from(error);
             assert_eq!(core.kind(), kind);
