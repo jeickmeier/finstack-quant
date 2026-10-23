@@ -134,10 +134,10 @@ fn require_supplied_historical_fixings(
     }
 }
 
-/// Resolve a floating-rate fallback outcome shared by the curve-missing and
-/// projection-failure call sites: propagate `error` when the policy demands
-/// it, otherwise log and return the fallback index rate. `error` is built by the caller (a `NotFound` for a missing curve, or
-/// the original projection error).
+/// Resolve the floating-rate fallback for one coupon: propagate `error` when
+/// the policy demands it, otherwise log and return the fallback index rate.
+/// The caller builds `error`: a `NotFound` for a missing curve, or the original
+/// projection error.
 fn resolve_floating_rate_fallback(
     error: finstack_quant_core::Error,
     reset_date: Date,
@@ -291,9 +291,9 @@ pub(crate) fn emit_fixed_coupons_on(
 /// corresponding curve or `FIXING:{forward_curve_id}` series.
 #[derive(Clone, Copy)]
 pub(crate) struct ResolvedFloatMarket<'a> {
-    /// Forward curves, one per float schedule.
     /// Explicit observation cutoff; absent for curve-base projection builds.
     pub(crate) observation_date: Option<Date>,
+    /// Forward curves, one per float schedule.
     pub(crate) curves: &'a [Option<std::sync::Arc<ForwardCurve>>],
     /// Historical fixing series (`FIXING:{forward_curve_id}`), one per float schedule.
     pub(crate) fixings: &'a [Option<ScalarTimeSeries>],
@@ -481,11 +481,13 @@ fn project_segment_indices(
 /// `forward_rate * gearing + margin`. Splits into cash/PIK according to coupon type.
 /// Cash and PIK flows are appended directly into the provided `out_flows` buffer.
 ///
-/// Seasoned coupons (observation dates before the curve base) resolve realized
-/// index fixings from `market.fixings` — the per-schedule `FIXING:{forward_curve_id}`
-/// series aligned with `market.curves` (exact-date observations for both
-/// overnight and term resets). Without a series, pre-base observations route
-/// through the spec's [`crate::builder::FloatingRateFallback`] policy.
+/// Seasoned coupons (observation dates before the valuation cutoff) resolve
+/// realized index fixings from `market.fixings`, the per-schedule
+/// `FIXING:{forward_curve_id}` series aligned with `market.curves` (exact-date
+/// observations for both overnight and term resets). The cutoff is the curve
+/// base date under `build` and `as_of` under `build_as_of`. Without a series,
+/// pre-cutoff observations route through the spec's
+/// [`crate::builder::FloatingRateFallback`] policy.
 ///
 /// # Returns
 ///
