@@ -238,7 +238,7 @@ fixture, not in this crate. Record the command in `meta.generated.command` and
 document the conventions next to the generator. Two existing patterns:
 
 - A generator script sitting beside the data, e.g.
-  [`gen_vol_golden.py`](../core/tests/golden/data/gen_vol_golden.py), run with
+  [`gen_vol_golden.py`](../models/tests/golden/data/gen_vol_golden.py), run with
   `uv run --with QuantLib --with mpmath python gen_vol_golden.py`.
 - A workspace generator, for the valuations/Python golden layers:
   `uv run python -m scripts.golden.quantlib.generate --family pricing --product all` regenerates, and
