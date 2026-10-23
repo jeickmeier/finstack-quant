@@ -37,6 +37,9 @@
 
 use crate::Result;
 
+/// Growth factor applied to the bracket width on each expansion step.
+const BRACKET_EXPANSION: f64 = 2.0;
+
 /// Brent's method solver (bracketing required).
 ///
 /// Implements Brent's root-finding algorithm, which combines bisection,
@@ -106,8 +109,6 @@ pub struct BrentSolver {
     pub tolerance: f64,
     /// Maximum iterations
     pub max_iterations: usize,
-    /// Bracket expansion factor
-    pub bracket_expansion: f64,
     /// Initial bracket size (adaptive to initial guess if None)
     pub initial_bracket_size: Option<f64>,
     /// Minimum bound for bracket search (default: -1e6)
@@ -121,7 +122,6 @@ impl Default for BrentSolver {
         Self {
             tolerance: 1e-12,
             max_iterations: 100,
-            bracket_expansion: 2.0,
             initial_bracket_size: None, // Adaptive by default
             bracket_min: -1e6,
             bracket_max: 1e6,
@@ -214,11 +214,7 @@ impl BrentSolver {
             }
         });
 
-        if !initial_size.is_finite()
-            || initial_size <= 0.0
-            || !self.bracket_expansion.is_finite()
-            || self.bracket_expansion <= 0.0
-        {
+        if !initial_size.is_finite() || initial_size <= 0.0 {
             return Err(crate::Error::Validation(
                 "Brent search requires positive finite bracket size and expansion".into(),
             ));
@@ -262,8 +258,8 @@ impl BrentSolver {
             }
 
             // Expand with bounds checking to prevent overflow
-            let next_a = (a - width * self.bracket_expansion).max(self.bracket_min);
-            let next_b = (b + width * self.bracket_expansion).min(self.bracket_max);
+            let next_a = (a - width * BRACKET_EXPANSION).max(self.bracket_min);
+            let next_b = (b + width * BRACKET_EXPANSION).min(self.bracket_max);
             if next_a < a {
                 a = next_a;
                 fa = f(a)?;

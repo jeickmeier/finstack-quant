@@ -101,7 +101,7 @@ impl HurstExponent {
 /// * `t` - First time coordinate in the model's chosen time unit.
 /// * `s` - Second time coordinate in the same time unit as `t`.
 /// * `h` - Hurst exponent controlling roughness and long-memory behavior.
-pub(crate) fn fbm_covariance(t: f64, s: f64, h: f64) -> f64 {
+fn fbm_covariance(t: f64, s: f64, h: f64) -> f64 {
     let two_h = 2.0 * h;
     0.5 * (t.abs().powf(two_h) + s.abs().powf(two_h) - (t - s).abs().powf(two_h))
 }
