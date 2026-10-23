@@ -109,53 +109,57 @@ impl HwSwaptionCashflows {
             index,
             discount,
         } = node;
-        let bond = |t| tree.bond_price(step, index, t, discount);
-        self.evaluate(
+        let bond = |t| Ok::<_, std::convert::Infallible>(tree.bond_price(step, index, t, discount));
+        match self.evaluate(
             tree.time_at_step(step),
             tree.config().kappa,
             tree.config().sigma,
             bond,
             terms,
-        )
-        .2
+        ) {
+            Ok((_, _, value)) => value,
+            Err(never) => match never {},
+        }
     }
 
-    pub(crate) fn evaluate(
+    /// Evaluate exercise cashflows, propagating failures from bond reconstruction.
+    pub(crate) fn evaluate<E>(
         &self,
         t: f64,
         kappa: f64,
         sigma: f64,
-        bond: impl Fn(f64) -> f64,
+        bond: impl Fn(f64) -> std::result::Result<f64, E>,
         terms: HwExerciseTerms,
-    ) -> (f64, f64, f64) {
-        let annuity: f64 = self.fixed.iter().map(|&(pay, tau)| tau * bond(pay)).sum();
-        if annuity <= 0.0 {
-            return (0.0, 0.0, 0.0);
+    ) -> std::result::Result<(f64, f64, f64), E> {
+        let mut annuity = 0.0;
+        for &(pay, tau) in &self.fixed {
+            annuity += tau * bond(pay)?;
         }
-        let floating: f64 = self
-            .float
-            .iter()
-            .map(|&(start, end, pay, tau, reset)| {
-                let adjustment = hw1f_delayed_coupon_adjustment(
-                    HullWhiteCalibrationParams { kappa, sigma },
-                    t,
-                    start,
-                    end,
-                    pay,
-                    reset,
-                    self.compounded,
-                );
-                (bond(start) / bond(end) * adjustment - 1.0 + self.spread * tau) * bond(pay)
-            })
-            .sum();
+        if annuity <= 0.0 {
+            return Ok((0.0, 0.0, 0.0));
+        }
+        let mut floating = 0.0;
+        for &(start, end, pay, tau, reset) in &self.float {
+            let adjustment = hw1f_delayed_coupon_adjustment(
+                HullWhiteCalibrationParams { kappa, sigma },
+                t,
+                start,
+                end,
+                pay,
+                reset,
+                self.compounded,
+            );
+            floating +=
+                (bond(start)? / bond(end)? * adjustment - 1.0 + self.spread * tau) * bond(pay)?;
+        }
         let swap_rate = floating / annuity;
         let payoff_annuity = match (terms.settlement, terms.cash_method) {
             (SettlementType::Cash, CashSettlementMethod::ParYield) => {
                 par_yield_annuity(self.fixed.len(), self.fixed_payments_per_year, swap_rate)
-                    * bond(self.cash_settlement_time)
+                    * bond(self.cash_settlement_time)?
             }
             (SettlementType::Cash, CashSettlementMethod::ZeroCoupon) => {
-                self.fixed.iter().map(|&(_, tau)| tau).sum::<f64>() * bond(self.horizon())
+                self.fixed.iter().map(|&(_, tau)| tau).sum::<f64>() * bond(self.horizon())?
             }
             _ => annuity,
         };
@@ -163,11 +167,11 @@ impl HwSwaptionCashflows {
             OptionType::Call => 1.0,
             OptionType::Put => -1.0,
         };
-        (
+        Ok((
             swap_rate,
             annuity,
             (sign * (swap_rate - terms.strike)).max(0.0) * payoff_annuity * terms.notional,
-        )
+        ))
     }
 }
 
@@ -257,7 +261,7 @@ pub(crate) fn value_with_exercise_today(
     // Zero volatility switches every convexity adjustment off; the
     // mean-reversion argument is then irrelevant.
     let (_, _, exercise_today) =
-        flows.evaluate(0.0, 1.0, 0.0, |maturity| curve.df(maturity), terms);
+        flows.evaluate(0.0, 1.0, 0.0, |maturity| curve.get_df(maturity), terms)?;
     Ok(continuation.max(exercise_today))
 }
 
@@ -273,6 +277,40 @@ pub(crate) struct HwExerciseTerms {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exercise_evaluation_propagates_bond_errors_without_zero_substitution() {
+        let flows = HwSwaptionCashflows {
+            fixed: vec![(2.0, 1.0)],
+            fixed_payments_per_year: 1.0,
+            float: vec![],
+            spread: 0.0,
+            compounded: false,
+            cash_settlement_time: 1.0,
+        };
+        let terms = HwExerciseTerms {
+            strike: 0.03,
+            notional: 1.0,
+            option_type: OptionType::Call,
+            settlement: SettlementType::Physical,
+            cash_method: CashSettlementMethod::default(),
+        };
+        let error = flows
+            .evaluate(
+                1.0,
+                0.1,
+                0.01,
+                |_| {
+                    Err(finstack_quant_core::Error::Validation(
+                        "broken exercise curve".into(),
+                    ))
+                },
+                terms,
+            )
+            .expect_err("curve failure");
+        assert_eq!(error.kind(), finstack_quant_core::ErrorKind::Validation);
+        assert!(error.to_string().contains("broken exercise curve"));
+    }
 
     #[test]
     fn par_yield_cash_claim_discounts_from_effective_date_to_exercise() {
@@ -301,9 +339,10 @@ mod tests {
                     exercise,
                     0.1,
                     0.0,
-                    |date| (-0.05 * (date - exercise)).exp(),
+                    |date| Ok::<_, std::convert::Infallible>((-0.05 * (date - exercise)).exp()),
                     terms,
                 )
+                .expect("valid exercise bonds")
                 .2;
             let rate = 0.05_f64.exp_m1();
             let expected = 1_000_000.0 * (rate - 0.02) / (1.0 + rate) * (-0.05 * lag).exp();
@@ -356,7 +395,16 @@ mod tests {
                 .sum();
             let expected =
                 (bond(start) / bond(end) * (-covariance).exp() - 1.0 + 0.001) * bond(pay);
-            let actual = flows.evaluate(t, kappa, sigma, bond, terms).2;
+            let actual = flows
+                .evaluate(
+                    t,
+                    kappa,
+                    sigma,
+                    |maturity| Ok::<_, std::convert::Infallible>(bond(maturity)),
+                    terms,
+                )
+                .expect("valid exercise bonds")
+                .2;
             assert!(
                 (actual - expected).abs() < 1e-11,
                 "compounded={compounded}: actual={actual}, expected={expected}"

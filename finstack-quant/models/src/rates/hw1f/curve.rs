@@ -36,12 +36,13 @@
 //! §3.3.1 (HW1F affine bond price, eqs. 3.39–3.40); Hull & White (1990). `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models` `docs/REFERENCES.md#hull-white-1990-pricing-ird`
 
 use crate::monte_carlo::process::ou::{calibrate_theta_from_curve, HullWhite1FParams};
+use crate::rates::clock::ModelDiscountCurve;
 use crate::rates::hull_white::{
     fd_instantaneous_forward, hw_b, hw_ln_a, HullWhiteCalibrationParams,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::Result;
+use finstack_quant_core::{Error, Result};
 
 /// Spacing (years) of the piecewise-constant θ(t) grid.
 ///
@@ -135,7 +136,8 @@ fn theta_grid(horizon: f64) -> Vec<f64> {
 ///
 /// # Errors
 ///
-/// Returns an error if the curve cannot be re-based to `as_of`.
+/// Returns an error if the curve cannot be re-based to `as_of` or a finite
+/// initial forward cannot be extracted from positive finite discount factors.
 ///
 /// # Arguments
 ///
@@ -144,7 +146,11 @@ fn theta_grid(horizon: f64) -> Vec<f64> {
 /// * `as_of` - Valuation date at which the short-rate process is initialized.
 pub fn initial_short_rate_from_curve(discount_curve: &dyn Discounting, as_of: Date) -> Result<f64> {
     let discount_fn = rebased_discount_fn(discount_curve, as_of)?;
-    Ok(fd_instantaneous_forward(&discount_fn, 0.0).unwrap_or(0.0))
+    fd_instantaneous_forward(&discount_fn, 0.0).ok_or_else(|| {
+        Error::Validation(
+            "cannot estimate a finite initial Hull-White forward from the discount curve".into(),
+        )
+    })
 }
 
 /// Per-event HW1F bond-reconstruction coefficients for a coupon period.
@@ -170,6 +176,11 @@ impl PeriodForwardCoeffs {
     /// L = (1/P(t,t+τ) − 1) / τ,   P(t,t+τ) = A·exp(−B·r)
     ///   = (exp(B·r − ln A) − 1) / τ
     /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `short_rate` - Simulated instantaneous short rate at the period start,
+    ///   expressed as a decimal annual rate.
     #[inline]
     #[must_use]
     pub fn simple_forward(&self, short_rate: f64) -> f64 {
@@ -196,9 +207,14 @@ impl PeriodForwardCoeffs {
     /// Degenerate coefficients that reproduce a *fixed* simple forward `rate`
     /// over an accrual `tau`, independent of the short rate (`B = 0`).
     ///
-    /// Used by unit tests that exercise payoff *mechanics* (coupon capping,
-    /// knock-out, redemption) with a known floating rate, and as a safe
-    /// fallback when no HW1F curve is available.
+    /// Used for a supplied deterministic fixing and for payoff-mechanics tests.
+    /// Required curves for stochastic reconstruction must be resolved separately.
+    ///
+    /// # Arguments
+    ///
+    /// * `rate` - Supplied annual decimal simple rate held fixed on every path.
+    /// * `tau` - Coupon accrual year fraction; a non-positive value makes
+    ///   [`Self::simple_forward`] return zero.
     #[must_use]
     pub fn from_flat_rate(rate: f64, tau: f64) -> Self {
         // simple_forward(r) = (exp(0·r − ln_a) − 1)/τ = (exp(−ln_a) − 1)/τ.
@@ -223,18 +239,26 @@ impl PeriodForwardCoeffs {
 /// Builds HW1F term-forward reconstructions from the calibrated process and the
 /// initial discount curve (defect M7 fix).
 ///
-/// Holds κ, σ, and the `P(as_of, as_of+·)` closure. For each coupon period the
+/// Holds κ, σ, and the concrete curve normalized to the model clock. For each coupon period the
 /// caller asks for [`Self::period_coeffs`], which yields a [`PeriodForwardCoeffs`]
 /// that the payoff stores and evaluates per path.
 pub struct Hw1fTermForward<'a> {
     kappa: f64,
     sigma: f64,
-    discount_fn: Box<dyn Fn(f64) -> f64 + 'a>,
+    discount_curve: ModelDiscountCurve<'a>,
 }
 
 impl<'a> Hw1fTermForward<'a> {
     /// Construct from the HW1F parameters and the same discount curve used to
     /// calibrate θ(t).
+    ///
+    /// # Arguments
+    ///
+    /// * `hw_params` - Mean reversion per model year and absolute short-rate
+    ///   volatility per square-root model year used for affine reconstruction.
+    /// * `discount_curve` - Borrowed curve whose base date and day count are
+    ///   mapped to the ACT/365F model clock; the borrow is retained by this object.
+    /// * `as_of` - Valuation date defining model time zero and the normalization anchor.
     ///
     /// # Errors
     ///
@@ -244,11 +268,11 @@ impl<'a> Hw1fTermForward<'a> {
         discount_curve: &'a dyn Discounting,
         as_of: Date,
     ) -> Result<Self> {
-        let discount_fn = rebased_discount_fn(discount_curve, as_of)?;
+        let discount_curve = ModelDiscountCurve::new(discount_curve, as_of)?;
         Ok(Self {
             kappa: hw_params.kappa,
             sigma: hw_params.sigma,
-            discount_fn: Box::new(discount_fn),
+            discount_curve,
         })
     }
 
@@ -259,21 +283,32 @@ impl<'a> Hw1fTermForward<'a> {
     ///
     /// # Arguments
     ///
-    /// * `fixing_t` - Coupon fixing time in years from the curve `as_of` date; negative values
+    /// * `fixing_t` - Finite coupon fixing time in years from the curve `as_of` date; negative values
     ///   are clamped to 0.
-    /// * `tau` - Accrual year fraction of the coupon period; non-positive values are clamped to 0.
-    #[must_use]
-    pub fn period_coeffs(&self, fixing_t: f64, tau: f64) -> PeriodForwardCoeffs {
+    /// * `tau` - Finite accrual year fraction of the coupon period; non-positive values are clamped to 0.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for invalid times or discount factors, or a
+    /// computation error for a non-finite bond-reconstruction coefficient.
+    pub fn period_coeffs(&self, fixing_t: f64, tau: f64) -> Result<PeriodForwardCoeffs> {
+        if !fixing_t.is_finite() || !tau.is_finite() {
+            return Err(Error::Validation(
+                "Hull-White fixing time and accrual must be finite".into(),
+            ));
+        }
         let t = fixing_t.max(0.0);
         let big_t = t + tau.max(0.0);
         let b = hw_b(self.kappa, t, big_t);
-        let ln_a = hw_ln_a(self.kappa, self.sigma, t, big_t, self.discount_fn.as_ref());
-        PeriodForwardCoeffs {
+        let ln_a = hw_ln_a(self.kappa, self.sigma, t, big_t, &|time| {
+            self.discount_curve.df(time)
+        })?;
+        Ok(PeriodForwardCoeffs {
             b,
             ln_a,
             tau,
             spread: 0.0,
-        }
+        })
     }
 
     /// Time-zero simple forward of the discount curve over
@@ -285,13 +320,30 @@ impl<'a> Hw1fTermForward<'a> {
     ///
     /// # Arguments
     ///
-    /// * `fixing_t` - Fixing time in ACT/365F years from `as_of`; negative
+    /// * `fixing_t` - Finite fixing time in ACT/365F years from `as_of`; negative
     ///   values are clamped to 0.
-    /// * `tau` - Positive rate tenor in years.
-    #[must_use]
-    pub fn curve_forward(&self, fixing_t: f64, tau: f64) -> f64 {
+    /// * `tau` - Positive finite rate tenor in years.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for invalid times or discount factors, or a
+    /// computation error if the simple forward is non-finite.
+    pub fn curve_forward(&self, fixing_t: f64, tau: f64) -> Result<f64> {
+        if !fixing_t.is_finite() || !tau.is_finite() || tau <= 0.0 {
+            return Err(Error::Validation(
+                "Hull-White curve forward requires a finite fixing time and positive finite tenor"
+                    .into(),
+            ));
+        }
         let t = fixing_t.max(0.0);
-        ((self.discount_fn)(t) / (self.discount_fn)(t + tau) - 1.0) / tau
+        let forward =
+            (self.discount_curve.get_df(t)? / self.discount_curve.get_df(t + tau)? - 1.0) / tau;
+        if !forward.is_finite() {
+            return Err(Error::Internal(
+                "Hull-White curve forward is non-finite".into(),
+            ));
+        }
+        Ok(forward)
     }
 }
 
@@ -319,6 +371,83 @@ mod tests {
             ])
             .build()
             .expect("flat discount curve")
+    }
+
+    struct InvalidAfterAnchor {
+        id: finstack_quant_core::types::CurveId,
+        as_of: Date,
+        valid_until: f64,
+        invalid: f64,
+    }
+
+    impl Discounting for InvalidAfterAnchor {
+        fn id(&self) -> &finstack_quant_core::types::CurveId {
+            &self.id
+        }
+        fn base_date(&self) -> Date {
+            self.as_of
+        }
+        fn df(&self, time: f64) -> f64 {
+            if time <= self.valid_until {
+                (-0.03 * time).exp()
+            } else {
+                self.invalid
+            }
+        }
+    }
+
+    #[test]
+    fn initial_rate_and_period_coefficients_propagate_post_anchor_curve_failures() {
+        let as_of = date(2025, Month::January, 1);
+        let hw = HullWhiteCalibrationParams::new(0.1, 0.01).expect("HW parameters");
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -1.0] {
+            let curve = InvalidAfterAnchor {
+                id: "BROKEN".into(),
+                as_of,
+                valid_until: 0.0,
+                invalid,
+            };
+            // The anchor is valid; failure must be detected at actual forward queries.
+            assert!(ModelDiscountCurve::new(&curve, as_of).is_ok());
+            assert!(initial_short_rate_from_curve(&curve, as_of).is_err());
+            let reconstruction = Hw1fTermForward::new(hw, &curve, as_of).expect("valid anchor");
+            assert!(reconstruction.period_coeffs(1.0, 0.5).is_err());
+            assert!(reconstruction.curve_forward(1.0, 0.5).is_err());
+            let later_failure = InvalidAfterAnchor {
+                valid_until: 1.25,
+                ..curve
+            };
+            assert!(initial_short_rate_from_curve(&later_failure, as_of).is_ok());
+            let reconstruction =
+                Hw1fTermForward::new(hw, &later_failure, as_of).expect("valid anchor");
+            assert!(reconstruction.period_coeffs(1.0, 0.5).is_err());
+            assert!(reconstruction.curve_forward(1.0, 0.5).is_err());
+        }
+    }
+
+    #[test]
+    fn period_coefficients_keep_finite_negative_fixing_and_zero_tenor_policy() {
+        let as_of = date(2025, Month::January, 1);
+        let curve = flat_curve(as_of, 0.03);
+        let hw = HullWhiteCalibrationParams {
+            kappa: 0.0,
+            sigma: 0.01,
+        };
+        let reconstruction = Hw1fTermForward::new(hw, &curve, as_of).expect("Ho-Lee limit");
+        let negative = reconstruction
+            .period_coeffs(-1.0, 0.5)
+            .expect("clamped fixing");
+        let zero = reconstruction.period_coeffs(0.0, 0.5).expect("zero fixing");
+        assert_eq!(negative.simple_forward(0.03), zero.simple_forward(0.03));
+        assert_eq!(
+            reconstruction
+                .period_coeffs(1.0, 0.0)
+                .expect("zero tenor")
+                .simple_forward(0.03),
+            0.0
+        );
+        assert!(reconstruction.period_coeffs(f64::NAN, 0.5).is_err());
+        assert!(reconstruction.curve_forward(1.0, 0.0).is_err());
     }
 
     #[test]
@@ -370,7 +499,9 @@ mod tests {
         // the bond at its forward value; the simple forward over [1, 1.5] is
         // (e^{rate·0.5} − 1)/0.5 ≈ 3.02%.
         let tau = 0.5_f64;
-        let coeffs = recon.period_coeffs(1.0, tau);
+        let coeffs = recon
+            .period_coeffs(1.0, tau)
+            .expect("valid curve coefficients");
         let fwd = coeffs.simple_forward(rate);
         let expected_simple = ((rate * tau).exp() - 1.0) / tau;
         assert!(
@@ -385,7 +516,9 @@ mod tests {
         let curve = flat_curve(as_of, 0.03);
         let hw = HullWhiteCalibrationParams::new(0.15, 0.01).expect("hw");
         let recon = Hw1fTermForward::new(hw, &curve, as_of).expect("recon");
-        let coeffs = recon.period_coeffs(1.0, 0.0);
+        let coeffs = recon
+            .period_coeffs(1.0, 0.0)
+            .expect("valid curve coefficients");
         assert!((coeffs.simple_forward(0.05)).abs() < 1e-12);
     }
 
@@ -397,7 +530,9 @@ mod tests {
         let curve = flat_curve(as_of, 0.03);
         let hw = HullWhiteCalibrationParams::new(0.15, 0.01).expect("hw");
         let recon = Hw1fTermForward::new(hw, &curve, as_of).expect("recon");
-        let coeffs = recon.period_coeffs(1.0, 0.5);
+        let coeffs = recon
+            .period_coeffs(1.0, 0.5)
+            .expect("valid curve coefficients");
         let lo = coeffs.simple_forward(0.01);
         let hi = coeffs.simple_forward(0.06);
         assert!(hi > lo, "forward must increase with r: lo={lo}, hi={hi}");

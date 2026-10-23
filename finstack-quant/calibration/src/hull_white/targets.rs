@@ -218,14 +218,14 @@ impl PreparedSwaption {
             SwaptionPayoff::Synthetic {
                 swap_start_time,
                 cashflows,
-            } => Ok(hw1f_swaption_price_prepared(
+            } => hw1f_swaption_price_prepared(
                 params.kappa,
                 params.sigma,
                 df,
                 expiry,
                 *swap_start_time,
                 cashflows,
-            )),
+            ),
         }
     }
 }
@@ -303,7 +303,14 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
     ) -> finstack_quant_core::Result<()> {
         for (idx, q) in quotes.iter().enumerate() {
             let pre = &self.prepared[idx];
-            let model_price = pre.model_price(*curve, self.df, q.expiry)?;
+            let model_price = pre
+                .model_price(*curve, self.df, q.expiry)
+                .map_err(
+                    |cause| finstack_quant_core::Error::MetricCalculationFailed {
+                        metric_id: format!("hull_white_swaption::{}Yx{}Y", q.expiry, q.tenor),
+                        cause: Box::new(cause),
+                    },
+                )?;
             if !model_price.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Hull-White swaption model produced a non-finite price \

@@ -37,7 +37,6 @@ use crate::monte_carlo::traits::ProcessMetadata;
 use crate::rates::hull_white::{fd_instantaneous_forward, HullWhiteParams};
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_core::Result;
-use tracing::warn;
 
 /// Validated Hull-White one-factor process parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -411,7 +410,9 @@ impl ProcessMetadata for HullWhite1FProcess {
 ///
 /// # Errors
 ///
-/// Returns an error when the mean reversion, volatility, or theta schedule is invalid.
+/// Returns an error when the mean reversion, volatility, or theta schedule is
+/// invalid, a discount factor is non-positive or non-finite, or a required
+/// forward estimate is non-finite. Negative finite forwards remain valid.
 ///
 /// ```
 /// use finstack_quant_models::monte_carlo::process::ou::calibrate_theta_from_curve;
@@ -431,14 +432,14 @@ where
     F: Fn(f64) -> f64,
 {
     if theta_times.is_empty() {
-        let f_0 = instantaneous_forward(&discount_curve_fn, 0.0);
+        let f_0 = instantaneous_forward(&discount_curve_fn, 0.0)?;
         return HullWhite1FParams::new(kappa, sigma, f_0);
     }
 
     let model = HullWhiteParams::constant(kappa, sigma)?;
     let theta_curve = fit_theta_levels(kappa, theta_times, |t| {
         let decay = -(-kappa * t).exp_m1();
-        Ok(instantaneous_forward(&discount_curve_fn, t)
+        Ok(instantaneous_forward(&discount_curve_fn, t)?
             + sigma * sigma / (2.0 * kappa * kappa) * decay * decay)
     })?;
     HullWhite1FParams::from_parts(model, theta_curve, theta_times.to_vec())
@@ -460,13 +461,10 @@ where
 /// short-rate-volatility curve. `theta_times` gives the year-fraction
 /// boundaries of the returned piecewise-constant mean-reversion-level curve;
 /// an empty slice produces one value at time zero. `discount_curve_fn(t)` must
-/// return the discount factor `P(0,t)` on the same time basis. The forward
-/// rate is obtained with a finite difference of width `1e-4` years.
-///
-/// If a sampled discount factor is non-positive, the finite-difference helper
-/// logs a warning and substitutes a zero forward contribution rather than
-/// returning an error. Production callers should therefore provide positive,
-/// finite discount factors and treat warnings as a market-data failure.
+/// return a positive finite discount factor `P(0,t)` on the same time basis,
+/// normalized to one at time zero. The forward rate uses the adaptive
+/// finite-difference spacing of [`fd_instantaneous_forward`]. A failed curve
+/// sample returns a validation error; it never becomes a zero forward.
 ///
 /// # Arguments
 ///
@@ -483,7 +481,8 @@ where
 /// # Errors
 ///
 /// Returns validation errors for a non-positive or non-finite `kappa`, an
-/// invalid volatility schedule, or an incompatible output theta schedule.
+/// invalid volatility schedule, an incompatible output theta schedule, or
+/// a non-positive/non-finite discount factor or non-finite forward estimate.
 pub fn calibrate_theta_from_curve_with_piecewise_sigma<F>(
     kappa: f64,
     sigma_times: Vec<f64>,
@@ -509,7 +508,7 @@ where
         // ∫σ²·e^{−κ(t−s)} ds is the variance kernel evaluated at κ/2.
         let single_decay = sigma_curve.integrate_squared_exp_weight(0.5 * kappa, t, 0.0, t)?;
         let double_decay = sigma_curve.integrate_squared_exp_weight(kappa, t, 0.0, t)?;
-        Ok(instantaneous_forward(&discount_curve_fn, t) + (single_decay - double_decay) / kappa)
+        Ok(instantaneous_forward(&discount_curve_fn, t)? + (single_decay - double_decay) / kappa)
     })?;
     HullWhite1FParams::with_piecewise_sigma(
         kappa,
@@ -566,24 +565,52 @@ fn fit_theta_levels(
         .collect()
 }
 
-/// Instantaneous forward `f(0,t)` via [`fd_instantaneous_forward`], falling
-/// back to `0.0` (with a warning) on a non-positive discount factor.
-fn instantaneous_forward<F>(discount_curve_fn: &F, t: f64) -> f64
+/// Required finite instantaneous forward `f(0,t)` for theta calibration.
+fn instantaneous_forward<F>(discount_curve_fn: &F, t: f64) -> Result<f64>
 where
     F: Fn(f64) -> f64,
 {
-    fd_instantaneous_forward(discount_curve_fn, t).unwrap_or_else(|| {
-        warn!(
-            t,
-            "instantaneous_forward: non-positive discount factor; returning 0.0. Check market data quality."
-        );
-        0.0
-    })
+    fd_instantaneous_forward(discount_curve_fn, t).ok_or_else(|| finstack_quant_core::Error::Validation(
+        format!("Hull-White theta calibration cannot estimate a finite forward from positive finite discount factors at t={t}")
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn theta_calibration_rejects_failed_curve_samples_instead_of_zero_drift() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -1.0] {
+            let bad_initial = |time: f64| if time == 0.0 { 1.0 } else { bad };
+            assert!(calibrate_theta_from_curve(0.1, 0.01, bad_initial, &[]).is_err());
+            assert!(calibrate_theta_from_curve(0.1, 0.01, bad_initial, &[0.0, 1.0]).is_err());
+            assert!(calibrate_theta_from_curve_with_piecewise_sigma(
+                0.1,
+                vec![0.0],
+                vec![0.01],
+                bad_initial,
+                &[0.0, 1.0]
+            )
+            .is_err());
+            let bad_later = |time: f64| {
+                if time < 0.5 {
+                    (-0.03 * time).exp()
+                } else {
+                    bad
+                }
+            };
+            assert!(calibrate_theta_from_curve(0.1, 0.01, bad_later, &[0.0, 1.0]).is_err());
+            assert!(calibrate_theta_from_curve_with_piecewise_sigma(
+                0.1,
+                vec![0.0],
+                vec![0.01],
+                bad_later,
+                &[0.0, 1.0]
+            )
+            .is_err());
+        }
+    }
 
     #[test]
     fn test_hw1f_params_constant_theta() {
@@ -695,9 +722,9 @@ mod tests {
         let discount_fn = |t: f64| (-0.05 * t).exp();
 
         // For flat curve, f(0,t) should be constant ≈ 0.05
-        let f_0 = instantaneous_forward(&discount_fn, 0.0);
-        let f_1 = instantaneous_forward(&discount_fn, 1.0);
-        let f_5 = instantaneous_forward(&discount_fn, 5.0);
+        let f_0 = instantaneous_forward(&discount_fn, 0.0).expect("valid curve forward");
+        let f_1 = instantaneous_forward(&discount_fn, 1.0).expect("valid curve forward");
+        let f_5 = instantaneous_forward(&discount_fn, 5.0).expect("valid curve forward");
 
         assert!((f_0 - 0.05).abs() < 0.01, "f(0,0) ≈ 0.05, got {}", f_0);
         assert!((f_1 - 0.05).abs() < 0.01, "f(0,1) ≈ 0.05, got {}", f_1);
@@ -727,7 +754,7 @@ mod tests {
         let times: Vec<f64> = (0..60).map(|i| f64::from(i) / 12.0).collect();
         let shift = |discount: &dyn Fn(f64) -> f64, t: f64| {
             let decay = 1.0 - (-kappa * t).exp();
-            instantaneous_forward(&discount, t)
+            instantaneous_forward(&discount, t).expect("valid curve forward")
                 + sigma * sigma / (2.0 * kappa * kappa) * decay * decay
         };
 
@@ -738,7 +765,8 @@ mod tests {
             let process = HullWhite1FProcess::new(params);
             let disc = ExactHullWhite1F::new();
             let mut work = vec![0.0_f64; disc.work_size(&process)];
-            let mut rate = vec![instantaneous_forward(&discount, 0.0)];
+            let mut rate =
+                vec![instantaneous_forward(&discount, 0.0).expect("valid curve forward")];
             for pair in times.windows(2) {
                 disc.step(
                     &process,
@@ -943,7 +971,7 @@ mod tests {
         let process = HullWhite1FProcess::new(params);
         let disc = ExactHullWhite1F::new();
         let mut work = vec![0.0_f64; disc.work_size(&process)];
-        let mut rate = vec![instantaneous_forward(&kinked, 0.0)];
+        let mut rate = vec![instantaneous_forward(&kinked, 0.0).expect("valid curve forward")];
 
         let grid = [0.0, 0.5, 1.0, 2.0, 5.0];
         for pair in grid.windows(2) {
@@ -956,7 +984,7 @@ mod tests {
                 &mut work,
             );
             let decay = 1.0 - (-kappa * pair[1]).exp();
-            let expected = instantaneous_forward(&kinked, pair[1])
+            let expected = instantaneous_forward(&kinked, pair[1]).expect("valid curve forward")
                 + sigma * sigma / (2.0 * kappa * kappa) * decay * decay;
             assert!(
                 (rate[0] - expected).abs() < 1e-12,
