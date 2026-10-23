@@ -95,10 +95,9 @@ impl Cs01Setup {
 
     /// CS01 in currency per 1 bp of spread for the shock built by `spec_for`
     /// from a signed basis-point size.
-    fn cs01(&self, as_of: Date, spec_for: impl Fn(f64) -> BumpSpec) -> Result<f64> {
+    fn cs01(&self, as_of: Date, pv_base: f64, spec_for: impl Fn(f64) -> BumpSpec) -> Result<f64> {
         let bump_bp = 1.0;
         let pv_up = self.pv_with(spec_for(bump_bp), as_of)?;
-        let pv_base = self.bond.value(&self.market, as_of)?.amount();
         Ok((pv_up - pv_base) / bump_bp)
     }
 }
@@ -114,7 +113,9 @@ impl MetricCalculator for Cs01Calculator {
             return finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01.calculate(context);
         }
 
-        cs01_setup(bond, context.curves.as_ref())?.cs01(as_of, BumpSpec::parallel_bp)
+        let setup = cs01_setup(bond, context.curves.as_ref())?;
+        let pv_base = setup.bond.value(&setup.market, as_of)?.amount();
+        setup.cs01(as_of, pv_base, BumpSpec::parallel_bp)
     }
 }
 
@@ -163,18 +164,17 @@ impl MetricCalculator for BucketedCs01Calculator {
             return finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericBucketedCs01.calculate(context);
         }
 
-        let series_key = bond
-            .credit_curve_id
-            .as_ref()
-            .map_or_else(|| bond.id.as_str(), CurveId::as_str)
-            .to_string();
+        let series_key = bond.id.as_str();
         let setup = cs01_setup(&bond, context.curves.as_ref())?;
+        // Price the prepared synthetic-curve bond once using the same model
+        // as every bumped value; the context may carry a different base model.
+        let pv_base = setup.bond.value(&setup.market, as_of)?.amount();
 
         let mut series: Vec<(Cow<'static, str>, f64)> = Vec::new();
         let mut total = 0.0;
         for (i, &t) in STANDARD_BUCKETS_YEARS.iter().enumerate() {
             // $ per bp of spread at this bucket.
-            let cs01 = setup.cs01(as_of, |bump_bp| {
+            let cs01 = setup.cs01(as_of, pv_base, |bump_bp| {
                 key_rate_spec(i, bump_bp, &STANDARD_BUCKETS_YEARS)
             })?;
             series.push((format_bucket_label(t), cs01));
@@ -182,7 +182,7 @@ impl MetricCalculator for BucketedCs01Calculator {
         }
 
         context.store_bucketed_series(
-            MetricId::composite(&MetricId::BucketedCs01, &[&series_key]),
+            MetricId::composite(&MetricId::BucketedCs01, &[series_key]),
             series,
         );
         Ok(total)
@@ -301,6 +301,40 @@ mod tests {
         assert!(
             cs01 < -0.1 && cs01 > -1.0,
             "z-spread fallback CS01 must be materially negative; got {cs01}"
+        );
+    }
+
+    #[test]
+    fn bucketed_cs01_uses_prepared_baseline_instead_of_context_value() {
+        use finstack_quant_valuations_core::metrics::{MetricId, STANDARD_BUCKETS_YEARS};
+
+        let as_of = Date::from_calendar_date(2025, Month::June, 2).expect("valid date");
+        let bond = make_bond_without_credit_curve();
+        let mut ctx = make_context(bond.clone(), as_of);
+        ctx.set_base_value(Money::from((17_i64, Currency::USD)));
+        let setup = super::cs01_setup(&bond, ctx.curves.as_ref()).expect("prepared setup");
+        let expected: Vec<_> = STANDARD_BUCKETS_YEARS
+            .iter()
+            .enumerate()
+            .map(|(i, &tenor)| {
+                let bumped = setup
+                    .pv_with(super::key_rate_spec(i, 1.0, &STANDARD_BUCKETS_YEARS), as_of)
+                    .expect("bumped value");
+                let base = setup.bond.value(&setup.market, as_of).expect("base value");
+                (
+                    super::format_bucket_label(tenor).into_owned(),
+                    bumped - base.amount(),
+                )
+            })
+            .collect();
+        let total = super::BucketedCs01Calculator
+            .calculate(&mut ctx)
+            .expect("bucketed CS01");
+        let key = MetricId::composite(&MetricId::BucketedCs01, &[bond.id.as_str()]);
+        assert_eq!(ctx.computed_series.get(&key), Some(&expected));
+        assert_eq!(
+            total,
+            expected.iter().map(|(_, amount)| amount).sum::<f64>()
         );
     }
 
