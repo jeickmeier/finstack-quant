@@ -142,21 +142,9 @@ impl_curve_storage_from!(
     BaseCorrelation => BaseCorrelationCurve,
     BasisSpread => BasisSpreadCurve,
     Parametric => ParametricCurve,
+    // Every PriceCurve uses the single Price variant; its kind lives on the curve.
+    Price => PriceCurve,
 );
-
-/// Every [`PriceCurve`] uses the single `Price` storage variant. Its kind is
-/// carried by the curve itself and drives typed context lookups and snapshots.
-impl From<Arc<PriceCurve>> for CurveStorage {
-    fn from(curve: Arc<PriceCurve>) -> Self {
-        Self::Price(curve)
-    }
-}
-
-impl From<PriceCurve> for CurveStorage {
-    fn from(curve: PriceCurve) -> Self {
-        Arc::new(curve).into()
-    }
-}
 
 impl CurveStorage {
     /// Roll this curve storage forward by the provided number of days.
