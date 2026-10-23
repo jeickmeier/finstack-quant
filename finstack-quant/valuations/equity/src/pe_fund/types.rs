@@ -13,6 +13,11 @@ use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Instrument;
 use time::macros::date;
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static WATERFALL_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Private markets fund investment instrument.
 ///
 /// Models a private equity, private credit, or alternative fund with a
@@ -182,6 +187,8 @@ impl PrivateMarketsFund {
 
     /// Run the waterfall allocation engine on all fund events.
     pub fn run_waterfall(&self) -> finstack_quant_core::Result<AllocationLedger> {
+        #[cfg(test)]
+        WATERFALL_CALLS.with(|count| count.set(count.get() + 1));
         for event in &self.events {
             if event.amount.currency() != self.currency {
                 return Err(finstack_quant_core::Error::CurrencyMismatch {
