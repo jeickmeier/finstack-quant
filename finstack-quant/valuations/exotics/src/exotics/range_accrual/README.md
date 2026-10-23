@@ -25,7 +25,7 @@ Useful methods: `RangeAccrual::validate()` (delegates to
 `accrual_year_fraction()`, `effective_lower_bound(initial_spot)` and
 `effective_upper_bound(initial_spot)` (call them as `note.terms.<method>`).
 
-The `pricer` submodule is `pub(crate)`: `npv_analytic`,
+The `pricer` submodule is `pub(crate)`: `compute_pv`,
 `RangeAccrualStaticReplicationPricer` and `RangeAccrualMcPricer` are named below
 to explain the pricing paths, but they cannot be called from outside the crate.
 Price through `Instrument::value` / `price_with_metrics`, or through the
@@ -37,7 +37,7 @@ registry with an explicit `ModelKey`.
 range_accrual/
 ├── mod.rs          # re-exports and module overview
 ├── types.rs        # RangeAccrual, RangeAccrualTerms, BoundsType, builders, examples, validate
-├── pricer.rs       # RangeAccrualStaticReplicationPricer, RangeAccrualMcPricer, npv_analytic
+├── pricer.rs       # RangeAccrualStaticReplicationPricer, RangeAccrualMcPricer, compute_pv
 ├── monte_carlo.rs  # RangeAccrualPayoff for the shared MC path-dependent pricer
 └── metrics.rs      # generic FD greeks and curve risk registration
 ```
@@ -208,7 +208,7 @@ finite-difference:
 | `Rho` | `UnifiedDv01Calculator` with `parallel_discount_only()` (central bump, selected model) |
 | `Dv01`, `BucketedDv01` | Parallel and triangular key-rate curve risk |
 
-`Theta` is registered universally by `metrics::standard_registry()`.
+`Theta` is registered universally by `pricer::STANDARD.metrics()`.
 
 ## Market dependencies
 

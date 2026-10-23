@@ -122,6 +122,22 @@ fn invalid_return_series(
     }
 }
 
+/// Zero-based column of `ticker` in `ticker_names`.
+///
+/// Returns [`finstack_quant_core::InputError::NotFound`], naming the loaded
+/// tickers, when `ticker` is absent.
+fn ticker_index(ticker_names: &[String], ticker: &str) -> finstack_quant_core::Result<usize> {
+    ticker_names
+        .iter()
+        .position(|name| name == ticker)
+        .ok_or_else(|| {
+            finstack_quant_core::InputError::NotFound {
+                id: format!("ticker '{ticker}' (loaded: {ticker_names:?})"),
+            }
+            .into()
+        })
+}
+
 /// Reject empty, duplicate, or non-monotonic date inputs at construction.
 ///
 /// Several lookback and aggregation paths use [`slice::partition_point`] on
@@ -466,8 +482,10 @@ impl Performance {
     /// * `ticker_names.len() != prices.len()` or ticker names are duplicated.
     /// * any price column length differs from `dates.len()`.
     /// * any ticker has no contiguous finite positive price span.
-    /// * `benchmark_ticker` is supplied but not found in `ticker_names`.
     /// * derived returns are non-finite or at or below `-1.0`.
+    ///
+    /// Returns [`finstack_quant_core::InputError::NotFound`] when
+    /// `benchmark_ticker` is supplied but not found in `ticker_names`.
     ///
     /// # Tracing
     ///
@@ -548,11 +566,15 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) when inputs are empty,
-    /// the column count does not match `ticker_names`, any return column has
-    /// the wrong length, the benchmark name is unknown, any ticker lacks a
-    /// contiguous finite return span, ticker names are duplicated, or any active return value is `<= -1.0`.
-    /// Propagates a date-range validation error if the synthetic prior price date underflows the calendar.
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
+    /// inputs are empty, the column count does not match `ticker_names`, any
+    /// return column has the wrong length, any ticker lacks a contiguous
+    /// finite return span, ticker names are duplicated, or any active return
+    /// value is `<= -1.0`. Propagates a date-range validation error if the
+    /// synthetic prior price date underflows the calendar.
+    ///
+    /// Returns [`finstack_quant_core::InputError::NotFound`] when
+    /// `benchmark_ticker` is supplied but not found in `ticker_names`.
     pub fn from_returns(
         dates: Vec<Date>,
         returns: Vec<Vec<f64>>,
@@ -618,13 +640,7 @@ impl Performance {
         }
 
         let benchmark_idx = match benchmark_ticker {
-            Some(name) => ticker_names.iter().position(|t| t == name).ok_or_else(|| {
-                invalid_return_series(
-                    name,
-                    0,
-                    "benchmark ticker not found among supplied ticker_names",
-                )
-            })?,
+            Some(name) => ticker_index(&ticker_names, name)?,
             None => 0,
         };
 
@@ -727,19 +743,12 @@ impl Performance {
     /// * `ticker` - Name of the ticker to use as benchmark. Must match one
     ///   of the names provided at construction time.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// `Ok(())` on success, or an [`Error::Validation`](finstack_quant_core::Error::Validation) if `ticker` is
-    /// not found among the loaded tickers.
+    /// Returns [`finstack_quant_core::InputError::NotFound`] when `ticker` is not
+    /// among the loaded ticker names; the benchmark is left unchanged.
     pub fn reset_bench_ticker(&mut self, ticker: &str) -> finstack_quant_core::Result<()> {
-        let idx = self
-            .ticker_names
-            .iter()
-            .position(|t| t == ticker)
-            .ok_or_else(|| {
-                invalid_return_series(ticker, 0, "ticker not found among loaded ticker_names")
-            })?;
-        self.benchmark_idx = idx;
+        self.benchmark_idx = self.get_ticker_index(ticker)?;
         Ok(())
     }
 
@@ -775,15 +784,7 @@ impl Performance {
     /// Returns [`finstack_quant_core::InputError::NotFound`] when `ticker` is not
     /// among the loaded ticker names.
     pub fn get_ticker_index(&self, ticker: &str) -> finstack_quant_core::Result<usize> {
-        self.ticker_names
-            .iter()
-            .position(|name| name == ticker)
-            .ok_or_else(|| {
-                finstack_quant_core::InputError::NotFound {
-                    id: format!("ticker '{ticker}' (loaded: {:?})", self.ticker_names),
-                }
-                .into()
-            })
+        ticker_index(&self.ticker_names, ticker)
     }
 
     /// Reject a tail `confidence` outside the open interval `(0, 1)`.
@@ -849,11 +850,8 @@ impl Performance {
 
     /// Per-period simple returns for one ticker over the active window.
     ///
-    /// This is the canonical way to read back the raw return series a
-    /// [`Performance`] was built from (or derived from prices). Prefer it over
-    /// calling [`Self::excess_returns`] with an all-zero risk-free vector or
-    /// un-compounding [`Self::cumulative_returns`]; both reproduce this series
-    /// only up to floating-point noise and are easy to get wrong.
+    /// The one-column form of [`Self::get_returns`]: the same values as its
+    /// row `ticker_idx`, without copying the other tickers.
     ///
     /// The series is span-aware: on edge-ragged panels it excludes the
     /// leading/trailing missing observations for this ticker, so its length

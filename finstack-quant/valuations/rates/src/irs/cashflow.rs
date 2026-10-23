@@ -26,12 +26,55 @@ use finstack_quant_core::Result;
 use rust_decimal::Decimal;
 
 use crate::irs::InterestRateSwap;
-use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_cashflows::builder::{
-    build_periods, merge_cashflow_schedules, CashFlowSchedule, FloatingCouponSpec,
-    FloatingRateSpec, Notional, PrincipalExchange, SchedulePeriod,
+    build_periods, merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
+    FloatingLegCompounding, FloatingRateFallback, FloatingRateSpec, Notional, PrincipalExchange,
+    RollRule, ScheduleParams, SchedulePeriod,
 };
-use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::pricing::overnight_conventions::builder_overnight_method;
+use finstack_quant_valuations_core::instruments::{FloatLegSpec, PayReceive};
+
+/// Coupon spec for one float leg. The caller chooses the calendar, the
+/// accrual-date adjustment and the fallback; every other field follows the leg.
+pub(crate) fn float_leg_coupon_spec(
+    leg: &FloatLegSpec,
+    calendar_id: &str,
+    adjust_accrual_dates: bool,
+    fallback: FloatingRateFallback,
+) -> FloatingCouponSpec {
+    FloatingCouponSpec {
+        rate_spec: FloatingRateSpec {
+            forward_curve_id: leg.forward_curve_id.clone(),
+            spread_bp: leg.spread_bp,
+            gearing: Decimal::ONE,
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            all_in_cap_bp: None,
+            all_in_floor_bp: None,
+            index_cap_bp: None,
+            overnight_index_constraints: Default::default(),
+            reset_frequency: leg.frequency,
+            index_tenor: None,
+            reset_lag_days: leg.reset_lag_days,
+            fixing_calendar_id: leg.fixing_calendar_id.clone(),
+            compounding: builder_overnight_method(leg.compounding),
+            overnight_basis: None,
+            fallback,
+        },
+        coupon_type: CouponType::Cash,
+        schedule: ScheduleParams {
+            frequency: leg.frequency,
+            day_count: leg.day_count,
+            business_day_convention: leg.business_day_convention,
+            calendar_id: calendar_id.into(),
+            stub: leg.stub,
+            end_of_month: leg.end_of_month,
+            payment_lag_days: leg.payment_lag_days,
+            adjust_accrual_dates,
+            roll_rule: RollRule::None,
+        },
+    }
+}
 
 /// Total backward shift (in business days) applied to overnight observation
 /// dates.
@@ -361,50 +404,20 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
     }
 
     let mut float_b = CashFlowSchedule::builder();
+    let fallback = if curves.is_some() {
+        FloatingRateFallback::Error
+    } else {
+        FloatingRateFallback::SpreadOnly
+    };
     let _ = float_b
         .principal(irs.notional, float.start, float.end)
         .principal_exchange(PrincipalExchange::None)
-        .floating_cf(FloatingCouponSpec {
-            rate_spec: FloatingRateSpec {
-                forward_curve_id: float.forward_curve_id.to_owned(),
-                spread_bp: float.spread_bp,
-                gearing: Decimal::ONE,
-                gearing_includes_spread: true,
-                index_floor_bp: None,
-                all_in_cap_bp: None,
-                all_in_floor_bp: None,
-                index_cap_bp: None,
-                overnight_index_constraints: Default::default(),
-                reset_frequency: float.frequency,
-                index_tenor: None,
-                reset_lag_days: float.reset_lag_days,
-                fixing_calendar_id: float.fixing_calendar_id.clone(),
-                compounding: finstack_quant_valuations_core::instruments::pricing::overnight_conventions::builder_overnight_method(
-                    float.compounding,
-                ),
-                overnight_basis: None,
-                fallback: if curves.is_some() {
-                    finstack_quant_cashflows::builder::FloatingRateFallback::Error
-                } else {
-                    finstack_quant_cashflows::builder::FloatingRateFallback::SpreadOnly
-                },
-            },
-            coupon_type: finstack_quant_cashflows::builder::CouponType::Cash,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency: float.frequency,
-                day_count: float.day_count,
-                business_day_convention: float.business_day_convention,
-                calendar_id: float
-                    .calendar_id
-                    .clone()
-                    .unwrap_or_else(|| "weekends_only".into()),
-                stub: float.stub,
-                end_of_month: float.end_of_month,
-                payment_lag_days: float.payment_lag_days,
-                adjust_accrual_dates: irs.adjust_float_accrual_dates,
-                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-            },
-        });
+        .floating_cf(float_leg_coupon_spec(
+            &float,
+            float.calendar_id.as_deref().unwrap_or("weekends_only"),
+            irs.adjust_float_accrual_dates,
+            fallback,
+        ));
     match (curves, as_of) {
         (Some(market), Some(date)) => float_b.build_as_of(market, date),
         _ => float_b.build(curves),

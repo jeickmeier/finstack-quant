@@ -637,6 +637,97 @@ fn performance_rolling_returns_errors_on_invalid_ticker_index() {
     );
 }
 
+fn two_ticker_daily_performance() -> Performance {
+    let dates = (1..=8).map(|day| d(2024, Month::January, day)).collect();
+    let prices = vec![
+        vec![100.0, 101.0, 99.5, 102.0, 101.0, 103.5, 102.5, 104.0],
+        vec![50.0, 50.5, 50.2, 50.9, 50.4, 51.2, 51.0, 51.6],
+    ];
+    Performance::new(
+        dates,
+        prices,
+        vec!["PORT".to_string(), "BENCH".to_string()],
+        Some("BENCH"),
+        PeriodKind::Daily,
+    )
+    .expect("performance should build")
+}
+
+#[test]
+fn performance_tail_metrics_reject_confidence_outside_open_unit_interval() {
+    let perf = two_ticker_daily_performance();
+    let is_validation = |result: finstack_quant_core::Result<Vec<f64>>| {
+        matches!(result, Err(finstack_quant_core::Error::Validation(_)))
+    };
+
+    for confidence in [0.0, 1.0, 95.0, -0.05, f64::NAN, f64::INFINITY] {
+        assert!(
+            is_validation(perf.value_at_risk(confidence)),
+            "value_at_risk({confidence})"
+        );
+        assert!(
+            is_validation(perf.expected_shortfall(confidence)),
+            "expected_shortfall({confidence})"
+        );
+        assert!(
+            is_validation(perf.tail_ratio(confidence)),
+            "tail_ratio({confidence})"
+        );
+        assert!(is_validation(perf.cdar(confidence)), "cdar({confidence})");
+        assert!(
+            is_validation(perf.parametric_var(confidence, None)),
+            "parametric_var({confidence})"
+        );
+        assert!(
+            is_validation(perf.cornish_fisher_var(confidence, None)),
+            "cornish_fisher_var({confidence})"
+        );
+        assert!(
+            is_validation(perf.modified_sharpe(0.0, confidence)),
+            "modified_sharpe({confidence})"
+        );
+        assert!(
+            matches!(
+                perf.summary(0.0, confidence),
+                Err(finstack_quant_core::Error::Validation(_))
+            ),
+            "summary({confidence})"
+        );
+    }
+
+    assert!(perf.value_at_risk(0.95).is_ok());
+    assert!(perf.summary(0.0, 0.95).is_ok());
+}
+
+#[test]
+fn performance_rolling_metrics_reject_zero_window() {
+    let perf = two_ticker_daily_performance();
+
+    assert!(matches!(
+        perf.rolling_returns(0, 0),
+        Err(finstack_quant_core::Error::Validation(_))
+    ));
+    assert!(matches!(
+        perf.rolling_volatility(0, 0),
+        Err(finstack_quant_core::Error::Validation(_))
+    ));
+    assert!(matches!(
+        perf.rolling_sortino(0, 0, 0.0),
+        Err(finstack_quant_core::Error::Validation(_))
+    ));
+    assert!(matches!(
+        perf.rolling_sharpe(0, 0, 0.0),
+        Err(finstack_quant_core::Error::Validation(_))
+    ));
+    assert!(matches!(
+        perf.rolling_greeks(0, 0, 0.0),
+        Err(finstack_quant_core::Error::Validation(_))
+    ));
+
+    let one_period = perf.rolling_returns(0, 1).expect("window of one is valid");
+    assert_eq!(one_period.values.len(), 7);
+}
+
 #[test]
 fn performance_new_rejects_non_finite_price_domain_in_simple_return_mode() {
     let dates = vec![d(2024, Month::January, 1), d(2024, Month::January, 2)];

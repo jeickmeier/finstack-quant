@@ -3,6 +3,7 @@
 pub mod dtsm;
 pub mod hull_white;
 
+use crate::bindings::pydoc::pydoc;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
@@ -11,7 +12,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let module = crate::bindings::module_utils::new_submodule(parent, "rates")?;
     module.setattr(
         "__doc__",
-        "Product-independent interest-rate models and statistical term-structure engines.",
+        pydoc!("finstack_quant.models.rates", "__module__"),
     )?;
 
     dtsm::register(py, &module)?;

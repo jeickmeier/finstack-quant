@@ -104,14 +104,7 @@ fn test_clo_json_roundtrip() {
     .unwrap();
 
     let tranches = TrancheStructure::new(vec![tranche]).unwrap();
-    let original = StructuredCredit::new_clo(
-        "TEST_CLO",
-        pool,
-        tranches,
-        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-        maturity_date(),
-        "USD-OIS",
-    )
+    let original = StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "TEST_CLO".into(), pool, tranches, closing_date: Date::from_calendar_date(2024, Month::January, 1).unwrap(), maturity: maturity_date(), discount_curve_id: "USD-OIS".into(), calendar_id: None })
     .expect("valid structured-credit dates");
 
     // Act
@@ -149,14 +142,7 @@ fn test_rmbs_credit_model_serialization() {
     .unwrap();
 
     let tranches = TrancheStructure::new(vec![tranche]).unwrap();
-    let mut rmbs = StructuredCredit::new_rmbs(
-        "TEST_RMBS",
-        pool,
-        tranches,
-        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-        maturity_date(),
-        "USD-OIS",
-    )
+    let mut rmbs = StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "TEST_RMBS".into(), pool, tranches, closing_date: Date::from_calendar_date(2024, Month::January, 1).unwrap(), maturity: maturity_date(), discount_curve_id: "USD-OIS".into(), calendar_id: None })
     .expect("valid structured-credit dates");
 
     // Set the credit model
@@ -266,6 +252,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         .with_rating(CreditRating::A)
     };
     bond.defaulted = true;
+    bond.default_date = Some(closing);
     bond.recovery_amount =
         Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
     bond.purchase_price =
@@ -287,17 +274,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     pool.collection_account = Money::new(250_000.0, Currency::USD).expect("valid money fixture");
     pool.reserve_account = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
     pool.excess_spread_account = Money::new(75_000.0, Currency::USD).expect("valid money fixture");
-    pool.rep_lines = Some(vec![RepLine::new(
-        "REP1",
-        Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.055,
-        Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-        DayCount::Act360,
-        finstack_quant_valuations::instruments::fixed_income::structured_credit::AssetType::FirstLienLoan {},
-    )
-    .with_cpr(0.08)
-    .with_cdr(0.03)
-    .with_recovery_rate(0.50)]);
 
     let mut equity = Tranche {
         oc_trigger: Some(CoverageTrigger::new(
@@ -359,7 +335,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     let tranches = TrancheStructure::new(vec![equity, senior]).unwrap();
 
     let mut deal =
-        StructuredCredit::new_clo("FULL-CLO", pool, tranches, closing, legal, "USD-SOFR-DISC")
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "FULL-CLO".into(), pool, tranches, closing_date: closing, maturity: legal, discount_curve_id: "USD-SOFR-DISC".into(), calendar_id: None })
             .expect("valid structured-credit dates");
 
     deal.first_payment_date = first_payment;
@@ -425,7 +401,7 @@ fn test_structured_credit_full_feature_json_roundtrip() {
     assert_eq!(original.frequency, parsed.frequency);
     assert_eq!(original.first_payment_date, parsed.first_payment_date);
 
-    // AssetPool with overrides, reinvestment, rep lines, and accounts
+    // AssetPool with overrides, reinvestment, and accounts
     assert_eq!(original.pool.assets.len(), parsed.pool.assets.len());
     assert_eq!(
         original.pool.assets[0].smm_override,
@@ -447,10 +423,6 @@ fn test_structured_credit_full_feature_json_roundtrip() {
     assert_eq!(
         original.pool.excess_spread_account,
         parsed.pool.excess_spread_account
-    );
-    assert_eq!(
-        original.pool.rep_lines.as_ref().unwrap()[0].cpr,
-        parsed.pool.rep_lines.as_ref().unwrap()[0].cpr
     );
 
     // Tranche structure (ratings, triggers, targets, attributes)
@@ -520,6 +492,49 @@ fn test_structured_credit_full_feature_json_roundtrip() {
         SwapNotional::TranchePar("SENIOR".into())
     );
     assert_eq!(parsed.hedge_swaps[0].priority, SwapPriority::SeniorFee);
+}
+
+#[test]
+fn test_structured_credit_representative_pool_json_roundtrip() {
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams;
+
+    let full = build_full_feature_structured_credit();
+    let mut pool = full.pool;
+    pool.assets.clear();
+    pool.rep_lines = Some(vec![RepLine::new(
+        "REP1",
+        Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
+        0.055,
+        Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+        DayCount::Act360,
+        finstack_quant_valuations::instruments::fixed_income::structured_credit::AssetType::FirstLienLoan {},
+    )
+    .with_cpr(0.08)
+    .with_cdr(0.03)
+    .with_recovery_rate(0.50)]);
+    let original = StructuredCredit::new_standard(
+        DealType::Clo,
+        StandardDealParams {
+            id: full.id,
+            pool,
+            tranches: full.tranches,
+            closing_date: full.closing_date,
+            maturity: full.maturity,
+            discount_curve_id: full.discount_curve_id,
+            calendar_id: None,
+        },
+    )
+    .expect("valid representative-pool deal");
+    let json = serde_json::to_string(&original).expect("serialize");
+    let parsed: StructuredCredit = serde_json::from_str(&json).expect("deserialize");
+    assert!(parsed.pool.assets.is_empty());
+    let original_line = &original.pool.rep_lines.as_ref().unwrap()[0];
+    let parsed_line = &parsed.pool.rep_lines.as_ref().unwrap()[0];
+    assert_eq!(
+        serde_json::to_value(original_line).expect("serialize original representative line"),
+        serde_json::to_value(parsed_line).expect("serialize parsed representative line")
+    );
 }
 
 #[test]
@@ -599,7 +614,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
         .unwrap(),
     ])
     .unwrap();
-    let mut sc = StructuredCredit::new_abs("ABS-WF", pool, tranches, closing, mat, "USD-OIS")
+    let mut sc = StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "ABS-WF".into(), pool, tranches, closing_date: closing, maturity: mat, discount_curve_id: "USD-OIS".into(), calendar_id: None })
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
     sc.waterfall_rules = Some(WaterfallRules {

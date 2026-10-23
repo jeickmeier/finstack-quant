@@ -8,8 +8,8 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, tranche_oas, AssetPool, DealType, OasConfig, PoolAsset,
-    StructuredCredit, Tranche, TrancheStructure,
+    tranche_oas, AssetPool, DealType, OasConfig, PoolAsset, StructuredCredit, Tranche,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -64,10 +64,20 @@ fn deal(index_floor_bp: Option<f64>) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_clo("CLO-FLOOR", pool, tranches, close(), maturity, "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO-FLOOR".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 0);
@@ -80,10 +90,13 @@ fn deal(index_floor_bp: Option<f64>) -> StructuredCredit {
 #[test]
 fn an_index_floor_above_the_forward_lifts_the_pool_coupon() {
     let market = market_with_curves(close());
-    let unfloored = run_simulation_with_diagnostics(&deal(None), &market, close()).expect("run");
-    let floored =
-        run_simulation_with_diagnostics(&deal(Some(600.0)), &market, close()).expect("run");
-    let slack = run_simulation_with_diagnostics(&deal(Some(100.0)), &market, close()).expect("run");
+    let unfloored = (deal(None)).run_simulation(&market, close()).expect("run");
+    let floored = (deal(Some(600.0)))
+        .run_simulation(&market, close())
+        .expect("run");
+    let slack = (deal(Some(100.0)))
+        .run_simulation(&market, close())
+        .expect("run");
 
     let first =
         |run: &finstack_quant_valuations_structured_credit::structured_credit::SimulationRun| {

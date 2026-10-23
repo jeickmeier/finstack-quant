@@ -5,8 +5,7 @@ Root bindings for ``finstack-quant-cashflows``. Build schedules from a
 ``CashflowScheduleBuildSpec``, validate canonical payloads, extract dated flows,
 and compute accrued interest.
 
-Examples
---------
+Examples:
 >>> import datetime
 >>> from finstack_quant.core.cashflow import CFKind, CashFlow
 >>> from finstack_quant.core.money import Money
@@ -279,9 +278,11 @@ def schedule_from_classified_flows(
     CashFlowSchedule
         Canonical schedule holding the sorted rows.
 
-    Notes
-    -----
-    This function does not raise.
+    Raises
+    ------
+    ValueError
+        If a row has a non-finite or negative accrual factor, a non-finite rate,
+        or a reset date after its payment date.
 
     Examples
     --------

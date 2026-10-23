@@ -19,6 +19,21 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Error {
+    /// Canonical core failure, preserving its validation or computation kind.
+    #[error(transparent)]
+    Core(#[from] finstack_quant_core::Error),
+    /// Mean-reversion speed is negative or non-finite.
+    #[error("Invalid mean reversion {value}: must be finite and non-negative")]
+    InvalidMeanReversion {
+        /// Offending speed per year.
+        value: f64,
+    },
+    /// A factor model requires at least one factor.
+    #[error("Invalid factor count {value}: must be positive")]
+    InvalidFactorCount {
+        /// Offending number of factors.
+        value: usize,
+    },
     /// Matrix validation or nearest-correlation failure from core.
     #[error(transparent)]
     Matrix(
@@ -95,12 +110,13 @@ impl From<Error> for finstack_quant_core::Error {
     /// Fold a correlation error into the canonical core error taxonomy.
     ///
     /// Matrix failures use core's `From<CorrelationError>` (iterative
-    /// failures such as `DidNotConverge` become computation errors); every
-    /// other variant is an input-validation failure and maps to
+    /// failures such as `DidNotConverge` become computation errors), and wrapped
+    /// core errors retain their original kind. Every other variant is an input-validation failure and maps to
     /// [`finstack_quant_core::Error::Validation`] with the full message.
     fn from(error: Error) -> Self {
         match error {
             Error::Matrix(matrix) => matrix.into(),
+            Error::Core(core) => core,
             other => finstack_quant_core::Error::Validation(other.to_string()),
         }
     }
@@ -110,6 +126,14 @@ impl From<Error> for finstack_quant_core::Error {
 mod tests {
     use super::*;
     use finstack_quant_core::ErrorKind;
+
+    #[test]
+    fn core_failures_preserve_their_kind_and_diagnostics() {
+        let source = finstack_quant_core::Error::Internal("recovery integration failed".into());
+        let folded: finstack_quant_core::Error = Error::Core(source.clone()).into();
+        assert_eq!(folded, source);
+        assert_eq!(folded.kind(), ErrorKind::Computation);
+    }
 
     #[test]
     fn convergence_failures_fold_to_computation_kind() {

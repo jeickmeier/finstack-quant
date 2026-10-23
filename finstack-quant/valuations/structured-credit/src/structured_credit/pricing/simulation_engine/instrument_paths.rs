@@ -369,6 +369,15 @@ impl<S: PeriodShockSource> PoolFlowSource for InstrumentPathFlowSource<'_, S> {
                 PerNameResolution::Realized => {
                     for (slot, &i) in self.alive.iter().enumerate() {
                         self.inputs[i].pd = if self.default_scratch[slot] { 1.0 } else { 0.0 };
+                        let recovery = engine.sample_recovery(shock.recovery_factor)?;
+                        // Explicit instrument/hazard recovery remains authoritative.
+                        if matches!(
+                            self.prepared.schedules[i].default_source,
+                            PeriodDefaultSource::DealModel
+                        ) && self.prepared.schedules[i].recovery_rate.is_none()
+                        {
+                            self.inputs[i].recovery_rate = recovery;
+                        }
                     }
                 }
                 PerNameResolution::Conditional => {
@@ -506,10 +515,20 @@ mod tests {
             .expect("senior"),
         ])
         .expect("tranches");
-        let mut deal =
-            StructuredCredit::new_clo("POOL-PATH", pool, tranches, AS_OF, maturity, "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut deal = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "POOL-PATH".into(),
+                pool,
+                tranches,
+                closing_date: AS_OF,
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         deal

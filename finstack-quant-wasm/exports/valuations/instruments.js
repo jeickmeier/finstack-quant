@@ -82,7 +82,6 @@ export const instruments = {
   coverageRulesCloStandard: wasm.coverageRulesCloStandard,
   coverageRulesValidate: wasm.coverageRulesValidate,
   waterfallCoverageTests: wasm.waterfallCoverageTests,
-  scenarioTableCells: wasm.scenarioTableCells,
   amortizationEventDate: wasm.amortizationEventDate,
   amortizationEventCumulativeLoss: wasm.amortizationEventCumulativeLoss,
   amortizationEventExcessSpread: wasm.amortizationEventExcessSpread,

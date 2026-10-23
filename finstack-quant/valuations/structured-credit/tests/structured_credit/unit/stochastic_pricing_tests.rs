@@ -7,6 +7,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::correlation::RecoverySpec;
 use finstack_quant_models::credit::pool::StochasticPrepaySpec;
 use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
 use finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides;
@@ -15,7 +16,7 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, tranche_breakeven_cdr, tranche_discount_margin, tranche_metrics, tranche_oas,
+    tranche_breakeven_cdr, tranche_discount_margin, tranche_metrics, tranche_oas,
     tranche_scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, ScenarioGrid,
     StructuredCredit, Tranche, TrancheStructure,
 };
@@ -68,13 +69,17 @@ fn discount_curve(base_date: Date) -> DiscountCurve {
 fn build_sc(id: &str, pool_balance: f64) -> StructuredCredit {
     let pool = simple_pool(pool_balance);
     let tranches = single_tranche_structure(pool_balance);
-    StructuredCredit::new_abs(
-        id,
-        pool,
-        tranches,
-        closing_date(),
-        legal_maturity(),
-        "USD-OIS",
+    StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: id.into(),
+            pool,
+            tranches,
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
@@ -240,37 +245,53 @@ fn enable_stochastic_populates_specs_for_each_deal_family() {
     let tranches = || single_tranche_structure(1_000_000.0);
     let (close, legal) = (closing_date(), legal_maturity());
     for sc in [
-        StructuredCredit::new_rmbs(
-            "RMBS",
-            pool(DealType::Rmbs),
-            tranches(),
-            close,
-            legal,
-            "USD-OIS",
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "RMBS".into(),
+                pool: pool(DealType::Rmbs),
+                tranches: tranches(),
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         ),
-        StructuredCredit::new_clo(
-            "CLO",
-            pool(DealType::Clo),
-            tranches(),
-            close,
-            legal,
-            "USD-OIS",
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO".into(),
+                pool: pool(DealType::Clo),
+                tranches: tranches(),
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         ),
-        StructuredCredit::new_cmbs(
-            "CMBS",
-            pool(DealType::Cmbs),
-            tranches(),
-            close,
-            legal,
-            "USD-OIS",
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CMBS".into(),
+                pool: pool(DealType::Cmbs),
+                tranches: tranches(),
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         ),
-        StructuredCredit::new_abs(
-            "CARD",
-            pool(DealType::Card),
-            tranches(),
-            close,
-            legal,
-            "USD-OIS",
+        StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CARD".into(),
+                pool: pool(DealType::Card),
+                tranches: tranches(),
+                closing_date: close,
+                maturity: legal,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         ),
     ] {
         let mut sc = sc.expect("valid structured-credit dates");
@@ -385,7 +406,8 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         recovery_lag: None,
     };
     let errors = [
-        run_simulation(&sc, &market, closing_date())
+        sc.run_simulation(&market, closing_date())
+            .map(|run| run.tranches)
             .expect_err("invalid simulation")
             .to_string(),
         (sc).tranche_cashflows("missing", &market, closing_date())
@@ -500,13 +522,17 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
     )
     .unwrap();
 
-    let mut sc = StructuredCredit::new_abs(
-        "ABS-LARGE-PV",
-        pool,
-        TrancheStructure::new(vec![tranche]).unwrap(),
-        close,
-        maturity,
-        "USD-OIS",
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-LARGE-PV".into(),
+            pool,
+            tranches: TrancheStructure::new(vec![tranche]).unwrap(),
+            closing_date: close,
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -521,7 +547,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         1.0, // factor_loading: full single-factor exposure
         0.5, // correlation: 50% systemic loading → meaningful path spread
     ));
-    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
         sc.credit_model.prepayment_spec.clone(),
     ));
     sc.credit_model.correlation_structure =
@@ -606,13 +632,17 @@ fn philox_rng_discipline_determinism_and_stream_sanity() {
         maturity,
     )
     .unwrap();
-    let mut sc = StructuredCredit::new_abs(
-        "ABS-PHILOX",
-        pool,
-        TrancheStructure::new(vec![tranche]).unwrap(),
-        close,
-        maturity,
-        "USD-OIS",
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-PHILOX".into(),
+            pool,
+            tranches: TrancheStructure::new(vec![tranche]).unwrap(),
+            closing_date: close,
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -623,7 +653,7 @@ fn philox_rng_discipline_determinism_and_stream_sanity() {
         1.0,
         0.4,
     ));
-    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
         sc.credit_model.prepayment_spec.clone(),
     ));
     sc.credit_model.correlation_structure =
@@ -883,7 +913,7 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
                     1.0,
                     0.5,
                 ));
-            sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+            sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
                 sc.credit_model.prepayment_spec.clone(),
             ));
             sc.credit_model.correlation_structure =
@@ -963,7 +993,7 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             ])
             .unwrap();
             let mut sc =
-                StructuredCredit::new_abs("REFERENCE", pool, tranches, start, end, "USD-OIS")
+                StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "REFERENCE".into(), pool, tranches, closing_date: start, maturity: end, discount_curve_id: "USD-OIS".into(), calendar_id: None })
                     .expect("valid structured-credit dates")
                     .with_calendar_id("nyse");
             sc.frequency = Tenor::quarterly();
@@ -1109,4 +1139,26 @@ fn default_monte_carlo_matches_explicit_estimator_count_and_honors_override() {
         result.npv.amount().to_bits(),
         "the estimator-count override must affect pricing, not only metadata"
     );
+}
+
+#[test]
+fn recovery_only_configuration_is_reported_and_fully_disabled() {
+    for recovery in [
+        RecoverySpec::constant(0.4).expect("constant recovery"),
+        RecoverySpec::market_correlated(0.4, 0.25, 0.4).expect("correlated recovery"),
+    ] {
+        let mut sc = build_sc("ABS-RECOVERY-ONLY", 1_000_000.0);
+        let deterministic_recovery = sc.credit_model.recovery_spec.clone();
+        sc.credit_model.stochastic_recovery_spec = Some(recovery);
+        assert!(sc.is_stochastic());
+        for _ in 0..2 {
+            sc.disable_stochastic();
+            assert!(!sc.is_stochastic());
+            assert!(sc.credit_model.stochastic_prepay_spec.is_none());
+            assert!(sc.credit_model.stochastic_default_spec.is_none());
+            assert!(sc.credit_model.stochastic_recovery_spec.is_none());
+            assert!(sc.credit_model.correlation_structure.is_none());
+            assert_eq!(sc.credit_model.recovery_spec, deterministic_recovery);
+        }
+    }
 }

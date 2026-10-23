@@ -19,7 +19,8 @@ use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOption, EquityOptionExercise,
 };
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::date::date;
 use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
 use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
@@ -127,7 +128,7 @@ fn equity_vanna_and_volga_match_reference_fd() -> finstack_quant_core::Result<()
         pv,
         MetricContext::default_config(),
     );
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     let res = registry.compute(&[MetricId::Vanna, MetricId::Volga], &mut ctx)?;
     let vanna = *res.get(&MetricId::Vanna).expect("vanna present");
@@ -181,7 +182,7 @@ fn equity_vanna_and_volga_are_zero_when_expired() -> finstack_quant_core::Result
         pv,
         MetricContext::default_config(),
     );
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     let res = registry.compute(&[MetricId::Vanna, MetricId::Volga], &mut ctx)?;
     assert_eq!(*res.get(&MetricId::Vanna).unwrap(), 0.0);
@@ -261,7 +262,7 @@ fn fx_vanna_and_volga_match_reference_fd() -> finstack_quant_core::Result<()> {
         pv,
         MetricContext::default_config(),
     );
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     let res = registry.compute(&[MetricId::Vanna, MetricId::Volga], &mut ctx)?;
     let vanna = *res.get(&MetricId::Vanna).expect("vanna present");
@@ -326,7 +327,7 @@ fn fx_volga_returns_zero_when_surface_vol_is_zero() -> finstack_quant_core::Resu
         pv,
         MetricContext::default_config(),
     );
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     let res = registry.compute(&[MetricId::Volga], &mut ctx)?;
     assert_eq!(*res.get(&MetricId::Volga).unwrap(), 0.0);

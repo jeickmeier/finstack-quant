@@ -10,15 +10,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AdvanceRate, BorrowingBaseRules, ConcentrationLimit, ConcentrationScope, EligibilityRule,
 };
 
-/// Which collateral an advance rate applies to.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.valuations.instruments import EligibilityRule
-/// >>> rule = EligibilityRule(max_days_past_due=60, max_maturity=datetime.date(2030, 1, 1))
-/// >>> rule.exclude_defaulted, rule.max_days_past_due
-/// (True, 60)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EligibilityRule")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "EligibilityRule",
@@ -35,29 +27,13 @@ crate::bindings::macros::wire_methods!(
     PyEligibilityRule,
     EligibilityRule,
     "EligibilityRule",
+    module = "finstack_quant.valuations.instruments",
     to_dict
 );
 
 #[pymethods]
 impl PyEligibilityRule {
-    /// Construct an eligibility rule.
-    ///
-    /// Parameters
-    /// ----------
-    /// exclude_defaulted : bool, optional
-    ///     Exclude defaulted rows; ``True`` by default.
-    /// max_maturity : datetime.date, optional
-    ///     Exclude rows maturing after this date; ``None`` for no limit.
-    /// max_days_past_due : int, optional
-    ///     Exclude balances more than this many days delinquent (a
-    ///     delinquency bucket of 30 days each); ``None`` for no limit.
-    /// exclude_non_performing : bool, optional
-    ///     Exclude unresolved non-performing loans; ``True`` by default.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``max_maturity`` is not a valid date.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EligibilityRule.__init__")]
     #[new]
     #[pyo3(signature = (*, exclude_defaulted=true, max_maturity=None, max_days_past_due=None, exclude_non_performing=true))]
     #[pyo3(
@@ -79,7 +55,7 @@ impl PyEligibilityRule {
         })
     }
 
-    /// Latest eligible maturity as ``datetime.date``, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EligibilityRule.max_maturity")]
     #[getter]
     fn max_maturity<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -98,24 +74,17 @@ impl PyEligibilityRule {
 }
 
 crate::bindings::macros::py_getters!(PyEligibilityRule |s| {
-    /// Whether defaulted rows are excluded.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EligibilityRule.exclude_defaulted")]
     exclude_defaulted -> bool = s.inner.exclude_defaulted;
 
-    /// Maximum days past due of an eligible balance, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EligibilityRule.max_days_past_due")]
     max_days_past_due -> Option<u32> = s.inner.max_days_past_due;
 
-    /// Whether unresolved non-performing loans are excluded.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EligibilityRule.exclude_non_performing")]
     exclude_non_performing -> bool = s.inner.exclude_non_performing;
 });
 
-/// Advance rate on one asset class of the collateral.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import AdvanceRate, EligibilityRule
-/// >>> rate = AdvanceRate("commercial_mortgage", 0.8, eligibility=EligibilityRule(max_days_past_due=60))
-/// >>> rate.asset_class, rate.rate
-/// ('commercial_mortgage', 0.8)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AdvanceRate")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "AdvanceRate",
@@ -128,29 +97,17 @@ pub struct PyAdvanceRate {
     pub(crate) inner: AdvanceRate,
 }
 
-crate::bindings::macros::wire_methods!(PyAdvanceRate, AdvanceRate, "AdvanceRate", to_dict);
+crate::bindings::macros::wire_methods!(
+    PyAdvanceRate,
+    AdvanceRate,
+    "AdvanceRate",
+    module = "finstack_quant.valuations.instruments",
+    to_dict
+);
 
 #[pymethods]
 impl PyAdvanceRate {
-    /// Construct an advance rate.
-    ///
-    /// Parameters
-    /// ----------
-    /// asset_class : str
-    ///     ``AssetType`` wire name the rate applies to (for example
-    ///     ``"commercial_mortgage"`` or ``"leveraged_loan"``).
-    /// rate : float
-    ///     Advance rate as a decimal in ``[0, 1]`` (``0.8`` lends 80% of
-    ///     eligible balance).
-    /// eligibility : EligibilityRule, optional
-    ///     Which rows of the class are eligible; the default rule excludes
-    ///     defaulted and non-performing rows.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``asset_class`` is empty or ``rate`` is not a finite decimal in
-    ///     ``[0, 1]`` (Rust ``AdvanceRate::validate``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AdvanceRate.__init__")]
     #[new]
     #[pyo3(signature = (asset_class, rate, *, eligibility=None))]
     #[pyo3(text_signature = "(asset_class, rate, *, eligibility=None)")]
@@ -179,24 +136,17 @@ impl PyAdvanceRate {
 }
 
 crate::bindings::macros::py_getters!(PyAdvanceRate |s| {
-    /// ``AssetType`` wire name the rate applies to.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AdvanceRate.asset_class")]
     asset_class -> String = s.inner.asset_class.clone();
 
-    /// Advance rate as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AdvanceRate.rate")]
     rate -> f64 = s.inner.rate;
 
-    /// Eligibility rule of the class.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AdvanceRate.eligibility")]
     eligibility -> PyEligibilityRule = PyEligibilityRule { inner: s.inner.eligibility.clone() };
 });
 
-/// Cap on the eligible collateral one obligor, industry or asset class may
-/// contribute; balance above the cap is excluded from the borrowing base.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import ConcentrationLimit
-/// >>> ConcentrationLimit("obligor", 5.0).scope
-/// 'obligor'
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConcentrationLimit")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ConcentrationLimit",
@@ -213,32 +163,18 @@ crate::bindings::macros::wire_methods!(
     PyConcentrationLimit,
     ConcentrationLimit,
     "ConcentrationLimit",
+    module = "finstack_quant.valuations.instruments",
     to_dict
 );
 
 #[pymethods]
 impl PyConcentrationLimit {
-    /// Construct a concentration limit.
-    ///
-    /// Parameters
-    /// ----------
-    /// scope : str
-    ///     ``"obligor"`` (per ``obligor_id``), ``"industry"`` (per
-    ///     ``industry``) or ``"asset_class"`` (per asset type).
-    /// max_pct : float
-    ///     Maximum share of the eligible collateral in percent (``20.0`` =
-    ///     20%).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``scope`` is not one of the three names or ``max_pct`` is not a
-    ///     finite percent in ``(0, 100]`` (Rust ``ConcentrationLimit::validate``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConcentrationLimit.__init__")]
     #[new]
     #[pyo3(text_signature = "(scope, max_pct)")]
     fn new(scope: &str, max_pct: f64) -> PyResult<Self> {
         let inner = ConcentrationLimit {
-            scope: crate::bindings::valuations::instruments::enum_from_str::<ConcentrationScope>(
+            scope: crate::bindings::valuations::convert::enum_from_str::<ConcentrationScope>(
                 scope, "scope",
             )?,
             max_pct,
@@ -258,25 +194,15 @@ impl PyConcentrationLimit {
 }
 
 crate::bindings::macros::py_getters!(PyConcentrationLimit |s| {
-    /// ``"obligor"``, ``"industry"`` or ``"asset_class"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConcentrationLimit.scope")]
     scope -> PyResult<String> =
         crate::bindings::valuations::convert::enum_to_py_string(&s.inner.scope);
 
-    /// Maximum share of the eligible collateral in percent.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConcentrationLimit.max_pct")]
     max_pct -> f64 = s.inner.max_pct;
 });
 
-/// Advance rates and concentration limits that size a borrowing base.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import AdvanceRate, BorrowingBaseRules, ConcentrationLimit
-/// >>> rules = BorrowingBaseRules(
-/// ...     [AdvanceRate("commercial_mortgage", 0.8)],
-/// ...     concentration_limits=[ConcentrationLimit("obligor", 20.0)],
-/// ... )
-/// >>> len(rules.advance_rates), rules.concentration_limits[0].max_pct
-/// (1, 20.0)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BorrowingBaseRules")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "BorrowingBaseRules",
@@ -293,25 +219,13 @@ crate::bindings::macros::wire_methods!(
     PyBorrowingBaseRules,
     BorrowingBaseRules,
     "BorrowingBaseRules",
+    module = "finstack_quant.valuations.instruments",
     to_dict
 );
 
 #[pymethods]
 impl PyBorrowingBaseRules {
-    /// Construct borrowing-base rules.
-    ///
-    /// Parameters
-    /// ----------
-    /// advance_rates : list[AdvanceRate]
-    ///     One advance rate per eligible asset class (at least one).
-    /// concentration_limits : list[ConcentrationLimit], optional
-    ///     Caps on obligor, industry or asset-class shares; none by default.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If no advance rate is given, a class is repeated or a rate or
-    ///     limit is invalid.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BorrowingBaseRules.__init__")]
     #[new]
     #[pyo3(signature = (advance_rates, *, concentration_limits=None))]
     #[pyo3(text_signature = "(advance_rates, *, concentration_limits=None)")]
@@ -334,7 +248,7 @@ impl PyBorrowingBaseRules {
         Ok(Self { inner })
     }
 
-    /// Advance rates by asset class.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BorrowingBaseRules.advance_rates")]
     #[getter]
     fn advance_rates(&self) -> Vec<PyAdvanceRate> {
         self.inner
@@ -346,7 +260,7 @@ impl PyBorrowingBaseRules {
             .collect()
     }
 
-    /// Concentration limits.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BorrowingBaseRules.concentration_limits")]
     #[getter]
     fn concentration_limits(&self) -> Vec<PyConcentrationLimit> {
         self.inner

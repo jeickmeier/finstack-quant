@@ -87,7 +87,6 @@ impl AutocallableMcPricer {
             )));
         }
         let mut past_min_spot = f64::INFINITY;
-        let mut past_max_spot = f64::NEG_INFINITY;
         let mut prior_memory_coupons = 0.0;
         let mut fixed_coupon_expiry_ratio = 0.0;
         for idx in 0..n_past {
@@ -102,7 +101,6 @@ impl AutocallableMcPricer {
                 ))
             })?;
             past_min_spot = past_min_spot.min(fix);
-            past_max_spot = past_max_spot.max(fix);
 
             if fix >= s0 * inst.coupon_barriers[idx] {
                 let coupon = inst.coupons[idx]
@@ -233,7 +231,6 @@ impl AutocallableMcPricer {
         )?
         .with_seasoned_state(
             past_min_spot,
-            past_max_spot,
             prior_memory_coupons,
             fixed_coupon_expiry_ratio,
         );

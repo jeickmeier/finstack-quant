@@ -16,16 +16,19 @@ from finstack_quant.valuations.instruments import Bond, price_instrument
 
 
 def test_structured_credit_constructor_derives_first_payment() -> None:
-    from finstack_quant.valuations.instruments import StructuredCredit
+    from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
     from tests.tests_typed_helpers import structured_credit_pool, structured_credit_tranches
 
-    deal = StructuredCredit.new_abs(
-        "NEW-ABS",
-        structured_credit_pool(),
-        structured_credit_tranches(),
-        date(2026, 9, 9),
-        date(2031, 1, 15),
-        "USD-OIS",
+    deal = StructuredCredit.new_standard(
+        "abs",
+        StandardDealParams(
+            "NEW-ABS",
+            structured_credit_pool(),
+            structured_credit_tranches(),
+            date(2026, 9, 9),
+            date(2031, 1, 15),
+            "USD-OIS",
+        ),
     )
     assert deal.first_payment_date == date(2026, 10, 9)
 

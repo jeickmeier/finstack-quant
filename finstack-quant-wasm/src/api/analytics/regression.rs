@@ -1,10 +1,8 @@
-//! WASM bindings for equality-constrained least-squares regression.
+//! WASM binding for equality-constrained least-squares regression.
 //!
 //! Binds `finstack_quant_analytics::regression::constrained_least_squares`
-//! (Jeet & Partani 2023, Appendix A). Unlike the JSON-shim pattern used
-//! elsewhere in this crate's bindings, this is a plain numeric API: no
-//! portfolio, sector, or attribution concepts are involved, so numeric
-//! vectors travel as `Float64Array` rather than through a JSON envelope.
+//! (Jeet & Partani 2023, Appendix A) as `analytics.constrainedLeastSquares`:
+//! numeric arrays in, a `Float64Array` of factor returns out.
 
 use crate::utils::input::{js_f64_seq, js_uint};
 use js_sys::Float64Array;

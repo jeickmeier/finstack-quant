@@ -12,9 +12,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, run_simulation_with_diagnostics, AdvancingPolicy, AssetPool, DealType,
-    DelinquencyModel, PeriodDiagnostics, PoolAsset, StepDownSpec, StepDownTrigger,
-    StructuredCredit, Tranche, TrancheCashflows, TrancheStructure, WaterfallRules,
+    AdvancingPolicy, AssetPool, DealType, DelinquencyModel, PeriodDiagnostics, PoolAsset,
+    StepDownSpec, StepDownTrigger, StructuredCredit, Tranche, TrancheCashflows, TrancheStructure,
+    WaterfallRules,
 };
 use time::Month;
 
@@ -83,10 +83,20 @@ fn abs(model: DelinquencyModel) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_abs("ABS-DQ", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-DQ".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
@@ -95,7 +105,9 @@ fn abs(model: DelinquencyModel) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
-    run_simulation(deal, &market(), close()).expect("simulation")
+    deal.run_simulation(&market(), close())
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 /// Pool interest collections per payment date: everything the interest
@@ -317,10 +329,20 @@ fn max_delinquency_step_down_trigger_fires_and_reverts() {
             .expect("EQ"),
         ])
         .expect("structure");
-        let mut deal =
-            StructuredCredit::new_abs("ABS-DQ-SD", pool, tranches, close(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut deal = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-DQ-SD".into(),
+                pool,
+                tranches,
+                closing_date: close(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         // Heavy entries for one year, then none: delinquency climbs past 5%
         // and decays back below it as balances cure or charge off.
@@ -380,7 +402,7 @@ fn abs_one_off(model: DelinquencyModel) -> StructuredCredit {
 }
 
 fn periods(deal: &StructuredCredit) -> Vec<PeriodDiagnostics> {
-    run_simulation_with_diagnostics(deal, &market(), close())
+    deal.run_simulation(&market(), close())
         .expect("simulation")
         .diagnostics
         .periods

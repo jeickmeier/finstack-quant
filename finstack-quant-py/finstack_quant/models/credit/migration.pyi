@@ -447,6 +447,55 @@ class TransitionMatrix:
         ...
 
     @staticmethod
+    def from_labeled(
+        row_labels: list[str],
+        column_labels: list[str],
+        data: list[float] | list[list[float]] | Any,
+        horizon: float,
+        scale: RatingScale | None = None,
+    ) -> TransitionMatrix:
+        """
+        Build a matrix whose origin and destination labels agree exactly in order.
+
+        Parameters
+        ----------
+        row_labels : list[str]
+            Ordered origin labels, one per row.
+        column_labels : list[str]
+            Ordered destination labels; must equal ``row_labels`` exactly.
+        data : list[float] | list[list[float]] | numpy.ndarray
+            Flat row-major decimal probabilities or square rows; each row sums to one.
+        horizon : float
+            Positive finite time horizon in years covered by the probabilities.
+        scale : RatingScale | None
+            Optional state ordering whose labels must match both label vectors.
+            When omitted, infers a custom scale with the last state absorbing.
+            WASM accepts this optional scale as JSON text or a plain object.
+
+        Returns
+        -------
+        TransitionMatrix
+            Validated matrix preserving the supplied label and probability order.
+
+        Raises
+        ------
+        ValueError
+            If label orders differ, inferred labels are invalid, matrix dimensions
+            or probabilities are invalid, the last inferred state is not absorbing,
+            or the horizon is non-positive or non-finite.
+        TypeError
+            If labels or probability data cannot be converted to the required types.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.credit import migration
+        >>> matrix = migration.TransitionMatrix.from_labeled(["A", "D"], ["A", "D"], [[0.9, 0.1], [0.0, 1.0]], 1.0)
+        >>> matrix.probability("A", "D")
+        0.1
+        """
+        ...
+
+    @staticmethod
     def from_dataframe(
         df: pandas.DataFrame,
         horizon: float,
@@ -474,8 +523,8 @@ class TransitionMatrix:
         Raises
         ------
         ValueError
-            If index and columns differ, or the matrix is invalid for the
-            scale.
+            If index and columns differ in labels or order, either differs from
+            an explicit scale, or the matrix is invalid for the scale.
 
         Examples
         --------
@@ -575,7 +624,7 @@ class TransitionMatrix:
         """
         ...
 
-    def to_matrix(self) -> list[list[float]]:
+    def to_rows(self) -> list[list[float]]:
         """
         Row-major copy of the underlying matrix.
 
@@ -864,7 +913,7 @@ class GeneratorMatrix:
         """
         ...
 
-    def to_matrix(self) -> list[list[float]]:
+    def to_rows(self) -> list[list[float]]:
         """
         Row-major copy of the underlying matrix.
 

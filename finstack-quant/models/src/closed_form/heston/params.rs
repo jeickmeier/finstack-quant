@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::volatility::heston::HestonParams;
 
 /// Relative price tolerance for residual integration mass and no-arbitrage bounds.
@@ -74,14 +72,6 @@ impl TryFrom<RawHestonPricingParams> for HestonPricingParams {
     }
 }
 
-impl Deref for HestonPricingParams {
-    type Target = HestonParams;
-
-    fn deref(&self) -> &Self::Target {
-        &self.model
-    }
-}
-
 impl HestonPricingParams {
     /// Create new Heston model parameters
     ///
@@ -132,8 +122,6 @@ pub struct HestonFourierSettings {
     pub panels: usize,
     /// Gauss-Legendre order per panel (default: 16)
     pub gl_order: usize,
-    /// Non-negative origin tolerance below the first quadrature node (default: 1e-8)
-    pub phi_eps: f64,
 }
 
 impl Default for HestonFourierSettings {
@@ -142,12 +130,11 @@ impl Default for HestonFourierSettings {
             u_max: 100.0,
             panels: 100,
             gl_order: 16,
-            phi_eps: 1e-8,
         }
     }
 }
 
-/// Gauss-Legendre orders supported by `composite_gauss_legendre_grid`.
+/// Gauss-Legendre orders supported by `gauss_legendre_grid`.
 ///
 /// A `gl_order` outside this set has no node/weight table, which would make
 /// `HestonStripPricer::new` return `None` and silently degrade to the slower
@@ -162,26 +149,19 @@ impl HestonFourierSettings {
     /// * `u_max` - Positive finite upper integration frequency.
     /// * `panels` - Positive composite panel count within the shared node budget.
     /// * `gl_order` - Gauss-Legendre nodes per panel: 2, 4, 8, or 16.
-    /// * `phi_eps` - Finite non-negative origin tolerance below every grid node.
     ///
     /// # Errors
     ///
     /// Returns a [`finstack_quant_core::Error::Validation`] if `gl_order` is not one
     /// of the supported composite Gauss-Legendre orders ({2, 4, 8, 16}), if
     /// `panels == 0`, or if `u_max` is not a positive finite number. An
-    /// invalid origin tolerance or a grid beyond the quadrature node budget
-    /// is also rejected.
-    pub fn new(
-        u_max: f64,
-        panels: usize,
-        gl_order: usize,
-        phi_eps: f64,
-    ) -> finstack_quant_core::Result<Self> {
+    /// integration grid beyond the node budget or with underflowing origin
+    /// frequencies is also rejected.
+    pub fn new(u_max: f64, panels: usize, gl_order: usize) -> finstack_quant_core::Result<Self> {
         let settings = Self {
             u_max,
             panels,
             gl_order,
-            phi_eps,
         };
         settings.validate()?;
         Ok(settings)
@@ -193,7 +173,7 @@ impl HestonFourierSettings {
     ///
     /// Returns a [`finstack_quant_core::Error::Validation`] if `gl_order` is not in
     /// {2, 4, 8, 16}, if the grid exceeds its node budget, if `panels == 0`,
-    /// if `u_max` is not positive finite, or if `phi_eps` could omit a grid node.
+    /// if `u_max` is not positive finite, or if its first frequency underflows.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         if !SUPPORTED_GL_ORDERS.contains(&self.gl_order) {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -221,13 +201,12 @@ impl HestonFourierSettings {
                 "HestonFourierSettings exceeds the quadrature node budget".to_string(),
             ));
         }
-        // The smallest supported normalized Gauss-Legendre node is >0.005
-        // panel widths. No validated grid may silently discard origin nodes.
-        let first_node_lower_bound = 0.005 * self.u_max / self.panels as f64;
-        if !self.phi_eps.is_finite() || self.phi_eps < 0.0 || self.phi_eps >= first_node_lower_bound
-        {
+        // Every quadrature frequency must remain strictly positive after
+        // floating-point scaling; otherwise the Fourier denominators vanish.
+        if 0.005 * self.u_max / self.panels as f64 == 0.0 {
             return Err(finstack_quant_core::Error::Validation(
-                "HestonFourierSettings.phi_eps must be finite, non-negative, and below the first integration node".to_string(),
+                "HestonFourierSettings grid cannot resolve its first positive integration node"
+                    .to_string(),
             ));
         }
         Ok(())
@@ -259,7 +238,6 @@ impl HestonFourierSettings {
             u_max,
             panels: u_max.ceil() as usize,
             gl_order: 16,
-            phi_eps: 0.0,
         }
     }
 }

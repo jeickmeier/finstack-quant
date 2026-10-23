@@ -147,8 +147,7 @@ fn risk_uses_selected_model_and_declared_bump_units() {
 fn risk_retains_custom_registered_pricing_dispatch() {
     use finstack_quant_core::market_data::surfaces::VolQuoteType;
     use finstack_quant_valuations::pricer::{
-        standard_pricer_registry, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
-        PricingErrorContext,
+        InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
     };
     use finstack_quant_valuations::results::ValuationResult;
     use time::macros::date;
@@ -213,7 +212,9 @@ fn risk_retains_custom_registered_pricing_dispatch() {
             PricingOptions::default().with_model(ModelKey::Normal),
         )
         .unwrap();
-    let mut registry = standard_pricer_registry().clone();
+    let mut registry = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
+        .clone();
     registry.replace(ScaledNormalPricer);
     let custom = registry
         .price_with_metrics(

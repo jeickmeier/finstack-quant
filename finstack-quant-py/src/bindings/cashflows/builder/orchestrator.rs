@@ -1,5 +1,6 @@
 //! Python bindings for `CashFlowBuilder`.
 
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::CashFlowBuilder;
 use pyo3::prelude::*;
 
@@ -14,11 +15,7 @@ use super::specs::{
     PyFloatingCouponSpec, PyPrincipalExchange, PyStepUpCouponSpec,
 };
 
-/// Wrapper for [`CashFlowBuilder`]
-/// (`finstack_quant.cashflows.builder.CashFlowBuilder`).
-///
-/// Created via ``CashFlowSchedule.builder()`` only; fluent methods mutate in
-/// place and return ``self`` for chaining, matching the Rust `&mut self` API.
+#[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder")]
 #[pyclass(
     name = "CashFlowBuilder",
     module = "finstack_quant.cashflows.builder",
@@ -32,7 +29,7 @@ pub struct PyCashFlowBuilder {
 
 #[pymethods]
 impl PyCashFlowBuilder {
-    /// Set principal details and instrument horizon.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.principal")]
     #[pyo3(text_signature = "(self, initial, issue_date, maturity)")]
     fn principal<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -46,18 +43,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    /// Select whether issue funding and maturity redemption notionals are emitted.
-    ///
-    /// Outstanding still starts at the :meth:`principal` initial amount for
-    /// coupon math. Scheduled amortization and explicit principal events still
-    /// emit. The default is :attr:`PrincipalExchange.INITIAL_AND_FINAL`.
-    ///
-    /// Parameters
-    /// ----------
-    /// exchange : PrincipalExchange
-    ///     ``INITIAL_AND_FINAL`` emits the issue draw and the redemption
-    ///     balloon on the lagged payment date. ``NONE`` tracks outstanding
-    ///     only (vanilla IRS / basis-swap convention).
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.principal_exchange")]
     #[pyo3(text_signature = "(self, exchange)")]
     fn principal_exchange<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -67,7 +53,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    /// Configure amortization for the instrument notional.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.amortization")]
     #[pyo3(text_signature = "(self, spec)")]
     fn amortization<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -78,7 +64,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    /// Add a single principal event (draw/repay).
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.add_principal_event")]
     #[pyo3(
         signature = (date, payment_date, delta, kind, cash=None),
         text_signature = "(self, date, payment_date, delta, kind, cash=None)"
@@ -104,7 +90,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    /// Add a full-horizon fixed coupon leg.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.fixed_cf")]
     #[pyo3(text_signature = "(self, spec)")]
     fn fixed_cf<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -115,7 +101,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    /// Add a full-horizon floating coupon leg.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.floating_cf")]
     #[pyo3(text_signature = "(self, spec)")]
     fn floating_cf<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -126,7 +112,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    /// Add a full-horizon step-up coupon leg.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.step_up_cf")]
     #[pyo3(text_signature = "(self, spec)")]
     fn step_up_cf<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -137,7 +123,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    /// Add a fee specification (fixed or periodic bp).
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.fee")]
     #[pyo3(text_signature = "(self, spec)")]
     fn fee<'py>(mut slf: PyRefMut<'py, Self>, spec: PyRef<'py, PyFeeSpec>) -> PyRefMut<'py, Self> {
         let inner_spec = spec.inner.clone();
@@ -145,7 +131,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    /// Add a fixed coupon over the half-open window ``[start, end)``.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.add_fixed_window")]
     #[pyo3(text_signature = "(self, start, end, spec)")]
     fn add_fixed_window<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -159,7 +145,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    /// Add a floating coupon over the half-open window ``[start, end)``.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.add_floating_window")]
     #[pyo3(text_signature = "(self, start, end, spec)")]
     fn add_floating_window<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -173,7 +159,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    /// Set the payment split (Cash/PIK/Split) over ``[start, end)``.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.add_payment_window")]
     #[pyo3(text_signature = "(self, start, end, split)")]
     fn add_payment_window<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -187,7 +173,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    /// Payment split program from boundary dates (PIK toggle windows).
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.payment_split_program")]
     #[pyo3(text_signature = "(self, steps)")]
     fn payment_split_program<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -201,17 +187,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    /// Switch from a fixed coupon to a floating coupon at ``switch``.
-    ///
-    /// Parameters
-    /// ----------
-    /// switch : datetime.date
-    ///     Date on which the floating leg begins (exclusive end of the
-    ///     fixed window).
-    /// fixed : FixedCouponSpec
-    ///     Fixed rate, settlement type, and schedule for the pre-switch window.
-    /// floating : FloatingCouponSpec
-    ///     Floating coupon spec for the post-switch window.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.fixed_to_float")]
     #[pyo3(text_signature = "(self, switch, fixed, floating)")]
     fn fixed_to_float<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -226,18 +202,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    /// Floating coupons whose margin changes on effective-from ``steps``.
-    ///
-    /// Parameters
-    /// ----------
-    /// steps : list[tuple[datetime.date, decimal.Decimal]]
-    ///     ``(effective_from, spread_bp)`` pairs in strictly increasing date
-    ///     order. Each spread (bp over the index, ``250`` = 2.50%) replaces
-    ///     the base spread from its date until the next step; the last runs
-    ///     to maturity.
-    /// base_spec : FloatingCouponSpec
-    ///     Base floating spec; its ``spread_bp`` applies from issue until the
-    ///     first step.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.float_margin_steps")]
     #[pyo3(text_signature = "(self, steps, base_spec)")]
     fn float_margin_steps<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -251,29 +216,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    /// Build the cashflow schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext, optional
-    ///     Market context for floating-rate projection. Fixed coupons and
-    ///     deterministic fees do not require one. Complete supplied fixing
-    ///     observations can build floating coupons without a forward curve.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If required inputs (principal) or market data are missing.
-    /// ValueError
-    ///     If a spec or date validation fails (including deferred fluent errors).
-    ///     This includes negative payment/reset lags, IMM roll rules combined
-    ///     with end-of-month rolling, third-Wednesday IMM with ACT/ACT ICMA,
-    ///     and an ACT/ACT ICMA end-of-month grid whose regular anchor is not
-    ///     month-end. For front stubs that anchor is maturity; otherwise it
-    ///     is the window start. Supplied historical fixing gaps before the
-    ///     resolved curve's base date fail under every fallback policy. Explicit
-    ///     fallback covers missing curves or absent fixing series, never curve,
-    ///     date, day-count or arithmetic errors.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.build")]
     #[pyo3(signature = (market=None), text_signature = "(self, market=None)")]
     fn build(
         &self,
@@ -287,29 +230,7 @@ impl PyCashFlowBuilder {
             .map_err(core_to_py)
     }
 
-    /// Build a schedule with an explicit historical-observation cutoff.
-    ///
-    /// Parameters
-    /// ----------
-    /// market : MarketContext
-    ///     Projection curves and exact historical index fixings.
-    /// as_of : datetime.date
-    ///     Resets before this date require fixings independently of curve base dates;
-    ///     an available same-day fixing takes precedence over projection.
-    ///
-    /// Returns
-    /// -------
-    /// CashFlowSchedule
-    ///     Canonical cashflows with realized and projected coupon amounts.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If required market data or principal inputs are missing.
-    /// ValueError
-    ///     If dates, schedule specifications, or required historical fixings are invalid.
-    /// RuntimeError
-    ///     If a numerical computation fails during cashflow construction.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.build_as_of")]
     fn build_as_of(
         &self,
         py: Python<'_>,

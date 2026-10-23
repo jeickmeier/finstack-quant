@@ -8,6 +8,7 @@
 //! returns a typed `ArbitrageReport`.
 
 use crate::bindings::macros::wire_methods;
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_core::wire::serde_label;
 use finstack_quant_models::volatility::arbitrage::{self as model_arbitrage, ArbitrageReport};
 use pyo3::prelude::*;
@@ -29,21 +30,7 @@ struct ViolationRow<'a> {
     description: &'a str,
 }
 
-/// Aggregated model-free arbitrage report for a volatility grid.
-///
-/// Returned by ``check_surface_grid``. Carries the sorted violation list
-/// (critical first), the pass flag, and per-type / per-severity counts.
-/// Picklable and JSON round-trippable; ``to_dataframe()`` gives one row per
-/// violation.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.models.volatility import check_surface_grid
-/// >>> strikes, expiries = [90.0, 100.0, 110.0], [1.0, 2.0]
-/// >>> vols, forwards = [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]], [100.0, 100.0]
-/// >>> report = check_surface_grid(strikes, expiries, vols, forwards)
-/// >>> (report.passed, report.total_violations)
-/// (True, 0)
+#[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport")]
 #[pyclass(
     name = "ArbitrageReport",
     module = "finstack_quant.models.volatility",
@@ -57,48 +44,43 @@ pub struct PyArbitrageReport {
 
 #[pymethods]
 impl PyArbitrageReport {
-    /// Identifier of the checked surface (``"grid"`` for array inputs).
+    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.vol_surface_id")]
     #[getter]
     fn vol_surface_id(&self) -> &str {
         &self.inner.vol_surface_id
     }
 
-    /// ``True`` when no violation above ``negligible`` severity was found.
+    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.passed")]
     #[getter]
     fn passed(&self) -> bool {
         self.inner.passed
     }
 
-    /// Number of violations of any severity.
+    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.total_violations")]
     #[getter]
     fn total_violations(&self) -> usize {
         self.inner.violations.len()
     }
 
-    /// Violation rows as serde dicts (``violation_type``, ``location``,
-    /// ``severity``, ``magnitude``, ``description``, ``suggested_fix``).
+    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.violations")]
     #[getter]
     fn violations<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.violations)
     }
 
-    /// Violation counts keyed by severity name; only severities that occur.
+    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.by_severity")]
     #[getter]
     fn by_severity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.counts_by_severity)
     }
 
-    /// Violation counts keyed by check type; only check types that occur.
+    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.by_type")]
     #[getter]
     fn by_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.counts_by_type)
     }
 
-    /// One row per violation as a ``pandas.DataFrame``.
-    ///
-    /// Columns: ``violation_type``, ``severity``, ``strike``, ``expiry``,
-    /// ``adjacent_expiry``, ``magnitude``, ``suggested_fix``, ``description``.
-    /// Empty (no columns) when the surface passed cleanly.
+    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = self
             .inner
@@ -130,34 +112,14 @@ impl PyArbitrageReport {
     }
 }
 
-wire_methods!(PyArbitrageReport, ArbitrageReport, "ArbitrageReport");
+wire_methods!(
+    PyArbitrageReport,
+    ArbitrageReport,
+    "ArbitrageReport",
+    module = "finstack_quant.models.volatility"
+);
 
-/// Check butterfly arbitrage via Durrleman's g(k) density condition.
-///
-/// Parameters
-/// ----------
-/// strikes : list[float]
-///     Monotonically increasing strike grid.
-/// expiries : list[float]
-///     Monotonically increasing expiry grid (years).
-/// vols : list[list[float]]
-///     Implied vols shaped ``[n_expiries][n_strikes]`` (decimal).
-/// forward_prices : list[float]
-///     Forward prices. Pass either one value to broadcast across expiries,
-///     or one value per expiry.
-/// tolerance : float, optional
-///     Tolerance in total-variance units. Default ``1e-10`` (Rust ``DEFAULT_ARBITRAGE_TOLERANCE``, the same default as every Rust arbitrage check); pass a looser value to screen noisy market quotes.
-///
-/// Returns
-/// -------
-/// list[dict]
-///     One serde dict per violation (``violation_type``, ``location``,
-///     ``severity``, ``magnitude``, ``description``, ``suggested_fix``).
-///
-/// Raises
-/// ------
-/// ValueError
-///     If grid dimensions are inconsistent or inputs are non-finite.
+#[doc = pydoc!("finstack_quant.models.volatility", "check_butterfly_grid")]
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_butterfly_grid<'py>(
@@ -179,31 +141,7 @@ fn check_butterfly_grid<'py>(
     serde_to_py(py, &violations)
 }
 
-/// Check calendar spread arbitrage (total variance monotonicity in log-moneyness).
-///
-/// Parameters
-/// ----------
-/// strikes : list[float]
-///     Monotonically increasing strike grid.
-/// expiries : list[float]
-///     Monotonically increasing expiry grid (years).
-/// vols : list[list[float]]
-///     Implied vols shaped ``[n_expiries][n_strikes]`` (decimal).
-/// forward_prices : list[float]
-///     Forward prices. Pass either one value to broadcast across expiries,
-///     or one value per expiry.
-/// tolerance : float, optional
-///     Tolerance in total-variance units. Default ``1e-10`` (Rust ``DEFAULT_ARBITRAGE_TOLERANCE``, the same default as every Rust arbitrage check); pass a looser value to screen noisy market quotes.
-///
-/// Returns
-/// -------
-/// list[dict]
-///     One serde dict per violation.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If grid dimensions are inconsistent or inputs are non-finite.
+#[doc = pydoc!("finstack_quant.models.volatility", "check_calendar_spread_grid")]
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_calendar_spread_grid<'py>(
@@ -225,35 +163,7 @@ fn check_calendar_spread_grid<'py>(
     serde_to_py(py, &violations)
 }
 
-/// Check Dupire local-vol density positivity.
-///
-/// Parameters
-/// ----------
-/// strikes : list[float]
-///     Monotonically increasing strike grid.
-/// expiries : list[float]
-///     Monotonically increasing expiry grid (years).
-/// vols : list[list[float]]
-///     Implied vols shaped ``[n_expiries][n_strikes]`` (decimal).
-/// forward_prices : list[float]
-///     One finite positive forward per expiry; length must equal
-///     ``len(expiries)``. A single forward is not broadcast.
-///
-/// Returns
-/// -------
-/// list[dict]
-///     One serde dict per violation.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If grid dimensions are inconsistent or inputs are non-finite.
-///
-/// Notes
-/// -----
-/// Evaluates the Dupire local-variance denominator across adjacent expiries
-/// using each expiry's forward price to convert strikes to forward
-/// log-moneyness.
+#[doc = pydoc!("finstack_quant.models.volatility", "check_local_vol_density_grid")]
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices))]
 fn check_local_vol_density_grid<'py>(
@@ -269,32 +179,7 @@ fn check_local_vol_density_grid<'py>(
     serde_to_py(py, &violations)
 }
 
-/// Run butterfly, calendar-spread, and local-vol density checks together.
-///
-/// Parameters
-/// ----------
-/// strikes : list[float]
-///     Monotonically increasing strike grid.
-/// expiries : list[float]
-///     Monotonically increasing expiry grid (years).
-/// vols : list[list[float]]
-///     Implied vols shaped ``[n_expiries][n_strikes]`` (decimal).
-/// forward_prices : list[float]
-///     Forward prices for every check. Pass either one value to broadcast or
-///     one value per expiry.
-/// tolerance : float, optional
-///     Shared tolerance for all checks. Default ``1e-10`` (Rust ``DEFAULT_ARBITRAGE_TOLERANCE``, the same default as every Rust arbitrage check); pass a looser value to screen noisy market quotes.
-///
-/// Returns
-/// -------
-/// ArbitrageReport
-///     Typed report with ``passed``, ``total_violations``, ``by_severity``,
-///     ``by_type``, ``violations`` and ``to_dataframe()``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the forward-price shape or grid inputs are invalid.
+#[doc = pydoc!("finstack_quant.models.volatility", "check_surface_grid")]
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_surface_grid(

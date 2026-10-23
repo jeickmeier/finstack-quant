@@ -17,6 +17,7 @@ from finstack_quant.core.market_data import (
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import (
     AssetPool,
+    StandardDealParams,
     StructuredCredit,
     Tranche,
 )
@@ -61,13 +62,11 @@ def _market() -> MarketContext:
 
 class TestStructuredCreditTyped:
     def test_new_abs_round_trips(self) -> None:
-        deal = StructuredCredit.new_abs(
-            "ABS-1",
-            _pool(),
-            _tranches(),
-            datetime.date(2024, 1, 15),
-            datetime.date(2031, 1, 15),
-            "USD-SOFR-DISC",
+        deal = StructuredCredit.new_standard(
+            "abs",
+            StandardDealParams(
+                "ABS-1", _pool(), _tranches(), datetime.date(2024, 1, 15), datetime.date(2031, 1, 15), "USD-SOFR-DISC"
+            ),
         )
         payload = json.loads(deal.to_json())
         assert payload["instrument"]["type"] == "structured_credit"
@@ -103,13 +102,11 @@ class TestStructuredCreditTyped:
         out of that JSON, and feed those exact strings back into the typed
         constructors without a translation shim.
         """
-        deal = StructuredCredit.new_abs(
-            "ABS-1",
-            _pool(),
-            _tranches(),
-            datetime.date(2024, 1, 15),
-            datetime.date(2031, 1, 15),
-            "USD-SOFR-DISC",
+        deal = StructuredCredit.new_standard(
+            "abs",
+            StandardDealParams(
+                "ABS-1", _pool(), _tranches(), datetime.date(2024, 1, 15), datetime.date(2031, 1, 15), "USD-SOFR-DISC"
+            ),
         )
         payload = json.loads(deal.to_json())
         deal_type_wire = payload["instrument"]["spec"]["deal_type"]
@@ -227,4 +224,24 @@ class TestStructuredCreditTypedAnalytics:
         })
         table = ScenarioTable.from_json(payload)
         assert table.tranche_id == "A"
-        assert table.cells()[0]["price"] == pytest.approx(98.2)
+        assert table.cells[0]["price"] == pytest.approx(98.2)
+        assert not callable(table.cells)
+        with pytest.raises(AttributeError):
+            table.cells = []  # type: ignore[misc]
+        cells = table.cells
+        cells[0]["price"] = 1.0
+        assert table.cells[0]["price"] == pytest.approx(98.2)
+
+
+def test_simulation_returns_complete_result() -> None:
+    from finstack_quant.valuations.instruments import SimulationRun
+
+    deal = StructuredCredit.example()
+    as_of = datetime.date(2024, 1, 1)
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
+    run = deal.run_simulation(market, as_of)
+    assert isinstance(run, SimulationRun)
+    assert "CLONOTES-A" in run.tranches
+    assert run.diagnostics.periods
+    restored = SimulationRun.from_json(run.to_json())
+    assert restored.to_dict() == run.to_dict()

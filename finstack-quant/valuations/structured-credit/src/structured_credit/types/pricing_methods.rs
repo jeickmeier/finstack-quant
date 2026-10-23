@@ -81,7 +81,8 @@ impl StructuredCredit {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<super::TrancheCashflows> {
-        crate::structured_credit::pricing::run_simulation(self, market, as_of)?
+        self.run_simulation(market, as_of)?
+            .tranches
             .remove(tranche_id)
             .ok_or_else(|| {
                 finstack_quant_core::InputError::NotFound {
@@ -372,11 +373,11 @@ impl StructuredCredit {
         let prepay = model
             .stochastic_prepay_spec
             .clone()
-            .unwrap_or_else(|| StochasticPrepaySpec::deterministic(model.prepayment_spec.clone()));
+            .unwrap_or_else(|| StochasticPrepaySpec::Deterministic(model.prepayment_spec.clone()));
         let default = model
             .stochastic_default_spec
             .clone()
-            .unwrap_or_else(|| StochasticDefaultSpec::deterministic(model.default_spec.clone()));
+            .unwrap_or_else(|| StochasticDefaultSpec::Deterministic(model.default_spec.clone()));
 
         Ok((prepay, default))
     }

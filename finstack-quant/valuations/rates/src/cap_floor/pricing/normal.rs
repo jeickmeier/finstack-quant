@@ -53,10 +53,9 @@ pub(crate) fn price_caplet_floorlet(
         OptionType::Put
     };
 
-    // For near-zero/invalid vol, return intrinsic to avoid unstable Bachelier numerics.
+    // For near-zero vol, return intrinsic to avoid unstable Bachelier numerics.
     const MIN_NORMAL_VOL: f64 = 1e-8;
-    let effective_sigma = if sigma.is_finite() { sigma } else { 0.0 };
-    if effective_sigma < MIN_NORMAL_VOL {
+    if sigma < MIN_NORMAL_VOL {
         let intrinsic = if is_cap {
             (forward - strike).max(0.0)
         } else {
@@ -65,14 +64,8 @@ pub(crate) fn price_caplet_floorlet(
         return Money::new(intrinsic * annuity, ccy);
     }
 
-    let pv = bachelier_price_with_annuity(
-        option_type,
-        forward,
-        strike,
-        effective_sigma.max(MIN_NORMAL_VOL),
-        t_fix.max(0.0),
-        annuity,
-    );
+    let pv =
+        bachelier_price_with_annuity(option_type, forward, strike, sigma, t_fix.max(0.0), annuity);
 
     if !pv.is_finite() {
         return Err(finstack_quant_core::Error::Validation(format!(

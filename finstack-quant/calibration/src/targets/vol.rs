@@ -155,7 +155,7 @@ pub(crate) fn solve(
             .with_max_iterations(config.solver.max_iterations());
         let outcome = sabr_calibrator
             .with_shift(SabrShift::Auto)
-            .calibrate_with_diagnostics(f, &strikes, &vols, t, params.beta)
+            .calibrate(f, &strikes, &vols, t, params.beta)
             .map_err(|e| finstack_quant_core::Error::Calibration {
                 message: format!("SABR calibration failed at t={t:.6}: {e}"),
                 category: "vol_surface".to_string(),

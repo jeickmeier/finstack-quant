@@ -188,11 +188,7 @@ pub fn kyle_lambda(
     let reference_price = js_f64(&reference_price, "referencePrice")?;
     let returns = js_f64_seq(&returns, "returns")?;
     let volumes = js_f64_seq(&volumes, "volumes")?;
-    Ok(KyleLambdaModel::lambda_from_series(
-        &returns,
-        &volumes,
-        reference_price,
-    ))
+    Ok(liquidity::kyle_lambda(&returns, &volumes, reference_price))
 }
 
 /// Absolute bid-ask spread of a liquidity profile.

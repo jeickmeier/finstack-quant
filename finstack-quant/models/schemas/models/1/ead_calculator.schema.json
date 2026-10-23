@@ -1,37 +1,45 @@
 {
   "$defs": {
+    "ClosedUnitIntervalF64Wire": {
+      "description": "Finite JSON number in the closed interval `[0, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
     "CreditConversionFactor": {
+      "additionalProperties": false,
       "description": "Credit Conversion Factor (CCF) for off-balance-sheet exposures.\n\nRepresents the fraction of undrawn commitments expected to be drawn\nat the time of default.",
       "properties": {
         "ccf": {
-          "description": "CCF value in \\[0, 1\\]. Basel IRB: typically 0.75 for revolvers.",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/ClosedUnitIntervalF64Wire"
         }
       },
       "required": [
         "ccf"
       ],
       "type": "object"
+    },
+    "NonNegativeF64Wire": {
+      "description": "Finite JSON number greater than or equal to zero.",
+      "format": "double",
+      "minimum": 0.0,
+      "type": "number"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/ead_calculator.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Exposure at Default calculator.",
   "properties": {
     "ccf": {
-      "$ref": "#/$defs/CreditConversionFactor",
-      "description": "Credit conversion factor for the undrawn portion."
+      "$ref": "#/$defs/CreditConversionFactor"
     },
     "drawn": {
-      "description": "Currently drawn amount.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonNegativeF64Wire"
     },
     "undrawn": {
-      "description": "Undrawn (available) commitment.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonNegativeF64Wire"
     }
   },
   "required": [

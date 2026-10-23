@@ -18,10 +18,9 @@ pub(crate) mod waterfall;
 
 pub use waterfall::execute_waterfall;
 
-use crate::structured_credit::types::{StructuredCredit, TrancheCashflows};
+use crate::structured_credit::types::StructuredCredit;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 
 #[cfg(test)]
@@ -31,50 +30,27 @@ thread_local! {
     pub(crate) static SIMULATION_RUNS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-/// Run full deterministic cashflow simulation for a structured credit instrument.
-///
-/// # Arguments
-///
-/// * `instrument` - Validated structured-credit deal containing asset pool,
-///   tranche structure, waterfall, and deterministic credit/prepayment model.
-/// * `market` - Market context used for rate resets, discounting, and other
-///   projection dependencies.
-/// * `as_of` - Requested valuation date; lifecycle policy may resolve an
-///   effective date from the market context.
-pub fn run_simulation(
-    instrument: &StructuredCredit,
-    market: &MarketContext,
-    as_of: Date,
-) -> Result<FxHashMap<String, TrancheCashflows>> {
-    run_simulation_with_diagnostics(instrument, market, as_of).map(|run| run.tranches)
-}
-
-/// Run the deterministic cashflow simulation and return the tranche results
-/// together with the deal-level accounting (reserve balance path, reserve
-/// interest, draw funding).
-///
-/// # Arguments
-///
-/// * `instrument` - Validated structured-credit deal containing asset pool,
-///   tranche structure, waterfall, and deterministic credit/prepayment model.
-/// * `market` - Market context used for rate resets, discounting, and other
-///   projection dependencies.
-/// * `as_of` - Requested valuation date; lifecycle policy may resolve an
-///   effective date from the market context.
-///
-/// # Errors
-///
-/// Propagates validation, schedule and cash-conservation errors from the
-/// simulation engine.
-pub fn run_simulation_with_diagnostics(
-    instrument: &StructuredCredit,
-    market: &MarketContext,
-    as_of: Date,
-) -> Result<simulation_engine::SimulationRun> {
-    #[cfg(test)]
-    SIMULATION_RUNS.with(|runs| runs.set(runs.get() + 1));
-    let lifecycle =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)?;
-    let effective_as_of = lifecycle.effective_as_of(market, as_of);
-    simulation_engine::simulate_with_source(instrument, market, effective_as_of, None)
+impl StructuredCredit {
+    /// Run deterministic cashflow simulation, returning tranche flows and deal accounting.
+    ///
+    /// The pricing lifecycle validates this deal once and resolves the effective
+    /// valuation date before starting the simulation.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market context supplying discount and forward curves and
+    ///   lifecycle date policy for the collateral and liabilities.
+    /// * `as_of` - Requested valuation date; market lifecycle policy can resolve
+    ///   an effective date before the simulation begins.
+    ///
+    /// # Errors
+    ///
+    /// Propagates validation, missing-curve, schedule and cash-conservation errors.
+    pub fn run_simulation(&self, market: &MarketContext, as_of: Date) -> Result<SimulationRun> {
+        #[cfg(test)]
+        SIMULATION_RUNS.with(|runs| runs.set(runs.get() + 1));
+        let lifecycle = finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let effective_as_of = lifecycle.effective_as_of(market, as_of);
+        simulation_engine::simulate_with_source(self, market, effective_as_of, None)
+    }
 }

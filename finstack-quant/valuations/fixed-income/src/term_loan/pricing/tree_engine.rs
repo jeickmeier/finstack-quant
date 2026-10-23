@@ -717,8 +717,8 @@ impl TreeValuator for TermLoanValuator {
         let risky_continuation = if let Some(hazard) = state.hazard_rate {
             let hazard = hazard.max(0.0);
             let survival = (-hazard * dt).exp();
-            let interval_df = state.discount_factor().unwrap_or_else(|| {
-                let rate = state.interest_rate().unwrap_or(0.0);
+            let interval_df = state.df.unwrap_or_else(|| {
+                let rate = state.interest_rate.unwrap_or(0.0);
                 (-rate * dt).exp()
             });
             let recovery_weight = continuous_frp_weight(interval_df, survival)?;
@@ -881,7 +881,11 @@ impl TermLoanTreePricer {
                 valuator,
                 node_coupons,
             } => tree.price_with_node_coupons(oas_bp, valuator, node_coupons),
-            PreparedTree::ShortRate { tree, valuator } => tree.price(oas_bp, valuator),
+            PreparedTree::ShortRate { tree, valuator } => tree.price(
+                oas_bp,
+                finstack_quant_core::math::Compounding::Continuous,
+                valuator,
+            ),
         }
     }
 

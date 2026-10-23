@@ -148,8 +148,8 @@ pub enum MigrationError {
         value: f64,
     },
 
-    /// Scales do not match for a binary matrix operation.
-    #[error("scale mismatch: matrices have different rating scales")]
+    /// Rating scales or supplied ordered labels do not agree.
+    #[error("scale mismatch: rating scales or ordered labels differ")]
     ScaleMismatch,
 
     /// Matrix inversion failed (singular or numerically degenerate).

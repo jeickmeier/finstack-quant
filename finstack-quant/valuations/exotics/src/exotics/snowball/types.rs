@@ -7,7 +7,6 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::BermudanCallProvision;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 /// Snowball note variant.
@@ -280,19 +279,40 @@ impl Snowball {
     /// * `prev_coupon` - Previous period's coupon in decimal; used as `c_{i-1}` for the
     ///   snowball variant and ignored for inverse floater.
     pub fn compute_coupon(&self, floating_rate: f64, prev_coupon: f64) -> f64 {
-        // `validate` guarantees the conversion; a rate `Decimal` always fits in `f64`.
-        let fixed_rate = self.fixed_rate.to_f64().unwrap_or(f64::NAN);
-        let raw = match self.variant {
-            SnowballVariant::Snowball => prev_coupon + fixed_rate - floating_rate,
-            SnowballVariant::InverseFloater => fixed_rate - self.gearing * floating_rate,
-        };
+        SnowballCouponSpec::from_instrument(self).compute_coupon(floating_rate, prev_coupon)
+    }
+}
 
-        let floored = raw.max(self.coupon_floor);
+/// Coupon parameters converted once before a pricing event loop.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct SnowballCouponSpec {
+    variant: SnowballVariant,
+    pub(super) initial_coupon: f64,
+    fixed_rate: f64,
+    gearing: f64,
+    coupon_floor: f64,
+    coupon_cap: Option<f64>,
+}
 
-        match self.coupon_cap {
-            Some(cap) => floored.min(cap),
-            None => floored,
+impl SnowballCouponSpec {
+    pub(super) fn from_instrument(inst: &Snowball) -> Self {
+        Self {
+            variant: inst.variant,
+            initial_coupon: inst.initial_coupon,
+            fixed_rate: inst.fixed_rate.as_f64(),
+            gearing: inst.gearing,
+            coupon_floor: inst.coupon_floor,
+            coupon_cap: inst.coupon_cap,
         }
+    }
+
+    pub(super) fn compute_coupon(&self, floating_rate: f64, prev_coupon: f64) -> f64 {
+        let raw = match self.variant {
+            SnowballVariant::Snowball => prev_coupon + self.fixed_rate - floating_rate,
+            SnowballVariant::InverseFloater => self.fixed_rate - self.gearing * floating_rate,
+        };
+        let floored = raw.max(self.coupon_floor);
+        self.coupon_cap.map_or(floored, |cap| floored.min(cap))
     }
 }
 
@@ -388,6 +408,28 @@ mod tests {
     fn example_inverse_floater_validates() {
         let s = Snowball::example_inverse_floater().expect("example");
         assert!(s.validate().is_ok());
+    }
+
+    #[test]
+    fn coupon_kernel_preserves_operation_and_floor_cap_order() {
+        let mut s = Snowball::example().expect("example");
+        s.fixed_rate = Decimal::ONE;
+        s.coupon_cap = None;
+        // Left-associated (previous + fixed) - floating rounds away the unit.
+        assert_eq!(s.compute_coupon(1e16, 1e16), 0.0);
+
+        s.variant = SnowballVariant::InverseFloater;
+        s.fixed_rate = Decimal::new(8123456789012345678, 20);
+        s.gearing = 1.2345678901234567;
+        let floating = 0.03123456789012345;
+        let expected = s.fixed_rate.as_f64() - s.gearing * floating;
+        assert_eq!(s.compute_coupon(floating, 0.0), expected);
+
+        // This pure helper can be called before instrument validation. Keep
+        // its floor-before-cap order even for inconsistent caller parameters.
+        s.coupon_floor = 0.10;
+        s.coupon_cap = Some(0.05);
+        assert_eq!(s.compute_coupon(floating, 0.0), 0.05);
     }
 
     #[test]

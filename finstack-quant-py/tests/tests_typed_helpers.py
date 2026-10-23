@@ -37,6 +37,7 @@ from finstack_quant.valuations.instruments import (
     PremiumLegSpec,
     ProtectionLegSpec,
     RepLine,
+    StandardDealParams,
     StructuredCredit,
     Swaption,
     Tranche,
@@ -341,11 +342,14 @@ def structured_credit_tranches() -> TrancheStructure:
 
 
 def build_structured_credit() -> StructuredCredit:
-    return StructuredCredit.new_abs(
-        "ABS-1",
-        structured_credit_pool(),
-        structured_credit_tranches(),
-        datetime.date(2024, 1, 15),
-        datetime.date(2031, 1, 15),
-        "USD-SOFR-DISC",
+    return StructuredCredit.new_standard(
+        "abs",
+        StandardDealParams(
+            "ABS-1",
+            structured_credit_pool(),
+            structured_credit_tranches(),
+            datetime.date(2024, 1, 15),
+            datetime.date(2031, 1, 15),
+            "USD-SOFR-DISC",
+        ),
     )

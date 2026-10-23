@@ -189,16 +189,6 @@ pub fn assert_money_approx_eq(actual: Money, expected: Money, tolerance: f64, me
     );
 }
 
-/// Assert metric is positive
-pub fn assert_positive(value: f64, metric_name: &str) {
-    assert!(
-        value > 0.0,
-        "{} should be positive, got {}",
-        metric_name,
-        value
-    );
-}
-
 /// Assert metric scales linearly with notional
 pub fn assert_linear_scaling(
     value1: f64,

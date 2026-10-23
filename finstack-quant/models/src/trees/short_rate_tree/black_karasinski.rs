@@ -307,12 +307,7 @@ impl ShortRateTree {
         // calibrates to float noise; anything materially off must not escape.
         let fit_tolerance_bp = self.config.curve_fit_tolerance_bp;
         let converged = max_error_bp.is_finite() && max_error_bp <= fit_tolerance_bp;
-        self.calibration_quality = Some(TreeCalibrationResult {
-            max_error_bp,
-            max_error_step,
-            fallback_count: 0,
-            converged,
-        });
+
         if !converged {
             return Err(Error::Validation(format!(
                 "Black-Karasinski calibration failed to reprice the discount \
@@ -321,6 +316,10 @@ impl ShortRateTree {
             )));
         }
 
+        self.calibration_quality = Some(TreeCalibrationResult {
+            max_error_bp,
+            max_error_step,
+        });
         self.bk_trinomial = Some(BkTrinomialLattice { j_max, probs });
 
         Ok(())

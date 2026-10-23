@@ -477,10 +477,18 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             let process = GbmProcess::new(GbmParams::new(p.r, p.q, p.sigma)?);
             require_domain(spec, &process, f64::MIN_POSITIVE)?;
             match spec.scheme {
-                SchemeSpec::Default => simulate(&process, &ExactGbm, spec, x0, parallel),
-                SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
-                SchemeSpec::LogEuler => simulate(&process, &LogEuler, spec, x0, parallel),
-                SchemeSpec::Milstein => simulate(&process, &Milstein, spec, x0, parallel),
+                SchemeSpec::Default => {
+                    simulate_with_noise(&process, &ExactGbm, spec, x0, parallel, None)
+                }
+                SchemeSpec::Euler => {
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
+                }
+                SchemeSpec::LogEuler => {
+                    simulate_with_noise(&process, &LogEuler, spec, x0, parallel, None)
+                }
+                SchemeSpec::Milstein => {
+                    simulate_with_noise(&process, &Milstein, spec, x0, parallel, None)
+                }
             }
         }
         ProcessSpec::GbmWithDividends { params, dividends } => {
@@ -502,7 +510,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             require_domain(spec, &process, f64::MIN_POSITIVE)?;
             match spec.scheme {
                 SchemeSpec::Default => {
-                    simulate(&process, &ExactGbmWithDividends, spec, x0, parallel)
+                    simulate_with_noise(&process, &ExactGbmWithDividends, spec, x0, parallel, None)
                 }
                 _ => unsupported(),
             }
@@ -518,17 +526,25 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             let process = MultiGbmProcess::new(assets, correlation.clone())?;
             require_domain(spec, &process, f64::MIN_POSITIVE)?;
             match spec.scheme {
-                SchemeSpec::Default => simulate(&process, &ExactMultiGbm, spec, x0, parallel),
-                SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
-                SchemeSpec::LogEuler => simulate(&process, &LogEuler, spec, x0, parallel),
-                SchemeSpec::Milstein => simulate(&process, &Milstein, spec, x0, parallel),
+                SchemeSpec::Default => {
+                    simulate_with_noise(&process, &ExactMultiGbm, spec, x0, parallel, None)
+                }
+                SchemeSpec::Euler => {
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
+                }
+                SchemeSpec::LogEuler => {
+                    simulate_with_noise(&process, &LogEuler, spec, x0, parallel, None)
+                }
+                SchemeSpec::Milstein => {
+                    simulate_with_noise(&process, &Milstein, spec, x0, parallel, None)
+                }
             }
         }
         ProcessSpec::Brownian(p) => {
             let process = BrownianProcess::new(BrownianParams::new(p.mu, p.sigma)?);
             match spec.scheme {
                 SchemeSpec::Default | SchemeSpec::Euler => {
-                    simulate(&process, &EulerMaruyama, spec, x0, parallel)
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
                 }
                 _ => unsupported(),
             }
@@ -542,7 +558,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                 MultiBrownianProcess::new(mus.clone(), sigmas.clone(), correlation.clone())?;
             match spec.scheme {
                 SchemeSpec::Default | SchemeSpec::Euler => {
-                    simulate(&process, &EulerMaruyama, spec, x0, parallel)
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
                 }
                 _ => unsupported(),
             }
@@ -552,7 +568,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             let process = MultiOuProcess::new(p.clone());
             match spec.scheme {
                 SchemeSpec::Default | SchemeSpec::Euler => {
-                    simulate(&process, &EulerMaruyama, spec, x0, parallel)
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
                 }
                 _ => unsupported(),
             }
@@ -560,19 +576,32 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
         ProcessSpec::HullWhite1F(p) => {
             let process = HullWhite1FProcess::new(p.clone());
             match spec.scheme {
-                SchemeSpec::Default => {
-                    simulate(&process, &ExactHullWhite1F::new(), spec, x0, parallel)
+                SchemeSpec::Default => simulate_with_noise(
+                    &process,
+                    &ExactHullWhite1F::new(),
+                    spec,
+                    x0,
+                    parallel,
+                    None,
+                ),
+                SchemeSpec::Euler => {
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
                 }
-                SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
                 _ => unsupported(),
             }
         }
         ProcessSpec::Cir(p) => {
-            let process = CirProcess::with_params(p.kappa, p.theta, p.sigma)?;
+            let process =
+                crate::monte_carlo::process::cir::CirParams::new(p.kappa, p.theta, p.sigma)
+                    .map(CirProcess::new)?;
             require_domain(spec, &process, 0.0)?;
             match spec.scheme {
-                SchemeSpec::Default => simulate(&process, &QeCir::new(), spec, x0, parallel),
-                SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
+                SchemeSpec::Default => {
+                    simulate_with_noise(&process, &QeCir::new(), spec, x0, parallel, None)
+                }
+                SchemeSpec::Euler => {
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
+                }
                 _ => unsupported(),
             }
         }
@@ -582,7 +611,12 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             shift_times,
         } => {
             let process = CirPlusPlusProcess::new(
-                CirProcess::with_params(params.kappa, params.theta, params.sigma)?,
+                crate::monte_carlo::process::cir::CirParams::new(
+                    params.kappa,
+                    params.theta,
+                    params.sigma,
+                )
+                .map(CirProcess::new)?,
                 shift_curve.clone(),
                 shift_times.clone(),
             )?;
@@ -597,8 +631,12 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                 )));
             }
             let mut summary = match spec.scheme {
-                SchemeSpec::Default => simulate(&process, &QeCir::new(), spec, &factor0, parallel),
-                SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, &factor0, parallel),
+                SchemeSpec::Default => {
+                    simulate_with_noise(&process, &QeCir::new(), spec, &factor0, parallel, None)
+                }
+                SchemeSpec::Euler => {
+                    simulate_with_noise(&process, &EulerMaruyama, spec, &factor0, parallel, None)
+                }
                 _ => unsupported(),
             }?;
             let stride = summary.times.len();
@@ -614,12 +652,24 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             Ok(summary)
         }
         ProcessSpec::Heston(p) => {
-            let process =
-                HestonProcess::with_params(p.r, p.q, p.kappa, p.theta, p.sigma_v, p.rho, p.v0)?;
-            require_spot_and_v0(spec, x0, p.v0)?;
+            let process = crate::closed_form::HestonPricingParams::new(
+                p.r,
+                p.q,
+                p.model.kappa,
+                p.model.theta,
+                p.model.sigma_v,
+                p.model.rho,
+                p.model.v0,
+            )
+            .map(HestonProcess::new)?;
+            require_spot_and_v0(spec, x0, p.model.v0)?;
             match spec.scheme {
-                SchemeSpec::Default => simulate(&process, &QeHeston::new(), spec, x0, parallel),
-                SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
+                SchemeSpec::Default => {
+                    simulate_with_noise(&process, &QeHeston::new(), spec, x0, parallel, None)
+                }
+                SchemeSpec::Euler => {
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
+                }
                 _ => unsupported(),
             }
         }
@@ -634,10 +684,17 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                 x0.get(1).copied().unwrap_or(f64::NAN),
             );
             match spec.scheme {
-                SchemeSpec::Default => {
-                    simulate(&process, &ExactSchwartzSmith::new(), spec, x0, parallel)
+                SchemeSpec::Default => simulate_with_noise(
+                    &process,
+                    &ExactSchwartzSmith::new(),
+                    spec,
+                    x0,
+                    parallel,
+                    None,
+                ),
+                SchemeSpec::Euler => {
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
                 }
-                SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
                 _ => unsupported(),
             }
         }
@@ -646,9 +703,11 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             require_domain(spec, &process, f64::MIN_POSITIVE)?;
             match spec.scheme {
                 SchemeSpec::Default | SchemeSpec::LogEuler => {
-                    simulate(&process, &LogEuler, spec, x0, parallel)
+                    simulate_with_noise(&process, &LogEuler, spec, x0, parallel, None)
                 }
-                SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
+                SchemeSpec::Euler => {
+                    simulate_with_noise(&process, &EulerMaruyama, spec, x0, parallel, None)
+                }
                 SchemeSpec::Milstein => unsupported(),
             }
         }
@@ -668,9 +727,14 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                 )));
             }
             match spec.scheme {
-                SchemeSpec::Default => {
-                    simulate(&process, &LmmPredictorCorrector::new(), spec, x0, parallel)
-                }
+                SchemeSpec::Default => simulate_with_noise(
+                    &process,
+                    &LmmPredictorCorrector::new(),
+                    spec,
+                    x0,
+                    parallel,
+                    None,
+                ),
                 _ => unsupported(),
             }
         }
@@ -693,7 +757,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
         ProcessSpec::RoughHeston(p) => {
             p.validate()?;
             let process = RoughHestonProcess::new(p.clone());
-            require_spot_and_v0(spec, x0, p.v0)?;
+            require_spot_and_v0(spec, x0, p.model.v0)?;
             if spec.scheme != SchemeSpec::Default {
                 return unsupported();
             }
@@ -716,7 +780,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                 TimeGridSpec::Times { times } => times.clone(),
             };
             let scheme = RoughHestonHybrid::new(&times, p.hurst.value())?;
-            simulate(&process, &scheme, spec, x0, parallel)
+            simulate_with_noise(&process, &scheme, spec, x0, parallel, None)
         }
         ProcessSpec::CheyetteRough(p) => {
             p.validate()?;
@@ -813,22 +877,6 @@ struct Scratch {
 const FBM_Z_INDEX: usize = 1;
 /// Factor slot receiving the unit-variance normal that drives that increment.
 const DRIVE_Z_INDEX: usize = 2;
-
-/// Simulate `spec.num_paths` streams of one concrete process and scheme that
-/// need no injected noise.
-fn simulate<P, D>(
-    process: &P,
-    scheme: &D,
-    spec: &PathSimulationSpec,
-    initial_state: &[f64],
-    parallel: bool,
-) -> Result<PathSummary>
-where
-    P: StochasticProcess + ProcessMetadata,
-    D: Discretization<P> + Clone,
-{
-    simulate_with_noise(process, scheme, spec, initial_state, parallel, None)
-}
 
 /// Simulate `spec.num_paths` streams of one concrete process and scheme.
 ///

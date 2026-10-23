@@ -13,7 +13,8 @@
 
 use super::helpers::*;
 use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
+use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations::pricer::STANDARD;
 use time::macros::date;
 
 /// Build an ATM market with rBergomi scalar parameters injected.
@@ -48,7 +49,7 @@ fn price_rbergomi_call(
     // Cap the path count so the test runs quickly.
     call.instrument_pricing_overrides.model_config.mc_paths = Some(mc_paths);
 
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let result = registry
         .price_with_metrics(
             &call,
@@ -237,7 +238,7 @@ fn rbergomi_rejects_in_window_discrete_dividend() {
     call.discrete_dividends = vec![(ex_date, 2.0)];
     call.instrument_pricing_overrides.model_config.mc_paths = Some(500);
 
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let result = registry.price_with_metrics(
         &call,
         ModelKey::MonteCarloRoughBergomi,
@@ -272,7 +273,7 @@ fn rbergomi_accepts_out_of_window_discrete_dividend() {
 
     let market = rbergomi_market(as_of, 100.0, 0.20, 0.0, 1.9, 0.1, -0.9);
 
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     // Past ex-date: should succeed.
     let mut call_past = create_call(as_of, expiry, 100.0);
@@ -323,7 +324,7 @@ fn rbergomi_reports_mc_stderr_that_shrinks_with_paths() {
     let strike = 100.0;
 
     let market = rbergomi_market(as_of, spot, 0.20, 0.0, 1.9, 0.1, -0.9);
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let stderr_for = |mc_paths: usize| -> f64 {
         let mut call = create_call(as_of, expiry, strike);
@@ -374,7 +375,7 @@ fn rbergomi_missing_scalars_error() {
     let mut call = create_call(as_of, expiry, 100.0);
     call.instrument_pricing_overrides.model_config.mc_paths = Some(500);
 
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let result = registry.price_with_metrics(
         &call,
         ModelKey::MonteCarloRoughBergomi,
@@ -410,7 +411,7 @@ fn rbergomi_flat_surface_matches_flat_override() {
     let vol = 0.20;
 
     let market = rbergomi_market(as_of, spot, vol, 0.02, 1.5, 0.1, -0.7);
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let price_with = |override_vol: Option<f64>| -> f64 {
         let mut call = create_call(as_of, expiry, strike);
@@ -461,7 +462,7 @@ fn rbergomi_price_scales_with_notional() {
     call_300.quantity = 300.0;
     call_300.instrument_pricing_overrides.model_config.mc_paths = Some(30_000);
 
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let pv_100 = registry
         .price_with_metrics(
             &call_100,

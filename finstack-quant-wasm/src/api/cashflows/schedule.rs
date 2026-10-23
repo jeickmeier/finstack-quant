@@ -22,10 +22,6 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::wire::DecimalWire;
 use wasm_bindgen::prelude::*;
 
-/// `[date, value]` pairs with ISO dates, as the coupon programs carry them.
-#[derive(serde::Deserialize)]
-struct DatedPair<T>(Date, T);
-
 /// Dated amounts as `{ date, amount }` objects.
 fn dated_flows_wire(flows: Vec<(Date, Money)>) -> Result<JsValue, JsValue> {
     to_js_value(
@@ -320,9 +316,10 @@ impl JsCashFlowSchedule {
 
 /// Fluent builder for a `CashFlowSchedule`.
 ///
-/// Created by `CashFlowSchedule.builder()`. Every setter consumes the builder
-/// and returns it, so calls chain; a call on a builder that was already
-/// consumed throws. Setter errors are recorded and reported by `build`.
+/// Created by `CashFlowSchedule.builder()`. Every setter updates the builder
+/// in place and returns it, so calls chain. A setter whose argument is
+/// rejected throws and leaves the builder unchanged. Setter errors are
+/// recorded and reported by `build`.
 #[wasm_bindgen(js_name = CashFlowBuilder)]
 #[derive(Clone, Debug)]
 pub struct JsCashFlowBuilder {
@@ -340,17 +337,17 @@ impl JsCashFlowBuilder {
     /// @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
     #[wasm_bindgen]
     pub fn principal(
-        mut self,
+        &mut self,
         initial: JsValue,
         issue_date: JsValue,
         maturity: JsValue,
-    ) -> Result<JsCashFlowBuilder, JsValue> {
+    ) -> Result<(), JsValue> {
         let _ = self.inner.principal(
             js_wire::<Money>(&initial, "initial")?,
             js_date(&issue_date, "issueDate")?,
             js_date(&maturity, "maturity")?,
         );
-        Ok(self)
+        Ok(())
     }
 
     /// Choose whether the initial funding and final redemption are emitted as flows.
@@ -359,11 +356,11 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `exchange` is not one of the listed strings (kind `validation`).
     #[wasm_bindgen(js_name = principalExchange)]
-    pub fn principal_exchange(mut self, exchange: JsValue) -> Result<JsCashFlowBuilder, JsValue> {
+    pub fn principal_exchange(&mut self, exchange: JsValue) -> Result<(), JsValue> {
         let _ = self
             .inner
             .principal_exchange(js_wire(&exchange, "exchange")?);
-        Ok(self)
+        Ok(())
     }
 
     /// Set the amortization rule of the principal.
@@ -372,9 +369,9 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not an `AmortizationSpec` (kind `validation`).
     #[wasm_bindgen]
-    pub fn amortization(mut self, spec: JsValue) -> Result<JsCashFlowBuilder, JsValue> {
+    pub fn amortization(&mut self, spec: JsValue) -> Result<(), JsValue> {
         let _ = self.inner.amortization(js_wire(&spec, "spec")?);
-        Ok(self)
+        Ok(())
     }
 
     /// Add a dated principal event (draw, repayment or other balance change).
@@ -388,13 +385,13 @@ impl JsCashFlowBuilder {
     /// @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
     #[wasm_bindgen(js_name = addPrincipalEvent)]
     pub fn add_principal_event(
-        mut self,
+        &mut self,
         date: JsValue,
         payment_date: JsValue,
         delta: JsValue,
         kind: JsValue,
         cash: Option<JsValue>,
-    ) -> Result<JsCashFlowBuilder, JsValue> {
+    ) -> Result<(), JsValue> {
         let _ = self.inner.add_principal_event(
             js_date(&date, "date")?,
             js_date(&payment_date, "paymentDate")?,
@@ -402,7 +399,7 @@ impl JsCashFlowBuilder {
             js_opt_wire::<Money>(cash.as_ref(), "cash")?,
             js_wire::<CFKind>(&kind, "kind")?,
         );
-        Ok(self)
+        Ok(())
     }
 
     /// Add a fixed-rate coupon leg over the whole life.
@@ -411,9 +408,9 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not a `FixedCouponSpec` (kind `validation`).
     #[wasm_bindgen(js_name = fixedCf)]
-    pub fn fixed_cf(mut self, spec: JsValue) -> Result<JsCashFlowBuilder, JsValue> {
+    pub fn fixed_cf(&mut self, spec: JsValue) -> Result<(), JsValue> {
         let _ = self.inner.fixed_cf(js_wire(&spec, "spec")?);
-        Ok(self)
+        Ok(())
     }
 
     /// Add a floating-rate coupon leg over the whole life.
@@ -422,9 +419,9 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not a `FloatingCouponSpec` (kind `validation`).
     #[wasm_bindgen(js_name = floatingCf)]
-    pub fn floating_cf(mut self, spec: JsValue) -> Result<JsCashFlowBuilder, JsValue> {
+    pub fn floating_cf(&mut self, spec: JsValue) -> Result<(), JsValue> {
         let _ = self.inner.floating_cf(js_wire(&spec, "spec")?);
-        Ok(self)
+        Ok(())
     }
 
     /// Add a fixed coupon leg whose rate steps up on listed dates.
@@ -433,9 +430,9 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not a `StepUpCouponSpec` (kind `validation`).
     #[wasm_bindgen(js_name = stepUpCf)]
-    pub fn step_up_cf(mut self, spec: JsValue) -> Result<JsCashFlowBuilder, JsValue> {
+    pub fn step_up_cf(&mut self, spec: JsValue) -> Result<(), JsValue> {
         let _ = self.inner.step_up_cf(js_wire(&spec, "spec")?);
-        Ok(self)
+        Ok(())
     }
 
     /// Add a one-off or recurring fee.
@@ -444,9 +441,9 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not a `FeeSpec` (kind `validation`).
     #[wasm_bindgen]
-    pub fn fee(mut self, spec: JsValue) -> Result<JsCashFlowBuilder, JsValue> {
+    pub fn fee(&mut self, spec: JsValue) -> Result<(), JsValue> {
         let _ = self.inner.fee(js_wire(&spec, "spec")?);
-        Ok(self)
+        Ok(())
     }
 
     /// Add a fixed coupon leg that applies only inside a date window.
@@ -458,17 +455,17 @@ impl JsCashFlowBuilder {
     /// @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
     #[wasm_bindgen(js_name = addFixedWindow)]
     pub fn add_fixed_window(
-        mut self,
+        &mut self,
         start: JsValue,
         end: JsValue,
         spec: JsValue,
-    ) -> Result<JsCashFlowBuilder, JsValue> {
+    ) -> Result<(), JsValue> {
         let _ = self.inner.add_fixed_window(
             js_date(&start, "start")?,
             js_date(&end, "end")?,
             js_wire(&spec, "spec")?,
         );
-        Ok(self)
+        Ok(())
     }
 
     /// Add a floating coupon leg that applies only inside a date window.
@@ -480,17 +477,17 @@ impl JsCashFlowBuilder {
     /// @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
     #[wasm_bindgen(js_name = addFloatingWindow)]
     pub fn add_floating_window(
-        mut self,
+        &mut self,
         start: JsValue,
         end: JsValue,
         spec: JsValue,
-    ) -> Result<JsCashFlowBuilder, JsValue> {
+    ) -> Result<(), JsValue> {
         let _ = self.inner.add_floating_window(
             js_date(&start, "start")?,
             js_date(&end, "end")?,
             js_wire(&spec, "spec")?,
         );
-        Ok(self)
+        Ok(())
     }
 
     /// Set the cash/PIK split of coupons paid inside a date window.
@@ -502,17 +499,17 @@ impl JsCashFlowBuilder {
     /// @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
     #[wasm_bindgen(js_name = addPaymentWindow)]
     pub fn add_payment_window(
-        mut self,
+        &mut self,
         start: JsValue,
         end: JsValue,
         split: JsValue,
-    ) -> Result<JsCashFlowBuilder, JsValue> {
+    ) -> Result<(), JsValue> {
         let _ = self.inner.add_payment_window(
             js_date(&start, "start")?,
             js_date(&end, "end")?,
             js_wire::<CouponType>(&split, "split")?,
         );
-        Ok(self)
+        Ok(())
     }
 
     /// Set a sequence of cash/PIK splits, each applying until its end date.
@@ -521,14 +518,10 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `steps` is not an array of `[isoDate, CouponType]` pairs (kind `validation`).
     #[wasm_bindgen(js_name = paymentSplitProgram)]
-    pub fn payment_split_program(mut self, steps: JsValue) -> Result<JsCashFlowBuilder, JsValue> {
-        let steps: Vec<(Date, CouponType)> =
-            js_wire::<Vec<DatedPair<CouponType>>>(&steps, "steps")?
-                .into_iter()
-                .map(|DatedPair(date, split)| (date, split))
-                .collect();
+    pub fn payment_split_program(&mut self, steps: JsValue) -> Result<(), JsValue> {
+        let steps = js_wire::<Vec<(Date, CouponType)>>(&steps, "steps")?;
         let _ = self.inner.payment_split_program(&steps);
-        Ok(self)
+        Ok(())
     }
 
     /// Pay a fixed coupon until a switch date, then a floating coupon.
@@ -540,17 +533,17 @@ impl JsCashFlowBuilder {
     /// @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
     #[wasm_bindgen(js_name = fixedToFloat)]
     pub fn fixed_to_float(
-        mut self,
+        &mut self,
         switch_date: JsValue,
         fixed: JsValue,
         floating: JsValue,
-    ) -> Result<JsCashFlowBuilder, JsValue> {
+    ) -> Result<(), JsValue> {
         let _ = self.inner.fixed_to_float(
             js_date(&switch_date, "switchDate")?,
             js_wire::<FixedCouponSpec>(&fixed, "fixed")?,
             js_wire::<FloatingCouponSpec>(&floating, "floating")?,
         );
-        Ok(self)
+        Ok(())
     }
 
     /// Add a floating leg whose margin steps on listed dates.
@@ -561,18 +554,18 @@ impl JsCashFlowBuilder {
     /// @throws If an argument does not match its wire type (kind `validation`).
     #[wasm_bindgen(js_name = floatMarginSteps)]
     pub fn float_margin_steps(
-        mut self,
+        &mut self,
         steps: JsValue,
         base_spec: JsValue,
-    ) -> Result<JsCashFlowBuilder, JsValue> {
-        let steps: Vec<_> = js_wire::<Vec<DatedPair<DecimalWire>>>(&steps, "steps")?
+    ) -> Result<(), JsValue> {
+        let steps: Vec<_> = js_wire::<Vec<(Date, DecimalWire)>>(&steps, "steps")?
             .into_iter()
-            .map(|DatedPair(date, margin)| (date, margin.0))
+            .map(|(date, margin)| (date, margin.0))
             .collect();
         let _ = self
             .inner
             .float_margin_steps(&steps, js_wire(&base_spec, "baseSpec")?);
-        Ok(self)
+        Ok(())
     }
 
     /// Build the schedule, projecting floating coupons from market curves when a market is given.

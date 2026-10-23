@@ -167,7 +167,7 @@ Registered for `InstrumentType::TermLoan` in `metrics/mod.rs`:
 | `Dv01`, `BucketedDv01` | Parallel and key-rate risk on the selected model. Quoted callable loans freeze the solved OAS under curve bumps. |
 | `Cs01`, `BucketedCs01` | Parallel and key-rate credit risk on the selected model. The credit tree re-bootstraps par spreads; discounting uses z-spread. |
 
-`Theta` is registered universally by `metrics::standard_registry()`.
+`Theta` is registered universally by `pricer::STANDARD.metrics()`.
 
 ## Bindings
 

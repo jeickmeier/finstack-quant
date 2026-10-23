@@ -495,16 +495,6 @@ fn fx_put_call_delta_strikes(
     )
 }
 
-#[inline]
-fn fx_put_call_25d_strikes(
-    forward: f64,
-    sigma_put: f64,
-    sigma_call: f64,
-    expiry: f64,
-) -> (f64, f64) {
-    fx_put_call_delta_strikes(forward, sigma_put, sigma_call, expiry, 0.25)
-}
-
 /// Per-expiry FX smile pillars: the (strikes, vols) of one expiry's own
 /// 3-point (25Δ put, ATM DNS, 25Δ call) or 5-point (plus 10Δ wings) smile.
 ///
@@ -533,7 +523,7 @@ fn fx_smile_pillars(
     }
 
     let k_atm = fx_atm_dns_strike(forward, atm, expiry);
-    let (k_put, k_call) = fx_put_call_25d_strikes(forward, sigma_put, sigma_call, expiry);
+    let (k_put, k_call) = fx_put_call_delta_strikes(forward, sigma_put, sigma_call, expiry, 0.25);
 
     if let Some((rr_10d, bf_10d)) = wings_10d {
         let (sigma_put_10d, sigma_call_10d) = recover_fx_wing_vols(atm, rr_10d, bf_10d);

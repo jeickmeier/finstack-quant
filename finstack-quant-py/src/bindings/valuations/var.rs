@@ -26,79 +26,7 @@ fn extract_history(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<MarketHis
     spec_from_py(py, obj, "MarketHistory")
 }
 
-/// Historical VaR and expected shortfall of a list of instruments.
-///
-/// Mirrors Rust ``metrics::risk::calculate_var``: every
-/// instrument is repriced under every ``history`` scenario, the per-scenario
-/// P&Ls are summed across instruments, and VaR / ES are read off that single
-/// portfolio distribution (R type-7 linear-interpolated quantile). Unlike
-/// summing the per-instrument ``hvar`` metric, offsetting positions diversify.
-/// Quote-recalibrated shocks (credit spreads) use the same recalibration
-/// provider as ``price_instrument``.
-///
-/// Parameters
-/// ----------
-/// instruments : list[Bond | InterestRateSwap | ... | str]
-///     Typed instruments or ``finstack_quant.instrument/1`` envelopes. An
-///     empty list returns zero VaR and ES.
-/// market : MarketContext | str
-///     Unshocked base market every scenario perturbs.
-/// history : MarketHistory | dict | str
-///     Historical risk-factor shifts; a non-empty portfolio needs at least
-///     one scenario.
-/// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-///     Valuation date for the base and every scenario revaluation.
-/// config : dict | str | None, optional
-///     Rust ``VarConfig``: ``confidence_level`` (decimal in ``(0, 1)``),
-///     ``method`` (``"full_revaluation"`` or ``"taylor_approximation"``) and
-///     ``reporting_currency`` (required for mixed-currency portfolios).
-///     ``None`` uses Rust ``VarConfig::default()``: 95%, full revaluation,
-///     natural currency.
-/// model : str, optional
-///     ``"default"`` (each instrument's canonical pricing path) or one model
-///     key from ``list_models()`` applied to every instrument.
-///
-/// Returns
-/// -------
-/// VarResult
-///     VaR, expected shortfall and the sorted P&L distribution. Losses are
-///     negative.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If an instrument, ``config``, ``history`` or ``model`` is invalid, the
-///     confidence level is outside ``(0, 1)``, a non-empty portfolio has no
-///     scenarios, or a mixed-currency portfolio has no ``reporting_currency``.
-/// KeyError
-///     If a curve, surface or price an instrument needs is missing.
-/// RuntimeError
-///     If a scenario revaluation fails numerically.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.core.currency import Currency
-/// >>> from finstack_quant.core.dates import StubKind
-/// >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
-/// >>> from finstack_quant.core.money import Money
-/// >>> from finstack_quant.core.types import Rate
-/// >>> from finstack_quant.valuations.instruments import (
-/// ...     Bond, MarketHistory, calculate_var)
-/// >>> as_of = datetime.date(2024, 1, 2)
-/// >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
-/// >>> def bond(id):
-/// ...     return Bond.fixed(id, Money(1e6, Currency("USD")), Rate(0.05), as_of,
-/// ...                       datetime.date(2029, 1, 2), StubKind.NONE, "USD-OIS")
-/// >>> shift = lambda s: [{"factor": {"type": "discount_rate", "curve_id": "USD-OIS",
-/// ...                                "tenor_years": 5.0}, "shift": s}]
-/// >>> history = MarketHistory(as_of, 2, [
-/// ...     {"date": "2023-12-29", "shifts": shift(0.0010)},
-/// ...     {"date": "2023-12-28", "shifts": shift(-0.0005)}])
-/// >>> one = calculate_var([bond("A")], market, history, as_of)
-/// >>> two = calculate_var([bond("A"), bond("B")], market, history, as_of)
-/// >>> (two.num_scenarios, one.var < 0, abs(two.var - 2 * one.var) < 1e-6)
-/// (2, True, True)
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "calculate_var")]
 #[pyfunction]
 #[pyo3(signature = (instruments, market, history, as_of, config=None, model="default"))]
 #[pyo3(text_signature = "(instruments, market, history, as_of, config=None, model='default')")]
@@ -143,21 +71,7 @@ fn calculate_var(
     .map_err(core_to_py)
 }
 
-/// Historical VaR / expected shortfall with its P&L distribution.
-///
-/// Typed wrapper of the Rust ``VarResult`` returned by
-/// :func:`calculate_var`. VaR and ES follow the P&L sign: losses
-/// are negative, and ``expected_shortfall <= var``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.instruments import VarResult
-/// >>> result = VarResult.from_json(
-/// ...     '{"var": -10.0, "expected_shortfall": -12.0, "pnl_distribution": [-12.0, 3.0],'
-/// ...     ' "num_scenarios": 2, "confidence_level": 0.95}')
-///
-/// >>> (result.var, list(result.to_dataframe()["pnl"]))
-/// (-10.0, [-12.0, 3.0])
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult")]
 #[pyclass(
     name = "VarResult",
     module = "finstack_quant.valuations.instruments",
@@ -172,10 +86,7 @@ pub(crate) struct PyVarResult {
 
 #[pymethods]
 impl PyVarResult {
-    /// The P&L distribution as a one-column pandas ``DataFrame``.
-    ///
-    /// Column ``pnl`` (``float64``), one row per scenario in the stored
-    /// worst-first order.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
@@ -189,22 +100,7 @@ impl PyVarResult {
         dict_to_dataframe(py, &data, None)
     }
 
-    /// Deserialize a result from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     Serialized ``VarResult``.
-    ///
-    /// Returns
-    /// -------
-    /// VarResult
-    ///     The parsed result.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is malformed, misses a field or carries an unknown one.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -214,23 +110,13 @@ impl PyVarResult {
         })
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     The result JSON (the WASM ``calculateVar`` object).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the result cannot be serialized.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``, ``dask``).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -248,22 +134,19 @@ impl PyVarResult {
 }
 
 crate::bindings::macros::py_getters!(PyVarResult |s| {
-    /// Value-at-Risk: the signed P&L at the ``1 - confidence_level`` quantile
-    /// (negative for a loss, ``0.0`` for an all-gain distribution), in the
-    /// portfolio or reporting currency.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.var")]
     var -> f64 = s.inner.var;
 
-    /// Expected shortfall: mean signed P&L over the worst
-    /// ``1 - confidence_level`` tail; same sign convention as ``var``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.expected_shortfall")]
     expected_shortfall -> f64 = s.inner.expected_shortfall;
 
-    /// Portfolio P&L per scenario, sorted ascending (worst first).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.pnl_distribution")]
     pnl_distribution -> Vec<f64> = s.inner.pnl_distribution.clone();
 
-    /// Number of scenarios in the distribution.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.num_scenarios")]
     num_scenarios -> usize = s.inner.num_scenarios;
 
-    /// Confidence level used, as a decimal (``0.95`` = 95%).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.confidence_level")]
     confidence_level -> f64 = s.inner.confidence_level;
 });
 

@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/ead_calculator.schema.json",
-      "bytes": 1232,
+      "bytes": 1406,
       "kind": "component",
       "path": "schemas/models/1/ead_calculator.schema.json",
       "summary": "Exposure at Default calculator.",
@@ -371,7 +371,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/latent_factor_spec.schema.json",
-      "bytes": 2779,
+      "bytes": 3052,
       "kind": "input",
       "path": "schemas/models/1/latent_factor_spec.schema.json",
       "summary": "Factor model specification for configuration and serialization.",
@@ -506,7 +506,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/monte_carlo_result.schema.json",
-      "bytes": 35924,
+      "bytes": 35794,
       "kind": "output",
       "path": "schemas/models/1/monte_carlo_result.schema.json",
       "summary": "Monte Carlo pricing result with optional captured paths.",
@@ -650,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/recovery_spec.schema.json",
-      "bytes": 1237,
+      "bytes": 2030,
       "kind": "input",
       "path": "schemas/models/1/recovery_spec.schema.json",
       "summary": "Recovery model specification for configuration and serialization.",
@@ -710,6 +710,15 @@
       "summary": "Rough Heston model parameters.",
       "title": "RoughHestonParams",
       "type_name": "RoughHestonParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/sabr_calibration_outcome.schema.json",
+      "bytes": 4199,
+      "kind": "output",
+      "path": "schemas/models/1/sabr_calibration_outcome.schema.json",
+      "summary": "Calibrated SABR parameters and deterministic solver diagnostics.",
+      "title": "SabrCalibrationOutcome",
+      "type_name": "SabrCalibrationOutcome"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/sabr_parameters.schema.json",
@@ -803,7 +812,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/toggle_exercise_model.schema.json",
-      "bytes": 5904,
+      "bytes": 5434,
       "kind": "input",
       "path": "schemas/models/1/toggle_exercise_model.schema.json",
       "summary": "Toggle exercise model for PIK/cash decision.",

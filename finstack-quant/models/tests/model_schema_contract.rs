@@ -99,7 +99,7 @@ fn migration_contracts_validate_against_their_schemas() {
     assert_wire_matches_schema("GeneratorMatrix", &generator);
     let simulator = MigrationSimulator::new(generator, 1.0).expect("simulator");
     assert_wire_matches_schema("MigrationSimulator", &simulator);
-    let master = MasterScale::sp_assumptions().expect("embedded master scale");
+    let master = MasterScale::default_calibration().expect("embedded master scale");
     assert_wire_matches_schema("MasterScale", &master);
 }
 
@@ -157,4 +157,81 @@ fn liquidity_profile_and_path_point_validate_against_their_schemas() {
     }))
     .expect("path point");
     assert_wire_matches_schema("PathPoint", &point);
+}
+
+#[test]
+fn checked_exposure_recovery_and_factor_schemas_reject_out_of_range_wire_values() {
+    for (name, wire) in [
+        (
+            "EadCalculator",
+            json!({"drawn": -1.0, "undrawn": 2.0, "ccf": {"ccf": 0.75}}),
+        ),
+        (
+            "EadCalculator",
+            json!({"drawn": 1.0, "undrawn": 2.0, "ccf": {"ccf": 1.1}}),
+        ),
+        (
+            "RecoverySpec",
+            json!({"type": "market_correlated", "mean_recovery": 0.4, "recovery_volatility": 0.6, "factor_correlation": 0.4}),
+        ),
+        (
+            "LatentFactorSpec",
+            json!({"type": "single_factor", "volatility": -0.1, "mean_reversion": 0.0}),
+        ),
+        (
+            "LatentFactorSpec",
+            json!({"type": "single_factor", "volatility": 0.1, "mean_reversion": -1.0}),
+        ),
+        (
+            "LatentFactorSpec",
+            json!({"type": "two_factor", "prepay_vol": 0.1, "credit_vol": 0.2, "correlation": 1.1}),
+        ),
+        (
+            "LatentFactorSpec",
+            json!({"type": "multi_factor", "num_factors": 0, "volatilities": [], "correlations": []}),
+        ),
+    ] {
+        let validator = jsonschema::options()
+            .build(&schema_for(name))
+            .expect("schema");
+        assert!(!validator.is_valid(&wire), "{name} accepted {wire}");
+    }
+    use finstack_quant_models::correlation::{LatentFactorSpec, RecoverySpec};
+    use finstack_quant_models::credit::lgd::EadCalculator;
+    assert_wire_matches_schema(
+        "EadCalculator",
+        &EadCalculator::revolver(100.0, 20.0).expect("exposure"),
+    );
+    for correlation in [-1.0, 1.0] {
+        assert_wire_matches_schema(
+            "RecoverySpec",
+            &RecoverySpec::market_correlated(0.4, 0.5, correlation).expect("recovery"),
+        );
+        assert_wire_matches_schema(
+            "LatentFactorSpec",
+            &LatentFactorSpec::two_factor(0.0, 3.0, correlation).expect("factors"),
+        );
+    }
+    assert_wire_matches_schema(
+        "LatentFactorSpec",
+        &LatentFactorSpec::single_factor(3.0, 20.0).expect("factors"),
+    );
+}
+
+#[test]
+fn optimal_toggle_schema_and_serde_reject_the_removed_discount_rate() {
+    use finstack_quant_models::credit::{OptimalToggle, ToggleExerciseModel};
+    let model = ToggleExerciseModel::optimal(100, 0.3, 0.03, 1.0).expect("valid optimal toggle");
+    assert_wire_matches_schema("ToggleExerciseModel", &model);
+    let mut wire = serde_json::to_value(&model).expect("serialize");
+    assert!(wire["optimal_exercise"]
+        .get("equity_discount_rate")
+        .is_none());
+    wire["optimal_exercise"]["equity_discount_rate"] = json!(1000.0);
+    assert!(serde_json::from_value::<ToggleExerciseModel>(wire.clone()).is_err());
+    assert!(serde_json::from_value::<OptimalToggle>(wire["optimal_exercise"].clone()).is_err());
+    let validator = jsonschema::options()
+        .build(&schema_for("ToggleExerciseModel"))
+        .expect("schema");
+    assert!(!validator.is_valid(&wire));
 }

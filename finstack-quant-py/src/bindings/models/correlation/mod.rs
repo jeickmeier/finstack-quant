@@ -8,6 +8,7 @@ use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema,
 };
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, correlation_to_py};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule, PyType};
@@ -21,9 +22,7 @@ use finstack_quant_models::correlation::{
     RecoverySpec, TrancheLossStatistics,
 };
 
-/// Copula model specification for configuration and deferred construction.
-///
-/// Use class methods to create a spec, then call `build()` to get a `Copula`.
+#[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec")]
 #[pyclass(
     name = "CopulaSpec",
     module = "finstack_quant.models.correlation",
@@ -46,19 +45,13 @@ impl PyCopulaSpec {
 
 #[pymethods]
 impl PyCopulaSpec {
-    /// One-factor Gaussian copula (market standard).
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.gaussian")]
     #[classmethod]
     fn gaussian(_cls: &Bound<'_, PyType>) -> Self {
         Self::from_inner(CopulaSpec::gaussian())
     }
 
-    /// Student-t copula with specified degrees of freedom.
-    ///
-    /// ``degrees_of_freedom`` must be finite and greater than 2 (required for
-    /// finite variance). Typical calibration range for CDX tranches is 4-10.
-    ///
-    /// Raises ``ValueError`` when ``degrees_of_freedom`` is not finite or
-    /// ``<= 2``.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.student_t")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, degrees_of_freedom)")]
     fn student_t(_cls: &Bound<'_, PyType>, degrees_of_freedom: f64) -> PyResult<Self> {
@@ -67,27 +60,21 @@ impl PyCopulaSpec {
             .map_err(correlation_to_py)
     }
 
-    /// Random Factor Loading copula with stochastic correlation.
-    ///
-    /// The ``loading_vol`` parameter controls the volatility of the factor
-    /// loading and is clamped to ``[0, 0.5]``.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.random_factor_loading")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, loading_vol)")]
     fn random_factor_loading(_cls: &Bound<'_, PyType>, loading_vol: f64) -> Self {
         Self::from_inner(CopulaSpec::random_factor_loading(loading_vol))
     }
 
-    /// Global-plus-sector two-factor Gaussian copula.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.multi_factor")]
     #[classmethod]
     #[pyo3(text_signature = "(cls)")]
     fn multi_factor(_cls: &Bound<'_, PyType>) -> Self {
         Self::from_inner(CopulaSpec::multi_factor())
     }
 
-    /// Build a concrete `Copula` from this specification.
-    ///
-    /// Raises ``ValueError`` for invalid Student-t degrees of freedom or
-    /// non-finite/out-of-range random-loading volatility in a deserialized spec.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.build")]
     fn build(&self) -> PyResult<PyCopula> {
         self.inner
             .build()
@@ -95,40 +82,44 @@ impl PyCopulaSpec {
             .map_err(correlation_to_py)
     }
 
-    /// ``True`` if this is a Gaussian spec.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_gaussian")]
     #[getter]
     fn is_gaussian(&self) -> bool {
         self.inner.is_gaussian()
     }
 
-    /// ``True`` if this is a Student-t spec.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_student_t")]
     #[getter]
     fn is_student_t(&self) -> bool {
         self.inner.is_student_t()
     }
 
-    /// ``True`` if this is a Random Factor Loading spec.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_rfl")]
     #[getter]
     fn is_rfl(&self) -> bool {
         self.inner.is_rfl()
     }
 
-    /// ``True`` if this is a Multi-factor spec.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_multi_factor")]
     #[getter]
     fn is_multi_factor(&self) -> bool {
         self.inner.is_multi_factor()
     }
 
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CopulaSpec", &self.inner)
     }
 }
 
-wire_methods!(PyCopulaSpec, CopulaSpec, "CopulaSpec");
+wire_methods!(
+    PyCopulaSpec,
+    CopulaSpec,
+    "CopulaSpec",
+    module = "finstack_quant.models.correlation"
+);
 
-/// Concrete copula model for portfolio default correlation.
-///
-/// Obtain an instance via ``CopulaSpec.build()``.
+#[doc = pydoc!("finstack_quant.models.correlation", "Copula")]
 #[pyclass(name = "Copula", module = "finstack_quant.models.correlation", frozen)]
 pub struct PyCopula {
     /// Boxed trait object.
@@ -137,9 +128,7 @@ pub struct PyCopula {
 
 #[pymethods]
 impl PyCopula {
-    /// Conditional default probability given factor realization(s).
-    ///
-    /// P(default | Z) where the default threshold is typically Φ⁻¹(PD).
+    #[doc = pydoc!("finstack_quant.models.correlation", "Copula.conditional_default_prob")]
     #[pyo3(text_signature = "(self, default_threshold, factor_realization, correlation)")]
     fn conditional_default_prob(
         &self,
@@ -152,38 +141,25 @@ impl PyCopula {
             .map_err(core_to_py)
     }
 
-    /// Number of systematic factors in the model.
+    #[doc = pydoc!("finstack_quant.models.correlation", "Copula.num_factors")]
     #[getter]
     fn num_factors(&self) -> usize {
         self.inner.num_factors()
     }
 
-    /// Model name for diagnostics.
+    #[doc = pydoc!("finstack_quant.models.correlation", "Copula.model_name")]
     #[getter]
     fn model_name(&self) -> &'static str {
         self.inner.model_name()
     }
 
-    /// Strict lower-tail dependence coefficient ``λ_L`` at the given
-    /// correlation.
-    ///
-    /// Random Factor Loading returns the probability mass at unit loading
-    /// under its calibrated clipped-normal loading distribution. Gaussian
-    /// models have zero tail dependence except at perfect correlation.
+    #[doc = pydoc!("finstack_quant.models.correlation", "Copula.tail_dependence")]
     #[pyo3(text_signature = "(self, correlation)")]
     fn tail_dependence(&self, correlation: f64) -> f64 {
         self.inner.tail_dependence(correlation)
     }
 
-    /// Heuristic stress-correlation proxy for the Random Factor Loading
-    /// copula.
-    ///
-    /// This is **not** the strict copula lower-tail-dependence coefficient
-    /// ``λ_L`` returned by ``tail_dependence``. It gauges the extra correlation mass in the
-    /// high-loading tail and vanishes in the Gaussian (``loading_vol = 0``)
-    /// limit.
-    ///
-    /// Raises ``ValueError`` for non-RFL copulas.
+    #[doc = pydoc!("finstack_quant.models.correlation", "Copula.stress_correlation_proxy")]
     #[pyo3(text_signature = "(self, correlation)")]
     fn stress_correlation_proxy(&self, correlation: f64) -> PyResult<f64> {
         self.inner
@@ -196,7 +172,7 @@ impl PyCopula {
     }
 }
 
-/// Recovery model specification for configuration and deferred construction.
+#[doc = pydoc!("finstack_quant.models.correlation", "RecoverySpec")]
 #[pyclass(
     name = "RecoverySpec",
     module = "finstack_quant.models.correlation",
@@ -219,10 +195,7 @@ impl PyRecoverySpec {
 
 #[pymethods]
 impl PyRecoverySpec {
-    /// Constant recovery rate.
-    ///
-    /// Raises ``ValueError`` if ``rate`` is not finite or lies outside
-    /// ``[0, 1]``.
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoverySpec.constant")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, rate)")]
     fn constant(_cls: &Bound<'_, PyType>, rate: f64) -> PyResult<Self> {
@@ -231,10 +204,7 @@ impl PyRecoverySpec {
             .map_err(correlation_to_py)
     }
 
-    /// Market-correlated (Andersen-Sidenius) stochastic recovery.
-    ///
-    /// Raises ``ValueError`` if ``mean`` is not finite or lies outside
-    /// ``[0, 1]``, or if ``vol`` / ``correlation`` are not finite.
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoverySpec.market_correlated")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, mean, vol, correlation)")]
     fn market_correlated(
@@ -248,44 +218,36 @@ impl PyRecoverySpec {
             .map_err(correlation_to_py)
     }
 
-    /// Market-standard stochastic recovery (40% mean, 25% vol, +40% corr —
-    /// recovery falls in stress under the canonical low-factor-stress
-    /// convention).
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoverySpec.market_standard_stochastic")]
     #[classmethod]
-    fn market_standard_stochastic(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(RecoverySpec::market_standard_stochastic())
+    fn market_standard_stochastic(_cls: &Bound<'_, PyType>) -> PyResult<Self> {
+        RecoverySpec::market_standard_stochastic()
+            .map(Self::from_inner)
+            .map_err(correlation_to_py)
     }
 
-    /// Location-parameter recovery rate of this spec.
-    ///
-    /// For a constant spec this is the constant rate. For a
-    /// market-correlated spec this returns the ``mean`` input — the target
-    /// recovery at factor ``Z = 0`` — which differs from the
-    /// Jensen-corrected unconditional mean ``E_Z[R(Z)]`` whenever the factor
-    /// sensitivity is non-zero. For the true unconditional mean call
-    /// ``build().expected_recovery``.
-    #[getter]
-    fn expected_recovery(&self) -> f64 {
-        self.inner.expected_recovery()
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoverySpec.build")]
+    fn build(&self) -> PyResult<PyRecoveryModel> {
+        self.inner
+            .build()
+            .map(|inner| PyRecoveryModel { inner })
+            .map_err(correlation_to_py)
     }
 
-    /// Build a concrete `RecoveryModel` from this specification.
-    fn build(&self) -> PyRecoveryModel {
-        PyRecoveryModel {
-            inner: self.inner.build(),
-        }
-    }
-
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoverySpec.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RecoverySpec", &self.inner)
     }
 }
 
-wire_methods!(PyRecoverySpec, RecoverySpec, "RecoverySpec");
+wire_methods!(
+    PyRecoverySpec,
+    RecoverySpec,
+    "RecoverySpec",
+    module = "finstack_quant.models.correlation"
+);
 
-/// Concrete recovery model for credit portfolio pricing.
-///
-/// Obtain an instance via ``RecoverySpec.build()``.
+#[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel")]
 #[pyclass(
     name = "RecoveryModel",
     module = "finstack_quant.models.correlation",
@@ -298,43 +260,61 @@ pub struct PyRecoveryModel {
 
 #[pymethods]
 impl PyRecoveryModel {
-    /// Expected (unconditional) recovery rate.
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.expected_recovery")]
     #[getter]
     fn expected_recovery(&self) -> f64 {
         self.inner.expected_recovery()
     }
 
-    /// Recovery conditional on the systematic market factor.
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.conditional_recovery")]
     #[pyo3(text_signature = "(self, market_factor)")]
-    fn conditional_recovery(&self, market_factor: f64) -> f64 {
-        self.inner.conditional_recovery(market_factor)
+    fn conditional_recovery(&self, market_factor: f64) -> PyResult<f64> {
+        self.inner
+            .conditional_recovery(market_factor)
+            .map_err(correlation_to_py)
     }
 
-    /// Loss given default (1 − recovery).
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.lgd")]
     #[getter]
     fn lgd(&self) -> f64 {
         self.inner.lgd()
     }
 
-    /// Conditional LGD given market factor.
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.conditional_lgd")]
     #[pyo3(text_signature = "(self, market_factor)")]
-    fn conditional_lgd(&self, market_factor: f64) -> f64 {
-        self.inner.conditional_lgd(market_factor)
+    fn conditional_lgd(&self, market_factor: f64) -> PyResult<f64> {
+        self.inner
+            .conditional_lgd(market_factor)
+            .map_err(correlation_to_py)
     }
 
-    /// Recovery-rate volatility scale (0 for constant models).
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.sample_recovery")]
+    #[pyo3(text_signature = "(self, market_factor, idiosyncratic_normal)")]
+    fn sample_recovery(&self, market_factor: f64, idiosyncratic_normal: f64) -> PyResult<f64> {
+        self.inner
+            .sample_recovery(market_factor, idiosyncratic_normal)
+            .map_err(correlation_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.has_idiosyncratic_dispersion")]
+    #[getter]
+    fn has_idiosyncratic_dispersion(&self) -> bool {
+        self.inner.has_idiosyncratic_dispersion()
+    }
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.recovery_volatility")]
     #[getter]
     fn recovery_volatility(&self) -> f64 {
         self.inner.recovery_volatility()
     }
 
-    /// Whether recovery varies with the market factor.
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.is_stochastic")]
     #[getter]
     fn is_stochastic(&self) -> bool {
         self.inner.is_stochastic()
     }
 
-    /// Model name for diagnostics.
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.model_name")]
     #[getter]
     fn model_name(&self) -> &'static str {
         self.inner.model_name()
@@ -349,7 +329,7 @@ impl PyRecoveryModel {
     }
 }
 
-/// Factor model specification for configuration and deferred construction.
+#[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorSpec")]
 #[pyclass(
     name = "LatentFactorSpec",
     module = "finstack_quant.models.correlation",
@@ -371,14 +351,20 @@ impl PyLatentFactorSpec {
 
 #[pymethods]
 impl PyLatentFactorSpec {
-    /// Single-factor model specification.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorSpec.single_factor")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, volatility, mean_reversion)")]
-    fn single_factor(_cls: &Bound<'_, PyType>, volatility: f64, mean_reversion: f64) -> Self {
-        Self::from_inner(LatentFactorSpec::single_factor(volatility, mean_reversion))
+    fn single_factor(
+        _cls: &Bound<'_, PyType>,
+        volatility: f64,
+        mean_reversion: f64,
+    ) -> PyResult<Self> {
+        LatentFactorSpec::single_factor(volatility, mean_reversion)
+            .map(Self::from_inner)
+            .map_err(correlation_to_py)
     }
 
-    /// Two-factor model (prepayment + credit) specification.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorSpec.two_factor")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, prepay_vol, credit_vol, correlation)")]
     fn two_factor(
@@ -386,24 +372,19 @@ impl PyLatentFactorSpec {
         prepay_vol: f64,
         credit_vol: f64,
         correlation: f64,
-    ) -> Self {
-        Self::from_inner(LatentFactorSpec::two_factor(
-            prepay_vol,
-            credit_vol,
-            correlation,
-        ))
+    ) -> PyResult<Self> {
+        LatentFactorSpec::two_factor(prepay_vol, credit_vol, correlation)
+            .map(Self::from_inner)
+            .map_err(correlation_to_py)
     }
 
-    /// Number of factors implied by this specification.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorSpec.num_factors")]
     #[getter]
     fn num_factors(&self) -> usize {
         self.inner.num_factors()
     }
 
-    /// Build a concrete factor model from this specification.
-    ///
-    /// Raises ``ValueError`` if a multi-factor specification contains an
-    /// invalid volatility vector or correlation matrix.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorSpec.build")]
     fn build(&self) -> PyResult<PyLatentFactorKind> {
         self.inner
             .build()
@@ -416,9 +397,7 @@ impl PyLatentFactorSpec {
     }
 }
 
-/// Concrete factor model for correlated behavior.
-///
-/// Obtain an instance via ``LatentFactorSpec.build()``.
+#[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind")]
 #[pyclass(
     name = "LatentFactorKind",
     module = "finstack_quant.models.correlation",
@@ -431,37 +410,37 @@ pub struct PyLatentFactorKind {
 
 #[pymethods]
 impl PyLatentFactorKind {
-    /// Number of factors in the model.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.num_factors")]
     #[getter]
     fn num_factors(&self) -> usize {
         self.inner.num_factors()
     }
 
-    /// Factor correlation matrix (flattened row-major).
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.correlation_matrix")]
     #[getter]
     fn correlation_matrix(&self) -> Vec<f64> {
         self.inner.correlation_matrix().to_vec()
     }
 
-    /// Factor volatilities.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.volatilities")]
     #[getter]
     fn volatilities(&self) -> Vec<f64> {
         self.inner.volatilities().to_vec()
     }
 
-    /// Factor names for reporting.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.factor_names")]
     #[getter]
     fn factor_names(&self) -> Vec<&'static str> {
         self.inner.factor_names()
     }
 
-    /// Model name for diagnostics.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.model_name")]
     #[getter]
     fn model_name(&self) -> &'static str {
         self.inner.model_name()
     }
 
-    /// Diagonal factor contribution for a single standard-normal draw.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.diagonal_factor_contribution")]
     #[pyo3(text_signature = "(self, factor_index, z)")]
     fn diagonal_factor_contribution(&self, factor_index: usize, z: f64) -> f64 {
         self.inner.diagonal_factor_contribution(factor_index, z)
@@ -476,7 +455,7 @@ impl PyLatentFactorKind {
     }
 }
 
-/// Single-factor model (common market factor).
+#[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor")]
 #[pyclass(
     name = "LatentSingleFactor",
     module = "finstack_quant.models.correlation",
@@ -491,28 +470,28 @@ pub struct PyLatentSingleFactor {
 
 #[pymethods]
 impl PyLatentSingleFactor {
-    /// Create a single-factor model.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.__init__")]
     #[new]
     #[pyo3(text_signature = "(volatility, mean_reversion)")]
-    fn new(volatility: f64, mean_reversion: f64) -> Self {
-        Self {
-            inner: LatentSingleFactor::new(volatility, mean_reversion),
-        }
+    fn new(volatility: f64, mean_reversion: f64) -> PyResult<Self> {
+        LatentSingleFactor::new(volatility, mean_reversion)
+            .map(|inner| Self { inner })
+            .map_err(correlation_to_py)
     }
 
-    /// Factor volatility.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.volatility")]
     #[getter]
     fn volatility(&self) -> f64 {
         self.inner.volatility()
     }
 
-    /// Mean reversion speed.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.mean_reversion")]
     #[getter]
     fn mean_reversion(&self) -> f64 {
         self.inner.mean_reversion()
     }
 
-    /// Number of factors (always 1).
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.num_factors")]
     #[getter]
     fn num_factors(&self) -> usize {
         self.inner.num_factors()
@@ -527,7 +506,7 @@ impl PyLatentSingleFactor {
     }
 }
 
-/// Two-factor model for prepayment and credit.
+#[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor")]
 #[pyclass(
     name = "LatentTwoFactor",
     module = "finstack_quant.models.correlation",
@@ -542,62 +521,62 @@ pub struct PyLatentTwoFactor {
 
 #[pymethods]
 impl PyLatentTwoFactor {
-    /// Create a two-factor model.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.__init__")]
     #[new]
     #[pyo3(text_signature = "(prepay_vol, credit_vol, correlation)")]
-    fn new(prepay_vol: f64, credit_vol: f64, correlation: f64) -> Self {
-        Self {
-            inner: LatentTwoFactor::new(prepay_vol, credit_vol, correlation),
-        }
+    fn new(prepay_vol: f64, credit_vol: f64, correlation: f64) -> PyResult<Self> {
+        LatentTwoFactor::new(prepay_vol, credit_vol, correlation)
+            .map(|inner| Self { inner })
+            .map_err(correlation_to_py)
     }
 
-    /// Standard RMBS calibration.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.rmbs_standard")]
     #[classmethod]
-    fn rmbs_standard(_cls: &Bound<'_, PyType>) -> Self {
-        Self {
-            inner: LatentTwoFactor::rmbs_standard(),
-        }
+    fn rmbs_standard(_cls: &Bound<'_, PyType>) -> PyResult<Self> {
+        LatentTwoFactor::rmbs_standard()
+            .map(|inner| Self { inner })
+            .map_err(correlation_to_py)
     }
 
-    /// Standard CLO calibration.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.clo_standard")]
     #[classmethod]
-    fn clo_standard(_cls: &Bound<'_, PyType>) -> Self {
-        Self {
-            inner: LatentTwoFactor::clo_standard(),
-        }
+    fn clo_standard(_cls: &Bound<'_, PyType>) -> PyResult<Self> {
+        LatentTwoFactor::clo_standard()
+            .map(|inner| Self { inner })
+            .map_err(correlation_to_py)
     }
 
-    /// Prepayment factor volatility.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.prepay_vol")]
     #[getter]
     fn prepay_vol(&self) -> f64 {
         self.inner.prepay_vol()
     }
 
-    /// Credit factor volatility.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.credit_vol")]
     #[getter]
     fn credit_vol(&self) -> f64 {
         self.inner.credit_vol()
     }
 
-    /// Factor correlation.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.correlation")]
     #[getter]
     fn correlation(&self) -> f64 {
         self.inner.correlation()
     }
 
-    /// Number of factors (always 2).
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.num_factors")]
     #[getter]
     fn num_factors(&self) -> usize {
         self.inner.num_factors()
     }
 
-    /// Cholesky ``L[1][0]`` for correlated factor generation.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.cholesky_l10")]
     #[getter]
     fn cholesky_l10(&self) -> f64 {
         self.inner.cholesky_l10()
     }
 
-    /// Cholesky ``L[1][1]`` for correlated factor generation.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.cholesky_l11")]
     #[getter]
     fn cholesky_l11(&self) -> f64 {
         self.inner.cholesky_l11()
@@ -613,7 +592,7 @@ impl PyLatentTwoFactor {
     }
 }
 
-/// Multi-factor model with custom correlation structure.
+#[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor")]
 #[pyclass(
     name = "LatentMultiFactor",
     module = "finstack_quant.models.correlation",
@@ -628,9 +607,7 @@ pub struct PyLatentMultiFactor {
 
 #[pymethods]
 impl PyLatentMultiFactor {
-    /// Create a validated multi-factor model.
-    ///
-    /// Raises ``ValueError`` if the correlation matrix is invalid.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.__init__")]
     #[new]
     #[pyo3(text_signature = "(num_factors, volatilities, correlations)")]
     fn new(
@@ -644,8 +621,7 @@ impl PyLatentMultiFactor {
             .map_err(correlation_to_py)
     }
 
-    /// Create an uncorrelated (identity) multi-factor model.
-    /// Raises ``ValueError`` for mismatched, negative or non-finite volatilities.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.uncorrelated")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, num_factors, volatilities)")]
     fn uncorrelated(
@@ -658,28 +634,25 @@ impl PyLatentMultiFactor {
             .map_err(correlation_to_py)
     }
 
-    /// Number of factors.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.num_factors")]
     #[getter]
     fn num_factors(&self) -> usize {
         self.inner.num_factors()
     }
 
-    /// Factor correlation matrix (flattened row-major).
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.correlation_matrix")]
     #[getter]
     fn correlation_matrix(&self) -> Vec<f64> {
         self.inner.correlation_matrix().to_vec()
     }
 
-    /// Factor volatilities.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.volatilities")]
     #[getter]
     fn volatilities(&self) -> Vec<f64> {
         self.inner.volatilities().to_vec()
     }
 
-    /// Generate correlated factor values from independent standard normal draws.
-    ///
-    /// Raises ``ValueError`` if ``independent_z`` does not contain exactly
-    /// ``num_factors`` draws.
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.generate_correlated_factors")]
     #[pyo3(text_signature = "(self, independent_z)")]
     fn generate_correlated_factors(&self, independent_z: Vec<f64>) -> PyResult<Vec<f64>> {
         self.inner
@@ -692,9 +665,7 @@ impl PyLatentMultiFactor {
     }
 }
 
-/// Correlated Bernoulli distribution for two binary events.
-///
-/// Wraps ``finstack_quant_core::math::probability::CorrelatedBernoulli``.
+#[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli")]
 #[pyclass(
     name = "CorrelatedBernoulli",
     module = "finstack_quant.models.correlation",
@@ -709,10 +680,7 @@ pub struct PyCorrelatedBernoulli {
 
 #[pymethods]
 impl PyCorrelatedBernoulli {
-    /// Create a correlated Bernoulli distribution.
-    ///
-    /// Correlation is clamped to the Fréchet-Hoeffding bounds for the
-    /// given marginal probabilities.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.__init__")]
     #[new]
     #[pyo3(text_signature = "(p1, p2, correlation)")]
     fn new(p1: f64, p2: f64, correlation: f64) -> PyResult<Self> {
@@ -721,70 +689,70 @@ impl PyCorrelatedBernoulli {
         })
     }
 
-    /// Marginal probability of event 1.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.p1")]
     #[getter]
     fn p1(&self) -> f64 {
         self.inner.p1()
     }
 
-    /// Marginal probability of event 2.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.p2")]
     #[getter]
     fn p2(&self) -> f64 {
         self.inner.p2()
     }
 
-    /// Correlation between events.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.correlation")]
     #[getter]
     fn correlation(&self) -> f64 {
         self.inner.correlation()
     }
 
-    /// Caller-requested correlation before Fréchet-Hoeffding clamping.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.requested_correlation")]
     #[getter]
     fn requested_correlation(&self) -> f64 {
         self.inner.requested_correlation()
     }
 
-    /// P(X₁=1, X₂=1).
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p11")]
     #[getter]
     fn joint_p11(&self) -> f64 {
         self.inner.joint_p11()
     }
 
-    /// P(X₁=1, X₂=0).
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p10")]
     #[getter]
     fn joint_p10(&self) -> f64 {
         self.inner.joint_p10()
     }
 
-    /// P(X₁=0, X₂=1).
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p01")]
     #[getter]
     fn joint_p01(&self) -> f64 {
         self.inner.joint_p01()
     }
 
-    /// P(X₁=0, X₂=0).
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p00")]
     #[getter]
     fn joint_p00(&self) -> f64 {
         self.inner.joint_p00()
     }
 
-    /// All four joint probabilities ``(p11, p10, p01, p00)``.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_probabilities")]
     fn joint_probabilities(&self) -> (f64, f64, f64, f64) {
         self.inner.joint_probabilities()
     }
 
-    /// Conditional probability P(X₂=1 | X₁=1).
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.conditional_p2_given_x1")]
     fn conditional_p2_given_x1(&self) -> f64 {
         self.inner.conditional_p2_given_x1()
     }
 
-    /// Conditional probability P(X₁=1 | X₂=1).
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.conditional_p1_given_x2")]
     fn conditional_p1_given_x2(&self) -> f64 {
         self.inner.conditional_p1_given_x2()
     }
 
-    /// Sample a pair of correlated binary outcomes from a uniform ``[0,1]`` draw.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.sample_from_uniform")]
     #[pyo3(text_signature = "(self, u)")]
     fn sample_from_uniform(&self, u: f64) -> PyResult<(u8, u8)> {
         self.inner.sample_from_uniform(u).map_err(core_to_py)
@@ -800,7 +768,7 @@ impl PyCorrelatedBernoulli {
     }
 }
 
-/// One name in a finite credit portfolio.
+#[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure")]
 #[pyclass(
     name = "CreditExposure",
     module = "finstack_quant.models.correlation",
@@ -814,6 +782,7 @@ pub struct PyCreditExposure {
 
 #[pymethods]
 impl PyCreditExposure {
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.__init__")]
     #[new]
     #[pyo3(text_signature = "(id, notional, default_probability, lgd, factor_loadings)")]
     fn new(
@@ -834,52 +803,49 @@ impl PyCreditExposure {
         }
     }
 
-    /// Stable identifier for this exposure.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.id")]
     #[getter]
     fn id(&self) -> String {
         self.inner.id.clone()
     }
 
-    /// Exposure at default, in the portfolio currency.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.notional")]
     #[getter]
     fn notional(&self) -> f64 {
         self.inner.notional
     }
 
-    /// Marginal probability of default over the horizon, in [0, 1].
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.default_probability")]
     #[getter]
     fn default_probability(&self) -> f64 {
         self.inner.default_probability
     }
 
-    /// Loss given default, as a fraction of notional in [0, 1].
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.lgd")]
     #[getter]
     fn lgd(&self) -> f64 {
         self.inner.lgd
     }
 
-    /// Systematic factor loadings driving correlated defaults.
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.factor_loadings")]
     #[getter]
     fn factor_loadings(&self) -> Vec<f64> {
         self.inner.factor_loadings.clone()
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CreditExposure", &self.inner)
     }
 }
 
-wire_methods!(PyCreditExposure, CreditExposure, "CreditExposure");
+wire_methods!(
+    PyCreditExposure,
+    CreditExposure,
+    "CreditExposure",
+    module = "finstack_quant.models.correlation"
+);
 
-/// Settings for deterministic portfolio credit-loss simulation.
-///
-/// ``num_paths`` must be between 1 and
-/// ``MAX_PORTFOLIO_LOSS_PATHS`` (inclusive).
+#[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig")]
 #[pyclass(
     name = "PortfolioLossConfig",
     module = "finstack_quant.models.correlation",
@@ -893,6 +859,7 @@ pub struct PyPortfolioLossConfig {
 
 #[pymethods]
 impl PyPortfolioLossConfig {
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.__init__")]
     #[new]
     #[pyo3(text_signature = "(num_paths, seed, confidence, copula)")]
     fn new(num_paths: usize, seed: u64, confidence: f64, copula: PyCopulaSpec) -> Self {
@@ -906,35 +873,30 @@ impl PyPortfolioLossConfig {
         }
     }
 
-    /// Number of simulated paths.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths
     }
 
-    /// RNG seed; the same seed reproduces the same paths exactly.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.seed")]
     #[getter]
     fn seed(&self) -> u64 {
         self.inner.seed
     }
 
-    /// Confidence level for VaR and expected shortfall, in (0, 1).
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.confidence")]
     #[getter]
     fn confidence(&self) -> f64 {
         self.inner.confidence
     }
 
-    /// Dependence structure used to couple the marginal defaults.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.copula")]
     #[getter]
     fn copula(&self) -> PyCopulaSpec {
         PyCopulaSpec::from_inner(self.inner.copula.clone())
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("PortfolioLossConfig", &self.inner)
     }
@@ -943,10 +905,11 @@ impl PyPortfolioLossConfig {
 wire_methods!(
     PyPortfolioLossConfig,
     PortfolioLossConfig,
-    "PortfolioLossConfig"
+    "PortfolioLossConfig",
+    module = "finstack_quant.models.correlation"
 );
 
-/// Simulated loss distribution and loss-positive VaR/expected shortfall.
+#[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult")]
 #[pyclass(
     name = "PortfolioLossResult",
     module = "finstack_quant.models.correlation",
@@ -960,14 +923,7 @@ pub struct PyPortfolioLossResult {
 
 #[pymethods]
 impl PyPortfolioLossResult {
-    /// Aggregate a finite loss distribution under loss-positive conventions.
-    ///
-    /// VaR is the nearest-rank loss quantile at ``confidence``; expected
-    /// shortfall averages exactly the worst ``1 - confidence`` probability
-    /// mass, with fractional weight on the boundary observation.
-    ///
-    /// Raises ``ValueError`` if ``losses`` is empty, a loss is non-finite or
-    /// negative, or ``confidence`` is outside ``(0, 1)``.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.from_losses")]
     #[staticmethod]
     #[pyo3(text_signature = "(losses, confidence)")]
     fn from_losses(losses: Vec<f64>, confidence: f64) -> PyResult<Self> {
@@ -976,43 +932,37 @@ impl PyPortfolioLossResult {
             .map_err(core_to_py)
     }
 
-    /// Simulated portfolio loss per path, in the ascending path order Rust produced.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.losses")]
     #[getter]
     fn losses(&self) -> Vec<f64> {
         self.inner.losses.clone()
     }
 
-    /// Mean simulated loss.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.expected_loss")]
     #[getter]
     fn expected_loss(&self) -> f64 {
         self.inner.expected_loss
     }
 
-    /// Value at risk at `confidence`, loss-positive (larger is worse).
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.var")]
     #[getter]
     fn var(&self) -> f64 {
         self.inner.var
     }
 
-    /// Probability-weighted mean loss in the worst `1 - confidence` tail, loss-positive.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.expected_shortfall")]
     #[getter]
     fn expected_shortfall(&self) -> f64 {
         self.inner.expected_shortfall
     }
 
-    /// Confidence level for VaR and expected shortfall, in (0, 1).
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.confidence")]
     #[getter]
     fn confidence(&self) -> f64 {
         self.inner.confidence
     }
 
-    /// Tranche loss statistics for one attachment/detachment pair.
-    ///
-    /// ``attachment`` and ``detachment`` are fractions of pool notional in
-    /// ``[0, 1]`` — a 0-3% equity tranche is ``(0.0, 0.03)``. Each path's
-    /// pool loss fraction ``L`` maps to
-    /// ``clamp(L - attachment, 0, width) / width``, and the resulting
-    /// distribution is aggregated at this result's own ``confidence``.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.tranche_loss_statistics")]
     #[pyo3(text_signature = "(attachment, detachment, pool_notional)")]
     fn tranche_loss_statistics(
         &self,
@@ -1029,46 +979,14 @@ impl PyPortfolioLossResult {
         .map_err(core_to_py)
     }
 
-    /// Primary table: the simulated loss distribution.
-    ///
-    /// Alias of :meth:`to_distribution_dataframe`. Every tabular result type
-    /// in the library answers ``to_dataframe()``; the one-row aggregate view
-    /// stays on :meth:`to_summary_dataframe`.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_distribution_dataframe(py)
-    }
-
-    /// Export the simulated loss distribution as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``loss``.
-    ///
-    /// One row per simulated path, indexed by path id (a ``RangeIndex``), in
-    /// the ascending path order Rust produced — so repeated exports of the
-    /// same result are identical. Feed it straight to ``df["loss"].hist()`` or
-    /// ``df["loss"].quantile(...)``.
-    ///
-    /// The aggregate statistics are not repeated per row; see
-    /// :meth:`to_summary_dataframe`.
-    fn to_distribution_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("loss", self.inner.losses.clone())?;
         dict_to_dataframe(py, &data, None)
     }
 
-    /// Export the aggregate loss statistics as a single-row pandas ``DataFrame``.
-    ///
-    /// ``var`` must be read as ``df["var"]``: attribute access resolves to
-    /// ``DataFrame.var`` (the variance method), not the column.
-    ///
-    /// Columns: ``expected_loss``, ``var``, ``expected_shortfall``,
-    /// ``confidence``, ``num_paths``.
-    ///
-    /// One simulation is one flat record, so a one-row frame is the right
-    /// shape: ``pd.concat`` over several correlation or recovery assumptions
-    /// gives a comparison table directly.
-    ///
-    /// ``var`` and ``expected_shortfall`` are loss-positive, matching the Rust
-    /// convention: a larger number is a worse outcome.
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.to_summary_dataframe")]
     fn to_summary_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let row = serde_json::json!({
             "expected_loss": self.inner.expected_loss,
@@ -1090,11 +1008,6 @@ impl PyPortfolioLossResult {
         )
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("PortfolioLossResult", &self.inner)
     }
@@ -1103,10 +1016,11 @@ impl PyPortfolioLossResult {
 wire_methods!(
     PyPortfolioLossResult,
     PortfolioLossResult,
-    "PortfolioLossResult"
+    "PortfolioLossResult",
+    module = "finstack_quant.models.correlation"
 );
 
-/// Expected loss, tail statistics, and breach probabilities for one tranche.
+#[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics")]
 #[pyclass(
     name = "TrancheLossStatistics",
     module = "finstack_quant.models.correlation",
@@ -1120,94 +1034,73 @@ pub struct PyTrancheLossStatistics {
 
 #[pymethods]
 impl PyTrancheLossStatistics {
-    /// Attachment point as a fraction of portfolio notional.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.attachment")]
     #[getter]
     fn attachment(&self) -> f64 {
         self.inner.attachment
     }
 
-    /// Detachment point as a fraction of portfolio notional.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.detachment")]
     #[getter]
     fn detachment(&self) -> f64 {
         self.inner.detachment
     }
 
-    /// Tranche width in currency: `(detachment - attachment)` x portfolio notional.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.tranche_notional")]
     #[getter]
     fn tranche_notional(&self) -> f64 {
         self.inner.tranche_notional
     }
 
-    /// Mean tranche loss as a fraction of `tranche_notional`.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_loss_fraction")]
     #[getter]
     fn expected_loss_fraction(&self) -> f64 {
         self.inner.expected_loss_fraction
     }
 
-    /// Mean tranche loss in currency.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_loss_amount")]
     #[getter]
     fn expected_loss_amount(&self) -> f64 {
         self.inner.expected_loss_amount
     }
 
-    /// Tranche value at risk as a fraction of `tranche_notional`.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.var_fraction")]
     #[getter]
     fn var_fraction(&self) -> f64 {
         self.inner.var_fraction
     }
 
-    /// Tranche value at risk in currency, loss-positive.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.var_amount")]
     #[getter]
     fn var_amount(&self) -> f64 {
         self.inner.var_amount
     }
 
-    /// Tranche expected shortfall as a fraction of `tranche_notional`.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_shortfall_fraction")]
     #[getter]
     fn expected_shortfall_fraction(&self) -> f64 {
         self.inner.expected_shortfall_fraction
     }
 
-    /// Tranche expected shortfall in currency, loss-positive.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_shortfall_amount")]
     #[getter]
     fn expected_shortfall_amount(&self) -> f64 {
         self.inner.expected_shortfall_amount
     }
 
-    /// Probability the tranche takes any loss at all.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.prob_attachment_breached")]
     #[getter]
     fn prob_attachment_breached(&self) -> f64 {
         self.inner.prob_attachment_breached
     }
 
-    /// Probability the tranche is written down in full.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.prob_full_writedown")]
     #[getter]
     fn prob_full_writedown(&self) -> f64 {
         self.inner.prob_full_writedown
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``attachment``, ``detachment``, ``tranche_notional``,
-    /// ``expected_loss_fraction``, ``expected_loss_amount``, ``var_fraction``,
-    /// ``var_amount``, ``expected_shortfall_fraction``,
-    /// ``expected_shortfall_amount``, ``prob_attachment_breached``,
-    /// ``prob_full_writedown``.
-    ///
-    /// These statistics describe ONE tranche, so a one-row frame is the right
-    /// shape. Build the capital-structure table by stacking tranches::
-    ///
-    ///     pd.concat(
-    ///         [
-    ///             result.tranche_loss_statistics(a, d, pool).to_dataframe()
-    ///             for a, d in [(0.0, 0.03), (0.03, 0.07), (0.07, 1.0)]
-    ///         ],
-    ///         ignore_index=True,
-    ///     )
-    ///
-    /// ``*_fraction`` columns are shares of the tranche's own notional;
-    /// ``*_amount`` columns are in the pool-notional unit passed to
-    /// :meth:`PortfolioLossResult.tranche_loss_statistics`.
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let row = serde_json::json!({
             "attachment": self.inner.attachment,
@@ -1241,11 +1134,6 @@ impl PyTrancheLossStatistics {
         )
     }
 
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("TrancheLossStatistics", &self.inner)
     }
@@ -1254,7 +1142,8 @@ impl PyTrancheLossStatistics {
 wire_methods!(
     PyTrancheLossStatistics,
     TrancheLossStatistics,
-    "TrancheLossStatistics"
+    "TrancheLossStatistics",
+    module = "finstack_quant.models.correlation"
 );
 impl_repr_html_via_dataframe!(PyTrancheLossStatistics);
 
@@ -1280,14 +1169,7 @@ fn extract_exposures(exposures: &Bound<'_, PyAny>) -> PyResult<Vec<CreditExposur
     crate::bindings::module_utils::py_to_serde(py, &records, "exposures")
 }
 
-/// Simulate a finite portfolio's loss-positive credit-loss distribution.
-///
-/// ``exposures`` is a ``list[CreditExposure]`` or a ``pandas.DataFrame`` with
-/// the ``CreditExposure`` field names as columns: ``id``, ``notional``,
-/// ``default_probability``, ``lgd`` and ``factor_loadings`` (a list per name).
-///
-/// Raises ``TypeError`` for other exposure containers, ``ValueError`` for
-/// missing columns or invalid simulation inputs.
+#[doc = pydoc!("finstack_quant.models.correlation", "simulate_portfolio_loss")]
 #[pyfunction]
 #[pyo3(signature = (exposures, config, recovery=None))]
 #[pyo3(text_signature = "(exposures, config, recovery=None)")]
@@ -1319,25 +1201,14 @@ fn extract_square_matrix(
     crate::bindings::matrix_input::extract_square_matrix(py, matrix, n, "matrix")
 }
 
-/// Fréchet-Hoeffding correlation bounds for two Bernoulli marginals.
-///
-/// Returns ``(rho_min, rho_max)`` — the feasible correlation range.
+#[doc = pydoc!("finstack_quant.models.correlation", "correlation_bounds")]
 #[pyfunction]
 #[pyo3(text_signature = "(p1, p2)")]
 fn correlation_bounds(p1: f64, p2: f64) -> PyResult<(f64, f64)> {
     probability::correlation_bounds(p1, p2).map_err(core_to_py)
 }
 
-/// Validate a correlation matrix.
-///
-/// ``matrix`` is either flat row-major (length ``n * n``) or a 2-D
-/// ``n x n`` list/array of rows.
-///
-/// Raises ``ValueError`` if ``n * n`` overflows the platform's ``usize``
-/// range, the shape does not match ``n``, or the matrix is not a valid
-/// correlation matrix (diagonal, bounds, symmetry, PSD).
-/// Raises ``OverflowError`` if ``n`` is negative or exceeds the platform's
-/// ``usize`` range, and ``TypeError`` if ``n`` is not an integer.
+#[doc = pydoc!("finstack_quant.models.correlation", "validate_correlation_matrix")]
 #[pyfunction]
 #[pyo3(text_signature = "(matrix, n)")]
 fn validate_correlation_matrix(
@@ -1350,54 +1221,7 @@ fn validate_correlation_matrix(
         .map_err(|err| correlation_to_py(corr::Error::from(err)))
 }
 
-/// Nearest correlation matrix (Higham 2002) for a near-PSD input.
-///
-/// Given a symmetric matrix ``matrix`` (flattened row-major, length ``n*n``)
-/// that is approximately a correlation matrix but has small PSD violations,
-/// returns the nearest valid correlation matrix (symmetric, unit diagonal,
-/// PSD) in Frobenius norm using Higham's alternating-projection algorithm
-/// with Dykstra's correction.
-///
-/// Typical use: repair a shrinkage or thresholded sample correlation that
-/// fails Cholesky by a small margin. Gross violations (asymmetric by more
-/// than ``1e-6``, diagonal further than ``1e-3`` from ``1.0``) raise rather
-/// than being silently reshaped.
-///
-/// Parameters
-/// ----------
-/// matrix : list[float] | list[list[float]]
-///     Flat row-major ``n x n`` input matrix, or a 2-D ``n x n`` list/array.
-/// n : int
-///     Non-negative matrix dimension representable as the platform's
-///     unsigned pointer-sized integer; ``n * n`` must also fit that range.
-/// max_iter : int, optional
-///     Non-negative maximum alternating-projection iterations, representable
-///     as the platform's unsigned pointer-sized integer. Defaults to the Rust
-///     ``NearestCorrelationOpts::default()`` value (currently ``200``).
-/// tol : float, optional
-///     Frobenius-norm tolerance between successive iterates. Defaults to
-///     the Rust ``NearestCorrelationOpts::default()`` value (currently
-///     ``1e-10``).
-///
-/// Returns
-/// -------
-/// list[float]
-///     Flattened row-major ``n x n`` correlation matrix with unit diagonal
-///     and PSD.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``n * n`` overflows the platform's ``usize`` range, the input shape
-///     does not match ``n``, is grossly asymmetric, or the diagonal is far
-///     from 1.
-/// OverflowError
-///     If ``n`` or ``max_iter`` is negative or exceeds the platform's
-///     unsigned pointer-sized integer range.
-/// TypeError
-///     If ``n`` or a supplied ``max_iter`` is not an integer.
-/// RuntimeError
-///     If the projection does not converge within ``max_iter`` iterations.
+#[doc = pydoc!("finstack_quant.models.correlation", "nearest_correlation")]
 #[pyfunction]
 #[pyo3(signature = (matrix, n, max_iter=None, tol=None))]
 fn nearest_correlation(
@@ -1419,25 +1243,7 @@ fn nearest_correlation(
         .map_err(|err| correlation_to_py(corr::Error::from(err)))
 }
 
-/// Pivoted Cholesky decomposition of a correlation matrix (flattened
-/// row-major).
-///
-/// Returns a factor matrix ``L`` (flat ``list[float]``, row-major, original
-/// variable order) satisfying ``L @ L.T == matrix``. Because diagonal
-/// pivoting is used to handle near-singular and positive-semidefinite
-/// matrices, the unpermuted factor is **not** guaranteed to be lower
-/// triangular — it may contain non-zero entries above the diagonal. The
-/// effective numerical rank is not surfaced through this function.
-///
-/// ``matrix`` is either flat row-major (length ``n * n``) or a 2-D
-/// ``n x n`` list/array of rows.
-///
-/// Raises ``ValueError`` if ``n * n`` overflows the platform's ``usize``
-/// range, the matrix shape is wrong, an entry is non-finite, or the matrix
-/// is indefinite. The message preserves the core Cholesky diagnostic,
-/// including dimensions or the offending position and value.
-/// Raises ``OverflowError`` if ``n`` is negative or exceeds the platform's
-/// ``usize`` range, and ``TypeError`` if ``n`` is not an integer.
+#[doc = pydoc!("finstack_quant.models.correlation", "cholesky_correlation")]
 #[pyfunction]
 #[pyo3(text_signature = "(matrix, n)")]
 fn cholesky_correlation(py: Python<'_>, matrix: &Bound<'_, PyAny>, n: usize) -> PyResult<Vec<f64>> {
@@ -1454,7 +1260,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "correlation")?;
     m.setattr(
         "__doc__",
-        "Correlation infrastructure: copulas, factor models, recovery models.",
+        pydoc!("finstack_quant.models.correlation", "__module__"),
     )?;
 
     m.add_class::<PyCopulaSpec>()?;

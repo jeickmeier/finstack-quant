@@ -75,7 +75,13 @@ fn test_tree_calibrates_to_curve() {
         // reusing the 5Y rates on a shorter clock changes their economics.
         tree.calibrate(&curve, t).unwrap();
         let expected_df = (-rate * t).exp();
-        let tree_df = tree.price(0.0, &valuator).unwrap();
+        let tree_df = tree
+            .price(
+                0.0,
+                finstack_quant_core::math::Compounding::Continuous,
+                &valuator,
+            )
+            .unwrap();
 
         assert!(
             (tree_df - expected_df).abs() < 1e-3,

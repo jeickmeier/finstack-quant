@@ -7,7 +7,7 @@ use finstack_quant_models::fourier::cos::{bs_cos_price, CosMarketParams};
 use finstack_quant_models::monte_carlo::{
     pricer::{
         basis::PolynomialBasis,
-        lsmc::{AmericanExercise, LsmcConfig, LsmcPricer},
+        lsmc::{AmericanExercise, LsmcConfig, LsmcEngine},
     },
     process::gbm::GbmProcess,
 };
@@ -60,7 +60,9 @@ fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
 
 #[test]
 fn lsmc_only_applies_immediate_exercise_when_scheduled_in_both_pricing_modes() {
-    let process = GbmProcess::with_params(0.2, 0.0, 0.0).unwrap();
+    let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.2, 0.0, 0.0)
+        .map(GbmProcess::new)
+        .unwrap();
     let payoff = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
     let basis = PolynomialBasis::new(1).expect("valid regression basis");
     for (dates, expected) in [
@@ -72,7 +74,7 @@ fn lsmc_only_applies_immediate_exercise_when_scheduled_in_both_pricing_modes() {
             .with_parallel(false)
             .with_antithetic(false)
             .with_seed(7);
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
         let estimate = pricer
             .price(&process, 50.0, 1.0, 1, &payoff, &basis, Currency::USD, 0.2)
             .unwrap();

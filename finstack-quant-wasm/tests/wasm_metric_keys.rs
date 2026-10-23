@@ -3,7 +3,7 @@
 
 use finstack_quant_core::{currency::Currency, money::Money};
 use finstack_quant_valuations::results::ValuationResult;
-use finstack_quant_wasm::api::valuations::pricing::valuation_result_to_json;
+use finstack_quant_wasm::api::valuations::results::valuation_result_to_json;
 use time::macros::date;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;

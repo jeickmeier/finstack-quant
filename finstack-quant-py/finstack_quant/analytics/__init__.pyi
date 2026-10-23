@@ -1,7 +1,7 @@
 """
 Performance analytics: returns, drawdowns, risk metrics, and benchmarks.
 
-The sole entry point is :class:`Performance`. Construct from a price panel
+The panel entry point is :class:`Performance`. Construct from a price panel
 (``Performance(prices_df)`` / ``Performance.from_arrays(...)``) or from a
 return panel (``Performance.from_returns(returns_df)`` /
 ``Performance.from_returns_arrays(...)``); every analytic — return / risk
@@ -10,9 +10,12 @@ scalars, drawdown statistics, rolling windows, periodic returns
 method on the resulting instance.
 
 The remaining classes are value-object outputs returned by `Performance`
-methods (`LookbackReturns`, `PeriodStats`, etc.). Four scalar free functions
+methods (`LookbackReturns`, `PeriodStats`, etc.) and the
+:class:`AnalyticsError` exception. Four scalar free functions
 (:func:`sharpe`, :func:`sortino`, :func:`volatility`, :func:`max_drawdown`)
-cover a single return series without a panel.
+cover a single return series without a panel, and
+:func:`constrained_least_squares` fits factor returns for factor-Brinson
+attribution.
 
 Examples
 --------
@@ -26,7 +29,9 @@ Examples
 from __future__ import annotations
 
 import datetime
-from typing import Sequence
+from typing import Any, Sequence
+
+from finstack_quant.core.dates import FiscalConfig
 
 import numpy as np
 import numpy.typing as npt
@@ -369,6 +374,21 @@ class PeriodStats:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class BetaResult:
     """
     Regression beta with confidence interval.
@@ -585,6 +605,21 @@ class BetaResult:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class GreeksResult:
     """
     Alpha, beta, and goodness-of-fit from a single-index regression.
@@ -781,6 +816,21 @@ class GreeksResult:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class RollingGreeks:
     """
     Rolling alpha and beta time series.
@@ -934,6 +984,21 @@ class RollingGreeks:
         Notes
         -----
         This method does not raise; failures degrade to ``None``.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 
@@ -1139,6 +1204,20 @@ class MultiFactorResult:
         ...
 
     def __repr__(self) -> str: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
 
 class DrawdownEpisode:
     """
@@ -1343,6 +1422,21 @@ class DrawdownEpisode:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class LookbackReturns:
     """
     Period-to-date returns for each ticker.
@@ -1519,6 +1613,21 @@ class LookbackReturns:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class DatedSeries:
     """
     Date-indexed numeric series returned by the rolling-window analytics.
@@ -1677,6 +1786,21 @@ class DatedSeries:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 # Performance engine
 
 class Performance:
@@ -1734,6 +1858,8 @@ class Performance:
         AnalyticsError
             If ``prices`` is invalid or empty, or dates are not strictly
             ascending.
+        KeyError
+            If ``benchmark_ticker`` is given but is not one of the column labels.
         TypeError
             If ``prices`` is not a pandas ``DataFrame`` or ``Series`` (use
             :meth:`from_arrays` for raw lists), or its column labels are not
@@ -1779,6 +1905,8 @@ class Performance:
         AnalyticsError
             If dimensions are inconsistent, dates are invalid, or ``frequency`` is
             unrecognized.
+        KeyError
+            If ``benchmark_ticker`` is given but is not in ``ticker_names``.
 
         Examples
         --------
@@ -1823,6 +1951,8 @@ class Performance:
         TypeError
             If ``returns`` is not a pandas ``DataFrame`` or ``Series`` (use
             :meth:`from_returns_arrays` for raw lists).
+        KeyError
+            If ``benchmark_ticker`` is given but is not one of the column labels.
 
         Returns
         -------
@@ -1877,6 +2007,8 @@ class Performance:
         ------
         AnalyticsError
             If dimensions are inconsistent or ``frequency`` is unrecognized.
+        KeyError
+            If ``benchmark_ticker`` is given but is not in ``ticker_names``.
 
         Examples
         --------
@@ -1919,8 +2051,8 @@ class Performance:
 
         Raises
         ------
-        AnalyticsError
-            If ``ticker`` does not match a loaded ticker name.
+        KeyError
+            If ``ticker`` is not a loaded ticker name; the benchmark is unchanged.
         """
 
     # -- Getters --
@@ -2510,7 +2642,8 @@ class Performance:
         Returns
         -------
         pd.Series
-            Sum of gains divided by sum of absolute losses indexed by ticker name.
+            Sum of all returns divided by the sum of absolute losses, indexed by
+            ticker name.
 
         Notes
         -----
@@ -3301,7 +3434,7 @@ class Performance:
             ``risk_free_rate`` is non-zero with ``"excess"``.
         AnalyticsError
             If ``ticker_idx`` is out of range, no factors are supplied, factor
-            lengths differ from the ticker return series, returns are
+            lengths differ from the ticker return series, factor returns are
             non-finite, observations are insufficient, or the regression is
             numerically singular; also if a fitted coefficient, annualized
             intercept, or residual volatility cannot be represented as a
@@ -3312,14 +3445,14 @@ class Performance:
     def lookback_returns(
         self,
         ref_date: object,
-        fiscal_year_start_month: int | None = None,
-        fiscal_year_start_day: int | None = None,
+        fiscal_config: FiscalConfig | None = None,
     ) -> LookbackReturns:
         """
         Period-to-date lookback returns.
 
-        Defaults to a January-1 fiscal-year start. FYTD is the first
-        observation on or after that fiscal calendar start through
+        MTD, QTD and YTD start on the first calendar day of ``ref_date``'s
+        month, calendar quarter and year. FYTD is the first observation on or
+        after the fiscal calendar start of *fiscal_config* through
         ``ref_date``. Holidays are not skipped. The first included simple
         return still spans the prior close.
 
@@ -3327,13 +3460,9 @@ class Performance:
         ----------
         ref_date : object
             Reference date (``datetime.date``, ``pd.Timestamp``, or ISO string).
-        fiscal_year_start_month : int, optional
-            Fiscal year start month in ``1..=12``. When only the day is given
-            the month is January; with both omitted the fiscal year is the
-            calendar year (Rust ``FiscalConfig::from_parts``).
-        fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``. When only the month is given
-            the day is the 1st.
+        fiscal_config : FiscalConfig, optional
+            Fiscal calendar that opens the FYTD window. ``None`` uses the
+            calendar year (Rust ``FiscalConfig::default``).
 
         Returns
         -------
@@ -3344,16 +3473,17 @@ class Performance:
         Raises
         ------
         ValueError
-            If *fiscal_year_start_month* is not in ``1..=12`` or
-            *fiscal_year_start_day* is not in ``1..=31``.
+            If *ref_date* is a string that is not ISO-8601.
+        TypeError
+            If *ref_date* is not date-like, or *fiscal_config* is neither a
+            ``FiscalConfig`` nor ``None``.
         """
 
     def period_stats(
         self,
         ticker_idx: int | str,
         aggregation_frequency: str | None = None,
-        fiscal_year_start_month: int | None = None,
-        fiscal_year_start_day: int | None = None,
+        fiscal_config: FiscalConfig | None = None,
     ) -> PeriodStats:
         """
         Period statistics for one ticker at a given aggregation frequency.
@@ -3367,14 +3497,10 @@ class Performance:
             Aggregation frequency (``"daily"``, ``"weekly"``, ``"monthly"``,
             ``"quarterly"``, ``"semi_annual"``, ``"annual"``); ``None`` uses the Rust default
             ``DEFAULT_PERIODIC_FREQUENCY`` (monthly).
-        fiscal_year_start_month : int, optional
-            Fiscal year start month in ``1..=12``. When only the day is given
-            the month is January (Rust ``FiscalConfig::from_parts``).
-        fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``, clamped to the month end.
-            When only the month is given
-            the day is the 1st. Supplying either fiscal argument applies fiscal
-            day, week, month, quarter, half-year and year boundaries.
+        fiscal_config : FiscalConfig, optional
+            ``None`` buckets Gregorian periods with ISO weeks. A ``FiscalConfig``
+            applies fiscal day, week, month, quarter, half-year and year
+            boundaries, clamping a start day past the month end.
 
         Returns
         -------
@@ -3384,10 +3510,12 @@ class Performance:
         Raises
         ------
         AnalyticsError
-            If the frequency or fiscal start is invalid, the ticker index is
-            out of range, or a containing period boundary cannot be represented.
+            If the frequency is invalid, the ticker index is out of range, or a
+            containing period boundary cannot be represented.
         KeyError
             If a ticker name is not present in the panel.
+        TypeError
+            If *fiscal_config* is neither a ``FiscalConfig`` nor ``None``.
         """
 
     def periodic_returns(
@@ -3529,6 +3657,21 @@ class Performance:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 def sharpe(
     returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series,
     risk_free_rate: float = 0.0,
@@ -3627,8 +3770,8 @@ def volatility(
     Returns
     -------
     float
-        Annualized volatility as a decimal (``0.15`` is 15%); ``0.0`` for an
-        empty input, ``nan`` for an invalid ``periods_per_year``.
+        Annualized volatility as a decimal (``0.15`` is 15%); ``0.0`` for fewer
+        than two observations, ``nan`` for an invalid ``periods_per_year``.
 
     Raises
     ------

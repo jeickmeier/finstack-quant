@@ -292,8 +292,10 @@ impl Tenor {
                 DayCount::Thirty360
                 | DayCount::ThirtyE360
                 | DayCount::ThirtyE360Isda
+                | DayCount::Thirty360It
                 | DayCount::Act360 => (years * 360.0).round(),
-                DayCount::Act365F => (years * 365.0).round(),
+                DayCount::Act365F | DayCount::Nl365 | DayCount::Act365L => (years * 365.0).round(),
+                DayCount::Bus252 => (years * 252.0).round(),
                 _ => (years * 365.25).round(),
             };
             Self::new(days as u32, TenorUnit::Days)
@@ -639,12 +641,15 @@ impl Tenor {
         day_count: DayCount,
     ) -> crate::Result<f64> {
         let end_date = self.add_to_date(as_of, calendar, business_day_convention)?;
+        if end_date <= as_of {
+            return Ok(0.0);
+        }
 
         let ctx = DayCountContext {
             calendar,
-            frequency: None,
+            frequency: Some(*self),
             bus_basis: None,
-            coupon_period: None,
+            coupon_period: Some((as_of, end_date)),
             end_is_termination_date: false,
         };
 

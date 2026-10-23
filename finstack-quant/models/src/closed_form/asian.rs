@@ -586,7 +586,8 @@ pub fn arithmetic_asian_tw_price_times(
     validate_fixing_times(fixing_times)?;
     let rate = -df.ln() / t_expiry;
 
-    let m1 = arithmetic_mean_first_moment_times(spot, rate, div_yield, fixing_times);
+    let m1 =
+        arithmetic_mean_first_moment_times(spot, rate, div_yield, fixing_times.iter().copied());
     super::vanilla::checked_closed_form_value(m1, "arithmetic Asian first moment")?;
     let upper_bound = match option_type {
         OptionType::Call => df * m1,
@@ -598,7 +599,13 @@ pub fn arithmetic_asian_tw_price_times(
         return Ok(degenerate(m1));
     }
 
-    let m2 = arithmetic_mean_second_moment_times(spot, rate, div_yield, vol, fixing_times);
+    let m2 = arithmetic_mean_second_moment_times(
+        spot,
+        rate,
+        div_yield,
+        vol,
+        fixing_times.iter().copied(),
+    );
     super::vanilla::checked_closed_form_value(m2, "arithmetic Asian second moment")?;
     if m2 <= m1 * m1 {
         return Ok(degenerate(m1));
@@ -622,14 +629,15 @@ fn arithmetic_mean_first_moment_times(
     spot: f64,
     rate: f64,
     div_yield: f64,
-    fixing_times: &[f64],
+    fixing_times: impl ExactSizeIterator<Item = f64>,
 ) -> f64 {
+    let n = fixing_times.len() as f64;
     let drift = rate - div_yield;
     let mut acc = NeumaierAccumulator::new();
-    for &t_i in fixing_times {
+    for t_i in fixing_times {
         acc.add((drift * t_i).exp());
     }
-    spot * acc.total() / fixing_times.len() as f64
+    spot * acc.total() / n
 }
 
 /// `E[A²]` for an arithmetic average on arbitrary (sorted) fixing times.
@@ -641,7 +649,7 @@ fn arithmetic_mean_second_moment_times(
     rate: f64,
     div_yield: f64,
     vol: f64,
-    fixing_times: &[f64],
+    fixing_times: impl ExactSizeIterator<Item = f64>,
 ) -> f64 {
     let n = fixing_times.len() as f64;
     let a = 2.0 * rate - 2.0 * div_yield + vol * vol;
@@ -652,7 +660,7 @@ fn arithmetic_mean_second_moment_times(
     let mut upper_acc = NeumaierAccumulator::new();
     let mut prefix_ab = 0.0_f64;
 
-    for &tk in fixing_times {
+    for tk in fixing_times {
         diag_acc.add((a * tk).exp());
         upper_acc.add((b * tk).exp() * prefix_ab);
         prefix_ab += (a_minus_b * tk).exp();
@@ -695,17 +703,13 @@ fn compute_arithmetic_mean_first_moment(
     div_yield: f64,
     num_fixings: usize,
 ) -> f64 {
-    let n = num_fixings as f64;
-    let dt = time / n;
-    let drift = rate - div_yield;
-
-    let mut acc = NeumaierAccumulator::new();
-    for i in 1..=num_fixings {
-        let t_i = (i as f64) * dt;
-        acc.add((drift * t_i).exp());
-    }
-
-    spot * acc.total() / n
+    let dt = time / num_fixings as f64;
+    arithmetic_mean_first_moment_times(
+        spot,
+        rate,
+        div_yield,
+        (0..num_fixings).map(|i| ((i + 1) as f64) * dt),
+    )
 }
 
 /// Compute `E[A²]` for arithmetic average with discrete fixings using O(n) algorithm.
@@ -736,34 +740,14 @@ fn compute_arithmetic_mean_second_moment(
     vol: f64,
     num_fixings: usize,
 ) -> f64 {
-    let n = num_fixings as f64;
-    let dt = time / n;
-
-    let a = 2.0 * rate - 2.0 * div_yield + vol * vol; // coefficient for min(tᵢ, tⱼ)
-    let b = rate - div_yield; // coefficient for |tᵢ - tⱼ|
-    let a_minus_b = a - b; // = r - q + σ²
-
-    let mut diag_acc = NeumaierAccumulator::new();
-    let mut upper_acc = NeumaierAccumulator::new();
-
-    // prefix_ab: Σᵢ'<k exp((a-b)·tᵢ')  — combined with exp(b·tₖ) for upper triangle
-    let mut prefix_ab = 0.0_f64;
-
-    for k in 1..=num_fixings {
-        let tk = (k as f64) * dt;
-
-        // Diagonal term: i = j = k → exp(a·tₖ)
-        diag_acc.add((a * tk).exp());
-
-        // Upper triangle: k acts as j, sum over all i < k
-        // Each pair (i,j) with i<j contributes exp((a-b)·tᵢ + b·tⱼ)
-        upper_acc.add((b * tk).exp() * prefix_ab);
-
-        prefix_ab += (a_minus_b * tk).exp();
-    }
-
-    // Off-diagonal total = 2 * upper_tri_sum (each unordered pair counted twice)
-    spot * spot * (diag_acc.total() + 2.0 * upper_acc.total()) / (n * n)
+    let dt = time / num_fixings as f64;
+    arithmetic_mean_second_moment_times(
+        spot,
+        rate,
+        div_yield,
+        vol,
+        (0..num_fixings).map(|i| ((i + 1) as f64) * dt),
+    )
 }
 
 #[cfg(test)]
@@ -1504,6 +1488,43 @@ mod tests {
                 slow,
                 rel_err
             );
+        }
+    }
+
+    #[test]
+    fn irregular_arithmetic_moments_match_gbm_covariance() {
+        let spot = 100.0;
+        let vol = 0.2_f64;
+        for times in [
+            vec![1e-9_f64, 2e-9, 3e-9],
+            vec![0.01, 0.3, 0.3 + 1e-12, 1.0],
+        ] {
+            for (rate, div) in [(0.03, 0.03), (0.01, 0.04), (0.05, 0.0)] {
+                let n = times.len() as f64;
+                let forwards: Vec<f64> = times
+                    .iter()
+                    .map(|&t| spot * ((rate - div) * t).exp())
+                    .collect();
+                let first = forwards.iter().sum::<f64>() / n;
+                let mut second = 0.0;
+                for (i, &ti) in times.iter().enumerate() {
+                    for (j, &tj) in times.iter().enumerate() {
+                        second += forwards[i] * forwards[j] * (vol * vol * ti.min(tj)).exp();
+                    }
+                }
+                second /= n * n;
+                let actual_first =
+                    arithmetic_mean_first_moment_times(spot, rate, div, times.iter().copied());
+                let actual_second = arithmetic_mean_second_moment_times(
+                    spot,
+                    rate,
+                    div,
+                    vol,
+                    times.iter().copied(),
+                );
+                assert!((actual_first - first).abs() < 1e-12);
+                assert!((actual_second - second).abs() / second < 1e-14);
+            }
         }
     }
 

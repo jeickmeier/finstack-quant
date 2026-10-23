@@ -59,32 +59,6 @@ pub struct NodeState {
     pub df: Option<f64>,
 }
 
-impl NodeState {
-    /// Get spot price
-    #[inline]
-    pub fn spot(&self) -> Option<f64> {
-        self.spot
-    }
-
-    /// Get interest rate
-    #[inline]
-    pub fn interest_rate(&self) -> Option<f64> {
-        self.interest_rate
-    }
-
-    /// Get hazard rate
-    #[inline]
-    pub fn hazard_rate(&self) -> Option<f64> {
-        self.hazard_rate
-    }
-
-    /// Get discount factor
-    #[inline]
-    pub fn discount_factor(&self) -> Option<f64> {
-        self.df
-    }
-}
-
 /// Per-node discount-factor conventions of the short-rate trees, expressed
 /// over the canonical core [`Compounding`].
 ///
@@ -305,23 +279,19 @@ pub(crate) fn price_recombining_tree<V: TreeValuator>(
     Ok(values[0])
 }
 
-/// Parameters controlling how a state variable evolves in the tree
+/// Multiplicative factors and transition probabilities for a CRR equity step.
 #[derive(Debug, Clone)]
 pub struct EvolutionParams {
-    /// Volatility for this factor
+    /// Annualized lognormal volatility as a decimal.
     pub volatility: f64,
-    /// Up factor
+    /// Gross multiplicative spot factor on an upward move.
     pub up_factor: f64,
-    /// Down factor
+    /// Gross multiplicative spot factor on a downward move.
     pub down_factor: f64,
-    /// Middle factor (for trinomial)
-    pub middle_factor: Option<f64>,
-    /// Probability of up move
+    /// Risk-neutral upward probability in `[0, 1]`.
     pub prob_up: f64,
-    /// Probability of down move
+    /// Risk-neutral downward probability, equal to `1 - prob_up`.
     pub prob_down: f64,
-    /// Probability of middle move (for trinomial)
-    pub prob_middle: Option<f64>,
 }
 
 impl EvolutionParams {
@@ -391,89 +361,15 @@ impl EvolutionParams {
             volatility,
             up_factor: u,
             down_factor: d,
-            middle_factor: None,
             prob_up: p,
             prob_down: 1.0 - p,
-            prob_middle: None,
-        })
-    }
-
-    /// Create evolution parameters for trinomial tree.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] when any of the three
-    /// risk-neutral probabilities is negative or the probabilities fail to sum
-    /// to one within `1e-10`. This catches arbitrage-violating parameter
-    /// combinations (extreme drift/vol/dt) in release builds; debug-only
-    /// `debug_assert!` was insufficient.
-    ///
-    /// # Arguments
-    ///
-    /// * `volatility` - Annualized volatility in decimal units.
-    /// * `risk_free_rate` - Risk free rate used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `dividend_yield` - Continuously compounded annual dividend yield in decimal units.
-    /// * `dt` - Positive time-step width in year-fraction units.
-    pub fn equity_trinomial(
-        volatility: f64,
-        risk_free_rate: f64,
-        dividend_yield: f64,
-        dt: f64,
-    ) -> finstack_quant_core::Result<Self> {
-        if !volatility.is_finite()
-            || volatility <= 0.0
-            || !risk_free_rate.is_finite()
-            || !dividend_yield.is_finite()
-            || !dt.is_finite()
-            || dt <= 0.0
-        {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Trinomial evolution requires finite inputs with volatility > 0 and dt > 0 \
-                 (got vol={volatility}, r={risk_free_rate}, q={dividend_yield}, dt={dt})"
-            )));
-        }
-        let u = (volatility * (2.0 * dt).sqrt()).exp();
-        let d = 1.0 / u;
-        let m = 1.0;
-
-        let drift = risk_free_rate - dividend_yield;
-        let sqrt_dt_half = (dt / 2.0).sqrt();
-        let exp_drift_half = (drift * dt / 2.0).exp();
-
-        let denominator = (volatility * sqrt_dt_half).exp() - (-volatility * sqrt_dt_half).exp();
-        let p_u = ((exp_drift_half - (-volatility * sqrt_dt_half).exp()) / denominator).powi(2);
-        let p_d = (((volatility * sqrt_dt_half).exp() - exp_drift_half) / denominator).powi(2);
-        let p_m = 1.0 - p_u - p_d;
-
-        if !(p_u >= 0.0 && p_d >= 0.0 && p_m >= 0.0) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Trinomial probabilities must be non-negative: p_u={}, p_d={}, p_m={} \
-                 (vol={}, r={}, q={}, dt={})",
-                p_u, p_d, p_m, volatility, risk_free_rate, dividend_yield, dt
-            )));
-        }
-        if (p_u + p_d + p_m - 1.0).abs() >= 1e-10 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Trinomial probabilities must sum to 1: p_u + p_d + p_m = {}",
-                p_u + p_d + p_m
-            )));
-        }
-
-        Ok(Self {
-            volatility,
-            up_factor: u,
-            down_factor: d,
-            middle_factor: Some(m),
-            prob_up: p_u,
-            prob_down: p_d,
-            prob_middle: Some(p_m),
         })
     }
 
     /// Recompute the risk-neutral branch probabilities for a different (per-step)
-    /// drift, keeping the up/down (and middle) factors fixed.
+    /// drift, keeping the up/down factors fixed.
     ///
-    /// The up/down factors of the CRR and trinomial lattices depend only on
+    /// The up/down factors of the CRR lattice depend only on
     /// `volatility` and `dt`, so re-deriving the parameters with a new drift
     /// leaves the node grid unchanged and the lattice recombining; only the
     /// branch probabilities vary. This lets a pricer drive each step's drift
@@ -481,20 +377,20 @@ impl EvolutionParams {
     /// tree's stock forward consistent with a non-flat discount curve
     /// (martingale property holds step by step).
     ///
-    /// `drift` is the net risk-neutral drift for the step (e.g. `r_i - q`).
+    /// # Arguments
+    ///
+    /// * `drift` - Net continuously compounded risk-neutral annual drift as a decimal, such as the step's forward rate minus dividend yield.
+    /// * `dt` - Finite positive step width in years; the same width used to construct the spatial factors.
     ///
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] when the implied
     /// probabilities for the new drift fall outside `[0, 1]` (same checks as
-    /// [`EvolutionParams::equity_crr`] / [`EvolutionParams::equity_trinomial`]).
+    /// [`EvolutionParams::equity_crr`]).
     pub fn with_drift(&self, drift: f64, dt: f64) -> finstack_quant_core::Result<Self> {
         // Passing the drift as the rate with q = 0 reproduces the same net
-        // drift; u/d/middle depend only on (volatility, dt) and are identical.
-        match self.middle_factor {
-            None => Self::equity_crr(self.volatility, drift, 0.0, dt),
-            Some(_) => Self::equity_trinomial(self.volatility, drift, 0.0, dt),
-        }
+        // drift; up/down factors depend only on (volatility, dt) and are identical.
+        Self::equity_crr(self.volatility, drift, 0.0, dt)
     }
 }
 
@@ -579,10 +475,10 @@ mod tests {
             ..NodeState::default()
         };
         assert_eq!(seen, [node(1, 50.0), node(1, 200.0), node(0, 100.0)]);
-        assert_eq!(seen[0].spot(), Some(50.0));
-        assert_eq!(seen[0].interest_rate(), Some(0.03));
-        assert_eq!(seen[0].hazard_rate(), None);
-        assert_eq!(seen[0].discount_factor(), None);
+        assert_eq!(seen[0].spot, Some(50.0));
+        assert_eq!(seen[0].interest_rate, Some(0.03));
+        assert_eq!(seen[0].hazard_rate, None);
+        assert_eq!(seen[0].df, None);
     }
 
     #[test]
@@ -605,7 +501,7 @@ mod tests {
     }
 
     #[test]
-    fn evolution_params_builders_satisfy_basic_probability_invariants() {
+    fn crr_evolution_satisfies_probability_invariants() {
         let crr = EvolutionParams::equity_crr(0.2, 0.05, 0.01, 0.25).expect("valid CRR params");
         assert!(crr.up_factor > 1.0);
         assert!(crr.down_factor < 1.0);
@@ -613,22 +509,6 @@ mod tests {
         assert!(crr.prob_up >= 0.0 && crr.prob_up <= 1.0);
         assert!(crr.prob_down >= 0.0 && crr.prob_down <= 1.0);
         assert!((crr.prob_up + crr.prob_down - 1.0).abs() < 1e-12);
-
-        let trinomial = EvolutionParams::equity_trinomial(0.2, 0.05, 0.01, 0.25)
-            .expect("valid trinomial params");
-        assert!(trinomial.up_factor > 1.0);
-        assert!(trinomial.down_factor < 1.0);
-        assert_eq!(trinomial.middle_factor, Some(1.0));
-        assert!(trinomial.prob_up >= 0.0);
-        assert!(trinomial.prob_down >= 0.0);
-        assert!(
-            trinomial.prob_middle.is_some(),
-            "middle probability should exist"
-        );
-        if let Some(p_mid) = trinomial.prob_middle {
-            assert!(p_mid >= 0.0);
-            assert!((trinomial.prob_up + trinomial.prob_down + p_mid - 1.0).abs() < 1e-10);
-        }
     }
 
     #[test]
@@ -641,16 +521,6 @@ mod tests {
         assert!(
             result.is_err(),
             "CRR with extreme drift/vol/dt must error, not silently corrupt the tree"
-        );
-    }
-
-    #[test]
-    fn evolution_params_trinomial_rejects_negative_probabilities() {
-        // Extreme drift relative to vol pushes one trinomial probability negative.
-        let result = EvolutionParams::equity_trinomial(0.02, 5.0, 0.0, 1.0);
-        assert!(
-            result.is_err(),
-            "Trinomial with negative implied probability must error"
         );
     }
 }

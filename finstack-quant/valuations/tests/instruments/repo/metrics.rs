@@ -8,6 +8,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::*;
+use finstack_quant_valuations::pricer::STANDARD;
 use rust_decimal::Decimal;
 use std::sync::Arc;
 
@@ -42,7 +43,7 @@ fn test_collateral_value_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::CollateralValue], &mut mctx)
         .unwrap();
@@ -59,7 +60,7 @@ fn test_required_collateral_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::RequiredCollateral], &mut mctx)
         .unwrap();
@@ -76,7 +77,7 @@ fn test_collateral_coverage_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::CollateralCoverage], &mut mctx)
         .unwrap();
@@ -108,7 +109,7 @@ fn test_collateral_coverage_overcollateralized() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::CollateralCoverage], &mut mctx)
         .unwrap();
@@ -129,7 +130,7 @@ fn test_repo_interest_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo.clone(), context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::RepoInterest], &mut mctx)
         .unwrap();
@@ -146,7 +147,7 @@ fn test_effective_rate_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo.clone(), context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::EffectiveRate], &mut mctx)
         .unwrap();
@@ -168,7 +169,7 @@ fn test_time_to_maturity_metric() {
     let as_of = date(2025, 1, 10);
     let mut mctx = create_metric_context(repo, context, as_of);
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::TimeToMaturity], &mut mctx)
         .unwrap();
@@ -187,7 +188,7 @@ fn test_time_to_maturity_at_maturity() {
     let maturity = repo.maturity;
     let mut mctx = create_metric_context(repo, context, maturity);
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::TimeToMaturity], &mut mctx)
         .unwrap();
@@ -203,7 +204,7 @@ fn test_implied_collateral_return_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::ImpliedCollateralReturn], &mut mctx)
         .unwrap();
@@ -220,7 +221,7 @@ fn test_dv01_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry.compute(&[MetricId::Dv01], &mut mctx).unwrap();
 
     let dv01 = results.get(&MetricId::Dv01).unwrap();
@@ -243,7 +244,7 @@ fn test_funding_risk_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::FundingRisk], &mut mctx)
         .unwrap();
@@ -262,7 +263,7 @@ fn test_theta_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry.compute(&[MetricId::Theta], &mut mctx).unwrap();
 
     let theta = results.get(&MetricId::Theta).unwrap();
@@ -280,7 +281,7 @@ fn test_accrued_interest_metric() {
     let mid_date = date(2025, 2, 15);
     let mut mctx = create_metric_context(repo.clone(), context, mid_date);
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry.compute(&[MetricId::Accrued], &mut mctx).unwrap();
 
     let accrued = results.get(&MetricId::Accrued).unwrap();
@@ -302,7 +303,7 @@ fn test_accrued_interest_before_start() {
     let before_start = date(2025, 1, 10);
     let mut mctx = create_metric_context(repo, context, before_start);
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry.compute(&[MetricId::Accrued], &mut mctx).unwrap();
 
     let accrued = results.get(&MetricId::Accrued).unwrap();
@@ -319,7 +320,7 @@ fn test_accrued_interest_at_maturity() {
     let maturity = repo.maturity;
     let mut mctx = create_metric_context(repo.clone(), context, maturity);
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry.compute(&[MetricId::Accrued], &mut mctx).unwrap();
 
     let accrued = results.get(&MetricId::Accrued).unwrap();
@@ -335,7 +336,7 @@ fn test_bucketed_dv01_metric() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::BucketedDv01], &mut mctx)
         .unwrap();
@@ -359,7 +360,7 @@ fn test_multiple_metrics_computed_together() {
         MetricId::TimeToMaturity,
     ];
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry.compute(&metrics, &mut mctx).unwrap();
 
     // All metrics should be present
@@ -374,7 +375,7 @@ fn test_metric_dependencies_resolved() {
     let context = create_standard_market_context();
     let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // CollateralCoverage depends on CollateralValue and RequiredCollateral
     let results = registry
@@ -426,7 +427,7 @@ fn test_metrics_with_price_with_metrics() {
 
 #[test]
 fn test_metrics_registry_has_repo_metrics() {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Verify all repo metrics are registered
     assert!(registry.has_metric(MetricId::CollateralValue));
@@ -445,7 +446,7 @@ fn test_metrics_registry_has_repo_metrics() {
 
 #[test]
 fn test_metrics_applicable_to_repo() {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Check applicability to Repo instrument type
     assert!(registry.is_applicable(
@@ -536,7 +537,7 @@ fn test_metric_date_handling_uses_adjusted_dates() {
     let mut mctx_weekend = create_metric_context(repo_weekend.clone(), context.clone(), as_of);
     let mut mctx_adjusted = create_metric_context(repo_adjusted.clone(), context.clone(), as_of);
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Compute metrics that depend on dates
     let metrics = vec![

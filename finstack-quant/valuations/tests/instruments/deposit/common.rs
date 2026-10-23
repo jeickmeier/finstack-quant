@@ -12,6 +12,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 pub use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::{MetricContext, MetricId, MetricRegistry};
+use finstack_quant_valuations::pricer::STANDARD;
 use rust_decimal::Decimal;
 use std::sync::Arc;
 
@@ -191,7 +192,9 @@ pub fn setup_metric_context(base: Date) -> (Deposit, MarketContext, MetricContex
         MetricContext::default_config(),
     );
 
-    let registry = finstack_quant_valuations::metrics::standard_registry().clone();
+    let registry = finstack_quant_valuations::pricer::STANDARD
+        .metrics()
+        .clone();
 
     (dep, ctx, metric_ctx, registry)
 }
@@ -203,7 +206,7 @@ pub fn compute_metric(
     base: Date,
     metric_id: MetricId,
 ) -> f64 {
-    let registry = finstack_quant_valuations::metrics::standard_registry();
+    let registry = STANDARD.metrics();
 
     let base_val = deposit.value(ctx, base).unwrap();
     let instrument_arc: Arc<dyn Instrument> = Arc::new(deposit.clone());
@@ -228,7 +231,7 @@ pub fn compute_metrics(
     base: Date,
     metric_ids: &[MetricId],
 ) -> finstack_quant_core::FxHashMap<MetricId, f64> {
-    let registry = finstack_quant_valuations::metrics::standard_registry();
+    let registry = STANDARD.metrics();
 
     let base_val = deposit.value(ctx, base).unwrap();
     let instrument_arc: Arc<dyn Instrument> = Arc::new(deposit.clone());

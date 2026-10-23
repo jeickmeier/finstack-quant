@@ -5,9 +5,9 @@
 //! Each engine implements the core pricing math for one model; the shared
 //! `BondPricer` registry adapter preserves the caller's explicit `ModelKey`
 //! selection:
-//! - [`discount`]: Non-callable PV = sum(CF_i * DF_i) from projected
+//! - `discount`: Non-callable PV = sum(CF_i * DF_i) from projected
 //!   cashflows and discount curves; an attached credit curve is ignored
-//! - [`hazard`]: Non-callable survival-weighted PV plus fractional recovery of
+//! - `hazard`: Non-callable survival-weighted PV plus fractional recovery of
 //!   par (FRP); an explicit hazard curve is required
 //! - [`tree`]: Rates-only and joint rates-credit option rollback and OAS,
 //!   including call, put, and return-floor rights
@@ -19,17 +19,15 @@
 //! - [`ytm_solver`]: Robust yield-to-maturity calculation
 //! - `settlement`: Settlement date and accrued interest utilities
 //!
-//! [`discount`]: crate::bond::pricing::discount
-//! [`hazard`]: crate::bond::pricing::hazard
 //! [`tree`]: crate::bond::pricing::tree
 //! [`merton_mc`]: crate::bond::pricing::merton_mc
 //! [`quote_conversions`]: crate::bond::pricing::quote_conversions
 //! [`ytm_solver`]: crate::bond::pricing::ytm_solver
 
 /// Discount curve-based bond pricing (PV = sum CF_i * DF_i).
-pub mod discount;
+pub(crate) mod discount;
 /// Non-callable hazard-rate pricing with fractional recovery of par.
-pub mod hazard;
+pub(crate) mod hazard;
 /// Merton structural credit Monte Carlo for PIK bonds.
 pub mod merton_mc;
 pub mod quote_conversions;

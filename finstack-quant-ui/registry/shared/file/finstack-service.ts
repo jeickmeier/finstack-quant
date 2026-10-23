@@ -313,15 +313,22 @@ export function createService(native: {
       });
     },
     scenarioTable(request) {
-      return result(() =>
-        instruments.trancheScenarioTable(
+      return result(() => {
+        const deal = instruments.StructuredCredit.fromJson(
           request.instrumentJson,
-          request.trancheId,
-          request.marketJson,
-          request.asOf,
-          request.gridJson,
-        ),
-      );
+        );
+        try {
+          return instruments.trancheScenarioTable(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.gridJson,
+          );
+        } finally {
+          deal.free();
+        }
+      });
     },
     cashflows(request) {
       return result(() => {

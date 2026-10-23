@@ -5,6 +5,7 @@
 
 use crate::fra::common::*;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_test_support::assertions::assert_positive;
 
 #[test]
 fn test_pv_result_matches_value() {

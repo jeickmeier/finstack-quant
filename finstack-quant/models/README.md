@@ -74,7 +74,7 @@ in the engine loop and configured with `McEngineConfig::antithetic`.
 | `process::brownian` | `BrownianParams`, `BrownianProcess`, `MultiBrownianProcess` |
 | `process::heston` | `HestonProcess`; uses canonical `closed_form::HestonPricingParams` and `volatility::heston::HestonParams` |
 | `process::cir` | `CirParams`, `CirProcess`, `CirPlusPlusProcess` |
-| `process::ou` | `HullWhite1FParams`, `HullWhite1FProcess` (`HullWhite1FProcess::vasicek` for constant θ), `calibrate_theta_from_curve` |
+| `process::ou` | `HullWhite1FParams`, `HullWhite1FProcess`, `calibrate_theta_from_curve` |
 | `process::multi_ou` | `MultiOuParams`, `MultiOuProcess` |
 | `process::schwartz_smith` | `SchwartzSmithParams`, `SchwartzSmithProcess` |
 | `process::lmm` | `LmmParams`, `LmmProcess` |
@@ -82,10 +82,9 @@ in the engine loop and configured with `McEngineConfig::antithetic`.
 | `process::rough_heston` | `RoughHestonParams`, `RoughHestonProcess` |
 | `process::cheyette_rough` | `CheyetteRoughVolParams`, `CheyetteRoughVolProcess` |
 
-There is no `process::correlation` module. Correlation helpers live in
-`finstack_quant_core::math::linalg`; the prelude re-exports `apply_correlation`
-and `cholesky_decomposition`, while `cholesky_correlation` (the engine's own
-factoring entry point) must be imported from core directly. A process declares
+Correlation helpers `apply_correlation`, `cholesky_decomposition`, and
+`cholesky_correlation` live in `finstack_quant_core::math::linalg` and are
+imported from core directly. A process declares
 its factor correlation via
 `StochasticProcess::factor_correlation`; the engine Cholesky-factors it and
 applies it to the raw shocks unless the scheme reports
@@ -144,7 +143,7 @@ let engine = McEngine::new(
 );
 
 let rng = PhiloxRng::new(11);
-let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
+let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).expect("valid GBM parameters");
 let disc = ExactGbm::new();
 let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 let discount_factor = (-0.03_f64).exp();
@@ -196,7 +195,7 @@ let engine = McEngine::new(
 );
 
 let rng = PhiloxRng::new(11);
-let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
+let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).expect("valid GBM parameters");
 let disc = ExactGbm::new();
 let payoff = European::new(OptionType::Call, 100.0, 1.0, 12);
 let process_params = ProcessParams::new("GBM").with_factors(vec!["spot".to_string()]);
@@ -229,7 +228,7 @@ accessor methods.
 ### Unbiased American pricing (two-pass LSMC)
 
 Single-pass Longstaff-Schwartz fits the regression and prices on the same path
-set, biasing the price upward. `LsmcPricer::price_unbiased` trains the policy on
+set, biasing the price upward. `LsmcEngine::price_unbiased` trains the policy on
 one path set and replays it on a second, independent set. It rejects a
 `pricing_seed` equal to the configured training seed.
 
@@ -237,7 +236,7 @@ one path set and replays it on a second, independent set. It rejects a
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::lsmc::{
-    AmericanExercise, LsmcConfig, LsmcPricer,
+    AmericanExercise, LsmcConfig, LsmcEngine,
 };
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::types::OptionType;
@@ -245,8 +244,8 @@ use finstack_quant_models::types::OptionType;
 let cfg = LsmcConfig::new(50_000, vec![25, 50, 75, 100], 100)
     .expect("valid LSMC config")
     .with_seed(42);
-let pricer = LsmcPricer::new(cfg);
-let process = GbmProcess::with_params(0.05, 0.0, 0.3).expect("valid GBM parameters");
+let pricer = LsmcEngine::new(cfg);
+let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.3).map(GbmProcess::new).expect("valid GBM parameters");
 let put = AmericanExercise::new(OptionType::Put, 100.0).expect("valid strike");
 let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
@@ -267,8 +266,8 @@ let unbiased = pricer
 assert!(unbiased.mean.amount() > 0.0);
 ```
 
-For finer control, `LsmcPricer::fit_exercise_policy` returns an `ExercisePolicy`
-that `LsmcPricer::price_with_policy` can replay across multiple scenarios.
+For finer control, `LsmcEngine::fit_exercise_policy` returns an `ExercisePolicy`
+that `LsmcEngine::price_with_policy` can replay across multiple scenarios.
 `LsmcConfig::every_step(num_paths, num_steps)` builds the American exercise grid
 `1..=num_steps`. Note that terminal exercise at `num_steps` is always applied
 whether or not it is listed, and immediate exercise at `t = 0` floors the
@@ -300,7 +299,7 @@ let engine = McEngine::new(
         .parallel(false),
 );
 let rng = PhiloxRng::new(42);
-let gbm = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid GBM parameters");
+let gbm = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2).map(GbmProcess::new).expect("valid GBM parameters");
 let disc = ExactGbm::new();
 let call = European::new(OptionType::Call, 100.0, 1.0, 50);
 
@@ -340,7 +339,7 @@ let pricer = EuropeanPricer::new(25_000)
     .expect("positive path count")
     .with_seed(19)
     .with_parallel(false);
-let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
+let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).expect("valid GBM parameters");
 let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 
 let result = pricer
@@ -461,8 +460,8 @@ Default path counts, seeds, and parallel/antithetic flags are versioned JSON in
 [`data/defaults/pricer_defaults.v1.json`](data/defaults/pricer_defaults.v1.json),
 embedded at build time and read by `McEngineConfig::new`, `LsmcConfig::new`,
 `PathDependentPricerConfig`, and the convenience pricers.
-Overlays use the `FinstackConfig` extension key
-`monte_carlo.defaults.v1` (`registry::MONTE_CARLO_DEFAULTS_EXTENSION_KEY`).
+`registry::embedded_defaults()` validates and caches the embedded record;
+explicit pricer arguments control per-run overrides.
 
 ## Extending the crate
 
@@ -489,16 +488,16 @@ via `max_event_step()` so grid mismatches are caught up front.
 
 ## Bindings
 
-- **Python** — `finstack_quant.models.monte_carlo` exposes `McEngine`, `TimeGrid`,
-  `EuropeanPricer`, `PathDependentPricer`, `LsmcPricer`, `MoneyEstimate`,
-  `Estimate`, `PathSummary`, `simulate_paths`, `price_heston`,
-  `heston_satisfies_feller`, `black_scholes_call` /
-  `black_scholes_put`, and the four finite-difference Greek functions.
+- **Python** — `finstack_quant.models.monte_carlo` exposes `EuropeanPricer`,
+  `PathDependentPricer`, `LsmcPricer`, `MoneyEstimate`, `Estimate`, `LrmGreeks`,
+  `PathSummary`, `simulate_paths`, `price_heston`, `heston_satisfies_feller`,
+  `finite_diff_delta`, and `finite_diff_gamma`. Built-in process and time-grid
+  choices are plain-data simulation specifications.
 - **WASM** — the `models.monteCarlo` namespace in
   [`exports/models/monteCarlo.js`](../../finstack-quant-wasm/exports/models/monteCarlo.js)
-  exposes `simulatePaths` and the convenience pricers: `EuropeanPricer.priceGbm`,
-  `priceHeston`, `priceAsian`, `priceAmerican`,
-  `priceAmericanUnbiased`, and `blackScholesCall/Put`.
+  exposes `simulatePaths`, `priceHeston`, `hestonSatisfiesFeller`,
+  `finiteDiffDelta`, `finiteDiffGamma`, and `relativeStderr`, with convenience
+  pricing methods on `EuropeanPricer`, `PathDependentPricer`, and `LsmcPricer`.
 
 Neither binding exposes the generic trait surface: `simulate_paths` selects among
 the built-in processes and schemes by spec, and custom processes, schemes, and

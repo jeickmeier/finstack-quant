@@ -340,31 +340,6 @@ impl Default for CdsOptionBuilder {
     }
 }
 
-/// Assert that a value is finite and non-NaN
-pub fn assert_finite(value: f64, msg: &str) {
-    assert!(
-        value.is_finite(),
-        "{}: value is not finite ({})",
-        msg,
-        value
-    );
-}
-
-/// Assert that a value is positive
-pub fn assert_positive(value: f64, msg: &str) {
-    assert!(value > 0.0, "{}: value {} should be positive", msg, value);
-}
-
-/// Assert that a value is non-negative
-pub fn assert_non_negative(value: f64, msg: &str) {
-    assert!(
-        value >= 0.0,
-        "{}: value {} should be non-negative",
-        msg,
-        value
-    );
-}
-
 /// Assert monotonic increasing property
 pub fn assert_increasing(values: &[(f64, f64)], x_label: &str, y_label: &str) {
     for i in 1..values.len() {

@@ -161,8 +161,7 @@ Levenberg-Marquardt on normalized vega-weighted squared relative quote errors ov
 | `with_tolerance` / `with_max_iterations` | Fluent overrides |
 | `with_shift(SabrShift)` | `None`, `Fixed(s)` for an explicit displacement, or `Auto` to pick a standardized shift when the forward or a strike is negative |
 | `with_atm_pinning(bool)` | Solves α analytically for an exact ATM match, then fits ν and ρ only |
-| `calibrate(F, &strikes, &vols, T, β)` | LM with finite-difference Jacobian under the configured shift/pinning settings |
-| `calibrate_with_diagnostics(...)` | Same fit, returning `SabrCalibrationOutcome` with solver statistics |
+| `calibrate(F, &strikes, &vols, T, β)` | LM under the configured shift/pinning settings, returning `SabrCalibrationOutcome` with parameters and solver statistics |
 
 The solve uses log(alpha), ensuring positive alpha without a quote-scale-dependent
 upper or lower bound. Nu is bounded to [0.001, 2.0] and rho to [-0.99, 0.99].
@@ -247,7 +246,7 @@ let market_vols = [0.22, 0.20, 0.19, 0.195, 0.21];
 let fitted = SabrCalibrator::high_precision()
     .calibrate(0.03, &strikes, &market_vols, 1.0, 0.5)?;
 
-let smile = SabrSmile::new(fitted, 0.03, 1.0);
+let smile = SabrSmile::new(fitted.parameters, 0.03, 1.0);
 let vols = smile.generate_smile(&strikes)?;
 let report = smile.validate_no_arbitrage(&strikes, 0.03)?;
 if !report.is_arbitrage_free() {

@@ -95,7 +95,6 @@ fn endogenous_hazard_matches_native() {
 fn toggle_exercise_optimal_keeps_a_reasonable_path_count() {
     let model = JsToggleExerciseModel::optimal(
         JsValue::from(10_000),
-        JsValue::from(0.10),
         JsValue::from(0.25),
         JsValue::from(0.04),
         JsValue::from(5.0),
@@ -116,7 +115,6 @@ fn toggle_exercise_optimal_rejects_an_unsafe_path_count() {
     // marshaled as an f64; the binding must reject it instead.
     let result = JsToggleExerciseModel::optimal(
         JsValue::from(9_007_199_254_740_993.0_f64),
-        JsValue::from(0.10),
         JsValue::from(0.25),
         JsValue::from(0.04),
         JsValue::from(5.0),

@@ -1,4 +1,4 @@
-//! Tranche measures on `CdsTranchePricer` — model upfront, par spread, spread
+//! Tranche measures on `CdsTranchePricer` — par spread, spread
 //! DV01, expected loss, correlation delta, jump-to-default — and their helpers.
 
 use super::pricer::{

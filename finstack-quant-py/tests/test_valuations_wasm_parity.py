@@ -193,7 +193,7 @@ def build_cases() -> dict[str, Any]:
         "market": equity_market.to_json(),
         "price": option_price,
         "greeks": option.greeks(equity_market, "2024-01-15"),
-        "delta": option.delta(equity_market, "2024-01-15"),
+        "delta": option.metric(equity_market, "2024-01-15", "delta"),
         "implied_vol": option.implied_vol(equity_market, "2024-01-15", option_price),
         "european": european.to_json(),
     }
@@ -228,7 +228,7 @@ def build_cases() -> dict[str, Any]:
         "to_dict": deal.to_dict(),
         "tranche_cashflows": _json(deal.tranche_cashflows("A", sc_market, close)),
         "equity_metrics": _json(equity),
-        "diagnostics": _json(deal.run_simulation_with_diagnostics(sc_market, close)),
+        "diagnostics": _json(deal.run_simulation(sc_market, close).diagnostics),
         "create_waterfall": _json(deal.create_waterfall()),
         "with_standard_fees": deal.with_standard_fees().to_json(),
         "enable_stochastic": stochastic.to_json(),
@@ -344,7 +344,7 @@ def build_cases() -> dict[str, Any]:
         "reinvestment_period": reinvestment_period,
         "pool_with_reinvestment_period": _json(pool.with_reinvestment_period(reinvestment_period)),
         "scenario_table": scenario_table,
-        "scenario_table_cells": ins.ScenarioTable.from_json(json.dumps(scenario_table)).cells(),
+        "scenario_table_cells": ins.ScenarioTable.from_json(json.dumps(scenario_table)).cells,
         "pool_with_reserve": _json(
             pool.with_reserve(Money(500_000.0, USD), 0.02, reserve_target=Money(750_000.0, USD))
         ),
@@ -483,10 +483,10 @@ def test_tranche_builder_requires_both_points() -> None:
         builder.build()
 
 
-def test_tranche_loss_methods_report_missing_index_data_as_a_lookup_miss() -> None:
+def test_tranche_loss_metrics_report_missing_index_data_as_a_lookup_miss() -> None:
     tranche = ins.CdsTranche.example()
     market = cef_cases._equity_market()
     with pytest.raises(KeyError):
-        tranche.expected_loss(market)
+        tranche.metric(market, AS_OF, "expected_loss")
     with pytest.raises(KeyError):
-        tranche.jump_to_default(market, AS_OF)
+        tranche.metric(market, AS_OF, "jump_to_default")

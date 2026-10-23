@@ -190,12 +190,12 @@ def test_hull_white_piecewise_bootstrap_matches_the_shared_golden() -> None:
     expected = HW["piecewise"]
     assert report.success is expected["success"]
     assert params.kappa == expected["params"]["kappa"]
-    assert params.times == expected["params"]["volatility"]["times"]
-    assert params.values == pytest.approx(expected["params"]["volatility"]["values"], rel=1e-8)
-    assert params.sigma(1.5) == pytest.approx(expected["sigma_at_1_5"], rel=1e-8)
-    assert params.sigma(0.5) == pytest.approx(expected["sigma_at_0_5"], rel=1e-8)
+    assert params.get_times() == expected["params"]["volatility"]["times"]
+    assert params.get_values() == pytest.approx(expected["params"]["volatility"]["values"], rel=1e-8)
+    assert params.get_sigma(1.5) == pytest.approx(expected["sigma_at_1_5"], rel=1e-8)
+    assert params.get_sigma(0.5) == pytest.approx(expected["sigma_at_0_5"], rel=1e-8)
     exact = HullWhiteParams.from_json(json.dumps(expected["params"]))
-    assert exact.sigma(1.5) == expected["sigma_at_1_5"]
+    assert exact.get_sigma(1.5) == expected["sigma_at_1_5"]
 
 
 def test_hull_white_cap_floor_fit_matches_the_shared_golden() -> None:

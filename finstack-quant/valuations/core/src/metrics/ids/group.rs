@@ -211,7 +211,6 @@ impl MetricGroup {
                 MetricId::BaseAmount,
                 MetricId::InverseRate,
                 MetricId::Fx01,
-                MetricId::FxDelta,
                 MetricId::FxVega,
             ],
             Self::Equity => &[
@@ -258,7 +257,6 @@ impl MetricGroup {
                 MetricId::BreakevenInflation,
                 MetricId::LpIrr,
                 MetricId::GpCarryTotal,
-                MetricId::MoicLp,
                 MetricId::DpiLp,
                 MetricId::TvpiLp,
                 MetricId::CarryAccrued,

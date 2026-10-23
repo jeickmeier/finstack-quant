@@ -28,7 +28,7 @@
 //! Result and config types ([`PeriodStats`], [`DrawdownEpisode`],
 //! [`BetaResult`], [`GreeksResult`], [`RollingGreeks`], [`MultiFactorResult`],
 //! [`ReturnKind`], [`DatedSeries`], [`RollingMetric`], [`PeriodicReturn`],
-//! [`LookbackReturns`]) are re-exported here because `Performance` returns them.
+//! [`LookbackReturns`], [`CagrDayCount`]) are re-exported here because `Performance` takes or returns them.
 //!
 //! The `DEFAULT_*` constants ([`DEFAULT_CONFIDENCE`], [`DEFAULT_ROLLING_WINDOW`],
 //! [`DEFAULT_PERIODS_PER_YEAR`], ...) are the values the Python and WebAssembly
@@ -42,6 +42,8 @@
 //!   equality-constrained least-squares solver exposed through the bindings.
 //!   It fits the factor returns that `finstack-quant-portfolio`'s
 //!   factor-Brinson attribution takes as caller-supplied input.
+//! - `schema` (default `json-schema` feature) registers the serde contracts
+//!   the bindings exchange as JSON Schema artifacts.
 //!
 //! Key conventions:
 //! - returns are simple decimal returns
@@ -82,7 +84,7 @@ pub(crate) mod aggregation;
 pub(crate) mod benchmark;
 pub(crate) mod defaults;
 pub(crate) mod drawdown;
-pub(crate) mod lookback;
+pub(crate) mod multi_factor;
 pub(crate) mod performance;
 pub mod regression;
 pub(crate) mod returns;
@@ -91,13 +93,14 @@ pub(crate) mod risk_metrics;
 pub mod schema;
 
 pub use aggregation::{PeriodStats, PeriodicReturn};
-pub use benchmark::{beta, BetaResult, GreeksResult, MultiFactorResult, ReturnKind, RollingGreeks};
+pub use benchmark::{beta, BetaResult, GreeksResult, RollingGreeks};
 pub use defaults::{
     DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR,
     DEFAULT_PERIODIC_FREQUENCY, DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE,
     DEFAULT_ROLLING_WINDOW,
 };
 pub use drawdown::DrawdownEpisode;
+pub use multi_factor::{MultiFactorResult, ReturnKind};
 pub use performance::{LookbackReturns, Performance};
 pub use risk_metrics::{
     max_drawdown, sharpe, sortino, volatility, CagrDayCount, DatedSeries, RollingMetric,

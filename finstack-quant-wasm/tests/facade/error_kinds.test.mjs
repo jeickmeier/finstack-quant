@@ -179,6 +179,22 @@ test('an unknown calendar is not found and a calendar union resolves', () => {
   assert.ok(perf.cagr('bus_252', 'nyse+gblo')[0] > 0);
 });
 
+test('an unknown benchmark ticker is not found', () => {
+  const dates = ['2024-01-01', '2024-01-02', '2024-01-03'];
+  const returns = [
+    [0.01, 0.02, 0],
+    [0, 0.01, 0.02],
+  ];
+  assert.throws(
+    () => analytics.Performance.fromReturns(dates, returns, ['A', 'B'], 'NOPE'),
+    kind('not_found', /NOPE/)
+  );
+  const panel = analytics.Performance.fromReturns(dates, returns, ['A', 'B']);
+  assert.throws(() => panel.resetBenchTicker('NOPE'), kind('not_found', /NOPE/));
+  assert.equal(panel.getBenchmarkIdx(), 0);
+  panel.free();
+});
+
 test('a JavaScript value of the wrong type is invalid_type', () => {
   assert.throws(
     () => portfolio.Portfolio.fromMaterialization(42),

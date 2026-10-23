@@ -288,7 +288,7 @@ mod bond_market_edge {
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+    use finstack_quant_valuations::metrics::{MetricContext, MetricId};
     use std::sync::Arc;
     use time::macros::date;
 
@@ -625,7 +625,7 @@ mod bond_market_edge {
         let dirty = bond.value(&market, as_of).unwrap().amount();
 
         // Get accrued via metrics
-        let registry = standard_registry();
+        let registry = finstack_quant_valuations::pricer::STANDARD.metrics();
         let pv = bond.value(&market, as_of).unwrap();
         let mut context = MetricContext::new(
             Arc::new(bond),

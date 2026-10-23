@@ -10,7 +10,6 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::{BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::{credit, numerical};
-use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use rust_decimal::prelude::ToPrimitive;
 
 /// Day-count policy applied when measuring premium accrual from the most
@@ -146,10 +145,10 @@ impl CdsPricer {
             return Ok((days.max(0) as f64) / 360.0);
         }
 
-        year_fraction(
-            cds.premium_leg.day_count,
+        cds.premium_leg.day_count.year_fraction(
             period.accrual_start,
             period.accrual_end,
+            DayCountContext::default(),
         )
     }
 
@@ -207,7 +206,9 @@ impl CdsPricer {
             return Ok((days.max(0) as f64) / 360.0);
         }
 
-        year_fraction(cds.premium_leg.day_count, last_coupon, as_of)
+        cds.premium_leg
+            .day_count
+            .year_fraction(last_coupon, as_of, DayCountContext::default())
     }
 
     fn clean_par_spread_denominator(

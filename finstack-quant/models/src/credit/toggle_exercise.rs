@@ -190,18 +190,11 @@ pub struct StochasticToggle {
 /// evolution of asset value with a first-passage barrier check.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct OptimalToggle {
     /// Number of nested Monte Carlo paths for continuation value estimation.
     /// Recommended range: 100–500.
     pub nested_paths: usize,
-    /// Equity holder discount rate applied to the nested-MC payoff.
-    ///
-    /// Note: the nested simulation drifts under the risk-neutral measure
-    /// (`risk_free_rate`) but discounts here, so the intermediate equity
-    /// figures are decision inputs, not measure-consistent prices. The
-    /// rate cancels in the cash-vs-PIK comparison and does not bias the
-    /// elected branch.
-    pub equity_discount_rate: f64,
     /// Annualised asset volatility for the nested GBM simulation.
     pub asset_vol: f64,
     /// Risk-free rate (continuous) used as drift in the nested simulation.
@@ -237,26 +230,16 @@ const NESTED_STEPS_PER_YEAR: usize = 12;
 /// For each scenario (cash / PIK) we simulate `o.nested_paths` forward paths
 /// of asset value using geometric Brownian motion over `o.horizon` years,
 /// checking for a first-passage barrier breach at every time step.  The
-/// equity value is `max(V(T) - barrier, 0)` discounted back; if the firm
+/// equity payoff is `max(V(T) - barrier, 0)`; if the firm
 /// defaults along the path the equity value is zero.
 ///
 /// Returns `true` (elect PIK) when the estimated equity value under PIK
 /// exceeds the equity value under cash.
 ///
-/// # Measure note
-///
-/// The nested simulation uses a risk-neutral GBM drift (`risk_free_rate`)
-/// but discounts the resulting payoff at the equity holder's
-/// `equity_discount_rate`. These two rates need not agree, so the
-/// `avg_equity_*` figures are **decision-only quantities, not equity
-/// prices** — a measure-consistent valuation would discount at the same
-/// rate used for the drift. Because the cash and PIK branches share an
-/// identical model (same drift, same discount, same paths), the
-/// measure inconsistency is a common factor that cancels in the
-/// `pik > cash` comparison, so the toggle *decision* is unaffected. The
-/// `equity_discount_rate` is therefore retained as a tunable knob that
-/// does not bias the elected branch (see the `discount_rate_invariant`
-/// test).
+/// Cash and PIK use identical draws and compare undiscounted payoff sums.
+/// Their common positive discount factor and path count cancel in the decision;
+/// omitting both also prevents numerical underflow from turning the decision
+/// into a tie.
 fn optimal_toggle_decision(o: &OptimalToggle, state: &CreditState, seed_bits: u64) -> bool {
     let v = state.asset_value.unwrap_or_else(|| {
         if state.leverage > 0.0 {
@@ -289,37 +272,18 @@ fn optimal_toggle_decision(o: &OptimalToggle, state: &CreditState, seed_bits: u6
         return false;
     }
 
-    let model_cash = NestedEquityMcModel {
+    let model = NestedEquityMcModel {
         sigma: o.asset_vol,
         risk_free_rate: o.risk_free_rate,
-        discount_rate: o.equity_discount_rate,
         horizon: o.horizon,
     };
 
-    let model_pik = NestedEquityMcModel {
-        sigma: o.asset_vol,
-        risk_free_rate: o.risk_free_rate,
-        discount_rate: o.equity_discount_rate,
-        horizon: o.horizon,
-    };
+    let equity_cash =
+        nested_equity_mc(o.nested_paths, v_cash_start, barrier_cash, model, seed_bits);
 
-    let avg_equity_cash = nested_equity_mc(
-        o.nested_paths,
-        v_cash_start,
-        barrier_cash,
-        model_cash,
-        seed_bits,
-    );
+    let equity_pik = nested_equity_mc(o.nested_paths, v_pik_start, barrier_pik, model, seed_bits);
 
-    let avg_equity_pik = nested_equity_mc(
-        o.nested_paths,
-        v_pik_start,
-        barrier_pik,
-        model_pik,
-        seed_bits,
-    );
-
-    avg_equity_pik > avg_equity_cash
+    equity_pik > equity_cash
 }
 
 /// Derive a full-entropy `u64` seed from a uniform draw `u` in `[0, 1)`.
@@ -344,8 +308,7 @@ fn uniform_to_seed(u: f64) -> u64 {
     z ^ (z >> 31)
 }
 
-/// Estimate `E[max(V(T) - barrier, 0)]` via simple GBM with first-passage
-/// default check, discounted at `discount_rate`.
+/// Sum terminal equity payoffs over common GBM paths with first-passage default checks.
 fn nested_equity_mc(
     num_paths: usize,
     v_start: f64,
@@ -356,7 +319,6 @@ fn nested_equity_mc(
     let NestedEquityMcModel {
         sigma,
         risk_free_rate,
-        discount_rate,
         horizon,
     } = model;
 
@@ -373,7 +335,6 @@ fn nested_equity_mc(
     let dt = horizon / n_steps as f64;
     let sqrt_dt = dt.sqrt();
     let drift = (risk_free_rate - 0.5 * sigma * sigma) * dt;
-    let discount_factor = (-discount_rate * horizon).exp();
 
     let mut total_payoff = 0.0;
 
@@ -394,18 +355,17 @@ fn nested_equity_mc(
 
         if !defaulted {
             let equity = (v - barrier).max(0.0);
-            total_payoff += equity * discount_factor;
+            total_payoff += equity;
         }
     }
 
-    total_payoff / num_paths as f64
+    total_payoff
 }
 
 #[derive(Debug, Clone, Copy)]
 struct NestedEquityMcModel {
     sigma: f64,
     risk_free_rate: f64,
-    discount_rate: f64,
     horizon: f64,
 }
 
@@ -474,8 +434,6 @@ impl ToggleExerciseModel {
     ///
     /// * `nested_paths` - Nested Monte Carlo paths per decision; at least 1
     ///   (100-500 is typical).
-    /// * `equity_discount_rate` - Continuously compounded equity-holder
-    ///   discount rate as a decimal.
     /// * `asset_vol` - Annualised asset volatility as a decimal; non-negative.
     /// * `risk_free_rate` - Continuously compounded risk-free drift as a
     ///   decimal.
@@ -488,7 +446,6 @@ impl ToggleExerciseModel {
     /// finite and positive.
     pub fn optimal(
         nested_paths: usize,
-        equity_discount_rate: f64,
         asset_vol: f64,
         risk_free_rate: f64,
         horizon: f64,
@@ -499,7 +456,6 @@ impl ToggleExerciseModel {
                 "{OWNER}: nested_paths must be at least 1"
             )));
         }
-        ensure_finite(OWNER, "equity_discount_rate", equity_discount_rate)?;
         ensure_finite(OWNER, "risk_free_rate", risk_free_rate)?;
         if !(asset_vol.is_finite() && asset_vol >= 0.0) {
             return Err(Error::Validation(format!(
@@ -513,7 +469,6 @@ impl ToggleExerciseModel {
         }
         Ok(Self::OptimalExercise(OptimalToggle {
             nested_paths,
-            equity_discount_rate,
             asset_vol,
             risk_free_rate,
             horizon,
@@ -609,15 +564,14 @@ mod tests {
         assert!(ToggleExerciseModel::threshold(variable.clone(), f64::NAN, above).is_err());
         assert!(ToggleExerciseModel::stochastic(variable.clone(), f64::NAN, 1.0).is_err());
         assert!(ToggleExerciseModel::stochastic(variable, 1.0, f64::INFINITY).is_err());
-        assert!(ToggleExerciseModel::optimal(0, 0.05, 0.3, 0.03, 1.0).is_err());
-        assert!(ToggleExerciseModel::optimal(100, f64::NAN, 0.3, 0.03, 1.0).is_err());
-        assert!(ToggleExerciseModel::optimal(100, 0.05, -0.3, 0.03, 1.0).is_err());
-        assert!(ToggleExerciseModel::optimal(100, 0.05, 0.3, 0.03, 0.0).is_err());
+        assert!(ToggleExerciseModel::optimal(0, 0.3, 0.03, 1.0).is_err());
+        assert!(ToggleExerciseModel::optimal(100, 0.3, f64::NAN, 1.0).is_err());
+        assert!(ToggleExerciseModel::optimal(100, -0.3, 0.03, 1.0).is_err());
+        assert!(ToggleExerciseModel::optimal(100, 0.3, 0.03, 0.0).is_err());
         assert_eq!(
-            ToggleExerciseModel::optimal(100, 0.05, 0.3, 0.03, 1.0).unwrap(),
+            ToggleExerciseModel::optimal(100, 0.3, 0.03, 1.0).unwrap(),
             ToggleExerciseModel::OptimalExercise(OptimalToggle {
                 nested_paths: 100,
-                equity_discount_rate: 0.05,
                 asset_vol: 0.3,
                 risk_free_rate: 0.03,
                 horizon: 1.0,
@@ -700,12 +654,10 @@ mod tests {
 
     /// Helper to build an `OptimalToggle` with typical parameters.
     ///
-    /// Tests set `CreditState::coupon_due` explicitly; the discount rate is
-    /// only the equity-holder discount rate.
+    /// Tests set `CreditState::coupon_due` explicitly for each decision.
     fn make_optimal_toggle(nested_paths: usize) -> OptimalToggle {
         OptimalToggle {
             nested_paths,
-            equity_discount_rate: 0.02,
             asset_vol: 0.30,
             risk_free_rate: 0.03,
             horizon: 1.0,
@@ -740,7 +692,6 @@ mod tests {
         // so PIK must be elected.
         let model = ToggleExerciseModel::OptimalExercise(OptimalToggle {
             nested_paths: 200,
-            equity_discount_rate: 0.05,
             asset_vol: 0.30,
             risk_free_rate: 0.03,
             horizon: 1.0,
@@ -768,7 +719,6 @@ mod tests {
         // cash, avoiding unnecessary debt accretion.
         let model = ToggleExerciseModel::OptimalExercise(OptimalToggle {
             nested_paths: 32,
-            equity_discount_rate: 0.02,
             asset_vol: 0.0,
             risk_free_rate: 0.0,
             horizon: 1.0,
@@ -827,57 +777,51 @@ mod tests {
     }
 
     #[test]
-    fn optimal_toggle_decision_invariant_to_discount_rate() {
-        // The nested MC drifts risk-neutrally but discounts at
-        // equity_discount_rate. That discount factor scales the cash and PIK
-        // averages by an identical positive constant, so the cash-vs-PIK
-        // decision must not depend on the discount rate. Verify across a
-        // grid of states and discount rates.
-        let states = [
-            CreditState {
-                hazard_rate: 0.10,
-                leverage: 0.60,
-                accreted_notional: 100.0,
-                coupon_due: 2.0,
-                asset_value: Some(166.67),
-                ..Default::default()
-            },
-            CreditState {
-                hazard_rate: 0.25,
-                leverage: 0.85,
-                accreted_notional: 100.0,
-                coupon_due: 4.0,
-                asset_value: Some(120.0),
-                ..Default::default()
-            },
-            CreditState {
-                hazard_rate: 0.05,
-                leverage: 0.40,
-                accreted_notional: 100.0,
-                coupon_due: 1.0,
-                asset_value: Some(250.0),
-                ..Default::default()
-            },
-        ];
-
-        for state in &states {
-            let mut decisions = Vec::new();
-            for &discount in &[0.0_f64, 0.02, 0.05, 0.10, 0.20] {
-                let o = OptimalToggle {
-                    nested_paths: 256,
-                    equity_discount_rate: discount,
-                    asset_vol: 0.30,
-                    risk_free_rate: 0.03,
-                    horizon: 1.0,
+    fn payoff_sum_comparison_preserves_ordinary_discounted_decisions_without_underflow_ties() {
+        let o = make_optimal_toggle(256);
+        let mut positive_decisions = 0;
+        for asset in [110.0, 120.0, 166.67, 250.0] {
+            for coupon in [1.0, 2.0, 4.0] {
+                let state = CreditState {
+                    accreted_notional: 100.0,
+                    coupon_due: coupon,
+                    asset_value: Some(asset),
+                    ..Default::default()
                 };
-                // Use a fixed seed so only the discount rate varies.
-                decisions.push(optimal_toggle_decision(&o, state, 777));
+                let model = NestedEquityMcModel {
+                    sigma: o.asset_vol,
+                    risk_free_rate: o.risk_free_rate,
+                    horizon: o.horizon,
+                };
+                let cash = nested_equity_mc(o.nested_paths, asset - coupon, 100.0, model, 777);
+                let pik = nested_equity_mc(o.nested_paths, asset, 100.0 + coupon, model, 777);
+                let decision = optimal_toggle_decision(&o, &state, 777);
+                for discount in [0.0_f64, 0.02, 0.05, 0.2] {
+                    let common = (-discount * o.horizon).exp() / o.nested_paths as f64;
+                    assert_eq!(decision, pik * common > cash * common);
+                }
+                if decision {
+                    positive_decisions += 1;
+                    let underflow = (-1000.0_f64 * o.horizon).exp();
+                    assert_eq!(pik * underflow, cash * underflow);
+                }
             }
-            assert!(
-                decisions.windows(2).all(|w| w[0] == w[1]),
-                "Toggle decision must be invariant to equity_discount_rate; got {decisions:?}"
-            );
         }
+        assert!(
+            positive_decisions > 0,
+            "grid must exercise a decision lost by discounted underflow"
+        );
+    }
+
+    #[test]
+    fn removed_equity_discount_rate_is_rejected_by_serde() {
+        let wire = serde_json::json!({"nested_paths":100, "equity_discount_rate":0.05,
+            "asset_vol":0.3, "risk_free_rate":0.03, "horizon":1.0});
+        assert!(serde_json::from_value::<OptimalToggle>(wire.clone()).is_err());
+        assert!(serde_json::from_value::<ToggleExerciseModel>(
+            serde_json::json!({"optimal_exercise":wire})
+        )
+        .is_err());
     }
 
     #[test]
@@ -929,23 +873,21 @@ mod tests {
     #[test]
     fn nested_equity_mc_zero_vol_is_deterministic() {
         // With zero vol the asset value stays constant, so the equity
-        // payoff is simply max(V * exp(r*T) - barrier, 0) * df.
+        // payoff sum is N * max(V * exp(r*T) - barrier, 0).
         let v: f64 = 150.0;
         let barrier: f64 = 100.0;
         let r: f64 = 0.05;
         let horizon: f64 = 1.0;
-        let discount: f64 = 0.05;
 
         let model = super::NestedEquityMcModel {
             sigma: 0.0,
             risk_free_rate: r,
-            discount_rate: discount,
             horizon,
         };
         let result = super::nested_equity_mc(200, v, barrier, model, 42);
 
         let v_terminal = v * (r * horizon).exp();
-        let expected = ((v_terminal - barrier).max(0.0)) * (-discount * horizon).exp();
+        let expected = 200.0 * (v_terminal - barrier).max(0.0);
 
         assert!(
             (result - expected).abs() < 1e-6,

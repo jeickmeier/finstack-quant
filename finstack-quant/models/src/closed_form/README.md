@@ -231,7 +231,7 @@ P_j = 0.5 + (1/π) ∫₀^∞ Re[e^(-iφ·ln K) · ψ_j(φ) / (iφ)] dφ
 | `heston_call_price_fourier` | `(spot, strike, time, &HestonPricingParams, Option<&HestonFourierSettings>) -> f64` |
 | `heston_put_price_fourier` | same, via put-call parity |
 | `HestonPricingParams` | `r` and `q` plus canonical `volatility::heston::HestonParams` — `new()` validates and returns `Result` |
-| `HestonFourierSettings` | `u_max`, `panels`, `gl_order`, `phi_eps`; `new()` / `validate()` |
+| `HestonFourierSettings` | `u_max`, `panels`, `gl_order`; `new()` / `validate()` |
 
 The "Little Heston Trap" algebra (Albrecher et al. 2007) lives once in
 `models::volatility::heston`;

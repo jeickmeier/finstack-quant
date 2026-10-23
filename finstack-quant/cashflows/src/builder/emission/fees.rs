@@ -37,8 +37,8 @@ fn checked_fee_amount(
 
 /// Emit fee cashflows on a specific date.
 ///
-/// Processes both periodic fees (based on drawn/undrawn balances) and fixed
-/// fees (explicit amounts) that fall on the given date.
+/// Processes periodic fees (based on drawn/undrawn balances) that accrue on
+/// the given date. Fixed fees are emitted by the caller, not here.
 ///
 /// For periodic fees, computes the fee amount as `base * bp * year_fraction`
 /// where base is either the drawn balance or the undrawn balance (commitment - outstanding).
@@ -51,11 +51,10 @@ fn checked_fee_amount(
 /// intraperiod balance changes, and undrawn-limit clipping semantics.
 ///
 /// Any non-zero fee amount is emitted; negative fees (rebates) are preserved
-/// as negative cashflows for both periodic and fixed fees.
+/// as negative cashflows.
 pub(in crate::builder) fn emit_fees_on(
     d: Date,
     periodic_fees: &[PeriodicFee],
-    fixed_fees: &[(Date, Money)],
     outstanding: Decimal,
     outstanding_history: &[(Date, Decimal)],
     ccy: Currency,
@@ -87,16 +86,16 @@ pub(in crate::builder) fn emit_fees_on(
                 let day_count_ctx = crate::builder::periods::period_day_count_context(
                     period,
                     pf.calendar,
-                    pf.frequency,
-                    pf.day_count,
-                    pf.stub,
-                    false,
-                    crate::builder::RollRule::None,
+                    pf.schedule.frequency,
+                    pf.schedule.day_count,
+                    pf.schedule.stub,
+                    pf.schedule.end_of_month,
+                    pf.schedule.roll_rule,
                     is_termination_date,
                 );
                 let coupon_period = day_count_ctx.coupon_period;
                 let yf = crate::builder::periods::contractual_accrual(
-                    pf.day_count,
+                    pf.schedule.day_count,
                     full_period,
                     accrual_start,
                     accrual_end,
@@ -136,10 +135,10 @@ pub(in crate::builder) fn emit_fees_on(
                         .with_accrual(CashFlowAccrual {
                             coupon_period,
                             end_is_termination_date: is_termination_date,
-                            calendar_id: Some(pf.calendar_id.clone()),
+                            calendar_id: Some(pf.schedule.calendar_id.to_string()),
                             start: accrual_start,
                             end: accrual_end,
-                            day_count: pf.day_count,
+                            day_count: pf.schedule.day_count,
                             projected_index_rate: None,
                         }),
                     );
@@ -148,11 +147,6 @@ pub(in crate::builder) fn emit_fees_on(
         }
     }
 
-    for (fd, amt) in fixed_fees {
-        if *fd == d && amt.amount() != 0.0 {
-            new_flows.push(CashFlow::new(d, None, *amt, CFKind::Fee, 0.0, None));
-        }
-    }
     Ok(())
 }
 
@@ -161,9 +155,9 @@ mod tests {
     use super::*;
     use crate::builder::compiler::PeriodicFee;
     use crate::builder::periods::SchedulePeriod;
-    use crate::builder::specs::{FeeAccrualBasis, FeeBase};
+    use crate::builder::specs::{FeeAccrualBasis, FeeBase, ScheduleParams};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
     use rust_decimal_macros::dec;
     use time::Month;
 
@@ -186,12 +180,19 @@ mod tests {
             unadjusted_end: accrual_end,
         };
         PeriodicFee {
-            calendar_id: "weekends_only".to_owned(),
+            schedule: ScheduleParams {
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: "weekends_only".into(),
+                stub: finstack_quant_core::dates::StubKind::ShortBack,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+                roll_rule: crate::builder::RollRule::None,
+            },
             base,
             bp,
-            day_count: DayCount::Act360,
-            frequency: Tenor::quarterly(),
-            stub: finstack_quant_core::dates::StubKind::ShortBack,
             calendar: finstack_quant_core::dates::calendar_by_id_strict("weekends_only")
                 .expect("weekends_only calendar should resolve"),
             periods: vec![crate::builder::date_generation::CompiledPeriod {
@@ -216,12 +217,11 @@ mod tests {
             FeeAccrualBasis::TimeWeightedAverage,
             FeeBase::Drawn,
         );
-        fee.day_count = DayCount::ActAct;
+        fee.schedule.day_count = DayCount::ActAct;
         let mut flows = Vec::new();
         emit_fees_on(
             end,
             &[fee],
-            &[],
             Decimal::ZERO,
             &[(start, dec!(1000000)), (event, Decimal::ZERO)],
             Currency::USD,
@@ -254,7 +254,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             outstanding,
             &history,
             Currency::USD,
@@ -294,7 +293,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf_pit],
-            &[],
             outstanding,
             &history,
             Currency::USD,
@@ -314,7 +312,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf_twa],
-            &[],
             outstanding,
             &history,
             Currency::USD,
@@ -354,7 +351,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             dec!(500000),
             &history,
             Currency::USD,
@@ -399,7 +395,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             dec!(500000),
             &history,
             Currency::USD,
@@ -444,7 +439,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             dec!(800000), // live balance after same-date amortization
             &history,
             Currency::USD,
@@ -482,7 +476,6 @@ mod tests {
         emit_fees_on(
             payment,
             &[pf],
-            &[],
             dec!(1000000),
             &history,
             Currency::USD,

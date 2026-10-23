@@ -29,6 +29,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     imm::register(&m)?;
     date_ext::register(&m)?;
 
+    m.add_function(wrap_pyfunction!(fx_standard_settlement_days, &m)?)?;
     m.add_function(wrap_pyfunction!(py_create_date, &m)?)?;
     m.add_function(wrap_pyfunction!(py_days_since_epoch, &m)?)?;
     m.add_function(wrap_pyfunction!(py_date_from_epoch_days, &m)?)?;
@@ -42,7 +43,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     all_names.extend_from_slice(sifma::EXPORTS);
     all_names.extend_from_slice(imm::EXPORTS);
     all_names.extend_from_slice(date_ext::EXPORTS);
-    all_names.extend_from_slice(&["create_date", "days_since_epoch", "date_from_epoch_days"]);
+    all_names.extend_from_slice(&[
+        "create_date",
+        "days_since_epoch",
+        "date_from_epoch_days",
+        "fx_standard_settlement_days",
+    ]);
     all_names.sort_unstable();
 
     let all = PyList::new(py, &all_names)?;
@@ -55,6 +61,16 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
 
     Ok(())
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.dates", "fx_standard_settlement_days")]
+#[pyfunction]
+#[pyo3(text_signature = "(base, quote)")]
+fn fx_standard_settlement_days(base: &Bound<'_, PyAny>, quote: &Bound<'_, PyAny>) -> PyResult<u32> {
+    Ok(finstack_quant_core::dates::fx::fx_standard_settlement_days(
+        crate::bindings::core::currency::extract_currency(base)?,
+        crate::bindings::core::currency::extract_currency(quote)?,
+    ))
 }
 
 /// Create a ``datetime.date`` from year, month (1-12), and day.

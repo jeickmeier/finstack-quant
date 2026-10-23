@@ -1020,13 +1020,17 @@ mod cases {
         .expect("tranche");
         let mut instrument = StructuredCredit {
             cleanup_call_decimal: Some(0.10),
-            ..StructuredCredit::new_abs(
-                "ABS-CLEANUP",
-                pool,
-                TrancheStructure::new(vec![tranche]).expect("structure"),
-                cleanup_test_date(),
-                maturity,
-                "USD-OIS",
+            ..StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Abs,
+                crate::structured_credit::StandardDealParams {
+                    id: "ABS-CLEANUP".into(),
+                    pool,
+                    tranches: TrancheStructure::new(vec![tranche]).expect("structure"),
+                    closing_date: cleanup_test_date(),
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
@@ -1168,13 +1172,17 @@ mod cases {
                 maturity,
             )
             .expect("tranche");
-            let mut instrument = StructuredCredit::new_clo(
-                "CLO-REINVEST",
-                pool,
-                TrancheStructure::new(vec![tranche]).expect("structure"),
-                cc_test_date(),
-                maturity,
-                "USD-OIS",
+            let mut instrument = StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Clo,
+                crate::structured_credit::StandardDealParams {
+                    id: "CLO-REINVEST".into(),
+                    pool,
+                    tranches: TrancheStructure::new(vec![tranche]).expect("structure"),
+                    closing_date: cc_test_date(),
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
@@ -1274,13 +1282,17 @@ mod cases {
             .expect("equity"),
         ])
         .expect("structure");
-        let mut instrument = StructuredCredit::new_clo(
-            "CLO-LOSS-CAP",
-            pool,
-            tranches,
-            cc_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-LOSS-CAP".into(),
+                pool,
+                tranches,
+                closing_date: cc_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -1366,13 +1378,17 @@ mod cases {
             .expect("equity"),
         ])
         .expect("structure");
-        let mut instrument = StructuredCredit::new_clo(
-            "CLO-CONSERVE",
-            pool,
-            tranches,
-            cc_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-CONSERVE".into(),
+                pool,
+                tranches,
+                closing_date: cc_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -1844,13 +1860,17 @@ mod cases {
             maturity,
         )
         .expect("tranche");
-        let mut instrument = StructuredCredit::new_abs(
-            "ABS-RESERVE",
-            pool,
-            TrancheStructure::new(vec![tranche]).expect("structure"),
-            cleanup_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Abs,
+            crate::structured_credit::StandardDealParams {
+                id: "ABS-RESERVE".into(),
+                pool,
+                tranches: TrancheStructure::new(vec![tranche]).expect("structure"),
+                closing_date: cleanup_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -1863,12 +1883,10 @@ mod cases {
     /// Total cash distributed to every tranche over the life of a deal.
     fn total_distributed(instrument: &StructuredCredit) -> f64 {
         let market = MarketContext::new().insert(cleanup_discount_curve());
-        let results = crate::structured_credit::pricing::run_simulation(
-            instrument,
-            &market,
-            cleanup_test_date(),
-        )
-        .expect("simulation");
+        let results = instrument
+            .run_simulation(&market, cleanup_test_date())
+            .map(|run| run.tranches)
+            .expect("simulation");
         results
             .values()
             .flat_map(|tc| tc.cashflows.iter())
@@ -1939,13 +1957,17 @@ mod cases {
                 mk("JR", junior_seniority, 0.0, 20.0, 2_000_000.0),
             ])
             .expect("structure");
-            let mut deal = StructuredCredit::new_abs(
-                "ABS-SPREAD",
-                pool,
-                tranches,
-                cleanup_test_date(),
-                maturity,
-                "USD-OIS",
+            let mut deal = StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Abs,
+                crate::structured_credit::StandardDealParams {
+                    id: "ABS-SPREAD".into(),
+                    pool,
+                    tranches,
+                    closing_date: cleanup_test_date(),
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
@@ -1982,12 +2004,10 @@ mod cases {
     #[test]
     fn fee_aware_capture_does_not_starve_note_interest() {
         let market = MarketContext::new().insert(cleanup_discount_curve());
-        let results = crate::structured_credit::pricing::run_simulation(
-            &excess_spread_deal(true),
-            &market,
-            cleanup_test_date(),
-        )
-        .expect("simulation");
+        let results = (excess_spread_deal(true))
+            .run_simulation(&market, cleanup_test_date())
+            .map(|run| run.tranches)
+            .expect("simulation");
 
         // The tranche is NOT pik_enabled, so its shortfalls land in
         // `total_deferred`. Reading `total_pik` here would pass vacuously.
@@ -2041,12 +2061,10 @@ mod cases {
             let mut deal = reserve_account_deal(reserve);
             deal.tranches.tranches[0].coupon = RateSpec::Fixed { rate: 0.09 };
             let market = MarketContext::new().insert(cleanup_discount_curve());
-            let results = crate::structured_credit::pricing::run_simulation(
-                &deal,
-                &market,
-                cleanup_test_date(),
-            )
-            .expect("simulation");
+            let results = deal
+                .run_simulation(&market, cleanup_test_date())
+                .map(|run| run.tranches)
+                .expect("simulation");
             let mut flows: Vec<(Date, f64)> = results
                 .values()
                 .flat_map(|tc| tc.interest_flows.iter())
@@ -2100,13 +2118,17 @@ mod cases {
             maturity,
         )
         .expect("equity");
-        let mut instrument = StructuredCredit::new_clo(
-            "CLO-OC",
-            pool,
-            TrancheStructure::new(vec![senior, equity]).expect("structure"),
-            cleanup_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-OC".into(),
+                pool,
+                tranches: TrancheStructure::new(vec![senior, equity]).expect("structure"),
+                closing_date: cleanup_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -2171,13 +2193,17 @@ mod cases {
             ),
         ])
         .expect("structure");
-        let mut instrument = StructuredCredit::new_clo(
-            "CLO-MEZZ",
-            pool,
-            tranches,
-            cleanup_test_date(),
-            maturity,
-            "USD-OIS",
+        let mut instrument = StructuredCredit::new_standard(
+            crate::structured_credit::DealType::Clo,
+            crate::structured_credit::StandardDealParams {
+                id: "CLO-MEZZ".into(),
+                pool,
+                tranches,
+                closing_date: cleanup_test_date(),
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -2202,12 +2228,10 @@ mod cases {
         // can converge while the trap still delays subordinated interest.
         let interest_wal = |deal: &StructuredCredit, tranche: &str| -> f64 {
             let market = MarketContext::new().insert(cleanup_discount_curve());
-            let results = crate::structured_credit::pricing::run_simulation(
-                deal,
-                &market,
-                cleanup_test_date(),
-            )
-            .expect("simulation");
+            let results = deal
+                .run_simulation(&market, cleanup_test_date())
+                .map(|run| run.tranches)
+                .expect("simulation");
             let flows = &results
                 .get(tranche)
                 .expect("tranche results")
@@ -2240,12 +2264,10 @@ mod cases {
         // benefit through earlier principal rather than nominal cash.
         let senior_principal_wal = |deal: &StructuredCredit| -> f64 {
             let market = MarketContext::new().insert(cleanup_discount_curve());
-            let results = crate::structured_credit::pricing::run_simulation(
-                deal,
-                &market,
-                cleanup_test_date(),
-            )
-            .expect("simulation");
+            let results = deal
+                .run_simulation(&market, cleanup_test_date())
+                .map(|run| run.tranches)
+                .expect("simulation");
             let flows = &results
                 .get("CLASS_A")
                 .expect("senior results")
@@ -2609,13 +2631,17 @@ mod cases {
         .expect("equity tranche");
         let mut instrument = StructuredCredit {
             cleanup_call_decimal: Some(0.10),
-            ..StructuredCredit::new_abs(
-                "ABS-BIG-RECOVERY-QUEUE",
-                pool,
-                TrancheStructure::new(vec![senior, equity]).expect("structure"),
-                start,
-                maturity,
-                "USD-OIS",
+            ..StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Abs,
+                crate::structured_credit::StandardDealParams {
+                    id: "ABS-BIG-RECOVERY-QUEUE".into(),
+                    pool,
+                    tranches: TrancheStructure::new(vec![senior, equity]).expect("structure"),
+                    closing_date: start,
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
@@ -2871,13 +2897,17 @@ mod cases {
                 .expect("equity"),
             ])
             .expect("structure");
-            let mut instrument = StructuredCredit::new_abs(
-                "ABS-TAIL-RECOVERY",
-                pool,
-                tranches,
-                closing,
-                maturity,
-                "USD-OIS",
+            let mut instrument = StructuredCredit::new_standard(
+                crate::structured_credit::DealType::Abs,
+                crate::structured_credit::StandardDealParams {
+                    id: "ABS-TAIL-RECOVERY".into(),
+                    pool,
+                    tranches,
+                    closing_date: closing,
+                    maturity,
+                    discount_curve_id: "USD-OIS".into(),
+                    calendar_id: None,
+                },
             )
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse");

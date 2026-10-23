@@ -476,7 +476,7 @@ fn seasoned_instrument_discount_factors_use_correct_time_origin() {
     let market = MarketContext::new().insert(disc.clone());
 
     // base_value: the canonical price from Instrument::value, which the
-    // discounting BondEngine computes via df_between_dates(as_of, date).
+    // discounting kernel computes via df_between_dates(as_of, date).
     let base_value = bond
         .value(&market, as_of_date)
         .expect("bond base value")

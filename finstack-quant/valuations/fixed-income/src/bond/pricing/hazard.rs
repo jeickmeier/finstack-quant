@@ -47,219 +47,205 @@ use finstack_quant_valuations_core::instruments::pricing::rates_credit::{
 
 use crate::bond::Bond;
 
-/// Hazard-rate bond pricing engine using FRP and `HazardCurve`.
+/// Resolve the hazard curve for the bond from its explicit
+/// `credit_curve_id` opt-in.
 ///
-/// This straight-bond leaf prices defaultable bonds using a reduced-form
-/// hazard-rate model with fractional recovery of par (FRP). It returns an
-/// error if no hazard curve is available or if the bond has embedded call,
-/// put, or return-floor rights.
-pub struct HazardBondEngine;
+/// Credit-risky pricing requires the instrument to name its hazard curve.
+/// The previous implicit discovery (`discount_curve_id` /
+/// `<discount_curve_id>-CREDIT` naming magic) could silently switch a
+/// bond to credit-risky pricing just because a similarly-named hazard
+/// curve existed in the market context.
+pub(crate) fn require_hazard_curve(
+    bond: &Bond,
+    market: &MarketContext,
+) -> Result<std::sync::Arc<HazardCurve>> {
+    let credit_id = bond.credit_curve_id.as_ref().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "credit-consuming bond pricing for '{}' requires an explicit credit_curve_id",
+            bond.id.as_str()
+        ))
+    })?;
+    market.get_hazard(credit_id.as_str())
+}
 
-impl HazardBondEngine {
-    /// Resolve the hazard curve for the bond from its explicit
-    /// `credit_curve_id` opt-in.
-    ///
-    /// Credit-risky pricing requires the instrument to name its hazard curve.
-    /// The previous implicit discovery (`discount_curve_id` /
-    /// `<discount_curve_id>-CREDIT` naming magic) could silently switch a
-    /// bond to credit-risky pricing just because a similarly-named hazard
-    /// curve existed in the market context.
-    pub(crate) fn require_hazard_curve(
-        bond: &Bond,
-        market: &MarketContext,
-    ) -> Result<std::sync::Arc<HazardCurve>> {
-        let credit_id = bond.credit_curve_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "credit-consuming bond pricing for '{}' requires an explicit credit_curve_id",
-                bond.id.as_str()
-            ))
-        })?;
-        market.get_hazard(credit_id.as_str())
+/// Reject option-bearing bonds at the deterministic straight-bond leaf.
+fn reject_embedded_options(bond: &Bond) -> Result<()> {
+    if bond.has_exercise_rights() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "HazardBondEngine is a straight-bond leaf and cannot price embedded options \
+             for bond '{}'; use the 'rates_credit' model for joint rates-credit optional pricing",
+            bond.id.as_str()
+        )));
     }
+    Ok(())
+}
 
-    /// Reject option-bearing bonds at the deterministic straight-bond leaf.
-    fn reject_embedded_options(bond: &Bond) -> Result<()> {
-        if bond.has_exercise_rights() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "HazardBondEngine is a straight-bond leaf and cannot price embedded options \
-                 for bond '{}'; use the 'rates_credit' model for joint rates-credit optional pricing",
-                bond.id.as_str()
-            )));
-        }
-        Ok(())
+/// Build pricing cashflows and the full internal schedule.
+fn build_schedules(
+    bond: &Bond,
+    market: &MarketContext,
+    as_of: Date,
+) -> Result<(Vec<(Date, Money)>, CashFlowSchedule)> {
+    let schedule = bond.full_cashflow_schedule(market)?;
+    let flows = bond.pricing_dated_cashflows_from_schedule(&schedule, as_of, as_of)?;
+    Ok((flows, schedule))
+}
+
+#[cfg(test)]
+fn price(bond: &Bond, market: &MarketContext, as_of: Date) -> Result<Money> {
+    Ok(
+        Money::new(price_raw(bond, market, as_of)?, bond.notional.currency())
+            .expect("valid money fixture"),
+    )
+}
+
+/// Price a bond using a hazard curve and return the unrounded PV.
+#[cfg(test)]
+pub(crate) fn price_raw(bond: &Bond, market: &MarketContext, as_of: Date) -> Result<f64> {
+    price_raw_with_oas(bond, market, as_of, 0.0)
+}
+
+/// Price a non-callable hazard-rate bond with a constant OAS.
+///
+/// `oas_quote_decimal` follows the bond's configured OAS quote
+/// compounding. The scalar FRP kernel converts it to a continuous spread
+/// and applies it consistently to promised cash and within-step recovery.
+pub(crate) fn price_raw_with_oas(
+    bond: &Bond,
+    market: &MarketContext,
+    as_of: Date,
+    oas_quote_decimal: f64,
+) -> Result<f64> {
+    reject_embedded_options(bond)?;
+    if !oas_quote_decimal.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "hazard-rate OAS must be finite, got {oas_quote_decimal}"
+        )));
     }
-
-    /// Build pricing cashflows and the full internal schedule.
-    fn build_schedules(
-        bond: &Bond,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<(Vec<(Date, Money)>, CashFlowSchedule)> {
-        let schedule = bond.full_cashflow_schedule(market)?;
-        let flows = bond.pricing_dated_cashflows_from_schedule(&schedule, as_of, as_of)?;
-        Ok((flows, schedule))
+    let compounding = bond
+        .instrument_pricing_overrides
+        .model_config
+        .oas_quote_compounding;
+    if compounding != finstack_quant_core::math::Compounding::Continuous {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "a {compounding} OAS quote is not supported by the hazard-rate model; \
+             quote the OAS as continuous"
+        )));
     }
+    let continuous_oas = oas_quote_decimal;
+    let disc = market.get_discount(&bond.discount_curve_id)?;
 
-    #[cfg(test)]
-    fn price(bond: &Bond, market: &MarketContext, as_of: Date) -> Result<Money> {
-        Ok(Money::new(
-            Self::price_raw(bond, market, as_of)?,
-            bond.notional.currency(),
+    // Explicit hazard-rate pricing must fail loudly when credit market data
+    // is missing; risk-free pricing belongs on the discounting model path.
+    let hazard = require_hazard_curve(bond, market)?;
+    let (flows, schedule) = build_schedules(bond, market, as_of)?;
+    let Some(final_payment_date) = schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.date > as_of && flow.kind.is_cash_settlement())
+        .map(|flow| flow.date)
+        .max()
+    else {
+        return Ok(0.0);
+    };
+    let minimum_steps = bond
+        .instrument_pricing_overrides
+        .model_config
+        .tree_steps
+        .unwrap_or(1);
+    let targets = build_daily_bond_rates_credit_targets(
+        disc.as_ref(),
+        hazard.as_ref(),
+        as_of,
+        final_payment_date,
+        minimum_steps,
+    )?;
+    let steps = targets.times.len() - 1;
+    let span_days = usize::try_from((final_payment_date - as_of).whole_days()).map_err(|_| {
+        finstack_quant_core::Error::Validation(
+            "hazard bond payment horizon exceeds supported grid size".to_string(),
         )
-        .expect("valid money fixture"))
+    })?;
+    let substeps_per_day = steps / span_days;
+
+    let mut cash_by_step = vec![0.0; steps + 1];
+    for (date, amount) in flows {
+        let day = usize::try_from((date - as_of).whole_days()).map_err(|_| {
+            finstack_quant_core::Error::Validation(
+                "hazard bond cashflow predates the valuation date".to_string(),
+            )
+        })?;
+        let step = day.checked_mul(substeps_per_day).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "hazard bond cashflow grid index overflow".to_string(),
+            )
+        })?;
+        if let Some(total) = cash_by_step.get_mut(step) {
+            *total += amount.amount();
+        }
     }
 
-    /// Price a bond using a hazard curve and return the unrounded PV.
-    #[cfg(test)]
-    pub(crate) fn price_raw(bond: &Bond, market: &MarketContext, as_of: Date) -> Result<f64> {
-        Self::price_raw_with_oas(bond, market, as_of, 0.0)
+    // `outstanding_by_date` is the canonical after-event balance replay;
+    // it includes historical and future amortization, PIK, draws, and
+    // repayments in schedule order.
+    let outstanding_path = crate::bond::pricing::settlement::recovery_principal_path(&schedule)?;
+    let mut outstanding = schedule.get_notional().initial.amount();
+    let mut balance_cursor = 0;
+    while balance_cursor < outstanding_path.len() && outstanding_path[balance_cursor].0 <= as_of {
+        outstanding = outstanding_path[balance_cursor].1.amount();
+        balance_cursor += 1;
     }
 
-    /// Price a non-callable hazard-rate bond with a constant OAS.
-    ///
-    /// `oas_quote_decimal` follows the bond's configured OAS quote
-    /// compounding. The scalar FRP kernel converts it to a continuous spread
-    /// and applies it consistently to promised cash and within-step recovery.
-    pub(crate) fn price_raw_with_oas(
-        bond: &Bond,
-        market: &MarketContext,
-        as_of: Date,
-        oas_quote_decimal: f64,
-    ) -> Result<f64> {
-        Self::reject_embedded_options(bond)?;
-        if !oas_quote_decimal.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "hazard-rate OAS must be finite, got {oas_quote_decimal}"
-            )));
+    let recovery = targets.recovery_rate.clamp(0.0, 1.0);
+    let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::default();
+    for (step, cash) in cash_by_step.iter().copied().enumerate() {
+        let oas_discount = (-continuous_oas * targets.times[step]).exp();
+        pv.add(
+            cash * targets.discount_factors[step]
+                * targets.survival_probabilities[step]
+                * oas_discount,
+        );
+        if step == steps {
+            break;
         }
-        let compounding = bond
-            .instrument_pricing_overrides
-            .model_config
-            .oas_quote_compounding;
-        if compounding != finstack_quant_core::math::Compounding::Continuous {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "a {compounding} OAS quote is not supported by the hazard-rate model; \
-                 quote the OAS as continuous"
-            )));
-        }
-        let continuous_oas = oas_quote_decimal;
-        let disc = market.get_discount(&bond.discount_curve_id)?;
 
-        // Explicit hazard-rate pricing must fail loudly when credit market data
-        // is missing; risk-free pricing belongs on the discounting model path.
-        let hazard = Self::require_hazard_curve(bond, market)?;
-        let (flows, schedule) = Self::build_schedules(bond, market, as_of)?;
-        let Some(final_payment_date) = schedule
-            .get_flows()
-            .iter()
-            .filter(|flow| flow.date > as_of && flow.kind.is_cash_settlement())
-            .map(|flow| flow.date)
-            .max()
-        else {
-            return Ok(0.0);
-        };
-        let minimum_steps = bond
-            .instrument_pricing_overrides
-            .model_config
-            .tree_steps
-            .unwrap_or(1);
-        let targets = build_daily_bond_rates_credit_targets(
-            disc.as_ref(),
-            hazard.as_ref(),
-            as_of,
-            final_payment_date,
-            minimum_steps,
-        )?;
-        let steps = targets.times.len() - 1;
-        let span_days =
-            usize::try_from((final_payment_date - as_of).whole_days()).map_err(|_| {
-                finstack_quant_core::Error::Validation(
-                    "hazard bond payment horizon exceeds supported grid size".to_string(),
-                )
-            })?;
-        let substeps_per_day = steps / span_days;
-
-        let mut cash_by_step = vec![0.0; steps + 1];
-        for (date, amount) in flows {
-            let day = usize::try_from((date - as_of).whole_days()).map_err(|_| {
-                finstack_quant_core::Error::Validation(
-                    "hazard bond cashflow predates the valuation date".to_string(),
-                )
-            })?;
-            let step = day.checked_mul(substeps_per_day).ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "hazard bond cashflow grid index overflow".to_string(),
-                )
-            })?;
-            if let Some(total) = cash_by_step.get_mut(step) {
-                *total += amount.amount();
+        let whole_day_boundary = step % substeps_per_day == 0;
+        if whole_day_boundary {
+            let day = step / substeps_per_day;
+            let date = as_of + time::Duration::days(day as i64);
+            while balance_cursor < outstanding_path.len()
+                && outstanding_path[balance_cursor].0 <= date
+            {
+                outstanding = outstanding_path[balance_cursor].1.amount();
+                balance_cursor += 1;
             }
         }
 
-        // `outstanding_by_date` is the canonical after-event balance replay;
-        // it includes historical and future amortization, PIK, draws, and
-        // repayments in schedule order.
-        let outstanding_path =
-            crate::bond::pricing::settlement::recovery_principal_path(&schedule)?;
-        let mut outstanding = schedule.get_notional().initial.amount();
-        let mut balance_cursor = 0;
-        while balance_cursor < outstanding_path.len() && outstanding_path[balance_cursor].0 <= as_of
-        {
-            outstanding = outstanding_path[balance_cursor].1.amount();
-            balance_cursor += 1;
-        }
-
-        let recovery = targets.recovery_rate.clamp(0.0, 1.0);
-        let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::default();
-        for (step, cash) in cash_by_step.iter().copied().enumerate() {
-            let oas_discount = (-continuous_oas * targets.times[step]).exp();
+        if recovery > 0.0 && outstanding > 0.0 {
+            let interval_discount = targets.discount_factors[step + 1]
+                / targets.discount_factors[step]
+                * (-continuous_oas * (targets.times[step + 1] - targets.times[step])).exp();
+            let interval_survival =
+                targets.survival_probabilities[step + 1] / targets.survival_probabilities[step];
+            let default_weight = continuous_frp_weight(interval_discount, interval_survival)?;
             pv.add(
-                cash * targets.discount_factors[step]
+                targets.discount_factors[step]
                     * targets.survival_probabilities[step]
-                    * oas_discount,
+                    * oas_discount
+                    * recovery
+                    * outstanding
+                    * default_weight,
             );
-            if step == steps {
-                break;
-            }
-
-            let whole_day_boundary = step % substeps_per_day == 0;
-            if whole_day_boundary {
-                let day = step / substeps_per_day;
-                let date = as_of + time::Duration::days(day as i64);
-                while balance_cursor < outstanding_path.len()
-                    && outstanding_path[balance_cursor].0 <= date
-                {
-                    outstanding = outstanding_path[balance_cursor].1.amount();
-                    balance_cursor += 1;
-                }
-            }
-
-            if recovery > 0.0 && outstanding > 0.0 {
-                let interval_discount = targets.discount_factors[step + 1]
-                    / targets.discount_factors[step]
-                    * (-continuous_oas * (targets.times[step + 1] - targets.times[step])).exp();
-                let interval_survival =
-                    targets.survival_probabilities[step + 1] / targets.survival_probabilities[step];
-                let default_weight = continuous_frp_weight(interval_discount, interval_survival)?;
-                pv.add(
-                    targets.discount_factors[step]
-                        * targets.survival_probabilities[step]
-                        * oas_discount
-                        * recovery
-                        * outstanding
-                        * default_weight,
-                );
-            }
         }
-
-        Ok(pv.total())
     }
+
+    Ok(pv.total())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bond::pricing::discount::BondEngine;
+    use crate::bond::pricing::discount;
     use crate::bond::pricing::tree::{bond_tree_settings, TreePricer};
     use crate::bond::{BondSettlementConvention, CallPut, CallPutSchedule, CashflowSpec};
     use finstack_quant_cashflows::builder::CouponType;
@@ -346,10 +332,9 @@ mod tests {
 
         let market = MarketContext::new().insert(disc).insert(hazard_zero);
 
-        let pv_rf = BondEngine::price_with_oas(&bond, &market, issue, 0.0)
-            .expect("RF price should succeed");
-        let pv_haz =
-            HazardBondEngine::price(&bond, &market, issue).expect("Hazard price should succeed");
+        let pv_rf =
+            discount::price_with_oas(&bond, &market, issue, 0.0).expect("RF price should succeed");
+        let pv_haz = price(&bond, &market, issue).expect("Hazard price should succeed");
 
         let diff = (pv_rf - pv_haz.amount()).abs();
         assert!(
@@ -405,10 +390,9 @@ mod tests {
             "settlement convention: cashflows dated on as_of must be excluded"
         );
 
-        let pv_rf = BondEngine::price_with_oas(&bond, &market, as_of, 0.0)
-            .expect("RF price should succeed");
-        let pv_haz =
-            HazardBondEngine::price(&bond, &market, as_of).expect("Hazard price should succeed");
+        let pv_rf =
+            discount::price_with_oas(&bond, &market, as_of, 0.0).expect("RF price should succeed");
+        let pv_haz = price(&bond, &market, as_of).expect("Hazard price should succeed");
 
         let diff = (pv_rf - pv_haz.amount()).abs();
         assert!(
@@ -429,7 +413,7 @@ mod tests {
         let bond = build_test_bond(issue, maturity);
         let market = MarketContext::new().insert(build_flat_discount(issue));
 
-        let err = HazardBondEngine::price(&bond, &market, issue)
+        let err = price(&bond, &market, issue)
             .expect_err("hazard pricing should reject missing hazard curve");
 
         assert!(
@@ -456,7 +440,7 @@ mod tests {
             .insert(build_flat_discount(issue))
             .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
 
-        let err = HazardBondEngine::price_raw(&callable, &market, issue)
+        let err = price_raw(&callable, &market, issue)
             .expect_err("straight hazard leaf must reject embedded options");
         assert!(
             err.to_string().contains("straight-bond leaf"),
@@ -855,10 +839,8 @@ mod tests {
             .insert(build_flat_discount(issue))
             .insert(hazard_high);
 
-        let pv_low =
-            HazardBondEngine::price(&bond, &market_low, issue).expect("Low hazard price succeeds");
-        let pv_high = HazardBondEngine::price(&bond, &market_high, issue)
-            .expect("High hazard price succeeds");
+        let pv_low = price(&bond, &market_low, issue).expect("Low hazard price succeeds");
+        let pv_high = price(&bond, &market_high, issue).expect("High hazard price succeeds");
 
         assert!(
             pv_high.amount() < pv_low.amount(),
@@ -884,10 +866,10 @@ mod tests {
             .insert(build_flat_discount(issue))
             .insert(hazard_high_recovery);
 
-        let pv_low_r = HazardBondEngine::price(&bond, &market_low_r, issue)
-            .expect("Low recovery hazard price succeeds");
-        let pv_high_r = HazardBondEngine::price(&bond, &market_high_r, issue)
-            .expect("High recovery hazard price succeeds");
+        let pv_low_r =
+            price(&bond, &market_low_r, issue).expect("Low recovery hazard price succeeds");
+        let pv_high_r =
+            price(&bond, &market_high_r, issue).expect("High recovery hazard price succeeds");
 
         assert!(
             pv_high_r.amount() > pv_low_r.amount(),
@@ -944,10 +926,9 @@ mod tests {
 
         let market = MarketContext::new().insert(disc).insert(hazard_zero);
 
-        let pv_rf = BondEngine::price_with_oas(&bond, &market, issue, 0.0)
-            .expect("RF price should succeed");
-        let pv_haz =
-            HazardBondEngine::price(&bond, &market, issue).expect("Hazard price should succeed");
+        let pv_rf =
+            discount::price_with_oas(&bond, &market, issue, 0.0).expect("RF price should succeed");
+        let pv_haz = price(&bond, &market, issue).expect("Hazard price should succeed");
 
         let diff = (pv_rf - pv_haz.amount()).abs();
         assert!(
@@ -974,20 +955,18 @@ mod tests {
             .insert(build_flat_discount(issue))
             .insert(build_flat_hazard("USD-CREDIT", issue, lambda, recovery));
 
-        let pv_cash =
-            HazardBondEngine::price(&cash_bond, &market, issue).expect("Cash bond price succeeds");
-        let pv_pik =
-            HazardBondEngine::price(&pik_bond, &market, issue).expect("PIK bond price succeeds");
+        let pv_cash = price(&cash_bond, &market, issue).expect("Cash bond price succeeds");
+        let pv_pik = price(&pik_bond, &market, issue).expect("PIK bond price succeeds");
 
         // With zero recovery, isolate the alive-leg difference.
         let market_no_rec = MarketContext::new()
             .insert(build_flat_discount(issue))
             .insert(build_flat_hazard("USD-CREDIT", issue, lambda, 0.0));
 
-        let pv_cash_norec = HazardBondEngine::price(&cash_bond, &market_no_rec, issue)
-            .expect("Cash bond no-recovery price");
-        let pv_pik_norec = HazardBondEngine::price(&pik_bond, &market_no_rec, issue)
-            .expect("PIK bond no-recovery price");
+        let pv_cash_norec =
+            price(&cash_bond, &market_no_rec, issue).expect("Cash bond no-recovery price");
+        let pv_pik_norec =
+            price(&pik_bond, &market_no_rec, issue).expect("PIK bond no-recovery price");
 
         // Recovery benefit = PV(with recovery) - PV(without recovery)
         let rec_benefit_cash = pv_cash.amount() - pv_cash_norec.amount();
@@ -1018,10 +997,8 @@ mod tests {
             .insert(build_flat_discount(issue))
             .insert(build_flat_hazard("USD-CREDIT", issue, 0.05, 0.4));
 
-        let pv_low =
-            HazardBondEngine::price(&bond, &market_low, issue).expect("Low hazard price succeeds");
-        let pv_high = HazardBondEngine::price(&bond, &market_high, issue)
-            .expect("High hazard price succeeds");
+        let pv_low = price(&bond, &market_low, issue).expect("Low hazard price succeeds");
+        let pv_high = price(&bond, &market_high, issue).expect("High hazard price succeeds");
 
         assert!(
             pv_high.amount() < pv_low.amount(),
@@ -1060,7 +1037,7 @@ mod tests {
         let hazard = build_flat_hazard("USD-CREDIT", issue, 10.0, 0.4);
         let market = MarketContext::new().insert(disc).insert(hazard);
 
-        let result = HazardBondEngine::price(&bond, &market, as_of);
+        let result = price(&bond, &market, as_of);
         let err = result.expect_err("prior-default curve must error, not return Ok(0.0)");
         let msg = err.to_string();
         assert!(

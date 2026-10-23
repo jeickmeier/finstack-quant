@@ -1,8 +1,8 @@
 //! Vanilla swaption pricer implementation.
 
 use crate::swaption::Swaption;
+use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::VolatilityModel;
 use finstack_quant_valuations_core::pricer::{
@@ -102,14 +102,11 @@ fn price_swaption(
     } else {
         // Use Act/365F for the option time-to-expiry so the vol-surface
         // pillar lookup is on the same time axis used by both pricing kernels.
-        let time_to_expiry = year_fraction(
-            finstack_quant_core::dates::DayCount::Act365F,
-            as_of,
-            swaption.expiry,
-        )
-        .map_err(|error| {
-            PricingError::model_failure_with_context(error.to_string(), context.clone())
-        })?;
+        let time_to_expiry = finstack_quant_core::dates::DayCount::Act365F
+            .year_fraction(as_of, swaption.expiry, DayCountContext::default())
+            .map_err(|error| {
+                PricingError::model_failure_with_context(error.to_string(), context.clone())
+            })?;
         let forward = swaption.forward_swap_rate(market, as_of).map_err(|error| {
             PricingError::model_failure_with_context(error.to_string(), context.clone())
         })?;

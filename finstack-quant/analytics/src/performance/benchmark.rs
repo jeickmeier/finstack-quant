@@ -4,9 +4,10 @@
 use super::Performance;
 use crate::benchmark::{
     batting_average, beta, beta_only, capture_ratio, down_capture, greeks, information_ratio,
-    m_squared, multi_factor_greeks, r_squared, rolling_greeks, tracking_error, treynor, up_capture,
-    BetaResult, GreeksResult, MultiFactorResult, ReturnKind, RollingGreeks,
+    m_squared, r_squared, rolling_greeks, tracking_error, treynor, up_capture, BetaResult,
+    GreeksResult, RollingGreeks,
 };
+use crate::multi_factor::{multi_factor_greeks, MultiFactorResult, ReturnKind};
 use crate::risk_metrics;
 
 impl Performance {
@@ -160,14 +161,16 @@ impl Performance {
     /// M-squared (Modigliani-Modigliani) for each ticker.
     ///
     /// Excess return uses the same geometric rf decompounding as
-    /// [`Self::sharpe`]. The cash return added back is the supplied
-    /// annualized risk-free rate.
+    /// [`Self::sharpe`]. The cash return added back is that decompounded
+    /// period rate times the panel's periods per year, `rf_period × N`
+    /// (close to `ln(1 + rf)` at daily frequency), not the annual rate itself.
     ///
     /// # Arguments
     ///
     /// * `risk_free_rate` - Annualized risk-free rate in decimal form.
-    ///   Decompounded to the panel frequency before forming the excess
-    ///   return; the same annual rate is added back as the cash return.
+    ///   Decompounded to the panel frequency as
+    ///   `rf_period = (1 + rf)^{1/N} − 1`; `rf_period × N` is both subtracted
+    ///   to form the excess return and added back as the cash return.
     pub fn m_squared(&self, risk_free_rate: f64) -> Vec<f64> {
         let ann = self.ann();
         self.map_pair_returns(|r, bench| {

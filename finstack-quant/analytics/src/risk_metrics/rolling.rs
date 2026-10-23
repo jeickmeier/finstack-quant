@@ -1,4 +1,4 @@
-//! Rolling risk metrics: Sharpe, Sortino, and volatility over a sliding window.
+//! Rolling metrics: compounded return, Sharpe, Sortino, and volatility over a sliding window.
 //!
 //! Crate-internal except for [`DatedSeries`] and [`RollingMetric`] (re-exported
 //! at the crate root).
@@ -11,7 +11,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 
-use super::return_based::invalid_annualization_factor;
 use super::{annualized_ratio_or_sign_infinity, ratio_or_sign_infinity};
 
 /// Number of slide steps before the incremental rolling kernel fully
@@ -23,7 +22,7 @@ use super::{annualized_ratio_or_sign_infinity, ratio_or_sign_infinity};
 /// over the full window to restore precision. Risk kernels also rebuild
 /// earlier when the risk sum collapses relative to its scale since the last
 /// rebuild, because removing an outlier can expose accumulated roundoff.
-pub(crate) const ROLLING_KERNEL_RECOMPUTE_INTERVAL: usize = 1024;
+const ROLLING_KERNEL_RECOMPUTE_INTERVAL: usize = 1024;
 
 #[inline]
 fn recompute_mean_m2(window: &[f64]) -> (f64, f64) {
@@ -129,7 +128,7 @@ impl DatedSeries {
     /// Allocate an empty series of `metric` with capacity for `cap` points.
     #[inline]
     #[must_use]
-    pub(crate) fn with_capacity(metric: RollingMetric, cap: usize) -> Self {
+    fn with_capacity(metric: RollingMetric, cap: usize) -> Self {
         Self {
             values: Vec::with_capacity(cap),
             dates: Vec::with_capacity(cap),
@@ -165,7 +164,8 @@ fn nan_series(metric: RollingMetric, dates: &[Date], start: usize, len: usize) -
 /// # Returns
 ///
 /// A [`DatedSeries`] with `values` and `dates` of equal length. Returns
-/// empty vectors if `window` is zero or larger than the series length.
+/// empty vectors if `window` is larger than the series length; callers
+/// guarantee `window >= 1` (`Performance::ensure_window`).
 pub(crate) fn rolling_sharpe(
     returns: &[f64],
     dates: &[Date],
@@ -174,10 +174,10 @@ pub(crate) fn rolling_sharpe(
     risk_free_rate: f64,
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
-    if n < window || window == 0 {
+    if n < window {
         return DatedSeries::with_capacity(RollingMetric::Sharpe, 0);
     }
-    if window < 2 || invalid_annualization_factor(true, ann_factor) {
+    if window < 2 {
         return nan_series(RollingMetric::Sharpe, dates, window - 1, n - window + 1);
     }
     let w = window as f64;
@@ -210,7 +210,8 @@ pub(crate) fn rolling_sharpe(
 /// # Returns
 ///
 /// A [`DatedSeries`] with `n - window + 1` values. Returns empty
-/// vectors if `window` is zero or larger than the series length.
+/// vectors if `window` is larger than the series length; callers guarantee
+/// `window >= 1` (`Performance::ensure_window`).
 pub(crate) fn rolling_volatility(
     returns: &[f64],
     dates: &[Date],
@@ -218,10 +219,10 @@ pub(crate) fn rolling_volatility(
     ann_factor: f64,
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
-    if n < window || window == 0 {
+    if n < window {
         return DatedSeries::with_capacity(RollingMetric::Volatility, 0);
     }
-    if window < 2 || invalid_annualization_factor(true, ann_factor) {
+    if window < 2 {
         return nan_series(RollingMetric::Volatility, dates, window - 1, n - window + 1);
     }
     let w = window as f64;
@@ -253,7 +254,8 @@ pub(crate) fn rolling_volatility(
 /// # Returns
 ///
 /// A [`DatedSeries`] with `n - window + 1` values. Returns empty
-/// vectors if `window` is zero or larger than the series length.
+/// vectors if `window` is larger than the series length; callers guarantee
+/// `window >= 1` (`Performance::ensure_window`).
 pub(crate) fn rolling_sortino(
     returns: &[f64],
     dates: &[Date],
@@ -262,10 +264,10 @@ pub(crate) fn rolling_sortino(
     mar: f64,
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
-    if n < window || window == 0 {
+    if n < window {
         return DatedSeries::with_capacity(RollingMetric::Sortino, 0);
     }
-    if window < 2 || invalid_annualization_factor(true, ann_factor) || !mar.is_finite() {
+    if window < 2 || !mar.is_finite() {
         return nan_series(RollingMetric::Sortino, dates, window - 1, n - window + 1);
     }
     let w = window as f64;
@@ -323,10 +325,12 @@ fn recompute_log_sum(window: &[f64]) -> NeumaierAccumulator {
 /// Rolling compounded returns over a sliding window.
 ///
 /// Computes the total compounded return over each `window`-length sub-slice
-/// of `returns`, right-labelled by the window-end date.
+/// of `returns`, right-labelled by the window-end date. Returns an empty
+/// series when `window` exceeds the series length; callers guarantee
+/// `window >= 1` (`Performance::ensure_window`).
 pub(crate) fn rolling_returns(returns: &[f64], dates: &[Date], window: usize) -> DatedSeries {
     let n = returns.len().min(dates.len());
-    if n < window || window == 0 {
+    if n < window {
         return DatedSeries::with_capacity(RollingMetric::Return, 0);
     }
     let count = n - window + 1;
@@ -499,27 +503,6 @@ mod tests {
     fn rolling_volatility_empty_window() {
         let rv = rolling_volatility(&[0.01], &[jan1(2025)], 5, 252.0);
         assert!(rv.values.is_empty());
-    }
-
-    #[test]
-    fn rolling_metrics_return_nan_values_for_invalid_ann_factor() {
-        let returns: Vec<f64> = (0..10).map(|i| (i as f64 - 5.0) * 0.01).collect();
-        let dates: Vec<Date> = (0..10).map(|i| jan1(2025) + Duration::days(i)).collect();
-
-        let rv = rolling_volatility(&returns, &dates, 5, 0.0);
-        assert_eq!(rv.values.len(), 6);
-        assert_eq!(rv.dates.len(), 6);
-        assert!(rv.values.iter().all(|value| value.is_nan()));
-
-        let rs = rolling_sharpe(&returns, &dates, 5, -252.0, 0.0);
-        assert_eq!(rs.values.len(), 6);
-        assert_eq!(rs.dates.len(), 6);
-        assert!(rs.values.iter().all(|value| value.is_nan()));
-
-        let rso = rolling_sortino(&returns, &dates, 5, f64::INFINITY, 0.0);
-        assert_eq!(rso.values.len(), 6);
-        assert_eq!(rso.dates.len(), 6);
-        assert!(rso.values.iter().all(|value| value.is_nan()));
     }
 
     #[test]

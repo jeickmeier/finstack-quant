@@ -115,9 +115,9 @@ public = [
     "next_cds_date", "prev_cds_date", "prev_cds_semiannual_roll",
     "next_semiannual_cds_maturity", "imm_option_expiry", "next_imm_option_expiry",
     "next_third_friday",
-    "create_date", "days_since_epoch", "date_from_epoch_days",
+    "create_date", "days_since_epoch", "date_from_epoch_days", "fx_standard_settlement_days",
 ]
-note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. Subset scope: the Rust dates::fx submodule (FX spot-lag/settlement date logic) remains Rust-only; calendar construction (rules, generated calendars, composites) is crate-private in Rust, and hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: dates::canonical_calendar_id (the one id-normalization seam; both host HolidayCalendar constructors take their canonical code from it), DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.roll_forward), PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message)."
+note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. The Rust dates::fx::fx_standard_settlement_days function is exposed as core.dates.fx_standard_settlement_days (WASM core.fxStandardSettlementDays). Other dates::fx settlement-date logic remains Rust-only; calendar construction (rules, generated calendars, composites) is crate-private in Rust, and hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: dates::canonical_calendar_id (the one id-normalization seam; both host HolidayCalendar constructors take their canonical code from it), DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.roll_forward), PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message)."
 
 [crates.core.module_symbols.market_data]
 python_package = "finstack_quant.core.market_data"
@@ -238,8 +238,8 @@ status = "exists"
 aggregation  = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.period_stats; freestanding bindings removed in paredown" }
 benchmark    = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.beta / .greeks / .rolling_greeks; freestanding bindings removed" }
 drawdown     = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.max_drawdown / .mean_drawdown / .get_drawdown_series / .drawdown_details" }
-lookback     = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.lookback_returns. Rust, Python, and WASM always expose LookbackReturns.fytd as a non-null per-ticker vector; the serialized field name is fytd." }
-performance  = { python = "finstack_quant.analytics", status = "flattened", note = "Performance class is the sole entry point on finstack_quant.analytics. Rust/Python accessors use callable get_* names, including get_ticker_index; WASM uses the corresponding get* camelCase methods. Result-object fields remain properties. Canonical Rust Performance::periodic_returns is shared as Python Performance.periodic_returns and WASM Performance.periodicReturns. Rust returns PeriodicReturn {date, value} points: WASM emits them as plain `{date, value}` objects (TS `PeriodicReturn`), Python as `(date, value)` tuples. Rolling methods return Rust DatedSeries {values, dates, value_column} (value_column = Rust RollingMetric name): Python wraps it as the DatedSeries class (to_json is the same object), WASM returns it as a plain object with values as a Float64Array. Rust Performance::correlation_matrix returns (matrix, repaired): Python returns the same `(matrix, repaired)` tuple, WASM the plain object `{matrix, repaired}`. Omitted arguments on both hosts resolve to the Rust `finstack_quant_analytics::DEFAULT_*` constants (DEFAULT_FREQUENCY, DEFAULT_PERIODIC_FREQUENCY, DEFAULT_ROLLING_WINDOW, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_ANNUALIZE, DEFAULT_RISK_FREE_RATE, DEFAULT_MAR — also the omega threshold), ReturnKind::from_label(None, ..) (excess), CagrDayCount::default() (act365_25) and FiscalConfig::from_parts / FiscalConfig::default() (an omitted fiscal month is January, an omitted day the 1st, both omitted is the calendar year)." }
+multi_factor  = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.multi_factor_greeks; MultiFactorResult and ReturnKind are re-exported at the crate root. ReturnKind is built by Rust ReturnKind::from_label(label, risk_free_rate) (excess / total; a non-zero rate with excess is rejected) — no binding-side parse tables." }
+performance  = { python = "finstack_quant.analytics", status = "flattened", note = "Performance class is the panel entry point on finstack_quant.analytics. Rust/Python accessors use callable get_* names, including get_ticker_index; WASM uses the corresponding get* camelCase methods. Result-object fields remain properties. Canonical Rust Performance::periodic_returns is shared as Python Performance.periodic_returns and WASM Performance.periodicReturns. Rust returns PeriodicReturn {date, value} points: WASM emits them as plain `{date, value}` objects (TS `PeriodicReturn`), Python as `(date, value)` tuples. Rolling methods return Rust DatedSeries {values, dates, value_column} (value_column = Rust RollingMetric name): Python wraps it as the DatedSeries class (to_json is the same object), WASM returns it as a plain object with values as a Float64Array. Rust Performance::correlation_matrix returns (matrix, repaired): Python returns the same `(matrix, repaired)` tuple, WASM the plain object `{matrix, repaired}`. Omitted arguments on both hosts resolve to the Rust `finstack_quant_analytics::DEFAULT_*` constants (DEFAULT_FREQUENCY, DEFAULT_PERIODIC_FREQUENCY, DEFAULT_ROLLING_WINDOW, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_ANNUALIZE, DEFAULT_RISK_FREE_RATE, DEFAULT_MAR — also the omega threshold), ReturnKind::from_label(None, ..) (excess), CagrDayCount::default() (act365_25) and FiscalConfig::default() (calendar year). Both hosts take the core FiscalConfig handle (Python fiscal_config, WASM fiscalConfig); omitted, None or null passes Rust None, so FYTD uses the calendar year and period_stats uses Gregorian periods with ISO weeks. WASM joins lookbackReturns and periodStats with raw *WithFiscalConfig twins in exports/analytics.js because wasm-bindgen cannot borrow an optional handle. Rust, Python, and WASM always expose LookbackReturns.fytd as a non-null per-ticker vector; the serialized field name is fytd." }
 regression   = { python = "finstack_quant.analytics", status = "flattened", note = "constrained_least_squares (Jeet & Partani 2023, Appendix A) exposed flat on finstack_quant.analytics; plain numeric list[float] API, no JSON envelope" }
 returns      = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance constructors (prices) / Performance.from_returns. Naming exception: Python Performance(prices) and Performance.from_returns(returns) take a DataFrame or a single-asset Series; the Rust-shaped (dates, matrix, ticker_names) constructors are Performance.from_arrays and Performance.from_returns_arrays. Rust and WASM expose only the array-shaped constructors; WASM publishes them as `new Performance(dates, prices, tickerNames, ...)` / `Performance.fromReturns(...)`; Python array adapters map to those canonical WASM constructors. `to_json` / `from_json` (WASM `toJson` / `fromJson`) are the serde round trip of the Rust Performance panel in both hosts." }
 risk_metrics = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance scalar methods (CAGR/Sharpe/Sortino/VaR/etc.) plus the four freestanding single-series functions analytics.sharpe / sortino / volatility / max_drawdown (WASM camelCase twins). CagrDayCount parses via Rust FromStr (labels act365_25 / DayCount names); ReturnKind is built by Rust ReturnKind::from_label(label, risk_free_rate) (excess / total; a non-zero rate with excess is rejected) — no binding-side parse tables. Python Performance.cagr(day_count=...) additionally accepts a core DayCount object; WASM Performance.cagr(dayCount) accepts labels only (pass dayCount.toString() to reuse a core.DayCount handle). Both resolve through Rust CagrDayCount (FromStr, or the DayCount variant directly)." }
@@ -276,7 +276,7 @@ fixings     = { python = "finstack_quant.cashflows.fixings",     status = "exist
 accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine" }
 aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. In Python, aggregation.calendar_year_ladder returns list[tuple[int, float, float, float]] over parallel arrays while CashFlowSchedule.calendar_year_ladder returns a pandas.DataFrame view alongside to_dataframe(). Rust-only (deliberately unbound): credit_adjusted_cashflow_pvs, the survival-weighted PV kernel consumed by valuations pricers, and weighted_average_life_from_principal, the Act/365F WAL kernel behind CashFlowSchedule.wal and the structured-credit WAL metric." }
 builder     = { python = "finstack_quant.cashflows.builder",     status = "exists", note = "Typed spec + builder + schedule surface; the JSON program bridge remains available on finstack_quant.cashflows" }
-schema      = { python = "finstack_quant.cashflows.schema",      status = "exists", note = "Compiled-in JSON Schema resources; package_cashflow_schema is doc(hidden) generator plumbing and stays Rust-only" }
+schema      = { python = "finstack_quant.cashflows.schema",      status = "exists", note = "Compiled-in JSON Schema resources; package_cashflow_schema is private generator plumbing and stays Rust-only" }
 
 [crates.cashflows.module_symbols.builder]
 python_package = "finstack_quant.cashflows.builder"
@@ -553,9 +553,8 @@ public = [
 # the Rust `LiquidityConfig::try_new`), `LiquidityTier` (surfaced as
 # the `"tier1".."tier5"` strings) and `SpreadVolatilityKind` (surfaced as the
 # `"relative"` / `"absolute"` strings on `LiquidityProfile`).
-# `KyleLambdaModel.lambda_from_series` is bound as the `kyle_lambda` free
-# function; the Rust argument order is `(returns, volumes, reference_price)`
-# in both hosts.
+# `kyle_lambda(returns, volumes, reference_price)` is the canonical Rust
+# estimator and uses the same argument order in both hosts.
 [crates.models.liquidity]
 python_package = "finstack_quant.models.liquidity"
 public = [
@@ -585,10 +584,9 @@ public = ["dtsm", "hull_white"]
 # `capfloor_hw1f_sigma_schedule_key`), `hw_b`, `hw_ln_a`,
 # `fd_instantaneous_forward`, `hw1f_caplet_price_from_dfs`,
 # `hw1f_term_caplet_price_from_dfs_with_model`,
-# `hw1f_delayed_coupon_adjustment` (shared delayed-payment pricing kernel),
-# and `hw1f_cap_floor_price_with_model`. WASM binds the same names under
-# `models.rates.hullWhite`; its facade makes `forwardCurve` optional because
-# wasm-bindgen cannot borrow an optional handle.
+# and `hw1f_delayed_coupon_adjustment` (shared delayed-payment pricing kernel).
+# WASM binds the same names under `models.rates.hullWhite`; both hosts require
+# explicit discount and forward curves, including single-curve calls.
 [crates.models.rates.hull_white]
 python_package = "finstack_quant.models.rates.hull_white"
 public = [
@@ -618,17 +616,17 @@ python_package = "finstack_quant.models.volatility"
 # `SabrParameters::quote_convention` (the hosts' `implied_vol` returns the
 # beta-dependent vol, documented on each method),
 # `SabrParameters::effective_rates` (the shift is on `SabrParameters.shift`),
-# `SabrParameters::{implied_vol_normal, implied_vol_lognormal}` (raw Hagan
-# expansions; hosts use `SabrParameters.implied_vol`, which selects the branch),
-# `SabrCalibrationOutcome` and the `*_with_diagnostics` / `*_with_derivatives`
-# / `*_with_atm_pinning` calibrator variants, `ArbitrageCheckConfig` /
+# `ArbitrageCheckConfig` /
 # `check_surface` on a `VolSurface`, and `SviParams::{validate, butterfly_violation}`
 # (validation runs in the constructor). `LocalVolSurface` is a class in Python
 # and a plain object with `localVol*` free functions in WASM; the Dupire
 # density check stays reachable through `check_local_vol_density_grid`.
+# `SabrCalibrator.calibrate` returns SabrCalibrationOutcome in both hosts;
+# WASM uses the schema-generated data object for parameters and diagnostics.
 public = [
     "ArbitrageReport",
     "LocalVolSurface",
+    "SabrCalibrationOutcome",
     "SabrCalibrator",
     "SabrParameters",
     "SabrSmile",
@@ -854,7 +852,9 @@ public = [
 # structs (`GaussianCopula`, `StudentTCopula`, `RandomFactorLoadingCopula`,
 # `MultiFactorCopula`) and recovery structs (`ConstantRecovery`,
 # `CorrelatedRecovery`) are reached through `CopulaSpec.build()` /
-# `RecoverySpec.build()`; `NearestCorrelationOpts` is flattened into
+# `RecoverySpec.build()`; its removed location shortcut is replaced by the
+# built model mean; sample_recovery and has_idiosyncratic_dispersion map directly.
+# `NearestCorrelationOpts` is flattened into
 # `nearest_correlation(max_iter=, tol=)`. `PortfolioLossResult` deserializes
 # through `PortfolioLossResult::from_losses` in both hosts. Host input conversion: the Python matrix functions also read nested rows or
 # a 2-D NumPy array (shape-checked by the Rust `flatten_square_matrix`); WASM
@@ -989,7 +989,9 @@ public = [
     "RevolvingCreditBuilder",
     "ScenarioTable",
     "SimulationDiagnostics",
+    "SimulationRun",
     "SpecialServicingSpec",
+    "StandardDealParams",
     "StochasticPricingResult",
     "StructuredCredit",
     "StructuredCreditBuilder",
@@ -1025,7 +1027,7 @@ public = [
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
-note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, Swaption, CapFloor) carry one getter per public Rust field, the Instrument trait surface (default_model, expiry, attributes, market_dependencies()), to_dict(), and price()/metric() twins of price_instrument/pricer::metric_value. InterestRateSwap.from_conventions binds Rust ConventionSwapParams; Bond.with_convention binds the BondConvention presets and Bond.with_stub overrides a preset's stub. Leg specs (FixedLegSpec/FloatLegSpec/PremiumLegSpec/ProtectionLegSpec) carry to_json/from_json/to_dict/pickle and field getters. PremiumLegSpec requires roll_rule explicitly in its Python constructor and JSON: RollRule.CDS_IMM (cds_imm) selects prescribed quarterly CDS dates, RollRule.NONE (none) honors bespoke frequency/stub terms, and RollRule.IMM is rejected at pricing. BondBuilder/TermLoanBuilder bind the Rust FinancialBuilder derives. Their WASM twins are accounted in the [parity] ledger. Typed credit/equity/FX wrappers (CreditDefaultSwap, CdsIndex, CdsTranche, ConvertibleBond, EquityOption, FxForward, FxOption) expose every public Rust field as a getter (Money -> Money, dates -> datetime.date, enums -> serde string, legs -> typed leg specs, margin_spec/coupon specs -> dict), the Instrument-trait surface (market_dependencies(), default_model, expiry, attributes), to_dict(), price(...)/metric(...) sharing the price_instrument pipeline, and the Rust accessors CreditDefaultSwap.par_spread/doc_clause_effective/protection_start, CdsIndex.par_spread/risky_pv01/cs01, CdsTranche.expected_loss/jump_to_default, ConvertibleBond.conversion_ratio/effective_conversion_ratio/parity/conversion_premium/greeks, EquityOption.greeks/delta/gamma/vega/theta/rho/implied_vol, FxOption.implied_vol, FxForward.market_forward_rate. Convenience constructors mirror Rust one-for-one: CreditDefaultSwap.example, CdsIndex.example/from_preset(CdsIndexParams, ...), CdsIndexParams.cdx_na_ig/cdx_na_hy/itraxx_europe, CdsTranche.example/standard(CdsTrancheParams, ...), CdsTrancheParams.equity_tranche/mezzanine_tranche, ConvertibleBond.example/example_mandatory, EquityOption.example/european (market-data ids default to the Rust european ids), FxOption.example/european, FxForward.example/from_trade_date/with_forward_points/with_forward_pips/standard_settlement_days. Builders carry one setter per Rust FinancialBuilder setter, including instrument_pricing_overrides/metric_pricing_overrides/scenario_pricing_overrides (serde dict or JSON string; metric_pricing_overrides also takes the typed MetricPricingOverrides) on every typed builder, with matching dict getters on the typed instruments (WASM twins instrumentPricingOverrides/metricPricingOverrides/scenarioPricingOverrides); price(metric_pricing_overrides=...) merges only metric-time settings, so market quotes and model_config are set through instrument_pricing_overrides: CreditDefaultSwapBuilder.upfront/valuation_convention/margin_spec/attributes, CdsIndexBuilder.constituents (list[CdsIndexConstituent|dict] | str; the former constituents_json setter is renamed)/upfront/margin_spec/attributes, CdsTrancheBuilder.business_day_convention/roll_rule/stub/upfront/attributes, ConvertibleBondBuilder.conversion/call_put/soft_call_trigger/resolved_settlement/cashflow_spec (typed class | dict | str; the former *_json setters are renamed)/attributes, EquityOptionBuilder.quantity/currency/day_count/attributes, FxForwardBuilder.attributes, FxOptionBuilder.day_count/attributes. Python build() runs only the Rust build() validation. Rust-only by design: CreditDefaultSwap::new_isda (pub(crate); no CreditDefaultSwap.standard), CdsIndex::with_constituents/with_constituents_equal_weight/with_index_factor (builder setters cover them), CdsTranche::correlation_delta, EquityOption::new/european_with_market_data (folded into european keywords), EquityOptionParams/EquityOptionMarketData/EquityUnderlyingParams/FxUnderlyingParams parameter bundles, FxOption::atm_dns_strike_for_convention, FxDeltaConvention as a type (spelled as the (kind, premium_currency, venue) triple / dict), PriceTrigger/CashflowSpec/DilutionEvent/CallPut as types (dict/JSON shapes), and EquityOptionGreeks/ConvertibleGreeks as types (returned as dicts). The MetricMetadata Rust DTO is represented as serialized records rather than a new Python runtime class. validate_instrument_json(json, metric_pricing_overrides=None) applies the canonical metric-pricing override merge before validation in both hosts. CdsOption is typed like the rest of the CDS family (example, builder with one setter per Rust FinancialBuilder setter, one getter per public field including the three *_pricing_overrides dicts, price/metric; delta/gamma/vega/theta/implied_vol are metric ids); CdsOptionParams/CdsOptionStrike/ProtectionStartConvention stay dict/serde-string shapes. JSON-envelope only in Python by decision (2026-10, audit VALA-007/VALB-007): every other registered instrument type is constructed with instrument_envelope_from_spec(type_tag, spec) (or a hand-built finstack_quant.instrument/1 envelope) and priced/exported through price_instrument / instrument_cashflows / calculate_var; typed Python wrappers for these are follow-up work, not drift. The JSON-only tags are: asian_option, autocallable, barrier_option, basis_swap, basket, bermudan_swaption, callable_range_accrual, cliquet_option, cms_option, cms_spread_option, cms_swap, commodity_asian_option, commodity_forward, commodity_future, commodity_future_option, commodity_spot_option, commodity_spread_option, commodity_swap, commodity_swaption, deposit, discounted_cash_flow, equity, equity_future, equity_future_option, equity_total_return_future, forward_rate_agreement, fx_barrier_option, fx_digital_option, fx_future, fx_future_option, fx_spot, fx_swap, fx_touch_option, fx_variance_swap, inflation_cap_floor, inflation_swap, interest_rate_future, interest_rate_future_option, levered_real_estate_equity, lookback_option, ndf, private_markets_fund, quanto_option, range_accrual, real_estate_asset, repo, snowball, tarn, trs_equity, variance_swap, volatility_index_future, volatility_index_future_option, xccy_swap, yoy_inflation_swap; and the fixed-income JSON-first set bond_future, dollar_roll, agency_mbs_passthrough, agency_cmo, agency_tba, inflation_linked_bond and trs_fixed_income_index (FiIndexTotalReturnSwap). Rust-only by design for those FI types: the carry breakdown dollar_roll::carry::CarryResult (implied_financing_rate and roll_specialness are reachable as metric ids), mbs_passthrough::pricer::{generate_cashflows, MbsCashflow} (instrument_cashflows exports the projected MBS rows), cmo::{PacCollar, PacSchedule, waterfall::execute_waterfall_with_principal_breakdown}, inflation_linked_bond::{IndexationMethod, DeflationProtection} (spec sub-shapes of the instrument JSON)."
+note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, Swaption, CapFloor) carry one getter per public Rust field, the Instrument trait surface (default_model, expiry, attributes, market_dependencies()), to_dict(), and price()/metric() twins of price_instrument/pricer::metric_value. InterestRateSwap.from_conventions binds Rust ConventionSwapParams; Bond.with_convention binds the BondConvention presets and Bond.with_stub overrides a preset's stub. Leg specs (FixedLegSpec/FloatLegSpec/PremiumLegSpec/ProtectionLegSpec) carry to_json/from_json/to_dict/pickle and field getters. PremiumLegSpec requires roll_rule explicitly in its Python constructor and JSON: RollRule.CDS_IMM (cds_imm) selects prescribed quarterly CDS dates, RollRule.NONE (none) honors bespoke frequency/stub terms, and RollRule.IMM is rejected at pricing. BondBuilder/TermLoanBuilder bind the Rust FinancialBuilder derives. Their WASM twins are accounted in the [parity] ledger. Typed credit/equity/FX wrappers (CreditDefaultSwap, CdsIndex, CdsTranche, ConvertibleBond, EquityOption, FxForward, FxOption) expose every public Rust field as a getter (Money -> Money, dates -> datetime.date, enums -> serde string, legs -> typed leg specs, margin_spec/coupon specs -> dict), the Instrument-trait surface (market_dependencies(), default_model, expiry, attributes), to_dict(), price(...)/metric(...) sharing the price_instrument pipeline, and the Rust accessors CreditDefaultSwap.par_spread/doc_clause_effective/protection_start, CdsIndex.par_spread/risky_pv01/cs01, ConvertibleBond.conversion_ratio/effective_conversion_ratio/parity/conversion_premium/greeks, EquityOption.greeks/implied_vol, FxOption.implied_vol, FxForward.market_forward_rate. Convenience constructors mirror Rust one-for-one: CreditDefaultSwap.example, CdsIndex.example/from_preset(CdsIndexParams, ...), CdsIndexParams.cdx_na_ig/cdx_na_hy/itraxx_europe, CdsTranche.example/standard(CdsTrancheParams, ...), CdsTrancheParams.equity_tranche/mezzanine_tranche, ConvertibleBond.example/example_mandatory, EquityOption.example/european (market-data ids default to the Rust european ids), FxOption.example/european, FxForward.example/from_trade_date/with_forward_points/with_forward_pips. Builders carry one setter per Rust FinancialBuilder setter, including instrument_pricing_overrides/metric_pricing_overrides/scenario_pricing_overrides (serde dict or JSON string; metric_pricing_overrides also takes the typed MetricPricingOverrides) on every typed builder, with matching dict getters on the typed instruments (WASM twins instrumentPricingOverrides/metricPricingOverrides/scenarioPricingOverrides); price(metric_pricing_overrides=...) merges only metric-time settings, so market quotes and model_config are set through instrument_pricing_overrides: CreditDefaultSwapBuilder.upfront/valuation_convention/margin_spec/attributes, CdsIndexBuilder.constituents (list[CdsIndexConstituent|dict] | str; the former constituents_json setter is renamed)/upfront/margin_spec/attributes, CdsTrancheBuilder.business_day_convention/roll_rule/stub/upfront/attributes, ConvertibleBondBuilder.conversion/call_put/soft_call_trigger/resolved_settlement/cashflow_spec (typed class | dict | str; the former *_json setters are renamed)/attributes, EquityOptionBuilder.quantity/currency/day_count/attributes, FxForwardBuilder.attributes, FxOptionBuilder.day_count/attributes. Python build() runs only the Rust build() validation. Rust-only by design: CreditDefaultSwap::new_isda (pub(crate); no CreditDefaultSwap.standard), CdsIndex::with_constituents/with_constituents_equal_weight/with_index_factor (builder setters cover them), EquityOption::new/european_with_market_data (folded into european keywords), EquityOptionParams/EquityOptionMarketData/EquityUnderlyingParams/FxUnderlyingParams parameter bundles, FxOption::atm_dns_strike_for_convention, FxDeltaConvention as a type (spelled as the (kind, premium_currency, venue) triple / dict), PriceTrigger/CashflowSpec/DilutionEvent/CallPut as types (dict/JSON shapes), and EquityOptionGreeks/ConvertibleGreeks as types (returned as dicts). The MetricMetadata Rust DTO is represented as serialized records rather than a new Python runtime class. validate_instrument_json(json, metric_pricing_overrides=None) applies the canonical metric-pricing override merge before validation in both hosts. CdsOption is typed like the rest of the CDS family (example, builder with one setter per Rust FinancialBuilder setter, one getter per public field including the three *_pricing_overrides dicts, price/metric; delta/gamma/vega/theta/implied_vol are metric ids); CdsOptionParams/CdsOptionStrike/ProtectionStartConvention stay dict/serde-string shapes. JSON-envelope only in Python by decision (2026-10, audit VALA-007/VALB-007): every other registered instrument type is constructed with instrument_envelope_from_spec(type_tag, spec) (or a hand-built finstack_quant.instrument/1 envelope) and priced/exported through price_instrument / instrument_cashflows / calculate_var; typed Python wrappers for these are follow-up work, not drift. The JSON-only tags are: asian_option, autocallable, barrier_option, basis_swap, basket, bermudan_swaption, callable_range_accrual, cliquet_option, cms_option, cms_spread_option, cms_swap, commodity_asian_option, commodity_forward, commodity_future, commodity_future_option, commodity_spot_option, commodity_spread_option, commodity_swap, commodity_swaption, deposit, discounted_cash_flow, equity, equity_future, equity_future_option, equity_total_return_future, forward_rate_agreement, fx_barrier_option, fx_digital_option, fx_future, fx_future_option, fx_spot, fx_swap, fx_touch_option, fx_variance_swap, inflation_cap_floor, inflation_swap, interest_rate_future, interest_rate_future_option, levered_real_estate_equity, lookback_option, ndf, private_markets_fund, quanto_option, range_accrual, real_estate_asset, repo, snowball, tarn, trs_equity, variance_swap, volatility_index_future, volatility_index_future_option, xccy_swap, yoy_inflation_swap; and the fixed-income JSON-first set bond_future, dollar_roll, agency_mbs_passthrough, agency_cmo, agency_tba, inflation_linked_bond and trs_fixed_income_index (FiIndexTotalReturnSwap). Rust-only by design for those FI types: the carry breakdown dollar_roll::carry::CarryResult (implied_financing_rate and roll_specialness are reachable as metric ids), mbs_passthrough::pricer::{generate_cashflows, MbsCashflow} (instrument_cashflows exports the projected MBS rows), cmo::{PacCollar, PacSchedule, waterfall::execute_waterfall_with_principal_breakdown}, inflation_linked_bond::{IndexationMethod, DeflationProtection} (spec sub-shapes of the instrument JSON)."
 
 # Symbol-level pinning for finstack_quant.models.credit. Rust-only
 # (deliberate, tracked as decisions rather than drift):
@@ -1034,7 +1036,9 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #   - credit::market_anchored (CreditVolatilityConversion; consumed inside the
 #     callable-lattice and revolver pricers)
 #   - credit::registry (embedded credit-assumptions registry; hosts reach it
-#     through the `*_assumptions()` / `from_registry_id()` constructors)
+#     through `default_calibration()` / exact `from_registry_id()` lookups;
+#     provider aliases and literal preset constructors are removed.
+#     `seniority_recovery_stats` requires an exact calibration ID in both hosts.)
 #   - merton::RawMertonModel (serde `try_from` funnel, not a public constructor)
 #   - migration::MigrationError, pd::PdCalibrationError,
 #     scoring::CreditScoringError (mapped to Python exceptions in errors.rs)
@@ -1045,9 +1049,14 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #     lgd::DownturnMethod (string / float / `method` + `params` on the host side)
 #   - credit::{ThresholdToggle, StochasticToggle, OptimalToggle}
 #     (reached through ToggleExerciseModel.kind / .params)
+# OptimalExercise uses undiscounted common-path payoff sums; optimal has
+# nested_paths, asset_vol, risk_free_rate and horizon in both hosts.
 #   - credit::{DynamicRecoveryModel, LeverageHazardMap}
 #     (reached through DynamicRecoverySpec.kind / .model and
 #     EndogenousHazardSpec.kind / .leverage_hazard_map)
+# DynamicRecoverySpec.linear_decline / linearDecline uses Rust's dimensionless
+# sensitivity in R0 * (1 - sensitivity * (N / N0 - 1)), bounded by floor and R0.
+# EndogenousHazardSpec.tabular accepts one or more points in both hosts.
 #   - MigrationSimulator::simulate / empirical_matrix with a caller-supplied
 #     RNG (hosts always use the seeded canonical Pcg64); RatingPaths is a
 #     host-side collection over Vec<RatingPath>, not a Rust type
@@ -1841,8 +1850,6 @@ backlog_ceiling = { modules = 0, members = 0 }
 "finstack_quant.models.credit.ToggleExerciseModel.kind" = "serde tag of the Rust enum variant"
 "finstack_quant.models.credit.ToggleExerciseModel.params" = "the Rust enum variant's payload as a dict"
 "finstack_quant.models.credit.lgd.DownturnLgd.params" = "serde form of the Rust `method()` enum"
-"finstack_quant.models.credit.migration.GeneratorMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
-"finstack_quant.models.credit.migration.TransitionMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
 "finstack_quant.models.credit.migration.RatingPaths" = "host collection over the Rust `Vec<RatingPath>` returned by `MigrationSimulator::simulate`; Rust has no named type"
 "finstack_quant.models.credit.migration.RatingPaths.default_rate" = "share of the Rust paths that end in the default state"
 "finstack_quant.models.credit.migration.RatingPaths.paths" = "the Rust `Vec<RatingPath>`"
@@ -1866,14 +1873,11 @@ backlog_ceiling = { modules = 0, members = 0 }
 "finstack_quant.models.factor.risk.PositionResidualContribution.source_kind" = "variant of the Rust `source` enum (see the `risk` module note)"
 "finstack_quant.models.factor.risk.TailScenarioBreakdown.position_ids" = "position ids the Rust `position_pnls` are ordered by"
 "finstack_quant.models.factor.risk.position_component_var" = "free-function form of Rust `PositionRiskDecomposition::component_var` (see the `risk` module note)"
-"finstack_quant.models.liquidity.kyle_lambda" = "free-function form of Rust `KyleLambdaModel::lambda_from_series` (see `[crates.models.liquidity]`)"
 "finstack_quant.models.monte_carlo.Estimate.ci_lower" = "first element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.Estimate.ci_upper" = "second element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.MoneyEstimate.ci_lower" = "first element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.MoneyEstimate.ci_upper" = "second element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.LsmcPricer.antithetic" = "Rust `LsmcConfig::antithetic` of the pricer's config"
-"finstack_quant.models.monte_carlo.LsmcPricer.basis" = "Rust `LsmcConvenience::basis` (default regression basis)"
-"finstack_quant.models.monte_carlo.LsmcPricer.basis_degree" = "Rust `LsmcConvenience::basis_degree`"
 "finstack_quant.models.monte_carlo.LsmcPricer.num_paths" = "Rust `LsmcConfig::num_paths` of the pricer's config"
 "finstack_quant.models.monte_carlo.LsmcPricer.seed" = "Rust `LsmcConfig::seed` of the pricer's config"
 "finstack_quant.models.monte_carlo.LsmcPricer.use_parallel" = "Rust `LsmcConfig::use_parallel` of the pricer's config"
@@ -1973,6 +1977,8 @@ js = "core"
 types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan", ScheduleErrorPolicy = "ScheduleErrorPolicy", StubKind = "StubKind", Thirty360Convention = "Thirty360Convention" }
 
 [parity.modules."finstack_quant.core.market_data"]
+# HazardCurve.conditional_default_prob maps by the snake_case/camelCase rule
+# to conditionalDefaultProb; both hosts delegate date interval integration to Rust.
 js = "core"
 types = { SabrParameterData = "SabrParameterData" }
 constructors = { SabrParameterData = "core.sabrParameterDataNew" }
@@ -2050,12 +2056,16 @@ js = "models.credit.liabilityManagement"
 types = { ExchangeOfferAnalysis = "ExchangeOfferAnalysis", LeverageImpact = "LeverageImpact", LmeAnalysis = "LmeAnalysis" }
 
 [parity.modules."finstack_quant.models.credit.migration"]
+# TransitionMatrix.from_labeled <-> fromLabeled owns ordered-label validation;
+# Python's from_dataframe only converts pandas labels and values to that API.
 js = "models.credit.migration"
 
 [parity.modules."finstack_quant.models.credit.pd"]
 js = "models.credit.pd"
 types = { MasterScaleGrade = "MasterScaleGrade", MasterScaleResult = "MasterScaleResult" }
 
+# RecoveryWaterfallResult's Python to_json/from_json restore the stored Rust
+# aggregate and allocations; both existing wire methods are documented in stubs.
 [parity.modules."finstack_quant.models.credit.recovery_waterfall"]
 js = "models.credit.recoveryWaterfall"
 types = { RecoveryAllocation = "RecoveryAllocation", RecoveryClaim = "RecoveryClaim", RecoveryWaterfallResult = "RecoveryWaterfallResult" }
@@ -2094,11 +2104,13 @@ js = "models.rates.dtsm"
 types = { FactorTimeSeries = "FactorTimeSeries", YieldForecast = "YieldForecast", YieldPcaView = "YieldPcaView" }
 
 [parity.modules."finstack_quant.models.rates.hull_white"]
+# HullWhiteParams schedule reads use get_sigma/get_times/get_values in Rust and Python;
+# WASM exposes getSigma/getTimes/getValues methods. The volatility JSON shape is unchanged.
 js = "models.rates.hullWhite"
 
 [parity.modules."finstack_quant.models.volatility"]
 js = "models.volatility"
-types = { ArbitrageReport = "ArbitrageReport", LocalVolSurface = "LocalVolSurface", SviParams = "SviParams" }
+types = { SabrCalibrationOutcome = "SabrCalibrationOutcome", ArbitrageReport = "ArbitrageReport", LocalVolSurface = "LocalVolSurface", SviParams = "SviParams" }
 
 [parity.modules."finstack_quant.portfolio"]
 js = "portfolio"
@@ -2146,7 +2158,7 @@ types = { CompositeExposureReport = "CompositeExposureReport", CompositeHistoryR
 
 [parity.modules."finstack_quant.valuations.instruments"]
 js = "valuations.instruments"
-types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
+types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SimulationRun = "SimulationRun", StandardDealParams = "StandardDealParams", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
 
 [parity.modules."finstack_quant.valuations.market"]
 js = "valuations.market"
@@ -2231,11 +2243,11 @@ excluded = { coverage_tests_dataframe = "pandas" }
 [parity.members."finstack_quant.valuations.instruments.StochasticPricingResult"]
 excluded = { draw_option_cost_dataframe = "pandas" }
 
+# ScenarioTable.cells is a read-only Python property of the stored wire field.
+# The ScenarioTable type mapping carries it to WASM; no computed-member alias is needed.
+
 [parity.members."finstack_quant.valuations.instruments.Tranche"]
 renames = { builder = { js = "valuations.instruments.trancheBuilder", reason = "WASM `Tranche` values are plain objects; the Rust Tranche::builder entry point is a free function returning the TrancheBuilder class" } }
-
-[parity.members."finstack_quant.valuations.instruments.ScenarioTable"]
-renames = { cells = { js = "valuations.instruments.scenarioTableCells", reason = "WASM `ScenarioTable` values are plain objects; the Rust constructor or method is a free function" } }
 
 [parity.members."finstack_quant.valuations.instruments.CdsTrancheParams"]
 renames = { equity_tranche = { js = "valuations.instruments.cdsTrancheParamsEquityTranche", reason = "WASM `CdsTrancheParams` values are plain objects; the Rust constructor or method is a free function" }, mezzanine_tranche = { js = "valuations.instruments.cdsTrancheParamsMezzanineTranche", reason = "WASM `CdsTrancheParams` values are plain objects; the Rust constructor or method is a free function" } }
@@ -2320,11 +2332,15 @@ wasm_only = { parse = "Rust Rate::from_str; twin of the Python Rate(text) constr
 [parity.members."finstack_quant.cashflows.accrual.ExCouponRule"]
 renames = { ex_date = { js = "cashflows.exCouponRuleExDate", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::ex_date function is a free function over the wire value" }, is_ex_coupon = { js = "cashflows.exCouponRuleIsExCoupon", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::is_ex_coupon function is a free function over the wire value" } }
 
+[parity.members."finstack_quant.cashflows.accrual.AccrualMethod"]
+excluded = { name = "literal" }
+
 [parity.members."finstack_quant.cashflows.aggregation.PeriodAggregation"]
 renames = { get_amount = { js = "cashflows.periodAggregationGetAmount", reason = "WASM aggregation values are plain objects; Rust owns the period and currency lookup" }, get_period = { js = "cashflows.periodAggregationGetPeriod", reason = "WASM aggregation values are plain objects; Rust owns exact period-label lookup" } }
+excluded = { periods = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.AmortizationSpec"]
-excluded = { custom_principal = "literal", linear_between = "literal", linear_to = "literal", percent_of_original_per_period = "literal", percent_of_remaining_per_period = "literal", step_remaining = "literal" }
+excluded = { custom_principal = "literal", linear_between = "literal", linear_to = "literal", percent_of_original_per_period = "literal", percent_of_remaining_per_period = "literal", step_remaining = "literal", kind = "literal", window = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.CouponType"]
 excluded = { split = "literal" }
@@ -2334,18 +2350,23 @@ renames = { mdr = { js = "cashflows.defaultModelSpecMdr", reason = "WASM Default
 excluded = { constant_cdr = "literal", cumulative_loss = "literal", sda = "literal", timing = "literal", vector = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FeeBase"]
-excluded = { undrawn = "literal" }
+excluded = { undrawn = "literal", kind = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FeeSpec"]
-renames = { periodic_bp = { js = "cashflows.feeSpecPeriodicBp", reason = "WASM FeeSpec values are plain objects; the Rust FeeSpec::PeriodicBp variant is built by a free function returning the wire value" } }
-excluded = { fixed = "literal" }
+excluded = { fixed = "literal", periodic_bp = "literal", kind = "literal" }
+
+[parity.members."finstack_quant.cashflows.builder.FixedCouponSpec"]
+excluded = { schedule = "literal" }
+
+[parity.members."finstack_quant.cashflows.builder.FloatingCouponSpec"]
+excluded = { schedule = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FloatingLegCompounding"]
 renames = { is_overnight = { js = "cashflows.floatingLegCompoundingIsOvernight", reason = "WASM FloatingLegCompounding values are plain objects; the Rust FloatingLegCompounding::is_overnight function is a free function returning or reading the wire value" }, sofr_observation_shift = { js = "cashflows.floatingLegCompoundingSofrObservationShift", reason = "WASM FloatingLegCompounding values are plain objects; the Rust FloatingLegCompounding::sofr_observation_shift function is a free function returning or reading the wire value" }, sonia_observation_shift = { js = "cashflows.floatingLegCompoundingSoniaObservationShift", reason = "WASM FloatingLegCompounding values are plain objects; the Rust FloatingLegCompounding::sonia_observation_shift function is a free function returning or reading the wire value" } }
 excluded = { compounded_in_arrears = "literal", compounded_with_observation_shift = "literal", rate_cutoff = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FloatingRateFallback"]
-excluded = { fixed_rate = "literal" }
+excluded = { fixed_rate = "literal", rate = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FloatingRateSpec"]
 renames = { euribor_3m = { js = "cashflows.floatingRateSpecEuribor3m", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::euribor_3m function is a free function over the wire value" }, sofr = { js = "cashflows.floatingRateSpecSofr", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::sofr function is a free function over the wire value" }, sonia = { js = "cashflows.floatingRateSpecSonia", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::sonia function is a free function over the wire value" }, validate = { js = "cashflows.floatingRateSpecValidate", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::validate function is a free function over the wire value" } }
@@ -2361,6 +2382,9 @@ excluded = { abs = "literal", cmbs_with_lockout = "literal", constant_cpr = "lit
 [parity.members."finstack_quant.cashflows.builder.RecoveryModelSpec"]
 renames = { recovery_rate = { js = "cashflows.recoveryModelSpecRecoveryRate", reason = "WASM RecoveryModelSpec values are plain objects; the Rust RecoveryModelSpec::recovery_rate function is a free function over the wire value" }, validate = { js = "cashflows.recoveryModelSpecValidate", reason = "WASM RecoveryModelSpec values are plain objects; the Rust RecoveryModelSpec::validate function is a free function over the wire value" } }
 excluded = { with_severity_vector = "literal" }
+
+[parity.members."finstack_quant.cashflows.builder.StepUpCouponSpec"]
+excluded = { schedule = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.ScheduleParams"]
 renames = { annual_actact = { js = "cashflows.scheduleParamsAnnualActact", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::annual_actact function is a free function over the wire value" }, eur_estr_swap = { js = "cashflows.scheduleParamsEurEstrSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::eur_estr_swap function is a free function over the wire value" }, eur_gov_bond = { js = "cashflows.scheduleParamsEurGovBond", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::eur_gov_bond function is a free function over the wire value" }, gbp_sonia_swap = { js = "cashflows.scheduleParamsGbpSoniaSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::gbp_sonia_swap function is a free function over the wire value" }, jpy_tona_swap = { js = "cashflows.scheduleParamsJpyTonaSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::jpy_tona_swap function is a free function over the wire value" }, quarterly_act360 = { js = "cashflows.scheduleParamsQuarterlyAct360", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::quarterly_act360 function is a free function over the wire value" }, semiannual_30360 = { js = "cashflows.scheduleParamsSemiannual30360", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::semiannual_30360 function is a free function over the wire value" }, usd_corporate_bond = { js = "cashflows.scheduleParamsUsdCorporateBond", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_corporate_bond function is a free function over the wire value" }, usd_sofr_swap = { js = "cashflows.scheduleParamsUsdSofrSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_sofr_swap function is a free function over the wire value" }, usd_treasury = { js = "cashflows.scheduleParamsUsdTreasury", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_treasury function is a free function over the wire value" }, validate = { js = "cashflows.scheduleParamsValidate", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::validate function is a free function over the wire value" } }

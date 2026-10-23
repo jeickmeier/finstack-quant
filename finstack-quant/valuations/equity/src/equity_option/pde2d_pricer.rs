@@ -16,7 +16,7 @@ use finstack_quant_valuations_core::pricer::{
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
-use finstack_quant_models::pde::{CraigSneydStepper, Grid1D, Grid2D, HestonPde, Solver2D};
+use finstack_quant_models::pde::{Grid1D, Grid2D, HestonPde, McsStepper, Solver2D};
 use finstack_quant_models::types::OptionType;
 
 /// Reject an unstable PDE result rather than returning an arbitrage-violating
@@ -88,24 +88,24 @@ impl EquityOptionHestonPdePricer {
                     PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
                 )
             })?;
-        let theta_v = cf_params.theta;
-        let v0 = cf_params.v0;
+        let theta_v = cf_params.model.theta;
+        let v0 = cf_params.model.v0;
 
         let is_call = matches!(inst.option_type, OptionType::Call);
 
         let pde = HestonPde {
             r: cf_params.r,
             q: cf_params.q,
-            kappa: cf_params.kappa,
-            theta_v: cf_params.theta,
-            sigma_v: cf_params.sigma_v,
-            rho: cf_params.rho,
+            kappa: cf_params.model.kappa,
+            theta_v: cf_params.model.theta,
+            sigma_v: cf_params.model.sigma_v,
+            rho: cf_params.model.rho,
             strike: inst.strike,
             is_call,
         };
 
-        let mean_reversion_fraction = -(-cf_params.kappa * t).exp_m1();
-        let initial_variance_weight = mean_reversion_fraction / cf_params.kappa;
+        let mean_reversion_fraction = -(-cf_params.model.kappa * t).exp_m1();
+        let initial_variance_weight = mean_reversion_fraction / cf_params.model.kappa;
         let mean_integrated_variance =
             v0 * initial_variance_weight + theta_v * (t - initial_variance_weight).max(0.0);
         // High accepted v0 also widens the log-spot distribution. A fixed
@@ -138,11 +138,11 @@ impl EquityOptionHestonPdePricer {
         // Divide the small exponential factors first: sigma²/kappa can
         // overflow for valid near-zero kappa even though the variance has a
         // finite continuous limit.
-        let variance_bound = cf_params.sigma_v.powi(2)
-            * (v0 * (initial_variance_factor / cf_params.kappa)
+        let variance_bound = cf_params.model.sigma_v.powi(2)
+            * (v0 * (initial_variance_factor / cf_params.model.kappa)
                 + 0.5
                     * theta_v
-                    * (mean_reversion_fraction / cf_params.kappa)
+                    * (mean_reversion_fraction / cf_params.model.kappa)
                     * mean_reversion_fraction);
         let v_min = 0.0;
         let v_max = 1.5_f64
@@ -170,7 +170,7 @@ impl EquityOptionHestonPdePricer {
         // payoff-kink error before the second-order MCS scheme takes over
         // (In 't Hout & Foulon 2010) — the configuration the tight-tolerance
         // bridge2d reference tests use.
-        let solver = Solver2D::new(grid, CraigSneydStepper::with_damping(2, self.time_steps));
+        let solver = Solver2D::new(grid, McsStepper::with_damping(2, self.time_steps));
 
         let solution = solver.solve(&pde, t).map_err(|e| {
             PricingError::model_failure_with_context(
