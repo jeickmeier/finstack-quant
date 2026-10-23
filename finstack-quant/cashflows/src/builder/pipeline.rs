@@ -121,7 +121,6 @@ impl CompiledCashFlowPlan {
         emit_fees_on(
             d,
             &self.periodic_fees,
-            &self.fixed_fees,
             state.outstanding,
             &state.outstanding_history,
             ccy,
