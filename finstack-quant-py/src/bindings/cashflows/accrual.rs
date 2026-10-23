@@ -1,5 +1,6 @@
 //! Python bindings for `finstack_quant_cashflows::accrual`.
 
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::accrual::{
     accrued_interest_amount as rust_accrued_interest_amount, AccrualConfig, AccrualIndex,
     AccrualMethod, ExCouponRule,
@@ -15,16 +16,7 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;
 use crate::errors::core_to_py;
 
-/// Accrual method selector (``AccrualMethod.LINEAR`` / ``AccrualMethod.COMPOUNDED``).
-///
-/// ``LINEAR`` is the ICMA Rule 251.1 bond convention; ``COMPOUNDED`` uses true
-/// exponential compounding within a coupon period and is not ICMA-compliant.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows.accrual import AccrualMethod
-/// >>> AccrualMethod.LINEAR == AccrualMethod.LINEAR
-/// True
+#[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualMethod")]
 #[pyclass(
     name = "AccrualMethod",
     module = "finstack_quant.cashflows.accrual",
@@ -53,7 +45,7 @@ impl PyAccrualMethod {
         inner: AccrualMethod::Compounded,
     };
 
-    /// Canonical snake_case label (``"linear"`` / ``"compounded"``).
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualMethod.name")]
     #[getter]
     fn name(&self) -> &'static str {
         match self.inner {
@@ -71,22 +63,7 @@ impl PyAccrualMethod {
     }
 }
 
-/// Coupon record-date convention: settlement on the record date retains the
-/// coupon; settlement after it and before payment trades ex-coupon.
-///
-/// Parameters
-/// ----------
-/// days_before_coupon : int
-///     Number of days from the coupon record date to payment (max 366).
-/// calendar_id : str, optional
-///     Business-day calendar for counting the window; when omitted, calendar
-///     days are used.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows.accrual import ExCouponRule
-/// >>> ExCouponRule(7).days_before_coupon
-/// 7
+#[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule")]
 #[pyclass(
     name = "ExCouponRule",
     module = "finstack_quant.cashflows.accrual",
@@ -101,7 +78,7 @@ pub struct PyExCouponRule {
 
 #[pymethods]
 impl PyExCouponRule {
-    /// Construct an ex-coupon rule; see the class docstring for parameters.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.__init__")]
     #[new]
     #[pyo3(
         signature = (days_before_coupon, calendar_id=None),
@@ -116,38 +93,19 @@ impl PyExCouponRule {
         }
     }
 
-    /// Days from the coupon record date to payment.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.days_before_coupon")]
     #[getter]
     fn days_before_coupon(&self) -> u32 {
         self.inner.days_before_coupon
     }
 
-    /// Optional business-day calendar identifier.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.calendar_id")]
     #[getter]
     fn calendar_id(&self) -> Option<String> {
         self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
-    /// Coupon record date for a coupon paid on ``payment_date``.
-    ///
-    /// Parameters
-    /// ----------
-    /// payment_date : datetime.date or str
-    ///     Payment date of the coupon this ex-coupon window precedes.
-    ///
-    /// Returns
-    /// -------
-    /// datetime.date
-    ///     Record date; settlement on this date retains the coupon. Settlement
-    ///     strictly after it and before ``payment_date`` trades ex-coupon.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``days_before_coupon`` exceeds 366, the date cannot be parsed,
-    ///     or the record date is outside the supported date range.
-    /// KeyError
-    ///     If the configured calendar id cannot be resolved.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.ex_date")]
     #[pyo3(text_signature = "(self, payment_date)")]
     fn ex_date<'py>(
         &self,
@@ -161,28 +119,7 @@ impl PyExCouponRule {
         date_to_py(py, d)
     }
 
-    /// Whether settlement forfeits the imminent coupon.
-    ///
-    /// Parameters
-    /// ----------
-    /// payment_date : datetime.date or str
-    ///     Coupon payment date used to calculate its record date.
-    /// settlement_date : datetime.date or str
-    ///     Ownership-transfer date; convert trade dates to settlement first.
-    ///
-    /// Returns
-    /// -------
-    /// bool
-    ///     True strictly after the record date and before payment. Settlement
-    ///     on the record date retains the coupon and returns False.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If either date is invalid, the offset exceeds 366, or the record
-    ///     date is outside the supported date range.
-    /// KeyError
-    ///     If the configured calendar identifier cannot be resolved.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "ExCouponRule.is_ex_coupon")]
     #[pyo3(text_signature = "(self, payment_date, settlement_date)")]
     fn is_ex_coupon(
         &self,
@@ -202,26 +139,7 @@ impl PyExCouponRule {
 
 wire_methods!(PyExCouponRule, ExCouponRule, "ExCouponRule");
 
-/// Configuration for schedule-driven interest accrual.
-///
-/// Parameters
-/// ----------
-/// method : AccrualMethod, optional
-///     Accrual method; defaults to the Rust ``AccrualConfig::default()``
-///     method (``AccrualMethod.LINEAR``, ICMA 251.1).
-/// ex_coupon : ExCouponRule, optional
-///     Ex-coupon window rule; ``None`` disables ex-coupon handling.
-/// include_pik : bool, default True
-///     Whether PIK (capitalized) interest counts toward the accrued amount.
-/// frequency : Tenor or str, optional
-///     Coupon frequency (e.g. ``"6M"``); required for the ACT/ACT ICMA day
-///     count and ignored otherwise.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows.accrual import AccrualConfig
-/// >>> AccrualConfig().include_pik
-/// True
+#[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig")]
 #[pyclass(
     name = "AccrualConfig",
     module = "finstack_quant.cashflows.accrual",
@@ -236,7 +154,7 @@ pub struct PyAccrualConfig {
 
 #[pymethods]
 impl PyAccrualConfig {
-    /// Construct an accrual configuration; see the class docstring for parameters.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.__init__")]
     #[new]
     #[pyo3(
         // `include_pik`'s runtime default tracks `AccrualConfig::default()`;
@@ -261,7 +179,7 @@ impl PyAccrualConfig {
         })
     }
 
-    /// Accrual method in force.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.method")]
     #[getter]
     fn method(&self) -> PyAccrualMethod {
         PyAccrualMethod {
@@ -269,7 +187,7 @@ impl PyAccrualConfig {
         }
     }
 
-    /// Ex-coupon rule, if any.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.ex_coupon")]
     #[getter]
     fn ex_coupon(&self) -> Option<PyExCouponRule> {
         self.inner
@@ -278,13 +196,13 @@ impl PyAccrualConfig {
             .map(|inner| PyExCouponRule { inner })
     }
 
-    /// Whether PIK interest is included in the accrued amount.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.include_pik")]
     #[getter]
     fn include_pik(&self) -> bool {
         self.inner.include_pik
     }
 
-    /// Coupon frequency used for ACT/ACT ICMA, if set.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualConfig.frequency")]
     #[getter]
     fn frequency(&self) -> Option<PyTenor> {
         self.inner.frequency.map(PyTenor::from_inner)
@@ -298,20 +216,7 @@ impl PyAccrualConfig {
 
 wire_methods!(PyAccrualConfig, AccrualConfig, "AccrualConfig");
 
-/// Prebuilt accrual state for repeated ``accrued_at`` queries on one schedule.
-///
-/// Build with ``AccrualIndex.build(schedule, config=None)``.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.cashflows import schedule_from_dated_flows
-/// >>> from finstack_quant.cashflows.accrual import AccrualIndex
-/// >>> from finstack_quant.core.dates import DayCount
-/// >>> from finstack_quant.core.money import Money
-/// >>> schedule = schedule_from_dated_flows([(datetime.date(2025, 6, 15), Money(100.0, "USD"))], "fixed", DayCount.ACT_360)
-/// >>> AccrualIndex.build(schedule).accrued_at(datetime.date(2024, 1, 1)).amount
-/// 0.0
+#[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualIndex")]
 #[pyclass(
     name = "AccrualIndex",
     module = "finstack_quant.cashflows.accrual",
@@ -328,28 +233,7 @@ pub struct PyAccrualIndex {
 
 #[pymethods]
 impl PyAccrualIndex {
-    /// Build reusable accrual state for repeated ``accrued_at`` queries.
-    ///
-    /// Parameters
-    /// ----------
-    /// schedule : CashFlowSchedule
-    ///     Canonical cashflow schedule containing coupon, PIK, and notional
-    ///     flows.
-    /// config : AccrualConfig, optional
-    ///     Accrual method and ex-coupon configuration bound into the index
-    ///     (default linear, PIK included). Build a separate index to accrue
-    ///     under a different config.
-    ///
-    /// Returns
-    /// -------
-    /// AccrualIndex
-    ///     Prebuilt accrual state.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the schedule fails validation, mixes currencies across coupon
-    ///     flows, or carries a non-finite accrual factor.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualIndex.build")]
     #[classmethod]
     #[pyo3(
         signature = (schedule, config=None),
@@ -369,28 +253,7 @@ impl PyAccrualIndex {
             .map_err(core_to_py)
     }
 
-    /// Accrued interest as of ``as_of`` using the prebuilt periods.
-    ///
-    /// Parameters
-    /// ----------
-    /// as_of : datetime.date or str
-    ///     Snapshot date; interest earns through accrual end and remains accrued
-    ///     until payment (exclusive), subject to ex-coupon entitlement.
-    ///
-    /// Returns
-    /// -------
-    /// Money
-    ///     Accrued interest in the schedule currency; negative inside an
-    ///     active ex-coupon window.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the date cannot be parsed, the period accrual fraction is invalid,
-    ///     compounded accrual has a non-finite period rate or a rate at or below
-    ///     -100%, or the resulting accrued interest is non-finite.
-    /// KeyError
-    ///     If a configured ex-coupon calendar id cannot be resolved.
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualIndex.accrued_at")]
     #[pyo3(text_signature = "(self, as_of)")]
     fn accrued_at(&self, as_of: &Bound<'_, PyAny>) -> PyResult<PyMoney> {
         self.inner
@@ -406,33 +269,7 @@ impl PyAccrualIndex {
     }
 }
 
-/// Compute accrued interest for a schedule as of ``as_of``.
-///
-/// Parameters
-/// ----------
-/// schedule : CashFlowSchedule
-///     Canonical cashflow schedule.
-/// as_of : datetime.date or str
-///     Snapshot date; interest earns through accrual end and remains accrued
-///     until payment (exclusive), subject to ex-coupon entitlement.
-/// config : AccrualConfig, optional
-///     Accrual method and ex-coupon configuration (default linear, PIK included).
-///
-/// Returns
-/// -------
-/// Money
-///     Accrued interest in the schedule's notional currency; negative inside
-///     an active ex-coupon window.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the schedule fails validation, mixes currencies across coupon
-///     flows, carries a non-finite accrual factor, compounded accrual has
-///     a non-finite period rate or a rate at or below -100%, or the resulting
-///     accrued interest is non-finite.
-/// KeyError
-///     If a configured ex-coupon calendar id cannot be resolved.
+#[doc = pydoc!("finstack_quant.cashflows.accrual", "accrued_interest_amount")]
 #[pyfunction]
 #[pyo3(
     signature = (schedule, as_of, config=None),

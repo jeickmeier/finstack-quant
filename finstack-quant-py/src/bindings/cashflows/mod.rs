@@ -6,6 +6,7 @@ pub(crate) mod builder;
 pub(crate) mod fixings;
 mod schema;
 
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::CashFlowMeta;
 use finstack_quant_cashflows::{CashflowScheduleBuildSpec, ScheduleBuildOpts};
 use pyo3::prelude::*;
@@ -14,34 +15,9 @@ use pyo3::types::{PyList, PyModule};
 use crate::bindings::core::cashflow::{extract_cf_kind, PyCashFlow};
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::date_to_py;
 use builder::schedule::{PyCashFlowMeta, PyCashFlowSchedule};
 
-/// Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
-///
-/// Parameters
-/// ----------
-/// spec_json : str
-///     JSON-encoded `CashflowScheduleBuildSpec`.
-/// market_json : str, optional
-///     JSON-encoded market context for floating-rate lookups. Complete supplied
-///     observations can build without a forward curve. Explicit fallback covers
-///     missing curves or absent fixing series; supplied historical gaps before
-///     a resolved curve's base date always fail.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-encoded `CashFlowSchedule`.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If either JSON document is malformed or the schedule fails to build,
-///     including unsupported roll-grid/ICMA anchors, negative lags, supplied
-///     historical fixing gaps, or curve/date/day-count/arithmetic failures.
-/// KeyError
-///     If required market data is unavailable and no eligible fallback resolves it.
+#[doc = pydoc!("finstack_quant.cashflows", "build_cashflow_schedule_json")]
 #[pyfunction]
 #[pyo3(
     signature = (spec_json, market_json = None),
@@ -58,50 +34,7 @@ fn build_cashflow_schedule_json(
     })
 }
 
-/// Build a typed ``CashFlowSchedule`` from a build spec (typed twin of
-/// ``build_cashflow_schedule_json``).
-///
-/// Parameters
-/// ----------
-/// spec : dict or str
-///     ``CashflowScheduleBuildSpec`` as a JSON string or an equivalent
-///     ``dict`` (keys ``notional``, ``issue_date``, ``maturity``,
-///     ``coupon_program``, ``payment_program``, ``fees``,
-///     ``principal_events``, ``principal_exchange``).
-/// market : MarketContext or str, optional
-///     Market context (or its JSON) for floating-rate projection; fixed
-///     coupons and deterministic fees do not need one. Complete supplied
-///     observations need no forward curve. Explicit fallback covers missing
-///     curves or absent fixing series, never supplied historical gaps before
-///     a resolved curve's base date or genuine projection errors.
-///
-/// Returns
-/// -------
-/// CashFlowSchedule
-///     Canonical typed schedule with ``to_dataframe()``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the spec is malformed or the schedule fails validation, including
-///     unsupported roll-grid/ICMA anchors, negative lags, supplied historical
-///     fixing gaps, or curve/date/day-count/arithmetic failures.
-/// KeyError
-///     If required market data is unavailable and no eligible fallback resolves it.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows import build_cashflow_schedule
-/// >>> spec = {
-/// ...     "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-/// ...     "issue_date": "2025-01-15", "maturity": "2026-01-15",
-/// ...     "coupon_program": [{"kind": "fixed", "spec": {
-/// ...         "rate": "0.05", "coupon_type": "cash",
-/// ...         "frequency": {"count": 6, "unit": "months"},
-/// ...         "day_count": "30_360", "calendar_id": "weekends_only"}}],
-/// ... }
-/// >>> build_cashflow_schedule(spec).get_flows()[0].kind.name
-/// 'notional'
+#[doc = pydoc!("finstack_quant.cashflows", "build_cashflow_schedule")]
 #[pyfunction]
 #[pyo3(signature = (spec, market=None), text_signature = "(spec, market=None)")]
 fn build_cashflow_schedule(
@@ -109,32 +42,15 @@ fn build_cashflow_schedule(
     spec: &Bound<'_, PyAny>,
     market: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyCashFlowSchedule> {
-    let spec_json =
-        crate::bindings::module_utils::py_to_json_string(py, spec, "CashflowScheduleBuildSpec")?;
-    let spec: CashflowScheduleBuildSpec = serde_json::from_str(&spec_json)
-        .map_err(|e| crate::errors::serde_json_to_py(e, "invalid CashflowScheduleBuildSpec"))?;
+    let spec: CashflowScheduleBuildSpec =
+        crate::bindings::module_utils::spec_from_py(py, spec, "CashflowScheduleBuildSpec")?;
     let market = crate::bindings::extract::extract_market_opt(py, market)?;
     py.detach(move || spec.build(market.as_ref()))
         .map(PyCashFlowSchedule::from_inner)
         .map_err(crate::errors::core_to_py)
 }
 
-/// Validate a cashflow schedule JSON string and return it canonicalized.
-///
-/// Parameters
-/// ----------
-/// schedule_json : str
-///     JSON-encoded `CashFlowSchedule`.
-///
-/// Returns
-/// -------
-/// str
-///     Canonicalized JSON-encoded `CashFlowSchedule`.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the JSON is malformed or the schedule fails validation.
+#[doc = pydoc!("finstack_quant.cashflows", "validate_cashflow_schedule_json")]
 #[pyfunction]
 #[pyo3(text_signature = "(schedule_json)")]
 fn validate_cashflow_schedule_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
@@ -144,28 +60,7 @@ fn validate_cashflow_schedule_json(py: Python<'_>, schedule_json: &str) -> PyRes
     })
 }
 
-/// Extract dated flows from a cashflow schedule.
-///
-/// Parameters
-/// ----------
-/// schedule_json : str
-///     JSON-encoded `CashFlowSchedule`.
-///
-/// Returns
-/// -------
-/// str
-///     JSON array of settlement cash entries. Non-cash PIK and default-write-down
-///     rows and zero-cash principal markers are omitted. Native currencies are
-///     retained without conversion or netting; parse the full schedule JSON
-///     when classifications are needed.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the schedule JSON, amounts, accrual metadata, row currencies, or
-///     dates are invalid, or a single-currency principal path fails balance
-///     reconciliation. Composite principal paths in multiple currencies
-///     receive structural validation without scalar balance reconciliation.
+#[doc = pydoc!("finstack_quant.cashflows", "dated_flows_json")]
 #[pyfunction]
 #[pyo3(text_signature = "(schedule_json)")]
 fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
@@ -174,71 +69,23 @@ fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
     })
 }
 
-/// Settlement cash entries of a schedule as ``[(date, Money), ...]`` (typed
-/// twin of ``dated_flows_json``).
-///
-/// Parameters
-/// ----------
-/// schedule : CashFlowSchedule
-///     Canonical cashflow schedule.
-///
-/// Returns
-/// -------
-/// list[tuple[datetime.date, Money]]
-///     Cash-settling rows in schedule order; PIK capitalizations and
-///     default write-downs are omitted, as are zero-cash principal markers.
-///     Native currencies are retained without conversion or netting.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``schedule`` amounts, accrual metadata, row currencies, or dates are
-///     invalid. Single-currency principal paths must reconcile with the
-///     opening notional. Composite principal paths in multiple currencies
-///     receive structural validation without scalar balance reconciliation.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.cashflows import dated_flows, schedule_from_dated_flows
-/// >>> from finstack_quant.core.dates import DayCount
-/// >>> from finstack_quant.core.money import Money
-/// >>> schedule = schedule_from_dated_flows([(datetime.date(2025, 6, 15), Money(100.0, "USD"))], "fixed", DayCount.ACT_360)
-/// >>> dated_flows(schedule)[0][1].amount
-/// 100.0
+#[doc = pydoc!("finstack_quant.cashflows", "dated_flows")]
 #[pyfunction]
 #[pyo3(text_signature = "(schedule)")]
 fn dated_flows<'py>(
     py: Python<'py>,
     schedule: PyRef<'py, PyCashFlowSchedule>,
 ) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
-    schedule
-        .inner
-        .dated_flows()
-        .map_err(crate::errors::core_to_py)?
-        .into_iter()
-        .map(|(date, amount)| Ok((date_to_py(py, date)?, PyMoney::from_inner(amount))))
-        .collect()
+    builder::specs::date_money_to_py(
+        py,
+        &schedule
+            .inner
+            .dated_flows()
+            .map_err(crate::errors::core_to_py)?,
+    )
 }
 
-/// Schedule-level inputs shared by ``schedule_from_dated_flows`` and
-/// ``schedule_from_classified_flows``.
-///
-/// Parameters
-/// ----------
-/// notional_hint : Money, optional
-///     Notional stamped on the resulting schedule. When omitted, a zero
-///     notional in the currency of the first flow (USD if there are none)
-///     is used.
-/// meta : CashFlowMeta, optional
-///     Schedule-level metadata (default: contractual, no calendars).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows import ScheduleBuildOpts
-/// >>> from finstack_quant.core.money import Money
-/// >>> ScheduleBuildOpts(notional_hint=Money(100.0, "USD")).notional_hint.amount
-/// 100.0
+#[doc = pydoc!("finstack_quant.cashflows", "ScheduleBuildOpts")]
 #[pyclass(
     name = "ScheduleBuildOpts",
     module = "finstack_quant.cashflows",
@@ -253,7 +100,7 @@ pub struct PyScheduleBuildOpts {
 
 #[pymethods]
 impl PyScheduleBuildOpts {
-    /// Construct build options; see the class docstring for parameters.
+    #[doc = pydoc!("finstack_quant.cashflows", "ScheduleBuildOpts.__init__")]
     #[new]
     #[pyo3(
         signature = (notional_hint=None, meta=None),
@@ -268,13 +115,13 @@ impl PyScheduleBuildOpts {
         }
     }
 
-    /// Notional stamped on the resulting schedule, if provided.
+    #[doc = pydoc!("finstack_quant.cashflows", "ScheduleBuildOpts.notional_hint")]
     #[getter]
     fn notional_hint(&self) -> Option<PyMoney> {
         self.inner.notional_hint.map(PyMoney::from_inner)
     }
 
-    /// Schedule-level metadata.
+    #[doc = pydoc!("finstack_quant.cashflows", "ScheduleBuildOpts.meta")]
     #[getter]
     fn meta(&self) -> PyCashFlowMeta {
         PyCashFlowMeta {
@@ -295,41 +142,7 @@ impl PyScheduleBuildOpts {
     }
 }
 
-/// Build a ``CashFlowSchedule`` from dated ``(date, Money)`` flows that all
-/// share one classification.
-///
-/// Parameters
-/// ----------
-/// flows : list[tuple[datetime.date, Money]]
-///     Dated amounts; any order.
-/// kind : CFKind or str
-///     Classification stamped on every row (e.g. ``"fixed"``).
-/// day_count : DayCount
-///     Representative day-count convention of the schedule.
-/// opts : ScheduleBuildOpts, optional
-///     Notional hint and metadata (default: zero notional in the first flow's
-///     currency, contractual metadata).
-///
-/// Returns
-/// -------
-/// CashFlowSchedule
-///     Canonical schedule with ``accrual_factor`` 0 and no rates on each row.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``kind`` is not a known cashflow kind label or a date cannot be
-///     parsed.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.cashflows import schedule_from_dated_flows
-/// >>> from finstack_quant.core.dates import DayCount
-/// >>> from finstack_quant.core.money import Money
-/// >>> flows = [(datetime.date(2025, 6, 15), Money(100.0, "USD"))]
-/// >>> schedule_from_dated_flows(flows, "fixed", DayCount.THIRTY_360).get_flows()[0].amount.amount
-/// 100.0
+#[doc = pydoc!("finstack_quant.cashflows", "schedule_from_dated_flows")]
 #[pyfunction]
 #[pyo3(
     signature = (flows, kind, day_count, opts=None),
@@ -350,33 +163,7 @@ fn schedule_from_dated_flows(
     ))
 }
 
-/// Build a ``CashFlowSchedule`` from pre-classified ``CashFlow`` rows.
-///
-/// Parameters
-/// ----------
-/// flows : list[CashFlow]
-///     Classified rows; any order, kinds preserved.
-/// day_count : DayCount
-///     Representative day-count convention of the schedule.
-/// opts : ScheduleBuildOpts, optional
-///     Notional hint and metadata (default: zero notional in the first flow's
-///     currency, contractual metadata).
-///
-/// Returns
-/// -------
-/// CashFlowSchedule
-///     Canonical schedule holding the sorted rows.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.cashflows import schedule_from_classified_flows
-/// >>> from finstack_quant.core.cashflow import CashFlow, CFKind
-/// >>> from finstack_quant.core.dates import DayCount
-/// >>> from finstack_quant.core.money import Money
-/// >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.PIK, 0.0)
-/// >>> schedule_from_classified_flows([flow], DayCount.ACT_360).get_flows()[0].kind.name
-/// 'pik'
+#[doc = pydoc!("finstack_quant.cashflows", "schedule_from_classified_flows")]
 #[pyfunction]
 #[pyo3(
     signature = (flows, day_count, opts=None),

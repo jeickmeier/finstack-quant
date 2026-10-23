@@ -1,5 +1,6 @@
 //! Python bindings for `finstack_quant_cashflows::builder` schedule types.
 
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::{
     merge_cashflow_schedules as rust_merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule,
     CashflowRepresentation,
@@ -10,6 +11,7 @@ use finstack_quant_core::types::CurveId;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use super::specs::date_money_to_py;
 use crate::bindings::cashflows::aggregation::PyPeriodAggregation;
 use crate::bindings::core::cashflow::{extract_cf_kind, PyCashFlow};
 use crate::bindings::core::currency::extract_currency;
@@ -19,39 +21,14 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::parse_label;
 use crate::bindings::macros::wire_methods;
+use crate::bindings::module_utils::spec_from_py;
 use crate::errors::core_to_py;
 
 use super::orchestrator::PyCashFlowBuilder;
 use super::specs::PyNotional;
 use crate::bindings::cashflows::fixings::PyProjectedFixing;
 
-/// Schedule-level metadata: representation, calendars, facility limit, horizon.
-///
-/// Parameters
-/// ----------
-/// representation : str, default "contractual"
-///     One of ``"contractual"``, ``"projected"``, ``"placeholder"``,
-///     ``"no_residual"``.
-/// calendar_ids : list[str], optional
-///     Holiday calendar identifiers used by the schedule (default none).
-/// commitment : Money, optional
-///     Facility limit / commitment for revolving structures.
-/// issue_date : datetime.date or str, optional
-///     Instrument issue date.
-/// maturity : datetime.date or str, optional
-///     Contractual maturity date.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``representation`` is not one of the accepted labels or a date
-///     cannot be parsed.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows.builder import CashFlowMeta
-/// >>> CashFlowMeta(calendar_ids=["usny"]).calendar_ids
-/// ['usny']
+#[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta")]
 #[pyclass(
     name = "CashFlowMeta",
     module = "finstack_quant.cashflows.builder",
@@ -66,7 +43,7 @@ pub struct PyCashFlowMeta {
 
 #[pymethods]
 impl PyCashFlowMeta {
-    /// Construct schedule metadata; see the class docstring for parameters.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.__init__")]
     #[new]
     #[pyo3(
         signature = (representation="contractual", calendar_ids=None, commitment=None, issue_date=None, maturity=None, projected_fixings=None),
@@ -96,37 +73,37 @@ impl PyCashFlowMeta {
         })
     }
 
-    /// Schedule representation label (``"contractual"``, ``"projected"``, …).
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.representation")]
     #[getter]
     fn representation(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(&self.inner.representation).map_err(core_to_py)
     }
 
-    /// Holiday calendar identifiers used by the schedule.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.calendar_ids")]
     #[getter]
     fn calendar_ids(&self) -> Vec<String> {
         self.inner.calendar_ids.clone()
     }
 
-    /// Optional facility limit / commitment.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.commitment")]
     #[getter]
     fn commitment(&self) -> Option<PyMoney> {
         self.inner.commitment.map(PyMoney::from_inner)
     }
 
-    /// Instrument issue date, when known.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner.issue_date.map(|d| date_to_py(py, d)).transpose()
     }
 
-    /// Contractual maturity date, when known.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner.maturity.map(|d| date_to_py(py, d)).transpose()
     }
 
-    /// Raw observations needed to fix coupons crossed by a market time roll.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.projected_fixings")]
     #[getter]
     fn projected_fixings(&self) -> Vec<PyProjectedFixing> {
         self.inner
@@ -145,19 +122,7 @@ impl PyCashFlowMeta {
 
 wire_methods!(PyCashFlowMeta, CashFlowMeta, "CashFlowMeta");
 
-/// Canonical, sorted cashflow schedule with notional, day count and metadata.
-///
-/// Build one with ``CashFlowSchedule.builder()`` (fluent), ``from_flows``
-/// (explicit rows, validated), or ``from_json``. Accessors return typed
-/// ``CashFlow`` rows; ``to_dataframe()`` exports a pandas frame; ``pv_by_period``
-/// discounts against a ``MarketContext``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
-/// >>> from finstack_quant.core.dates import DayCount
-/// >>> CashFlowSchedule.from_flows([], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta()).get_notional().initial.amount
-/// 1.0
+#[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule")]
 #[pyclass(
     name = "CashFlowSchedule",
     module = "finstack_quant.cashflows.builder",
@@ -206,19 +171,13 @@ fn is_missing(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
     Ok(false)
 }
 
-fn optional_json_field<T: serde::de::DeserializeOwned>(
-    frame: &Bound<'_, PyAny>,
+fn optional_json_field<T: serde::de::DeserializeOwned + Send>(
     columns: &Option<Vec<Bound<'_, PyAny>>>,
     index: usize,
     label: &str,
 ) -> PyResult<Option<T>> {
     match columns.as_ref().map(|rows| &rows[index]) {
-        Some(value) if !is_missing(value)? => {
-            let json = crate::bindings::module_utils::py_to_json_string(frame.py(), value, label)?;
-            serde_json::from_str(&json)
-                .map(Some)
-                .map_err(|e| crate::errors::serde_json_to_py(e, &format!("invalid {label}")))
-        }
+        Some(value) if !is_missing(value)? => spec_from_py(value.py(), value, label).map(Some),
         _ => Ok(None),
     }
 }
@@ -295,8 +254,8 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
                 accrual_factor,
                 rate,
             );
-            flow.accrual = optional_json_field(obj, &accruals, i, "CashFlowAccrual")?;
-            flow.principal_delta = optional_json_field(obj, &deltas, i, "principal_delta")?;
+            flow.accrual = optional_json_field(&accruals, i, "CashFlowAccrual")?;
+            flow.principal_delta = optional_json_field(&deltas, i, "principal_delta")?;
             flow.principal_date = match principal_dates.as_ref().map(|dates| &dates[i]) {
                 Some(date) if !is_missing(date)? => Some(py_to_date(date)?),
                 _ => None,
@@ -312,7 +271,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
 
 #[pymethods]
 impl PyCashFlowSchedule {
-    /// Create a new fluent cashflow builder (the only builder entry point).
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.builder")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn builder() -> PyCashFlowBuilder {
@@ -321,54 +280,7 @@ impl PyCashFlowSchedule {
         }
     }
 
-    /// Build a schedule from ``CashFlow`` rows or a pandas DataFrame,
-    /// validating every row.
-    ///
-    /// Both input shapes go through Rust ``CashFlowSchedule::from_flows``,
-    /// which checks each row (``CashFlow.validate``) before sorting.
-    ///
-    /// Parameters
-    /// ----------
-    /// flows : list[CashFlow] or pandas.DataFrame
-    ///     Either typed rows, or a frame with columns ``date``, ``amount``
-    ///     (float, native currency units), ``currency`` (ISO code), ``kind``
-    ///     (``CFKind`` label such as ``"fixed"``), ``accrual_factor`` (float
-    ///     year fraction; ``0.0`` for non-coupon rows), and optional
-    ///     ``reset_date``, ``rate``. Dates accept
-    ///     ``datetime.date``, ``pandas.Timestamp`` or ISO strings; ``NaN`` /
-    ///     ``None`` in the optional columns means absent.
-    /// notional : Notional
-    ///     Representative notional stamped on the schedule.
-    /// day_count : DayCount
-    ///     Representative day-count convention.
-    /// meta : CashFlowMeta, optional
-    ///     Schedule metadata (default: contractual, no calendars).
-    ///
-    /// Returns
-    /// -------
-    /// CashFlowSchedule
-    ///     Canonical schedule holding the sorted rows.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a required frame column is missing, a currency code or kind
-    ///     label is unknown, a date cannot be parsed, or a row fails
-    ///     ``CashFlow.validate`` (e.g. a negative or non-finite
-    ///     ``accrual_factor``, or a reset date after the payment date).
-    /// TypeError
-    ///     If ``flows`` is neither a list of ``CashFlow`` nor a DataFrame.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.cashflows.builder import CashFlowSchedule, Notional
-    /// >>> from finstack_quant.core.cashflow import CashFlow, CFKind
-    /// >>> from finstack_quant.core.dates import DayCount
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0)
-    /// >>> CashFlowSchedule.from_flows([flow], Notional.par(1_000.0, "USD"), DayCount.ACT_360).get_flows()[0].kind.name
-    /// 'fixed'
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.from_flows")]
     #[staticmethod]
     #[pyo3(
         signature = (flows, notional, day_count, meta=None),
@@ -390,18 +302,7 @@ impl PyCashFlowSchedule {
         .map_err(core_to_py)
     }
 
-    /// Return a copy with the metadata representation label replaced.
-    ///
-    /// Parameters
-    /// ----------
-    /// representation : str
-    ///     One of ``"contractual"``, ``"projected"``, ``"placeholder"``,
-    ///     ``"no_residual"``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the label is not one of the accepted representations.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.with_representation")]
     #[pyo3(text_signature = "(self, representation)")]
     fn with_representation(&self, representation: &str) -> PyResult<Self> {
         Ok(Self::from_inner(self.inner.clone().with_representation(
@@ -409,18 +310,13 @@ impl PyCashFlowSchedule {
         )))
     }
 
-    /// Return a copy with the representative notional replaced (flows unchanged).
-    ///
-    /// Parameters
-    /// ----------
-    /// notional : Notional
-    ///     New representative notional.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.with_notional")]
     #[pyo3(text_signature = "(self, notional)")]
     fn with_notional(&self, notional: PyRef<'_, PyNotional>) -> Self {
         Self::from_inner(self.inner.clone().with_notional(notional.inner.clone()))
     }
 
-    /// Canonical ordered cashflows.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.get_flows")]
     #[pyo3(text_signature = "(self)")]
     fn get_flows(&self) -> Vec<PyCashFlow> {
         self.inner
@@ -430,7 +326,7 @@ impl PyCashFlowSchedule {
             .collect()
     }
 
-    /// Interest-like coupon cashflows (Fixed/FloatReset/InflationCoupon/Stub).
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.coupons")]
     #[pyo3(text_signature = "(self)")]
     fn coupons(&self) -> Vec<PyCashFlow> {
         self.inner
@@ -439,7 +335,7 @@ impl PyCashFlowSchedule {
             .collect()
     }
 
-    /// Flow dates in schedule order.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.dates")]
     #[pyo3(text_signature = "(self)")]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         self.inner
@@ -449,19 +345,19 @@ impl PyCashFlowSchedule {
             .collect()
     }
 
-    /// Representative schedule notional.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.get_notional")]
     #[pyo3(text_signature = "(self)")]
     fn get_notional(&self) -> PyNotional {
         PyNotional::from_inner(self.inner.get_notional().clone())
     }
 
-    /// Representative day-count convention.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.get_day_count")]
     #[pyo3(text_signature = "(self)")]
     fn get_day_count(&self) -> PyDayCount {
         PyDayCount::from_inner(self.inner.get_day_count())
     }
 
-    /// Schedule-level metadata.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.get_meta")]
     #[pyo3(text_signature = "(self)")]
     fn get_meta(&self) -> PyCashFlowMeta {
         PyCashFlowMeta {
@@ -469,24 +365,13 @@ impl PyCashFlowSchedule {
         }
     }
 
-    /// Validate all schedule-level and per-flow invariants.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a flow is non-finite, mis-ordered, or the notional is invalid.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.validate")]
     #[pyo3(text_signature = "(self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Return a new schedule with every amount scaled by ``scale``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``scale`` is non-finite or a scaled cash amount or principal
-    ///     movement exceeds the Decimal range.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.scale_amounts")]
     #[pyo3(text_signature = "(self, scale)")]
     fn scale_amounts(&self, scale: f64) -> PyResult<Self> {
         self.inner
@@ -496,65 +381,22 @@ impl PyCashFlowSchedule {
             .map_err(core_to_py)
     }
 
-    /// Weighted average life in years from ``as_of`` (Act/365F basis).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If future principal repayments mix currencies or the day-count
-    ///     calculation fails. No future repayments returns zero.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.wal")]
     #[pyo3(text_signature = "(self, as_of)")]
     fn wal(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
         self.inner.wal(py_to_date(as_of)?).map_err(core_to_py)
     }
 
-    /// Outstanding balance path as ``[(date, Money), ...]``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If principal flows mix currencies.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.outstanding_by_date")]
     #[pyo3(text_signature = "(self)")]
     fn outstanding_by_date<'py>(
         &self,
         py: Python<'py>,
     ) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
-        self.inner
-            .outstanding_by_date()
-            .map_err(core_to_py)?
-            .into_iter()
-            .map(|(d, m)| Ok((date_to_py(py, d)?, PyMoney::from_inner(m))))
-            .collect()
+        date_money_to_py(py, &self.inner.outstanding_by_date().map_err(core_to_py)?)
     }
 
-    /// Periodized present values resolved from a market context.
-    ///
-    /// Parameters
-    /// ----------
-    /// periods : list[Period]
-    ///     Reporting periods (half-open buckets).
-    /// market : MarketContext or str
-    ///     Market context (or its JSON) containing the required curves.
-    /// disc_curve_id : str
-    ///     Discount curve identifier.
-    /// base : datetime.date or str
-    ///     Valuation date for discount factors and survival; flows on or before
-    ///     it get zero PV. Each curve uses its own day count.
-    /// credit_curve_id : str, optional
-    ///     Hazard curve identifier for credit-adjusted PV.
-    ///
-    /// Returns
-    /// -------
-    /// PeriodAggregation
-    ///     ``{period_id_label: {currency_code: pv}}`` with ``to_dataframe()``;
-    ///     empty periods omitted.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If a curve id is not present in ``market``.
-    /// ValueError
-    ///     If periods overlap or discount inputs are inconsistent.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.pv_by_period")]
     #[pyo3(
         signature = (periods, market, disc_curve_id, base, credit_curve_id=None),
         text_signature = "(self, periods, market, disc_curve_id, base, credit_curve_id=None)"
@@ -582,28 +424,7 @@ impl PyCashFlowSchedule {
         .map_err(core_to_py)
     }
 
-    /// Calendar-year non-principal / principal / PV ladder as a DataFrame.
-    ///
-    /// Returns a ``pandas.DataFrame`` view alongside ``to_dataframe()``; use
-    /// ``finstack_quant.cashflows.aggregation.calendar_year_ladder`` for raw
-    /// ``(year, non_principal, principal, pv)`` tuples over parallel arrays.
-    ///
-    /// Parameters
-    /// ----------
-    /// pvs : list[float]
-    ///     Present value of each flow in ``get_flows()`` order, in the flow's
-    ///     currency units; must be finite.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    ///     Columns ``year, non_principal, principal, pv`` sorted by year.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``pvs`` does not have one entry per flow or contains a
-    ///     non-finite value, or flow amounts mix currencies.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.calendar_year_ladder")]
     #[pyo3(text_signature = "(self, pvs)")]
     fn calendar_year_ladder<'py>(
         &self,
@@ -625,29 +446,7 @@ impl PyCashFlowSchedule {
         crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
     }
 
-    /// Flows as a pandas DataFrame.
-    ///
-    /// Parameters
-    /// ----------
-    /// outstanding : bool, default False
-    ///     Append an ``outstanding`` column with the principal balance
-    ///     (float, in the notional currency) after all economic principal
-    ///     events on or before each payment date. Before the first event,
-    ///     use the initial notional.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    ///     Columns ``date`` (``datetime64``), ``reset_date`` (``datetime64``,
-    ///     ``NaT`` when absent), ``kind``, ``amount`` (float), ``currency``,
-    ///     ``accrual_factor``, ``rate`` (``NaN`` when absent) and optionally
-    ///     ``outstanding``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``outstanding=True`` and ``meta.issue_date`` is missing or
-    ///     principal flows mix currencies with the notional.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.to_dataframe")]
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(signature = (outstanding=false), text_signature = "(self, outstanding=False)")]
     fn to_dataframe<'py>(&self, py: Python<'py>, outstanding: bool) -> PyResult<Bound<'py, PyAny>> {
@@ -737,33 +536,14 @@ impl PyCashFlowSchedule {
         )
     }
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
+    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule._repr_html_")]
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
         let frame = self.to_dataframe(py, false).ok()?;
         frame.call_method0("_repr_html_").ok()?.extract().ok()
     }
 }
 
-/// Merge multiple schedules into one deterministic composite schedule.
-///
-/// Parameters
-/// ----------
-/// schedules : list[CashFlowSchedule]
-///     Schedules to combine.
-/// notional : Notional
-///     Representative notional stamped on the merged schedule.
-/// day_count : DayCount
-///     Day-count convention attached to the merged schedule.
-///
-/// Returns
-/// -------
-/// CashFlowSchedule
-///     Combined schedule with all rows in canonical order.
+#[doc = pydoc!("finstack_quant.cashflows.builder", "merge_cashflow_schedules")]
 #[pyfunction]
 #[pyo3(text_signature = "(schedules, notional, day_count)")]
 pub(crate) fn merge_cashflow_schedules(
