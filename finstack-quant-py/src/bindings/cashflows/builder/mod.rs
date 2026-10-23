@@ -39,7 +39,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     let module = crate::bindings::module_utils::new_submodule(parent, "builder")?;
     module.setattr(
         "__doc__",
-        "Composable cashflow builder: coupon/fee/amortization specs, CashFlowBuilder, CashFlowSchedule.",
+        pydoc!("finstack_quant.cashflows.builder", "__module__"),
     )?;
 
     specs::add_classes(&module)?;

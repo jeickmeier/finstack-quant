@@ -120,7 +120,12 @@ impl PyCashFlowMeta {
     }
 }
 
-wire_methods!(PyCashFlowMeta, CashFlowMeta, "CashFlowMeta");
+wire_methods!(
+    PyCashFlowMeta,
+    CashFlowMeta,
+    "CashFlowMeta",
+    stub = "finstack_quant.cashflows.builder"
+);
 
 #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule")]
 #[pyclass(
@@ -142,7 +147,12 @@ impl PyCashFlowSchedule {
     }
 }
 
-wire_methods!(PyCashFlowSchedule, CashFlowSchedule, "CashFlowSchedule");
+wire_methods!(
+    PyCashFlowSchedule,
+    CashFlowSchedule,
+    "CashFlowSchedule",
+    stub = "finstack_quant.cashflows.builder"
+);
 
 /// Extract one string column of a DataFrame-like object as Python objects.
 fn frame_column<'py>(

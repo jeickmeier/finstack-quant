@@ -269,7 +269,12 @@ pub struct PyFixedCouponSpec {
     pub(crate) inner: FixedCouponSpec,
 }
 
-wire_methods!(PyFixedCouponSpec, FixedCouponSpec, "FixedCouponSpec");
+wire_methods!(
+    PyFixedCouponSpec,
+    FixedCouponSpec,
+    "FixedCouponSpec",
+    stub = "finstack_quant.cashflows.builder"
+);
 
 #[pymethods]
 impl PyFixedCouponSpec {
@@ -336,6 +341,7 @@ wire_methods!(
     PyFloatingRateSpec,
     FloatingRateSpec,
     "FloatingRateSpec",
+    stub = "finstack_quant.cashflows.builder",
     validate
 );
 
@@ -550,7 +556,8 @@ pub struct PyFloatingCouponSpec {
 wire_methods!(
     PyFloatingCouponSpec,
     FloatingCouponSpec,
-    "FloatingCouponSpec"
+    "FloatingCouponSpec",
+    stub = "finstack_quant.cashflows.builder"
 );
 
 #[pymethods]
@@ -616,7 +623,12 @@ pub struct PyStepUpCouponSpec {
     pub(crate) inner: StepUpCouponSpec,
 }
 
-wire_methods!(PyStepUpCouponSpec, StepUpCouponSpec, "StepUpCouponSpec");
+wire_methods!(
+    PyStepUpCouponSpec,
+    StepUpCouponSpec,
+    "StepUpCouponSpec",
+    stub = "finstack_quant.cashflows.builder"
+);
 
 #[pymethods]
 impl PyStepUpCouponSpec {

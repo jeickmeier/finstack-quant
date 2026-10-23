@@ -30,7 +30,12 @@ pub struct PyAmortizationSpec {
     pub(crate) inner: AmortizationSpec,
 }
 
-wire_methods!(PyAmortizationSpec, AmortizationSpec, "AmortizationSpec");
+wire_methods!(
+    PyAmortizationSpec,
+    AmortizationSpec,
+    "AmortizationSpec",
+    stub = "finstack_quant.cashflows.builder"
+);
 
 #[pymethods]
 impl PyAmortizationSpec {
@@ -190,7 +195,13 @@ impl PyNotional {
     }
 }
 
-wire_methods!(PyNotional, Notional, "Notional", validate);
+wire_methods!(
+    PyNotional,
+    Notional,
+    "Notional",
+    stub = "finstack_quant.cashflows.builder",
+    validate
+);
 
 #[pymethods]
 impl PyNotional {

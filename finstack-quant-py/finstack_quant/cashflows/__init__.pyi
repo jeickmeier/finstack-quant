@@ -5,8 +5,7 @@ Root bindings for ``finstack-quant-cashflows``. Build schedules from a
 ``CashflowScheduleBuildSpec``, validate canonical payloads, extract dated flows,
 and compute accrued interest.
 
-Examples
---------
+Examples:
 >>> import datetime
 >>> from finstack_quant.core.cashflow import CFKind, CashFlow
 >>> from finstack_quant.core.money import Money

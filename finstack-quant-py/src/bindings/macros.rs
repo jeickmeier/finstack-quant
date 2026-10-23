@@ -11,7 +11,10 @@
 /// - Append `validate` when the Rust type's invariants are checked by an
 ///   inherent `validate()` returning a `finstack_quant_core` error rather than
 ///   by its `Deserialize` impl.
-/// - Pass `module = "finstack_quant.domain"` to take JSON method docstrings from that module's stubs.
+/// - Pass `module = "finstack_quant.domain"` to take the `to_json` and
+///   `from_json` docstrings from that module's stubs.
+/// - Pass `stub = "finstack_quant.domain"` instead when the stubs also
+///   document `__reduce__`: every generated docstring then comes from them.
 /// - Append `to_dict` to also generate `to_dict`, returning the canonical
 ///   serde shape as a plain `dict`.
 /// - Append `arc` when the wrapper holds `inner: Arc<T>`. Such types (curves,
@@ -25,10 +28,12 @@
 ///   `finstack_quant_core::Result`), so both directions run the Rust checks.
 macro_rules! wire_methods {
     ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal) => {
-        $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [], |inner| inner,
-            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
-            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json")));
+        $crate::bindings::macros::wire_methods!(@module_json $py_type, $rust_type, $name, $module, |inner| inner);
         $crate::bindings::macros::wire_methods!(@reduce $py_type);
+    };
+    ($py_type:ident, $rust_type:ty, $name:literal, stub = $module:literal) => {
+        $crate::bindings::macros::wire_methods!(@module_json $py_type, $rust_type, $name, $module, |inner| inner);
+        $crate::bindings::macros::wire_methods!(@stub_reduce $py_type, $name, $module);
     };
 
     ($py_type:ident, $rust_type:ty, $name:literal) => {
@@ -56,13 +61,18 @@ macro_rules! wire_methods {
         }
     };
     ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, validate) => {
-        $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [], |inner| {
+        $crate::bindings::macros::wire_methods!(@module_json $py_type, $rust_type, $name, $module, |inner| {
             inner.validate().map_err($crate::errors::core_to_py)?;
             inner
-        },
-            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
-            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json")));
+        });
         $crate::bindings::macros::wire_methods!(@reduce $py_type);
+    };
+    ($py_type:ident, $rust_type:ty, $name:literal, stub = $module:literal, validate) => {
+        $crate::bindings::macros::wire_methods!(@module_json $py_type, $rust_type, $name, $module, |inner| {
+            inner.validate().map_err($crate::errors::core_to_py)?;
+            inner
+        });
+        $crate::bindings::macros::wire_methods!(@stub_reduce $py_type, $name, $module);
     };
     ($py_type:ident, $rust_type:ty, $name:literal, validate) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [], |inner| {
@@ -136,6 +146,15 @@ macro_rules! wire_methods {
                 "Raises\n------\nValueError\n    If the JSON is malformed, carries unknown fields, or fails validation."
             ));
     };
+    (@module_json $py_type:ident, $rust_type:ty, $name:literal, $module:literal, |$inner:ident| $checked:expr) => {
+        $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [], |$inner| $checked,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json")));
+    };
+    (@stub_reduce $py_type:ident, $name:literal, $module:literal) => {
+        $crate::bindings::macros::wire_methods!(@documented_reduce $py_type,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".__reduce__")));
+    };
     (@documented_json $py_type:ident, $rust_type:ty, $name:literal, [$($deref:tt)?], |$inner:ident| $checked:expr, $to_doc:expr, $from_doc:expr) => {
         #[::pyo3::pymethods]
         impl $py_type {
@@ -163,10 +182,15 @@ macro_rules! wire_methods {
         }
     };
     (@reduce $py_type:ident) => {
+        $crate::bindings::macros::wire_methods!(@documented_reduce $py_type, concat!(
+            "Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``, ``dask``)\n",
+            "through the same strict serde round-trip as ``to_json`` / ``from_json``."
+        ));
+    };
+    (@documented_reduce $py_type:ident, $doc:expr) => {
         #[::pyo3::pymethods]
         impl $py_type {
-            /// Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``, ``dask``)
-            /// through the same strict serde round-trip as ``to_json`` / ``from_json``.
+            #[doc = $doc]
             fn __reduce__<'py>(
                 &self,
                 py: ::pyo3::Python<'py>,

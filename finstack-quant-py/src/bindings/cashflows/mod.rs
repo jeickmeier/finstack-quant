@@ -184,10 +184,7 @@ fn schedule_from_classified_flows(
 /// Register the `finstack_quant.cashflows` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "cashflows")?;
-    m.setattr(
-        "__doc__",
-        "Cashflow schedule construction (typed and JSON), validation, and dated-flow extraction.",
-    )?;
+    m.setattr("__doc__", pydoc!("finstack_quant.cashflows", "__module__"))?;
 
     builder::register(py, &m)?;
     accrual::register(py, &m)?;
