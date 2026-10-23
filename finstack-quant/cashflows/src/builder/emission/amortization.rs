@@ -51,7 +51,7 @@ pub(in crate::builder) fn emit_amortization_on(
 ) -> finstack_quant_core::Result<()> {
     let outstanding = &mut state.outstanding;
     let is_maturity = setup.final_amortization_date == Some(d);
-    let on_boundary = setup.amort_dates.contains(&d);
+    let on_boundary = setup.payment_dates.contains_key(&d);
     let pay = match &setup.rule {
         PreparedAmortization::LinearTo {
             installment,

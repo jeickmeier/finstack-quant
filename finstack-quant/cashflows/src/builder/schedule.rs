@@ -12,8 +12,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
-use super::compiler::{FixedSchedule, FloatSchedule};
-
 /// Stable ordering rank used for deterministic sorting of same-date cashflows.
 ///
 /// All known `CFKind` variants are explicitly ranked so that same-date ordering
@@ -163,45 +161,6 @@ fn day_count_rank(day_count: DayCount) -> u8 {
         DayCount::Thirty360It => 11,
         _ => 12,
     }
-}
-
-pub(crate) fn finalize_flows(
-    fixed: &[FixedSchedule],
-    floating: &[FloatSchedule],
-    issue_date: Option<Date>,
-    maturity_date: Option<Date>,
-    mut projected_fixings: Vec<crate::fixings::ProjectedFixing>,
-) -> (CashFlowMeta, DayCount) {
-    crate::fixings::normalize_projected_fixings(&mut projected_fixings);
-
-    let mut cals: Vec<String> = fixed
-        .iter()
-        .map(|schedule| schedule.spec.schedule.calendar_id.to_string())
-        .chain(
-            floating
-                .iter()
-                .map(|schedule| schedule.spec.schedule.calendar_id.to_string()),
-        )
-        .collect();
-    cals.sort_unstable();
-    cals.dedup();
-    let meta = CashFlowMeta {
-        projected_fixings,
-        calendar_ids: cals,
-        commitment: None,
-        issue_date,
-        maturity: maturity_date,
-        representation: CashflowRepresentation::default(),
-    };
-
-    let out_day_count = if let Some(schedule) = fixed.first() {
-        schedule.spec.schedule.day_count
-    } else if let Some(schedule) = floating.first() {
-        schedule.spec.schedule.day_count
-    } else {
-        DayCount::Act365F
-    };
-    (meta, out_day_count)
 }
 
 /// Meaning of the emitted schedule relative to pricing and waterfall policy.
