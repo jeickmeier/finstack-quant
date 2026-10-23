@@ -1188,7 +1188,6 @@ impl JsToggleExerciseModel {
 
     /// Nested-Monte-Carlo optimal exercise rule.
     /// @param nested_paths - Inner simulation paths per decision date; a positive safe integer.
-    /// @param equity_discount_rate - Continuously compounded equity discount rate, as a decimal.
     /// @param asset_vol - Annualized asset volatility as a decimal; non-negative.
     /// @param risk_free_rate - Continuously compounded risk-free rate, as a decimal.
     /// @param horizon - Inner simulation horizon in years; positive and finite.
@@ -1201,14 +1200,12 @@ impl JsToggleExerciseModel {
     /// is negative, or `horizon` is not positive and finite.
     pub fn optimal(
         nested_paths: JsValue,
-        equity_discount_rate: JsValue,
         asset_vol: JsValue,
         risk_free_rate: JsValue,
         horizon: JsValue,
     ) -> Result<JsToggleExerciseModel, JsValue> {
         ToggleExerciseModel::optimal(
             js_uint(&nested_paths, "nestedPaths")?,
-            js_f64(&equity_discount_rate, "equityDiscountRate")?,
             js_f64(&asset_vol, "assetVol")?,
             js_f64(&risk_free_rate, "riskFreeRate")?,
             js_f64(&horizon, "horizon")?,

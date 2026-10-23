@@ -3010,16 +3010,6 @@ export interface D_8A837E6F142B34E8Cfd4 {
    */
   asset_vol: number;
   /**
-   * Equity holder discount rate applied to the nested-MC payoff.
-   *
-   * Note: the nested simulation drifts under the risk-neutral measure
-   * (`risk_free_rate`) but discounts here, so the intermediate equity
-   * figures are decision inputs, not measure-consistent prices. The
-   * rate cancels in the cash-vs-PIK comparison and does not bias the
-   * elected branch.
-   */
-  equity_discount_rate: number;
-  /**
    * Forward-looking horizon in years for the nested simulation (e.g. 1.0).
    */
   horizon: number;
@@ -3032,7 +3022,6 @@ export interface D_8A837E6F142B34E8Cfd4 {
    * Risk-free rate (continuous) used as drift in the nested simulation.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Metric-time pricing configuration.

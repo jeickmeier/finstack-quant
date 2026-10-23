@@ -364,7 +364,7 @@ const CASES = {
     credit.ToggleExerciseModel.threshold('leverage', 0.7, 'above').shouldPik(STATE, 0.5),
     credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPik(STATE, 0.5),
     credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPik(STATE, 0.9),
-    credit.ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).shouldPik(STATE, 0.5),
+    credit.ToggleExerciseModel.optimal(100, 0.2, 0.03, 1.0).shouldPik(STATE, 0.5),
   ],
   rating_factors: () => [
     credit.moodysWarfFactor('B2'),

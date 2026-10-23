@@ -225,7 +225,7 @@ test('toggle rules decide PIK from a credit state (F138: the state has a consume
   assert.equal(stochastic.shouldPik(state(0.8), 0.5), true);
   assert.equal(stochastic.shouldPik(state(0.8), 0.9), false);
 
-  const optimal = credit.ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1);
+  const optimal = credit.ToggleExerciseModel.optimal(100, 0.2, 0.03, 1);
   assert.equal(optimal.kind, 'optimal_exercise');
   // Optimal exercise runs a nested simulation seeded from `u`: deterministic per draw.
   assert.equal(optimal.shouldPik(state(0.8), 0.5), optimal.shouldPik(state(0.8), 0.5));
@@ -244,7 +244,7 @@ test('credit spec factories reject NaN instead of writing null', () => {
   for (const call of [
     () => credit.ToggleExerciseModel.threshold('leverage', NaN, 'above'),
     () => credit.ToggleExerciseModel.stochastic('leverage', NaN, 1),
-    () => credit.ToggleExerciseModel.optimal(100, NaN, 0.2, 0.03, 1),
+    () => credit.ToggleExerciseModel.optimal(100, 0.2, NaN, 1),
     () => credit.EndogenousHazardSpec.powerLaw(0.05, 1.5, NaN),
   ]) {
     assert.throws(call, (e) => e.kind === 'validation');
@@ -334,4 +334,24 @@ test('rating-factor tables come from the Rust registry', () => {
     () => credit.moodysWarfFactor(7),
     (e) => e instanceof TypeError
   );
+});
+
+test('optimal toggle wire rejects the removed equity discount rate', () => {
+  const model = credit.ToggleExerciseModel.optimal(100, 0.3, 0.03, 1);
+  try {
+    const wire = JSON.parse(model.toJson());
+    assert.deepEqual(Object.keys(wire.optimal_exercise).sort(), [
+      'asset_vol',
+      'horizon',
+      'nested_paths',
+      'risk_free_rate',
+    ]);
+    wire.optimal_exercise.equity_discount_rate = 1000;
+    assert.throws(
+      () => credit.ToggleExerciseModel.fromJson(wire),
+      (e) => e.kind === 'validation' && /equity_discount_rate/.test(e.message)
+    );
+  } finally {
+    model.free();
+  }
 });
