@@ -12,6 +12,7 @@ use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_test_support::assertions::assert_positive;
 
 #[test]
 fn test_settlement_adjustment_formula() {
