@@ -535,15 +535,16 @@ test('typed and JSON schedule builders agree', () => {
   });
 });
 
-test('a builder setter consumes its receiver; build does not', () => {
-  const start = cashflows.CashFlowSchedule.builder();
-  const next = start.principal(usd('1000'), ISSUE, MATURITY);
-  // The consumed receiver no longer owns a builder.
-  assert.throws(() => start.fixedCf(fixedSpec));
-  const first = next.build();
-  const second = next.build();
+test('builder setters update the receiver in place; build does not consume it', () => {
+  const builder = cashflows.CashFlowSchedule.builder();
+  assert.equal(builder.principal(usd('1000'), ISSUE, MATURITY), builder);
+  // A rejected argument throws and leaves the builder usable.
+  assert.throws(() => builder.fixedCf({ ...fixedSpec, bogus: 1 }));
+  assert.equal(builder.fixedCf(fixedSpec), builder);
+  const first = builder.build();
+  const second = builder.build();
   assert.equal(first.toJson(), second.toJson());
-  for (const handle of [first, second, next]) handle.free();
+  for (const handle of [first, second, builder]) handle.free();
 });
 
 test('builder and schedule errors are structured and Rust-owned', () => {
@@ -702,7 +703,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
   );
   assert.throws(
     () => cashflows.notionalPar(100, 'usd!'),
-    kind('validation', /currency: unknown variant `usd!`/)
+    kind('validation', /Invalid currency code "usd!"/)
   );
   assert.throws(
     () =>

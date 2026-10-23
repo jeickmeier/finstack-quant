@@ -11,8 +11,8 @@ use crate::utils::input::{js_currency, js_f64, js_uint};
 use crate::utils::wire::{js_decimal, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::{
-    DefaultModelSpec, FloatingLegCompounding, FloatingRateSpec, Notional,
-    PrepaymentModelSpec, RecoveryModelSpec, ScheduleParams,
+    DefaultModelSpec, FloatingLegCompounding, FloatingRateSpec, Notional, PrepaymentModelSpec,
+    RecoveryModelSpec, ScheduleParams,
 };
 use wasm_bindgen::prelude::*;
 
