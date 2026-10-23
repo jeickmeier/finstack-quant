@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import datetime
 import json
+from pathlib import Path
 import pickle
+import subprocess
+import sys
 
 import pytest
 
@@ -253,3 +256,103 @@ def test_reinvestment_period_round_trips_but_is_rejected_for_instrument_collater
         )
     with pytest.raises(ValueError, match="reinvestment_period"):
         AssetPool("P", "clo", Currency("USD")).with_reinvestment_period({"end": "2028-01-15"})
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_diagnostics_dataframe_preserves_join_order_values_and_empty_dtypes(empty: bool) -> None:
+    import pandas as pd
+
+    def money(amount: float, currency: str = "USD") -> dict[str, str]:
+        return {"amount": str(amount), "currency": currency}
+
+    values = {
+        "pool_factor": 0.8,
+        "wac": 0.06,
+        "weighted_avg_spread_bp": 125.0,
+        "warf": 250.0,
+        "interest_collections": 2.0,
+        "principal_collections": 3.0,
+        "defaults": 4.0,
+        "recoveries": 5.0,
+        "reinvested_par": 6.0,
+        "fees_paid": 7.0,
+        "reserve_balance": 8.0,
+        "spread_account": 9.0,
+        "funding_account": 10.0,
+        "delinquent_balance": 11.0,
+        "servicer_advances_outstanding": 12.0,
+        "excess_spread": 0.02,
+    }
+    scalars = {"pool_factor", "wac", "weighted_avg_spread_bp", "warf", "excess_spread"}
+    dates = [] if empty else ["2024-02-15", "2024-01-15", "2024-02-15", "2024-03-15"]
+    balances = [] if empty else [101.0, 102.0, 103.0, 104.0]
+    periods = []
+    for date, balance in zip(dates, balances, strict=True):
+        period = {key: value if key in scalars else money(value) for key, value in values.items()}
+        periods.append({"payment_date": date, "pool_balance": money(balance), "coverage_tests": [], **period})
+    diagnostics = SimulationDiagnostics.from_json(
+        json.dumps({
+            "periods": periods,
+            "reserve_balance_path": [],
+            "reserve_interest_paid": [
+                ["2024-02-15", money(21.0, "EUR")],
+                ["2024-01-15", money(22.0)],
+                ["2024-02-15", money(999.0)],
+                ["2030-01-01", money(888.0)],
+            ],
+            "draws_from_reserve": money(0.0),
+            "draws_from_principal": money(0.0),
+            "unfunded_draws": money(0.0),
+            "reserve_replenished": money(0.0),
+            "early_amortization_date": None,
+            "tranche_draws": [],
+        })
+    )
+    expected = {"date": pd.Series(dates, dtype="str"), "pool_balance": pd.Series(balances, dtype="float64")}
+    for key, value in values.items():
+        expected[key] = pd.Series([value] * len(dates), dtype="float64")
+    expected["reserve_interest"] = pd.Series([] if empty else [21.0, 22.0, 21.0, 0.0], dtype="float64")
+    columns = [
+        "date",
+        "pool_balance",
+        "pool_factor",
+        "wac",
+        "weighted_avg_spread_bp",
+        "warf",
+        "interest_collections",
+        "principal_collections",
+        "defaults",
+        "recoveries",
+        "reinvested_par",
+        "fees_paid",
+        "reserve_balance",
+        "reserve_interest",
+        "spread_account",
+        "funding_account",
+        "delinquent_balance",
+        "servicer_advances_outstanding",
+        "excess_spread",
+    ]
+    pd.testing.assert_frame_equal(diagnostics.to_dataframe(), pd.DataFrame(expected, columns=columns))
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_diagnostics_dataframe_without_pyarrow(empty: bool) -> None:
+    code = """
+import runpy
+import sys
+
+# Block PyArrow before pandas is imported, as in a base installation.
+sys.modules["pyarrow"] = None
+tests = runpy.run_path(sys.argv[1])
+tests["test_diagnostics_dataframe_preserves_join_order_values_and_empty_dtypes"](sys.argv[2] == "True")
+assert sys.modules["pyarrow"] is None
+"""
+    result = subprocess.run(  # noqa: S603 - fixed interpreter and repository-owned test file.
+        [sys.executable, "-c", code, str(Path(__file__).resolve()), str(empty)],
+        cwd=Path(__file__).resolve().parent.parent,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

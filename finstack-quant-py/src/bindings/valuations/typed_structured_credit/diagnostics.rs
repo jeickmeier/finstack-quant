@@ -226,7 +226,11 @@ impl PySimulationDiagnostics {
     /// ``reserve_interest``, ``spread_account``, ``funding_account``,
     /// ``delinquent_balance``, ``servicer_advances_outstanding`` and
     /// ``excess_spread`` (annualized decimal);
-    /// amounts in currency units.
+    /// amounts in their stored currency units without FX conversion. Rows keep
+    /// stored period order and duplicate dates. Reserve interest uses the first
+    /// matching date in ``reserve_interest_paid``; missing matches are zero.
+    /// An empty result retains all nineteen columns with a string date and
+    /// float64 numeric dtypes.
     ///
     /// Returns
     /// -------
@@ -236,67 +240,12 @@ impl PySimulationDiagnostics {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the rows cannot be serialized.
+    ///     If the canonical table cannot be built or converted.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .periods
-            .iter()
-            .map(|period| {
-                let reserve_interest = self
-                    .inner
-                    .reserve_interest_paid
-                    .iter()
-                    .find(|(paid, _)| *paid == period.payment_date)
-                    .map_or(0.0, |(_, amount)| amount.amount());
-                serde_json::json!({
-                    "date": period.payment_date.to_string(),
-                    "pool_balance": period.pool_balance.amount(),
-                    "pool_factor": period.pool_factor,
-                    "wac": period.wac,
-                    "weighted_avg_spread_bp": period.weighted_avg_spread_bp,
-                    "warf": period.warf,
-                    "interest_collections": period.interest_collections.amount(),
-                    "principal_collections": period.principal_collections.amount(),
-                    "defaults": period.defaults.amount(),
-                    "recoveries": period.recoveries.amount(),
-                    "reinvested_par": period.reinvested_par.amount(),
-                    "fees_paid": period.fees_paid.amount(),
-                    "reserve_balance": period.reserve_balance.amount(),
-                    "reserve_interest": reserve_interest,
-                    "spread_account": period.spread_account.amount(),
-                    "funding_account": period.funding_account.amount(),
-                    "delinquent_balance": period.delinquent_balance.amount(),
-                    "servicer_advances_outstanding": period.servicer_advances_outstanding.amount(),
-                    "excess_spread": period.excess_spread,
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(
+        crate::bindings::pandas_utils::table_to_dataframe(
             py,
-            &rows,
-            &[
-                ("date", "str"),
-                ("pool_balance", "float64"),
-                ("pool_factor", "float64"),
-                ("wac", "float64"),
-                ("weighted_avg_spread_bp", "float64"),
-                ("warf", "float64"),
-                ("interest_collections", "float64"),
-                ("principal_collections", "float64"),
-                ("defaults", "float64"),
-                ("recoveries", "float64"),
-                ("reinvested_par", "float64"),
-                ("fees_paid", "float64"),
-                ("reserve_balance", "float64"),
-                ("reserve_interest", "float64"),
-                ("spread_account", "float64"),
-                ("funding_account", "float64"),
-                ("delinquent_balance", "float64"),
-                ("servicer_advances_outstanding", "float64"),
-                ("excess_spread", "float64"),
-            ],
+            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
         )
     }
 
