@@ -473,7 +473,7 @@ pub fn calendar_by_id_strict(id: &str) -> crate::Result<&'static dyn HolidayCale
 ///
 /// Returns `InputError::CalendarNotFound` (with suggestions) when `id` or any
 /// `+`-joined member is not a built-in calendar.
-pub(crate) fn canonical_calendar_id(id: &str) -> crate::Result<String> {
+pub fn canonical_calendar_id(id: &str) -> crate::Result<String> {
     let calendar = calendar_by_id_strict(id)?;
     Ok(match calendar.metadata() {
         Some(metadata) => metadata.id.to_string(),

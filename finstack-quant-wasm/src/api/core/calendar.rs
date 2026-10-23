@@ -9,7 +9,8 @@ use crate::utils::input::{js_epoch_days, js_int, js_string};
 use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, days_since_epoch as rust_days_since_epoch, DateExt, HolidayCalendar,
+    calendar_by_id_strict, canonical_calendar_id, days_since_epoch as rust_days_since_epoch,
+    DateExt, HolidayCalendar,
 };
 use wasm_bindgen::prelude::*;
 
@@ -55,11 +56,7 @@ impl JsHolidayCalendar {
     pub fn new(code: JsValue) -> Result<JsHolidayCalendar, JsValue> {
         let code = js_string(&code, "code")?;
         let calendar = calendar_by_id_strict(&code).map_err(to_js_err)?;
-        let code = calendar.calendar_id().ok_or_else(|| {
-            to_js_err(finstack_quant_core::Error::Validation(format!(
-                "calendar '{code}' has no canonical id"
-            )))
-        })?;
+        let code = canonical_calendar_id(&code).map_err(to_js_err)?;
         Ok(Self { calendar, code })
     }
 
