@@ -86,16 +86,16 @@ pub(in crate::builder) fn emit_fees_on(
                 let day_count_ctx = crate::builder::periods::period_day_count_context(
                     period,
                     pf.calendar,
-                    pf.frequency,
-                    pf.day_count,
-                    pf.stub,
-                    false,
-                    crate::builder::RollRule::None,
+                    pf.schedule.frequency,
+                    pf.schedule.day_count,
+                    pf.schedule.stub,
+                    pf.schedule.end_of_month,
+                    pf.schedule.roll_rule,
                     is_termination_date,
                 );
                 let coupon_period = day_count_ctx.coupon_period;
                 let yf = crate::builder::periods::contractual_accrual(
-                    pf.day_count,
+                    pf.schedule.day_count,
                     full_period,
                     accrual_start,
                     accrual_end,
@@ -135,10 +135,10 @@ pub(in crate::builder) fn emit_fees_on(
                         .with_accrual(CashFlowAccrual {
                             coupon_period,
                             end_is_termination_date: is_termination_date,
-                            calendar_id: Some(pf.calendar_id.clone()),
+                            calendar_id: Some(pf.schedule.calendar_id.to_string()),
                             start: accrual_start,
                             end: accrual_end,
-                            day_count: pf.day_count,
+                            day_count: pf.schedule.day_count,
                             projected_index_rate: None,
                         }),
                     );
@@ -155,9 +155,9 @@ mod tests {
     use super::*;
     use crate::builder::compiler::PeriodicFee;
     use crate::builder::periods::SchedulePeriod;
-    use crate::builder::specs::{FeeAccrualBasis, FeeBase};
+    use crate::builder::specs::{FeeAccrualBasis, FeeBase, ScheduleParams};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
     use rust_decimal_macros::dec;
     use time::Month;
 
@@ -180,12 +180,19 @@ mod tests {
             unadjusted_end: accrual_end,
         };
         PeriodicFee {
-            calendar_id: "weekends_only".to_owned(),
+            schedule: ScheduleParams {
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: "weekends_only".into(),
+                stub: finstack_quant_core::dates::StubKind::ShortBack,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+                roll_rule: crate::builder::RollRule::None,
+            },
             base,
             bp,
-            day_count: DayCount::Act360,
-            frequency: Tenor::quarterly(),
-            stub: finstack_quant_core::dates::StubKind::ShortBack,
             calendar: finstack_quant_core::dates::calendar_by_id_strict("weekends_only")
                 .expect("weekends_only calendar should resolve"),
             periods: vec![crate::builder::date_generation::CompiledPeriod {
@@ -210,7 +217,7 @@ mod tests {
             FeeAccrualBasis::TimeWeightedAverage,
             FeeBase::Drawn,
         );
-        fee.day_count = DayCount::ActAct;
+        fee.schedule.day_count = DayCount::ActAct;
         let mut flows = Vec::new();
         emit_fees_on(
             end,
