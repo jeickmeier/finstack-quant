@@ -418,7 +418,7 @@ fn test_validation_rejects_invalid_params() {
 /// boundary rather than silently degrading the pricer to the per-strike path.
 #[test]
 fn fourier_settings_rejects_unsupported_gl_order() {
-    let err = HestonFourierSettings::new(100.0, 100, 10, 1e-8)
+    let err = HestonFourierSettings::new(100.0, 100, 10)
         .expect_err("gl_order=10 has no Gauss-Legendre table and must be rejected");
     let msg = err.to_string();
     assert!(
@@ -429,7 +429,7 @@ fn fourier_settings_rejects_unsupported_gl_order() {
     // Supported orders construct successfully.
     for &order in &SUPPORTED_GL_ORDERS {
         assert!(
-            HestonFourierSettings::new(100.0, 100, order, 1e-8).is_ok(),
+            HestonFourierSettings::new(100.0, 100, order).is_ok(),
             "gl_order={order} should be accepted"
         );
     }
@@ -438,9 +438,10 @@ fn fourier_settings_rejects_unsupported_gl_order() {
 /// W-02: `validate` rejects degenerate `panels` / `u_max` too.
 #[test]
 fn fourier_settings_rejects_degenerate_grid() {
-    assert!(HestonFourierSettings::new(100.0, 0, 16, 1e-8).is_err());
-    assert!(HestonFourierSettings::new(0.0, 100, 16, 1e-8).is_err());
-    assert!(HestonFourierSettings::new(f64::NAN, 100, 16, 1e-8).is_err());
+    assert!(HestonFourierSettings::new(100.0, 0, 16).is_err());
+    assert!(HestonFourierSettings::new(0.0, 100, 16).is_err());
+    assert!(HestonFourierSettings::new(f64::NAN, 100, 16).is_err());
+    assert!(HestonFourierSettings::new(f64::from_bits(1), 100, 16).is_err());
     // The default settings must always be valid.
     assert!(HestonFourierSettings::default().validate().is_ok());
 }
@@ -677,7 +678,7 @@ fn gil_pelaez_exposes_truncation_tail_diagnostic() {
 
     // Short maturity with a deliberately too-small u_max: the integrand has
     // not decayed by u_max, so the truncation tail is non-negligible.
-    let coarse = HestonFourierSettings::new(8.0, 40, 16, 1e-8).expect("valid settings");
+    let coarse = HestonFourierSettings::new(8.0, 40, 16).expect("valid settings");
     let diag = heston_pj_with_diagnostics(1, 100.0, 100.0, 0.02, &params, &coarse);
     assert!(
         diag.probability.is_finite() && diag.raw_probability.is_finite(),
@@ -729,7 +730,7 @@ fn low_variance_settings_match_high_umax_reference() {
         "low v0 must widen u_max beyond the maturity-bucket default"
     );
 
-    let reference = HestonFourierSettings::new(2000.0, 2000, 16, 1e-8).expect("valid");
+    let reference = HestonFourierSettings::new(2000.0, 2000, 16).expect("valid");
     let price = heston_call_price_fourier(spot, strike, time, &params, None)
         .expect("Heston Fourier call price");
     let ref_price = heston_call_price_fourier(spot, strike, time, &params, Some(&reference))
@@ -792,15 +793,12 @@ fn heston_small_vol_of_vol_is_continuous_to_deterministic_variance() {
 }
 
 #[test]
-fn heston_rejects_unresolved_grids_and_invalid_origin_tolerances() {
+fn heston_rejects_unresolved_grids_and_invalid_spots() {
     let params = HestonPricingParams::new(0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
-    let coarse = HestonFourierSettings::new(8.0, 40, 16, 1e-8).expect("valid grid");
+    let coarse = HestonFourierSettings::new(8.0, 40, 16).expect("valid grid");
     let cached = HestonStripPricer::new(100.0, 0.0001, &params, &coarse).expect("valid cache");
     assert!(cached.price_call(100.0).is_err());
     assert!(heston_call_price_fourier(100.0, 100.0, 0.0001, &params, Some(&coarse)).is_err());
-    for phi_eps in [f64::NAN, f64::INFINITY, -1.0, 100.0] {
-        assert!(HestonFourierSettings::new(100.0, 100, 16, phi_eps).is_err());
-    }
     for bad in [f64::NAN, f64::INFINITY, -100.0, 0.0] {
         assert!(heston_call_price_fourier(bad, 100.0, 0.0, &params, None).is_err());
         assert!(heston_call_price_fourier(100.0, bad, 1.0, &params, None).is_err());
