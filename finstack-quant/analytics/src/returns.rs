@@ -14,7 +14,8 @@ use finstack_quant_core::math::summation::NeumaierAccumulator;
 /// pairs 1:1 with the return-aligned date grid used by
 /// [`crate::Performance::new`].
 ///
-/// Non-positive or non-finite prices produce `NaN` for that element.
+/// Callers pass a validated span of finite positive prices; a price ratio
+/// that overflows or underflows yields `NaN` for that element.
 ///
 /// # Arguments
 ///
@@ -30,17 +31,11 @@ pub(crate) fn pairwise_returns(prices: &[f64]) -> Vec<f64> {
     }
     let mut out = Vec::with_capacity(prices.len() - 1);
     for w in prices.windows(2) {
-        let p0 = w[0];
-        let p1 = w[1];
-        if p0 <= 0.0 || !p0.is_finite() || !p1.is_finite() {
+        let ratio = w[1] / w[0];
+        if !ratio.is_finite() || ratio <= 0.0 {
             out.push(f64::NAN);
         } else {
-            let ratio = p1 / p0;
-            if !ratio.is_finite() || ratio <= 0.0 {
-                out.push(f64::NAN);
-            } else {
-                out.push(ratio - 1.0);
-            }
+            out.push(ratio - 1.0);
         }
     }
     out
@@ -64,11 +59,12 @@ pub(crate) fn pairwise_returns(prices: &[f64]) -> Vec<f64> {
 ///
 /// # Returns
 ///
-/// The equivalent one-period simple rate. Returns [`f64::NAN`] when either
-/// input is non-finite or `ann_factor` is not strictly positive.
+/// The equivalent one-period simple rate. Returns [`f64::NAN`] when
+/// `risk_free_rate` is non-finite; `ann_factor` is a positive finite
+/// periods-per-year count supplied by every caller.
 #[must_use]
 pub(crate) fn periodic_risk_free_rate(risk_free_rate: f64, ann_factor: f64) -> f64 {
-    if !risk_free_rate.is_finite() || !ann_factor.is_finite() || ann_factor <= 0.0 {
+    if !risk_free_rate.is_finite() {
         return f64::NAN;
     }
     if (ann_factor - 1.0).abs() <= f64::EPSILON {
@@ -286,7 +282,6 @@ mod tests {
     fn periodic_risk_free_rate_geometric_decompound() {
         let rf_period = periodic_risk_free_rate(0.02, 252.0);
         assert!((rf_period - (1.02_f64.powf(1.0 / 252.0) - 1.0)).abs() < 1e-15);
-        assert!(periodic_risk_free_rate(0.02, 0.0).is_nan());
         assert!(periodic_risk_free_rate(f64::NAN, 252.0).is_nan());
     }
 
