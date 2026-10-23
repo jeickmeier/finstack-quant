@@ -672,7 +672,7 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
             hull_white.hw_bond_vol(0.05, 0.01, 0.0, 1.0, 5.0),
             hull_white.hw1f_zcb_option_price(0.95, 0.80, 0.84, 0.02, True),
             hull_white.hw1f_caplet_forward_rate_normal_vol(0.05, 0.01, 1.0, 0.25),
-            hull_white.hw1f_cap_floor_price(0.05, 0.01, CAP_PERIODS, 0.03, True, curve(0.03)),
+            hull_white.hw1f_cap_floor_price(0.05, 0.01, CAP_PERIODS, 0.03, True, curve(0.03), curve(0.03)),
             hull_white.hw1f_cap_floor_price(0.05, 0.01, CAP_PERIODS, 0.03, False, curve(0.03), curve(0.035)),
         ],
         "dtsm.yield_panel": lambda: [

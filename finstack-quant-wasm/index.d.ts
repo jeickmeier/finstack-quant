@@ -28292,17 +28292,15 @@ export interface HullWhiteNamespace {
   /**
    * Price of a cap or floor under Hull-White one-factor, per unit notional.
    *
-   * The facade makes `forwardCurve` optional and passes the discount curve when
-   * it is omitted, as Python does.
    * @param kappa - Mean-reversion speed per year; positive.
    * @param sigma - Short-rate volatility per square-root year, as a decimal; positive.
    * @param periods - Array of `[tFix, tPay, accrual]` triples in years, one per caplet or floorlet.
    * @param strike - Cap or floor strike rate, as a decimal.
    * @param isCap - `true` for a cap, `false` for a floor.
    * @param discountCurve - `core.DiscountCurve` handle used to discount the payoffs.
-   * @param forwardCurve - `core.DiscountCurve` handle that projects the forward rates.
+   * @param forwardCurve - `core.DiscountCurve` handle projecting forward rates; pass the discount curve explicitly for single-curve pricing.
    * @returns The cap or floor price per unit notional.
-   * @throws Error - Throws a `validation` error if `kappa` or `sigma` is out of range or `periods` is malformed.
+   * @throws Error - Throws an error if either required curve handle is missing or has the wrong type. Throws a `validation` error if `kappa` or `sigma` is out of range or `periods` is malformed.
    */
   hw1fCapFloorPrice(
     kappa: number,
@@ -28311,7 +28309,7 @@ export interface HullWhiteNamespace {
     strike: number,
     isCap: boolean,
     discountCurve: DiscountCurve,
-    forwardCurve?: DiscountCurve
+    forwardCurve: DiscountCurve
   ): number;
   /**
    * Normal volatility of a caplet's forward rate implied by Hull-White one-factor.

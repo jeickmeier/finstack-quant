@@ -272,9 +272,9 @@ fn hw1f_caplet_forward_rate_normal_vol(kappa: f64, sigma: f64, t_fix: f64, accru
 ///     ``True`` prices a cap, ``False`` a floor.
 /// discount_curve : DiscountCurve
 ///     Discounting curve queried at ``t_pay``.
-/// forward_curve : DiscountCurve | None, default ``None``
-///     Projection curve for the forward rates; ``None`` reuses
-///     ``discount_curve`` (single-curve).
+/// forward_curve : DiscountCurve
+///     Projection curve for forward rates. Pass ``discount_curve`` explicitly
+///     for single-curve pricing, or a distinct projection curve for two-curve pricing.
 ///
 /// Returns
 /// -------
@@ -286,11 +286,11 @@ fn hw1f_caplet_forward_rate_normal_vol(kappa: f64, sigma: f64, t_fix: f64, accru
 /// ------
 /// ValueError
 ///     If ``kappa`` or ``sigma`` is non-finite or not strictly positive.
+/// TypeError
+///     If either required curve is omitted, ``None``, or not a ``DiscountCurve``.
 #[pyfunction]
-#[pyo3(signature = (kappa, sigma, periods, strike, is_cap, discount_curve, forward_curve = None))]
-#[pyo3(
-    text_signature = "(kappa, sigma, periods, strike, is_cap, discount_curve, forward_curve=None)"
-)]
+#[pyo3(signature = (kappa, sigma, periods, strike, is_cap, discount_curve, forward_curve))]
+#[pyo3(text_signature = "(kappa, sigma, periods, strike, is_cap, discount_curve, forward_curve)")]
 #[allow(clippy::too_many_arguments)]
 fn hw1f_cap_floor_price(
     kappa: f64,
@@ -299,14 +299,11 @@ fn hw1f_cap_floor_price(
     strike: f64,
     is_cap: bool,
     discount_curve: PyRef<'_, PyDiscountCurve>,
-    forward_curve: Option<PyRef<'_, PyDiscountCurve>>,
+    forward_curve: PyRef<'_, PyDiscountCurve>,
 ) -> PyResult<f64> {
     let params = HullWhiteCalibrationParams::new(kappa, sigma).map_err(core_to_py)?;
     let discount = std::sync::Arc::clone(&discount_curve.inner);
-    let forward = forward_curve.map_or_else(
-        || std::sync::Arc::clone(&discount_curve.inner),
-        |curve| std::sync::Arc::clone(&curve.inner),
-    );
+    let forward = std::sync::Arc::clone(&forward_curve.inner);
     let discount_df = |t: f64| discount.df(t);
     let forward_df = |t: f64| forward.df(t);
     Ok(hull_white::hw1f_cap_floor_price(

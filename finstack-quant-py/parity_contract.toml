@@ -584,10 +584,9 @@ public = ["dtsm", "hull_white"]
 # `capfloor_hw1f_sigma_schedule_key`), `hw_b`, `hw_ln_a`,
 # `fd_instantaneous_forward`, `hw1f_caplet_price_from_dfs`,
 # `hw1f_term_caplet_price_from_dfs_with_model`,
-# `hw1f_delayed_coupon_adjustment` (shared delayed-payment pricing kernel),
-# and `hw1f_cap_floor_price_with_model`. WASM binds the same names under
-# `models.rates.hullWhite`; its facade makes `forwardCurve` optional because
-# wasm-bindgen cannot borrow an optional handle.
+# and `hw1f_delayed_coupon_adjustment` (shared delayed-payment pricing kernel).
+# WASM binds the same names under `models.rates.hullWhite`; both hosts require
+# explicit discount and forward curves, including single-curve calls.
 [crates.models.rates.hull_white]
 python_package = "finstack_quant.models.rates.hull_white"
 public = [
