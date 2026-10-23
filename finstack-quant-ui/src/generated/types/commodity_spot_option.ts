@@ -519,6 +519,8 @@ export interface D_24D6Afbb949D55F73647 {
  *
  * For American exercise, the model requires a spot price to build the binomial tree.
  * `spot_id` must identify an observed spot for early exercise and Monte Carlo.
+ * A numeric scalar is in the underlying currency; a Money scalar must carry
+ * that same currency.
  * The commodity forward is never substituted for the spot underlying.
  * The convenience yield (cost-of-carry) is implied from the forward/spot ratio:
  * `q = r - ln(F/S)/T`
@@ -587,6 +589,7 @@ export interface D_6990E6C5E63D5457943C {
   settlement: "physical" | "cash";
   /**
    * Optional spot price ID (for spot-based pricing and American options).
+   * Numeric prices use the underlying currency; Money prices must match it.
    */
   spot_id?: Id3 | null;
   /**
