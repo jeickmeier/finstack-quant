@@ -5,7 +5,7 @@
 //! and business day arithmetic. All methods are allocation-free.
 
 use crate::dates::calendar::business_days::{
-    adjustment_failed, seek_business_day, BusinessDayConvention, MAX_BUSINESS_DAY_SEARCH_DAYS,
+    adjustment_failed, seek_business_day, BusinessDayConvention,
 };
 use crate::dates::periods::FiscalConfig;
 use time::{Date, Duration, Month};
@@ -277,8 +277,8 @@ impl DateExt for Date {
             } else {
                 BusinessDayConvention::Preceding
             };
-            current = seek_business_day(start, step, MAX_BUSINESS_DAY_SEARCH_DAYS, cal)
-                .ok_or_else(|| adjustment_failed(self, conv))?;
+            current =
+                seek_business_day(start, step, cal).ok_or_else(|| adjustment_failed(self, conv))?;
         }
         Ok(current)
     }
@@ -300,6 +300,7 @@ impl DateExt for Date {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dates::calendar::business_days::MAX_BUSINESS_DAY_SEARCH_DAYS;
     use time::Date;
 
     fn make_date(y: i32, m: u8, d: u8) -> Date {

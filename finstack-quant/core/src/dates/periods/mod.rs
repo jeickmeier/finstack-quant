@@ -571,15 +571,16 @@ impl PeriodId {
 /// Always holds a start month in `1..=12` and a start day in `1..=31`;
 /// deserialization applies the same validation as [`FiscalConfig::new`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(try_from = "FiscalConfigFields")]
+#[serde(try_from = "FiscalConfigFields", into = "FiscalConfigFields")]
 pub struct FiscalConfig {
-    /// The month when the fiscal year starts (1-12).
-    start_month: u8,
+    /// The month when the fiscal year starts.
+    start_month: Month,
     /// The day of the month when the fiscal year starts (1-31).
     start_day: u8,
 }
 
-#[derive(serde::Deserialize)]
+/// Wire shape of [`FiscalConfig`]: plain month and day numbers.
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FiscalConfigFields {
     start_month: u8,
@@ -591,6 +592,15 @@ impl TryFrom<FiscalConfigFields> for FiscalConfig {
 
     fn try_from(fields: FiscalConfigFields) -> crate::Result<Self> {
         Self::new(fields.start_month, fields.start_day)
+    }
+}
+
+impl From<FiscalConfig> for FiscalConfigFields {
+    fn from(config: FiscalConfig) -> Self {
+        Self {
+            start_month: config.start_month(),
+            start_day: config.start_day,
+        }
     }
 }
 
@@ -618,11 +628,11 @@ impl FiscalConfig {
     /// Returns `Error::Validation` naming the offending value when
     /// `start_month` is outside `1..=12` or `start_day` is outside `1..=31`.
     pub fn new(start_month: u8, start_day: u8) -> crate::Result<Self> {
-        if !(1..=12).contains(&start_month) {
-            return Err(crate::Error::Validation(format!(
+        let start_month = Month::try_from(start_month).map_err(|_| {
+            crate::Error::Validation(format!(
                 "fiscal start_month must be in 1..=12, got {start_month}"
-            )));
-        }
+            ))
+        })?;
         if !(1..=31).contains(&start_day) {
             return Err(crate::Error::Validation(format!(
                 "fiscal start_day must be in 1..=31, got {start_day}"
@@ -669,7 +679,7 @@ impl FiscalConfig {
 
     /// Month the fiscal year starts in (1 = January … 12).
     pub fn start_month(&self) -> u8 {
-        self.start_month
+        self.start_month as u8
     }
 
     /// Day of [`Self::start_month`] the fiscal year starts on (1-31).
@@ -693,28 +703,22 @@ impl FiscalConfig {
     /// Returns `Error::Validation` when the start date falls outside the
     /// supported calendar range.
     pub fn year_start(self, fiscal_year: i32) -> crate::Result<Date> {
-        let calendar_year = if self.start_month == 1 && self.start_day == 1 {
+        let calendar_year = if self.start_month == Month::January && self.start_day == 1 {
             fiscal_year
         } else {
             checked_year_offset(fiscal_year, -1)?
         };
-        let month = Month::try_from(self.start_month).map_err(|_| {
-            crate::Error::Validation(format!(
-                "fiscal start_month must be in 1..=12, got {}",
-                self.start_month
-            ))
-        })?;
         crate::dates::create_date(
             calendar_year,
-            month,
-            self.start_day.min(month.length(calendar_year)),
+            self.start_month,
+            self.start_day.min(self.start_month.length(calendar_year)),
         )
     }
 
     /// Standard calendar year (January 1).
     pub fn calendar_year() -> Self {
         Self {
-            start_month: 1,
+            start_month: Month::January,
             start_day: 1,
         }
     }
@@ -722,7 +726,7 @@ impl FiscalConfig {
     /// US Federal fiscal year (October 1).
     pub fn us_federal() -> Self {
         Self {
-            start_month: 10,
+            start_month: Month::October,
             start_day: 1,
         }
     }
@@ -730,7 +734,7 @@ impl FiscalConfig {
     /// UK fiscal year (April 6).
     pub fn uk() -> Self {
         Self {
-            start_month: 4,
+            start_month: Month::April,
             start_day: 6,
         }
     }
@@ -738,7 +742,7 @@ impl FiscalConfig {
     /// Japanese fiscal year (April 1).
     pub fn japan() -> Self {
         Self {
-            start_month: 4,
+            start_month: Month::April,
             start_day: 1,
         }
     }
@@ -746,7 +750,7 @@ impl FiscalConfig {
     /// Australian fiscal year (July 1).
     pub fn australia() -> Self {
         Self {
-            start_month: 7,
+            start_month: Month::July,
             start_day: 1,
         }
     }

@@ -22,7 +22,10 @@ pub(super) mod calendars_generated {
     include!(concat!(env!("OUT_DIR"), "/calendars.rs"));
 }
 
-pub use calendars_generated::*;
+pub use calendars_generated::WEEKENDS_ONLY;
+// Crate-internal access to the generated market calendars for the tests.
+#[cfg(test)]
+pub(crate) use calendars_generated::*;
 
 /// Identifier of the holiday-free [`WEEKENDS_ONLY`] calendar.
 ///
