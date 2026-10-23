@@ -473,7 +473,7 @@ pub fn get_unitless_scalar_strict(
 /// Pricing options, dispatch and pricer-published measures handed from the
 /// registry to [`compute_metrics_dyn`].
 #[derive(Default)]
-pub struct MetricBuildOptions {
+pub(crate) struct MetricBuildOptions {
     /// Config, market history and recalibration provider for the metric context.
     pub pricing: PricingOptions,
     /// Pricer dispatch metric calculators use when they reprice bumped markets.
@@ -515,7 +515,7 @@ pub struct MetricBuildOptions {
 /// registered, `Error::MetricNotApplicable` when it is registered but has no
 /// calculator for this instrument type, and `Error::MetricCalculationFailed`
 /// when a calculator runs and fails (for example on a missing market input).
-pub fn compute_metrics_dyn(
+pub(crate) fn compute_metrics_dyn(
     instrument: Arc<dyn crate::instruments::Instrument>,
     curves: Arc<MarketContext>,
     as_of: Date,
@@ -642,7 +642,7 @@ pub fn compute_metrics_dyn(
 /// Production pricing enriches the model-produced result envelope in the
 /// registry and must not construct a parallel `ValuationResult` here.
 #[cfg(test)]
-pub fn build_with_metrics_dyn(
+pub(crate) fn build_with_metrics_dyn(
     instrument: Arc<dyn crate::instruments::Instrument>,
     curves: Arc<MarketContext>,
     as_of: Date,
