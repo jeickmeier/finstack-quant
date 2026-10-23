@@ -14,6 +14,7 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations::recalibration::QuoteBump;
+use finstack_quant_valuations_test_support::assertions::assert_finite;
 use time::macros::date;
 
 fn quote_calibrated_discount(rate: f64, as_of: finstack_quant_core::dates::Date) -> DiscountCurve {
