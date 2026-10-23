@@ -161,47 +161,6 @@ pub enum CashflowRepresentation {
     NoResidual,
 }
 
-impl CashflowRepresentation {
-    /// Serde `snake_case` wire label for this representation.
-    ///
-    /// Returns `contractual`, `projected`, `placeholder`, or `no_residual`.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Contractual => "contractual",
-            Self::Projected => "projected",
-            Self::Placeholder => "placeholder",
-            Self::NoResidual => "no_residual",
-        }
-    }
-}
-
-impl std::fmt::Display for CashflowRepresentation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl std::str::FromStr for CashflowRepresentation {
-    type Err = finstack_quant_core::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        [
-            Self::Contractual,
-            Self::Projected,
-            Self::Placeholder,
-            Self::NoResidual,
-        ]
-        .into_iter()
-        .find(|representation| representation.as_str() == s)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "invalid cashflow representation {s:?}; expected contractual, projected, placeholder, or no_residual"
-            ))
-        })
-    }
-}
-
 /// Metadata shared by an entire cashflow schedule.
 ///
 /// Tracks referenced calendar IDs, optional facility limits, and the instrument's

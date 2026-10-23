@@ -171,8 +171,9 @@ pub fn adjust_overnight_accrual_boundaries(
 fn shifted_observation_days(compounding: &FloatingLegCompounding) -> Result<(i32, bool)> {
     match compounding {
         FloatingLegCompounding::Simple | FloatingLegCompounding::SimpleAverage => {
+            let tag = finstack_quant_core::wire::serde_tag(compounding)?;
             Err(finstack_quant_core::Error::Validation(format!(
-                "Overnight coupon projection requires a compounded convention, not {compounding}"
+                "Overnight coupon projection requires a compounded convention, not {tag}"
             )))
         }
         FloatingLegCompounding::CompoundedInArrears { lookback_days } => {
