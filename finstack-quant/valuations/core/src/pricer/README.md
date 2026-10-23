@@ -40,7 +40,7 @@ the key types and `PricingError`, so the two are mutually recursive by design;
 the split is by role, not by dependency layer.
 
 Not to be confused with `finstack_quant_models::monte_carlo::pricer`
-(`EuropeanPricer`, `LsmcPricer`, `basis`, `path_dependent`) — a different module
+(`EuropeanPricer`, `LsmcEngine`, `LsmcPricer`, `basis`, `path_dependent`) — a different module
 in a different crate, reached by the MC instrument pricers.
 
 ## Layout

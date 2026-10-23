@@ -159,6 +159,7 @@ import type {
 } from './types/generated/margin/index.js';
 import type {
   ArbitrageValidationResult,
+  SabrCalibrationOutcome,
   BsGreeks,
   BumpSizeConfig,
   ExchangeOfferAnalysis,
@@ -390,6 +391,7 @@ export type {
 };
 export type {
   ArbitrageValidationResult,
+  SabrCalibrationOutcome,
   BsGreeks,
   BumpSizeConfig,
   ExchangeOfferAnalysis,
@@ -10413,11 +10415,11 @@ export interface RecoveryModel extends WasmOwned {
    */
   readonly lgd: number;
   /**
-   * Recovery-rate volatility scale (0 for constant models).
+   * Local recovery shock scale in decimals, not realized recovery standard deviation.
    */
   readonly recoveryVolatility: number;
   /**
-   * Whether recovery varies with the market factor.
+   * Whether the recovery distribution is nonconstant, including obligor-only variation.
    */
   readonly isStochastic: boolean;
   /**
@@ -10426,16 +10428,30 @@ export interface RecoveryModel extends WasmOwned {
   readonly modelName: string;
   /**
    * Recovery conditional on the systematic market factor.
-   * @returns Conditional recovery rate as a fraction of par in `[0, 1]`.
    * @param marketFactor - Realized standardized market factor used to condition recovery or loss given default.
+   * @returns Conditional mean recovery in `[0, 1]`.
+   * @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
    */
   conditionalRecovery(marketFactor: number): number;
   /**
    * Conditional LGD given market factor.
-   * @returns Conditional loss-given-default as a fraction of par in `[0, 1]`.
    * @param marketFactor - Realized standardized market factor used to condition recovery or loss given default.
+   * @returns One minus conditional mean recovery.
+   * @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
    */
   conditionalLgd(marketFactor: number): number;
+  /**
+   * Whether sampling needs an independent obligor recovery draw.
+   */
+  readonly hasIdiosyncraticDispersion: boolean;
+  /**
+   * Sample bounded recovery from the canonical logistic-normal law.
+   * @param marketFactor - Finite systematic standard-normal shock; low values represent credit stress.
+   * @param idiosyncraticNormal - Finite independent obligor standard-normal shock; ignored for constant or perfectly systematic models.
+   * @returns Sampled recovery as a decimal fraction of notional in `[0, 1]`.
+   * @throws Throws a `validation` error if either shock is non-finite.
+   */
+  sampleRecovery(marketFactor: number, idiosyncraticNormal: number): number;
 }
 
 /**
@@ -10443,19 +10459,9 @@ export interface RecoveryModel extends WasmOwned {
  */
 export interface RecoverySpec extends WasmOwned {
   /**
-   * Location-parameter recovery rate of this spec.
-   *
-   * For a constant spec this is the constant rate. For a
-   * market-correlated spec this returns the `mean` input — the target
-   * recovery at factor `Z = 0` — which differs from the Jensen-corrected
-   * unconditional mean `E_Z[R(Z)]` whenever the factor sensitivity is
-   * non-zero. For the true unconditional mean call
-   * `build().expectedRecovery`.
-   */
-  readonly expectedRecovery: number;
-  /**
    * Build a concrete recovery model from this specification.
-   * @returns A concrete `RecoveryModel` handle.
+   * @returns The validated recovery-model handle.
+   * @throws Error - Throws a `validation` error for invalid recovery inputs, or a `computation` error if expected-recovery integration fails.
    */
   build(): RecoveryModel;
   /**
@@ -10497,10 +10503,10 @@ export interface RecoverySpecConstructor {
    * Throws if `mean` is not finite or lies outside `[0, 1]`, or if `vol` /
    * `correlation` are not finite.
    * @returns A `RecoverySpec` handle for deferred construction.
-   * @param mean - Mean recovery rate expressed as a fraction from 0 through 1.
-   * @param vol - Recovery-rate volatility; finite values are clamped to `[0, 0.5]`.
-   * @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are clamped.
-   * @throws Error - Throws a JavaScript exception if `mean` is not finite or lies outside `[0, 1]`, or if `vol` or `correlation` is non-finite. Finite volatility and correlation inputs are clamped to their supported ranges.
+   * @param mean - Zero-total-shock recovery location in `[0, 1]`; this is not the unconditional mean.
+   * @param vol - Local shock scale, finite in `[0, 0.5]`; this is not the realized recovery standard deviation.
+   * @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are rejected.
+   * @throws Error - Throws a JavaScript exception if `mean` is not finite or lies outside `[0, 1]`, or if `vol` or `correlation` is non-finite or outside its supported range.
    */
   marketCorrelated(mean: number, vol: number, correlation: number): RecoverySpec;
   /**
@@ -10775,7 +10781,7 @@ export interface LatentFactorSpec extends WasmOwned {
   /**
    * Build the concrete latent-factor model.
    * @returns The `LatentFactorKind` handle.
-   * @throws Error - Throws a `validation` error if a multi-factor specification has an invalid correlation matrix or volatility vector.
+   * @throws Error - Throws a `validation` error if the specification contains an invalid volatility, mean-reversion speed, correlation, count or matrix.
    */
   build(): LatentFactorKind;
   /**
@@ -10805,7 +10811,7 @@ export interface LatentFactorSpecConstructor {
    * @param volatility - Annualized factor volatility as a decimal; non-negative.
    * @param meanReversion - Mean-reversion speed per year; non-negative.
    * @returns The single-factor specification.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   singleFactor(volatility: number, meanReversion: number): LatentFactorSpec;
   /**
@@ -10814,7 +10820,7 @@ export interface LatentFactorSpecConstructor {
    * @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
    * @param correlation - Correlation between the two factors, from -1 through 1.
    * @returns The two-factor specification.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   twoFactor(prepayVol: number, creditVol: number, correlation: number): LatentFactorSpec;
 }
@@ -10875,10 +10881,10 @@ export interface LatentMultiFactorConstructor {
   ): LatentMultiFactor;
   /**
    * Model with independent factors (identity correlation).
-   * @param numFactors - Number of systematic factors; a non-negative safe integer, with zero resolving to one.
+   * @param numFactors - Positive number of systematic factors; zero is rejected.
    * @param volatilities - Annualized factor volatilities, one per factor; must be finite, non-negative and match the factor count.
    * @returns The uncorrelated multi-factor model.
-   * @throws Error - Throws a `TypeError` if `numFactors` is not a safe non-negative integer or `volatilities` is not an array of numbers. Throws a validation error for a length mismatch, negative or non-finite volatility.
+   * @throws Error - Throws a `TypeError` if `numFactors` is not a safe non-negative integer or `volatilities` is not an array of numbers. Throws a validation error for a zero factor count, a length mismatch, or negative or non-finite volatility.
    */
   uncorrelated(numFactors: number, volatilities: NumericArray): LatentMultiFactor;
 }
@@ -10922,7 +10928,7 @@ export interface LatentSingleFactorConstructor {
    * @returns Returns a `LatentSingleFactor` handle.
    * @param volatility - Annualized factor volatility as a decimal; non-negative.
    * @param meanReversion - Mean-reversion speed per year; non-negative.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   new (volatility: number, meanReversion: number): LatentSingleFactor;
 }
@@ -10979,7 +10985,7 @@ export interface LatentTwoFactorConstructor {
    * @param prepayVol - Annualized prepayment-factor volatility as a decimal; non-negative.
    * @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
    * @param correlation - Correlation between the two factors, from -1 through 1.
-   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, or a `validation` error if a model input is non-finite or outside its documented range.
    */
   new (prepayVol: number, creditVol: number, correlation: number): LatentTwoFactor;
   /**
@@ -24807,12 +24813,12 @@ export interface SabrCalibrator extends WasmOwned {
   withMaxIterations(maxIterations: number): SabrCalibrator;
   /**
    * Calibrate `(alpha, nu, rho)` to market vols with `beta` fixed.
-   * @returns A `SabrParameters` handle.
    * @param forward - Forward price or rate in the same quote convention as the strike.
    * @param strikes - Option strikes aligned one-for-one with market_vols.
-   * @param marketVols - Market-implied annualized volatilities aligned one-for-one with strikes.
-   * @param t - Time from the curve base date in years.
-   * @param beta - SABR CEV elasticity parameter held fixed during calibration.
+   * @param marketVols - Positive quotes aligned with strikes: absolute decimal-rate normal volatilities for beta near zero, otherwise annual Black volatilities in relative decimals.
+   * @param t - Positive time to expiry in years.
+   * @param beta - SABR CEV elasticity in `[0, 1]`, held fixed during calibration.
+   * @returns Calibrated parameters, signed model-minus-market quote errors, and deterministic solver diagnostics.
    * @throws Error - Throws a JavaScript exception if the strike and volatility lengths differ, the quote arrays are empty, the SABR inputs or fitted parameters are invalid, or the calibration solver does not converge.
    */
   calibrate(
@@ -24821,7 +24827,7 @@ export interface SabrCalibrator extends WasmOwned {
     marketVols: number[],
     t: number,
     beta: number
-  ): SabrParameters;
+  ): SabrCalibrationOutcome;
   /**
    * Return a copy of this calibrator with an overridden displacement policy,
    * preserving all other settings.
@@ -25086,17 +25092,11 @@ export interface DownturnLgdConstructor {
    */
   readonly prototype: DownturnLgd;
   /**
-   * Basel downturn calibration for secured exposures.
-   * @returns The registry's Basel secured downturn adjustment.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the calibration.
+   * Load the calibration selected by the embedded registry's default ID.
+   * @returns The registry-selected calibration handle.
+   * @throws Error - Throws a `validation` error if the registry or its configured default is malformed.
    */
-  baselSecured(): DownturnLgd;
-  /**
-   * Basel downturn calibration for unsecured exposures.
-   * @returns The registry's Basel unsecured downturn adjustment.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the calibration.
-   */
-  baselUnsecured(): DownturnLgd;
+  defaultCalibration(): DownturnLgd;
   /**
    * Load a downturn adjustment from canonical JSON and validate its parameters.
    * @param json - Canonical JSON for this type, as JSON text or a plain object.
@@ -25463,7 +25463,7 @@ export interface GeneratorMatrix extends WasmOwned {
    * @returns An array of `number[]` rows in scale order.
    * @throws Error - Throws a `validation` error if the rows cannot be converted.
    */
-  toMatrix(): number[][];
+  toRows(): number[][];
   /**
    * Number of states in the scale.
    */
@@ -25620,17 +25620,11 @@ export interface MasterScaleConstructor {
    */
   fromRegistryId(scaleId: string): MasterScale;
   /**
-   * Moody's-style master scale from the embedded credit-assumption registry.
-   * @returns The Moody's assumptions master scale.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the scale.
+   * Load the calibration selected by the embedded registry's default ID.
+   * @returns The registry-selected calibration handle.
+   * @throws Error - Throws a `validation` error if the registry or its configured default is malformed.
    */
-  moodysAssumptions(): MasterScale;
-  /**
-   * S&P-style master scale from the embedded credit-assumption registry.
-   * @returns The S&P assumptions master scale.
-   * @throws Error - Throws a `validation` error if the registry cannot supply the scale.
-   */
-  spAssumptions(): MasterScale;
+  defaultCalibration(): MasterScale;
 }
 
 /**
@@ -26114,7 +26108,7 @@ export interface RatingFactorTable extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const table = models.credit.RatingFactorTable.moodysStandard();
+ * const table = models.credit.RatingFactorTable.defaultCalibration();
  * console.log(table.agency, table.getFactor("B2"));
  * table.free();
  * ```
@@ -26143,11 +26137,11 @@ export interface RatingFactorTableConstructor {
    */
   fromRegistryId(id: string): RatingFactorTable;
   /**
-   * Moody's standard WARF table from the embedded credit-assumption registry.
-   * @returns The Moody's standard rating-factor table.
-   * @throws Error - Throws a `validation` error if the embedded registry cannot supply the table.
+   * Load the calibration selected by the embedded registry's default ID.
+   * @returns The registry-selected calibration handle.
+   * @throws Error - Throws a `validation` error if the registry or its configured default is malformed.
    */
-  moodysStandard(): RatingFactorTable;
+  defaultCalibration(): RatingFactorTable;
 }
 
 /**
@@ -26654,7 +26648,7 @@ export interface TransitionMatrix extends WasmOwned {
    * @returns An array of `number[]` rows in scale order.
    * @throws Error - Throws a `validation` error if the rows cannot be converted.
    */
-  toMatrix(): number[][];
+  toRows(): number[][];
   /**
    * Horizon the probabilities apply to, in years.
    */
@@ -26698,6 +26692,26 @@ export interface TransitionMatrixConstructor {
    * @throws Error - Throws a `validation` error if the dimensions do not match the scale, an entry is outside `[0, 1]`, a row does not sum to one, the default state is not absorbing, or `horizon` is not positive.
    */
   new (scale: RatingScale, data: NumericArray | NumericArray[], horizon: number): TransitionMatrix;
+  /**
+   * Build a transition matrix whose row, column and optional scale labels agree in order.
+   * @example
+   * const matrix = models.credit.migration.TransitionMatrix.fromLabeled(['A', 'D'], ['A', 'D'], [[0.9, 0.1], [0, 1]], 1);
+   * console.log(matrix.probability('A', 'D')); // 0.1
+   * @param rowLabels - Ordered origin labels, one per row.
+   * @param columnLabels - Ordered destination labels; must equal `rowLabels` exactly.
+   * @param data - Flat row-major probabilities or square nested rows; each row sums to one.
+   * @param horizon - Positive finite horizon in years covered by the probabilities.
+   * @param scale - Optional `RatingScale` JSON text or plain object, such as `scale.toJson()`; its labels must match both vectors in order. Omit to infer a custom scale with the last label absorbing.
+   * @returns The validated transition-matrix handle; no entries are reordered.
+   * @throws Error - Throws a `TypeError` for invalid host input types, or a `validation` error for differing label orders, invalid labels, matrix dimensions, probabilities, horizon or absorbing default row.
+   */
+  fromLabeled(
+    rowLabels: readonly string[],
+    columnLabels: readonly string[],
+    data: NumericArray | readonly NumericArray[],
+    horizon: number,
+    scale?: JsonInput
+  ): TransitionMatrix;
   /**
    * Load a handle from its canonical JSON wire form, the same form
    * Python `from_json` reads.
@@ -27047,11 +27061,11 @@ export interface CreditLgdNamespace {
   /**
    * Historical Beta recovery distribution for a debt seniority class.
    * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
-   * @param ratingAgency - Agency whose calibration to use, such as `"moodys"` or `"sp"`; omitted uses the registry default.
+   * @param calibrationId - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.
    * @returns The calibrated `BetaRecovery` handle.
-   * @throws Error - Throws a `validation` error if the seniority or agency is not recognized.
+   * @throws Error - Throws a `validation` error for an unrecognized seniority and a `not_found` error for an unknown calibration ID.
    */
-  seniorityRecoveryStats(seniority: string, ratingAgency?: string): BetaRecovery;
+  seniorityRecoveryStats(seniority: string, calibrationId: string): BetaRecovery;
   /**
    * Direct and indirect workout cost rates.
    */
@@ -28078,7 +28092,7 @@ export interface HullWhiteParams extends WasmOwned {
    * @returns The volatility of the segment containing `t`.
    * @throws Error - Throws a `TypeError` if `t` is not a number.
    */
-  sigma(t: number): number;
+  getSigma(t: number): number;
   /**
    * Covariance of the short-rate state variable at two times.
    * @param leftTime - First time in years; non-negative.
@@ -28106,13 +28120,17 @@ export interface HullWhiteParams extends WasmOwned {
    */
   readonly kappa: number;
   /**
-   * Segment end times of the volatility schedule, in years.
+   * Segment start times of the volatility schedule, in years.
+   * @returns A copy of the strictly increasing knots, starting at zero.
+   * @throws Never throws; reads the validated schedule.
    */
-  readonly times: Float64Array;
+  getTimes(): Float64Array;
   /**
-   * Volatility on each schedule segment, as decimals.
+   * Volatility on each schedule segment, in absolute rate units per square-root year.
+   * @returns A copy of the non-negative volatility values aligned with `getTimes()`.
+   * @throws Never throws; reads the validated schedule.
    */
-  readonly values: Float64Array;
+  getValues(): Float64Array;
 }
 
 /**
@@ -28122,7 +28140,7 @@ export interface HullWhiteParams extends WasmOwned {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const params = models.rates.hullWhite.HullWhiteParams.piecewise(0.05, [0, 2.5], [0.01, 0.012]);
- * console.log(params.sigma(3), params.stateVariance(2), params.bondVol(0, 1, 5));
+ * console.log(params.getSigma(3), params.stateVariance(2), params.bondVol(0, 1, 5));
  * params.free();
  * ```
  */
@@ -28181,17 +28199,15 @@ export interface HullWhiteNamespace {
   /**
    * Price of a cap or floor under Hull-White one-factor, per unit notional.
    *
-   * The facade makes `forwardCurve` optional and passes the discount curve when
-   * it is omitted, as Python does.
    * @param kappa - Mean-reversion speed per year; positive.
    * @param sigma - Short-rate volatility per square-root year, as a decimal; positive.
    * @param periods - Array of `[tFix, tPay, accrual]` triples in years, one per caplet or floorlet.
    * @param strike - Cap or floor strike rate, as a decimal.
    * @param isCap - `true` for a cap, `false` for a floor.
    * @param discountCurve - `core.DiscountCurve` handle used to discount the payoffs.
-   * @param forwardCurve - `core.DiscountCurve` handle that projects the forward rates.
+   * @param forwardCurve - `core.DiscountCurve` handle projecting forward rates; pass the discount curve explicitly for single-curve pricing.
    * @returns The cap or floor price per unit notional.
-   * @throws Error - Throws a `validation` error if `kappa` or `sigma` is out of range or `periods` is malformed.
+   * @throws Error - Throws an error if either required curve handle is missing or has the wrong type. Throws a `validation` error if `kappa` or `sigma` is out of range or `periods` is malformed.
    */
   hw1fCapFloorPrice(
     kappa: number,
@@ -28200,7 +28216,7 @@ export interface HullWhiteNamespace {
     strike: number,
     isCap: boolean,
     discountCurve: DiscountCurve,
-    forwardCurve?: DiscountCurve
+    forwardCurve: DiscountCurve
   ): number;
   /**
    * Normal volatility of a caplet's forward rate implied by Hull-White one-factor.

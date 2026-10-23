@@ -8,7 +8,7 @@ from finstack_quant.models.credit import pd
 
 
 def test_library_scales_load_and_are_ordered() -> None:
-    scale = pd.MasterScale.sp_assumptions()
+    scale = pd.MasterScale.default_calibration()
     assert scale.n_grades == len(scale) == 8
 
     uppers = [g.upper_pd for g in scale.grades]
@@ -18,11 +18,11 @@ def test_library_scales_load_and_are_ordered() -> None:
     for grade in scale.grades:
         assert grade.central_pd <= grade.upper_pd
 
-    assert pd.MasterScale.moodys_assumptions().n_grades > 0
+    assert pd.MasterScale.from_registry_id("moodys_assumptions").n_grades > 0
 
 
 def test_map_pd_notches_to_the_owning_band() -> None:
-    scale = pd.MasterScale.sp_assumptions()
+    scale = pd.MasterScale.default_calibration()
 
     result = scale.map_pd(0.003)
     assert result.grade == "BBB"
@@ -36,7 +36,7 @@ def test_map_pd_notches_to_the_owning_band() -> None:
 
 
 def test_map_pd_rejects_non_finite() -> None:
-    scale = pd.MasterScale.sp_assumptions()
+    scale = pd.MasterScale.default_calibration()
     for bad in (float("nan"), float("inf"), float("-inf")):
         with pytest.raises(ValueError, match="non-finite"):
             scale.map_pd(bad)
@@ -44,7 +44,7 @@ def test_map_pd_rejects_non_finite() -> None:
 
 def test_map_pd_rejects_out_of_range_probabilities() -> None:
     """A sign error or a percent/decimal mix-up (5.0 for "5%") raises."""
-    scale = pd.MasterScale.sp_assumptions()
+    scale = pd.MasterScale.default_calibration()
 
     for bad in (-0.1, 1.5, 5.0):
         with pytest.raises(ValueError, match=r"outside \[0, 1\]"):
@@ -55,7 +55,7 @@ def test_map_pd_rejects_out_of_range_probabilities() -> None:
 
 
 def test_map_pds_builds_a_grading_table() -> None:
-    scale = pd.MasterScale.sp_assumptions()
+    scale = pd.MasterScale.default_calibration()
     table = scale.map_pds([0.0005, 0.003, 0.05])
     assert list(table.columns) == ["grade", "grade_index", "input_pd", "central_pd"]
     assert list(table["grade"]) == ["AA", "BBB", "B"]
@@ -65,7 +65,7 @@ def test_map_pds_builds_a_grading_table() -> None:
 def test_master_scale_json_pickle_and_frame() -> None:
     import pickle
 
-    scale = pd.MasterScale.sp_assumptions()
+    scale = pd.MasterScale.default_calibration()
     assert pd.MasterScale.from_json(scale.to_json()).n_grades == scale.n_grades
     assert pickle.loads(pickle.dumps(scale))  # noqa: S301 - trusted in-process round trip.grades == scale.grades
     frame = scale.to_dataframe()

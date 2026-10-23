@@ -7,7 +7,6 @@ use super::{
     CopulaBasedDefault, FactorCorrelatedDefault, IntensityProcessDefault, StochasticDefault,
 };
 use crate::correlation::CopulaSpec;
-use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 
 /// Stochastic default model specification.
@@ -75,11 +74,6 @@ impl Default for StochasticDefaultSpec {
 }
 
 impl StochasticDefaultSpec {
-    /// Create a deterministic (non-stochastic) default spec.
-    pub fn deterministic(spec: DefaultModelSpec) -> Self {
-        StochasticDefaultSpec::Deterministic(spec)
-    }
-
     /// Create a copula-based default spec with Gaussian copula.
     pub fn gaussian_copula(base_cdr: f64, correlation: f64) -> Self {
         StochasticDefaultSpec::Copula {
@@ -192,29 +186,6 @@ impl StochasticDefaultSpec {
             StochasticDefaultSpec::FactorCorrelated { factor_loading, .. } => Some(*factor_loading),
         }
     }
-
-    /// Get the first-month annualized CDR, or the configured hazard rate.
-    pub fn base_rate(&self) -> f64 {
-        match self {
-            StochasticDefaultSpec::Deterministic(spec)
-            | StochasticDefaultSpec::FactorCorrelated {
-                base_spec: spec, ..
-            } => spec
-                .mdr(1)
-                .ok()
-                .and_then(|mdr| finstack_quant_cashflows::builder::monthly_to_annual(mdr).ok())
-                .unwrap_or(0.0),
-            StochasticDefaultSpec::Copula { base_cdr, .. } => *base_cdr,
-            StochasticDefaultSpec::IntensityProcess { base_hazard, .. } => *base_hazard,
-        }
-    }
-
-    /// Get the base MDR (monthly default rate) for this specification.
-    ///
-    /// Returns the unconditional expected MDR before factor shocks are applied.
-    pub fn base_mdr(&self) -> f64 {
-        annual_to_monthly_clamped(self.base_rate())
-    }
 }
 
 #[cfg(test)]
@@ -233,7 +204,6 @@ mod tests {
 
         assert!(spec.is_stochastic());
         assert_eq!(spec.correlation(), Some(0.20));
-        assert!((spec.base_rate() - 0.02).abs() < 1e-10);
 
         let model = spec.build().expect("valid Gaussian copula spec");
         assert!(model.is_some());
@@ -325,7 +295,7 @@ mod tests {
 
     #[test]
     fn test_deterministic_build_returns_none() {
-        let spec = StochasticDefaultSpec::deterministic(DefaultModelSpec::constant_cdr(0.02));
+        let spec = StochasticDefaultSpec::Deterministic(DefaultModelSpec::constant_cdr(0.02));
 
         assert!(!spec.is_stochastic());
         assert!(spec.build().expect("deterministic spec is valid").is_none());

@@ -112,7 +112,7 @@ impl PdeProblem2D for HestonPde {
 
 #[cfg(test)]
 mod tests {
-    use super::super::adi::{fill_boundaries, AdiWorkBuffers, CraigSneydStepper};
+    use super::super::adi::{fill_boundaries, AdiWorkBuffers, McsStepper};
     use super::super::grid::Grid1D;
     use super::super::grid2d::Grid2D;
     use super::super::solver2d::Solver2D;
@@ -181,7 +181,7 @@ mod tests {
         let gy = Grid1D::sinh_concentrated(v_min, v_max, 81, theta_v, 0.15).expect("valid v-grid");
         let grid = Grid2D::new(gx, gy);
 
-        let solver = Solver2D::new(grid, CraigSneydStepper::with_damping(4, 400));
+        let solver = Solver2D::new(grid, McsStepper::with_damping(4, 400));
 
         let solution = solver
             .solve(&pde, maturity)
@@ -244,7 +244,7 @@ mod tests {
                 Grid1D::sinh_concentrated(v_min, v_max, 61, theta_v, 0.15).expect("valid v-grid");
             let grid = Grid2D::new(gx, gy);
 
-            let solver = Solver2D::new(grid, CraigSneydStepper::with_damping(4, 150));
+            let solver = Solver2D::new(grid, McsStepper::with_damping(4, 150));
 
             let solution = solver
                 .solve(&pde, maturity)
@@ -301,7 +301,7 @@ mod tests {
         let gy = Grid1D::sinh_concentrated(0.001, 1.5, 61, theta_v, 0.15).expect("valid v-grid");
         let grid = Grid2D::new(gx, gy);
 
-        let solver = Solver2D::new(grid, CraigSneydStepper::with_damping(4, 150));
+        let solver = Solver2D::new(grid, McsStepper::with_damping(4, 150));
 
         let solution = solver
             .solve(&pde, maturity)
@@ -343,7 +343,7 @@ mod tests {
                 .expect("variance grid");
             let solution = Solver2D::new(
                 Grid2D::new(x_grid.clone(), v_grid),
-                CraigSneydStepper::with_damping(4, 400),
+                McsStepper::with_damping(4, 400),
             )
             .solve(&problem, 1.0)
             .expect("Feller-violating solve");
@@ -397,7 +397,7 @@ mod tests {
             is_call: true,
         };
         let grid_call = Grid2D::new(gx.clone(), gy.clone());
-        let solver_call = Solver2D::new(grid_call, CraigSneydStepper::new(200));
+        let solver_call = Solver2D::new(grid_call, McsStepper::new(200));
         let sol_call = solver_call
             .solve(&pde_call, maturity)
             .expect("Heston call grid is within the MCS stability regime");
@@ -414,7 +414,7 @@ mod tests {
             is_call: false,
         };
         let grid_put = Grid2D::new(gx, gy);
-        let solver_put = Solver2D::new(grid_put, CraigSneydStepper::new(200));
+        let solver_put = Solver2D::new(grid_put, McsStepper::new(200));
         let sol_put = solver_put
             .solve(&pde_put, maturity)
             .expect("Heston put grid is within the MCS stability regime");
@@ -439,7 +439,7 @@ mod tests {
     /// can drive either the full MCS scheme or the bare Douglas scheme over an
     /// identical grid.
     fn solve_heston_call(
-        stepper: &CraigSneydStepper,
+        stepper: &McsStepper,
         pde: &HestonPde,
         grid: &Grid2D,
         spot: f64,
@@ -556,7 +556,7 @@ mod tests {
         // split start-up damping, at three successive time resolutions.
         let [mcs_coarse, mcs_price, mcs_fine] = [n_steps / 2, n_steps, n_steps * 2].map(|steps| {
             solve_heston_call(
-                &CraigSneydStepper::with_damping(4, steps),
+                &McsStepper::with_damping(4, steps),
                 &pde,
                 &grid,
                 spot,
@@ -567,7 +567,7 @@ mod tests {
 
         // Bare Douglas at theta = 1/3 (no MCS corrector): inadmissible scheme.
         let douglas_theta13 = solve_heston_call(
-            &CraigSneydStepper::douglas_for_test(1.0 / 3.0, n_steps),
+            &McsStepper::douglas_for_test(1.0 / 3.0, n_steps),
             &pde,
             &grid,
             spot,
@@ -578,7 +578,7 @@ mod tests {
         // Bare Douglas at theta = 1/2 (no MCS corrector): a legitimate,
         // unconditionally stable scheme — used as an accuracy baseline.
         let douglas_theta12 = solve_heston_call(
-            &CraigSneydStepper::douglas_for_test(0.5, n_steps),
+            &McsStepper::douglas_for_test(0.5, n_steps),
             &pde,
             &grid,
             spot,
@@ -687,7 +687,7 @@ mod tests {
         let gy = Grid1D::sinh_concentrated(v_min, v_max, 81, theta_v, 0.15).expect("valid v-grid");
 
         let mcs_price = solve_heston_call(
-            &CraigSneydStepper::with_damping(4, 200),
+            &McsStepper::with_damping(4, 200),
             &pde,
             &Grid2D::new(gx, gy),
             spot,

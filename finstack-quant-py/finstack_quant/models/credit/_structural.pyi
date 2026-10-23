@@ -42,31 +42,31 @@ class RatingFactorTable:
     Examples
     --------
     >>> from finstack_quant.models.credit import RatingFactorTable
-    >>> table = RatingFactorTable.moodys_standard()
+    >>> table = RatingFactorTable.default_calibration()
     >>> (table.get_factor("B"), table.agency)
     (2720.0, "Moody's")
 
     """
 
     @staticmethod
-    def moodys_standard() -> RatingFactorTable:
+    def default_calibration() -> RatingFactorTable:
         """
-        Load the embedded Moody's standard WARF table.
+        Load the calibration selected by the embedded registry's default ID.
 
         Returns
         -------
         RatingFactorTable
-            Default rating-factor table.
+            Validated calibration selected by the current registry data.
 
         Raises
         ------
         ValueError
-            If the embedded registry is invalid or its default table is missing.
+            If the embedded registry or its configured default is malformed.
 
         Examples
         --------
         >>> from finstack_quant.models.credit import RatingFactorTable
-        >>> RatingFactorTable.moodys_standard().default_factor > 0.0
+        >>> isinstance(RatingFactorTable.default_calibration(), RatingFactorTable)
         True
         """
         ...
@@ -199,7 +199,7 @@ class RatingFactorTable:
         Examples
         --------
         >>> from finstack_quant.models.credit import RatingFactorTable
-        >>> value = RatingFactorTable.moodys_standard()
+        >>> value = RatingFactorTable.default_calibration()
         >>> RatingFactorTable.from_json(value.to_json()).to_json() == value.to_json()
         True
         """

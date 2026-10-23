@@ -1,4 +1,5 @@
 use super::*;
+use crate::volatility::heston::heston_pj_characteristic_function;
 
 /// Test that ψ_j(0) ≈ 1 for both probability characteristic functions.
 #[test]
@@ -7,7 +8,15 @@ fn test_pj_char_function_at_zero() {
     let log_spot = 100.0_f64.ln();
 
     for j in [1u8, 2u8] {
-        let (psi, _status) = heston_pj_characteristic_function(j, 1e-10, 1.0, log_spot, &params);
+        let (psi, _status) = heston_pj_characteristic_function(
+            j,
+            1e-10,
+            log_spot,
+            params.r,
+            params.q,
+            1.0,
+            &params.model,
+        );
         assert!(
             (psi.re - 1.0).abs() < 0.01,
             "ψ_{}(0) real part should be ~1, got {}",
@@ -122,117 +131,6 @@ fn test_black_scholes_limit() {
         "Heston should converge to BS: Heston={}, BS={}",
         heston_price,
         bs_price
-    );
-}
-
-/// Test against the volatility/heston.rs implementation.
-///
-/// Cross-validates this closed-form implementation against the canonical
-/// Heston pricer in `crate::volatility::heston`.
-///
-/// The two carry independent implementations of the same Gil-Pelaez /
-/// "Little Heston Trap" formulation with different quadrature (composite
-/// Gauss-Legendre here, Kahl-Jackel-truncated in core), so this is the pin
-/// that would catch either drifting away from the other.
-#[test]
-fn test_cross_validation_with_core_heston() {
-    let spot = 100.0;
-    let strike = 100.0;
-    let time = 0.5;
-    let r = 0.05;
-    let q = 0.02;
-    let v0 = 0.04;
-    let kappa = 2.0;
-    let theta = 0.04;
-    let sigma_v = 0.3;
-    let rho = -0.7;
-
-    let params = HestonPricingParams::new(r, q, kappa, theta, sigma_v, rho, v0).expect("valid");
-    let our_price = heston_call_price_fourier(spot, strike, time, &params, None)
-        .expect("Heston Fourier call price");
-
-    let core_params = crate::volatility::heston::HestonParams::new(v0, kappa, theta, sigma_v, rho)
-        .expect("valid Heston params");
-    let vol_price = crate::closed_form::heston_call_price_fourier(
-        spot,
-        strike,
-        time,
-        &crate::closed_form::HestonPricingParams {
-            r,
-            q,
-            model: core_params,
-        },
-        None,
-    )
-    .expect("checked Heston price");
-
-    // These are two implementations of the *same* Gil-Pelaez / Little-Trap
-    // formulation, so the only admissible difference is quadrature error.
-    // Measured agreement on this parameter set is 8.4e-9 absolute
-    // (0.0000 bp); ATM 1y, ITM 2y and a high-vol-of-vol case all sit at or
-    // below 0.005 bp. The tolerance is therefore 0.01 bp -- still ~1000x the
-    // observed gap, but tight enough that any real algebraic drift fails
-    // immediately. (The previous 10 bp bound was ~6 orders of magnitude
-    // looser than actual agreement and would not have caught drift.)
-    let diff_bp = (our_price - vol_price).abs() * 10_000.0 / our_price.max(1e-12);
-    assert!(
-        diff_bp < 0.01,
-        "Heston implementations diverged by {:.6} bp at canonical params \
-             (closed_form={:.9}, core={:.9}); these share a formulation, so any \
-             visible gap is quadrature drift.",
-        diff_bp,
-        our_price,
-        vol_price
-    );
-}
-
-/// Deep-OTM short-dated is where the two quadrature schemes actually diverge.
-///
-/// Measured 2026-08-03 at S=100, K=120, T=0.25: closed_form 0.029983851 vs
-/// core 0.030009480 -- 2.6e-5 absolute, but 8.5 bp *relative* because the
-/// price is tiny. Both schemes integrate the same characteristic function, so
-/// this is under-convergence in the tail of at least one of them, not a
-/// modelling difference.
-///
-/// Pinned here so the wing behaviour cannot silently get worse. When the
-/// shared characteristic function is extracted and a single converged
-/// quadrature is adopted, this bound should drop to the 0.01 bp used above.
-#[test]
-fn test_cross_validation_deep_otm_wing_divergence_is_bounded() {
-    let (spot, strike, time, r, q) = (100.0, 120.0, 0.25, 0.02, 0.0);
-    let (v0, kappa, theta, sigma_v, rho) = (0.05, 3.0, 0.05, 0.5, -0.8);
-
-    let params = HestonPricingParams::new(r, q, kappa, theta, sigma_v, rho, v0).expect("valid");
-    let our_price = heston_call_price_fourier(spot, strike, time, &params, None)
-        .expect("Heston Fourier call price");
-
-    let core_params = crate::volatility::heston::HestonParams::new(v0, kappa, theta, sigma_v, rho)
-        .expect("valid Heston params");
-    let core_price = crate::closed_form::heston_call_price_fourier(
-        spot,
-        strike,
-        time,
-        &crate::closed_form::HestonPricingParams {
-            r,
-            q,
-            model: core_params,
-        },
-        None,
-    )
-    .expect("checked Heston price");
-
-    let abs_diff = (our_price - core_price).abs();
-    let diff_bp = abs_diff * 10_000.0 / our_price.max(1e-12);
-
-    assert!(
-        abs_diff < 1e-4,
-        "deep-OTM absolute divergence grew: {abs_diff:.3e} \
-         (closed_form={our_price:.9}, core={core_price:.9})"
-    );
-    assert!(
-        diff_bp < 15.0,
-        "deep-OTM relative divergence grew to {diff_bp:.4} bp \
-         (closed_form={our_price:.9}, core={core_price:.9})"
     );
 }
 
@@ -520,7 +418,7 @@ fn test_validation_rejects_invalid_params() {
 /// boundary rather than silently degrading the pricer to the per-strike path.
 #[test]
 fn fourier_settings_rejects_unsupported_gl_order() {
-    let err = HestonFourierSettings::new(100.0, 100, 10, 1e-8)
+    let err = HestonFourierSettings::new(100.0, 100, 10)
         .expect_err("gl_order=10 has no Gauss-Legendre table and must be rejected");
     let msg = err.to_string();
     assert!(
@@ -531,7 +429,7 @@ fn fourier_settings_rejects_unsupported_gl_order() {
     // Supported orders construct successfully.
     for &order in &SUPPORTED_GL_ORDERS {
         assert!(
-            HestonFourierSettings::new(100.0, 100, order, 1e-8).is_ok(),
+            HestonFourierSettings::new(100.0, 100, order).is_ok(),
             "gl_order={order} should be accepted"
         );
     }
@@ -540,9 +438,10 @@ fn fourier_settings_rejects_unsupported_gl_order() {
 /// W-02: `validate` rejects degenerate `panels` / `u_max` too.
 #[test]
 fn fourier_settings_rejects_degenerate_grid() {
-    assert!(HestonFourierSettings::new(100.0, 0, 16, 1e-8).is_err());
-    assert!(HestonFourierSettings::new(0.0, 100, 16, 1e-8).is_err());
-    assert!(HestonFourierSettings::new(f64::NAN, 100, 16, 1e-8).is_err());
+    assert!(HestonFourierSettings::new(100.0, 0, 16).is_err());
+    assert!(HestonFourierSettings::new(0.0, 100, 16).is_err());
+    assert!(HestonFourierSettings::new(f64::NAN, 100, 16).is_err());
+    assert!(HestonFourierSettings::new(f64::from_bits(1), 100, 16).is_err());
     // The default settings must always be valid.
     assert!(HestonFourierSettings::default().validate().is_ok());
 }
@@ -589,7 +488,15 @@ fn strip_pricer_no_false_corruption_on_normal_params() {
 #[test]
 fn test_characteristic_function_handles_extreme_inputs() {
     let params = HestonPricingParams::new(0.05, 0.0, 0.1, 0.04, 1.0, 0.9, 0.04).expect("valid");
-    let (psi, _status) = heston_pj_characteristic_function(1, 0.0, 1.0, 100.0_f64.ln(), &params);
+    let (psi, _status) = heston_pj_characteristic_function(
+        1,
+        0.0,
+        100.0_f64.ln(),
+        params.r,
+        params.q,
+        1.0,
+        &params.model,
+    );
     assert!(
         psi.is_finite(),
         "characteristic function should stay finite"
@@ -608,7 +515,7 @@ fn long_dated_high_kappa_theta_does_not_fall_back_to_bs() {
     let spot = 100.0;
     let strike = 100.0;
     let time = 15.0;
-    let settings = HestonFourierSettings::for_maturity(time, params.v0);
+    let settings = HestonFourierSettings::for_maturity(time, params.model.v0);
 
     // Neither Gil-Pelaez probability may be flagged corrupted.
     for j in [1u8, 2u8] {
@@ -624,14 +531,21 @@ fn long_dated_high_kappa_theta_does_not_fall_back_to_bs() {
     // fallback at either v0 or v_bar(T).
     let price = heston_call_price_fourier(spot, strike, time, &params, Some(&settings))
         .expect("Heston Fourier call price");
-    let bs_v0 = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+    let bs_v0 = black_scholes_call(
+        spot,
+        strike,
+        time,
+        params.r,
+        params.q,
+        params.model.v0.sqrt(),
+    );
     let bs_vbar = black_scholes_call(
         spot,
         strike,
         time,
         params.r,
         params.q,
-        params.deterministic_avg_variance(time).sqrt(),
+        params.model.deterministic_avg_variance(time).sqrt(),
     );
     assert!(price.is_finite() && price > 0.0);
     assert!(
@@ -654,7 +568,7 @@ fn small_vol_of_vol_uses_deterministic_avg_variance_not_v0() {
     // Closed-form check of v_bar itself.
     let kt: f64 = 2.0;
     let expected_vbar = 0.09 + (0.01 - 0.09) * (1.0 - (-kt).exp()) / kt;
-    let vbar = params.deterministic_avg_variance(time);
+    let vbar = params.model.deterministic_avg_variance(time);
     assert!(
         (vbar - expected_vbar).abs() < 1e-14,
         "v_bar(T) mismatch: got {vbar}, expected {expected_vbar}"
@@ -664,7 +578,14 @@ fn small_vol_of_vol_uses_deterministic_avg_variance_not_v0() {
     let price = heston_call_price_fourier(spot, strike, time, &params, None)
         .expect("Heston Fourier call price");
     let bs_vbar = black_scholes_call(spot, strike, time, params.r, params.q, vbar.sqrt());
-    let bs_v0 = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+    let bs_v0 = black_scholes_call(
+        spot,
+        strike,
+        time,
+        params.r,
+        params.q,
+        params.model.v0.sqrt(),
+    );
     assert!(
         (price - bs_vbar).abs() < 1e-12,
         "Heston limit must use v_bar: got {price}, expected {bs_vbar}"
@@ -687,8 +608,8 @@ fn deterministic_avg_variance_taylor_branch_is_continuous() {
     };
     // Just below and just above the 1e-6 κt switch. The two κ values
     // genuinely differ, so allow the O(κt·(v0−θ)) ≈ 1e-8 physical gap.
-    let below = mk(0.9e-6).deterministic_avg_variance(t);
-    let above = mk(1.1e-6).deterministic_avg_variance(t);
+    let below = mk(0.9e-6).model.deterministic_avg_variance(t);
+    let above = mk(1.1e-6).model.deterministic_avg_variance(t);
     assert!(
         (below - above).abs() < 5e-8,
         "Taylor/closed-form branches must agree at the switch: {below} vs {above}"
@@ -705,8 +626,8 @@ fn canonical_heston_params_validate_correlation() {
 
     let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
         .expect("valid Heston params");
-    assert_eq!(params.rho, -0.7);
-    assert_eq!(params.kappa, 2.0);
+    assert_eq!(params.model.rho, -0.7);
+    assert_eq!(params.model.kappa, 2.0);
 }
 
 /// Scalar Fourier integration reports convergence failure after bounded refinement.
@@ -757,7 +678,7 @@ fn gil_pelaez_exposes_truncation_tail_diagnostic() {
 
     // Short maturity with a deliberately too-small u_max: the integrand has
     // not decayed by u_max, so the truncation tail is non-negligible.
-    let coarse = HestonFourierSettings::new(8.0, 40, 16, 1e-8).expect("valid settings");
+    let coarse = HestonFourierSettings::new(8.0, 40, 16).expect("valid settings");
     let diag = heston_pj_with_diagnostics(1, 100.0, 100.0, 0.02, &params, &coarse);
     assert!(
         diag.probability.is_finite() && diag.raw_probability.is_finite(),
@@ -809,7 +730,7 @@ fn low_variance_settings_match_high_umax_reference() {
         "low v0 must widen u_max beyond the maturity-bucket default"
     );
 
-    let reference = HestonFourierSettings::new(2000.0, 2000, 16, 1e-8).expect("valid");
+    let reference = HestonFourierSettings::new(2000.0, 2000, 16).expect("valid");
     let price = heston_call_price_fourier(spot, strike, time, &params, None)
         .expect("Heston Fourier call price");
     let ref_price = heston_call_price_fourier(spot, strike, time, &params, Some(&reference))
@@ -857,7 +778,7 @@ fn heston_small_vol_of_vol_is_continuous_to_deterministic_variance() {
                 1.0,
                 params.r,
                 params.q,
-                params.deterministic_avg_variance(1.0).sqrt(),
+                params.model.deterministic_avg_variance(1.0).sqrt(),
             );
             let actual = heston_call_price_fourier(100.0, 100.0, 1.0, &params, None)
                 .expect("converged near-deterministic Heston price");
@@ -872,15 +793,12 @@ fn heston_small_vol_of_vol_is_continuous_to_deterministic_variance() {
 }
 
 #[test]
-fn heston_rejects_unresolved_grids_and_invalid_origin_tolerances() {
+fn heston_rejects_unresolved_grids_and_invalid_spots() {
     let params = HestonPricingParams::new(0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
-    let coarse = HestonFourierSettings::new(8.0, 40, 16, 1e-8).expect("valid grid");
+    let coarse = HestonFourierSettings::new(8.0, 40, 16).expect("valid grid");
     let cached = HestonStripPricer::new(100.0, 0.0001, &params, &coarse).expect("valid cache");
     assert!(cached.price_call(100.0).is_err());
     assert!(heston_call_price_fourier(100.0, 100.0, 0.0001, &params, Some(&coarse)).is_err());
-    for phi_eps in [f64::NAN, f64::INFINITY, -1.0, 100.0] {
-        assert!(HestonFourierSettings::new(100.0, 100, 16, phi_eps).is_err());
-    }
     for bad in [f64::NAN, f64::INFINITY, -100.0, 0.0] {
         assert!(heston_call_price_fourier(bad, 100.0, 0.0, &params, None).is_err());
         assert!(heston_call_price_fourier(100.0, bad, 1.0, &params, None).is_err());

@@ -22,7 +22,7 @@ use super::error::PdCalibrationError;
 /// ```
 /// use finstack_quant_models::credit::pd::MasterScale;
 ///
-/// let scale = MasterScale::sp_assumptions().unwrap();
+/// let scale = MasterScale::default_calibration().unwrap();
 /// let result = scale.map_pd(0.0015).unwrap();
 /// assert_eq!(result.grade, "BBB");
 /// ```
@@ -205,7 +205,7 @@ impl MasterScale {
         )
     }
 
-    /// Library PD-band assumptions using S&P-style labels.
+    /// Load the registry-selected default PD-band calibration.
     ///
     /// These bands are Finstack Quant library assumptions. They are not
     /// presented as S&P empirical default rates or as an agency calibration.
@@ -232,40 +232,10 @@ impl MasterScale {
     /// configured default PD master-scale ID is absent, or the registry grades
     /// violate [`MasterScale::new`] invariants. This indicates an invalid
     /// package/configuration, not an inability to map a particular PD.
-    pub fn sp_assumptions() -> finstack_quant_core::Result<Self> {
+    pub fn default_calibration() -> finstack_quant_core::Result<Self> {
         Self::from_registry_id(
             crate::credit::registry::embedded_registry()?.default_pd_master_scale_id(),
         )
-    }
-
-    /// Library PD-band assumptions using Moody's-style labels.
-    ///
-    /// These bands are Finstack Quant library assumptions. They are not
-    /// presented as Moody's empirical default rates or as an agency calibration.
-    ///
-    /// | Grade | Upper PD  | Central PD |
-    /// |-------|-----------|------------|
-    /// | Aaa   | 0.0001    | 0.00003    |
-    /// | Aa    | 0.0005    | 0.0002     |
-    /// | A     | 0.001     | 0.0007     |
-    /// | Baa   | 0.005     | 0.002      |
-    /// | Ba    | 0.02      | 0.01       |
-    /// | B     | 0.08      | 0.04       |
-    /// | Caa   | 0.25      | 0.13       |
-    /// | Ca/C  | 1.0       | 0.45       |
-    ///
-    /// These are Finstack Quant library assumptions using Moody's-style
-    /// notation, not Moody's historical default-rate observations or a rating
-    /// agency calibration. Select this scale only when that reporting-label
-    /// convention is appropriate for the downstream scorecard.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the embedded credit registry cannot be loaded, the
-    /// `moodys_assumptions` entry is absent, or its grades violate
-    /// [`MasterScale::new`] invariants.
-    pub fn moodys_assumptions() -> finstack_quant_core::Result<Self> {
-        Self::from_registry_id("moodys_assumptions")
     }
 
     /// Load a PD master scale from the credit assumptions registry.

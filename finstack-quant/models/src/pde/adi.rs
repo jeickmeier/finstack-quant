@@ -67,7 +67,7 @@ use super::stepper::StepperError;
 ///
 /// Sized to the largest grid the caller intends to step. Reusing this across
 /// timesteps (and across grids of identical shape) lets `Solver2D` skip
-/// per-step allocations in [`CraigSneydStepper::step`].
+/// per-step allocations in [`McsStepper::step`].
 #[derive(Clone, Default)]
 pub struct AdiWorkBuffers {
     x_line: Vec<f64>,
@@ -126,62 +126,6 @@ impl AdiWorkBuffers {
             cached_ops: None,
         }
     }
-
-    /// Resize all buffers in place if the grid shape changed.
-    fn resize_for(&mut self, grid: &Grid2D) {
-        let nx_int = grid.nx_interior();
-        let ny_int = grid.ny_interior();
-        let interior = nx_int * ny_int;
-        let line_max = nx_int.max(ny_int);
-        if self.x_line.len() != nx_int || self.y_line.len() != ny_int {
-            self.cached_ops = None;
-        }
-        if self.x_line.len() != nx_int {
-            self.x_line.resize(nx_int, 0.0);
-        }
-        if self.y_line.len() != ny_int {
-            self.y_line.resize(ny_int, 0.0);
-        }
-        if self.line_out.len() != line_max {
-            self.line_out.resize(line_max, 0.0);
-        }
-        if self.rhs_buf.len() != line_max {
-            self.rhs_buf.resize(line_max, 0.0);
-        }
-        if self.thomas_scratch.len() != line_max {
-            self.thomas_scratch.resize(line_max, 0.0);
-        }
-        if self.y0.len() != interior {
-            self.y0.resize(interior, 0.0);
-        }
-        if self.y1.len() != interior {
-            self.y1.resize(interior, 0.0);
-        }
-        if self.y2.len() != interior {
-            self.y2.resize(interior, 0.0);
-        }
-        if self.ytld.len() != interior {
-            self.ytld.resize(interior, 0.0);
-        }
-        if self.ax_u.len() != interior {
-            self.ax_u.resize(interior, 0.0);
-        }
-        if self.ay_u.len() != interior {
-            self.ay_u.resize(interior, 0.0);
-        }
-        if self.ax_y2.len() != interior {
-            self.ax_y2.resize(interior, 0.0);
-        }
-        if self.ay_y2.len() != interior {
-            self.ay_y2.resize(interior, 0.0);
-        }
-        if self.cross.len() != interior {
-            self.cross.resize(interior, 0.0);
-        }
-        if self.cross_y2.len() != interior {
-            self.cross_y2.resize(interior, 0.0);
-        }
-    }
 }
 
 /// Default MCS `theta`: second-order accurate and unconditionally stable for
@@ -207,7 +151,7 @@ const MCS_THETA: f64 = 1.0 / 3.0;
 /// The type name is retained for API stability; the implemented scheme is the
 /// Modified Craig-Sneyd scheme (plain Craig-Sneyd is the `theta = 1/2` special
 /// case — see the module documentation).
-pub struct CraigSneydStepper {
+pub struct McsStepper {
     /// MCS `theta` parameter for the implicit weight.
     theta: f64,
     /// Number of initial intervals using two implicit-Euler split halfsteps.
@@ -224,7 +168,7 @@ pub struct CraigSneydStepper {
     apply_mcs_corrector: bool,
 }
 
-impl CraigSneydStepper {
+impl McsStepper {
     /// Modified Craig-Sneyd ADI stepper with the standard `theta = 1/3`.
     ///
     /// # Arguments
@@ -290,17 +234,12 @@ impl CraigSneydStepper {
     }
 
     /// Generate time levels from maturity backward to 0.
+    ///
+    /// # Arguments
+    ///
+    /// * `maturity` - Terminal time in years, divided into this stepper's equal time intervals.
     pub fn time_levels(&self, maturity: f64) -> Vec<f64> {
-        let n = self.n_steps;
-        if n == 0 {
-            return vec![maturity];
-        }
-        let dt = maturity / n as f64;
-        let mut levels: Vec<f64> = (0..n)
-            .map(|i| (maturity - i as f64 * dt).max(0.0))
-            .collect();
-        levels.push(0.0);
-        levels
+        super::stepper::backward_time_levels(maturity, self.n_steps)
     }
 
     /// Execute one Modified Craig-Sneyd ADI step from `t_from` to `t_to`
@@ -401,7 +340,6 @@ impl CraigSneydStepper {
 
         let interior = nx_int * ny_int;
 
-        buffers.resize_for(grid);
         let AdiWorkBuffers {
             x_line,
             y_line,
@@ -826,7 +764,7 @@ mod tests {
             }
         }
 
-        let stepper = CraigSneydStepper::new(n_time);
+        let stepper = McsStepper::new(n_time);
         let levels = stepper.time_levels(t_mat);
         let mut buffers = AdiWorkBuffers::for_grid(&grid);
 
@@ -867,7 +805,7 @@ mod tests {
         let maturity = 100.0;
         let eigenvalue = -2.0 / std::f64::consts::FRAC_PI_2.powi(2);
         let expected = (1.0 - 0.5 * maturity * eigenvalue).powi(-4);
-        let solution = super::super::Solver2D::new(grid, CraigSneydStepper::with_damping(1, 1))
+        let solution = super::super::Solver2D::new(grid, McsStepper::with_damping(1, 1))
             .solve(&Heat2D, maturity)
             .expect("implicit damping");
         let actual = solution.values[4];
@@ -972,7 +910,7 @@ mod tests {
             .max(0.0);
         let initial_min = u_int.iter().copied().fold(f64::INFINITY, f64::min).min(0.0);
 
-        let stepper = CraigSneydStepper::new(100);
+        let stepper = McsStepper::new(100);
         let mut buffers = AdiWorkBuffers::for_grid(&grid);
         // March several steps: instability would amplify step over step.
         let mut t_from = 0.25;
@@ -1022,7 +960,7 @@ mod tests {
         let mut u_full = vec![1.0; nx * ny];
         let mut u_int = vec![1.0; nx_int * ny_int];
 
-        let stepper = CraigSneydStepper::new(10);
+        let stepper = McsStepper::new(10);
         let mut buffers = AdiWorkBuffers::for_grid(&grid);
         let zero = stepper.step(
             &Heat2D,

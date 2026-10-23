@@ -60,8 +60,13 @@ fn sabr_calibrator_with_tolerance_calibrates() {
             JsValue::from(0.5),
         )
         .expect("calibrate");
-    assert!((fitted.beta() - 0.5).abs() < 1e-12);
-    assert!(fitted.alpha() > 0.0);
+    let fitted: finstack_quant_models::volatility::sabr::SabrCalibrationOutcome =
+        serde_wasm_bindgen::from_value(fitted).expect("typed calibration outcome");
+    assert!((fitted.parameters.beta - 0.5).abs() < 1e-12);
+    assert!(fitted.parameters.alpha > 0.0);
+    assert_eq!(fitted.quote_errors.len(), 5);
+    assert!(fitted.total_iterations >= fitted.winning_iterations);
+    assert!(fitted.max_relative_quote_error <= 1e-6);
 }
 
 #[wasm_bindgen_test]

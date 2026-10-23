@@ -5,7 +5,7 @@
 //! types `CollateralPiece` and `WorkoutLgdResult` cross the boundary as plain
 //! objects in their canonical serde form.
 
-use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, js_u64, js_uint};
+use crate::utils::input::{from_js_json, js_f64, js_string, js_u64, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::credit::lgd::{
     self, BetaRecovery, CollateralPiece, CreditConversionFactor, DownturnLgd, EadCalculator,
@@ -113,20 +113,20 @@ impl JsBetaRecovery {
 
 /// Historical Beta recovery distribution for a debt seniority class.
 /// @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
-/// @param rating_agency - Agency whose calibration to use, such as `"moodys"` or `"sp"`; omitted uses the registry default.
+/// @param calibration_id - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.
 /// @returns The calibrated `BetaRecovery` handle.
 ///
 /// # Errors
 ///
-/// Throws a `validation` error if the seniority or agency is not recognized.
+/// Throws a `validation` error for an unrecognized seniority and a `not_found` error for an unknown calibration ID.
 #[wasm_bindgen(js_name = seniorityRecoveryStats)]
 pub fn seniority_recovery_stats(
     seniority: JsValue,
-    rating_agency: Option<JsValue>,
+    calibration_id: JsValue,
 ) -> Result<JsBetaRecovery, JsValue> {
     let seniority = js_string(&seniority, "seniority")?;
-    let rating_agency = js_opt_string(rating_agency.as_ref(), "ratingAgency")?;
-    lgd::seniority_recovery_stats(&seniority, rating_agency.as_deref())
+    let calibration_id = js_string(&calibration_id, "calibrationId")?;
+    lgd::seniority_recovery_stats(&seniority, &calibration_id)
         .map(|inner| JsBetaRecovery { inner })
         .map_err(to_js_err)
 }
@@ -491,30 +491,15 @@ impl JsDownturnLgd {
             .map_err(to_js_err)
     }
 
-    /// Basel downturn calibration for secured exposures.
-    /// @returns The registry's Basel secured downturn adjustment.
+    /// Load the calibration selected by the embedded registry's default ID.
+    /// @returns The registry-selected calibration handle.
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if the registry cannot supply the
-    /// calibration.
-    #[wasm_bindgen(js_name = baselSecured)]
-    pub fn basel_secured() -> Result<JsDownturnLgd, JsValue> {
-        DownturnLgd::basel_secured()
-            .map(|inner| Self { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Basel downturn calibration for unsecured exposures.
-    /// @returns The registry's Basel unsecured downturn adjustment.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if the registry cannot supply the
-    /// calibration.
-    #[wasm_bindgen(js_name = baselUnsecured)]
-    pub fn basel_unsecured() -> Result<JsDownturnLgd, JsValue> {
-        DownturnLgd::basel_unsecured()
+    /// Throws a `validation` error if the registry or its configured default is malformed.
+    #[wasm_bindgen(js_name = defaultCalibration)]
+    pub fn default_calibration() -> Result<JsDownturnLgd, JsValue> {
+        DownturnLgd::default_calibration()
             .map(|inner| Self { inner })
             .map_err(to_js_err)
     }

@@ -1897,15 +1897,32 @@ export type StochasticPrepaySpec =
  */
 export type RecoverySpec =
   | {
-      rate: number;
+      rate: ClosedUnitIntervalF64Wire;
       type: "constant";
     }
   | {
-      factor_correlation: number;
-      mean_recovery: number;
+      /**
+       * Systematic standard-normal loading in [-1, 1]; positive means low recovery in stress.
+       */
+      factor_correlation: CorrelationWire;
+      /**
+       * Zero-total-shock recovery location in [0, 1], not the unconditional mean.
+       */
+      mean_recovery: ClosedUnitIntervalF64Wire;
+      /**
+       * Local shock scale in [0, 0.5], not realized recovery standard deviation.
+       */
       recovery_volatility: number;
       type: "market_correlated";
     };
+/**
+ * Finite JSON number in the closed interval `[0, 1]`.
+ */
+export type ClosedUnitIntervalF64Wire = number;
+/**
+ * Finite correlation coefficient in the closed interval `[-1, 1]`.
+ */
+export type CorrelationWire = number;
 /**
  * Final payoff type for autocallable products.
  */
@@ -2583,17 +2600,9 @@ export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "
  */
 export type PositiveF64Wire = number;
 /**
- * Finite JSON number in the closed interval `[0, 1]`.
- */
-export type ClosedUnitIntervalF64Wire = number;
-/**
  * Finite JSON number greater than or equal to zero.
  */
 export type NonNegativeF64Wire = number;
-/**
- * Finite correlation coefficient in the closed interval `[-1, 1]`.
- */
-export type CorrelationWire = number;
 /**
  * Settlement type for options
  */
@@ -19057,9 +19066,7 @@ export interface SimulatedPath {
  * # State Vector Layout
  *
  * The `state` vector contains the raw state variables in process-defined order.
- * For simple single-asset models, the crate's internal `state_indices`
- * constants provide common aliases.
- * For multi-asset or process-specific layouts, consult
+ * Interpret every layout using
  * [`PathDataset::process_params.factor_names`](PathDataset::process_params) or
  * [`PathDataset::state_var_keys`].
  */
@@ -19081,7 +19088,7 @@ export interface PathPoint {
   payoff_value?: number | null;
   /**
    * State variables at this point (spot, variance, rate, etc.)
-   * Indexed by position - see `state_indices` for standard layout
+   * Positions follow `PathDataset::process_params.factor_names`.
    */
   state: number[];
   /**

@@ -73,7 +73,6 @@ impl ShortRateTree {
 
         let mut max_error_bp = 0.0_f64;
         let mut max_error_step = 0_usize;
-        let mut fallback_count = 0_usize;
 
         for step in 0..self.config.steps {
             let current_time = self.time_steps[step + 1];
@@ -113,16 +112,14 @@ impl ShortRateTree {
                 mean_rate.exp().clamp(alpha_lb, alpha_ub)
             };
 
-            let (alpha, used_fallback) = match solver.solve(objective, initial_alpha) {
-                Ok(a) => (a.clamp(alpha_lb, alpha_ub), false),
-                Err(_) => {
-                    // Solver failed - use fallback based on the market zero
-                    // rate (current_time > 0 for every calibrated step).
-                    let market_rate = -target_df.ln() / current_time;
-                    fallback_count += 1;
-                    (market_rate.clamp(alpha_lb, alpha_ub), true)
-                }
-            };
+            let alpha = solver
+                .solve(objective, initial_alpha)
+                .map_err(|error| {
+                    Error::Validation(format!(
+                        "BDT calibration solver failed at step {step}: {error}"
+                    ))
+                })?
+                .clamp(alpha_lb, alpha_ub);
 
             let current_step_rates: Vec<f64> = (0..num_nodes)
                 .map(|j| {
@@ -150,18 +147,13 @@ impl ShortRateTree {
                 max_error_step = step;
             }
 
-            if error_bp > 1.0 || used_fallback {
+            if error_bp > 1.0 {
                 tracing::warn!(
-                    "BDT calibration step {}: error={:.2}bp, target_df={:.6}, model_df={:.6}{}",
+                    "BDT calibration step {}: error={:.2}bp, target_df={:.6}, model_df={:.6}",
                     step,
                     error_bp,
                     target_df,
                     model_df,
-                    if used_fallback {
-                        " (FALLBACK USED)"
-                    } else {
-                        ""
-                    }
                 );
             }
 
@@ -204,12 +196,11 @@ impl ShortRateTree {
             state_prices.push(next_state_prices);
         }
 
-        if max_error_bp > 1.0 || fallback_count > 0 {
+        if max_error_bp > 1.0 {
             tracing::warn!(
-                "BDT calibration completed: max error={:.2}bp at step {}, fallbacks={} (target: <1bp, 0 fallbacks)",
+                "BDT calibration completed: max error={:.2}bp at step {} (target: <1bp)",
                 max_error_bp,
-                max_error_step,
-                fallback_count
+                max_error_step
             );
         } else {
             tracing::debug!(
@@ -241,13 +232,7 @@ impl ShortRateTree {
         // mispricing. When the tolerance is breached, the diagnostic message
         // reports whether the clamp engaged (the usual root cause for a wide
         // tree) so the caller knows which knob to turn.
-        if !max_error_bp.is_finite() || max_error_bp > fit_tolerance_bp || fallback_count > 0 {
-            self.calibration_quality = Some(TreeCalibrationResult {
-                max_error_bp,
-                max_error_step,
-                fallback_count,
-                converged: false,
-            });
+        if !max_error_bp.is_finite() || max_error_bp > fit_tolerance_bp {
             let clamp_note = if clamp_engaged {
                 format!(
                     " The node-rate clamp [{alpha_lb:.0e}, {alpha_ub}] engaged \
@@ -260,16 +245,13 @@ impl ShortRateTree {
             };
             return Err(Error::Validation(format!(
                 "BDT calibration did not converge: max curve error {max_error_bp:.4} bp \
-                 at step {max_error_step}, tolerance {fit_tolerance_bp:.4} bp, \
-                 solver fallbacks {fallback_count}.{clamp_note}"
+                 at step {max_error_step}, tolerance {fit_tolerance_bp:.4} bp.{clamp_note}"
             )));
         }
 
         self.calibration_quality = Some(TreeCalibrationResult {
             max_error_bp,
             max_error_step,
-            fallback_count,
-            converged: true,
         });
 
         Ok(())

@@ -109,7 +109,7 @@ fn structured_credit() -> StructuredCredit {
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
-    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
         sc.credit_model.prepayment_spec.clone(),
     ));
     sc

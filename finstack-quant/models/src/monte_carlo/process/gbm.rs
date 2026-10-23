@@ -68,11 +68,11 @@
 //! use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 //! use finstack_quant_models::monte_carlo::traits::StochasticProcess;
 //!
-//! let gbm = GbmProcess::with_params(
+//! let gbm = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(
 //!     0.05,  // r = 5% risk-free rate
 //!     0.02,  // q = 2% dividend yield
 //!     0.20,  // sigma = 20% volatility
-//! )
+//! ).map(GbmProcess::new)
 //! .unwrap();
 //!
 //! let mut drift = [0.0];
@@ -103,11 +103,11 @@
 //! );
 //! let rng = PhiloxRng::new(42);
 //!
-//! let gbm = GbmProcess::with_params(
+//! let gbm = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(
 //!     0.05,  // r = 5% risk-free rate
 //!     0.02,  // q = 2% dividend yield
 //!     0.20,  // sigma = 20% volatility
-//! ).unwrap();
+//! ).map(GbmProcess::new).unwrap();
 //! let disc = ExactGbm::new();
 //! let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 //! let result = engine
@@ -295,15 +295,6 @@ impl GbmProcess {
             params,
             drift_schedule: None,
         }
-    }
-
-    /// Create with explicit parameters.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any parameter is invalid (see [`GbmParams::new`]).
-    pub fn with_params(r: f64, q: f64, sigma: f64) -> finstack_quant_core::Result<Self> {
-        Ok(Self::new(GbmParams::new(r, q, sigma)?))
     }
 
     /// Attach a deterministic time-varying drift schedule.
@@ -525,7 +516,9 @@ mod tests {
 
     #[test]
     fn test_gbm_drift_diffusion() {
-        let gbm = GbmProcess::with_params(0.05, 0.02, 0.2).unwrap();
+        let gbm = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.02, 0.2)
+            .map(GbmProcess::new)
+            .unwrap();
         let x = [100.0];
         let mut drift = [0.0];
         let mut diffusion = [0.0];
@@ -648,7 +641,9 @@ mod tests {
 
     #[test]
     fn gbm_process_carries_optional_drift_schedule() {
-        let process = GbmProcess::with_params(0.05, 0.02, 0.2).expect("valid gbm");
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.02, 0.2)
+            .map(GbmProcess::new)
+            .expect("valid gbm");
         assert!(process.drift_schedule().is_none());
 
         let sched =

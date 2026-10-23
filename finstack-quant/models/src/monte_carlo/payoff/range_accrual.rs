@@ -37,8 +37,6 @@ pub struct RangeAccrualPayoff {
     pub coupon_rate: f64,
     /// Notional amount
     pub notional: f64,
-    /// Currency
-    pub currency: Currency,
 
     // Historical fixing info (for mid-life valuations)
     /// Number of past observations that were in range
@@ -61,11 +59,10 @@ impl RangeAccrualPayoff {
     /// # Arguments
     ///
     /// * `observation_dates` - Future model times for each range check, sorted ascending; repeats retain observation multiplicity
-    /// * `lower_bound` - Lower bound of the range (effective/absolute)
-    /// * `upper_bound` - Upper bound of the range (must be > lower_bound)
-    /// * `coupon_rate` - Annual coupon rate
-    /// * `notional` - Notional amount
-    /// * `currency` - Currency
+    /// * `lower_bound` - Inclusive lower barrier in absolute spot units.
+    /// * `upper_bound` - Inclusive upper barrier in the same units, strictly above `lower_bound`.
+    /// * `coupon_rate` - Nonnegative decimal coupon for the accrual period; callers include any year fraction.
+    /// * `notional` - Principal amount in the currency supplied later to `Payoff::value`.
     ///
     /// # Errors
     ///
@@ -77,7 +74,6 @@ impl RangeAccrualPayoff {
         upper_bound: f64,
         coupon_rate: f64,
         notional: f64,
-        currency: Currency,
     ) -> finstack_quant_core::Result<Self> {
         Self::new_with_history(
             observation_dates,
@@ -85,7 +81,6 @@ impl RangeAccrualPayoff {
             upper_bound,
             coupon_rate,
             notional,
-            currency,
             0,
             0,
         )
@@ -98,27 +93,24 @@ impl RangeAccrualPayoff {
     /// # Arguments
     ///
     /// * `observation_dates` - Future model times for each range check, sorted ascending; repeats retain observation multiplicity
-    /// * `lower_bound` - Lower bound of the range (effective/absolute)
-    /// * `upper_bound` - Upper bound of the range (must be > lower_bound)
-    /// * `coupon_rate` - Annual coupon rate
-    /// * `notional` - Notional amount
-    /// * `currency` - Currency
-    /// * `past_in_range` - Number of past observations that were in range
-    /// * `total_past_observations` - Total number of past observations
+    /// * `lower_bound` - Inclusive lower barrier in absolute spot units.
+    /// * `upper_bound` - Inclusive upper barrier in the same units, strictly above `lower_bound`.
+    /// * `coupon_rate` - Nonnegative decimal coupon for the accrual period; callers include any year fraction.
+    /// * `notional` - Principal amount in the currency supplied later to `Payoff::value`.
+    /// * `past_in_range` - Historical in-range observation count, at most `total_past_observations`.
+    /// * `total_past_observations` - All historical observations included in the accrued fraction denominator.
     ///
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] if `lower_bound >= upper_bound`,
     /// `coupon_rate` is negative, `past_in_range > total_past_observations`, or
     /// `observation_dates` are not finite, non-negative, and sorted in ascending order.
-    #[allow(clippy::too_many_arguments)]
     pub fn new_with_history(
         observation_dates: Vec<f64>,
         lower_bound: f64,
         upper_bound: f64,
         coupon_rate: f64,
         notional: f64,
-        currency: Currency,
         past_in_range: usize,
         total_past_observations: usize,
     ) -> finstack_quant_core::Result<Self> {
@@ -171,7 +163,6 @@ impl RangeAccrualPayoff {
             upper_bound,
             coupon_rate,
             notional,
-            currency,
             past_in_range,
             total_past_observations,
             days_in_range: 0,
@@ -287,7 +278,6 @@ mod tests {
             105.0, // Upper bound
             0.08,  // 8% coupon
             100_000.0,
-            Currency::USD,
         )
         .expect("valid range accrual inputs");
 
@@ -299,15 +289,8 @@ mod tests {
     #[test]
     fn test_range_accrual_in_range() {
         let observation_dates = vec![0.25, 0.5];
-        let mut accrual = RangeAccrualPayoff::new(
-            observation_dates,
-            95.0,
-            105.0,
-            0.08,
-            100_000.0,
-            Currency::USD,
-        )
-        .expect("valid range accrual inputs");
+        let mut accrual = RangeAccrualPayoff::new(observation_dates, 95.0, 105.0, 0.08, 100_000.0)
+            .expect("valid range accrual inputs");
 
         // Both observations in range
         let mut state1 = PathState::new(10, 0.25);
@@ -318,7 +301,8 @@ mod tests {
         state2.set(state_keys::SPOT, 98.0);
         accrual.on_event(&mut state2).expect("valid payoff event");
 
-        let value = accrual.value(Currency::USD).expect("valid payoff");
+        let value = accrual.value(Currency::EUR).expect("valid payoff");
+        assert_eq!(value.currency(), Currency::EUR);
         // 2 days in range / 2 total = 1.0 fraction
         // Payoff = 0.08 * 1.0 * 100_000 = 8_000
         assert!((value.amount() - 8_000.0).abs() < 1e-6);
@@ -327,15 +311,8 @@ mod tests {
     #[test]
     fn test_range_accrual_partial() {
         let observation_dates = vec![0.25, 0.5, 0.75];
-        let mut accrual = RangeAccrualPayoff::new(
-            observation_dates,
-            95.0,
-            105.0,
-            0.08,
-            100_000.0,
-            Currency::USD,
-        )
-        .expect("valid range accrual inputs");
+        let mut accrual = RangeAccrualPayoff::new(observation_dates, 95.0, 105.0, 0.08, 100_000.0)
+            .expect("valid range accrual inputs");
 
         // Only 2 out of 3 in range
         let mut state1 = PathState::new(10, 0.25);
@@ -359,15 +336,8 @@ mod tests {
     #[test]
     fn test_range_accrual_boundary() {
         let observation_dates = vec![0.25];
-        let mut accrual = RangeAccrualPayoff::new(
-            observation_dates,
-            95.0,
-            105.0,
-            0.08,
-            100_000.0,
-            Currency::USD,
-        )
-        .expect("valid range accrual inputs");
+        let mut accrual = RangeAccrualPayoff::new(observation_dates, 95.0, 105.0, 0.08, 100_000.0)
+            .expect("valid range accrual inputs");
 
         // Exactly at lower boundary (should be in range)
         let mut state = PathState::new(10, 0.25);
@@ -387,15 +357,8 @@ mod tests {
     #[test]
     fn test_range_accrual_reset() {
         let observation_dates = vec![0.25];
-        let mut accrual = RangeAccrualPayoff::new(
-            observation_dates,
-            95.0,
-            105.0,
-            0.08,
-            100_000.0,
-            Currency::USD,
-        )
-        .expect("valid range accrual inputs");
+        let mut accrual = RangeAccrualPayoff::new(observation_dates, 95.0, 105.0, 0.08, 100_000.0)
+            .expect("valid range accrual inputs");
 
         let mut state = PathState::new(10, 0.25);
         state.set(state_keys::SPOT, 100.0);
@@ -421,7 +384,6 @@ mod tests {
             105.0,
             0.08,
             100_000.0,
-            Currency::USD,
             1, // 1 past observation in range
             2, // 2 total past observations
         )
@@ -452,7 +414,6 @@ mod tests {
             105.0,
             0.08,
             100_000.0,
-            Currency::USD,
             3, // 3 past in range
             5, // 5 total past
         )
@@ -476,15 +437,8 @@ mod tests {
     fn test_range_accrual_multiple_observations_per_step() {
         // Test that multiple observations are handled when time step overshoots
         let observation_dates = vec![0.1, 0.2, 0.3]; // Close together
-        let mut accrual = RangeAccrualPayoff::new(
-            observation_dates,
-            95.0,
-            105.0,
-            0.08,
-            100_000.0,
-            Currency::USD,
-        )
-        .expect("valid range accrual inputs");
+        let mut accrual = RangeAccrualPayoff::new(observation_dates, 95.0, 105.0, 0.08, 100_000.0)
+            .expect("valid range accrual inputs");
 
         // Single time step that passes all observations
         let mut state = PathState::new(10, 0.5); // Time = 0.5, past all observations
@@ -499,37 +453,13 @@ mod tests {
     #[test]
     fn test_range_accrual_rejects_degenerate_inputs() {
         // Inverted bounds: lower >= upper.
-        assert!(RangeAccrualPayoff::new(
-            vec![0.25, 0.5],
-            105.0,
-            95.0,
-            0.08,
-            100_000.0,
-            Currency::USD,
-        )
-        .is_err());
+        assert!(RangeAccrualPayoff::new(vec![0.25, 0.5], 105.0, 95.0, 0.08, 100_000.0,).is_err());
 
         // Negative coupon rate.
-        assert!(RangeAccrualPayoff::new(
-            vec![0.25, 0.5],
-            95.0,
-            105.0,
-            -0.01,
-            100_000.0,
-            Currency::USD,
-        )
-        .is_err());
+        assert!(RangeAccrualPayoff::new(vec![0.25, 0.5], 95.0, 105.0, -0.01, 100_000.0,).is_err());
 
         // Unsorted observation dates.
-        assert!(RangeAccrualPayoff::new(
-            vec![0.5, 0.25],
-            95.0,
-            105.0,
-            0.08,
-            100_000.0,
-            Currency::USD,
-        )
-        .is_err());
+        assert!(RangeAccrualPayoff::new(vec![0.5, 0.25], 95.0, 105.0, 0.08, 100_000.0,).is_err());
 
         // past_in_range exceeds total_past_observations.
         assert!(RangeAccrualPayoff::new_with_history(
@@ -538,7 +468,6 @@ mod tests {
             105.0,
             0.08,
             100_000.0,
-            Currency::USD,
             3,
             2,
         )
@@ -546,11 +475,10 @@ mod tests {
     }
     #[test]
     fn equal_time_range_observations_keep_distinct_carry_and_counts() {
-        let mut payoff =
-            RangeAccrualPayoff::new(vec![0.5, 0.5], 95.0, 105.0, 0.1, 1000.0, Currency::USD)
-                .expect("payoff")
-                .with_observation_multipliers(&[1.0, 0.9])
-                .expect("multipliers");
+        let mut payoff = RangeAccrualPayoff::new(vec![0.5, 0.5], 95.0, 105.0, 0.1, 1000.0)
+            .expect("payoff")
+            .with_observation_multipliers(&[1.0, 0.9])
+            .expect("multipliers");
         for _ in 0..2 {
             payoff.reset();
             let mut state = PathState::new(1, 0.5);

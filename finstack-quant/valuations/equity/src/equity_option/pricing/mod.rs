@@ -546,19 +546,23 @@ mod tests {
             sigma,
             t_vol: t,
         } = collect_inputs(&european, &curves, as_of).expect("inputs");
-        let mut params = finstack_quant_models::types::OptionMarketParams::call(
+        let mut params = finstack_quant_models::types::OptionMarketParams {
             spot,
-            european.strike,
+            strike: european.strike,
             rate,
-            sigma,
-            t,
-        );
+            volatility: sigma,
+            time_to_expiry: t,
+            dividend_yield: 0.0,
+            option_type: finstack_quant_models::types::OptionType::Call,
+        };
         params.dividend_yield = q;
-        let tree_european =
-            finstack_quant_models::trees::binomial_tree::BinomialTree::leisen_reimer(51)
-                .price_european(&params)
-                .expect("European lattice")
-                * european.quantity;
+        let tree_european = finstack_quant_models::trees::binomial_tree::BinomialTree::new(
+            51,
+            finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer,
+        )
+        .price_european(&params)
+        .expect("European lattice")
+            * european.quantity;
         assert!(american_pv.amount() >= tree_european);
         assert!((tree_european - european_pv.amount()).abs() < 0.01 * european.quantity);
     }

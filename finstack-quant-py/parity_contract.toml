@@ -553,9 +553,8 @@ public = [
 # the Rust `LiquidityConfig::try_new`), `LiquidityTier` (surfaced as
 # the `"tier1".."tier5"` strings) and `SpreadVolatilityKind` (surfaced as the
 # `"relative"` / `"absolute"` strings on `LiquidityProfile`).
-# `KyleLambdaModel.lambda_from_series` is bound as the `kyle_lambda` free
-# function; the Rust argument order is `(returns, volumes, reference_price)`
-# in both hosts.
+# `kyle_lambda(returns, volumes, reference_price)` is the canonical Rust
+# estimator and uses the same argument order in both hosts.
 [crates.models.liquidity]
 python_package = "finstack_quant.models.liquidity"
 public = [
@@ -585,10 +584,9 @@ public = ["dtsm", "hull_white"]
 # `capfloor_hw1f_sigma_schedule_key`), `hw_b`, `hw_ln_a`,
 # `fd_instantaneous_forward`, `hw1f_caplet_price_from_dfs`,
 # `hw1f_term_caplet_price_from_dfs_with_model`,
-# `hw1f_delayed_coupon_adjustment` (shared delayed-payment pricing kernel),
-# and `hw1f_cap_floor_price_with_model`. WASM binds the same names under
-# `models.rates.hullWhite`; its facade makes `forwardCurve` optional because
-# wasm-bindgen cannot borrow an optional handle.
+# and `hw1f_delayed_coupon_adjustment` (shared delayed-payment pricing kernel).
+# WASM binds the same names under `models.rates.hullWhite`; both hosts require
+# explicit discount and forward curves, including single-curve calls.
 [crates.models.rates.hull_white]
 python_package = "finstack_quant.models.rates.hull_white"
 public = [
@@ -618,17 +616,17 @@ python_package = "finstack_quant.models.volatility"
 # `SabrParameters::quote_convention` (the hosts' `implied_vol` returns the
 # beta-dependent vol, documented on each method),
 # `SabrParameters::effective_rates` (the shift is on `SabrParameters.shift`),
-# `SabrParameters::{implied_vol_normal, implied_vol_lognormal}` (raw Hagan
-# expansions; hosts use `SabrParameters.implied_vol`, which selects the branch),
-# `SabrCalibrationOutcome` and the `*_with_diagnostics` / `*_with_derivatives`
-# / `*_with_atm_pinning` calibrator variants, `ArbitrageCheckConfig` /
+# `ArbitrageCheckConfig` /
 # `check_surface` on a `VolSurface`, and `SviParams::{validate, butterfly_violation}`
 # (validation runs in the constructor). `LocalVolSurface` is a class in Python
 # and a plain object with `localVol*` free functions in WASM; the Dupire
 # density check stays reachable through `check_local_vol_density_grid`.
+# `SabrCalibrator.calibrate` returns SabrCalibrationOutcome in both hosts;
+# WASM uses the schema-generated data object for parameters and diagnostics.
 public = [
     "ArbitrageReport",
     "LocalVolSurface",
+    "SabrCalibrationOutcome",
     "SabrCalibrator",
     "SabrParameters",
     "SabrSmile",
@@ -854,7 +852,9 @@ public = [
 # structs (`GaussianCopula`, `StudentTCopula`, `RandomFactorLoadingCopula`,
 # `MultiFactorCopula`) and recovery structs (`ConstantRecovery`,
 # `CorrelatedRecovery`) are reached through `CopulaSpec.build()` /
-# `RecoverySpec.build()`; `NearestCorrelationOpts` is flattened into
+# `RecoverySpec.build()`; its removed location shortcut is replaced by the
+# built model mean; sample_recovery and has_idiosyncratic_dispersion map directly.
+# `NearestCorrelationOpts` is flattened into
 # `nearest_correlation(max_iter=, tol=)`. `PortfolioLossResult` deserializes
 # through `PortfolioLossResult::from_losses` in both hosts. Host input conversion: the Python matrix functions also read nested rows or
 # a 2-D NumPy array (shape-checked by the Rust `flatten_square_matrix`); WASM
@@ -1036,7 +1036,9 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #   - credit::market_anchored (CreditVolatilityConversion; consumed inside the
 #     callable-lattice and revolver pricers)
 #   - credit::registry (embedded credit-assumptions registry; hosts reach it
-#     through the `*_assumptions()` / `from_registry_id()` constructors)
+#     through `default_calibration()` / exact `from_registry_id()` lookups;
+#     provider aliases and literal preset constructors are removed.
+#     `seniority_recovery_stats` requires an exact calibration ID in both hosts.)
 #   - merton::RawMertonModel (serde `try_from` funnel, not a public constructor)
 #   - migration::MigrationError, pd::PdCalibrationError,
 #     scoring::CreditScoringError (mapped to Python exceptions in errors.rs)
@@ -1843,8 +1845,6 @@ backlog_ceiling = { modules = 0, members = 0 }
 "finstack_quant.models.credit.ToggleExerciseModel.kind" = "serde tag of the Rust enum variant"
 "finstack_quant.models.credit.ToggleExerciseModel.params" = "the Rust enum variant's payload as a dict"
 "finstack_quant.models.credit.lgd.DownturnLgd.params" = "serde form of the Rust `method()` enum"
-"finstack_quant.models.credit.migration.GeneratorMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
-"finstack_quant.models.credit.migration.TransitionMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
 "finstack_quant.models.credit.migration.RatingPaths" = "host collection over the Rust `Vec<RatingPath>` returned by `MigrationSimulator::simulate`; Rust has no named type"
 "finstack_quant.models.credit.migration.RatingPaths.default_rate" = "share of the Rust paths that end in the default state"
 "finstack_quant.models.credit.migration.RatingPaths.paths" = "the Rust `Vec<RatingPath>`"
@@ -1868,14 +1868,11 @@ backlog_ceiling = { modules = 0, members = 0 }
 "finstack_quant.models.factor.risk.PositionResidualContribution.source_kind" = "variant of the Rust `source` enum (see the `risk` module note)"
 "finstack_quant.models.factor.risk.TailScenarioBreakdown.position_ids" = "position ids the Rust `position_pnls` are ordered by"
 "finstack_quant.models.factor.risk.position_component_var" = "free-function form of Rust `PositionRiskDecomposition::component_var` (see the `risk` module note)"
-"finstack_quant.models.liquidity.kyle_lambda" = "free-function form of Rust `KyleLambdaModel::lambda_from_series` (see `[crates.models.liquidity]`)"
 "finstack_quant.models.monte_carlo.Estimate.ci_lower" = "first element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.Estimate.ci_upper" = "second element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.MoneyEstimate.ci_lower" = "first element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.MoneyEstimate.ci_upper" = "second element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.LsmcPricer.antithetic" = "Rust `LsmcConfig::antithetic` of the pricer's config"
-"finstack_quant.models.monte_carlo.LsmcPricer.basis" = "Rust `LsmcConvenience::basis` (default regression basis)"
-"finstack_quant.models.monte_carlo.LsmcPricer.basis_degree" = "Rust `LsmcConvenience::basis_degree`"
 "finstack_quant.models.monte_carlo.LsmcPricer.num_paths" = "Rust `LsmcConfig::num_paths` of the pricer's config"
 "finstack_quant.models.monte_carlo.LsmcPricer.seed" = "Rust `LsmcConfig::seed` of the pricer's config"
 "finstack_quant.models.monte_carlo.LsmcPricer.use_parallel" = "Rust `LsmcConfig::use_parallel` of the pricer's config"
@@ -2054,6 +2051,8 @@ js = "models.credit.liabilityManagement"
 types = { ExchangeOfferAnalysis = "ExchangeOfferAnalysis", LeverageImpact = "LeverageImpact", LmeAnalysis = "LmeAnalysis" }
 
 [parity.modules."finstack_quant.models.credit.migration"]
+# TransitionMatrix.from_labeled <-> fromLabeled owns ordered-label validation;
+# Python's from_dataframe only converts pandas labels and values to that API.
 js = "models.credit.migration"
 
 [parity.modules."finstack_quant.models.credit.pd"]
@@ -2098,11 +2097,13 @@ js = "models.rates.dtsm"
 types = { FactorTimeSeries = "FactorTimeSeries", YieldForecast = "YieldForecast", YieldPcaView = "YieldPcaView" }
 
 [parity.modules."finstack_quant.models.rates.hull_white"]
+# HullWhiteParams schedule reads use get_sigma/get_times/get_values in Rust and Python;
+# WASM exposes getSigma/getTimes/getValues methods. The volatility JSON shape is unchanged.
 js = "models.rates.hullWhite"
 
 [parity.modules."finstack_quant.models.volatility"]
 js = "models.volatility"
-types = { ArbitrageReport = "ArbitrageReport", LocalVolSurface = "LocalVolSurface", SviParams = "SviParams" }
+types = { SabrCalibrationOutcome = "SabrCalibrationOutcome", ArbitrageReport = "ArbitrageReport", LocalVolSurface = "LocalVolSurface", SviParams = "SviParams" }
 
 [parity.modules."finstack_quant.portfolio"]
 js = "portfolio"

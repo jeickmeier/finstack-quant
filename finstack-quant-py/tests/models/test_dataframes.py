@@ -1,7 +1,7 @@
 """Tests for model-owned pandas ``DataFrame`` accessors.
 
 - ``models.monte_carlo``: ``PathSummary.to_dataframe``.
-- ``models.correlation``: ``PortfolioLossResult.to_distribution_dataframe``
+- ``models.correlation``: ``PortfolioLossResult.to_dataframe``
   / ``to_summary_dataframe``, ``TrancheLossStatistics.to_dataframe``.
 
 Everything is built through public constructors and calculators, so the tests
@@ -123,7 +123,7 @@ def _portfolio_loss_result() -> PortfolioLossResult:
 
 def test_portfolio_loss_distribution_dataframe_is_one_row_per_path() -> None:
     result = _portfolio_loss_result()
-    df = result.to_distribution_dataframe()
+    df = result.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["loss"]
     assert len(df) == len(result.losses)

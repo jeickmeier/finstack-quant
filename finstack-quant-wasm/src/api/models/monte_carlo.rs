@@ -14,14 +14,14 @@ use crate::utils::input::{
 };
 
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
+use finstack_quant_models::monte_carlo::convenience;
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{self, GbmEuropeanFdSpec};
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
+use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
-use finstack_quant_models::types::OptionType;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use wasm_bindgen::prelude::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -675,54 +675,7 @@ impl JsPathDependentPricer {
 /// Longstaff-Schwartz Monte Carlo pricer for American options under GBM.
 #[wasm_bindgen(js_name = LsmcPricer)]
 pub struct JsLsmcPricer {
-    inner: LsmcConvenience,
-}
-
-/// One LSMC pricing call after its overrides are resolved by Rust.
-struct LsmcCall {
-    pricer: finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer,
-    gbm: GbmInputs,
-    num_steps: usize,
-    currency: Option<Currency>,
-    basis: finstack_quant_models::monte_carlo::pricer::basis::BasisKind,
-    basis_degree: usize,
-}
-
-impl JsLsmcPricer {
-    #[allow(clippy::too_many_arguments)]
-    fn call(
-        &self,
-        spot: &JsValue,
-        strike: &JsValue,
-        rate: &JsValue,
-        div_yield: &JsValue,
-        vol: &JsValue,
-        expiry: &JsValue,
-        currency: Option<&JsValue>,
-        num_steps: Option<&JsValue>,
-        basis: Option<&JsValue>,
-        basis_degree: Option<&JsValue>,
-    ) -> Result<LsmcCall, JsValue> {
-        let gbm = gbm_inputs(spot, strike, rate, div_yield, vol, expiry)?;
-        let currency = js_opt_currency(currency, "currency")?;
-        let basis = js_opt_string(basis, "basis")?;
-        let (pricer, num_steps, basis, basis_degree) = self
-            .inner
-            .call_config(
-                js_opt_uint(num_steps, "numSteps")?,
-                basis.as_deref(),
-                js_opt_uint(basis_degree, "basisDegree")?,
-            )
-            .map_err(to_js_err)?;
-        Ok(LsmcCall {
-            pricer,
-            gbm,
-            num_steps,
-            currency,
-            basis,
-            basis_degree,
-        })
-    }
+    inner: LsmcPricer,
 }
 
 #[wasm_bindgen(js_class = LsmcPricer)]
@@ -751,7 +704,7 @@ impl JsLsmcPricer {
         antithetic: Option<JsValue>,
     ) -> Result<JsLsmcPricer, JsValue> {
         let basis = js_opt_string(basis.as_ref(), "basis")?;
-        LsmcConvenience::new(
+        LsmcPricer::new(
             js_opt_uint(num_paths.as_ref(), "numPaths")?,
             js_opt_u64(seed.as_ref(), "seed")?,
             js_opt_bool(use_parallel.as_ref(), "useParallel")?,
@@ -840,32 +793,27 @@ impl JsLsmcPricer {
         basis_degree: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
-        let call = self.call(
-            &spot,
-            &strike,
-            &rate,
-            &div_yield,
-            &vol,
-            &expiry,
-            currency.as_ref(),
-            num_steps.as_ref(),
-            basis.as_ref(),
-            basis_degree.as_ref(),
-        )?;
-        let estimate = call
-            .pricer
+        let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
+        let currency = js_opt_currency(currency.as_ref(), "currency")?;
+        let num_steps = js_opt_uint(num_steps.as_ref(), "numSteps")?;
+        let basis = js_opt_string(basis.as_ref(), "basis")?;
+        let basis_degree = js_opt_uint(basis_degree.as_ref(), "basisDegree")?;
+        let estimate = self
+            .inner
             .price_american(
-                option_type,
-                call.gbm.spot,
-                call.gbm.strike,
-                call.gbm.rate,
-                call.gbm.div_yield,
-                call.gbm.vol,
-                call.gbm.expiry,
-                call.num_steps,
-                call.currency,
-                call.basis,
-                call.basis_degree,
+                &OptionMarketParams {
+                    option_type,
+                    spot: gbm.spot,
+                    strike: gbm.strike,
+                    rate: gbm.rate,
+                    dividend_yield: gbm.div_yield,
+                    volatility: gbm.vol,
+                    time_to_expiry: gbm.expiry,
+                },
+                num_steps,
+                currency,
+                basis.as_deref(),
+                basis_degree,
             )
             .map_err(to_js_err)?;
         to_js_value(&estimate)
@@ -916,32 +864,27 @@ impl JsLsmcPricer {
     ) -> Result<JsValue, JsValue> {
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
         let pricing_seed = js_u64(&pricing_seed, "pricingSeed")?;
-        let call = self.call(
-            &spot,
-            &strike,
-            &rate,
-            &div_yield,
-            &vol,
-            &expiry,
-            currency.as_ref(),
-            num_steps.as_ref(),
-            basis.as_ref(),
-            basis_degree.as_ref(),
-        )?;
-        let estimate = call
-            .pricer
+        let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
+        let currency = js_opt_currency(currency.as_ref(), "currency")?;
+        let num_steps = js_opt_uint(num_steps.as_ref(), "numSteps")?;
+        let basis = js_opt_string(basis.as_ref(), "basis")?;
+        let basis_degree = js_opt_uint(basis_degree.as_ref(), "basisDegree")?;
+        let estimate = self
+            .inner
             .price_american_unbiased(
-                option_type,
-                call.gbm.spot,
-                call.gbm.strike,
-                call.gbm.rate,
-                call.gbm.div_yield,
-                call.gbm.vol,
-                call.gbm.expiry,
-                call.num_steps,
-                call.currency,
-                call.basis,
-                call.basis_degree,
+                &OptionMarketParams {
+                    option_type,
+                    spot: gbm.spot,
+                    strike: gbm.strike,
+                    rate: gbm.rate,
+                    dividend_yield: gbm.div_yield,
+                    volatility: gbm.vol,
+                    time_to_expiry: gbm.expiry,
+                },
+                num_steps,
+                currency,
+                basis.as_deref(),
+                basis_degree,
                 pricing_seed,
             )
             .map_err(to_js_err)?;

@@ -74,7 +74,7 @@ impl BarrierOptionHestonMcPricer {
             finstack_quant_valuations_core::instruments::pricing::heston_market::heston_params_from_market_strict(
                 market, r, q,
             )?;
-        let v0 = heston_params.v0;
+        let v0 = heston_params.model.v0;
         let sigma = v0.sqrt();
         let process = HestonProcess::new(heston_params).with_drift_schedule(std::sync::Arc::new(
             super::pricer::barrier_drift(inst, market, as_of, q)?,

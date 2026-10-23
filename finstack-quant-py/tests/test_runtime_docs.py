@@ -123,6 +123,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
     "finstack_quant.cashflows.schema": _SCHEMA_REGISTRY,
     "finstack_quant.core.schema": _SCHEMA_REGISTRY,
     "finstack_quant.margin.schema": _SCHEMA_REGISTRY,
+    "finstack_quant.models.credit.migration": ("TransitionMatrix.from_labeled",),
     "finstack_quant.models.factor.schema": _SCHEMA_REGISTRY,
     "finstack_quant.portfolio.schema": _SCHEMA_REGISTRY,
     "finstack_quant.scenarios.schema": _SCHEMA_REGISTRY,

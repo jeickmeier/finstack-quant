@@ -65,7 +65,7 @@ fn test_moodys_warf_factor_nr() {
 #[test]
 fn test_rating_factor_table_creation() {
     // Arrange & Act
-    let table = RatingFactorTable::moodys_standard().expect("registry table");
+    let table = RatingFactorTable::default_calibration().expect("registry table");
 
     // Assert
     assert_eq!(table.agency(), "Moody's");

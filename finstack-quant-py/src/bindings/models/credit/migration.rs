@@ -8,7 +8,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::{kinded_to_py, value_error};
+use crate::bindings::pydoc::pydoc;
+use crate::errors::kinded_to_py;
 
 /// Build a labelled square `pd.DataFrame` (`index` = origin, `columns` = destination).
 fn labelled_square_frame<'py>(
@@ -263,24 +264,34 @@ impl PyTransitionMatrix {
     ) -> PyResult<Self> {
         let index: Vec<String> = df.getattr("index")?.call_method0("tolist")?.extract()?;
         let columns: Vec<String> = df.getattr("columns")?.call_method0("tolist")?.extract()?;
-        if index != columns {
-            return Err(value_error(
-                "from_dataframe requires identical index and column labels in scale order",
-            ));
-        }
-        let scale = match scale {
-            Some(scale) => scale.inner.clone(),
-            None => RatingScale::custom(index).map_err(kinded_to_py)?,
-        };
+        Self::from_labeled(index, columns, &df.getattr("values")?, horizon, scale)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.from_labeled")]
+    #[staticmethod]
+    #[pyo3(signature = (row_labels, column_labels, data, horizon, scale = None))]
+    fn from_labeled(
+        row_labels: Vec<String>,
+        column_labels: Vec<String>,
+        data: &Bound<'_, PyAny>,
+        horizon: f64,
+        scale: Option<&PyRatingScale>,
+    ) -> PyResult<Self> {
         let data = crate::bindings::matrix_input::extract_square_matrix(
-            df.py(),
-            &df.getattr("values")?,
-            scale.n_states(),
+            data.py(),
+            data,
+            row_labels.len(),
             "data",
         )?;
-        TransitionMatrix::new(scale, &data, horizon)
-            .map(Self::from_inner)
-            .map_err(kinded_to_py)
+        TransitionMatrix::from_labeled(
+            &row_labels,
+            &column_labels,
+            &data,
+            horizon,
+            scale.map(|scale| scale.inner.clone()),
+        )
+        .map(Self::from_inner)
+        .map_err(kinded_to_py)
     }
 
     /// Transition probability from one labelled state to another.
@@ -324,7 +335,7 @@ impl PyTransitionMatrix {
 
     /// Row-major copy of the underlying matrix as nested lists.
     #[pyo3(text_signature = "($self)")]
-    fn to_matrix(&self) -> Vec<Vec<f64>> {
+    fn to_rows(&self) -> Vec<Vec<f64>> {
         self.inner.to_rows()
     }
 
@@ -464,7 +475,7 @@ impl PyGeneratorMatrix {
 
     /// Row-major copy of the underlying matrix as nested lists.
     #[pyo3(text_signature = "($self)")]
-    fn to_matrix(&self) -> Vec<Vec<f64>> {
+    fn to_rows(&self) -> Vec<Vec<f64>> {
         self.inner.to_rows()
     }
 

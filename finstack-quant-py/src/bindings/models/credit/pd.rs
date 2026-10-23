@@ -281,31 +281,13 @@ impl PyMasterScale {
             .map_err(kinded_to_py)
     }
 
-    /// Library PD-band assumptions using S&P-style labels.
+    /// Load the calibration selected by the embedded registry's default ID.
     ///
-    /// The labels resemble S&P notation as a reporting convention only;
-    /// neither the boundaries nor the central PDs are agency-published
-    /// statistics.
-    ///
-    /// Raises ``ValueError`` if the embedded credit registry is invalid.
+    /// Raises ``ValueError`` if the registry or its configured default is malformed.
     #[staticmethod]
     #[pyo3(text_signature = "()")]
-    fn sp_assumptions() -> PyResult<Self> {
-        MasterScale::sp_assumptions()
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Library PD-band assumptions using Moody's-style labels.
-    ///
-    /// As with ``sp_assumptions``, the labels are a reporting convention
-    /// rather than an agency calibration.
-    ///
-    /// Raises ``ValueError`` if the embedded credit registry is invalid.
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn moodys_assumptions() -> PyResult<Self> {
-        MasterScale::moodys_assumptions()
+    fn default_calibration() -> PyResult<Self> {
+        MasterScale::default_calibration()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }

@@ -313,7 +313,7 @@ test('every endogenous-hazard factory is bound and validates (F149)', () => {
 });
 
 test('rating-factor tables come from the Rust registry', () => {
-  const table = credit.RatingFactorTable.moodysStandard();
+  const table = credit.RatingFactorTable.defaultCalibration();
   assert.equal(typeof table.agency, 'string');
   assert.equal(typeof table.methodology, 'string');
   assert.equal(table.getFactor('B2'), credit.moodysWarfFactor('B2'));

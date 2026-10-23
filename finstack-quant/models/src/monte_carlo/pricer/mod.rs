@@ -5,7 +5,7 @@
 //! `path_dependent` and `lsmc` modules expose richer workflows for
 //! path-dependent contracts and early-exercise problems. GBM Asian and
 //! American convenience entry points used by host bindings live on
-//! [`path_dependent::PathDependentPricer`] and [`lsmc::LsmcPricer`].
+//! [`path_dependent::PathDependentPricer`] and [`lsmc::LsmcEngine`].
 //!
 //! These pricers bundle process, discretization, and engine choices for common
 //! use cases; the lower-level engine remains the more flexible option when you

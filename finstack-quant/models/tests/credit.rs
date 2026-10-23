@@ -50,7 +50,7 @@ fn credit_workflow_maps_migration_and_loss_modules_together() {
     assert!(pd_1y > 0.0);
     assert!(pd_1y > pd_half, "one-year PD must exceed the half-year PD");
 
-    let mapped = MasterScale::sp_assumptions()
+    let mapped = MasterScale::default_calibration()
         .unwrap()
         .map_pd(pd_1y)
         .unwrap();
