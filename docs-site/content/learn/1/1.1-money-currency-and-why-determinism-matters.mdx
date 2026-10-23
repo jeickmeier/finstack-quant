@@ -14,8 +14,6 @@ api:
 - finstack_quant.core.currency.Currency
 - finstack_quant.core.market_data.DiscountCurve
 - finstack_quant.core.market_data.FxMatrix
-- finstack_quant.core.market_data.fx_market_pair
-- finstack_quant.core.market_data.fx_pip_size
 - finstack_quant.core.market_data.invert_fx_rate
 - finstack_quant.core.money.Money
 - finstack_quant.core.types.Bps
@@ -90,7 +88,7 @@ from decimal import Decimal
 from finstack_quant.core.money import Money
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.config import FinstackConfig, RoundingMode
-from finstack_quant.core.market_data import FxMatrix, fx_market_pair, fx_pip_size, invert_fx_rate
+from finstack_quant.core.market_data import FxMatrix, fx_pair_convention, invert_fx_rate
 from finstack_quant.valuations.instruments import price_instrument
 from _shared.analyst_book import book_spec, build_book, build_market, instruments
 AS_OF = date(2025, 1, 15)
@@ -161,13 +159,13 @@ The intermediate USD units cancel. The reciprocal is EUR per JPY, so multiplying
 ```python exec id=exercise-fx-triangulation role=exercise
 from datetime import date
 from finstack_quant.core.currency import Currency
-from finstack_quant.core.market_data import FxMatrix, fx_pip_size, invert_fx_rate
+from finstack_quant.core.market_data import FxMatrix, fx_pair_convention, invert_fx_rate
 AS_OF = date(2025, 1, 15)
 crosses=FxMatrix()
 crosses.set_quotes([(Currency('EUR'),Currency('USD'),1.08)])
 crosses.set_quotes([(Currency('USD'),Currency('JPY'),150.0)])
 eur_jpy=crosses.rate('EUR','JPY',AS_OF).rate
-print({'JPY_per_EUR':eur_jpy,'JPY_pip':fx_pip_size('EUR','JPY'),'EUR_per_JPY':invert_fx_rate(eur_jpy)})
+print({'JPY_per_EUR':eur_jpy,'JPY_pip':fx_pair_convention('EUR','JPY').pip_size,'EUR_per_JPY':invert_fx_rate(eur_jpy)})
 ```
 {/* /notebook-block */}
 

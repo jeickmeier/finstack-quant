@@ -47,8 +47,6 @@
       "finstack_quant.core.currency.Currency",
       "finstack_quant.core.market_data.DiscountCurve",
       "finstack_quant.core.market_data.FxMatrix",
-      "finstack_quant.core.market_data.fx_market_pair",
-      "finstack_quant.core.market_data.fx_pip_size",
       "finstack_quant.core.market_data.invert_fx_rate",
       "finstack_quant.core.money.Money",
       "finstack_quant.core.types.Bps",

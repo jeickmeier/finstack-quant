@@ -7769,17 +7769,6 @@ export interface CoreNamespace {
    */
   FxPairConvention: FxPairConventionConstructor;
   /**
-   * Order two currencies into the market CCY1/CCY2 pair.
-   *
-   * Priority is EUR > GBP > AUD > NZD > USD > other, with a stable ISO-4217
-   * alphabetic tie-break when both sides share the same rank.
-   * @param a - First currency ISO code of the unordered pair. Need not be market CCY1.
-   * @param b - Second currency ISO code of the unordered pair. Need not be market CCY2.
-   * @returns A two-element array `[CCY1, CCY2]` of `Currency` handles in market order.
-   * @throws Error - Throws a JavaScript exception if either code is not a recognized ISO-4217 alphabetic currency.
-   */
-  fxMarketPair(a: string, b: string): Currency[];
-  /**
    * Market convention for an unordered currency pair.
    *
    * Returned `base` / `quote` are always the market CCY1/CCY2, even when the
@@ -7790,17 +7779,6 @@ export interface CoreNamespace {
    * @throws Error - Throws a JavaScript exception if either code is not a recognized ISO-4217 alphabetic currency.
    */
   fxPairConvention(base: string, quote: string): FxPairConvention;
-  /**
-   * Pip size in outright-rate units for a currency pair.
-   *
-   * Returns `0.01` when either side is JPY, KRW, or HUF; otherwise `0.0001`.
-   * Argument order does not matter.
-   * @param base - One currency ISO code of the pair. Order is not significant.
-   * @param quote - The other currency ISO code of the pair. Order is not significant.
-   * @returns Pip size as a decimal increment of the outright FX rate.
-   * @throws Error - Throws a JavaScript exception if either code is not a recognized ISO-4217 alphabetic currency.
-   */
-  fxPipSize(base: string, quote: string): number;
   /**
    * Reciprocal of a strictly positive finite FX rate.
    * @param rate - Outright FX rate to invert, in quote-per-base units. Must be finite and strictly positive; the reciprocal must also be a valid FX rate.

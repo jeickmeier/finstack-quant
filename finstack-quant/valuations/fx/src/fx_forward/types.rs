@@ -381,7 +381,7 @@ impl FxForward {
     /// Create an FX forward from spot plus forward points quoted in pips.
     ///
     /// Converts pips to decimal points with
-    /// [`fx_pip_size`](finstack_quant_core::money::fx::fx_pip_size) for this
+    /// [`FxPairConvention::pip_size`](finstack_quant_core::money::fx::FxPairConvention) for this
     /// instrument's stored `base_currency` / `quote_currency`, then delegates
     /// to [`with_forward_points`](Self::with_forward_points). Pip size is
     /// `0.01` when either side is JPY, KRW, or HUF, otherwise `0.0001`.
@@ -431,8 +431,11 @@ impl FxForward {
                 pips
             )));
         }
-        let pip_size =
-            finstack_quant_core::money::fx::fx_pip_size(self.base_currency, self.quote_currency);
+        let pip_size = finstack_quant_core::money::fx::fx_pair_convention(
+            self.base_currency,
+            self.quote_currency,
+        )
+        .pip_size;
         self.with_forward_points(spot_rate, pips * pip_size)
     }
 

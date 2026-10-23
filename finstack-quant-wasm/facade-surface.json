@@ -733,9 +733,7 @@
       "finiteMaxOrNan",
       "finiteMinOrNan",
       "fiscalYear",
-      "fxMarketPair",
       "fxPairConvention",
-      "fxPipSize",
       "immOptionExpiry",
       "invertFxRate",
       "isCdsDate",
@@ -1610,13 +1608,7 @@
     "methods": ["free"],
     "getters": ["base", "pipSize", "quote", "settlementDays", "usdQuotation"]
   },
-  "core.fxMarketPair": {
-    "kind": "function"
-  },
   "core.fxPairConvention": {
-    "kind": "function"
-  },
-  "core.fxPipSize": {
     "kind": "function"
   },
   "core.invertFxRate": {
