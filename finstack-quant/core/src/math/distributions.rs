@@ -10,16 +10,15 @@
 //! - **Binomial**: Binary outcomes (coin flips, defaults)
 //!
 //! ## Continuous Distributions
-//! - **Gamma**: Shape-scale family, variance modeling
 //! - **Beta**: Bounded \[0,1\] values (recovery rates, correlations)
 //! - **Chi-Squared**: Variance estimation, CIR model, hypothesis testing
 //!
 //! # Numerical Stability
 //!
 //! - Log-space calculations prevent overflow for large parameters
-//! - Stirling's approximation for factorials when n ≥ 20
+//! - Binomial PMF via a log-space recurrence (no factorials), renormalized to unit mass
 //! - Defensive checks for boundary conditions (p=0, p=1, k>n)
-//! - Uses battle-tested `statrs` crate for PDF/CDF implementations
+//! - Gamma-function and incomplete-gamma evaluation delegates to the `statrs` crate
 //!
 //! # Use Cases
 //!

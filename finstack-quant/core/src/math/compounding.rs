@@ -147,7 +147,6 @@ impl Compounding {
     ///
     /// ```text
     /// Continuous:   DF = exp(-r × t)
-    /// Annual:       DF = (1 + r)^(-t)
     /// Periodic(n):  DF = (1 + r/n)^(-n × t)
     /// Simple:       DF = 1 / (1 + r × t)
     /// ```
@@ -191,7 +190,6 @@ impl Compounding {
     ///
     /// ```text
     /// Continuous: r = -ln(DF) / t
-    /// Annual: r = DF^(-1/t) - 1
     /// Periodic(n): r = n × (DF^(-1/(n×t)) - 1)
     /// Simple: r = (1/DF - 1) / t
     /// ```
@@ -233,7 +231,6 @@ impl Compounding {
     ///
     /// ```text
     /// Continuous: c = r
-    /// Annual: c = ln(1 + r)
     /// Periodic(n): c = n × ln(1 + r/n)
     /// Simple: c = r (DF = 1/(1 + r t) → e^(-r t) as t → 0)
     /// ```
@@ -255,7 +252,6 @@ impl Compounding {
     ///
     /// ```text
     /// Continuous: r = c
-    /// Annual: r = e^c − 1
     /// Periodic(n): r = n × (e^(c/n) − 1)
     /// Simple: r = c
     /// ```

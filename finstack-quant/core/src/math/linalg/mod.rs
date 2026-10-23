@@ -483,7 +483,10 @@ fn is_exactly_lower_triangular(factor: &[f64], n: usize) -> bool {
 ///
 /// # Returns
 ///
-/// [`CorrelationFactor`] with the unpermuted lower-triangular factor.
+/// [`CorrelationFactor`] holding the factor in the original variable order. It
+/// satisfies `L Lᵀ = matrix` but is generally not lower triangular once pivoting
+/// reorders variables; apply it with [`CorrelationFactor::apply`], not
+/// [`apply_lower_triangular`].
 ///
 /// # Errors
 ///
@@ -673,10 +676,6 @@ pub fn cholesky_correlation(
 /// assert!((sorted[0] - 2.0).abs() < 1e-12);
 /// assert!((sorted[1] - 5.0).abs() < 1e-12);
 /// ```
-///
-/// Exposed as a shared helper so downstream crates (`finstack-quant-valuations`,
-/// etc.) can delegate their eigendecomposition without pulling `nalgebra`
-/// in as a direct dependency.
 ///
 /// # Arguments
 ///
@@ -1137,8 +1136,9 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64], x: &mut [f64]) -> Result<()> {
 /// Validate a flattened row-major correlation matrix with located diagnostics.
 ///
 /// Checks matrix size, unit diagonal, coefficient bounds, symmetry, and
-/// positive semidefiniteness in that order. Numerical thresholds and Cholesky
-/// semantics are identical to [`validate_correlation_matrix`].
+/// positive semidefiniteness in that order. The diagonal and symmetry checks
+/// use [`DIAGONAL_TOLERANCE`] and [`SYMMETRY_TOLERANCE`]; positive
+/// semidefiniteness is tested with [`cholesky_correlation`].
 ///
 /// # Arguments
 ///

@@ -173,7 +173,9 @@ impl HazardCurve {
     ///
     /// An exact knot match shocks that knot. Otherwise the segment containing
     /// the requested tenor is shocked; targets beyond the final knot are a
-    /// no-op. Requests are applied in order, so repeated targets are additive.
+    /// no-op. A curve with a single knot has no segment to shock, so every
+    /// tenor shock is applied to that knot as one parallel bump. Requests are
+    /// applied in order, so repeated targets are additive.
     /// Stored par-spread and calibration recipes are intentionally removed.
     ///
     /// # Arguments

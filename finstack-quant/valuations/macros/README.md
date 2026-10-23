@@ -82,12 +82,11 @@ supplies a fallback for a field that stays required:
 |-------|-----------|---------------------|
 | `Option<Inner>` | optional | stays `None` |
 | named `attributes` | optional | `Default::default()` |
-| anything else | required | `build()` returns `InputError::Invalid` |
+| anything else | required | `build()` returns a validation error naming the field |
 | non-`Option` field with `#[builder(default …)]` | required, but defaulted | the default expression |
 
-A missing required field produces `finstack_quant_core::InputError::Invalid`
-("Invalid input data"), converted into `Error::Input`. The error does **not**
-name the missing field.
+A missing required field produces `finstack_quant_core::Error::Validation`
+with the message `"<Builder>: missing required field '<field>'"`.
 
 ### Attributes
 

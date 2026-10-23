@@ -219,7 +219,7 @@ const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
 ///   Parameters." *SIAM Journal*, 11(2), 431-441.
 #[derive(Clone, Debug)]
 pub struct LevenbergMarquardtSolver {
-    /// Convergence tolerance for gradient norm
+    /// Convergence tolerance on the residual norm
     pub tolerance: f64,
     /// Maximum iterations
     pub max_iterations: usize,
