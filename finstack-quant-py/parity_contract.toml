@@ -1975,6 +1975,8 @@ js = "core"
 types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan", ScheduleErrorPolicy = "ScheduleErrorPolicy", StubKind = "StubKind", Thirty360Convention = "Thirty360Convention" }
 
 [parity.modules."finstack_quant.core.market_data"]
+# HazardCurve.conditional_default_prob maps by the snake_case/camelCase rule
+# to conditionalDefaultProb; both hosts delegate date interval integration to Rust.
 js = "core"
 types = { SabrParameterData = "SabrParameterData" }
 constructors = { SabrParameterData = "core.sabrParameterDataNew" }
