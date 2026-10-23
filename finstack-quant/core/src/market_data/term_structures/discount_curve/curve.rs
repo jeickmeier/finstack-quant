@@ -109,11 +109,6 @@ impl DiscountCurve {
             } else {
                 compounding.df_from_rate(r, t)
             };
-            if !df.is_finite() || df <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "DiscountCurve::from_zero_rates: rate {r} at t={t} gives invalid discount factor {df}"
-                )));
-            }
             knots.push((t, df));
         }
         if !knots.iter().any(|&(t, _)| t == 0.0) {
@@ -620,9 +615,8 @@ impl DiscountCurve {
     /// # Errors
     ///
     /// Returns `Error::Validation` when `tenor_years` is non-finite or not
-    /// strictly positive, `InputError::TooFewPoints` when the discount curve
-    /// has fewer than two knots, or an error when the derived forward curve
-    /// fails validation.
+    /// strictly positive, or an error when the derived forward curve fails
+    /// validation.
     pub fn to_forward_curve(
         &self,
         forward_id: impl Into<CurveId>,
@@ -639,10 +633,6 @@ impl DiscountCurve {
         // not be applied to already-derived forward-rate ordinates.
         let style = interp_style.unwrap_or(InterpStyle::Linear);
         let mut forward_rates = Vec::with_capacity(self.knots.len());
-
-        if self.knots.len() < 2 {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
 
         for &t in self.knots.iter() {
             let df_start = self.df(t);

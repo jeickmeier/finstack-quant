@@ -167,7 +167,7 @@ impl ForwardCurveBuilder {
         let projection_grid = self
             .projection_grid
             .map(|grid| {
-                let last_knot = *kvec.last().ok_or(InputError::TooFewPoints)?;
+                let last_knot = kvec[kvec.len() - 1];
                 if grid.len() < 2
                     || grid.iter().any(|time| !time.is_finite() || *time < 0.0)
                     || grid[0].abs() > 1e-12
