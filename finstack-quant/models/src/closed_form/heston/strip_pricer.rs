@@ -86,12 +86,6 @@ impl HestonStripPricer {
         let tail_window_start = settings.u_max * (1.0 - HESTON_TAIL_WINDOW_FRACTION);
 
         for (phi, _) in &grid {
-            if phi.abs() < settings.phi_eps {
-                psi1_over_iphi.push(Complex::new(0.0, 0.0));
-                psi2_over_iphi.push(Complex::new(0.0, 0.0));
-                continue;
-            }
-
             interior_nodes += 1;
             let denom = i * *phi;
             let (psi1, status1) = heston_pj_characteristic_function(
@@ -317,9 +311,6 @@ pub(super) fn heston_pj_on_grid(
     let mut ok_nodes = 0_usize;
 
     for (phi, weight) in grid {
-        if phi.abs() < settings.phi_eps {
-            continue;
-        }
         interior_nodes += 1;
 
         let (psi, status) = heston_pj_characteristic_function(
