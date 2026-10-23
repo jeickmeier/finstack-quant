@@ -102,12 +102,6 @@ fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
         // Retain the existing economic precedence before resolving representation ties.
         .then_with(|| (a.kind as usize).cmp(&(b.kind as usize)))
         .then_with(|| {
-            a.accrual
-                .as_ref()
-                .map(|value| value.day_count as usize)
-                .cmp(&b.accrual.as_ref().map(|value| value.day_count as usize))
-        })
-        .then_with(|| {
             a.amount
                 .amount_decimal()
                 .serialize()
@@ -835,9 +829,7 @@ impl CashFlowSchedule {
         weighted_average_life_from_principal(
             self.flows
                 .iter()
-                .filter(|cf| {
-                    cf.kind.is_principal_repayment() && cf.date > as_of && cf.amount.amount() > 0.0
-                })
+                .filter(|cf| cf.kind.is_principal_repayment())
                 .map(|cf| (cf.date, cf.amount)),
             as_of,
         )
