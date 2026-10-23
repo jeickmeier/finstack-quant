@@ -268,13 +268,15 @@ impl CashFlowBuilder {
         self
     }
 
-    /// Adds (or overrides) a payment split over a single date window.
+    /// Adds a payment split over a single date window.
     ///
     /// The lower-level primitive behind [`payment_split_program`](Self::payment_split_program).
     /// Pushes a single payment-program piece covering `[start, end)` and uses
     /// `split` as the coupon settlement type within that window. Subsequent
-    /// calls add additional pieces; later windows take precedence on overlap
-    /// during compilation.
+    /// calls add additional pieces. Windows may be disjoint or nested: where
+    /// they nest, the innermost (narrowest) window's split applies whatever the
+    /// call order, and for identical windows the last call wins. Partially
+    /// overlapping windows are rejected by `build` with a validation error.
     ///
     /// Prefer [`payment_split_program`](Self::payment_split_program) for
     /// PIK-toggle scheduling, which sequences windows from a single

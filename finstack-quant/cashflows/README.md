@@ -131,7 +131,7 @@ sorted and non-overlapping; the public entry points validate this and return
 | `aggregate_by_period(flows, periods)` | `IndexMap<PeriodId, IndexMap<Currency, Money>>`; unsorted input is sorted first |
 | `aggregate_cashflows_checked(flows, target)` | Single `Money`; every flow must already be in `target`, otherwise `Error::CurrencyMismatch` |
 | `calendar_year_ladder(dates, kind_labels, amounts, pvs)` | `Vec<CalendarYearLadderRow>` keyed by calendar year |
-| `credit_adjusted_cashflow_pvs(cashflows, discount_factors, hazard, recovery_rate, date_ctx)` | Native-currency row PVs as `Vec<f64>`, using the complete stream to identify funded principal |
+| `credit_adjusted_cashflow_pvs(cashflows, discount_factors, hazard, recovery_rate, as_of)` | Native-currency row PVs as `Vec<f64>`, using the complete stream to identify funded principal |
 
 Per-currency totals accumulate through a Neumaier-compensated `f64` sum over
 `Money::amount()`; no per-flow ISO-4217 rounding is applied during
@@ -146,9 +146,8 @@ After the economic principal reduction has passed, an unpaid settlement is
 valued as a cash receivable, consistently before and after schedule normalization.
 Already-paid economic replay rows carry no recovery. A final PIK coupon paid
 before capitalization carries no funded-principal recovery before payment.
-`DateContext` supplies the valuation base date and the fallback day-count
-convention and context for survival curves without their own date origin.
-Discount curves use their own date basis for relative discounting.
+`as_of` is the valuation date. Survival is conditional on it, flows on or
+before it have zero PV, and discount factors are supplied per row.
 
 ## Conventions
 
@@ -170,7 +169,7 @@ Discount curves use their own date basis for relative discounting.
 ## JSON and schemas
 
 `CashflowScheduleBuildSpec` is the serde-first construction path used by the
-bindings: `notional`, `issue`, `maturity`, plus optional `coupon_program`,
+bindings: `notional`, `issue_date`, `maturity`, plus optional `coupon_program`,
 `payment_program`, `fees`, `principal_events`, and `principal_exchange`. It is
 `#[serde(deny_unknown_fields)]`, and dates are ISO `YYYY-MM-DD` strings
 (`time::Date` serde; schema type `finstack_quant_core::wire::DateWire`).
@@ -235,8 +234,8 @@ The authoritative contract, including the deliberately Rust-only surface, is
 
 | Path | Contents |
 |------|----------|
-| [`tests/cashflows.rs`](tests/cashflows.rs) | Aggregator for the `tests/cashflows/` tree (builder cases, worked examples, schema round-trips) |
-| [`tests/coupon_spec_strictness.rs`](tests/coupon_spec_strictness.rs) | `deny_unknown_fields` and spec-validation behavior |
+| [`tests/main.rs`](tests/main.rs) | Single integration-test target; declares the `tests/cashflows/` tree (builder cases, worked examples, schema round-trips) |
+| `tests/main.rs` module `coupon_spec_strictness` | `deny_unknown_fields` and spec-validation behavior |
 | [`benches/cashflow_hot_paths.rs`](benches/cashflow_hot_paths.rs) | Build, accrual, and aggregation hot paths |
 | [`benches/cashflow_scaling.rs`](benches/cashflow_scaling.rs) | Complexity scaling as schedule length grows |
 

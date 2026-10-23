@@ -19,9 +19,9 @@
 //!   lagged redemption date into the complete build-date grid.
 //!
 //! Determinism and validation follow the project invariants: windows must be
-//! within `[issue, maturity]`, coverage must be unique (no overlapping coupon
-//! pieces without containment), and every produced schedule must contain at
-//! least two dates.
+//! within `[issue, maturity]`. Coupon pieces must not overlap at all. Payment
+//! pieces may nest (the innermost wins) but must not partially overlap. Every
+//! produced schedule must contain at least two dates.
 
 use finstack_quant_core::dates::{Date, DayCount, HolidayCalendar, Tenor};
 use finstack_quant_core::money::Money;
