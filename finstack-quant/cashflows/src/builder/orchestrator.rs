@@ -3,11 +3,13 @@
 //!
 //! Fluent builder methods live in `coupon_api`.
 
-use super::schedule::{finalize_flows, CashFlowSchedule};
+use super::schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use super::specs::PrincipalEventSpec;
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
+use crate::fixings::ProjectedFixing;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -45,7 +47,6 @@ pub(super) struct BuildState {
 
 #[derive(Debug)]
 pub(super) struct AmortizationSetup {
-    pub(super) amort_dates: finstack_quant_core::FxHashSet<Date>,
     pub(super) final_amortization_date: Option<Date>,
     pub(super) payment_dates: finstack_quant_core::FxHashMap<Date, Date>,
     pub(super) rule: PreparedAmortization,
@@ -190,10 +191,7 @@ fn derive_amortization_setup(
             }
         }
     }
-    let mut amort_base: Vec<Date> = payment_dates.keys().copied().collect();
-    amort_base.sort_unstable();
-    amort_base.dedup();
-    if amort_base.is_empty()
+    if payment_dates.is_empty()
         && matches!(
             notional.amort,
             AmortizationSpec::LinearTo { .. }
@@ -224,8 +222,9 @@ fn derive_amortization_setup(
         AmortizationSpec::LinearTo { final_notional } => {
             let initial = f64_to_decimal(notional.initial.amount())?;
             let final_notional = f64_to_decimal(final_notional.amount())?;
-            let installment = ((initial - final_notional) / Decimal::from(amort_base.len() as u64))
-                .max(Decimal::ZERO);
+            let installment = ((initial - final_notional)
+                / Decimal::from(payment_dates.len() as u64))
+            .max(Decimal::ZERO);
             PreparedAmortization::LinearTo {
                 installment,
                 final_notional,
@@ -242,13 +241,13 @@ fn derive_amortization_setup(
             }
         }
         AmortizationSpec::LinearBetween { start, end } => {
-            if !amort_base.contains(end) {
+            if !payment_dates.contains_key(end) {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "LinearBetween end {end} must be a coupon accrual boundary"
                 )));
             }
-            let count = amort_base
-                .iter()
+            let count = payment_dates
+                .keys()
                 .filter(|date| **date > *start && **date <= *end)
                 .count();
             if count == 0 {
@@ -264,11 +263,9 @@ fn derive_amortization_setup(
         }
     };
 
-    let final_amortization_date = amort_base.last().copied();
-    let amort_dates: finstack_quant_core::FxHashSet<Date> = amort_base.into_iter().collect();
+    let final_amortization_date = payment_dates.keys().max().copied();
 
     Ok(AmortizationSetup {
-        amort_dates,
         final_amortization_date,
         payment_dates,
         rule,
@@ -545,21 +542,14 @@ impl CashFlowBuilder {
         }
         let (notional, issue, maturity) = validate_core_inputs(self)?;
 
-        let (
-            CompiledSchedules {
-                fixed_schedules,
-                float_schedules,
-            },
+        let CompiledSchedules {
+            fixed_schedules,
+            float_schedules,
+        } = compute_coupon_schedules(self, issue, maturity)?;
+        let FeeSchedules {
             periodic_fees,
             fixed_fees,
-        ) = {
-            let compiled = compute_coupon_schedules(self, issue, maturity)?;
-            let FeeSchedules {
-                periodic_fees,
-                fixed_fees,
-            } = build_fee_schedules(issue, maturity, &self.fees)?;
-            (compiled, periodic_fees, fixed_fees)
-        };
+        } = build_fee_schedules(issue, maturity, &self.fees)?;
 
         let mut principal_events = self.principal_events.clone();
         principal_events.sort_by_key(|ev| ev.date);
@@ -769,8 +759,8 @@ impl CompiledCashFlowPlan {
         let (meta, out_day_count) = finalize_flows(
             &self.fixed_schedules,
             &self.float_schedules,
-            Some(self.issue),
-            Some(self.maturity),
+            self.issue,
+            self.maturity,
             state.projected_fixings,
         );
         debug!(flows = flows.len(), "cashflow schedule: project complete");
@@ -783,4 +773,44 @@ impl CompiledCashFlowPlan {
         schedule.validate()?;
         Ok(schedule)
     }
+}
+
+/// Build the metadata and representative day count of a compiled schedule.
+fn finalize_flows(
+    fixed: &[FixedSchedule],
+    floating: &[FloatSchedule],
+    issue_date: Date,
+    maturity_date: Date,
+    mut projected_fixings: Vec<ProjectedFixing>,
+) -> (CashFlowMeta, DayCount) {
+    crate::fixings::normalize_projected_fixings(&mut projected_fixings);
+
+    let mut cals: Vec<String> = fixed
+        .iter()
+        .map(|schedule| schedule.spec.schedule.calendar_id.to_string())
+        .chain(
+            floating
+                .iter()
+                .map(|schedule| schedule.spec.schedule.calendar_id.to_string()),
+        )
+        .collect();
+    cals.sort_unstable();
+    cals.dedup();
+    let meta = CashFlowMeta {
+        projected_fixings,
+        calendar_ids: cals,
+        commitment: None,
+        issue_date: Some(issue_date),
+        maturity: Some(maturity_date),
+        representation: CashflowRepresentation::default(),
+    };
+
+    let out_day_count = if let Some(schedule) = fixed.first() {
+        schedule.spec.schedule.day_count
+    } else if let Some(schedule) = floating.first() {
+        schedule.spec.schedule.day_count
+    } else {
+        DayCount::Act365F
+    };
+    (meta, out_day_count)
 }

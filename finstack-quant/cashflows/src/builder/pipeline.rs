@@ -134,8 +134,8 @@ impl CompiledCashFlowPlan {
                 // at the next contractual boundary, never at its funding date.
                 let remaining = self
                     .amort_setup
-                    .amort_dates
-                    .iter()
+                    .payment_dates
+                    .keys()
                     .filter(|&&date| date > d && date <= *end)
                     .count();
                 if remaining > 0 {
