@@ -39,6 +39,9 @@ PACKAGE_DIR = Path(finstack_quant.__file__).parent
 _SCHEMA_REGISTRY = ("get", "index", "validate")
 
 CONVERTED: dict[str, tuple[str, ...] | None] = {
+    "finstack_quant.models.rates.dtsm": None,
+    "finstack_quant.models.rates.hull_white": None,
+    "finstack_quant.models.rates": None,
     "finstack_quant.models.liquidity": None,
     "finstack_quant.models.volatility": None,
     "finstack_quant.models": None,
