@@ -1090,3 +1090,21 @@ class TestScheduleParity:
         assert StubKind.NONE is not None
         assert StubKind.SHORT_FRONT is not None
         assert StubKind.SHORT_BACK is not None
+
+
+@pytest.mark.parametrize("rate", [0.0, 1e-18, 0.02, 10.0])
+def test_hazard_conditional_default_prob_survives_low_unconditional_survival(rate: float) -> None:
+    curve = HazardCurve("CONDITIONAL", "1900-01-01", [(100.0, 7.0), (101.0, rate)], recovery_rate=0.4)
+    start, end = date(2025, 1, 1), date(2026, 1, 1)
+    assert curve.sp(start) < 1e-12
+    if rate == 10.0:
+        assert curve.sp(start) == 0.0
+    assert curve.conditional_default_prob(start, "2026-01-01") == pytest.approx(-math.expm1(-rate), rel=1e-12, abs=0.0)
+    assert curve.conditional_default_prob(start, start) == 0.0
+    assert curve.conditional_default_prob("1899-01-01", "1900-01-01") == 0.0
+    with pytest.raises(ValueError, match="end >= start"):
+        curve.conditional_default_prob(end, start)
+    with pytest.raises(ValueError, match="Invalid date 'not-a-date'"):
+        curve.conditional_default_prob("not-a-date", end)
+    with pytest.raises(TypeError):
+        curve.conditional_default_prob(1.0, end)  # type: ignore[arg-type]

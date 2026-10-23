@@ -12,9 +12,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_equity_metrics, run_simulation_with_diagnostics, AssetPool, CoverageTestSpec,
-    DealType, PoolAsset, ReserveInterestDestination, SimulationDiagnostics, StructuredCredit,
-    Tranche, TrancheStructure,
+    calculate_equity_metrics, AssetPool, CoverageTestSpec, DealType, PeriodDiagnostics, PoolAsset,
+    ReserveInterestDestination, SimulationDiagnostics, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -95,9 +94,20 @@ fn clo(cdr: f64) -> StructuredCredit {
     .expect("structure");
     let mut deal = StructuredCredit {
         coverage_triggers: vec![CoverageTestSpec::oc("A", 1.20)],
-        ..StructuredCredit::new_clo("CLO-DIAG", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse")
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-DIAG".into(),
+                pool,
+                tranches,
+                closing_date: close(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse")
     };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
@@ -110,7 +120,7 @@ fn clo(cdr: f64) -> StructuredCredit {
 /// bullet pool) and follows the pool as it defaults.
 #[test]
 fn period_diagnostics_carry_the_executor_coverage_ratios_and_pool_path() {
-    let clean = run_simulation_with_diagnostics(&clo(0.0), &market(), close()).expect("run");
+    let clean = (clo(0.0)).run_simulation(&market(), close()).expect("run");
     let periods = &clean.diagnostics.periods;
     assert_eq!(periods.len(), clean.tranches["A"].interest_flows.len());
 
@@ -131,7 +141,7 @@ fn period_diagnostics_carry_the_executor_coverage_ratios_and_pool_path() {
     assert_eq!(first.defaults.amount(), 0.0);
     assert!(first.interest_collections.amount() > 0.0);
 
-    let stressed = run_simulation_with_diagnostics(&clo(0.10), &market(), close()).expect("run");
+    let stressed = (clo(0.10)).run_simulation(&market(), close()).expect("run");
     let periods = &stressed.diagnostics.periods;
     assert!(periods[0].defaults.amount() > 0.0);
     assert!(periods
@@ -172,7 +182,7 @@ fn equity_irr_reproduces_xirr_of_the_equity_flows() {
         tranche_id: "E".into(),
     };
 
-    let run = run_simulation_with_diagnostics(&deal, &market(), close()).expect("run");
+    let run = deal.run_simulation(&market(), close()).expect("run");
     let equity = &run.tranches["E"];
     assert!(
         run.diagnostics
@@ -223,11 +233,170 @@ fn equity_irr_reproduces_xirr_of_the_equity_flows() {
 /// Diagnostics with populated periods survive a JSON round-trip.
 #[test]
 fn diagnostics_round_trip_through_json() {
-    let run = run_simulation_with_diagnostics(&clo(0.05), &market(), close()).expect("run");
+    let run = (clo(0.05)).run_simulation(&market(), close()).expect("run");
     assert!(!run.diagnostics.periods.is_empty());
 
     let json = serde_json::to_string(&run.diagnostics).expect("serialize");
     let parsed: SimulationDiagnostics = serde_json::from_str(&json).expect("deserialize");
 
     assert_eq!(parsed, run.diagnostics);
+}
+
+#[test]
+fn full_simulation_run_serialization_preserves_flows_and_accounting() {
+    let run = clo(0.05).run_simulation(&market(), close()).expect("run");
+    let json = serde_json::to_string(&run).expect("serialize complete run");
+    let restored: finstack_quant_valuations_structured_credit::structured_credit::SimulationRun =
+        serde_json::from_str(&json).expect("deserialize complete run");
+    assert_eq!(restored.tranches.len(), run.tranches.len());
+    assert_eq!(restored.diagnostics, run.diagnostics);
+    for (id, flows) in &run.tranches {
+        assert_eq!(restored.tranches[id].cashflows, flows.cashflows);
+    }
+}
+
+fn table_period(payment_date: Date, balance: f64) -> PeriodDiagnostics {
+    PeriodDiagnostics {
+        payment_date,
+        pool_balance: usd(balance),
+        pool_factor: 0.8,
+        wac: 0.06,
+        weighted_avg_spread_bp: 125.0,
+        warf: 250.0,
+        interest_collections: usd(2.0),
+        principal_collections: usd(3.0),
+        defaults: usd(4.0),
+        recoveries: usd(5.0),
+        reinvested_par: usd(6.0),
+        fees_paid: usd(7.0),
+        reserve_balance: usd(8.0),
+        spread_account: usd(9.0),
+        funding_account: usd(10.0),
+        delinquent_balance: usd(11.0),
+        servicer_advances_outstanding: usd(12.0),
+        excess_spread: 0.02,
+        coverage_tests: Vec::new(),
+    }
+}
+
+fn table_diagnostics(periods: Vec<PeriodDiagnostics>) -> SimulationDiagnostics {
+    SimulationDiagnostics {
+        periods,
+        reserve_balance_path: Vec::new(),
+        reserve_interest_paid: Vec::new(),
+        draws_from_reserve: usd(0.0),
+        draws_from_principal: usd(0.0),
+        unfunded_draws: usd(0.0),
+        reserve_replenished: usd(0.0),
+        early_amortization_date: None,
+        tranche_draws: Vec::new(),
+    }
+}
+
+#[test]
+fn diagnostics_table_preserves_period_order_and_first_matching_interest() {
+    use finstack_quant_core::table::TableColumnData;
+    let early = d(2024, 1, 15);
+    let late = d(2024, 2, 15);
+    let missing = d(2024, 3, 15);
+    let mut diagnostics = table_diagnostics(vec![
+        table_period(late, 101.0),
+        table_period(early, 102.0),
+        table_period(late, 103.0),
+        table_period(missing, 104.0),
+    ]);
+    // Interest records are unsorted, duplicate dates use their first value,
+    // and a non-USD tag is not silently converted to the period currency.
+    diagnostics.reserve_interest_paid = vec![
+        (late, Money::new(21.0, Currency::EUR).expect("money")),
+        (early, usd(22.0)),
+        (late, usd(999.0)),
+        (d(2030, 1, 1), usd(888.0)),
+    ];
+    let table = diagnostics.to_table().expect("table");
+    assert_eq!(table.row_count, 4);
+    assert_eq!(table.columns.len(), 19);
+    assert_eq!(
+        table.column("date").expect("date").data,
+        TableColumnData::String(vec![
+            late.to_string(),
+            early.to_string(),
+            late.to_string(),
+            missing.to_string(),
+        ])
+    );
+    assert_eq!(
+        table.column("pool_balance").expect("balance").data,
+        TableColumnData::Float64(vec![101.0, 102.0, 103.0, 104.0])
+    );
+    assert_eq!(
+        table.column("reserve_interest").expect("interest").data,
+        TableColumnData::Float64(vec![21.0, 22.0, 21.0, 0.0])
+    );
+    for (name, expected) in [
+        ("pool_factor", 0.8),
+        ("wac", 0.06),
+        ("weighted_avg_spread_bp", 125.0),
+        ("warf", 250.0),
+        ("interest_collections", 2.0),
+        ("principal_collections", 3.0),
+        ("defaults", 4.0),
+        ("recoveries", 5.0),
+        ("reinvested_par", 6.0),
+        ("fees_paid", 7.0),
+        ("reserve_balance", 8.0),
+        ("spread_account", 9.0),
+        ("funding_account", 10.0),
+        ("delinquent_balance", 11.0),
+        ("servicer_advances_outstanding", 12.0),
+        ("excess_spread", 0.02),
+    ] {
+        assert_eq!(
+            table.column(name).expect("column").data,
+            TableColumnData::Float64(vec![expected; 4])
+        );
+    }
+}
+
+#[test]
+fn empty_diagnostics_table_retains_column_order_and_dtypes() {
+    use finstack_quant_core::table::TableColumnData;
+    let mut diagnostics = table_diagnostics(Vec::new());
+    diagnostics
+        .reserve_interest_paid
+        .push((d(2024, 1, 1), usd(99.0)));
+    let table = diagnostics.to_table().expect("empty table");
+    assert_eq!(table.row_count, 0);
+    assert_eq!(
+        table
+            .columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "date",
+            "pool_balance",
+            "pool_factor",
+            "wac",
+            "weighted_avg_spread_bp",
+            "warf",
+            "interest_collections",
+            "principal_collections",
+            "defaults",
+            "recoveries",
+            "reinvested_par",
+            "fees_paid",
+            "reserve_balance",
+            "reserve_interest",
+            "spread_account",
+            "funding_account",
+            "delinquent_balance",
+            "servicer_advances_outstanding",
+            "excess_spread",
+        ]
+    );
+    assert_eq!(table.columns[0].data, TableColumnData::String(Vec::new()));
+    assert!(table.columns[1..]
+        .iter()
+        .all(|column| column.data == TableColumnData::Float64(Vec::new())));
 }

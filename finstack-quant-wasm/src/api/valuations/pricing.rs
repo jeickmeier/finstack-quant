@@ -25,12 +25,15 @@
 //! that label inside the instrument JSON. This contract is verified by
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
+#[cfg(test)]
+use super::results::valuation_result_json;
+use super::results::valuation_result_value;
 use crate::api::core::market_context::JsMarketContext;
 use crate::utils::input::{
-    from_js_json, js_opt_bool, js_opt_f64, js_opt_string, js_opt_string_seq, js_string,
-    js_string_seq, json_text, opt_json_text,
+    js_opt_bool, js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text,
+    opt_json_text,
 };
-use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::results::ValuationResult;
 use wasm_bindgen::prelude::*;
@@ -49,22 +52,6 @@ pub(super) fn parse_pricing_instrument_json(
         metric_pricing_overrides,
     )
     .map_err(to_js_err)
-}
-
-pub(super) fn valuation_result_json(result: ValuationResult) -> Result<String, JsValue> {
-    serde_json::to_string(&result).map_err(to_js_err)
-}
-
-/// Convert a [`ValuationResult`] into a structured JavaScript object.
-///
-/// The `price*` entry points return this rather than a JSON string so JS
-/// callers read `result.value.amount` / `result.measures.dv01` directly, the
-/// same way Python callers read `PyValuationResult` getters. It uses
-/// JSON-compatible map/object conventions while preserving every 64-bit
-/// integer as JavaScript `BigInt`. In particular, Monte Carlo seeds span the
-/// full `u64` range and cannot be narrowed to a JavaScript `number`.
-pub(super) fn valuation_result_value(result: &ValuationResult) -> Result<JsValue, JsValue> {
-    to_js_value_with_bigints(result)
 }
 
 pub(super) fn price_result_with_context(
@@ -92,52 +79,6 @@ pub(super) fn price_result_with_context(
         options,
     )
     .map_err(to_js_err)
-}
-
-/// Validate and serialize a `ValuationResult` object or JSON text to canonical JSON.
-///
-/// The inverse of the structured `priceInstrument*` return: it accepts the
-/// plain object those entry points return, with 64-bit fields such as the
-/// Monte Carlo `seed` as `BigInt`, and writes the same canonical JSON as
-/// Python `ValuationResult.to_json()`, keeping every integer exact. Use it in
-/// place of `JSON.stringify`, which throws on `BigInt`.
-/// @param result - Canonical JSON text or a `ValuationResult` object returned by `priceInstrument`,
-/// `priceInstrumentWithMarket`, a typed instrument's `price`, or a portfolio
-/// valuation's `valuation_result` entry; 64-bit fields must be `BigInt` or
-/// safe-integer numbers.
-/// @returns Canonical `ValuationResult` JSON text.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `result` does not match the
-/// `ValuationResult` schema (for example a seed given as a string) or the
-/// canonical result cannot be serialized.
-#[wasm_bindgen(js_name = valuationResultToJson)]
-pub fn valuation_result_to_json(result: JsValue) -> Result<String, JsValue> {
-    let result: ValuationResult = from_js_json(&result, "result")?;
-    valuation_result_json(result)
-}
-
-/// Decoded series of one composite base metric from a valuation result.
-///
-/// Free-function twin of Python `ValuationResult.metric_series` (Rust
-/// `ValuationResult::metric_series`): every measure key that encodes a series
-/// of `base` (e.g. `bucketed_dv01::USD-OIS::10y`) is decoded into its
-/// components; scalar entries stored directly under `base` are excluded.
-/// @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-/// @param base - Canonical base metric identifier (e.g. `"bucketed_dv01"`).
-/// @returns `[components, value]` pairs in measure order.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if `result` does not match the
-/// `ValuationResult` schema or `base` is not a canonically encoded metric key.
-#[wasm_bindgen(js_name = valuationResultMetricSeries)]
-pub fn valuation_result_metric_series(result: JsValue, base: JsValue) -> Result<JsValue, JsValue> {
-    let result: ValuationResult = from_js_json(&result, "result")?;
-    let base: finstack_quant_valuations::metrics::MetricId =
-        js_string(&base, "base")?.parse().map_err(to_js_err)?;
-    to_js_value(&result.metric_series(&base))
 }
 
 /// Validate a canonical v1 instrument envelope after optional metric-pricing
@@ -485,27 +426,6 @@ pub fn list_models() -> Result<JsValue, JsValue> {
 pub fn list_models_grouped() -> Result<JsValue, JsValue> {
     let grouped = finstack_quant_valuations::pricer::list_models_grouped();
     to_js_value(&grouped)
-}
-
-/// Return the maintained liquid listed-derivatives coverage catalog.
-///
-/// The catalog maps stable CME, Eurex, Montréal, and SGX product families to
-/// canonical Finstack instrument types and names residual model gaps. It is not
-/// a live contract-month or liquidity feed.
-/// @param exchange - Optional exact filter: `"cme"`, `"eurex"`, `"montreal"`, or `"sgx"`.
-/// @returns Product-family coverage rows with instrument routes and official source URLs.
-/// @throws Error - Throws when `exchange` is unsupported, the embedded listed-product sidecar is invalid, or rows cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = listedProductCatalog)]
-pub fn listed_product_catalog(exchange: Option<JsValue>) -> Result<JsValue, JsValue> {
-    let exchange = js_opt_string(exchange.as_ref(), "exchange")?;
-    let exchange = exchange
-        .as_deref()
-        .map(str::parse::<finstack_quant_valuations::market::listed::ListedExchange>)
-        .transpose()
-        .map_err(to_js_err)?;
-    let rows = finstack_quant_valuations::market::listed::listed_product_catalog(exchange)
-        .map_err(to_js_err)?;
-    to_js_value(&rows)
 }
 
 // MarketContext-handle overloads — parse market once, reuse across pricing calls

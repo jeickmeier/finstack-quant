@@ -17,8 +17,8 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIn
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AmortizationEvent;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, CoverageRules, CoverageTestSpec, PenaltyStep, PoolAsset, PrepaymentPenalty,
-    ScenarioTable, Tranche, TrancheStructure, Waterfall,
+    AssetPool, CoverageRules, CoverageTestSpec, PenaltyStep, PoolAsset, PrepaymentPenalty, Tranche,
+    TrancheStructure, Waterfall,
 };
 use finstack_quant_valuations::instruments::{MertonMcConfig, PikSchedule};
 use wasm_bindgen::prelude::*;
@@ -537,16 +537,6 @@ pub fn waterfall_coverage_tests(waterfall: JsValue) -> Result<JsValue, JsValue> 
     let waterfall: Waterfall = from_js_json(&waterfall, "waterfall")?;
     let tests: Vec<&CoverageTestSpec> = waterfall.coverage_tests().collect();
     to_js_value(&tests)
-}
-
-/// The grid cells of a structured-credit scenario table.
-/// @param table - `ScenarioTable` plain object or JSON string, as returned by `trancheScenarioTable`.
-/// @returns `ScenarioCell` plain objects: `cpr`, `cdr`, `severity`, `price`, `wal` and `writedown` per grid point.
-/// @throws Error - Throws with kind `validation` if `table` does not match the `ScenarioTable` schema.
-#[wasm_bindgen(js_name = scenarioTableCells)]
-pub fn scenario_table_cells(table: JsValue) -> Result<JsValue, JsValue> {
-    let table: ScenarioTable = from_js_json(&table, "table")?;
-    to_js_value(&table.cells)
 }
 
 // ---------------------------------------------------------------------------

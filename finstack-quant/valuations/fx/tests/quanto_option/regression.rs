@@ -224,7 +224,7 @@ fn standard_quanto_metrics_are_finite() {
                 MetricId::Delta,
                 MetricId::Gamma,
                 MetricId::Vega,
-                MetricId::FxDelta,
+                MetricId::Fx01,
                 MetricId::FxVega,
                 MetricId::Correlation01,
             ],
@@ -236,7 +236,7 @@ fn standard_quanto_metrics_are_finite() {
         MetricId::Delta,
         MetricId::Gamma,
         MetricId::Vega,
-        MetricId::FxDelta,
+        MetricId::Fx01,
         MetricId::FxVega,
         MetricId::Correlation01,
     ] {

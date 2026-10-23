@@ -13720,6 +13720,8 @@ export interface QuantoOption {
  *
  * For American exercise, the model requires a spot price to build the binomial tree.
  * `spot_id` must identify an observed spot for early exercise and Monte Carlo.
+ * A numeric scalar is in the underlying currency; a Money scalar must carry
+ * that same currency.
  * The commodity forward is never substituted for the spot underlying.
  * The convenience yield (cost-of-carry) is implied from the forward/spot ratio:
  * `q = r - ln(F/S)/T`
@@ -13819,6 +13821,7 @@ export interface CommoditySpotOption {
   settlement: SettlementType;
   /**
    * Optional spot price ID (for spot-based pricing and American options).
+   * Numeric prices use the underlying currency; Money prices must match it.
    */
   spot_id?: Id | null;
   /**
@@ -20040,6 +20043,57 @@ export interface ScenarioTable {
    * Identifier of the tranche evaluated.
    */
   tranche_id: string;
+}
+/**
+ * Tranche cashflows and deal accounting from one deterministic simulation.
+ */
+export interface SimulationRun {
+  /**
+   * Reserve, draw-funding and reserve-interest accounting.
+   */
+  diagnostics: SimulationDiagnostics;
+  /**
+   * Detailed cashflow results per tranche id.
+   */
+  tranches: {
+    [k: string]: TrancheCashflows;
+  };
+  [k: string]: unknown;
+}
+/**
+ * Inputs for the standard structured-credit registry constructor.
+ */
+export interface StandardDealParams {
+  /**
+   * Optional holiday calendar for payment-date adjustment. Construction accepts
+   * `None`; simulation requires a calendar before generating payment dates.
+   */
+  calendar_id?: Id | null;
+  /**
+   * Contractual deal inception; the first accrual boundary is one registry
+   * payment period later (capped at maturity).
+   */
+  closing_date: DateWire;
+  /**
+   * Market-context discount curve used for tranche PV.
+   */
+  discount_curve_id: Id;
+  /**
+   * Stable deal identifier used for pricing results and risk labels.
+   */
+  id: Id;
+  /**
+   * Legal final date, strictly after closing.
+   */
+  maturity: DateWire;
+  /**
+   * Current collateral balances and contractual asset terms, in the pool currency.
+   */
+  pool: AssetPool;
+  /**
+   * Capital structure, current note balances and coupon terms.
+   */
+  tranches: TrancheStructure;
 }
 /**
  * Market conventions of one swaption market.

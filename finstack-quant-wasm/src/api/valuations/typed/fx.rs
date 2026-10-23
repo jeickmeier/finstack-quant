@@ -37,6 +37,45 @@ macro_rules! fx_class {
     };
 }
 
+/// Expose the complete selected-model Greek bundle on an FX option class.
+macro_rules! fx_greeks_bundle {
+    ($rust_name:ident, $js_name:literal) => {
+        #[wasm_bindgen(js_class = $js_name)]
+        impl $rust_name {
+            /// Compute every Greek that applies to this instrument as a JavaScript object.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+            /// @returns Map of Greek name to value, with keys in the Rust
+            /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …);
+            /// only the Greeks that apply to the instrument are present.
+            ///
+            /// # Errors
+            ///
+            /// Throws a JavaScript exception if the instrument or market JSON,
+            /// `asOf`, or `model` is invalid; required market data is missing;
+            /// pricing fails; a returned Greek is non-finite; or the result cannot
+            /// be converted to a JavaScript value.
+            pub fn greeks(
+                &self,
+                market_json: JsValue,
+                as_of: JsValue,
+                model: Option<JsValue>,
+            ) -> Result<JsValue, JsValue> {
+                let market_json = json_text(&market_json, "marketJson")?;
+                let as_of = js_string(&as_of, "asOf")?;
+                let model = js_opt_string(model.as_ref(), "model")?;
+                super::option_greeks(
+                    Box::new(self.inner.clone()),
+                    &market_json,
+                    &as_of,
+                    model.as_deref(),
+                )
+            }
+        }
+    };
+}
+
 /// Emit an FX option class: the `fx_class!` surface plus one method per
 /// applicable Greek (through `greek_methods!`) and `greeks()`.
 ///
@@ -81,39 +120,7 @@ macro_rules! fx_option_class {
             )+
         });
 
-        #[wasm_bindgen(js_class = $js_name)]
-        impl $rust_name {
-            /// Compute every Greek that applies to this instrument as a JavaScript object.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Map of Greek name to value, with keys in the Rust
-            /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …);
-            /// only the Greeks that apply to the instrument are present.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument or market JSON,
-            /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; a returned Greek is non-finite; or the result cannot
-            /// be converted to a JavaScript value.
-            pub fn greeks(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<JsValue, JsValue> {
-                let market_json = json_text(&market_json, "marketJson")?;
-                let as_of = js_string(&as_of, "asOf")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                super::option_greeks(
-                    Box::new(self.inner.clone()),
-                    &market_json,
-                    &as_of,
-                    model.as_deref(),
-                )
-            }
-        }
+        fx_greeks_bundle!($rust_name, $js_name);
     };
 }
 
@@ -172,15 +179,9 @@ macro_rules! fx_option_with_all_greeks {
     };
 }
 
-// `FxOption` registers the model (analytic) theta; `QuantoOption` keeps the
-// universal theta-horizon P&L.
-fx_option_with_all_greeks!(
-    JsFxOption,
-    "FxOption",
-    instruments::fx::fx_option::FxOption,
-    FxOption,
-    "@returns Model theta per day: annual analytic theta divided by the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days); not annualized."
-);
+fx_class!(JsFxOption, "FxOption", instruments::fx::fx_option::FxOption);
+fx_greeks_bundle!(JsFxOption, "FxOption");
+// `QuantoOption` keeps the universal theta-horizon P&L.
 fx_option_with_all_greeks!(
     JsQuantoOption,
     "QuantoOption",
@@ -214,24 +215,6 @@ fx_option!(
 
 #[wasm_bindgen(js_class = FxForward)]
 impl JsFxForward {
-    /// Market-standard spot lag in business days for a currency pair.
-    ///
-    /// Mirrors Rust `FxForward::standard_settlement_days`: T+1 for USD/CAD,
-    /// USD/TRY and USD/RUB, T+2 otherwise.
-    /// @param base - Base (foreign) currency ISO code.
-    /// @param quote - Quote (domestic) currency ISO code.
-    /// @returns Spot lag in business days (1 or 2).
-    /// @throws Error - Throws with kind `validation` if a currency code is not ISO-4217.
-    #[wasm_bindgen(js_name = standardSettlementDays)]
-    pub fn standard_settlement_days(base: JsValue, quote: JsValue) -> Result<u32, JsValue> {
-        Ok(
-            instruments::fx::fx_forward::FxForward::standard_settlement_days(
-                js_currency(&base, "base")?,
-                js_currency(&quote, "quote")?,
-            ),
-        )
-    }
-
     /// Build an at-market forward from a trade date and a standard FX tenor.
     ///
     /// Mirrors Rust `FxForward::from_trade_date`: spot is rolled from
@@ -468,7 +451,7 @@ factories!(JsFxOption, "FxOption", instruments::fx::fx_option::FxOption, {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_valuations::metrics::{standard_registry, MetricId};
+    use finstack_quant_valuations::metrics::MetricId;
     use finstack_quant_valuations::pricer::{InstrumentType, STANDARD_OPTION_GREEKS};
 
     #[test]
@@ -494,7 +477,8 @@ mod tests {
             .iter()
             .map(|metric| MetricId::parse_strict(metric).expect("standard greek"))
             .collect();
-        standard_registry()
+        finstack_quant_valuations::pricer::STANDARD
+            .metrics()
             .applicable_subset(&menu, instrument_type)
             .iter()
             .map(|id| id.as_str().to_string())
@@ -503,8 +487,7 @@ mod tests {
 
     #[test]
     fn option_greek_methods_match_the_metric_registry() {
-        let classes: [(&[&str], InstrumentType); 5] = [
-            (JsFxOption::GREEK_METHODS, JsFxOption::INSTRUMENT_TYPE),
+        let classes: [(&[&str], InstrumentType); 4] = [
             (
                 JsQuantoOption::GREEK_METHODS,
                 JsQuantoOption::INSTRUMENT_TYPE,
@@ -597,12 +580,12 @@ setters!(JsFxForwardBuilder, "FxForwardBuilder", {
         /// @param value - Maturity/settlement date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => date,
+        maturity as maturity => js_date,
         /// Set the contract forward rate (quote per base).
         /// @param value - Contract forward rate; when never set the forward is valued at-market (zero PV at inception).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        contract_rate as contractRate => num,
+        contract_rate as contractRate => js_f64,
         /// Set the domestic (quote currency) discount curve identifier.
         /// @param value - Domestic (quote currency) discount curve identifier.
         /// @returns The builder, for chaining.
@@ -617,7 +600,7 @@ setters!(JsFxForwardBuilder, "FxForwardBuilder", {
         /// @param value - Spot FX rate; when never set the spot is sourced from the market's FX matrix.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        quoted_spot as quotedSpot => num,
+        quoted_spot as quotedSpot => js_f64,
         /// Set the base currency calendar identifier for business day adjustment.
         /// @param value - Base currency holiday calendar identifier.
         /// @returns The builder, for chaining.
@@ -715,17 +698,17 @@ setters!(JsFxOptionBuilder, "FxOptionBuilder", {
         /// @param value - Strike exchange rate, quote currency per unit of base currency.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        strike as strike => num,
+        strike as strike => js_f64,
         /// Set the option type: `"call"` or `"put"` on base currency.
         /// @param value - Option type of the FX option.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        option_type as optionType => en,
+        option_type as optionType => js_wire,
         /// Set the option expiry date.
         /// @param value - Option expiry date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        expiry as expiry => date,
+        expiry as expiry => js_date,
         /// Set the domestic currency discount curve identifier.
         /// @param value - Domestic currency discount curve identifier.
         /// @returns The builder, for chaining.

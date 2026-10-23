@@ -102,15 +102,6 @@ fn register_standard_metrics(registry: &mut MetricRegistry) -> Result<(), Metric
     crate::instruments::equity::real_estate::metrics::register_levered_real_estate_metrics(registry)
 }
 
-/// Return the shared standard pricer registry by reference.
-///
-/// This is the registry of the [`STANDARD`] family: every built-in pricer.
-/// Callers that need to mutate a registry should start from
-/// `standard_pricer_registry().clone()`.
-pub fn standard_pricer_registry() -> &'static PricerRegistry {
-    STANDARD.pricers()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,32 +167,26 @@ mod tests {
 
     #[test]
     fn standard_registry_returns_shared_singleton() {
+        assert!(ptr::eq(STANDARD.pricers(), STANDARD.pricers()));
         assert!(ptr::eq(
-            standard_pricer_registry(),
-            standard_pricer_registry()
-        ));
-        assert!(ptr::eq(
-            standard_pricer_registry(),
+            STANDARD.pricers(),
             STANDARD.shared_pricers().as_ref(),
         ));
-        assert!(ptr::eq(
-            crate::metrics::standard_registry(),
-            STANDARD.metrics()
-        ));
+        assert!(ptr::eq(STANDARD.metrics(), STANDARD.metrics()));
     }
 
     #[test]
     fn cloned_standard_registry_is_independently_mutable() {
         let key = PricerKey::new(InstrumentType::Deposit, ModelKey::Tree);
-        assert!(standard_pricer_registry().get_pricer(key).is_none());
+        assert!(STANDARD.pricers().get_pricer(key).is_none());
 
-        let mut cloned = standard_pricer_registry().clone();
+        let mut cloned = STANDARD.pricers().clone();
         cloned
             .register(DummyPricer)
             .expect("new clone registration");
 
         assert!(cloned.get_pricer(key).is_some());
-        assert!(standard_pricer_registry().get_pricer(key).is_none());
+        assert!(STANDARD.pricers().get_pricer(key).is_none());
     }
 
     /// Every pricer has exactly one owning family, and the umbrella is the
@@ -232,7 +217,8 @@ mod tests {
             owner.insert(umbrella_resident, STANDARD.name());
         }
 
-        let standard: Vec<InstrumentType> = standard_pricer_registry()
+        let standard: Vec<InstrumentType> = crate::pricer::STANDARD
+            .pricers()
             .all_models_grouped()
             .keys()
             .copied()
@@ -246,8 +232,8 @@ mod tests {
     /// applicable metrics.
     #[test]
     fn family_registries_match_the_umbrella_for_owned_types() {
-        let standard_models = standard_pricer_registry().all_models_grouped();
-        let standard_metrics = crate::metrics::standard_registry();
+        let standard_models = STANDARD.pricers().all_models_grouped();
+        let standard_metrics = STANDARD.metrics();
         for family in FAMILIES {
             let models = family.pricers().all_models_grouped();
             assert!(!models.is_empty(), "{} registers no pricers", family.name());

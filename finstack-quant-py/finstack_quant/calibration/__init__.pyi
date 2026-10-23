@@ -599,7 +599,20 @@ class CalibrationConfig:
         ValueError: ...
         """
 
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
     def __repr__(self) -> str: ...
 
 class RateQuote:
@@ -3530,7 +3543,20 @@ class QuoteQuality:
         ValueError: ...
         """
 
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
     def __repr__(self) -> str: ...
 
 class CalibrationDiagnostics:

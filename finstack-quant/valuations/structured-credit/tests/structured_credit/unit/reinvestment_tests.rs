@@ -14,9 +14,9 @@ use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, AssetPool, CoverageTestAction, CoverageTestSpec, DealType,
-    InstrumentCollateral, PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria,
-    ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows, TrancheStructure,
+    AssetPool, CoverageTestAction, CoverageTestSpec, DealType, InstrumentCollateral, PoolAsset,
+    ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche,
+    TrancheCashflows, TrancheStructure,
 };
 use time::Month;
 
@@ -125,9 +125,20 @@ fn clo(
     .expect("structure");
     let mut deal = StructuredCredit {
         coverage_triggers: tests,
-        ..StructuredCredit::new_clo("CLO-REINVEST", pool, tranches, close, maturity, "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse")
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-REINVEST".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse")
     };
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
@@ -142,7 +153,9 @@ fn simulate(
 ) -> FxHashMap<String, TrancheCashflows> {
     let (deal, as_of) = clo(period, cdr, tests);
     let market = market(as_of);
-    run_simulation(&deal, &market, as_of).expect("simulation")
+    deal.run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 fn principal_through(results: &FxHashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
@@ -405,7 +418,6 @@ fn instrument_collateral_pools_cannot_reinvest() {
         bonds: vec![Bond::example().expect("fixed bond")],
         ..Default::default()
     });
-    pool.reinvestment_period = Some(window(&[], None));
     let tranches = TrancheStructure::new(vec![Tranche::new(
         "A",
         0.0,
@@ -417,10 +429,23 @@ fn instrument_collateral_pools_cannot_reinvest() {
     )
     .expect("tranche")])
     .expect("structure");
-    let deal = StructuredCredit::new_clo("CLO-INSTR", pool, tranches, close, maturity, "USD-OIS")
-        .expect("valid structured-credit dates")
-        .with_calendar_id("nyse");
-    let err = run_simulation(&deal, &market(close), close)
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO-INSTR".into(),
+            pool,
+            tranches,
+            closing_date: close,
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
+    deal.pool.reinvestment_period = Some(window(&[], None));
+    let err = deal
+        .run_simulation(&market(close), close)
         .expect_err("instrument pools reject reinvestment periods");
     assert!(
         err.to_string()
@@ -435,8 +460,10 @@ fn amortizing_tranches_must_name_debt_classes_of_the_deal() {
         (&["E"][..], "is the equity class"),
         (&["X"][..], "is not a tranche of the deal"),
     ] {
-        let (deal, as_of) = clo(Some(window(ids, None)), 0.0, Vec::new());
-        let err = run_simulation(&deal, &market(as_of), as_of)
+        let (mut deal, as_of) = clo(None, 0.0, Vec::new());
+        deal.pool.reinvestment_period = Some(window(ids, None));
+        let err = deal
+            .run_simulation(&market(as_of), as_of)
             .expect_err("invalid amortizing tranche is rejected");
         assert!(
             err.to_string().contains(expected),

@@ -189,6 +189,66 @@ impl HazardCurve {
         Ok(sp1 - sp2)
     }
 
+    /// Default probability between two dates, conditional on survival to `start`.
+    ///
+    /// Computes `1 - exp(-integral(lambda))` directly over the intervening
+    /// piecewise-constant hazard segments. This remains well-defined when
+    /// unconditional survival at `start` underflows; it does not infer an
+    /// observed default from low survival probabilities.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Conditioning date, converted from the curve base date with
+    ///   the curve's day-count convention. Dates before the base are clamped
+    ///   to time zero, matching date-based survival queries.
+    /// * `end` - End date of the default interval; must be on or after `start`.
+    ///   Equal dates return zero. The final hazard rate extends beyond the
+    ///   last knot.
+    ///
+    /// # Returns
+    ///
+    /// Conditional default probability as a decimal fraction in `[0, 1]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for reversed dates or if the curve's
+    /// day-count convention cannot compute either date's year fraction.
+    #[must_use = "computed conditional default probability should not be discarded"]
+    pub fn conditional_default_prob(&self, start: Date, end: Date) -> crate::Result<f64> {
+        if end < start {
+            return Err(crate::Error::Validation(format!(
+                "conditional_default_prob requires end >= start (start={start}, end={end})"
+            )));
+        }
+        if start == end {
+            return Ok(0.0);
+        }
+        let start_time = self.year_fraction_to(start)?.max(0.0);
+        let end_time = self.year_fraction_to(end)?.max(0.0);
+        let mut integral = 0.0;
+        let mut previous_time = 0.0_f64;
+        for (&time, &lambda) in self.knots.iter().zip(self.lambdas.iter()) {
+            // Match survival_pillars: a redundant time-zero knot contributes
+            // neither a segment nor its hazard to the first positive segment.
+            if time <= 1e-9 {
+                continue;
+            }
+            let overlap = end_time.min(time) - start_time.max(previous_time);
+            if overlap > 0.0 {
+                integral += lambda * overlap;
+            }
+            if time >= end_time {
+                return Ok(-(-integral).exp_m1());
+            }
+            previous_time = time;
+        }
+        let tail_start = start_time.max(previous_time);
+        if end_time > tail_start {
+            integral += self.lambdas[self.lambdas.len() - 1] * (end_time - tail_start);
+        }
+        Ok(-(-integral).exp_m1())
+    }
+
     /// Instantaneous hazard rate λ(t) at time `t`.
     ///
     /// For piecewise-constant hazard curves, this returns the lambda value

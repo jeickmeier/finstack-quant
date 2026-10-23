@@ -178,10 +178,9 @@ fn production_barrier_ndf_quanto_uses_asset_financing_and_payoff_discounting() {
         "{value} versus {expected}"
     );
     note.instrument_pricing_overrides.model_config.mc_paths = Some(20_000);
-    use finstack_quant_valuations::pricer::{
-        standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
-    };
-    let simulated = standard_pricer_registry()
+    use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
+    let simulated = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .get_pricer(PricerKey::new(
             InstrumentType::RangeAccrual,
             ModelKey::MonteCarloGBM,
@@ -225,8 +224,9 @@ fn barrier_model_value(
     as_of: Date,
     model: finstack_quant_valuations::pricer::ModelKey,
 ) -> f64 {
-    use finstack_quant_valuations::pricer::{standard_pricer_registry, InstrumentType, PricerKey};
-    standard_pricer_registry()
+    use finstack_quant_valuations::pricer::{InstrumentType, PricerKey};
+    finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .get_pricer(PricerKey::new(InstrumentType::BarrierOption, model))
         .expect("registered barrier model")
         .price_dyn(option, market, as_of)

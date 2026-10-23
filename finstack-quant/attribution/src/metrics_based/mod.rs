@@ -345,10 +345,12 @@ pub(crate) fn attribute_request(request: &crate::AttributionRequest<'_>) -> Resu
     let metrics_instrument: Arc<dyn Instrument> = Arc::from(metrics_instrument);
     let metrics = match request.metrics {
         Some(metrics) => metrics.to_vec(),
-        None => finstack_quant_valuations::metrics::standard_registry().applicable_subset(
-            &crate::default_attribution_metrics(),
-            metrics_instrument.key(),
-        ),
+        None => finstack_quant_valuations::pricer::STANDARD
+            .metrics()
+            .applicable_subset(
+                &crate::default_attribution_metrics(),
+                metrics_instrument.key(),
+            ),
     };
 
     // Attach FinstackConfig so sensitivity bump knobs (e.g. rate_bump_bp)

@@ -13,6 +13,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::assertions::assert_positive;
 use time::macros::date;
 
 #[test]

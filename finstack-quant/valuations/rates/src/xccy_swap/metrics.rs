@@ -23,7 +23,6 @@ pub(crate) fn register_xccy_swap_metrics(
             // exposure, so this is a first-order risk, not only a cross-gamma
             // input.
             (Fx01, GenericFx01Calculator),
-            (FxDelta, GenericFx01Calculator),
             // Combined DV01 sums every rate curve of both currencies, so the
             // two legs' offsetting curve risks net. `Pv01` reports each curve
             // separately as `pv01::{curve}`.

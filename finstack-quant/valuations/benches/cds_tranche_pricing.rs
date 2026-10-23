@@ -266,9 +266,12 @@ fn bench_cds_tranche_correlation_delta(c: &mut Criterion) {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let tranche = create_tranche(3.0, 7.0, 5);
+    let pricer = CdsTranchePricer::new();
 
     group.bench_function("correlation_delta", |b| {
-        b.iter(|| tranche.correlation_delta(black_box(&market), black_box(as_of)));
+        b.iter(|| {
+            pricer.calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of))
+        });
     });
 
     group.finish();
@@ -280,9 +283,10 @@ fn bench_cds_tranche_jump_to_default(c: &mut Criterion) {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let tranche = create_tranche(3.0, 7.0, 5);
+    let pricer = CdsTranchePricer::new();
 
     group.bench_function("jump_to_default", |b| {
-        b.iter(|| tranche.jump_to_default(black_box(&market), black_box(as_of)));
+        b.iter(|| pricer.calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of)));
     });
 
     group.finish();
@@ -294,9 +298,10 @@ fn bench_cds_tranche_par_spread(c: &mut Criterion) {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let tranche = create_tranche(3.0, 7.0, 5);
+    let pricer = CdsTranchePricer::new();
 
     group.bench_function("par_spread", |b| {
-        b.iter(|| tranche.par_spread(black_box(&market), black_box(as_of)));
+        b.iter(|| pricer.calculate_par_spread(&tranche, black_box(&market), black_box(as_of)));
     });
 
     group.finish();
@@ -308,6 +313,7 @@ fn bench_cds_tranche_all_metrics(c: &mut Criterion) {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let tranche = create_tranche(3.0, 7.0, 5);
+    let pricer = CdsTranchePricer::new();
 
     group.bench_function("all_metrics", |b| {
         b.iter(|| {
@@ -320,9 +326,11 @@ fn bench_cds_tranche_all_metrics(c: &mut Criterion) {
                 )
                 .unwrap();
 
-            let _corr_delta = tranche.correlation_delta(black_box(&market), black_box(as_of));
-            let _jtd = tranche.jump_to_default(black_box(&market), black_box(as_of));
-            let _par = tranche.par_spread(black_box(&market), black_box(as_of));
+            let _corr_delta =
+                pricer.calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of));
+            let _jtd =
+                pricer.calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of));
+            let _par = pricer.calculate_par_spread(&tranche, black_box(&market), black_box(as_of));
         });
     });
 

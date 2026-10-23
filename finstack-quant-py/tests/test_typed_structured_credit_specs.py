@@ -190,7 +190,7 @@ def test_typed_specs_are_accepted_by_pool_asset_and_the_deal_prices() -> None:
         .build()
     )
     market = MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04))
-    diagnostics = deal.run_simulation_with_diagnostics(market, CLOSE)
+    diagnostics = deal.run_simulation(market, CLOSE).diagnostics
     frame = diagnostics.to_dataframe()
     assert len(frame) > 12
     assert (frame["pool_balance"].iloc[:12] >= 10_000_000.0 - 1e-6).all(), "the lockout stops prepayment"

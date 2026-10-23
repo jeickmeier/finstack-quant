@@ -24,7 +24,8 @@ use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use std::sync::Arc;
 use time::macros::date;
 
@@ -120,7 +121,7 @@ fn test_call_delta_positive() {
     };
 
     let market = create_option_market(as_of, 100.0, 0.25, 0.05, 0.02);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -169,7 +170,7 @@ fn test_put_delta_negative() {
     };
 
     let market = create_option_market(as_of, 100.0, 0.25, 0.05, 0.02);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -221,7 +222,7 @@ fn test_theta_negative_for_long_positions() {
         };
 
         let market = create_option_market(as_of, 100.0, 0.25, 0.05, 0.02);
-        let registry = standard_registry();
+        let registry = STANDARD.metrics();
         let pv = option.value(&market, as_of).unwrap();
         let mut context = MetricContext::new(
             Arc::new(option),
@@ -271,7 +272,7 @@ fn test_bond_dv01_negative() {
         .unwrap();
 
     let market = MarketContext::new().insert(disc_curve);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = bond.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(bond),
@@ -319,7 +320,7 @@ fn test_vega_always_positive() {
         };
 
         let market = create_option_market(as_of, 100.0, 0.25, 0.05, 0.02);
-        let registry = standard_registry();
+        let registry = STANDARD.metrics();
         let pv = option.value(&market, as_of).unwrap();
         let mut context = MetricContext::new(
             Arc::new(option),
@@ -377,7 +378,7 @@ fn test_gamma_always_positive() {
         };
 
         let market = create_option_market(as_of, 100.0, 0.25, 0.05, 0.02);
-        let registry = standard_registry();
+        let registry = STANDARD.metrics();
         let pv = option.value(&market, as_of).unwrap();
         let mut context = MetricContext::new(
             Arc::new(option),
@@ -434,7 +435,7 @@ fn test_call_rho_positive() {
     };
 
     let market = create_option_market(as_of, 100.0, 0.25, 0.05, 0.02);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -481,7 +482,7 @@ fn test_put_rho_negative() {
     };
 
     let market = create_option_market(as_of, 100.0, 0.25, 0.05, 0.02);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -807,7 +808,7 @@ fn test_put_call_parity_delta_relationship() {
     };
 
     let market = create_option_market(as_of, spot, vol, rate, div_yield);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Compute deltas
     let call_pv = call.value(&market, as_of).unwrap();

@@ -107,11 +107,9 @@ def _pymethod_ranges(lines: list[str]) -> list[tuple[int, int]]:
 
 
 # Macro invocations whose `///` entries become public PyO3 methods: each doc
-# block documents the entry that follows it (`name -> Ret = expr;`, a Greek
-# name, or the `build` keyword).
-_METHOD_MACRO = re.compile(
-    r"^(?:crate::bindings::macros::)?(?:py_getters|instrument_greek_methods|instrument_envelope_methods)!\("
-)
+# block documents the entry that follows it (`name -> Ret = expr;` or the
+# `build` keyword).
+_METHOD_MACRO = re.compile(r"^(?:crate::bindings::macros::)?(?:py_getters|instrument_envelope_methods)!\(")
 
 
 def _method_macro_ranges(lines: list[str]) -> list[tuple[int, int]]:

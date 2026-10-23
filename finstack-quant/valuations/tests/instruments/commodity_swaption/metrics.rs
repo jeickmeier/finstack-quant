@@ -10,7 +10,8 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
 use finstack_quant_valuations::instruments::{CommodityUnderlyingParams, Instrument};
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
 use finstack_quant_valuations_test_support::date::date;
 use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
@@ -59,7 +60,7 @@ fn ng_swaption() -> (CommoditySwaption, MarketContext, Date) {
 /// with the parallel DV01.
 #[test]
 fn test_commodity_swaption_dv01_and_bucketed_dv01() -> finstack_quant_core::Result<()> {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let (swaption, market, as_of) = ng_swaption();
     let pv = swaption.value(&market, as_of)?;
     let mut ctx = MetricContext::new(

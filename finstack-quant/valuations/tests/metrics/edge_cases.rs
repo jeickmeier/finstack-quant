@@ -10,7 +10,7 @@
 use crate::metrics::common::test_option;
 use crate::metrics::credit_support as test_utils;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
@@ -22,17 +22,12 @@ use finstack_quant_valuations::instruments::equity::equity_option::{
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::builders::simple_option_market;
 use finstack_quant_valuations_test_support::tolerances;
 use std::sync::Arc;
 use time::macros::date;
-
-/// Create an option market. Delegates to common builder for most cases,
-/// but allows custom vol surface for edge case tests.
-fn create_option_market(as_of: Date, spot: f64, vol: f64, rate: f64) -> MarketContext {
-    simple_option_market(as_of, spot, vol, rate)
-}
 
 #[test]
 fn test_expired_option_returns_zero_theta() {
@@ -43,8 +38,8 @@ fn test_expired_option_returns_zero_theta() {
     let mut option = test_option(expiry).id("EXPIRED_OPTION").build();
     option.exercise = Some(EquityOptionExercise::new(expiry, 100.0, expiry, false));
 
-    let market = create_option_market(as_of, 100.0, 0.25, 0.05);
-    let registry = standard_registry();
+    let market = simple_option_market(as_of, 100.0, 0.25, 0.05);
+    let registry = STANDARD.metrics();
 
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
@@ -103,7 +98,7 @@ fn test_zero_recovery_cds() {
 
     let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = cds.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(cds),
@@ -138,8 +133,8 @@ fn test_deep_itm_option_greeks() {
         .strike(strike)
         .build();
 
-    let market = create_option_market(as_of, spot, 0.25, 0.05);
-    let registry = standard_registry();
+    let market = simple_option_market(as_of, spot, 0.25, 0.05);
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -174,8 +169,8 @@ fn test_zero_volatility_option_limits() {
     let atm_option = test_option(expiry).id("ZERO_VOL_ATM").build();
 
     // Market with zero volatility
-    let market = create_option_market(as_of, spot, 0.0, 0.05);
-    let registry = standard_registry();
+    let market = simple_option_market(as_of, spot, 0.0, 0.05);
+    let registry = STANDARD.metrics();
 
     let pv = atm_option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
@@ -338,7 +333,7 @@ fn test_zero_quantity_is_rejected() {
         attributes: Default::default(),
     };
 
-    let market = create_option_market(as_of, 100.0, 0.25, 0.05);
+    let market = simple_option_market(as_of, 100.0, 0.25, 0.05);
     let err = option
         .value(&market, as_of)
         .expect_err("zero-quantity equity option must fail validation");
@@ -379,8 +374,8 @@ fn test_deep_otm_option_greeks() {
         attributes: Default::default(),
     };
 
-    let market = create_option_market(as_of, spot, 0.25, 0.05);
-    let registry = standard_registry();
+    let market = simple_option_market(as_of, spot, 0.25, 0.05);
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -435,8 +430,8 @@ fn test_deep_itm_put_greeks() {
         attributes: Default::default(),
     };
 
-    let market = create_option_market(as_of, spot, 0.25, 0.05);
-    let registry = standard_registry();
+    let market = simple_option_market(as_of, spot, 0.25, 0.05);
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -490,8 +485,8 @@ fn test_deep_otm_put_greeks() {
         attributes: Default::default(),
     };
 
-    let market = create_option_market(as_of, spot, 0.25, 0.05);
-    let registry = standard_registry();
+    let market = simple_option_market(as_of, spot, 0.25, 0.05);
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -528,8 +523,8 @@ fn test_atm_option_gamma_peak() {
     let expiry = date!(2025 - 01 - 01);
     let spot = 100.0;
 
-    let market = create_option_market(as_of, spot, 0.25, 0.05);
-    let registry = standard_registry();
+    let market = simple_option_market(as_of, spot, 0.25, 0.05);
+    let registry = STANDARD.metrics();
 
     // Test multiple strikes and verify ATM has higher gamma
     let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
@@ -626,8 +621,8 @@ fn test_extreme_volatility_handling() {
     };
 
     // Test with very high vol (200% = 2.0)
-    let market = create_option_market(as_of, 100.0, 2.0, 0.05);
-    let registry = standard_registry();
+    let market = simple_option_market(as_of, 100.0, 2.0, 0.05);
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -684,8 +679,8 @@ fn test_very_short_dated_option() {
         attributes: Default::default(),
     };
 
-    let market = create_option_market(as_of, 100.0, 0.25, 0.05);
-    let registry = standard_registry();
+    let market = simple_option_market(as_of, 100.0, 0.25, 0.05);
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),
@@ -765,7 +760,7 @@ fn test_very_low_interest_rate_greeks() {
         attributes: Default::default(),
     };
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = call_option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(call_option),
@@ -851,7 +846,7 @@ fn test_vol_smile_greeks() {
         attributes: Default::default(),
     };
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),

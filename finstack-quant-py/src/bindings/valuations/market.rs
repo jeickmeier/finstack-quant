@@ -5,8 +5,7 @@
 //! registry is process-global and loaded once from the crate's embedded JSON
 //! tables; every lookup here borrows it, so the wrappers below are plain
 //! serde-backed value objects (``to_json`` / ``from_json`` / pickle).
-//! Listed-product coverage (`listed_product_catalog`) is registered from
-//! `pricing.rs`.
+//! Listed-product coverage is exposed by `listed_product_catalog`.
 
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
@@ -14,7 +13,7 @@ use pyo3::types::PyModule;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::{enum_to_py_string, opt_repr};
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_valuations::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
     SwaptionConventionId, XccyConventionId,
@@ -26,6 +25,7 @@ use finstack_quant_valuations::market::conventions::{
 
 /// Names this module contributes to `finstack_quant.valuations.market.__all__`.
 pub(crate) const EXPORTS: &[&str] = &[
+    "listed_product_catalog",
     "CdsConventionSpec",
     "ConventionRegistry",
     "InflationSwapConventions",
@@ -62,7 +62,7 @@ macro_rules! convention_record_methods {
                 serde_to_py(py, &self.inner)
             }
 
-            /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+            #[doc = pydoc!("finstack_quant.valuations.market", concat!($name, ".__reduce__"))]
             fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
                 let from_json = py.get_type::<Self>().getattr("from_json")?;
                 crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -579,6 +579,7 @@ impl PyConventionRegistry {
 /// * `_py` - Interpreter token.
 /// * `m` - The `finstack_quant.valuations.market` module under construction.
 pub(crate) fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(pyo3::wrap_pyfunction!(listed_product_catalog, m)?)?;
     m.add_class::<PyConventionRegistry>()?;
     m.add_class::<PyRateIndexConventions>()?;
     m.add_class::<PyCdsConventionSpec>()?;
@@ -587,4 +588,19 @@ pub(crate) fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()>
     m.add_class::<PyXccyConventions>()?;
     m.add_class::<PyIrFutureConventions>()?;
     Ok(())
+}
+
+#[doc = pydoc!("finstack_quant.valuations.market", "listed_product_catalog")]
+#[pyfunction(signature = (exchange=None))]
+fn listed_product_catalog<'py>(
+    py: Python<'py>,
+    exchange: Option<&str>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let exchange = exchange
+        .map(str::parse::<finstack_quant_valuations::market::listed::ListedExchange>)
+        .transpose()
+        .map_err(value_error)?;
+    let rows = finstack_quant_valuations::market::listed::listed_product_catalog(exchange)
+        .map_err(core_to_py)?;
+    serde_to_py(py, &rows)
 }

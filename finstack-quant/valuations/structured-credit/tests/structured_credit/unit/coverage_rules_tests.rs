@@ -17,9 +17,9 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, run_simulation_with_diagnostics, AssetPool, CccBucketRule, CoverageRules,
-    CoverageTestSpec, DealType, DefaultedValuation, DiscountObligationRule, InstrumentCollateral,
-    PoolAsset, StructuredCredit, TestContext, Tranche, TrancheCashflows, TrancheStructure,
+    AssetPool, CccBucketRule, CoverageRules, CoverageTestSpec, DealType, DefaultedValuation,
+    DiscountObligationRule, InstrumentCollateral, PoolAsset, StructuredCredit, TestContext,
+    Tranche, TrancheCashflows, TrancheStructure,
 };
 use time::macros::date;
 use time::Month;
@@ -343,13 +343,17 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
     .expect("structure");
     let mut deal = StructuredCredit {
         coverage_triggers: vec![CoverageTestSpec::oc("A", 1.54)],
-        ..StructuredCredit::new_clo(
-            "CLO-DEFAULTED-VALUATION",
-            pool,
-            tranches,
-            close,
-            maturity(),
-            "USD-OIS",
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-DEFAULTED-VALUATION".into(),
+                pool,
+                tranches,
+                closing_date: close,
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse")
@@ -388,8 +392,14 @@ fn defaulted_collateral_at_market_value_fails_the_test_that_recovery_value_passe
     let market = market(as_of);
     let first_payment = d(2024, 4, 1);
 
-    let recovery_run = run_simulation(&recovery, &market, as_of).expect("recovery run");
-    let market_value_run = run_simulation(&market_value, &market, as_of).expect("market run");
+    let recovery_run = recovery
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("recovery run");
+    let market_value_run = market_value
+        .run_simulation(&market, as_of)
+        .map(|run| run.tranches)
+        .expect("market run");
 
     let recovery_cure = principal_on(&recovery_run, "A", first_payment);
     let market_value_cure = principal_on(&market_value_run, "A", first_payment);
@@ -443,7 +453,7 @@ fn nr_haircut_leaves_instrument_collateral_at_par() {
     let closing = date!(2024 - 01 - 15);
     let market = MarketContext::new().insert(flat_discount_curve(0.03, closing, "USD-OIS"));
     let first_principal = |deal: &StructuredCredit| -> Date {
-        let run = run_simulation_with_diagnostics(deal, &market, closing).expect("run");
+        let run = deal.run_simulation(&market, closing).expect("run");
         run.tranches["A"]
             .principal_flows
             .iter()

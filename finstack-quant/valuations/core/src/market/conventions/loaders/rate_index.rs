@@ -123,7 +123,7 @@ pub(crate) fn load_registry() -> Result<FxHashMap<IndexId, RateIndexConventions>
         json,
         "rate index",
         IndexId::new,
-        |rec: &RateIndexConventionsRecord| rec.clone().into_conventions(),
+        RateIndexConventionsRecord::into_conventions,
     )
 }
 

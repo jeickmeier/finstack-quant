@@ -11,8 +11,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AfcSpec, AssetPool, DealType, PoolAsset, SimulationRun,
-    StructuredCredit, Tranche, TrancheStructure, WaterfallRules,
+    AfcSpec, AssetPool, DealType, PoolAsset, SimulationRun, StructuredCredit, Tranche,
+    TrancheStructure, WaterfallRules,
 };
 use time::Month;
 
@@ -76,10 +76,20 @@ fn deal(carryover: bool) -> StructuredCredit {
         .expect("EQ"),
     ])
     .expect("structure");
-    let mut sc =
-        StructuredCredit::new_abs("ABS-AFC", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-AFC".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -95,7 +105,7 @@ fn deal(carryover: bool) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit) -> SimulationRun {
-    run_simulation_with_diagnostics(deal, &market(), close()).expect("simulation")
+    deal.run_simulation(&market(), close()).expect("simulation")
 }
 
 fn interest_on(run: &SimulationRun, id: &str, date: Date) -> f64 {

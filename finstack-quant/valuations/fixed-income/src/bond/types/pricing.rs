@@ -82,7 +82,7 @@ impl Bond {
         model: finstack_quant_valuations_core::pricer::ModelKey,
         curves: &finstack_quant_core::market_data::context::MarketContext,
     ) -> Result<()> {
-        use crate::bond::pricing::hazard::HazardBondEngine;
+        use crate::bond::pricing::hazard;
         use finstack_quant_valuations_core::pricer::ModelKey;
 
         if model == ModelKey::RatesCredit && self.credit_curve_id.is_none() {
@@ -103,7 +103,7 @@ impl Bond {
                 )));
             }
             ModelKey::HazardRate | ModelKey::RatesCredit => {
-                HazardBondEngine::require_hazard_curve(self, curves)?;
+                hazard::require_hazard_curve(self, curves)?;
             }
             ModelKey::Discounting | ModelKey::Tree => {}
             _ => {
@@ -127,8 +127,7 @@ impl Bond {
         oas_quote_decimal: f64,
     ) -> Result<crate::bond::pricing::tree::TreePriceOutcome> {
         use crate::bond::pricing::{
-            discount::BondEngine,
-            hazard::HazardBondEngine,
+            discount, hazard,
             tree::{bond_tree_config, bond_tree_settings, TreePriceOutcome, TreePricer},
         };
         use finstack_quant_valuations_core::pricer::ModelKey;
@@ -136,16 +135,11 @@ impl Bond {
         self.validate_model_contract(model, curves)?;
         match model {
             ModelKey::Discounting => Ok(TreePriceOutcome {
-                amount: BondEngine::price_with_oas(self, curves, as_of, oas_quote_decimal)?,
+                amount: discount::price_with_oas(self, curves, as_of, oas_quote_decimal)?,
                 lsmc: None,
             }),
             ModelKey::HazardRate => Ok(TreePriceOutcome {
-                amount: HazardBondEngine::price_raw_with_oas(
-                    self,
-                    curves,
-                    as_of,
-                    oas_quote_decimal,
-                )?,
+                amount: hazard::price_raw_with_oas(self, curves, as_of, oas_quote_decimal)?,
                 lsmc: None,
             }),
             ModelKey::Tree => TreePricer::with_config(bond_tree_config(self, curves)?)
@@ -817,9 +811,8 @@ mod tests {
             "native inference must select the joint model when joint controls are attached"
         );
 
-        let expected =
-            crate::bond::pricing::hazard::HazardBondEngine::price_raw(&bond, &market, as_of)
-                .expect("scalar FRP price");
+        let expected = crate::bond::pricing::hazard::price_raw(&bond, &market, as_of)
+            .expect("scalar FRP price");
         let actual = bond
             .price_for_model_raw(ModelKey::HazardRate, &market, as_of)
             .expect("explicit hazard-rate price");

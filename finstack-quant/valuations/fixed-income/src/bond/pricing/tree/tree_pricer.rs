@@ -43,7 +43,7 @@ use std::borrow::Cow;
 /// deterministic, and overnight observation conventions are replayed through
 /// mid-period exercise. The legacy rates-only tree rejects stochastic floating
 /// coupons because its valuator carries a projected scalar cashflow schedule.
-pub struct TreePricer {
+pub(crate) struct TreePricer {
     /// Pricer configuration (tree steps, volatility, convergence settings)
     config: TreePricerConfig,
     /// Explicit rates-only or joint rates-credit family.
@@ -306,18 +306,7 @@ impl TreePricer {
     ///
     /// A `TreePricer` with the specified configuration.
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations_fixed_income::bond::pricing::tree::{TreePricer, TreePricerConfig};
-    ///
-    /// let config = TreePricerConfig {
-    ///     tree_steps: 400,
-    ///     ..TreePricerConfig::default()
-    /// };
-    /// let pricer = TreePricer::with_config(config);
-    /// ```
-    pub fn with_config(config: TreePricerConfig) -> Self {
+    pub(crate) fn with_config(config: TreePricerConfig) -> Self {
         Self {
             config,
             model: BondTreeModel::RatesOnly,
@@ -335,7 +324,7 @@ impl TreePricer {
     ///
     /// A pricer that requires the bond to identify a hazard curve through
     /// `credit_curve_id` and values embedded rights in the joint model.
-    pub fn rates_credit(config: TreePricerConfig) -> Self {
+    pub(crate) fn rates_credit(config: TreePricerConfig) -> Self {
         Self {
             config,
             model: BondTreeModel::RatesCredit,

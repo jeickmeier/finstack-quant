@@ -2,9 +2,8 @@
 
 use crate::fx_option::FxOption;
 use crate::shared::{
-    collect_fx_option_inputs as collect_shared_fx_option_inputs,
-    collect_fx_option_inputs_no_vol as collect_shared_fx_option_inputs_no_vol,
-    FxOptionInputRequest,
+    collect_fx_option_inputs, collect_fx_option_inputs_no_vol, FxOptionInputRequest,
+    FxOptionInputs, FxOptionInputsNoVol,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -15,12 +14,24 @@ use finstack_quant_models::types::OptionType;
 
 const STRIKE_ZERO_TOL: f64 = 1e-12;
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static COMPUTE_GREEKS_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
     inst.validate()?;
     if crate::shared::event_has_occurred(inst.expiry, as_of) {
         return Ok(Money::from((0_i64, inst.quote_currency)));
     }
-    let (spot, r_d, r_f, sigma, t) = collect_inputs(inst, curves, as_of)?;
+    let FxOptionInputs {
+        spot,
+        r_domestic: r_d,
+        r_foreign: r_f,
+        sigma,
+        t,
+        ..
+    } = collect_fx_option_inputs(input_request(inst, curves, as_of))?;
 
     if t <= 0.0 {
         let intrinsic = match inst.option_type {
@@ -64,35 +75,6 @@ fn input_request<'a>(
     }
 }
 
-/// Pricing inputs without volatility lookup. Used by IV solver and as a base
-/// for the full input collection. Returns `(spot, r_d, r_f, t_vol)` and
-/// short-circuits to `(spot, 0, 0, 0)` when `as_of >= expiry`.
-fn collect_inputs_no_vol(
-    inst: &FxOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> Result<(f64, f64, f64, f64)> {
-    let inputs = collect_shared_fx_option_inputs_no_vol(input_request(inst, curves, as_of))?;
-    Ok((inputs.spot, inputs.r_domestic, inputs.r_foreign, inputs.t))
-}
-
-/// Full pricing inputs including volatility. Returns `(spot, r_d, r_f, sigma,
-/// t_vol)` and short-circuits to `(spot, 0, 0, 0, 0)` when expired.
-fn collect_inputs(
-    inst: &FxOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> Result<(f64, f64, f64, f64, f64)> {
-    let inputs = collect_shared_fx_option_inputs(input_request(inst, curves, as_of))?;
-    Ok((
-        inputs.spot,
-        inputs.r_domestic,
-        inputs.r_foreign,
-        inputs.sigma,
-        inputs.t,
-    ))
-}
-
 pub(crate) fn implied_vol(
     inst: &FxOption,
     curves: &MarketContext,
@@ -100,7 +82,13 @@ pub(crate) fn implied_vol(
     target_price: f64,
 ) -> Result<f64> {
     inst.validate()?;
-    let (spot, r_d, r_f, t) = collect_inputs_no_vol(inst, curves, as_of)?;
+    let FxOptionInputsNoVol {
+        spot,
+        r_domestic: r_d,
+        r_foreign: r_f,
+        t,
+        ..
+    } = collect_fx_option_inputs_no_vol(input_request(inst, curves, as_of))?;
     if t <= 0.0 {
         return Ok(0.0);
     }
@@ -130,11 +118,20 @@ pub(crate) fn compute_greeks(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<FxOptionGreeks> {
+    #[cfg(test)]
+    COMPUTE_GREEKS_CALLS.with(|count| count.set(count.get() + 1));
     if crate::shared::event_has_occurred(inst.expiry, as_of) {
         return Ok(FxOptionGreeks::default());
     }
     inst.validate()?;
-    let (spot, r_d, r_f, sigma, t) = collect_inputs(inst, curves, as_of)?;
+    let FxOptionInputs {
+        spot,
+        r_domestic: r_d,
+        r_foreign: r_f,
+        sigma,
+        t,
+        ..
+    } = collect_fx_option_inputs(input_request(inst, curves, as_of))?;
     if t <= 0.0 || inst.strike.abs() < STRIKE_ZERO_TOL {
         // At the expiry kink use half of each one-sided delta, consistently
         // across all four quoting conventions. Zero-strike puts are worthless.

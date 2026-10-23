@@ -294,32 +294,28 @@ impl MetricContext {
         }
     }
 
-    /// Take the reusable market scratch context, cloning the base market only
-    /// the first time a finite-difference metric needs a mutable copy.
-    #[inline]
-    pub fn take_market_scratch(&mut self) -> MarketContext {
-        self.market_scratch
-            .take()
-            .unwrap_or_else(|| self.curves.as_ref().clone())
-    }
-
-    /// Return an unbumped scratch context for reuse by the next metric.
-    #[inline]
-    pub fn put_market_scratch(&mut self, scratch: MarketContext) {
-        self.market_scratch = Some(scratch);
-    }
-
-    /// Run a finite-difference calculation against the reusable scratch market
-    /// and return it to the context even when the calculation fails.
+    /// Run a finite-difference calculation against a reusable scratch market.
+    ///
+    /// On success, retain the scratch market for the next calculation. On error,
+    /// discard it because the calculation may have left a bump unreverted.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Calculation borrowing this metric context and its mutable market
+    ///   scratch copy. Restore every market bump before returning `Ok`; an `Err`
+    ///   discards the copy and the next call starts from the original market.
     #[inline]
     pub fn with_market_scratch<T>(
         &mut self,
         f: impl FnOnce(&Self, &mut MarketContext) -> finstack_quant_core::Result<T>,
     ) -> finstack_quant_core::Result<T> {
-        let mut scratch = self.take_market_scratch();
+        let mut scratch = self
+            .market_scratch
+            .take()
+            .unwrap_or_else(|| self.curves.as_ref().clone());
         let result = f(self, &mut scratch);
         if result.is_ok() {
-            self.put_market_scratch(scratch);
+            self.market_scratch = Some(scratch);
         } else {
             // The failing path may have exited before reverting a bump token.
             // Discard the scratch copy instead of caching a contaminated market.

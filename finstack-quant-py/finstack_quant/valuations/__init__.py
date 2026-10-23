@@ -23,6 +23,8 @@ True
 
 from finstack_quant.finstack_quant import valuations as _valuations
 
+__doc__ = _valuations.__doc__
+
 ValuationResult = _valuations.ValuationResult
 # The submodules are compiled modules with no pure-Python shim; the extension
 # registers each under its public path (`finstack_quant.valuations.instruments`

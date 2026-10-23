@@ -102,14 +102,14 @@ test('typed FX Greeks use volatility points, basis points, and daily theta', () 
   const expected = {
     vega: ((price(0.2 + h) - price(0.2 - h)) / (2 * h)) * 0.01,
     rho: ((price(0.2, 0.04 + h) - price(0.2, 0.04 - h)) / (2 * h)) * 0.0001,
-    foreignRho: ((price(0.2, 0.04, 0.02 + h) - price(0.2, 0.04, 0.02 - h)) / (2 * h)) * 0.0001,
+    foreign_rho: ((price(0.2, 0.04, 0.02 + h) - price(0.2, 0.04, 0.02 - h)) / (2 * h)) * 0.0001,
     theta: (price(0.2, 0.04, 0.02, '2024-01-03') - price(0.2, 0.04, 0.02, '2024-01-01')) / 2,
   };
   const typed = valuations.instruments.FxOption.fromJson(JSON.stringify(envelope));
   try {
     const marketJson = JSON.stringify(market());
     for (const [metric, expectedValue] of Object.entries(expected)) {
-      const actual = typed[metric](marketJson, asOf, model);
+      const actual = typed.metric(marketJson, asOf, metric, model);
       assert.ok(Math.abs(expectedValue) > 1, `${metric} probe must have material exposure`);
       assert.ok(
         Math.abs(actual - expectedValue) < Math.abs(expectedValue) * 1e-5,

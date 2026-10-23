@@ -4,6 +4,7 @@ use super::helpers::*;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::assertions::{assert_non_negative, assert_positive};
 use time::macros::date;
 
 // ==================== EXPIRY TESTS ====================

@@ -589,7 +589,7 @@ fn quanto_defaults_are_bit_identical() {
         ("vega", m(MetricId::Vega), 0x40aee02c44085cc0),
         ("rho", m(MetricId::Rho), 0xc01e1b66ed300000),
         ("foreign_rho", m(MetricId::ForeignRho), 0x4049b76ea7a3c800),
-        ("fx_delta", m(MetricId::FxDelta), 0x0000000000000000),
+        ("fx01", m(MetricId::Fx01), 0x0000000000000000),
         ("fx_vega", m(MetricId::FxVega), 0x4069b5dd2fd70a00),
     ]);
 }
@@ -613,8 +613,8 @@ fn quanto_rho_and_fx_greeks_honour_bump_config() {
         1e-12,
     );
 
-    // FxDelta / FxVega report cash P&L per 1% FX move / 1 FX vol point.
-    let fx_delta_ref = (pv(&opt, &bump_price(&market, "JPYUSD-SPOT", h_s), QUANTO_AS_OF)
+    // Fx01 / FxVega report cash P&L per 1% FX move / 1 FX vol point.
+    let fx01_ref = (pv(&opt, &bump_price(&market, "JPYUSD-SPOT", h_s), QUANTO_AS_OF)
         - pv(
             &opt,
             &bump_price(&market, "JPYUSD-SPOT", -h_s),
@@ -624,7 +624,7 @@ fn quanto_rho_and_fx_greeks_honour_bump_config() {
     let fx_vega_ref = (pv(&opt, &bump_vol(&market, "JPYUSD-VOL", h_v), QUANTO_AS_OF)
         - pv(&opt, &bump_vol(&market, "JPYUSD-VOL", -h_v), QUANTO_AS_OF))
         / (2.0 * h_v * 100.0);
-    assert_rel("quanto fx delta", m(MetricId::FxDelta), fx_delta_ref, 1e-12);
+    assert_rel("quanto fx01", m(MetricId::Fx01), fx01_ref, 1e-12);
     assert_rel("quanto fx vega", m(MetricId::FxVega), fx_vega_ref, 1e-12);
 
     let h = 35_000.0 * h_s;

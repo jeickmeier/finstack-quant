@@ -83,7 +83,6 @@
       "implied_collateral_return",
       "index_ratio",
       "lp_irr",
-      "moic_lp",
       "nav01",
       "real_yield",
       "repo_interest",
@@ -138,14 +137,7 @@
       "variance_time_to_maturity",
       "weight_risk"
     ],
-    "FX": [
-      "base_amount",
-      "fx01",
-      "fx_delta",
-      "fx_vega",
-      "inverse_rate",
-      "spot_rate"
-    ],
+    "FX": ["base_amount", "fx01", "fx_vega", "inverse_rate", "spot_rate"],
     "Greeks": [
       "bucketed_vega",
       "charm",

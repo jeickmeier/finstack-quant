@@ -7,7 +7,7 @@ use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
 use crate::bindings::valuations::convert::{money_from_py, money_to_py, opt_repr};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 
-/// Typed wrapper for the Rust `RepLine` (aggregated representative pool line).
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "RepLine",
@@ -22,78 +22,7 @@ pub struct PyRepLine {
 
 #[pymethods]
 impl PyRepLine {
-    /// Aggregated representative line for pool modeling.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique identifier for the rep line.
-    /// balance : Money
-    ///     Aggregated balance.
-    /// rate : float | Rate
-    ///     Weighted average coupon as an annual decimal rate (e.g. ``0.07``
-    ///     = 7%).
-    /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Weighted average maturity date (date-like or ISO-8601 string).
-    /// seasoning_months : int
-    ///     Weighted average seasoning in months.
-    /// day_count : DayCount
-    ///     Day count convention.
-    /// asset_type : dict
-    ///     Canonical Rust AssetType JSON object specifying amortization behavior.
-    /// spread_bp : float | Bps, optional
-    ///     Weighted average spread over the reference index, in basis
-    ///     points (e.g. ``150.0`` = 150bp), for floating-rate lines.
-    /// forward_curve_id : str, optional
-    ///     Reference index identifier, if floating.
-    /// index_floor_bp : float, optional
-    ///     Floor on the floating index in basis points (``100`` = 1%), applied before
-    ///     ``spread_bp``; ignored on fixed-rate lines.
-    /// cpr : float, optional
-    ///     Constant prepayment rate override, as an annual decimal (e.g.
-    ///     ``0.10`` = 10% CPR).
-    /// cdr : float, optional
-    ///     Constant default rate override, as an annual decimal (e.g.
-    ///     ``0.02`` = 2% CDR).
-    /// recovery_rate : float, optional
-    ///     Recovery rate override, as a decimal fraction (e.g. ``0.45`` =
-    ///     45%).
-    /// contractual_payment : Money, optional
-    ///     Contractual periodic payment for level-pay lines; inferred from
-    ///     the balance and remaining schedule when ``None``.
-    /// amortization_term_months : int, optional
-    ///     Schedule length in months from origination; with
-    ///     ``seasoning_months`` the line amortizes over ``term − seasoning``.
-    /// io_months : int, optional
-    ///     Interest-only window in months from origination.
-    ///
-    /// Returns
-    /// -------
-    /// RepLine
-    ///     The rep line.
-    ///
-    /// Raises
-    /// ------
-    /// TypeError
-    ///     If ``maturity`` is neither date-like nor a string, or ``rate`` /
-    ///     ``spread_bp`` are not numbers / ``Rate`` / ``Bps``.
-    /// ValueError
-    ///     If a string ``maturity`` is not valid ISO-8601.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.dates import DayCount
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import RepLine
-    /// >>> line = RepLine(
-    /// ...     "LINE-1", Money(80_000_000.0, Currency("USD")), 0.07,
-    /// ...     datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan"},
-    /// ...     cpr=0.10, cdr=0.02, recovery_rate=0.45,
-    /// ... )
-    /// >>> "LINE-1" in repr(line)
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.__init__")]
     #[new]
     #[pyo3(signature = (id, balance, rate, maturity, seasoning_months, day_count, *, asset_type,
                         spread_bp = None, forward_curve_id = None, index_floor_bp = None, cpr = None,
@@ -156,17 +85,7 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
         Ok(Self { inner })
     }
 
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Parameters
-    /// ----------
-    /// json : str
-    ///     Strict JSON object with exactly the fields ``to_json`` writes.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed or has the wrong shape.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -175,31 +94,31 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
         Ok(Self { inner })
     }
 
-    /// Serialize to the canonical JSON wire form.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
     }
 
-    /// Return every field as a plain ``dict`` (canonical serde shape).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Canonical asset classification, including its amortization behavior.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.asset_type")]
     #[getter]
     fn asset_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.asset_type)
     }
 
-    /// Weighted average maturity as ``datetime.date``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
@@ -220,46 +139,45 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
 }
 
 crate::bindings::macros::py_getters!(PyRepLine |s| {
-    /// Rep line identifier.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.id")]
     id -> String = s.inner.id.clone();
 
-    /// Aggregated balance.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.balance")]
     balance -> PyMoney = money_to_py(s.inner.balance);
 
-    /// Weighted average coupon as an annual decimal rate.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.rate")]
     rate -> f64 = s.inner.rate;
 
-    /// Weighted average spread in basis points, or ``None`` for fixed lines.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.spread_bp")]
     spread_bp -> Option<f64> = s.inner.spread_bp;
 
-    /// Reference index identifier, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.forward_curve_id")]
     forward_curve_id -> Option<String> = s.inner.forward_curve_id.clone();
 
-    /// Floor on the floating index in basis points, applied before the
-    /// spread, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.index_floor_bp")]
     index_floor_bp -> Option<f64> = s.inner.index_floor_bp;
 
-    /// Contractual periodic payment, or ``None`` when inferred.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.contractual_payment")]
     contractual_payment -> Option<PyMoney> = s.inner.contractual_payment.map(money_to_py);
 
-    /// Amortization schedule length in months from origination, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.amortization_term_months")]
     amortization_term_months -> Option<u32> = s.inner.amortization_term_months;
 
-    /// Interest-only window in months from origination, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.io_months")]
     io_months -> Option<u32> = s.inner.io_months;
 
-    /// Weighted average seasoning in months.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.seasoning_months")]
     seasoning_months -> u32 = s.inner.seasoning_months;
 
-    /// Accrual day-count convention.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    /// CPR override as an annual decimal, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.cpr")]
     cpr -> Option<f64> = s.inner.cpr;
 
-    /// CDR override as an annual decimal, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.cdr")]
     cdr -> Option<f64> = s.inner.cdr;
 
-    /// Recovery-rate override as a decimal fraction, or ``None``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.recovery_rate")]
     recovery_rate -> Option<f64> = s.inner.recovery_rate;
 });

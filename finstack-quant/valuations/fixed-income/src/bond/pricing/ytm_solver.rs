@@ -280,10 +280,9 @@ mod tests {
                                 .expect("actual payment discount")
                     })
                     .sum::<f64>();
-                let curve_pv = crate::bond::pricing::discount::BondEngine::price_with_oas(
-                    &bond, &market, as_of, 0.0,
-                )
-                .expect("actual-date curve price");
+                let curve_pv =
+                    crate::bond::pricing::discount::price_with_oas(&bond, &market, as_of, 0.0)
+                        .expect("actual-date curve price");
                 assert!((curve_pv - expected_curve_pv).abs() < 1e-10);
                 let yield_rate = 0.047;
                 let target = super::super::quote_conversions::price_from_ytm(

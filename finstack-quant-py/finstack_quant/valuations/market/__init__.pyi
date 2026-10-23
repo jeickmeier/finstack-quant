@@ -311,6 +311,21 @@ class RateIndexConventions:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class CdsConventionSpec:
     """
     Schedule conventions for one CDS family (``isda_na``, ``isda_eu``, ...).
@@ -500,6 +515,21 @@ class CdsConventionSpec:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class SwaptionConventions:
     """
     Market conventions for a swaption family (settlement, fixed-leg schedule, index).
@@ -672,6 +702,21 @@ class SwaptionConventions:
             Index id such as ``"USD-SOFR"``.
 
         This accessor does not raise; it returns the stored convention value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 
@@ -853,6 +898,21 @@ class InflationSwapConventions:
             Tenor string, ``"3M"`` for the standard 3-month lag.
 
         This accessor does not raise; it returns the stored convention value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 
@@ -1110,6 +1170,21 @@ class XccyConventions:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
+        """
+        ...
+
 class IrFutureConventions:
     """
     Contract conventions for a listed interest-rate future.
@@ -1345,6 +1420,21 @@ class IrFutureConventions:
             Adjustment, or ``None`` when the pricer derives it.
 
         This accessor does not raise; it returns the stored convention value.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and canonical JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of the stored value fails.
         """
         ...
 

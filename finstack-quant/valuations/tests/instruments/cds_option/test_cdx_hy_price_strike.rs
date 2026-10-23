@@ -15,6 +15,7 @@ use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_test_support::assertions::assert_positive;
 use time::macros::date;
 
 const VOL: f64 = 0.40;

@@ -726,10 +726,10 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
     use crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult;
     use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
-    use crate::instruments::fixed_income::revolving_credit::pricing::unified::EnhancedMonteCarloResult;
+    use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
         BorrowingBaseReport, EquityMetrics, OasResult, PoolStats, ScenarioTable,
-        SimulationDiagnostics, TrancheCashflows, TrancheMetrics,
+        SimulationDiagnostics, SimulationRun, StandardDealParams, TrancheCashflows, TrancheMetrics,
     };
     use crate::instruments::json_loader::InstrumentJson;
     use crate::instruments::MarketDependencies;
@@ -1054,6 +1054,23 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::tranche_cashflows),
+        finstack_quant_core::schema_artifact!(
+            StandardDealParams,
+            "common",
+            "standard_deal_params",
+            Component,
+            "Inputs for the standard structured-credit registry constructor."
+        )
+        .with_packager(package_valuations_schema),
+        finstack_quant_core::schema_artifact!(
+            SimulationRun,
+            "results",
+            "simulation_run",
+            Component,
+            "Tranche cashflows and deal accounting from one deterministic simulation."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
         finstack_quant_core::schema_artifact!(
             SimulationDiagnostics,
             "results",

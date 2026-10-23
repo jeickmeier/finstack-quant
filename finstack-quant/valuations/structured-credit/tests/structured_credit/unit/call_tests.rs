@@ -15,9 +15,9 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation, tranche_metrics, AssetPool, CallAssumption, DealType, PoolAsset,
-    ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows,
-    TrancheMetrics, TrancheStructure,
+    tranche_metrics, AssetPool, CallAssumption, DealType, PoolAsset, ReinvestmentCriteria,
+    ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows, TrancheMetrics,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -117,10 +117,20 @@ fn clo(cpr: f64) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_clo("CLO-CALL", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO-CALL".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 0);
@@ -128,7 +138,9 @@ fn clo(cpr: f64) -> StructuredCredit {
 }
 
 fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
-    run_simulation(deal, &market_with_curves(close()), close()).expect("simulation")
+    deal.run_simulation(&market_with_curves(close()), close())
+        .map(|run| run.tranches)
+        .expect("simulation")
 }
 
 fn metrics(deal: &StructuredCredit, id: &str) -> TrancheMetrics {

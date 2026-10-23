@@ -11,9 +11,8 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::pricer::{
-    standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
-};
+use finstack_quant_valuations::pricer::STANDARD;
+use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
 use std::sync::Arc;
 use time::Month;
 
@@ -389,7 +388,7 @@ fn test_fx_forward_registry_pricer() {
         .build()
         .expect("should build");
 
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     // Verify pricer is registered
     assert!(

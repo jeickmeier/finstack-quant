@@ -737,6 +737,7 @@
       "fxMarketPair",
       "fxPairConvention",
       "fxPipSize",
+      "fxStandardSettlementDays",
       "immOptionExpiry",
       "invertFxRate",
       "isCdsDate",
@@ -1192,6 +1193,9 @@
     "methods": ["free", "toString"],
     "getters": []
   },
+  "core.fxStandardSettlementDays": {
+    "kind": "function"
+  },
   "core.createDate": {
     "kind": "function"
   },
@@ -1367,6 +1371,7 @@
     "statics": ["flat", "fromJson", "fromSurvivalProbs"],
     "methods": [
       "cdsQuoteBp",
+      "conditionalDefaultProb",
       "defaultProb",
       "free",
       "hazardRate",
@@ -4564,7 +4569,6 @@
       "prettyInstrumentJson",
       "priceInstrument",
       "priceInstrumentWithMarket",
-      "scenarioTableCells",
       "trancheBreakevenCdr",
       "trancheBuilder",
       "trancheDiscountMargin",
@@ -4977,16 +4981,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "example", "fromJson", "standard"],
-    "methods": [
-      "expectedLoss",
-      "free",
-      "jumpToDefault",
-      "marketDependencies",
-      "metric",
-      "price",
-      "toDict",
-      "toJson"
-    ],
+    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
     "getters": [
       "attachPct",
       "attributes",
@@ -5097,19 +5092,14 @@
     "constructor": false,
     "statics": ["builder", "european", "example", "fromJson"],
     "methods": [
-      "delta",
       "free",
-      "gamma",
       "greeks",
       "impliedVol",
       "marketDependencies",
       "metric",
       "price",
-      "rho",
-      "theta",
       "toDict",
-      "toJson",
-      "vega"
+      "toJson"
     ],
     "getters": [
       "attributes",
@@ -5139,7 +5129,7 @@
   "valuations.instruments.StructuredCredit": {
     "kind": "class",
     "constructor": false,
-    "statics": ["builder", "example", "fromJson", "newAbs", "newClo", "newCmbs", "newRmbs"],
+    "statics": ["builder", "example", "fromJson", "newStandard"],
     "methods": [
       "createWaterfall",
       "disableStochastic",
@@ -5150,7 +5140,7 @@
       "metric",
       "price",
       "priceStochastic",
-      "runSimulationWithDiagnostics",
+      "runSimulation",
       "toDict",
       "toJson",
       "trancheCashflows",
@@ -5217,7 +5207,7 @@
   "valuations.instruments.FxForward": {
     "kind": "class",
     "constructor": false,
-    "statics": ["builder", "example", "fromJson", "fromTradeDate", "standardSettlementDays"],
+    "statics": ["builder", "example", "fromJson", "fromTradeDate"],
     "methods": [
       "free",
       "marketDependencies",
@@ -5268,22 +5258,14 @@
     "constructor": false,
     "statics": ["builder", "european", "example", "fromJson"],
     "methods": [
-      "delta",
-      "foreignRho",
       "free",
-      "gamma",
       "greeks",
       "impliedVol",
       "marketDependencies",
       "metric",
       "price",
-      "rho",
-      "theta",
       "toDict",
-      "toJson",
-      "vanna",
-      "vega",
-      "volga"
+      "toJson"
     ],
     "getters": [
       "attributes",
@@ -6008,9 +5990,6 @@
     "kind": "function"
   },
   "valuations.instruments.waterfallCoverageTests": {
-    "kind": "function"
-  },
-  "valuations.instruments.scenarioTableCells": {
     "kind": "function"
   },
   "valuations.instruments.amortizationEventDate": {

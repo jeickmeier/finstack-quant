@@ -94,7 +94,7 @@ pub(crate) fn normalize_registry_id(id: &str) -> String {
 ///
 /// This is the canonical helper for all simple convention loaders. It handles:
 /// 1. Deserializing `RegistryFile<R>` from JSON
-/// 2. Converting each `R` record via `map_record` (which may return `Result<V>`)
+/// 2. Consuming each owned `R` record via `map_record` (which may return `Result<V>`)
 /// 3. Re-keying from `String` to a typed domain ID via `make_id`
 ///
 /// # Errors
@@ -105,7 +105,7 @@ pub(crate) fn parse_and_rekey<R, Id, V>(
     json: &str,
     registry_name: &str,
     make_id: impl Fn(String) -> Id,
-    map_record: impl Fn(&R) -> Result<V, Error>,
+    map_record: impl Fn(R) -> Result<V, Error>,
 ) -> Result<FxHashMap<Id, V>, Error>
 where
     R: for<'de> serde::Deserialize<'de>,
@@ -122,7 +122,7 @@ where
     let mut final_map = FxHashMap::default();
     let mut seen_ids: FxHashSet<String> = FxHashSet::default();
     for entry in file.entries {
-        let value = map_record(&entry.record)?;
+        let value = map_record(entry.record)?;
         for id in entry.ids {
             let key = normalize_registry_id(&id);
             if !seen_ids.insert(key.clone()) {

@@ -5,7 +5,14 @@ from __future__ import annotations
 import pytest
 
 from finstack_quant.core.cashflow import CFKind
-from finstack_quant.core.dates import BusinessDayConvention, DayCount, PeriodKind, Tenor
+from finstack_quant.core.currency import Currency
+from finstack_quant.core.dates import (
+    BusinessDayConvention,
+    DayCount,
+    PeriodKind,
+    Tenor,
+    fx_standard_settlement_days,
+)
 
 
 def test_canonical_parsers_normalize_case_and_outer_whitespace() -> None:
@@ -81,3 +88,25 @@ def test_nonfinite_sentinel_parser_rejects_aliases(token: str) -> None:
     payload["profit_factor"] = token
     with pytest.raises(ValueError, match="expected a number"):
         PeriodStats.from_json(json.dumps(payload))
+
+
+@pytest.mark.parametrize("other", ["CAD", "TRY", "PHP", "RUB"])
+def test_fx_standard_settlement_days_accepts_both_pair_orders(other: str) -> None:
+    assert fx_standard_settlement_days("usd", other) == 1
+    assert fx_standard_settlement_days(Currency(other), Currency("USD")) == 1
+
+
+@pytest.mark.parametrize(("base", "quote"), [("EUR", "USD"), ("USD", "MXN"), ("EUR", "CAD")])
+def test_fx_standard_settlement_days_defaults_to_two(base: str, quote: str) -> None:
+    assert fx_standard_settlement_days(base, quote) == 2
+
+
+def test_fx_standard_settlement_days_rejects_invalid_currencies() -> None:
+    with pytest.raises(ValueError, match='Invalid currency code "INVALID"'):
+        fx_standard_settlement_days("INVALID", "USD")
+    with pytest.raises(ValueError, match='Invalid currency code " CAD "'):
+        fx_standard_settlement_days("USD", " CAD ")
+    with pytest.raises(TypeError):
+        fx_standard_settlement_days(1, "USD")  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        fx_standard_settlement_days("USD", None)  # type: ignore[arg-type]

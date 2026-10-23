@@ -40,7 +40,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_spot_option.schema.json",
-          "sha256": "ec7f53e8207b3d857f28653458679461ba68f379a2323d76c3dc9ab52aa94229",
+          "sha256": "b1236451ebabb00e1400d7bc4e170c885d5593dce696dd5750e4acd979bebd86",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "bfc9d9f669838171062785e24e666aa5abbf74260ae917d436a9a66ceff8c191",
+          "sha256": "37ebf215c43191df171360d7328a9a5f7c829b5a33539df738b193d3d83a995c",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "e76d67b8580511b9871438cbd4ca83f30b68029701c9f46dbbbd4fedf87e3724",
+          "sha256": "9f3c76efbba7300ba46b0f26b195155a939414cded74a50e9702c813ff654352",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -1248,8 +1248,8 @@
         "member": "trancheScenarioTable",
         "inputs": [
           {
-            "name": "instrumentJson",
-            "type": "JsonInput",
+            "name": "deal",
+            "type": "StructuredCredit",
             "optional": false
           },
           {
@@ -1274,8 +1274,8 @@
           }
         ],
         "returns": "ScenarioTable",
-        "declaration": "/**\n   * Scenario (CPR x CDR x severity) table for a tranche; returns a typed\n   * `ScenarioTable` object. `grid` is a JSON `ScenarioGrid` (`cprs`, `cdrs`,\n   * `severities`).\n   *\n   * The result is a plain object with snake_case fields — the same shape\n   * Python exposes through its typed `ScenarioTable` wrapper. Pass it to\n   * `JSON.stringify` if a wire string is needed.\n   * @returns Typed `ScenarioTable` object over the CPR/CDR/severity grid.\n   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.\n   * @param trancheId - Stable tranche identifier used to select the required domain object.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.\n   * @throws Error - Throws a JavaScript exception if the instrument, market, or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.\n   */\n  trancheScenarioTable(\n    instrumentJson: JsonInput,\n    trancheId: string,\n    marketJson: JsonInput,\n    asOf: string,\n    grid: string\n  ): ScenarioTable;",
-        "sha256": "5a647d2f495e8f05bb16c42b0789a653e18bd4c17454154274a790f70618ed93"
+        "declaration": "/**\n   * Scenario (CPR x CDR x severity) table for a tranche; returns a typed\n   * `ScenarioTable` object. `grid` is a JSON `ScenarioGrid` (`cprs`, `cdrs`,\n   * `severities`).\n   *\n   * The result is a plain object with snake_case fields — the same shape\n   * Python exposes through its typed `ScenarioTable` wrapper. Pass it to\n   * `JSON.stringify` if a wire string is needed.\n   * @returns Typed `ScenarioTable` object over the CPR/CDR/severity grid.\n   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.\n   * @param trancheId - Stable tranche identifier used to select the required domain object.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.\n   * @throws Error - Throws a JavaScript exception if the market or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.\n   */\n  trancheScenarioTable(\n    deal: StructuredCredit,\n    trancheId: string,\n    marketJson: JsonInput,\n    asOf: string,\n    grid: string\n  ): ScenarioTable;",
+        "sha256": "c9009eb3ddfb1f48001beec3d4682559c65f8c4f09e26a24f3fe6e7e636ed1a9"
       }
     }
   ],

@@ -1,12 +1,24 @@
-//! Private markets fund metrics: IRR, MOIC, DPI, TVPI, carry calculations, and theta.
+//! Private markets fund metrics: IRR, DPI, TVPI, carry calculations, and theta.
 
 use crate::pe_fund::waterfall::{FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche};
-use crate::pe_fund::PrivateMarketsFund;
+use crate::pe_fund::{AllocationLedger, PrivateMarketsFund};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
+use std::sync::Arc;
+
+/// Run the allocation once for the current instrument view of this request.
+fn allocation_ledger(context: &mut MetricContext) -> Result<Arc<AllocationLedger>> {
+    if let Some(ledger) = context.ext::<Arc<AllocationLedger>>() {
+        return Ok(Arc::clone(ledger));
+    }
+    let pe: &PrivateMarketsFund = context.instrument_as()?;
+    let ledger = Arc::new(pe.run_waterfall()?);
+    context.set_ext(Arc::clone(&ledger));
+    Ok(ledger)
+}
 
 /// Total LP contributions (paid-in capital) on or before `as_of`, in
 /// currency units.
@@ -44,8 +56,8 @@ struct LpIrrCalculator;
 
 impl MetricCalculator for LpIrrCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let ledger = allocation_ledger(context)?;
         let pe: &PrivateMarketsFund = context.instrument_as()?;
-        let ledger = pe.run_waterfall()?;
 
         let mut flows: Vec<(Date, Money)> = ledger
             .lp_cashflows()?
@@ -73,8 +85,7 @@ struct GpCarryTotalCalculator;
 
 impl MetricCalculator for GpCarryTotalCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let pe: &PrivateMarketsFund = context.instrument_as()?;
-        let ledger = pe.run_waterfall()?;
+        let ledger = allocation_ledger(context)?;
 
         let total_gp_carry: f64 = ledger
             .rows
@@ -83,44 +94,6 @@ impl MetricCalculator for GpCarryTotalCalculator {
             .map(|r| r.to_gp.amount())
             .sum();
         Ok(total_gp_carry)
-    }
-}
-
-/// Total value multiple on paid-in capital:
-/// `(realized LP distributions to date + residual value) / paid-in capital`.
-///
-/// Shared implementation for the LP MOIC and TVPI metrics, which are the
-/// same quantity by definition on a net LP basis.
-fn total_value_to_paid_in(context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-    let pe: &PrivateMarketsFund = context.instrument_as()?;
-    let ledger = pe.run_waterfall()?;
-
-    let total_contributions = paid_in_to_date(pe, context.as_of);
-    let realized_lp_distributions = realized_lp_to_date(&ledger, context.as_of);
-
-    // Use the base_value (pricing result) as the NAV / Residual Value.
-    // This correctly captures the NPV of future flows or the explicit valuation.
-    let residual_nav = context.base_value.amount();
-
-    if total_contributions <= 1e-6 {
-        return Ok(0.0);
-    }
-
-    Ok((realized_lp_distributions + residual_nav) / total_contributions)
-}
-
-/// Multiple on Invested Capital (MOIC) for LP calculator.
-///
-/// Net LP MOIC: `(realized LP distributions + residual value) / paid-in
-/// capital`, where realized distributions are the ledger's `to_lp` amounts
-/// (net of GP carry) and the residual value is the pricing `base_value`. On
-/// this net LP basis MOIC equals TVPI by definition; the metric is kept as a
-/// separate id because desks quote both names.
-struct MoicLpCalculator;
-
-impl MetricCalculator for MoicLpCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        total_value_to_paid_in(context)
     }
 }
 
@@ -133,8 +106,8 @@ struct DpiLpCalculator;
 
 impl MetricCalculator for DpiLpCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let ledger = allocation_ledger(context)?;
         let pe: &PrivateMarketsFund = context.instrument_as()?;
-        let ledger = pe.run_waterfall()?;
 
         let total_contributions = paid_in_to_date(pe, context.as_of);
         let total_lp_distributions = realized_lp_to_date(&ledger, context.as_of);
@@ -155,7 +128,21 @@ struct TvpiLpCalculator;
 
 impl MetricCalculator for TvpiLpCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        total_value_to_paid_in(context)
+        let ledger = allocation_ledger(context)?;
+        let pe: &PrivateMarketsFund = context.instrument_as()?;
+
+        let total_contributions = paid_in_to_date(pe, context.as_of);
+        let realized_lp_distributions = realized_lp_to_date(&ledger, context.as_of);
+
+        // Use the base_value (pricing result) as the NAV / Residual Value.
+        // This correctly captures the NPV of future flows or the explicit valuation.
+        let residual_nav = context.base_value.amount();
+
+        if total_contributions <= 1e-6 {
+            return Ok(0.0);
+        }
+
+        Ok((realized_lp_distributions + residual_nav) / total_contributions)
     }
 }
 
@@ -168,8 +155,7 @@ struct CarryAccruedCalculator;
 
 impl MetricCalculator for CarryAccruedCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let pe: &PrivateMarketsFund = context.instrument_as()?;
-        let ledger = pe.run_waterfall()?;
+        let ledger = allocation_ledger(context)?;
 
         Ok(ledger
             .rows
@@ -226,7 +212,6 @@ pub(crate) fn register_private_markets_fund_metrics(
         metrics: [
             (LpIrr, LpIrrCalculator),
             (GpCarryTotal, GpCarryTotalCalculator),
-            (MoicLp, MoicLpCalculator),
             (DpiLp, DpiLpCalculator),
             (TvpiLp, TvpiLpCalculator),
             (CarryAccrued, CarryAccruedCalculator),
@@ -566,9 +551,9 @@ mod tests {
     }
 
     #[test]
-    fn test_moic_calculation() {
+    fn test_tvpi_calculation() {
         // 100% LP promote tier so the full distribution reaches the LP and
-        // the ledger-basis MOIC  equals the naive 2x.
+        // the ledger-basis TVPI  equals the naive 2x.
         let spec = PeFundWaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 1.0, 0.0)
@@ -591,7 +576,7 @@ mod tests {
 
         let curves = finstack_quant_core::market_data::context::MarketContext::new();
         // Fully realized fund: holder-view residual value is ~0, so the net
-        // LP MOIC is realized distributions / paid-in = 2x.
+        // LP TVPI is realized distributions / paid-in = 2x.
         let base_value = Money::from((0_i64, test_currency()));
         let mut context = MetricContext::new(
             std::sync::Arc::new(pe),
@@ -601,22 +586,18 @@ mod tests {
             MetricContext::default_config(),
         );
 
-        let moic = MoicLpCalculator
-            .calculate(&mut context)
-            .expect("should succeed");
-        assert!((moic - 2.0).abs() < 1e-6); // 2x multiple
-
-        // With residual value, MOIC includes it (net LP MOIC == TVPI):
-        // (2.0M realized + 0.5M residual) / 1.0M paid-in = 2.5x.
-        context.set_base_value(Money::from((500_000_i64, test_currency())));
-        let moic_with_residual = MoicLpCalculator
-            .calculate(&mut context)
-            .expect("should succeed");
-        assert!((moic_with_residual - 2.5).abs() < 1e-6);
         let tvpi = TvpiLpCalculator
             .calculate(&mut context)
             .expect("should succeed");
-        assert!((moic_with_residual - tvpi).abs() < 1e-12);
+        assert!((tvpi - 2.0).abs() < 1e-6); // 2x multiple
+
+        // TVPI also includes residual value:
+        // (2.0M realized + 0.5M residual) / 1.0M paid-in = 2.5x.
+        context.set_base_value(Money::from((500_000_i64, test_currency())));
+        let tvpi_with_residual = TvpiLpCalculator
+            .calculate(&mut context)
+            .expect("should succeed");
+        assert!((tvpi_with_residual - 2.5).abs() < 1e-6);
     }
 
     /// Holder-view PV : a fully realized fund has
@@ -674,5 +655,123 @@ mod tests {
             (lp_irr - 0.1487).abs() < 0.01,
             "LpIrr should equal the realized IRR, got {lp_irr}"
         );
+    }
+
+    #[test]
+    fn allocation_is_shared_per_request_without_changing_metric_outputs() {
+        use crate::pe_fund::types::WATERFALL_CALLS;
+        let fund = PrivateMarketsFund::example().expect("fund");
+        let calculators: [&dyn MetricCalculator; 5] = [
+            &LpIrrCalculator,
+            &GpCarryTotalCalculator,
+            &DpiLpCalculator,
+            &TvpiLpCalculator,
+            &CarryAccruedCalculator,
+        ];
+        for as_of in [test_date(2026, 6, 15), test_date(2028, 1, 1)] {
+            let nav = Money::from((1_500_000_i64, test_currency()));
+            let ledger = fund.run_waterfall().expect("reference allocation");
+            let paid_in = paid_in_to_date(&fund, as_of);
+            let realized = realized_lp_to_date(&ledger, as_of);
+            let mut flows: Vec<_> = ledger
+                .lp_cashflows()
+                .expect("reference flows")
+                .into_iter()
+                .filter(|(date, _)| *date <= as_of)
+                .collect();
+            flows.push((as_of, nav));
+            let expected = [
+                calculate_irr(&flows, fund.waterfall_spec.day_count).expect("reference IRR"),
+                ledger
+                    .rows
+                    .iter()
+                    .filter(|row| row.date <= as_of)
+                    .map(|row| row.to_gp.amount())
+                    .sum(),
+                realized / paid_in,
+                (realized + nav.amount()) / paid_in,
+                ledger
+                    .rows
+                    .iter()
+                    .rfind(|row| row.date <= as_of)
+                    .map_or(0.0, |row| row.gp_carry_cum.amount()),
+            ];
+            for order in [[0, 1, 2, 3, 4], [4, 3, 2, 1, 0], [2, 0, 4, 1, 3]] {
+                let mut context = MetricContext::new(
+                    Arc::new(fund.clone()),
+                    Arc::new(finstack_quant_core::market_data::context::MarketContext::new()),
+                    as_of,
+                    nav,
+                    MetricContext::default_config(),
+                );
+                WATERFALL_CALLS.with(|count| count.set(0));
+                for index in order {
+                    assert_eq!(
+                        calculators[index].calculate(&mut context).expect("metric"),
+                        expected[index]
+                    );
+                }
+                WATERFALL_CALLS.with(|count| assert_eq!(count.get(), 1));
+
+                // NAV is read from the request, not frozen in the allocation cache.
+                context.set_base_value(Money::from((3_000_000_i64, test_currency())));
+                assert_eq!(
+                    TvpiLpCalculator
+                        .calculate(&mut context)
+                        .expect("updated NAV"),
+                    (realized + 3_000_000.0) / paid_in
+                );
+                WATERFALL_CALLS.with(|count| assert_eq!(count.get(), 1));
+
+                // Replacing the instrument view must discard the ledger.
+                let mut changed = fund.clone();
+                for event in &mut changed.events {
+                    event.amount = Money::new(event.amount.amount() * 2.0, test_currency())
+                        .expect("scaled event");
+                }
+                context.set_instrument(Arc::new(changed.clone()));
+                assert!(context.ext::<Arc<AllocationLedger>>().is_none());
+                let changed_carry = GpCarryTotalCalculator
+                    .calculate(&mut context)
+                    .expect("changed fund");
+                WATERFALL_CALLS.with(|count| assert_eq!(count.get(), 2));
+                let mut fresh = MetricContext::new(
+                    Arc::new(changed),
+                    Arc::new(finstack_quant_core::market_data::context::MarketContext::new()),
+                    as_of,
+                    nav,
+                    MetricContext::default_config(),
+                );
+                assert_eq!(
+                    changed_carry,
+                    GpCarryTotalCalculator
+                        .calculate(&mut fresh)
+                        .expect("fresh fund")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn allocation_errors_are_not_cached_or_hidden_by_paid_in_guard() {
+        use crate::pe_fund::types::WATERFALL_CALLS;
+        let mut fund = PrivateMarketsFund::example().expect("fund");
+        fund.events[0].amount = Money::from((1_i64, finstack_quant_core::currency::Currency::EUR));
+        let mut context = MetricContext::new(
+            Arc::new(fund),
+            Arc::new(finstack_quant_core::market_data::context::MarketContext::new()),
+            test_date(2020, 1, 1),
+            Money::from((0_i64, test_currency())),
+            MetricContext::default_config(),
+        );
+        WATERFALL_CALLS.with(|count| count.set(0));
+        for calculator in [&DpiLpCalculator as &dyn MetricCalculator, &TvpiLpCalculator] {
+            assert!(matches!(
+                calculator.calculate(&mut context),
+                Err(finstack_quant_core::Error::CurrencyMismatch { .. })
+            ));
+            assert!(context.ext::<Arc<AllocationLedger>>().is_none());
+        }
+        WATERFALL_CALLS.with(|count| assert_eq!(count.get(), 2));
     }
 }

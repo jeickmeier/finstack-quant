@@ -53,13 +53,12 @@ pub use types::{
     WaterfallRules, WaterfallTier,
 };
 
-pub use pricing::{execute_waterfall, run_simulation};
+pub use pricing::execute_waterfall;
 
 pub use pricing::coverage_tests::{TestContext, TestResult};
 pub use pricing::waterfall::WaterfallContext;
 pub use pricing::{
-    run_simulation_with_diagnostics, CoverageTestDiagnostic, PeriodDiagnostics,
-    SimulationDiagnostics, SimulationRun,
+    CoverageTestDiagnostic, PeriodDiagnostics, SimulationDiagnostics, SimulationRun,
 };
 
 pub use metrics::{
