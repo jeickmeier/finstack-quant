@@ -110,8 +110,21 @@ flag "--full" help="Also run the nightly tier: docs, doctests and the slow suite
 flag "--release" help="Also run the nightly tier and the release gates (publish checks, semver)"
 '''
 depends = ["gen-write"]
+# Sequential on purpose, not `{ tasks = [...] }`: every stage below shells
+# out to Cargo against the same target directory (pre-commit's clippy,
+# gen-check's schema builds, all-test's nextest/maturin/wasm-pack), and
+# Cargo's build lock serializes them anyway. Running them in parallel only
+# made the queued stages wait invisibly on that lock — the terminal sat on
+# the last printed line (e.g. the nextest summary) with no hint of which
+# stage was actually running — while the differing feature/profile sets
+# (--all-features clippy vs nextest vs maturin vs wasm32) thrashed the
+# shared fingerprints. Sequential stages keep output attributable and
+# progress continuous; total work is unchanged.
 run = [
-  { tasks = ["pre-commit-run", "gen-check", "all-test", "all-audit"] },
+  { task = "pre-commit-run" },
+  { task = "gen-check" },
+  { task = "all-test" },
+  { task = "all-audit" },
   '''
   if [ "${usage_full:-false}" = "true" ] || [ "${usage_release:-false}" = "true" ]; then
     mise run all-doc
@@ -422,14 +435,19 @@ run = [
 
 [tasks.gen-check]
 description = "Fail if any generated artifact drifts from its source"
-# The checks only read the workspace, so they run in parallel; the digest
-# taken around them catches one that writes.
+# The checks only read the workspace; the digest taken around them catches
+# one that writes. They run sequentially, not with `--jobs`: rust-check-schemas
+# and gen-check-contracts both invoke Cargo against the same target directory,
+# so in parallel they just queue invisibly on Cargo's build lock (see all-ci).
 run = """
 set -eu
 uv run --no-sync pytest scripts/tests/test_generation_digest.py -q
 uv run --no-sync python scripts/generation_digest.py --check-manifest
 before_digest=$(uv run --no-sync python scripts/generation_digest.py)
-mise run --jobs 8 rust-check-schemas ::: gen-check-contracts ::: gen-check-ui ::: gen-check-sources
+mise run rust-check-schemas
+mise run gen-check-contracts
+mise run gen-check-ui
+mise run gen-check-sources
 after_digest=$(uv run --no-sync python scripts/generation_digest.py)
 test "$before_digest" = "$after_digest" \
   || (echo "Generated artifacts changed during the check: $before_digest -> $after_digest"; exit 1)

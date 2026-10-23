@@ -253,13 +253,9 @@ mise run rust-check-schemas
 Do not run `cargo test` directly — it would also run doc tests, which this
 workspace runs only through `mise run rust-test --doctest`.
 
-## License
+## Quick Start Examples
 
-MIT OR Apache-2.0
-
-# Quick Start Examples
-
-## Example 1: Computing Bucketed DV01 for a Bond
+### Example 1: Computing Bucketed DV01 for a Bond
 
 ```
 use finstack_quant_core::currency::Currency;
@@ -308,7 +304,7 @@ assert!(total_dv01 < 0.0);
 # }
 ```
 
-## Example 2: Computing Parallel DV01 for an Interest Rate Swap
+### Example 2: Computing Parallel DV01 for an Interest Rate Swap
 
 ```
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
@@ -360,7 +356,7 @@ assert!(dv01.abs() > 0.0);
 # }
 ```
 
-## Example 3: Computing Theta (Time Decay) for an Option
+### Example 3: Computing Theta (Time Decay) for an Option
 
 ```
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
@@ -425,7 +421,7 @@ assert!(theta < 0.0);
 # }
 ```
 
-## Example 4: Computing Multiple Greeks for an Option
+### Example 4: Computing Multiple Greeks for an Option
 
 ```
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
@@ -492,3 +488,7 @@ assert!(greek(MetricId::Theta) < 0.0);
 # Ok(())
 # }
 ```
+
+## License
+
+MIT OR Apache-2.0
