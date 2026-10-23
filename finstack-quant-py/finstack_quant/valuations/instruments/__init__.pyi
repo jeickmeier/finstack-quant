@@ -32605,7 +32605,11 @@ class SimulationDiagnostics:
         ``reserve_interest``, ``spread_account``, ``funding_account``,
         ``delinquent_balance``, ``servicer_advances_outstanding`` and
         ``excess_spread`` (annualized decimal);
-        amounts in currency units.
+        amounts in their stored currency units without FX conversion. Rows keep
+        stored period order and duplicate dates. Reserve interest uses the first
+        matching date in ``reserve_interest_paid``; missing matches are zero.
+        An empty result retains all nineteen columns with a string date and
+        float64 numeric dtypes.
 
         Returns
         -------
@@ -32615,7 +32619,7 @@ class SimulationDiagnostics:
         Raises
         ------
         ValueError
-            If the rows cannot be serialized.
+            If the canonical table cannot be built or converted.
         """
         ...
 

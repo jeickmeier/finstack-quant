@@ -707,6 +707,13 @@ every coverage test as the executor evaluated it (`CoverageTestDiagnostic {
 test_id, ratio, trigger_level, cushion, passing }`; a single source, not a
 recomputation).
 
+`SimulationDiagnostics::to_table()` owns the nineteen-column period export used
+by Python `to_dataframe()`. It retains period order and duplicate dates, joins
+the first reserve-interest entry matching each payment date, and uses zero for
+missing matches. Amounts retain their recorded currency-unit magnitudes without
+FX conversion. Empty exports retain the string date column and all eighteen
+Float64 columns.
+
 `calculate_equity_metrics(deal, market, as_of, purchase_price_pct)` returns
 `EquityMetrics { invested, irr, moic, nav_pct, cash_on_cash }` for the residual
 class: `−invested` on the valuation date against every projected distribution

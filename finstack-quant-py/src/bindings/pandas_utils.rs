@@ -1,6 +1,7 @@
 //! Shared helpers for constructing pandas DataFrames and Series from Rust data.
 
 use crate::bindings::date_utils::date_to_py;
+use finstack_quant_core::table::{TableColumnData, TableEnvelope};
 use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
@@ -39,6 +40,41 @@ pub fn dict_to_dataframe<'py>(
         kwargs.set_item("index", idx)?;
     }
     pandas_dataframe(py)?.call((columns,), Some(&kwargs))
+}
+
+/// Convert a typed Rust table directly to pandas, preserving column order and dtypes.
+///
+/// Nullable columns use pandas extension dtypes, including on the empty path.
+/// String values remain strings; dates and other semantics are owned by the
+/// Rust table producer. This conversion requires pandas but does not require PyArrow.
+///
+/// # Arguments
+///
+/// * `py` - Python interpreter token used to construct pandas objects.
+/// * `table` - Validated Rust table whose ordered columns and values are copied
+///   into the resulting DataFrame without inferring financial or date semantics.
+pub(crate) fn table_to_dataframe<'py>(
+    py: Python<'py>,
+    table: &TableEnvelope,
+) -> PyResult<Bound<'py, PyAny>> {
+    let data = PyDict::new(py);
+    let series = pandas_series(py)?;
+    for column in &table.columns {
+        let (values, dtype) = match &column.data {
+            TableColumnData::String(values) => (PyList::new(py, values)?, "str"),
+            TableColumnData::NullableString(values) => (PyList::new(py, values)?, "string"),
+            TableColumnData::Float64(values) => (PyList::new(py, values)?, "float64"),
+            TableColumnData::NullableFloat64(values) => (PyList::new(py, values)?, "Float64"),
+            TableColumnData::UInt32(values) => (PyList::new(py, values)?, "uint32"),
+            TableColumnData::NullableUInt32(values) => (PyList::new(py, values)?, "UInt32"),
+            TableColumnData::Int64(values) => (PyList::new(py, values)?, "int64"),
+            TableColumnData::NullableInt64(values) => (PyList::new(py, values)?, "Int64"),
+        };
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("dtype", dtype)?;
+        data.set_item(&column.name, series.call((values,), Some(&kwargs))?)?;
+    }
+    dict_to_dataframe(py, &data, None)
 }
 
 /// Build a `pd.Series` from already-converted data plus a label index.
