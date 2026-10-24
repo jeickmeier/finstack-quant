@@ -277,7 +277,7 @@ pub(crate) fn kurtosis(returns: &[f64]) -> f64 {
 /// not an EWMA / RiskMetrics estimator.
 #[must_use]
 pub(crate) fn parametric_var(returns: &[f64], confidence: f64, ann_factor: Option<f64>) -> f64 {
-    if returns.is_empty() {
+    if returns.len() < 2 {
         return f64::NAN;
     }
     if !valid_horizon(ann_factor) {
@@ -338,7 +338,7 @@ pub(crate) fn parametric_var(returns: &[f64], confidence: f64, ann_factor: Optio
 /// - Cornish & Fisher (1937): see docs/REFERENCES.md#cornishFisher1937
 #[must_use]
 pub(crate) fn cornish_fisher_var(returns: &[f64], confidence: f64, ann_factor: Option<f64>) -> f64 {
-    if returns.is_empty() {
+    if returns.len() < 2 {
         return f64::NAN;
     }
     if !valid_horizon(ann_factor) {

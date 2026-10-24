@@ -58,6 +58,36 @@ fn attribution_result_examples() -> finstack_quant_core::Result<Vec<serde_json::
     Ok(vec![value])
 }
 
+/// The shared inputs of the example attribution run: empty market snapshots
+/// at two dates a month apart, with the default method.
+fn attribution_inputs() -> finstack_quant_core::Result<AttributionInputs> {
+    use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
+
+    let date = |month, day| {
+        finstack_quant_core::dates::Date::from_calendar_date(2024, month, day).map_err(|error| {
+            finstack_quant_core::Error::Internal(format!("build example date: {error}"))
+        })
+    };
+    let market = MarketContextState::try_from(&MarketContext::new())?;
+    Ok(crate::AttributionInputs {
+        market_t0: market.clone(),
+        market_t1: market,
+        as_of_t0: date(time::Month::January, 1)?,
+        as_of_t1: date(time::Month::February, 1)?,
+        method: crate::AttributionMethod::default(),
+        model_params_t0: None,
+        config: None,
+        credit_factor_model: None,
+        credit_factor_detail_options: crate::CreditFactorDetailOptions::default(),
+        full_cross_attribution: false,
+    })
+}
+
+/// The shared attribution inputs on their own, without an instrument payload.
+fn attribution_inputs_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
+    finstack_quant_core::schema::example(&attribution_inputs()?)
+}
+
 /// A minimal but complete attribution run, built from public constructors.
 ///
 /// A deposit priced against an empty market at two dates: enough to show the
@@ -65,24 +95,20 @@ fn attribution_result_examples() -> finstack_quant_core::Result<Vec<serde_json::
 /// the method - without the example carrying a whole calibrated market.
 fn attribution_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 
-    let date = |month, day| {
-        finstack_quant_core::dates::Date::from_calendar_date(2024, month, day).map_err(|error| {
-            finstack_quant_core::Error::Internal(format!("build example date: {error}"))
-        })
-    };
-    let as_of_t0 = date(time::Month::January, 1)?;
-    let as_of_t1 = date(time::Month::February, 1)?;
-    let maturity = date(time::Month::April, 1)?;
+    let inputs = attribution_inputs()?;
+    let maturity =
+        finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::April, 1).map_err(
+            |error| finstack_quant_core::Error::Internal(format!("build example date: {error}")),
+        )?;
 
     let deposit = Deposit::builder()
         .id("DEP_3M".into())
         .notional(Money::from((1000000_i64, Currency::USD)))
-        .start_date(as_of_t0)
+        .start_date(inputs.as_of_t0)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD-OIS".into())
@@ -91,21 +117,9 @@ fn attribution_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>>
             finstack_quant_core::Error::Internal(format!("build example deposit: {error}"))
         })?;
 
-    let market = MarketContextState::try_from(&MarketContext::new())?;
     let spec = crate::spec::AttributionSpec {
         instrument: InstrumentJson::Deposit(deposit),
-        inputs: crate::AttributionInputs {
-            market_t0: market.clone(),
-            market_t1: market,
-            as_of_t0,
-            as_of_t1,
-            method: crate::AttributionMethod::default(),
-            model_params_t0: None,
-            config: None,
-            credit_factor_model: None,
-            credit_factor_detail_options: crate::CreditFactorDetailOptions::default(),
-            full_cross_attribution: false,
-        },
+        inputs,
     };
 
     let value = serde_json::to_value(AttributionEnvelope::new(spec)).map_err(|error| {
@@ -134,7 +148,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Shared market snapshots, dates, method and options for a batch of instruments",
         title = "Finstack Quant Shared Attribution Inputs"
     )
-    .with_summary("Shared attribution settings without an instrument payload."),
+    .with_summary("Shared attribution settings without an instrument payload.")
+    .with_examples(attribution_inputs_examples),
     finstack_quant_core::schema_artifact!(
         AttributionResultEnvelope,
         "attribution",

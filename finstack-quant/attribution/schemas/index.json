@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
-      "bytes": 231856,
+      "bytes": 232846,
       "kind": "input",
       "path": "schemas/attribution/1/attribution_inputs.schema.json",
       "summary": "Shared attribution settings without an instrument payload.",

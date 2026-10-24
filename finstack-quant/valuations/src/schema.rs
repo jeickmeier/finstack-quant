@@ -1061,7 +1061,8 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
             Component,
             "Inputs for the standard structured-credit registry constructor."
         )
-        .with_packager(package_valuations_schema),
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::standard_deal_params),
         finstack_quant_core::schema_artifact!(
             SimulationRun,
             "results",
@@ -1070,7 +1071,8 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
             "Tranche cashflows and deal accounting from one deterministic simulation."
         )
         .with_packager(package_valuations_schema)
-        .with_kind(SchemaKind::Output),
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::simulation_run),
         finstack_quant_core::schema_artifact!(
             SimulationDiagnostics,
             "results",

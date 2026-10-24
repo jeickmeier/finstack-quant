@@ -174,6 +174,9 @@ impl Performance {
     pub fn m_squared(&self, risk_free_rate: f64) -> Vec<f64> {
         let ann = self.ann();
         self.map_pair_returns(|r, bench| {
+            if r.len().min(bench.len()) < 2 {
+                return f64::NAN;
+            }
             let (ann_ret, ann_vol) = risk_metrics::mean_vol_annualized(r, ann);
             let (_, bench_vol) = risk_metrics::mean_vol_annualized(bench, ann);
             m_squared(ann_ret, ann_vol, bench_vol, risk_free_rate, ann)

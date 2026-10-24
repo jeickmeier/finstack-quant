@@ -304,6 +304,28 @@ pub(super) fn simulation_diagnostics() -> Result<Vec<Value>> {
     example_from_json::<structured_credit::SimulationDiagnostics>(simulation_diagnostics_value())
 }
 
+/// The standard-constructor inputs of the canonical example CLO deal.
+pub(super) fn standard_deal_params() -> Result<Vec<Value>> {
+    let deal = structured_credit::StructuredCredit::example()?;
+    example(&structured_credit::StandardDealParams {
+        id: deal.id.clone(),
+        pool: deal.pool.clone(),
+        tranches: deal.tranches.clone(),
+        closing_date: deal.closing_date,
+        maturity: deal.maturity,
+        discount_curve_id: deal.discount_curve_id.clone(),
+        calendar_id: deal.calendar_id,
+    })
+}
+
+/// One simulation run carrying the senior tranche's quarterly payment.
+pub(super) fn simulation_run() -> Result<Vec<Value>> {
+    example_from_json::<structured_credit::SimulationRun>(json!({
+        "tranches": {"A": tranche_cashflows_value("A")},
+        "diagnostics": simulation_diagnostics_value()
+    }))
+}
+
 /// The market data the canonical bond needs to price.
 pub(super) fn market_dependencies() -> Result<Vec<Value>> {
     use crate::instruments::Instrument;

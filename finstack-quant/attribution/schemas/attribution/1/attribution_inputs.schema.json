@@ -5971,6 +5971,46 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Shared market snapshots, dates, method and options for a batch of instruments",
+  "examples": [
+    {
+      "as_of_t0": "2024-01-01",
+      "as_of_t1": "2024-02-01",
+      "credit_factor_detail_options": {
+        "include_per_bucket_breakdown": true,
+        "include_per_issuer_adder": false
+      },
+      "full_cross_attribution": false,
+      "market_t0": {
+        "credit_indices": [],
+        "curves": [],
+        "dividends": [],
+        "fx": null,
+        "fx_delta_vol_surfaces": [],
+        "hierarchy": null,
+        "inflation_indices": [],
+        "prices": {},
+        "schema_version": 1,
+        "series": [],
+        "surfaces": [],
+        "vol_cubes": []
+      },
+      "market_t1": {
+        "credit_indices": [],
+        "curves": [],
+        "dividends": [],
+        "fx": null,
+        "fx_delta_vol_surfaces": [],
+        "hierarchy": null,
+        "inflation_indices": [],
+        "prices": {},
+        "schema_version": 1,
+        "series": [],
+        "surfaces": [],
+        "vol_cubes": []
+      },
+      "method": "parallel"
+    }
+  ],
   "properties": {
     "as_of_t0": {
       "$ref": "#/$defs/DateWire",

@@ -182,7 +182,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
-      "bytes": 229452,
+      "bytes": 232405,
       "kind": "component",
       "path": "schemas/common/1/standard_deal_params.schema.json",
       "summary": "Inputs for the standard structured-credit registry constructor.",
@@ -1082,7 +1082,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
-      "bytes": 33933,
+      "bytes": 36503,
       "kind": "output",
       "path": "schemas/results/1/simulation_run.schema.json",
       "summary": "Tranche cashflows and deal accounting from one deterministic simulation.",
