@@ -193,9 +193,11 @@ fn forward_par_asw(
         )));
     }
 
+    let df_as_of = disc.df_on_date(as_of)?;
     let fixed_day_count = fixed_leg_day_count.unwrap_or_else(|| bond.cashflow_spec.day_count());
     let fixed_frequency = Some(bond.cashflow_spec.frequency());
-    let ann = fixed_leg_annuity(disc.as_ref(), fixed_day_count, fixed_frequency, &sched)?;
+    let ann =
+        fixed_leg_annuity(disc.as_ref(), fixed_day_count, fixed_frequency, &sched)? / df_as_of;
     // Use epsilon check to avoid unstable ratios when annuity is degenerate.
     if ann.abs() < 1e-12 {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -210,6 +212,11 @@ fn forward_par_asw(
         &sched,
         float_spread_bp,
     )?;
+    let (float_pv, fixed_ann, float_ann) = (
+        float_pv / df_as_of,
+        fixed_ann / df_as_of,
+        float_ann / df_as_of,
+    );
     if float_ann.abs() < 1e-12 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "ASW forward {calc} calculation is undefined for near-zero floating-leg annuity"
@@ -218,7 +225,7 @@ fn forward_par_asw(
 
     // Equivalent fixed rate from coupon-only PV
     let eq_coupon = if let Some(custom) = &bond.custom_cashflows {
-        let pv_coupon = pv_coupon_from_custom_schedule(disc.as_ref(), custom, as_of)?;
+        let pv_coupon = pv_coupon_from_custom_schedule(disc.as_ref(), custom, as_of)? / df_as_of;
         pv_coupon / (bond.notional.amount() * ann)
     } else {
         bond.cashflow_spec.plain_fixed_rate()?.ok_or_else(|| {
@@ -534,6 +541,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                         ));
                     }
                     let dc_fixed = day_count;
+                    let df_settlement = disc.df_on_date(quote_ctx.quote_date)?;
                     if let Some(fwd_id) = asw_forward_curve_id.as_ref() {
                         let fwd = context.curves.get_forward(fwd_id)?;
                         let (float_day_count, float_frequency) = asw_float_leg_conventions(&fwd)?;
@@ -551,7 +559,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                             dc_fixed,
                             Some(frequency),
                             &fixed_schedule,
-                        )?;
+                        )? / df_settlement;
                         let (float_pv, float_ann) = floating_leg_pv_and_annuity(
                             disc.as_ref(),
                             fwd.as_ref(),
@@ -560,6 +568,8 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                             0.0,
                             Some((context.curves.as_ref(), context.as_of)),
                         )?;
+                        let (float_pv, float_ann) =
+                            (float_pv / df_settlement, float_ann / df_settlement);
                         if float_ann.abs() < 1e-12 {
                             return Err(finstack_quant_core::Error::Validation(
                                 "ASW market calculation is undefined for near-zero floating-leg annuity"
@@ -576,6 +586,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                             Some(frequency),
                             &fixed_schedule,
                         )?;
+                        let ann = ann / df_settlement;
                         if ann.abs() < 1e-12 {
                             return Err(finstack_quant_core::Error::Validation(
                                 "ASW market calculation is undefined for near-zero fixed-leg annuity"
@@ -590,7 +601,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                             disc.day_count(),
                             None,
                             &fixed_schedule,
-                        )?;
+                        )? / df_settlement;
                         if float_ann.abs() < 1e-12 {
                             return Err(finstack_quant_core::Error::Validation(
                                 "ASW market calculation is undefined for near-zero floating-leg annuity"

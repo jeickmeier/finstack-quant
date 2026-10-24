@@ -97,14 +97,10 @@ pub(super) fn with_term_loan_risk_view<R>(
         let loan: &TermLoan = context.instrument_as()?;
         pinned_loan(loan, context)?
     };
-    let Some(risk_loan) = pinned else {
-        return f(context);
-    };
-    let orig_instrument = Arc::clone(&context.instrument);
-    context.set_instrument(Arc::new(risk_loan) as Arc<dyn Instrument>);
-    let result = f(context);
-    context.set_instrument(orig_instrument);
-    result
+    match pinned {
+        Some(risk_loan) => context.with_instrument(Arc::new(risk_loan), f),
+        None => f(context),
+    }
 }
 
 fn uses_credit_tree(context: &MetricContext, loan: &TermLoan) -> bool {

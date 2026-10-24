@@ -11,6 +11,7 @@ use self::inflation01::bumped_inflation_market;
 use crate::inflation_linked_bond::InflationLinkedBond;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::bumps::BumpSpec;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::Result;
@@ -64,24 +65,26 @@ impl MetricCalculator for BreakevenInflationCalculator {
         let disc_curve = curves.get_discount(ilb.discount_curve_id.as_str())?;
 
         let day_count = disc_curve.day_count();
-        let base_date = disc_curve.base_date();
         // Provide the coupon frequency so an ACT/ACT (ISMA) discount-curve day
         // count does not error; ignored by other conventions.
         let t = day_count.year_fraction(
-            base_date,
+            context.as_of,
             ilb.maturity,
             DayCountContext {
                 frequency: Some(ilb.frequency),
                 ..Default::default()
             },
         )?;
-        // Use annually-compounded (effective-annual) zero rate so that the
-        // nominal yield passed to `breakeven_inflation` is on the same basis as
+        // Use annually-compounded (effective-annual) forward zero rate from
+        // `as_of` to maturity so that the nominal yield passed to
+        // `breakeven_inflation` is anchored at `as_of` on the same basis as
         // the real yield after its Street→Annual conversion inside that method.
-        let nominal_yield = disc_curve.zero_rate(
-            t,
-            finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN),
-        );
+        let nominal_yield = if t > 0.0 {
+            let df = disc_curve.df_between_dates(context.as_of, ilb.maturity)?;
+            df.powf(-1.0 / t) - 1.0
+        } else {
+            0.0
+        };
 
         ilb.breakeven_inflation(nominal_yield, context.as_of)
     }

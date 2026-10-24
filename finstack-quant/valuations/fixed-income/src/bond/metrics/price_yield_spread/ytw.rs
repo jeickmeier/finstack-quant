@@ -74,21 +74,28 @@ impl MetricCalculator for YtwCalculator {
             context.require_cashflows()?
         };
 
-        // Construct current dirty market price from quoted clean price + accrued at quote_date.
+        // Construct current dirty market price from quoted clean price + accrued at quote_date,
+        // or fall back to the model dirty price at quote_date when the bond has no exercise rights.
         let bond: &Bond = context.instrument_as()?;
-        let clean_px = bond
+        let dirty_amt = match bond
             .instrument_pricing_overrides
             .market_quotes
             .quoted_clean_price_pct
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "bond.instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
-                        .to_string(),
-                })
-            })?;
-
-        // Dirty price in currency at quote_date: quoted clean is % of par.
-        let dirty_amt = quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount());
+        {
+            Some(clean_px) => quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount()),
+            None if !bond.has_exercise_rights() => {
+                super::quote_date_dirty_target(bond, context, &quote_ctx)?
+            }
+            None => {
+                return Err(finstack_quant_core::Error::from(
+                    finstack_quant_core::InputError::NotFound {
+                        id:
+                            "bond.instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
+                                .to_string(),
+                    },
+                ));
+            }
+        };
         let dirty_now = Money::new(dirty_amt, bond.notional.currency())?;
 
         // Lower return-floor protection into its pricing-effective call
