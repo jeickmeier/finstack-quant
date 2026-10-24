@@ -63,11 +63,6 @@ const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
     ("registry/variance_swap", &["1M", "6M"], PRICE_SERIES),
     ("registry/fx_variance_swap", &["1M", "6M"], PRICE_SERIES),
     // Instrument-held state that `Instrument::theta_observed_state` does not roll.
-    (
-        "golden/quantlib/asian_option/spx_geometric_asian_call_1y_quantlib",
-        &["6M"],
-        "the rolled trade is a seasoned geometric Asian, which has no analytical pricer",
-    ),
     ("registry/trs_equity", &["1M", "6M"], HELD),
     ("registry/trs_fixed_income_index", &["1M", "6M"], HELD),
     ("registry/range_accrual", &["6M"], HELD),

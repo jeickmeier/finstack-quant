@@ -261,6 +261,10 @@ impl BarrierOptionPdePricer {
                 spot <= barrier_level
             }
         {
+            if is_knock_out && inst.rebate_timing == PayoutTiming::AtHit {
+                let rebate = inst.rebate.map_or(0.0, |m| m.amount());
+                return Money::new(rebate, ccy).map_err(wrap);
+            }
             let mut observed = inst.clone();
             observed.observed_barrier_breached = Some(true);
             return self.price_internal(&observed, market, as_of);

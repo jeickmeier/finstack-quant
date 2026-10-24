@@ -56,8 +56,8 @@ impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let fwd: &CommodityForward = context.instrument_as()?;
 
-        // Expired forward has zero delta
-        if fwd.maturity < context.as_of {
+        let payment_date = fwd.payment_date()?;
+        if payment_date < context.as_of {
             return Ok(0.0);
         }
 
@@ -66,7 +66,7 @@ impl MetricCalculator for DeltaCalculator {
             .get_discount(fwd.discount_curve_id.as_str())?;
 
         // Use df_between_dates for base-date-safe discounting (consistent with npv())
-        let df = disc.df_between_dates(context.as_of, fwd.maturity)?;
+        let df = disc.df_between_dates(context.as_of, payment_date)?;
 
         // Delta = sign(position) × Q × M × DF
         Ok(fwd.position.sign() * fwd.quantity * fwd.multiplier * df)

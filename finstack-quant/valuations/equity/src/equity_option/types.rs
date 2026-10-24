@@ -728,6 +728,39 @@ impl finstack_quant_valuations_core::instruments::Instrument for EquityOption {
         Some(self.expiry)
     }
 
+    /// A roll that reaches expiry observes the held `as_of` spot there: the
+    /// option is exercised when that spot is in the money and settles on
+    /// expiry, the instrument's last payment date.
+    fn theta_observed_state(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        _as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
+    > {
+        if self.exercise.is_some() || rolled_date < self.expiry {
+            return Ok(None);
+        }
+        let spot =
+            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+                market.get_price(&self.spot_id)?,
+                self.currency,
+            )?;
+        let in_the_money = match self.option_type {
+            OptionType::Call => spot > self.strike,
+            OptionType::Put => spot < self.strike,
+        };
+        let mut observed = self.clone();
+        observed.exercise = Some(EquityOptionExercise::new(
+            self.expiry,
+            spot,
+            self.expiry,
+            in_the_money,
+        ));
+        Ok(Some(Box::new(observed)))
+    }
+
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 

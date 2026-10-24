@@ -40,12 +40,15 @@ enum SpotGreek {
     Gamma,
 }
 
-/// One-day forward difference of `greek`, per year on the Act/365F clock.
+/// One-day forward difference of `greek`, per year on the option's `day_count`.
 ///
 /// Returns `0.0` at or within two days of expiry, where the one-day time bump
 /// would cross expiry.
 fn spot_greek_decay(context: &MetricContext, greek: SpotGreek) -> Result<f64> {
     let option: &EquityOption = context.instrument_as()?;
+    if option.exercise.is_some() {
+        return Ok(0.0);
+    }
     let as_of = context.as_of;
     let base_pv = match greek {
         SpotGreek::Delta => 0.0,
@@ -70,14 +73,15 @@ fn spot_greek_decay(context: &MetricContext, greek: SpotGreek) -> Result<f64> {
     let bump_pct = super::spot_bump_decimal(context, option, current_spot)?;
     let spot_bump = current_spot * bump_pct;
 
-    // Guard near-expiry: avoid time bumps when T < 2 days.
-    // The 365.0 basis matches the pricer's Act/365F vol clock so that
-    // `h_years` below uses the same day-count as the re-priced PV.
-    let time_bump_days = if t < 2.0 / 365.0 {
+    let rolled_date = as_of + time::Duration::days(1);
+    let h_years = option.day_count.year_fraction(
+        as_of,
+        rolled_date,
+        finstack_quant_core::dates::DayCountContext::default(),
+    )?;
+    if h_years <= 0.0 || t < 2.0 * h_years {
         return Ok(0.0);
-    } else {
-        1.0
-    };
+    }
 
     let spot_greek_at = |date, base_pv: f64| -> Result<f64> {
         let curves_up = bump_scalar_price(&context.curves, &option.spot_id, bump_pct)?;
@@ -92,34 +96,11 @@ fn spot_greek_decay(context: &MetricContext, greek: SpotGreek) -> Result<f64> {
 
     let greek_t = spot_greek_at(as_of, base_pv)?;
 
-    let rolled_date = as_of + time::Duration::days(time_bump_days as i64);
     let base_pv_future = match greek {
         SpotGreek::Delta => 0.0,
         SpotGreek::Gamma => context.reprice_instrument_raw(option, &context.curves, rolled_date)?,
     };
     let greek_t_future = spot_greek_at(rolled_date, base_pv_future)?;
 
-    // h is in days, convert to years for proper scaling. Use the 365.0
-    // (Act/365F) basis to match the pricer's vol clock — a 1/365.25 clock
-    // would mis-scale the derivative denominator by ~0.07%.
-    let h_years = time_bump_days / 365.0;
     Ok((greek_t_future - greek_t) / h_years)
-}
-
-#[cfg(test)]
-mod tests {
-    /// W-33: the charm/color time-bump clock must use the Act/365F (365.0)
-    /// basis to match the pricer's vol clock. A 1/365.25 clock mis-scales the
-    /// derivative denominator by ~0.07%.
-    #[test]
-    fn time_bump_clock_is_act365f() {
-        let time_bump_days: f64 = 1.0;
-        let h_years = time_bump_days / 365.0;
-        // Exact Act/365F day fraction for a single calendar day.
-        let expected = 1.0 / 365.0;
-        assert!((h_years - expected).abs() < 1e-15);
-        // And it must NOT be the 365.25 calendar-year basis.
-        let calendar = 1.0 / 365.25;
-        assert!((h_years - calendar).abs() > 1e-9);
-    }
 }

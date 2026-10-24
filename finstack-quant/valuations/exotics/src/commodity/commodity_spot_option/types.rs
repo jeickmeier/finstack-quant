@@ -335,10 +335,13 @@ impl CommoditySpotOption {
                 ));
             }
             if as_of == self.expiry {
+                let spot = if self.spot_id.is_some() {
+                    self.required_spot(market)?
+                } else {
+                    self.forward_price(market, as_of)?
+                };
                 return Money::new(
-                    self.intrinsic_value(self.required_spot(market)?)
-                        * self.quantity
-                        * self.multiplier,
+                    self.intrinsic_value(spot) * self.quantity * self.multiplier,
                     self.underlying.currency,
                 )
                 .map(Some);
@@ -819,7 +822,11 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Commo
                     0.0
                 }
             } else {
-                let spot = self.required_spot(market)?;
+                let spot = if self.spot_id.is_some() {
+                    self.required_spot(market)?
+                } else {
+                    self.forward_price(market, as_of)?
+                };
                 let sign = if self.option_type == OptionType::Call {
                     1.0
                 } else {
@@ -937,8 +944,6 @@ impl CommoditySpotOption {
         as_of: Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
         if as_of > self.expiry {
             return Ok(Some(0.0));
         }
@@ -1059,24 +1064,26 @@ impl CommoditySpotOption {
                 Some(fwd) => {
                     let mut inst = self.clone();
                     inst.quoted_forward = Some(fwd * (1.0 + fwd_bump_pct));
-                    let bumped =
-                        finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+                    let (inst_vol, bumped) =
+                        finstack_quant_valuations_core::metrics::bump_active_volatility(
+                            &inst,
                             market,
                             self.vol_surface_id.as_str(),
                             vol_bump,
                         )?;
-                    Ok(inst.value(&bumped, as_of)?.amount())
+                    Ok(inst_vol.value(&bumped, as_of)?.amount())
                 }
                 None => {
                     let bumped_price =
                         bump_price_curve_pct(market, self.forward_curve_id.as_str(), fwd_bump_pct)?;
-                    let bumped =
-                        finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+                    let (inst_vol, bumped) =
+                        finstack_quant_valuations_core::metrics::bump_active_volatility(
+                            self,
                             &bumped_price,
                             self.vol_surface_id.as_str(),
                             vol_bump,
                         )?;
-                    Ok(self.value(&bumped, as_of)?.amount())
+                    Ok(inst_vol.value(&bumped, as_of)?.amount())
                 }
             }
         };
@@ -1102,8 +1109,6 @@ impl CommoditySpotOption {
         base_pv: f64,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::Instrument;
-
         if as_of > self.expiry {
             return Ok(Some(0.0));
         }
@@ -1114,18 +1119,20 @@ impl CommoditySpotOption {
         }
 
         let vol_bump = bumps.vol_bump_decimal;
-        let up = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+        let (inst_up, up) = finstack_quant_valuations_core::metrics::bump_active_volatility(
+            self,
             market,
             self.vol_surface_id.as_str(),
             vol_bump,
         )?;
-        let dn = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
+        let (inst_dn, dn) = finstack_quant_valuations_core::metrics::bump_active_volatility(
+            self,
             market,
             self.vol_surface_id.as_str(),
             -vol_bump,
         )?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let pv_dn = self.value(&dn, as_of)?.amount();
+        let pv_up = inst_up.value(&up, as_of)?.amount();
+        let pv_dn = inst_dn.value(&dn, as_of)?.amount();
         let width_vol_points =
             vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some(
