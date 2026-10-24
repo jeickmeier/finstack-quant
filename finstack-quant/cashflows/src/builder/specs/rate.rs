@@ -30,6 +30,10 @@ pub enum RateSpec {
     },
     /// Floating index plus spread, with the canonical floor, cap, gearing and
     /// reset conventions of [`FloatingRateSpec`](super::FloatingRateSpec).
+    ///
+    /// [`RateSpec::try_rate_for_period`] resolves the fixing calendar, a reset
+    /// on the valuation date, `fallback` and `compounding` differently from the
+    /// cashflow builder; see its doc.
     Floating(FloatingRateSpec),
 }
 
@@ -49,12 +53,26 @@ impl RateSpec {
     ///
     /// A floating rate whose reset date (accrual start less `reset_lag_days`
     /// business days on the fixing calendar) is on or before `as_of` reads the
-    /// fixing series; later resets project from the forward curve.
+    /// fixing series; later resets project from the forward curve at the reset
+    /// date.
+    ///
+    /// # Differences from the cashflow builder
+    ///
+    /// This path serves loan and tranche coupons and does not follow every
+    /// [`FloatingRateSpec`] rule the builder applies:
+    ///
+    /// - With no `fixing_calendar_id`, the reset lag counts weekends-only
+    ///   business days; the builder uses the coupon schedule calendar.
+    /// - A reset on `as_of` requires that day's recorded fixing; the builder
+    ///   uses it when published and otherwise projects.
+    /// - `fallback` is not consulted: a missing fixing or curve is an error.
+    /// - Any explicit `compounding`, including `Simple`, is rejected; leave it
+    ///   unset for a term-rate coupon.
     ///
     /// # Arguments
     ///
-    /// * `accrual_start` - Start of the accrual period, also the effective date
-    ///   used to sample a projected term-index quote.
+    /// * `accrual_start` - Start of the accrual period; the reset date is this
+    ///   date less `reset_lag_days` business days.
     /// * `accrual_end` - Exclusive end of the full contractual coupon period.
     /// * `accrual_year_fraction` - Positive finite contractual coupon accrual,
     ///   used to convert the curve-basis quote before spreads and rate bounds.
@@ -63,9 +81,9 @@ impl RateSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the fixing calendar is unknown, a required fixing
-    /// is missing, a seasoned compounded-overnight coupon is requested, or
-    /// the projection fails.
+    /// Returns an error if a fixed rate is not finite, `reset_lag_days` is
+    /// negative, `compounding` is set, the fixing calendar is unknown, a
+    /// required fixing is missing, or the projection fails.
     pub fn try_rate_for_period(
         &self,
         accrual_start: Date,
@@ -92,7 +110,8 @@ impl RateSpec {
                 }
                 if spec.compounding.is_some() {
                     return Err(finstack_quant_core::Error::Validation(
-                        "seasoned compounded-overnight tranche coupons require a canonical compounded fixing schedule"
+                        "RateSpec::try_rate_for_period does not support an explicit `compounding` method; \
+                         leave it unset for a term-rate coupon"
                             .into(),
                     ));
                 }

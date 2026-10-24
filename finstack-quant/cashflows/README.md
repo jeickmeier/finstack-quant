@@ -99,9 +99,11 @@ the common desks:
 Accrual boundaries are left unadjusted by default (bond/ICMA convention); the
 swap presets set `adjust_accrual_dates = true` so both accrual boundaries roll
 with the business-day convention (ISDA 2006 §4.10). Only payment dates roll in
-the bond case. Each coupon-program window is an independent schedule with a
-fresh stub at conversion; a fixed-to-float switch does not continue the
-pre-switch roll. `annual_actact()` is ISDA Act/Act, not ICMA (use
+the bond case. Every coupon- or payment-window boundary (a fixed-to-float
+switch, margin step or PIK toggle) cuts the horizon, and each piece gets its
+own schedule: with the default front stub, coupon dates before an off-cycle
+boundary roll back from it rather than from issue. Snap such dates onto the
+accrual grid when the coupon dates must not move. `annual_actact()` is ISDA Act/Act, not ICMA (use
 `eur_gov_bond` / `usd_treasury` for government bonds).
 
 ## Accrual

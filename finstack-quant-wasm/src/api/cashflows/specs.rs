@@ -220,7 +220,7 @@ pub fn prepayment_model_spec_smm(spec: JsValue, seasoning_months: JsValue) -> Re
 /// @param spec - `RecoveryModelSpec` wire object.
 /// @param seasoning_months - Months since origination of the defaulting balance (non-negative integer).
 /// @returns Recovery as a decimal fraction of defaulted par: `1 − severity` for the month when a severity vector is set, otherwise the flat `rate`.
-/// @throws If `spec` is not a `RecoveryModelSpec` (kind `validation`) or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+/// @throws If `spec` is not a `RecoveryModelSpec`, its `rate` is outside `[0, 1]` or its severity vector is empty or out of range (kind `validation`; the spec is validated before the query, as Python validates at construction), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
 #[wasm_bindgen(js_name = recoveryModelSpecRecoveryRate)]
 pub fn recovery_model_spec_recovery_rate(
     spec: JsValue,

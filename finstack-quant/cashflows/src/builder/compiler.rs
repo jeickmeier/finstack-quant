@@ -7,10 +7,12 @@
 //! Responsibilities:
 //! - Partition the `[issue, maturity]` horizon into windows using coupon/payment
 //!   program boundaries.
-//! - For each window, derive an **independent** date schedule (fresh stub at
-//!   the window start) according to frequency, stub, BDC, calendar, and
-//!   day‑count conventions. A mid-horizon conversion does not continue the
-//!   pre-switch roll.
+//! - For each window, derive an **independent** date schedule according to
+//!   frequency, stub, BDC, calendar, and day‑count conventions. Coupon and
+//!   payment program boundaries both cut the horizon. A front stub rolls each
+//!   piece back from its end, so an off-cycle cut moves the earlier coupon
+//!   dates of that piece; a back stub rolls forward from its start. A
+//!   mid-horizon conversion does not continue the pre-switch roll.
 //! - Materialize per‑window coupon specs (fixed or floating) and selected
 //!   payment split (Cash | PIK | Split) with precise coverage semantics.
 //! - Compile fee specifications into periodic and fixed fee schedules.

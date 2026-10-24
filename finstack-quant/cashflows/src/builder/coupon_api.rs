@@ -78,12 +78,18 @@ impl CashFlowBuilder {
     }
 
     /// Adds a fixed coupon over the half-open window `[start, end)`.
+    ///
+    /// `start` and `end` are horizon cut points that regenerate the coupon
+    /// dates on each side; see [window boundaries](CashFlowBuilder#window-boundaries).
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn add_fixed_window(&mut self, start: Date, end: Date, spec: FixedCouponSpec) -> &mut Self {
         self.push_coupon_program(ProgramWindow::explicit(start, end), CouponSpec::Fixed(spec))
     }
 
     /// Adds a floating coupon over the half-open window `[start, end)`.
+    ///
+    /// `start` and `end` are horizon cut points that regenerate the coupon
+    /// dates on each side; see [window boundaries](CashFlowBuilder#window-boundaries).
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn add_floating_window(
         &mut self,
@@ -278,6 +284,10 @@ impl CashFlowBuilder {
     /// call order, and for identical windows the last call wins. Partially
     /// overlapping windows are rejected by `build` with a validation error.
     ///
+    /// `start` and `end` also cut the coupon horizon, so an off-cycle date
+    /// moves the coupon dates around it; see
+    /// [window boundaries](CashFlowBuilder#window-boundaries).
+    ///
     /// Prefer [`payment_split_program`](Self::payment_split_program) for
     /// PIK-toggle scheduling, which sequences windows from a single
     /// boundary-step list. Use this method only when you need to wire up
@@ -354,9 +364,13 @@ impl CashFlowBuilder {
     ///
     /// # Notes
     ///
-    /// - Periods not covered by steps default to `Cash`
+    /// - Each split applies up to (not including) its date; periods after the
+    ///   last step default to `Cash`
     /// - Steps must be ordered by end date
     /// - Works with both fixed and floating coupons
+    /// - Step dates cut the coupon horizon, so an off-cycle date moves the
+    ///   coupon dates around it; see
+    ///   [window boundaries](CashFlowBuilder#window-boundaries)
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn payment_split_program(&mut self, steps: &[(Date, CouponType)]) -> &mut Self {
         let dates: Vec<Date> = steps.iter().map(|&(date, _)| date).collect();
@@ -429,7 +443,9 @@ impl CashFlowBuilder {
     /// `base_spec.rate_spec.spread_bp` applies from issue until the first
     /// step; each step's spread applies from its date until the next step, and
     /// the last one runs to maturity. Each date starts a coupon window, so an
-    /// off-cycle step date splits the enclosing accrual period. A step dated
+    /// off-cycle step date regenerates the coupon dates on both sides of it
+    /// rather than splitting only the enclosing accrual period; see
+    /// [window boundaries](CashFlowBuilder#window-boundaries). A step dated
     /// on the issue date replaces the base spread from issue; one dated on
     /// maturity never applies.
     ///
@@ -519,7 +535,10 @@ impl CashFlowBuilder {
     ///
     /// Creates a hybrid instrument that pays fixed coupons until a switch date,
     /// then converts to floating coupons. Common for convertible/callable bonds
-    /// and structured products with changing payment profiles.
+    /// and structured products with changing payment profiles. `switch` is a
+    /// horizon cut point: each leg gets its own schedule, so the fixed leg does
+    /// not continue into the floating roll; see
+    /// [window boundaries](CashFlowBuilder#window-boundaries).
     ///
     /// # Arguments
     ///

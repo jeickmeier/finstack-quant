@@ -1463,9 +1463,10 @@ export interface D_0067Baa6B86C47F45A9E {
    */
   compounding?: D_74E12B9De60A5731F116 | null;
   /**
-   * Policy when forward curve lookup fails during emission.
+   * Policy when projecting a coupon fails; see [`FloatingRateFallback`]
+   * for when it applies and what it replaces.
    *
-   * Defaults to `Error`, which surfaces curve lookup failures.
+   * Defaults to `Error`, which surfaces projection failures.
    * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
    * to use a fixed index rate.
    */
@@ -1501,16 +1502,15 @@ export interface D_0067Baa6B86C47F45A9E {
    */
   index_floor_bp?: Decimal5 | null;
   /**
-   * Explicit term-index tenor when no forward curve resolves.
+   * Expected term-index tenor, checked against the resolved forward curve.
    *
    * The named forward curve is already the term index (for example a 3M
-   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
-   * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
-   * when no forward curve resolves. Ignored for overnight-compounded
-   * legs. When set, the builder warns at build time if it disagrees with
-   * the resolved curve's tenor by more than 10% — the curve remains
-   * authoritative.
+   * EURIBOR curve) and owns the quoted tenor. Projection is
+   * `fwd.rate(reset_date)`, not a FRA-style average over
+   * `[reset, reset + tenor]`. The builder only uses this field to warn at
+   * build time when it disagrees with the resolved curve's tenor by more
+   * than 10%; the curve remains authoritative. Ignored for
+   * overnight-compounded legs.
    */
   index_tenor?: Tenor2 | null;
   /**
@@ -2362,19 +2362,28 @@ export interface Money2 {
 export interface DB298E98Ea5050D260A3B {
   /**
    * Holiday calendar IDs used for schedule adjustments.
+   *
+   * Informational: carried through merge and host views, but no Rust
+   * engine reads it; accrual uses each flow's `accrual.calendar_id`.
    */
   calendar_ids: string[];
   /**
    * Total facility commitment for revolving and delayed-draw facilities;
    * `None` for instruments without one.
+   *
+   * Informational: carried through merge and host views, but no Rust
+   * engine reads it.
    */
   commitment?: Money1 | null;
   /**
-   * Issue date of the instrument, when known.
+   * Issue date of the instrument.
    *
-   * Used by the accrual engine to establish the first coupon period start
-   * date precisely, avoiding the inverse day count approximation that can
-   * be off by 1-2 days.
+   * Required by accrual and by `outstanding_by_date` /
+   * `outstanding_at_dates`, which return an error when it is missing rather
+   * than infer the first coupon period start from flow dates. `validate`
+   * and the public lifecycle normalization instead fall back to the first
+   * flow date to locate the issue funding row. Merging schedules keeps it
+   * only when every input carries the same date.
    */
   issue_date?: Date2 | null;
   /**

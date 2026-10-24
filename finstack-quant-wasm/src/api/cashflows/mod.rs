@@ -26,10 +26,12 @@ use wasm_bindgen::prelude::*;
 /// start otherwise); the opposite endpoint may be irregular. Negative payment
 /// and reset lags are rejected.
 ///
-/// Complete supplied fixing observations can build a floating coupon without
-/// a forward curve. Explicit fallback applies to missing curves or absent
-/// fixing series. Supplied historical gaps before a resolved curve's base date
-/// always fail, as do curve, date, day-count and arithmetic errors.
+/// Every floating coupon needs its forward curve, even when the supplied
+/// fixing observations cover it, unless an explicit fallback applies. An
+/// explicit fallback replaces the whole coupon when its projection fails
+/// (missing curve, absent fixing series, a reset before the curve base date,
+/// or a projection day-count error). Supplied historical gaps before a
+/// resolved curve's base date always fail.
 ///
 /// @param spec_json - JSON-encoded `CashflowScheduleBuildSpec`. Optional
 ///   `principal_exchange` is `"none"` or `"initial_and_final"` (default).

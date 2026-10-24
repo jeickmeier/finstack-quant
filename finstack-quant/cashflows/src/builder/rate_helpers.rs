@@ -1,7 +1,11 @@
-//! Centralized rate projection for floating rate instruments.
+//! Floating rate projection for the cashflow builder and its consumers.
 //!
-//! Provides a single implementation of floating rate projection logic used across
-//! all instruments: bonds, swaps, credit facilities, and structured products.
+//! Term and overnight projection, fixing cutoffs, and the gearing/spread/bound
+//! arithmetic used by the schedule builder: bonds, term loans, structured
+//! coupons and the bond LSMC pricer. Compounded overnight swap-style coupons
+//! (IRS, basis, cross-currency, futures, cap/floor, TRS, revolver) project
+//! through a separate engine, `finstack_quant_valuations_core::instruments::pricing::overnight`;
+//! mirror overnight convention changes in both. See [`super::overnight`].
 //!
 //! ## Responsibilities
 //!
@@ -259,8 +263,8 @@ pub fn apply_bp_bounds(rate: f64, floor_bp: Option<f64>, cap_bp: Option<f64>) ->
 ///   seasoned resets from a `MarketContext` `ScalarTimeSeries` with id
 ///   `FIXING:{forward_curve_id}` *before* calling this function, and routes this
 ///   error through the spec's
-///   [`crate::builder::FloatingRateFallback`] policy when no series
-///   is provided. A reset exactly on the curve base date (T+0) is projected
+///   [`crate::builder::FloatingRateFallback`] policy (see its doc for when
+///   that applies). A reset exactly on the curve base date (T+0) is projected
 ///   from `t = 0`.
 /// - the accrual window or fraction is invalid, or a required curve-time
 ///   conversion fails

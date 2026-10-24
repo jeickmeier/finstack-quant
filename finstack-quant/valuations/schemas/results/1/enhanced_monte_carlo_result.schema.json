@@ -462,10 +462,10 @@
     },
     "CashFlowMeta": {
       "additionalProperties": false,
-      "description": "Metadata shared by an entire cashflow schedule.\n\nTracks referenced calendar IDs, optional facility limits, and the instrument's\nissue date for use by downstream engines (e.g., accrual calculation).",
+      "description": "Metadata shared by an entire cashflow schedule.\n\nCarries the representation tag, the issue and maturity dates, projected\nfixings for time rolls, and two informational fields (`calendar_ids`,\n`commitment`) that no Rust engine reads.",
       "properties": {
         "calendar_ids": {
-          "description": "Holiday calendar IDs used for schedule adjustments.",
+          "description": "Holiday calendar IDs used for schedule adjustments.\n\nInformational: carried through merge and host views, but no Rust\nengine reads it; accrual uses each flow's `accrual.calendar_id`.",
           "items": {
             "type": "string"
           },
@@ -480,7 +480,7 @@
               "type": "null"
             }
           ],
-          "description": "Total facility commitment for revolving and delayed-draw facilities;\n`None` for instruments without one."
+          "description": "Total facility commitment for revolving and delayed-draw facilities;\n`None` for instruments without one.\n\nInformational: carried through merge and host views, but no Rust\nengine reads it."
         },
         "issue_date": {
           "anyOf": [
@@ -491,7 +491,7 @@
               "type": "null"
             }
           ],
-          "description": "Issue date of the instrument, when known.\n\nUsed by the accrual engine to establish the first coupon period start\ndate precisely, avoiding the inverse day count approximation that can\nbe off by 1-2 days."
+          "description": "Issue date of the instrument.\n\nRequired by accrual and by `outstanding_by_date` /\n`outstanding_at_dates`, which return an error when it is missing rather\nthan infer the first coupon period start from flow dates. `validate`\nand the public lifecycle normalization instead fall back to the first\nflow date to locate the issue funding row. Merging schedules keeps it\nonly when every input carries the same date."
         },
         "maturity": {
           "anyOf": [

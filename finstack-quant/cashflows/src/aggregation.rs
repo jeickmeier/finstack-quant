@@ -703,8 +703,10 @@ fn validate_recovery(
 ///
 /// # Arguments
 ///
-/// * `principal` - Dated principal reductions as `(payment_date, amount)`
-///   pairs; only positive amounts strictly after `as_of` contribute.
+/// * `principal` - Dated principal reductions as `(date, amount)` pairs; only
+///   positive amounts strictly after `as_of` contribute. The caller chooses
+///   the date convention: [`CashFlowSchedule::wal`](crate::builder::CashFlowSchedule::wal)
+///   passes each repayment's balance-effective date and par amount.
 /// * `as_of` - Valuation date from which Act/365F time weights are measured.
 ///
 /// # Errors

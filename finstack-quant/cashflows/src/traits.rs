@@ -89,7 +89,13 @@ pub trait CashflowScheduleSource: Send + Sync {
     ///
     /// Implementations must preserve classification and attach the correct
     /// [`crate::builder::CashflowRepresentation`] to schedule metadata. They must not perform
-    /// public date filtering, PIK omission, or final sorting.
+    /// public date filtering or final sorting: `as_of` is a projection and
+    /// fixing cutoff, never a row filter. Past rows must stay, because
+    /// statements replays balances and period flows from this schedule, and
+    /// [`CashflowProvider::cashflow_schedule`] applies the one public
+    /// `date >= as_of` filter. The inflation-linked bond, FRA, convertible and
+    /// DCF equity sources currently pre-filter by date; that is a known
+    /// deviation, not a pattern to copy.
     fn raw_cashflow_schedule(
         &self,
         curves: &MarketContext,

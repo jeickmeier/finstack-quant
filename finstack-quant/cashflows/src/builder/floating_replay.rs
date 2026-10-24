@@ -381,13 +381,20 @@ impl CompiledFloatingCoupon {
     /// index rate and notional.
     ///
     /// Schedule emission and replay state both settle through this method, so
-    /// floor/cap, gearing, spread, and cash/PIK arithmetic cannot diverge.
+    /// gearing, spread, and cash/PIK arithmetic are shared. Bound placement is
+    /// not: for overnight coupons, schedule emission pre-composes the period
+    /// index and all-in bounds into `constrained_index_rate` and compiles this
+    /// coupon with bound-free params, while the bond LSMC replay keeps the
+    /// bounds in the params. The results agree because the clamps are
+    /// idempotent; a change to how either side applies bounds must be made in
+    /// both.
     ///
     /// # Arguments
     ///
     /// * `notional` - Accrual-start outstanding principal in currency units.
     /// * `constrained_index_rate` - Decimal index rate after any overnight
-    ///   daily/period index constraints; for term coupons this is the fixing.
+    ///   daily/period index constraints (and, from schedule emission, the
+    ///   all-in bound adjustment); for term coupons this is the fixing.
     /// * `projected_index_rate` - Decimal index rate recorded as cashflow
     ///   metadata before overnight period constraints.
     /// * `accrual_factor` - Year fraction accrued on `notional`: the full
