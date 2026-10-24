@@ -385,8 +385,8 @@ where
     }
     let up = bump_scalar_price(market, scalar_id, bump_pct)?;
     let down = bump_scalar_price(market, scalar_id, -bump_pct)?;
-    let pv_up = inst.value(&up, as_of)?.amount();
-    let pv_dn = inst.value(&down, as_of)?.amount();
+    let pv_up = inst.value_raw(&up, as_of)?;
+    let pv_dn = inst.value_raw(&down, as_of)?;
     central_diff_by_width(pv_up, pv_dn, 2.0 * bump_size)
 }
 

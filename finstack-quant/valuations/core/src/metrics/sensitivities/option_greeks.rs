@@ -13,7 +13,9 @@ use crate::instruments::{
     GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
     OptionGreeksRequest,
 };
+use crate::metrics::sensitivities::theta::{theta_period, GenericThetaAny};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::Result;
 
 /// Hull-White 1F rate delta or gamma, when the request selected that model.
@@ -132,6 +134,11 @@ where
         if let Some(value) = context.computed.get(&metric_id) {
             return Ok(*value);
         }
+        // Analytic theta is a one-day number; other horizons need the
+        // roll-forward theta that honors `theta_period`.
+        if matches!(self.kind, OptionGreekKind::Theta) && theta_period(context) != Tenor::daily() {
+            return GenericThetaAny.calculate(context);
+        }
 
         let native_model = context.instrument.default_model();
         if context
@@ -161,17 +168,27 @@ where
                 bumps,
             },
         )?;
-        store_available_greeks(context, greeks);
+        store_available_greeks(context, self.kind, greeks);
         context.computed_metric(&metric_id)
     }
 }
 
-fn store_available_greeks(context: &mut MetricContext, greeks: OptionGreeks) {
+/// Cache every greek the provider returned so later metric requests reuse it.
+///
+/// Theta is cached only when it is the requested greek: asking for Delta must
+/// not fill the theta breakdown that the generic theta calculator would
+/// otherwise produce. Analytic theta is a one-day value (on the
+/// `theta_day_basis` day basis) with no cashflow component, so it is reported
+/// entirely as roll-down over a one-day period.
+fn store_available_greeks(
+    context: &mut MetricContext,
+    requested_kind: OptionGreekKind,
+    greeks: OptionGreeks,
+) {
     for (metric, value) in [
         (MetricId::Delta, greeks.delta),
         (MetricId::Gamma, greeks.gamma),
         (MetricId::Vega, greeks.vega),
-        (MetricId::Theta, greeks.theta),
         (MetricId::Rho, greeks.rho_bp),
         (MetricId::ForeignRho, greeks.foreign_rho_bp),
         (MetricId::Vanna, greeks.vanna),
@@ -179,6 +196,20 @@ fn store_available_greeks(context: &mut MetricContext, greeks: OptionGreeks) {
     ] {
         if let Some(value) = value {
             context.computed.entry(metric).or_insert(value);
+        }
+    }
+    if matches!(requested_kind, OptionGreekKind::Theta) {
+        if let Some(theta) = greeks.theta {
+            context.computed.entry(MetricId::Theta).or_insert(theta);
+            context.computed.entry(MetricId::ThetaCarry).or_insert(0.0);
+            context
+                .computed
+                .entry(MetricId::ThetaRollDown)
+                .or_insert(theta);
+            context
+                .computed
+                .entry(MetricId::ThetaPeriodDays)
+                .or_insert(1.0);
         }
     }
 }

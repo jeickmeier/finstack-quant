@@ -290,6 +290,21 @@ where
     Ok(seeded)
 }
 
+/// Clone of `instrument` seeded with [`CRN_SEED_SCENARIO`] so base and bumped
+/// Monte Carlo reprices share random draws; any caller-set seed label is
+/// replaced. Instruments without pricing overrides cannot be Monte Carlo
+/// priced and are returned unchanged.
+pub(crate) fn clone_with_crn_seed_if_supported<I>(instrument: &I) -> I
+where
+    I: Clone + Instrument,
+{
+    let mut seeded = instrument.clone();
+    if let Some(overrides) = seeded.get_instrument_pricing_overrides_mut() {
+        overrides.model_config.mc_seed_scenario = Some(CRN_SEED_SCENARIO.to_string());
+    }
+    seeded
+}
+
 fn eval_raw_with_scratch_bumps<I>(
     context: &MetricContext,
     scratch: &mut MarketContext,

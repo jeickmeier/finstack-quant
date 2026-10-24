@@ -70,6 +70,22 @@ impl MarketScenario {
         Self { date, shifts }
     }
 
+    /// Re-date this scenario so its shifts apply as of `date`.
+    ///
+    /// Historical VaR replays a past day's shifts on today's market. FX spot
+    /// shifts are quoted as of `self.date`, so they must be applied at the
+    /// valuation date, not the historical date the shifts were observed on.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Valuation date the shifts are applied on; replaces the
+    ///   historical observation date. The shifts themselves are unchanged.
+    #[must_use]
+    pub fn at_date(mut self, date: Date) -> Self {
+        self.date = date;
+        self
+    }
+
     /// Apply this scenario to a base market context.
     ///
     /// Creates a new `MarketContext` with all risk factor shifts applied.

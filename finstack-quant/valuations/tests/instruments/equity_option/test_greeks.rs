@@ -542,6 +542,37 @@ fn test_theta_negative_for_long_options() {
 }
 
 #[test]
+fn theta_horizon_follows_theta_period() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    let market = build_standard_market(as_of, 100.0, 0.25, 0.05, 0.0);
+    let metrics = [MetricId::Theta, MetricId::ThetaPeriodDays];
+    let options = finstack_quant_valuations::instruments::PricingOptions::default;
+
+    let daily_call = create_call(as_of, expiry, 100.0);
+    let daily = daily_call
+        .price_with_metrics(&market, as_of, &metrics, options())
+        .expect("daily theta");
+    assert_eq!(daily.metric(MetricId::ThetaPeriodDays), Some(1.0));
+    let daily_theta = daily.metric(MetricId::Theta).expect("daily theta");
+
+    let mut weekly_call = daily_call;
+    weekly_call.metric_pricing_overrides.theta_period =
+        Some(finstack_quant_core::dates::Tenor::weekly());
+    let weekly = weekly_call
+        .price_with_metrics(&market, as_of, &metrics, options())
+        .expect("weekly theta");
+    assert_eq!(weekly.metric(MetricId::ThetaPeriodDays), Some(7.0));
+    let weekly_theta = weekly.metric(MetricId::Theta).expect("weekly theta");
+    in_range(
+        weekly_theta / daily_theta,
+        5.0,
+        9.0,
+        "one-week theta vs one-day theta",
+    );
+}
+
+#[test]
 fn test_atm_theta_magnitude_highest() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);

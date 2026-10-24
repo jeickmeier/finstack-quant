@@ -401,6 +401,7 @@ fn reprice_with_dispatch(
 fn aggregate_scenario_pnls_par<F>(
     history: &MarketHistory,
     base_market: &MarketContext,
+    as_of: Date,
     scenario_pnl: F,
     provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<Vec<f64>>
@@ -408,7 +409,10 @@ where
     F: Fn(&MarketContext) -> Result<f64> + Send + Sync,
 {
     let map_scenario = |scenario: &super::market_history::MarketScenario| {
-        let scenario_market = scenario.apply(base_market, provider.as_deref())?;
+        let scenario_market = scenario
+            .clone()
+            .at_date(as_of)
+            .apply(base_market, provider.as_deref())?;
         scenario_pnl(&scenario_market)
     };
 
@@ -472,7 +476,8 @@ fn calculate_var_full_revaluation(
         Ok(acc.total())
     };
 
-    let pnls = aggregate_scenario_pnls_par(history, base_market, scenario_pnl, provider.clone())?;
+    let pnls =
+        aggregate_scenario_pnls_par(history, base_market, as_of, scenario_pnl, provider.clone())?;
 
     VarResult::from_distribution(pnls, config.confidence_level)
 }
@@ -712,7 +717,8 @@ fn calculate_var_taylor(
                 base_money.currency(),
                 reporting_currency,
                 scenario,
-            )?;
+            )?
+            .at_date(as_of);
             if scenario.shifts.iter().all(|s| s.shift == 0.0) {
                 continue;
             }
@@ -829,7 +835,7 @@ mod tests {
             .collect();
         let history = history_from_scenarios(as_of, 64, scenarios);
         for _ in 0..20 {
-            let error = aggregate_scenario_pnls_par(&history, &market, |_| Ok(0.0), None)
+            let error = aggregate_scenario_pnls_par(&history, &market, as_of, |_| Ok(0.0), None)
                 .expect_err("every scenario is invalid")
                 .to_string();
             assert!(

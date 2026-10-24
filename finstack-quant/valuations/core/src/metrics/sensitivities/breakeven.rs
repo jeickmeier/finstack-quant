@@ -3,11 +3,13 @@
 //! Computes how much a valuation parameter (spread, yield, vol, correlation)
 //! can move before carry + roll-down is wiped out over the configured horizon.
 
-use crate::instruments::{BreakevenConfig, BreakevenMode, BreakevenTarget};
+use crate::instruments::{BreakevenConfig, BreakevenMode, BreakevenTarget, Instrument};
 use crate::metrics::sensitivities::theta::calculate_theta_date;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use std::borrow::Cow;
 
@@ -144,6 +146,19 @@ fn iterative_mode_error(context: &MetricContext, target: BreakevenTarget) -> Opt
     None
 }
 
+/// Discount and forward curves a yield breakeven shifts, discount curves
+/// first, without duplicates.
+fn ytm_curve_ids(instrument: &dyn Instrument) -> Result<Vec<CurveId>> {
+    let curves = instrument.market_dependencies()?.curves;
+    let mut ids: Vec<CurveId> = curves.discount_curves.iter().cloned().collect();
+    for fwd in &curves.forward_curves {
+        if !ids.contains(fwd) {
+            ids.push(fwd.clone());
+        }
+    }
+    Ok(ids)
+}
+
 /// Bump `base` by `delta` for the given breakeven target.
 ///
 /// Curve and surface ids are resolved from `context`; the bump is applied to
@@ -158,7 +173,7 @@ fn bump_market_for_target(
     target: BreakevenTarget,
 ) -> Result<MarketContext> {
     match target {
-        BreakevenTarget::ZSpread | BreakevenTarget::Oas | BreakevenTarget::Ytm => {
+        BreakevenTarget::ZSpread | BreakevenTarget::Oas => {
             // Use the instrument's first discount curve, falling back to
             // the cached `discount_curve_id` on the context.
             let curve_id = context
@@ -171,6 +186,23 @@ fn bump_market_for_target(
                     id: "iterative_breakeven: no discount curve found for instrument".into(),
                 })?;
             crate::metrics::bump_discount_curve_parallel(base, &curve_id, delta)
+        }
+        BreakevenTarget::Ytm => {
+            // A yield move shifts every rate the instrument discounts or
+            // projects with, so all its discount and forward curves move
+            // together in parallel.
+            let mut curve_ids = ytm_curve_ids(context.instrument.as_ref())?;
+            if curve_ids.is_empty() {
+                curve_ids.push(context.discount_curve_id.clone().ok_or_else(|| {
+                    finstack_quant_core::InputError::NotFound {
+                        id: "iterative_breakeven: no rate curve found for instrument".into(),
+                    }
+                })?);
+            }
+            base.bump(curve_ids.into_iter().map(|id| MarketBump::Curve {
+                id,
+                spec: BumpSpec::parallel_bp(delta),
+            }))
         }
         BreakevenTarget::ImpliedVol => {
             let vol_surface_ids = context
@@ -227,7 +259,9 @@ fn iterative_breakeven(
 ) -> Result<f64> {
     // Determine the horizon date (same convention as carry decomposition).
     let period = crate::metrics::sensitivities::theta::theta_period(context);
-    let expiry_date = context.instrument.expiry();
+    let expiry_date = context
+        .instrument
+        .last_payment_date(&context.curves, context.as_of)?;
     let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 
     let held_market = context.fixings_held_market(rolled_date)?;
