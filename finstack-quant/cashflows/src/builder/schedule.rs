@@ -748,7 +748,13 @@ impl CashFlowSchedule {
             self.flows
                 .iter()
                 .filter(|cf| cf.kind.is_principal_repayment())
-                .map(|cf| (cf.date, cf.amount)),
+                .map(|cf| {
+                    let amount = match cf.principal_delta {
+                        Some(delta) => delta.checked_neg(),
+                        None => cf.amount,
+                    };
+                    (cf.get_balance_date(), amount)
+                }),
             as_of,
         )
     }
@@ -2246,5 +2252,37 @@ mod tests {
             schedule.calendar_year_ladder(&[90.0, 80.0]),
             Err(finstack_quant_core::Error::CurrencyMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn wal_uses_par_principal_delta_and_balance_date() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let economic = Date::from_calendar_date(2025, Month::July, 1).expect("date");
+        let payment = Date::from_calendar_date(2025, Month::July, 3).expect("date");
+        let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        let mut redemption =
+            flow(payment, 52.5, CFKind::Amortization).with_principal_date(economic);
+        redemption.principal_delta = Some(Money::new(-50.0, Currency::USD).expect("money"));
+        let schedule = CashFlowSchedule::from_flows_unchecked(
+            vec![
+                flow(issue, -100.0, CFKind::Notional),
+                redemption,
+                flow(maturity, 50.0, CFKind::Notional),
+            ],
+            Notional::par(100.0, Currency::USD).expect("notional"),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                ..Default::default()
+            },
+        );
+        let t_econ = DayCount::Act365F
+            .year_fraction(issue, economic, DayCountContext::default())
+            .expect("yf");
+        let t_mat = DayCount::Act365F
+            .year_fraction(issue, maturity, DayCountContext::default())
+            .expect("yf");
+        let expected = 0.5 * t_econ + 0.5 * t_mat;
+        assert!((schedule.wal(issue).expect("wal") - expected).abs() < 1e-12);
     }
 }

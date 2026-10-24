@@ -474,15 +474,13 @@ pub fn project_index_rate(
             "term index projection requires a finite positive contractual accrual fraction".into(),
         ));
     }
-    let curve_time = |date: Date| {
-        if date == fwd_base {
-            Ok(0.0)
-        } else {
-            fwd_day_count.signed_year_fraction(fwd_base, date, DayCountContext::default())
-        }
+    let t0 = if reset_date == fwd_base {
+        0.0
+    } else {
+        fwd_day_count.signed_year_fraction(fwd_base, reset_date, DayCountContext::default())?
     };
-    let t0 = curve_time(reset_date)?;
-    let curve_accrual = curve_time(accrual_end)? - curve_time(accrual_start)?;
+    let curve_accrual =
+        fwd_day_count.year_fraction(accrual_start, accrual_end, DayCountContext::default())?;
     // Keep the tenor fixing at the reset date; only its annualization changes.
     let index_rate = fwd.rate(t0) * (curve_accrual / accrual_year_fraction);
     if !curve_accrual.is_finite() || curve_accrual <= 0.0 || !index_rate.is_finite() {
