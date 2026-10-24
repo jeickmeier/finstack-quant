@@ -219,6 +219,13 @@ class TestMoneyParity:
         with pytest.raises(TypeError, match="unsupported right operand"):
             5.0 - Money(1.0, usd)
 
+    def test_bool_amount_rejected(self, usd: Currency) -> None:
+        """Money rejects bool amounts even though bool is a subclass of int."""
+        with pytest.raises(TypeError, match="Money amount must be"):
+            Money(True, usd)  # type: ignore[arg-type]
+        with pytest.raises(TypeError, match="Money amount must be"):
+            Money(False, usd)  # type: ignore[arg-type]
+
 
 class TestCoreTypesParity:
     """Core scalar type contracts."""

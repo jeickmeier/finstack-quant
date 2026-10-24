@@ -116,6 +116,11 @@ pub(crate) fn is_python_decimal(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
 /// follow IEEE 754 semantics and later ``amount`` accessors expose an ``f64``
 /// view.
 pub(crate) fn money_from_amount(obj: &Bound<'_, PyAny>, ccy: Currency) -> PyResult<Money> {
+    if obj.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(PyTypeError::new_err(
+            "Money amount must be float, int, str, or decimal.Decimal",
+        ));
+    }
     if !obj.is_instance_of::<PyFloat>() && !obj.is_instance_of::<PyInt>() {
         if let Ok(text) = obj.cast::<PyString>() {
             return Money::from_decimal_str(text.to_str()?, ccy).map_err(core_to_py);
@@ -145,7 +150,9 @@ impl PyMoney {
         config: Option<PyRef<'_, PyFinstackConfig>>,
     ) -> PyResult<Self> {
         let ccy = extract_currency(currency)?;
-        if !amount.is_instance_of::<PyFloat>() && !amount.is_instance_of::<PyInt>() {
+        if amount.is_instance_of::<pyo3::types::PyBool>()
+            || (!amount.is_instance_of::<PyFloat>() && !amount.is_instance_of::<PyInt>())
+        {
             return Err(PyTypeError::new_err(
                 "Money amount must be float or int; use Money.from_decimal for an exact Decimal",
             ));

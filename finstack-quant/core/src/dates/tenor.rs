@@ -640,16 +640,26 @@ impl Tenor {
         business_day_convention: BusinessDayConvention,
         day_count: DayCount,
     ) -> crate::Result<f64> {
-        let end_date = self.add_to_date(as_of, calendar, business_day_convention)?;
+        let unadjusted_end = self.add_to_date(as_of, None, BusinessDayConvention::Unadjusted)?;
+        let end_date = if let Some(cal) = calendar {
+            adjust(unadjusted_end, business_day_convention, cal)?
+        } else {
+            unadjusted_end
+        };
         if end_date <= as_of {
             return Ok(0.0);
         }
+
+        let coupon_period = match day_count {
+            DayCount::ActActIsma => Some((as_of, unadjusted_end)),
+            _ => Some((as_of, end_date)),
+        };
 
         let ctx = DayCountContext {
             calendar,
             frequency: Some(*self),
             bus_basis: None,
-            coupon_period: Some((as_of, end_date)),
+            coupon_period,
             end_is_termination_date: false,
         };
 
@@ -1043,6 +1053,20 @@ mod tests {
 
         // 2025 is not a leap year, so 365 days / 365 = 1.0
         assert!((years - 1.0).abs() < 0.001);
+
+        // ActActIsma with calendar adjustment when unadjusted end lands on a weekend
+        // (2025-02-15 is a Saturday -> rolls to Monday 2025-02-17 under Following).
+        let cal = crate::dates::calendar_by_id_strict("target2").expect("target2 calendar");
+        let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid");
+        let isma_years = Tenor::monthly()
+            .to_years_with_context(
+                start,
+                Some(cal),
+                BusinessDayConvention::Following,
+                DayCount::ActActIsma,
+            )
+            .expect("ActActIsma with adjusted end date");
+        assert!(isma_years > 1.0 / 12.0);
     }
 
     #[test]

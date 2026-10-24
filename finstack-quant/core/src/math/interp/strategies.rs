@@ -409,18 +409,22 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
 
 impl PiecewiseQuadraticForwardStrategy {
     #[inline]
-    fn boundary_df(&self, knots: &[f64], boundary_index: usize) -> f64 {
+    fn boundary_log_df(&self, knots: &[f64], boundary_index: usize) -> f64 {
         if boundary_index == 0 {
-            (-self.a[0]).exp()
+            self.a[0]
         } else {
             let last_seg = self.a.len() - 1;
             let h = knots[boundary_index] - knots[boundary_index - 1];
-            let y = self.a[last_seg]
+            self.a[last_seg]
                 + self.b[last_seg] * h
                 + self.c[last_seg] * h * h
-                + self.d[last_seg] * h * h * h;
-            (-y).exp()
+                + self.d[last_seg] * h * h * h
         }
+    }
+
+    #[inline]
+    fn boundary_df(&self, knots: &[f64], boundary_index: usize) -> f64 {
+        (-self.boundary_log_df(knots, boundary_index)).exp()
     }
 
     #[inline]
@@ -437,7 +441,7 @@ impl PiecewiseQuadraticForwardStrategy {
     #[inline]
     fn flat_forward_df(&self, x: f64, knots: &[f64], boundary_index: usize) -> f64 {
         let t0 = knots[boundary_index];
-        let y0 = -self.boundary_df(knots, boundary_index).ln();
+        let y0 = self.boundary_log_df(knots, boundary_index);
         let slope = self.boundary_slope(knots, boundary_index);
         let y = y0 + slope * (x - t0);
         (-y).exp()
@@ -847,16 +851,11 @@ impl MonotoneConvexStrategy {
             f[0] = 1.5 * fd[0] - 0.5 * f[1];
             f[n - 1] = 1.5 * fd[n - 2] - 0.5 * f[n - 2];
 
-            // Apply the Hagan-West forward-positivity amelioration only when
-            // every discrete forward is non-negative. Per Hagan & West (2006),
-            // positivity enforcement is an optional amelioration that is only
-            // valid for positive curves; if any discrete forward is negative
-            // the input is a genuine negative-rate curve (DF > 1 somewhere)
-            // and the projection is skipped so negative forwards interpolate
-            // faithfully instead of being clamped toward zero.
-            if fd.iter().all(|&v| v >= 0.0) {
-                Self::apply_monotonicity_constraints(&mut f, &fd);
-            }
+            // Apply the Hagan-West forward-positivity amelioration locally on
+            // every knot whose adjacent discrete forwards are non-negative,
+            // while leaving negative-rate segments unclamped so genuine
+            // negative forwards interpolate faithfully.
+            Self::apply_monotonicity_constraints(&mut f, &fd);
         }
 
         Ok(Self {
@@ -869,24 +868,26 @@ impl MonotoneConvexStrategy {
 
     /// Apply the Hagan-West (2006), equations (60)-(62), forward bounds.
     ///
-    /// Each knot forward is clamped once to the intersection of its adjacent
-    /// segment bounds: `0 <= f[i] <= 2 * min(fd[i-1], fd[i])`. Boundary knots
-    /// use their sole adjacent discrete forward. A zero-rate segment therefore
-    /// has zero forwards at both ends, without a later segment undoing it.
-    ///
-    /// Regions I-III are monotone between their nonnegative endpoint forwards.
-    /// In region IV the minimum deviation is `-g0*g1/(g0+g1)`; bounding both
-    /// positive deviations by the segment mean keeps this minimum above zero.
-    ///
-    /// This method is called only when all discrete forwards are nonnegative;
-    /// negative-rate curves keep their original interpolation.
+    /// Each knot forward whose adjacent discrete forwards are non-negative is
+    /// clamped once to the intersection of its adjacent segment bounds:
+    /// `0 <= f[i] <= 2 * min(fd[i-1], fd[i])`. Boundary knots use their sole
+    /// adjacent discrete forward when non-negative. A zero-rate segment
+    /// therefore has zero forwards at both ends, without a later segment
+    /// undoing it, while knots bordering a negative discrete forward remain
+    /// unclamped.
     fn apply_monotonicity_constraints(f: &mut [f64], fd: &[f64]) {
         let last = f.len() - 1;
-        f[0] = f[0].clamp(0.0, 2.0 * fd[0]);
-        for i in 1..last {
-            f[i] = f[i].clamp(0.0, 2.0 * fd[i - 1].min(fd[i]));
+        if fd[0] >= 0.0 {
+            f[0] = f[0].clamp(0.0, 2.0 * fd[0]);
         }
-        f[last] = f[last].clamp(0.0, 2.0 * fd[last - 1]);
+        for i in 1..last {
+            if fd[i - 1] >= 0.0 && fd[i] >= 0.0 {
+                f[i] = f[i].clamp(0.0, 2.0 * fd[i - 1].min(fd[i]));
+            }
+        }
+        if fd[last - 1] >= 0.0 {
+            f[last] = f[last].clamp(0.0, 2.0 * fd[last - 1]);
+        }
     }
 
     /// Compute both the discount factor `DF(t)` and the instantaneous forward

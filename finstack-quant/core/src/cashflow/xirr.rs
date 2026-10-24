@@ -111,8 +111,10 @@ pub fn irr(cashflows: &[f64], guess: Option<f64>) -> crate::Result<f64> {
 ///   unsorted; same-date flows are netted and zero net dates are ignored before
 ///   selecting the time origin. Amounts at identical year fractions are netted
 ///   again before solving; the resulting flows must change sign exactly once.
-/// - `day_count`: Convention used to convert dates into year fractions from the
-///   earliest nonzero net dated flow date.
+/// - `day_count`: Context-free convention used to convert dates into year
+///   fractions from the earliest nonzero net dated flow date via
+///   [`DayCountContext::default`]. Context-dependent conventions (`Bus252`,
+///   `ActActIsma`, `Act365L`) return an error.
 /// - `guess`: Optional finite decimal annual rate greater than -1 used to
 ///   split the search bracket. `None` uses 10%; it does not select a root.
 ///
