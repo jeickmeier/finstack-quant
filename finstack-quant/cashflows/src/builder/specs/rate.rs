@@ -75,8 +75,27 @@ impl RateSpec {
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
         match self {
-            Self::Fixed { rate } => Ok(*rate),
+            Self::Fixed { rate } => {
+                if !rate.is_finite() {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "fixed rate must be finite".into(),
+                    ));
+                }
+                Ok(*rate)
+            }
             Self::Floating(spec) => {
+                if spec.reset_lag_days < 0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "reset_lag_days must be non-negative (0 = on accrual start, >0 = prior business days); got {}",
+                        spec.reset_lag_days
+                    )));
+                }
+                if spec.compounding.is_some() {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "seasoned compounded-overnight tranche coupons require a canonical compounded fixing schedule"
+                            .into(),
+                    ));
+                }
                 let params = crate::builder::FloatingRateParams::try_from(spec)?;
                 let calendar_id = spec
                     .fixing_calendar_id
@@ -91,12 +110,6 @@ impl RateSpec {
                 // Tranche coupons treat a reset on the valuation date as fixed:
                 // it needs the day's recorded fixing and is never projected.
                 if reset_date <= as_of {
-                    if spec.compounding.is_some() {
-                        return Err(finstack_quant_core::Error::Validation(
-                            "seasoned compounded-overnight tranche coupons require a canonical compounded fixing schedule"
-                                .into(),
-                        ));
-                    }
                     let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
                         market,
                         spec.forward_curve_id.as_str(),
@@ -112,7 +125,7 @@ impl RateSpec {
                 }
                 let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
                 crate::builder::project_floating_rate(
-                    accrual_start,
+                    reset_date,
                     fwd.as_ref(),
                     &params,
                     accrual_start,
@@ -121,5 +134,80 @@ impl RateSpec {
                 )
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::builder::{FloatingLegCompounding, FloatingRateFallback, FloatingRateSpec};
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    use finstack_quant_core::types::CurveId;
+    use rust_decimal::Decimal;
+    use time::Month;
+
+    #[test]
+    fn try_rate_for_period_validates_inputs_and_uses_reset_date_for_projection() {
+        let base = Date::from_calendar_date(2025, Month::January, 2).expect("valid date");
+        let start = Date::from_calendar_date(2025, Month::April, 4).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::July, 4).expect("valid date");
+        let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.03), (0.25, 0.05), (1.0, 0.08)])
+            .build()
+            .expect("valid curve");
+        let market = MarketContext::new().insert(fwd);
+
+        assert!(RateSpec::Fixed { rate: f64::NAN }
+            .try_rate_for_period(start, end, 0.25, base, &market)
+            .is_err());
+
+        let base_float = FloatingRateSpec {
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
+            spread_bp: Decimal::ZERO,
+            gearing: Decimal::ONE,
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            index_cap_bp: None,
+            all_in_floor_bp: None,
+            all_in_cap_bp: None,
+            overnight_index_constraints: Default::default(),
+            reset_frequency: Tenor::quarterly(),
+            index_tenor: None,
+            reset_lag_days: 2,
+            fixing_calendar_id: None,
+            compounding: None,
+            overnight_basis: None,
+            fallback: FloatingRateFallback::Error,
+        };
+
+        let mut neg_lag = base_float.clone();
+        neg_lag.reset_lag_days = -2;
+        assert!(RateSpec::Floating(neg_lag)
+            .try_rate_for_period(start, end, 0.25, base, &market)
+            .is_err());
+
+        let mut compounded = base_float.clone();
+        compounded.compounding =
+            Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 });
+        assert!(RateSpec::Floating(compounded)
+            .try_rate_for_period(start, end, 0.25, base, &market)
+            .is_err());
+
+        let mut zero_lag = base_float.clone();
+        zero_lag.reset_lag_days = 0;
+        let r_lag2 = RateSpec::Floating(base_float)
+            .try_rate_for_period(start, end, 91.0 / 360.0, base, &market)
+            .expect("lag 2 projection");
+        let r_lag0 = RateSpec::Floating(zero_lag)
+            .try_rate_for_period(start, end, 91.0 / 360.0, base, &market)
+            .expect("lag 0 projection");
+        assert!(
+            (r_lag2 - r_lag0).abs() > 1e-6,
+            "projection must evaluate forward curve at reset_date rather than accrual_start"
+        );
     }
 }

@@ -226,8 +226,9 @@ pub fn recovery_model_spec_recovery_rate(
     spec: JsValue,
     seasoning_months: JsValue,
 ) -> Result<f64, JsValue> {
-    Ok(js_wire::<RecoveryModelSpec>(&spec, "spec")?
-        .recovery_rate(js_uint(&seasoning_months, "seasoningMonths")?))
+    let spec = js_wire::<RecoveryModelSpec>(&spec, "spec")?;
+    spec.validate().map_err(to_js_err)?;
+    Ok(spec.recovery_rate(js_uint(&seasoning_months, "seasoningMonths")?))
 }
 
 /// Check a recovery model's rate and severity vector.

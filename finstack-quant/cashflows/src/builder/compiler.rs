@@ -30,7 +30,8 @@ use rust_decimal::Decimal;
 
 use super::date_generation::{
     build_schedule_period, compile_periods, effective_frequency, effective_stub,
-    generate_periods_with_adjustment, validate_accrual_grid, CompiledPeriod,
+    generate_periods_with_adjustment, validate_accrual_grid, validate_unique_payment_dates,
+    CompiledPeriod,
 };
 use super::rate_helpers::FloatingRateParams;
 use super::specs::{
@@ -527,6 +528,7 @@ pub(super) fn compute_coupon_schedules(
 
     let mut fixed_schedules: Vec<FixedSchedule> = Vec::new();
     let mut float_schedules: Vec<FloatSchedule> = Vec::new();
+    let mut all_window_periods = Vec::new();
 
     for w in grid.windows(2) {
         let s = w[0];
@@ -543,6 +545,7 @@ pub(super) fn compute_coupon_schedules(
         if periods.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
+        all_window_periods.extend(periods.iter().map(|entry| entry.period));
         let calendar = calendar_by_id_strict(&schedule.calendar_id)?;
 
         match &chosen_coupon.coupon {
@@ -605,6 +608,8 @@ pub(super) fn compute_coupon_schedules(
             }
         }
     }
+
+    validate_unique_payment_dates(&all_window_periods)?;
 
     Ok(CompiledSchedules {
         fixed_schedules,

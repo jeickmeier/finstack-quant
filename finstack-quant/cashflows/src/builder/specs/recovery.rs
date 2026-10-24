@@ -98,7 +98,7 @@ impl RecoveryModelSpec {
                     .unwrap_or(1.0 - self.rate);
                 (1.0 - severity).clamp(0.0, 1.0)
             }
-            _ => self.rate,
+            _ => self.rate.clamp(0.0, 1.0),
         }
     }
 
