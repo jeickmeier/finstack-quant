@@ -24,7 +24,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::fx::FxQuery;
-use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::ResettingSide;
 
@@ -48,21 +47,33 @@ pub(super) fn mtm_fx_fixing_series_id(
     ))
 }
 
-fn require_historical_fx_reset(
+/// Published `resetting_currency -> constant_currency` MtM reset on `reset_date`, if any.
+fn observed_fx_reset(
     context: &finstack_quant_core::market_data::context::MarketContext,
     resetting_currency: finstack_quant_core::currency::Currency,
     constant_currency: finstack_quant_core::currency::Currency,
     reset_date: Date,
-    as_of: Date,
-) -> Result<f64> {
+) -> Option<f64> {
     let series_id = mtm_fx_fixing_series_id(resetting_currency, constant_currency);
-    let series = context.get_series(&series_id).ok();
-    finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-        series,
-        &format!("FX-{resetting_currency}-{constant_currency}"),
-        reset_date,
-        as_of,
-    )
+    context
+        .get_series(&series_id)
+        .ok()?
+        .value_on_exact(reset_date)
+        .ok()
+}
+
+/// Error for a past MtM reset that a still-unsettled flow depends on.
+fn missing_fx_reset(
+    resetting_currency: finstack_quant_core::currency::Currency,
+    constant_currency: finstack_quant_core::currency::Currency,
+    reset_date: Date,
+    as_of: Date,
+) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(format!(
+        "Missing MtM FX reset 'FX-{resetting_currency}-{constant_currency}' on {reset_date} \
+         (valuation date: {as_of}). Provide it in fixing series '{}'.",
+        mtm_fx_fixing_series_id(resetting_currency, constant_currency)
+    ))
 }
 
 /// Compute the PV of an MtM-resetting XCCY swap in reporting currency.
@@ -70,12 +81,12 @@ fn require_historical_fx_reset(
 /// Dispatched from `XccySwap::base_value` when `notional_exchange` is `MtmResetting`.
 /// Assumes the swap has been validated (schedules aligned, legs in distinct currencies,
 /// FX matrix reachable).
-pub(crate) fn pv_mtm_reset(
+pub(crate) fn pv_mtm_reset_raw(
     swap: &XccySwap,
     resetting_side: ResettingSide,
     context: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
-) -> Result<Money> {
+) -> Result<f64> {
     let (flows, _) = project_mtm_cashflows(swap, resetting_side, context, as_of)?;
     let fx = context.fx().ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
@@ -110,7 +121,7 @@ pub(crate) fn pv_mtm_reset(
         };
         pv.add(converted);
     }
-    Money::new(pv.total(), swap.reporting_currency)
+    Ok(pv.total())
 }
 
 /// Enumerate the complete MtM-resetting cashflow stream for `cashflow_schedule`.
@@ -184,27 +195,59 @@ fn project_mtm_cashflows(
         Vec::with_capacity(constant_periods.len() + resetting_periods.len() * 2 + 4);
     let mut projected_fixings = Vec::new();
 
+    let start_c = swap.adjusted_leg_start(constant_leg)?;
+    let start_r = swap.adjusted_leg_start(resetting_leg)?;
+    let end_c = swap.adjusted_leg_end(constant_leg)?;
+    let end_r = swap.adjusted_leg_end(resetting_leg)?;
+
+    let resetting_ccy = resetting_leg.notional.currency();
+    let constant_ccy = constant_leg.notional.currency();
+
+    // Period `j`'s notional still drives an unsettled flow: its coupon, the
+    // rebalancing exchange at the next period start, or the final exchange.
+    // A past reset is only required when this holds.
+    let period_needs_notional = |j: usize| -> bool {
+        resetting_periods
+            .get(j)
+            .is_some_and(|p| p.payment_date > as_of)
+            || resetting_periods
+                .get(j + 1)
+                .is_some_and(|next| next.accrual_start > as_of)
+            || (j + 1 == resetting_periods.len() && end_r > as_of)
+    };
+
     // Per-period notional at T_start — also drives the initial principal cashflow.
-    let n_r_initial = if constant_leg.leg.start < as_of {
-        let historical_fx = require_historical_fx_reset(
-            context,
-            resetting_leg.notional.currency(),
-            constant_leg.notional.currency(),
-            constant_leg.leg.start,
-            as_of,
-        )?;
-        require_positive_finite(
-            historical_fx,
-            swap.id.as_str(),
-            "historical initial FX reset",
-        )?;
-        n_c / historical_fx
+    // A reset on or before `as_of` uses its published fixing. An unpublished
+    // reset on `as_of`, or a past one nothing depends on, keeps the contractual
+    // resetting notional.
+    let n_r_initial = if constant_leg.leg.start <= as_of {
+        match observed_fx_reset(context, resetting_ccy, constant_ccy, constant_leg.leg.start) {
+            Some(historical_fx) => {
+                require_positive_finite(
+                    historical_fx,
+                    swap.id.as_str(),
+                    "historical initial FX reset",
+                )?;
+                n_c / historical_fx
+            }
+            None if constant_leg.leg.start < as_of
+                && (start_r > as_of || period_needs_notional(0)) =>
+            {
+                return Err(missing_fx_reset(
+                    resetting_ccy,
+                    constant_ccy,
+                    constant_leg.leg.start,
+                    as_of,
+                ));
+            }
+            None => resetting_leg.notional.amount(),
+        }
     } else {
         compute_resetting_notional(
             n_c,
             spot_x_at_as_of,
             as_of,
-            constant_leg.leg.start,
+            start_c,
             disc_c.as_ref(),
             disc_r.as_ref(),
             &swap.id,
@@ -213,7 +256,7 @@ fn project_mtm_cashflows(
 
     // Initial principal exchanges.
     flows.push(CashFlow::new(
-        constant_leg.leg.start,
+        start_c,
         None,
         Money::new(
             initial_principal_sign(constant_leg.side) * n_c,
@@ -225,7 +268,7 @@ fn project_mtm_cashflows(
     ));
     let cf_initial_amount = initial_principal_sign(resetting_leg.side) * n_r_initial;
     flows.push(CashFlow::new(
-        resetting_leg.leg.start,
+        start_r,
         None,
         Money::new(cf_initial_amount, resetting_leg.notional.currency())?,
         CFKind::Notional,
@@ -264,18 +307,32 @@ fn project_mtm_cashflows(
 
     let mut n_r_prev = n_r_initial;
     for (j, period) in resetting_periods.iter().enumerate() {
+        let mut has_notional_fixing = true;
         let n_r_j = if j == 0 {
             n_r_initial
         } else if period.accrual_start < as_of {
-            let historical_fx = require_historical_fx_reset(
-                context,
-                resetting_leg.notional.currency(),
-                constant_leg.notional.currency(),
-                period.accrual_start,
-                as_of,
-            )?;
-            require_positive_finite(historical_fx, swap.id.as_str(), "historical FX reset")?;
-            n_c / historical_fx
+            match observed_fx_reset(context, resetting_ccy, constant_ccy, period.accrual_start) {
+                Some(historical_fx) => {
+                    require_positive_finite(
+                        historical_fx,
+                        swap.id.as_str(),
+                        "historical FX reset",
+                    )?;
+                    n_c / historical_fx
+                }
+                None if period_needs_notional(j) => {
+                    return Err(missing_fx_reset(
+                        resetting_ccy,
+                        constant_ccy,
+                        period.accrual_start,
+                        as_of,
+                    ));
+                }
+                None => {
+                    has_notional_fixing = false;
+                    resetting_leg.notional.amount()
+                }
+            }
         } else {
             compute_resetting_notional(
                 n_c,
@@ -288,7 +345,7 @@ fn project_mtm_cashflows(
             )?
         };
 
-        if j > 0 {
+        if j > 0 && has_notional_fixing {
             projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
                 series_id: mtm_fx_fixing_series_id(
                     resetting_leg.notional.currency(),
@@ -341,7 +398,7 @@ fn project_mtm_cashflows(
 
     // Final principal exchanges; the resetting leg uses its last marked notional.
     flows.push(CashFlow::new(
-        constant_leg.leg.end,
+        end_c,
         None,
         Money::new(
             constant_leg.side.sign() * n_c,
@@ -353,7 +410,7 @@ fn project_mtm_cashflows(
     ));
     let cf_final_amount = resetting_leg.side.sign() * n_r_prev;
     flows.push(CashFlow::new(
-        resetting_leg.leg.end,
+        end_r,
         None,
         Money::new(cf_final_amount, resetting_leg.notional.currency())?,
         CFKind::Notional,
@@ -440,14 +497,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn historical_fx_reset_requires_exact_fixing_series_observation() {
+    fn observed_fx_reset_requires_exact_fixing_series_observation() {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::market_data::context::MarketContext;
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
         use time::macros::date;
 
         let reset_date = date!(2025 - 01 - 02);
-        let as_of = date!(2025 - 01 - 03);
         let series = ScalarTimeSeries::new(
             mtm_fx_fixing_series_id(Currency::EUR, Currency::USD),
             vec![(reset_date, 1.08)],
@@ -456,18 +512,23 @@ mod tests {
         .expect("valid FX fixing series");
         let market = MarketContext::new().insert_series(series);
 
-        let rate =
-            require_historical_fx_reset(&market, Currency::EUR, Currency::USD, reset_date, as_of)
-                .expect("exact reset fixing");
-        assert_eq!(rate, 1.08);
-        assert!(require_historical_fx_reset(
-            &market,
-            Currency::EUR,
-            Currency::USD,
-            date!(2025 - 01 - 01),
-            as_of,
-        )
-        .is_err());
+        assert_eq!(
+            observed_fx_reset(&market, Currency::EUR, Currency::USD, reset_date),
+            Some(1.08)
+        );
+        assert_eq!(
+            observed_fx_reset(&market, Currency::EUR, Currency::USD, date!(2025 - 01 - 01)),
+            None
+        );
+        assert_eq!(
+            observed_fx_reset(
+                &MarketContext::new(),
+                Currency::EUR,
+                Currency::USD,
+                reset_date
+            ),
+            None
+        );
     }
 
     #[test]

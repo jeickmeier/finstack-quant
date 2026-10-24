@@ -275,6 +275,34 @@ impl CmsSwap {
                 self.accrual_fractions.len(),
             )));
         }
+        for (index, accrual) in self.accrual_fractions.iter().enumerate() {
+            if !accrual.is_finite() || *accrual < 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CmsSwap accrual_fractions[{index}] must be finite and nonnegative, got {accrual}"
+                )));
+            }
+        }
+        if let Some(cap) = self.cms_cap {
+            if !cap.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CmsSwap cms_cap must be finite, got {cap}"
+                )));
+            }
+        }
+        if let Some(floor) = self.cms_floor {
+            if !floor.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CmsSwap cms_floor must be finite, got {floor}"
+                )));
+            }
+        }
+        if let (Some(floor), Some(cap)) = (self.cms_floor, self.cms_cap) {
+            if floor > cap {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CmsSwap cms_floor ({floor}) must not exceed cms_cap ({cap})"
+                )));
+            }
+        }
 
         let (FundingLeg::Fixed { periods, .. } | FundingLeg::Floating { periods, .. }) =
             &self.funding_leg;
@@ -706,6 +734,15 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSwap {
             .price_internal_with_convexity(self, market, as_of, 1.0)
     }
 
+    fn base_value_raw(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        crate::cms_swap::pricer::CmsSwapPricer
+            .price_internal_with_convexity_raw(self, market, as_of, 1.0)
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
@@ -720,12 +757,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSwap {
                 None,
             ),
         );
+        let cms_spread = self.cms_spread_rate()?;
         for strike in [self.cms_cap, self.cms_floor].into_iter().flatten() {
             deps.add_volatility_dependency(
                 finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     self.vol_surface_id.clone(),
                     None,
-                    Some(strike),
+                    Some(strike - cms_spread),
                 ),
             );
         }

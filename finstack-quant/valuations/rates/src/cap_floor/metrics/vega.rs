@@ -103,19 +103,14 @@ fn hull_white_surface_vega_per_pct(option: &CapFloor, context: &MetricContext) -
 fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
     let market = context.curves.as_ref();
     let bump = finstack_quant_valuations_core::instruments::pricing::hw1f_params::HW_SIGMA_BUMP;
-    let base = resolve_capfloor_hw1f_model_params(option, market)?;
+    let base = resolve_capfloor_hw1f_model_params(option, market, context.as_of)?;
     let with_sigma = |shift: f64| -> Result<CapFloor> {
         let mut bumped = option.clone();
         bumped
             .instrument_pricing_overrides
             .model_config
             .hw1f_mean_reversion = Some(base.kappa);
-        if option
-            .instrument_pricing_overrides
-            .model_config
-            .hw1f_sigma_schedule
-            .is_some()
-        {
+        if !base.get_times().is_empty() {
             let values = base
                 .get_values()
                 .iter()

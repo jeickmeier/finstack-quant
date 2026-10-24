@@ -5,6 +5,7 @@
 use crate::instruments::deposit::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
@@ -338,7 +339,14 @@ fn test_usd_deposit_friday_trade_with_nyse_calendar() {
         pv.amount()
     );
     assert_eq!(pv.currency(), Currency::USD);
-    assert!((df_s - 1.0).abs() < 1e-12, "DF(start): {}", df_s);
+    // DF(start) discounts from the trade date to the spot-dated curve base.
+    let expected_df_s = ctx
+        .get_discount("USD-OIS")
+        .expect("curve")
+        .df_between_dates(trade_date, expected_spot_date)
+        .expect("df");
+    assert!(expected_df_s < 1.0, "trade date precedes spot");
+    assert!((df_s - expected_df_s).abs() < 1e-12, "DF(start): {}", df_s);
     assert!(df_e > 0.0 && df_e < 1.0, "DF(end): {}", df_e);
     let expected_par = (df_s / df_e - 1.0) / yf;
     assert!(

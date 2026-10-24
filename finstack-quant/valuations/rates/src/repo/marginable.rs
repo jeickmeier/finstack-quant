@@ -41,14 +41,17 @@ impl Marginable for Repo {
     ) -> Result<SimmSensitivities> {
         let currency = self.cash_amount.currency();
         let mut sens = SimmSensitivities::new(currency);
+        if as_of >= self.maturity {
+            return Ok(sens);
+        }
 
         // Repos have limited rate sensitivity - mainly to the repo rate
         // Short-term IR sensitivity
         let days_to_maturity = (self.maturity - as_of).whole_days().max(1) as f64;
         let years_to_maturity = days_to_maturity / CALENDAR_DAYS_PER_YEAR;
 
-        // DV01 approximation for short-term lending
-        let dv01 = self.cash_amount.amount() * years_to_maturity * ONE_BASIS_POINT;
+        // DV01 approximation for short-term lending (higher discount rates reduce repayment PV)
+        let dv01 = -self.cash_amount.amount() * years_to_maturity * ONE_BASIS_POINT;
 
         // Assign to shortest tenor bucket (3M for very short, otherwise 6M)
         let tenor = if years_to_maturity <= constants::tenor_buckets::BUCKET_3M {

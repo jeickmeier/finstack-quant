@@ -73,6 +73,20 @@ impl Pricer for SwaptionHullWhitePricer {
 
         self.price_internal(swaption, market, as_of)
     }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let swaption = finstack_quant_valuations_core::pricer::expect_inst::<Swaption>(
+            instrument,
+            InstrumentType::Swaption,
+        )?;
+
+        self.price_internal_raw(swaption, market, as_of)
+    }
 }
 
 impl SwaptionHullWhitePricer {
@@ -83,13 +97,38 @@ impl SwaptionHullWhitePricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
-        if let Some(pv) = swaption.terminal_value(market, as_of).map_err(|error| {
-            PricingError::from_core(
-                error,
-                PricingErrorContext::from_instrument(swaption).model(ModelKey::HullWhite1F),
-            )
-        })? {
-            return Ok(ValuationResult::stamped(swaption.id(), as_of, pv));
+        let pv = self.price_internal_raw(swaption, market, as_of)?;
+        Ok(ValuationResult::stamped(
+            swaption.id.as_str(),
+            as_of,
+            Money::new(pv, swaption.notional.currency()).map_err(|error| {
+                finstack_quant_valuations_core::pricer::PricingError::from_core(
+                    error,
+                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                        swaption,
+                    )
+                    .model(ModelKey::HullWhite1F),
+                )
+            })?,
+        ))
+    }
+
+    fn price_internal_raw(
+        &self,
+        swaption: &Swaption,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        if let Some(pv) = swaption
+            .terminal_value_raw(market, as_of)
+            .map_err(|error| {
+                PricingError::from_core(
+                    error,
+                    PricingErrorContext::from_instrument(swaption).model(ModelKey::HullWhite1F),
+                )
+            })?
+        {
+            return Ok(pv);
         }
 
         super::bermudan::require_single_curve(
@@ -179,19 +218,7 @@ impl SwaptionHullWhitePricer {
             }
         })?;
 
-        Ok(ValuationResult::stamped(
-            swaption.id.as_str(),
-            as_of,
-            Money::new(pv, swaption.notional.currency()).map_err(|error| {
-                finstack_quant_valuations_core::pricer::PricingError::from_core(
-                    error,
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        swaption,
-                    )
-                    .model(ModelKey::HullWhite1F),
-                )
-            })?,
-        ))
+        Ok(pv)
     }
 }
 

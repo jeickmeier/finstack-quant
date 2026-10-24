@@ -226,25 +226,11 @@ impl ForwardRateAgreement {
     ///
     /// - Returns error if fixing date has passed but no `observed_fixing` is provided
     /// - Returns error if settlement denominator is pathological (forward rate ≈ -1/τ)
-    fn settlement_amount_raw(
-        &self,
-        context: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
+    pub(crate) fn resolved_fixing_date(&self) -> finstack_quant_core::Result<Date> {
         use finstack_quant_core::dates::DateExt;
 
-        self.validate()?;
-
-        if as_of >= self.start_date {
-            return Ok(0.0);
-        }
-
-        // Determine fixing date: use explicit fixing_date if provided,
-        // otherwise infer from start_date - reset_lag_days business days.
-        //
-        // IMPORTANT: reset_lag_days is in BUSINESS DAYS, not calendar days.
-        let fixing_date = match self.fixing_date {
-            Some(explicit_date) => explicit_date,
+        match self.fixing_date {
+            Some(explicit_date) => Ok(explicit_date),
             None => {
                 let business_day_convention = self
                     .fixing_business_day_convention
@@ -263,15 +249,20 @@ impl ForwardRateAgreement {
                         self.id, cal_id
                     ))
                 })?;
-                // Subtract reset_lag_days business days, then apply the convention.
                 let base_fixing_date = self
                     .start_date
                     .add_business_days(-(self.reset_lag_days), cal)?;
-                adjust(base_fixing_date, business_day_convention, cal)?
+                adjust(base_fixing_date, business_day_convention, cal)
             }
-        };
+        }
+    }
 
-        // Accrual factor
+    pub(crate) fn resolved_forward_rate(
+        &self,
+        context: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, f64)> {
+        let fixing_date = self.resolved_fixing_date()?;
         let tau = self
             .day_count
             .year_fraction(
@@ -286,22 +277,52 @@ impl ForwardRateAgreement {
                 self.id
             )));
         }
-
-        // Start-of-day valuation policy: a fixing dated exactly `as_of` is not
-        // yet published and remains projected. Only earlier fixing dates
-        // require the observed value.
         let forward_rate = if fixing_date < as_of {
-            self.observed_fixing.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "FRA '{}': fixing date {} has passed (as_of={}) but no observed_fixing provided",
-                    self.id, fixing_date, as_of
-                ))
-            })?
+            if let Some(obs) = self.observed_fixing {
+                obs
+            } else {
+                let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+                    self.forward_curve_id.as_str(),
+                );
+                if let Ok(series) = context.get_series(&series_id) {
+                    finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                        Some(series),
+                        self.forward_curve_id.as_str(),
+                        fixing_date,
+                        as_of,
+                    )?
+                } else {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "FRA '{}': fixing date {} has passed (as_of={}) but no observed_fixing provided",
+                        self.id, fixing_date, as_of
+                    )));
+                }
+            }
+        } else if let Ok(fwd) = context.get_forward(&self.forward_curve_id) {
+            fwd.as_ref()
+                .rate_between_dates(self.start_date, self.maturity, tau)?
+        } else if let Some(obs) = self.observed_fixing {
+            obs
         } else {
             let fwd = context.get_forward(&self.forward_curve_id)?;
             fwd.as_ref()
                 .rate_between_dates(self.start_date, self.maturity, tau)?
         };
+        Ok((forward_rate, tau))
+    }
+
+    fn settlement_amount_raw(
+        &self,
+        context: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
+
+        if as_of >= self.start_date {
+            return Ok(0.0);
+        }
+
+        let (forward_rate, tau) = self.resolved_forward_rate(context, as_of)?;
 
         // Warn if forward rate is outside reasonable bounds (likely data error)
         if crate::rate_validation::rate_outside_range(
@@ -395,6 +416,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for ForwardRateAgre
         deps.add_discount_curve(self.discount_curve_id.clone());
         if self.observed_fixing.is_none() {
             deps.add_forward_curve(self.forward_curve_id.clone());
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                self.forward_curve_id.as_str(),
+            ));
         }
         Ok(deps)
     }

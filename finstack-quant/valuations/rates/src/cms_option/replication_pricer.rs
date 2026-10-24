@@ -190,6 +190,16 @@ impl CmsReplicationPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
+        let pv = self.price_internal_raw(inst, curves, as_of)?;
+        Money::new(pv, inst.notional.currency())
+    }
+
+    fn price_internal_raw(
+        &self,
+        inst: &CmsOption,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> Result<f64> {
         let mut total_pv = 0.0;
 
         let strike = inst.strike_f64()?;
@@ -283,7 +293,7 @@ impl CmsReplicationPricer {
             total_pv += period_pv * accrual_fraction;
         }
 
-        Money::new(total_pv * inst.notional.amount(), inst.notional.currency())
+        Ok(total_pv * inst.notional.amount())
     }
 }
 
@@ -306,5 +316,18 @@ impl Pricer for CmsReplicationPricer {
         let pv = self.price_internal(cms, market, as_of)?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
+    }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let cms = finstack_quant_valuations_core::pricer::expect_inst::<CmsOption>(
+            instrument,
+            InstrumentType::CmsOption,
+        )?;
+        Ok(self.price_internal_raw(cms, market, as_of)?)
     }
 }

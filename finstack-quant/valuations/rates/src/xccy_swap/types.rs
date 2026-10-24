@@ -364,7 +364,11 @@ impl XccySwap {
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> Result<()> {
         let needs_fx = self.leg1.notional.currency() != self.reporting_currency
-            || self.leg2.notional.currency() != self.reporting_currency;
+            || self.leg2.notional.currency() != self.reporting_currency
+            || matches!(
+                self.notional_exchange,
+                NotionalExchange::MtmResetting { .. }
+            );
         if !needs_fx {
             return Ok(());
         }
@@ -398,6 +402,24 @@ impl XccySwap {
                     label,
                     leg.notional.currency(),
                     self.reporting_currency,
+                    err,
+                ))
+            })?;
+        }
+        if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
+            let (constant_leg, resetting_leg) = self.partition_legs(resetting_side)?;
+            fx.rate(FxQuery::new(
+                resetting_leg.notional.currency(),
+                constant_leg.notional.currency(),
+                constant_leg.leg.start,
+                Default::default(),
+            ))
+            .map_err(|err| {
+                finstack_quant_core::Error::Validation(format!(
+                    "XccySwap '{}' FX path unreachable for MtM reset: {}->{} ({})",
+                    self.id.as_str(),
+                    resetting_leg.notional.currency(),
+                    constant_leg.notional.currency(),
                     err,
                 ))
             })?;
@@ -491,6 +513,16 @@ impl XccySwap {
         leg: &XccySwapLeg,
     ) -> Result<&'static dyn finstack_quant_core::dates::HolidayCalendar> {
         finstack_quant_core::dates::calendar_by_id_strict(self.resolve_leg_calendar_id(leg)?)
+    }
+
+    pub(crate) fn adjusted_leg_start(&self, leg: &XccySwapLeg) -> Result<Date> {
+        let cal = self.resolve_leg_calendar(leg)?;
+        finstack_quant_core::dates::adjust(leg.leg.start, leg.leg.business_day_convention, cal)
+    }
+
+    pub(crate) fn adjusted_leg_end(&self, leg: &XccySwapLeg) -> Result<Date> {
+        let cal = self.resolve_leg_calendar(leg)?;
+        finstack_quant_core::dates::adjust(leg.leg.end, leg.leg.business_day_convention, cal)
     }
 
     /// Build one leg's accrual periods. Single source for the pricing paths
@@ -647,6 +679,9 @@ impl XccySwap {
         let mut flows = Vec::with_capacity(periods.len());
         let mut projected_fixings = Vec::new();
         for period in &periods {
+            if period.payment_date <= as_of {
+                continue;
+            }
             let projected = self.projected_leg_period(
                 leg,
                 fwd.as_ref(),
@@ -680,11 +715,13 @@ impl XccySwap {
     }
 
     fn leg_principal_schedule(&self, leg: &XccySwapLeg, anchor: Date) -> Result<CashFlowSchedule> {
+        let start_date = self.adjusted_leg_start(leg)?;
+        let end_date = self.adjusted_leg_end(leg)?;
         let mut builder = CashFlowSchedule::builder();
         let _ = builder.principal(
             Money::from((0_i64, leg.notional.currency())),
             anchor,
-            leg.leg.end,
+            end_date,
         );
         // MtmResetting also requires initial AND final exchange; this arm makes the helper non-panicky if accidentally called on an MtM swap. `base_value` dispatches MtmResetting to `pricing_mtm::pv_mtm_reset` before this method is reached.
         if matches!(
@@ -693,8 +730,8 @@ impl XccySwap {
         ) {
             let initial_amount = initial_principal_sign(leg.side) * leg.notional.amount();
             let _ = builder.add_principal_event(
-                leg.leg.start,
-                leg.leg.start,
+                start_date,
+                start_date,
                 Money::from((0_i64, leg.notional.currency())),
                 Some(Money::new(-initial_amount, leg.notional.currency())?),
                 CFKind::Notional,
@@ -709,8 +746,8 @@ impl XccySwap {
         ) {
             let final_amount = leg.side.sign() * leg.notional.amount();
             let _ = builder.add_principal_event(
-                leg.leg.end,
-                leg.leg.end,
+                end_date,
+                end_date,
                 Money::from((0_i64, leg.notional.currency())),
                 Some(Money::new(-final_amount, leg.notional.currency())?),
                 CFKind::Notional,
@@ -733,13 +770,13 @@ impl XccySwap {
     ///
     /// # Returns
     ///
-    /// Present value in the **reporting currency**, not the leg currency.
-    fn pv_leg_in_reporting_currency(
+    /// Unrounded present value in the **reporting currency**, not the leg currency.
+    fn pv_leg_in_reporting_currency_raw(
         &self,
         leg: &XccySwapLeg,
         context: &MarketContext,
         as_of: Date,
-    ) -> Result<Money> {
+    ) -> Result<f64> {
         self.validate_leg(leg)?;
 
         let calendar_id = self.resolve_leg_calendar_id(leg)?;
@@ -751,19 +788,22 @@ impl XccySwap {
             ));
         }
 
+        let start_date = self.adjusted_leg_start(leg)?;
+        let end_date = self.adjusted_leg_end(leg)?;
+
         let unsettled_coupon = periods.iter().any(|period| period.payment_date > as_of);
         let unsettled_initial = matches!(
             self.notional_exchange,
             NotionalExchange::InitialAndFinal | NotionalExchange::MtmResetting { .. }
-        ) && leg.leg.start > as_of;
+        ) && start_date > as_of;
         let unsettled_final = matches!(
             self.notional_exchange,
             NotionalExchange::Final
                 | NotionalExchange::InitialAndFinal
                 | NotionalExchange::MtmResetting { .. }
-        ) && leg.leg.end > as_of;
+        ) && end_date > as_of;
         if !unsettled_coupon && !unsettled_initial && !unsettled_final {
-            return Ok(Money::from((0_i64, self.reporting_currency)));
+            return Ok(0.0);
         }
 
         let disc = context.get_discount(&leg.leg.discount_curve_id)?;
@@ -804,9 +844,9 @@ impl XccySwap {
         if matches!(
             self.notional_exchange,
             NotionalExchange::InitialAndFinal | NotionalExchange::MtmResetting { .. }
-        ) && leg.leg.start > as_of
+        ) && start_date > as_of
         {
-            let df = disc.as_ref().df_between_dates(as_of, leg.leg.start)?;
+            let df = disc.as_ref().df_between_dates(as_of, start_date)?;
             let cf_leg_currency = initial_principal_sign(leg.side) * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
             pv.add(cf_rep);
@@ -818,9 +858,9 @@ impl XccySwap {
             NotionalExchange::Final
                 | NotionalExchange::InitialAndFinal
                 | NotionalExchange::MtmResetting { .. }
-        ) && leg.leg.end > as_of
+        ) && end_date > as_of
         {
-            let df = disc.as_ref().df_between_dates(as_of, leg.leg.end)?;
+            let df = disc.as_ref().df_between_dates(as_of, end_date)?;
             let cf_leg_currency = leg.side.sign() * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
             pv.add(cf_rep);
@@ -858,7 +898,7 @@ impl XccySwap {
             pv.add(cf_rep);
         }
 
-        Money::new(pv.total(), self.reporting_currency)
+        Ok(pv.total())
     }
 }
 
@@ -941,6 +981,10 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
         ));
         if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
             let (constant_leg, resetting_leg) = self.partition_legs(resetting_side)?;
+            deps.add_fx_pair(
+                resetting_leg.notional.currency(),
+                constant_leg.notional.currency(),
+            );
             deps.add_series_id(crate::xccy_swap::pricing_mtm::mtm_fx_fixing_series_id(
                 resetting_leg.notional.currency(),
                 constant_leg.notional.currency(),
@@ -954,6 +998,15 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
+        let pv = self.base_value_raw(market, as_of)?;
+        Money::new(pv, self.reporting_currency)
+    }
+
+    fn base_value_raw(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
         // One structural check shared with `validate_invariants`: leg
         // invariants, distinct leg currencies and MtM schedule alignment.
         self.validate()?;
@@ -965,7 +1018,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
         self.validate_fx_reachable(market)?;
 
         if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
-            return crate::xccy_swap::pricing_mtm::pv_mtm_reset(
+            return crate::xccy_swap::pricing_mtm::pv_mtm_reset_raw(
                 self,
                 resetting_side,
                 market,
@@ -973,11 +1026,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
             );
         }
 
-        // pv_leg_in_reporting_currency builds its own period schedule; no need to pre-build here.
-        let pv1_rep = self.pv_leg_in_reporting_currency(&self.leg1, market, as_of)?;
-        let pv2_rep = self.pv_leg_in_reporting_currency(&self.leg2, market, as_of)?;
+        // pv_leg_in_reporting_currency_raw builds its own period schedule; no need to pre-build here.
+        let pv1_rep = self.pv_leg_in_reporting_currency_raw(&self.leg1, market, as_of)?;
+        let pv2_rep = self.pv_leg_in_reporting_currency_raw(&self.leg2, market, as_of)?;
 
-        pv1_rep.checked_add(pv2_rep)
+        Ok(pv1_rep + pv2_rep)
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();

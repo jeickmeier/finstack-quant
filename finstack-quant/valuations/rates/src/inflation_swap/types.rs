@@ -278,6 +278,10 @@ impl InflationSwap {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
+        if as_of >= payment_date {
+            return Ok(Money::from((0_i64, self.notional.currency())));
+        }
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
 
         // Use instrument day count for accrual period
@@ -290,7 +294,6 @@ impl InflationSwap {
 
         // Date-based DF from as_of to payment: correct when the curve base
         // date differs from as_of.
-        let payment_date = self.adjusted_payment_date(self.maturity)?;
         let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
 
         fixed_payment.checked_mul_f64(df)
@@ -364,13 +367,16 @@ impl InflationSwap {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
+        if as_of >= payment_date {
+            return Ok(Money::from((0_i64, self.notional.currency())));
+        }
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let index_ratio = self.projected_index_ratio(market, as_of)?;
         let inflation_payment = self.notional.checked_mul_f64(index_ratio - 1.0)?;
 
         // Date-based DF from as_of to payment: correct when the curve base
         // date differs from as_of.
-        let payment_date = self.adjusted_payment_date(self.maturity)?;
         let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
 
         inflation_payment.checked_mul_f64(df)
@@ -834,6 +840,7 @@ impl YoYInflationSwap {
     /// for long-dated YoY swaps it carries a few-bp-to-material bias. Use a
     /// stochastic-inflation model where that bias is unacceptable.
     pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let mut pv = 0.0_f64;
 
@@ -890,6 +897,7 @@ impl YoYInflationSwap {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
 
         let mut sum_infl_pv = 0.0_f64;
@@ -931,6 +939,7 @@ impl YoYInflationSwap {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Vec<CashFlow>> {
+        self.validate()?;
         let mut flows = Vec::new();
         let fixed_rate = self.fixed_rate.as_f64();
 
@@ -1003,6 +1012,10 @@ impl finstack_quant_valuations_core::instruments::Instrument for YoYInflationSwa
         finstack_quant_valuations_core::pricer::InstrumentType::YoYInflationSwap,
         crate::RATES
     );
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,

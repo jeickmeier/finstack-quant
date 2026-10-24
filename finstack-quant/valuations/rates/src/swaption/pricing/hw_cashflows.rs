@@ -1,4 +1,5 @@
 //! Contractual exercise cashflows shared by European and Bermudan HW trees.
+use crate::irs::{resolve_fixed_leg, resolve_float_leg};
 use crate::swaption::CashSettlementMethod;
 use finstack_quant_cashflows::builder::{build_periods, period_accrual};
 use finstack_quant_core::dates::Date;
@@ -30,6 +31,8 @@ impl HwSwaptionCashflows {
         as_of: Date,
     ) -> Result<Self> {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
+        let fixed = resolve_fixed_leg(fixed, &float.forward_curve_id, &"Swaption underlying")?;
+        let float = resolve_float_leg(float, &"Swaption underlying")?;
         let compounded = match float.compounding {
             FloatingLegCompounding::Simple => false,
             FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }

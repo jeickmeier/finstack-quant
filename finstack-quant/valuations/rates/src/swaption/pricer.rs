@@ -37,6 +37,26 @@ impl Pricer for SimpleSwaptionBlackPricer {
             VolatilityModel::Black,
         )
     }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let swaption = finstack_quant_valuations_core::pricer::expect_inst::<Swaption>(
+            instrument,
+            InstrumentType::Swaption,
+        )?;
+
+        price_swaption_raw(
+            swaption,
+            market,
+            as_of,
+            ModelKey::Black76,
+            VolatilityModel::Black,
+        )
+    }
 }
 
 /// European swaption pricer using the Bachelier normal formula.
@@ -66,6 +86,26 @@ impl Pricer for SimpleSwaptionNormalPricer {
             VolatilityModel::Normal,
         )
     }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let swaption = finstack_quant_valuations_core::pricer::expect_inst::<Swaption>(
+            instrument,
+            InstrumentType::Swaption,
+        )?;
+
+        price_swaption_raw(
+            swaption,
+            market,
+            as_of,
+            ModelKey::Normal,
+            VolatilityModel::Normal,
+        )
+    }
 }
 
 fn price_swaption(
@@ -75,6 +115,20 @@ fn price_swaption(
     model: ModelKey,
     expected_vol_model: VolatilityModel,
 ) -> std::result::Result<ValuationResult, PricingError> {
+    let context = PricingErrorContext::from_instrument(swaption).model(model);
+    let pv_raw = price_swaption_raw(swaption, market, as_of, model, expected_vol_model)?;
+    let pv = finstack_quant_core::money::Money::new(pv_raw, swaption.notional.currency())
+        .map_err(|error| PricingError::from_core(error, context))?;
+    Ok(ValuationResult::stamped(swaption.id(), as_of, pv))
+}
+
+fn price_swaption_raw(
+    swaption: &Swaption,
+    market: &MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+    model: ModelKey,
+    expected_vol_model: VolatilityModel,
+) -> std::result::Result<f64, PricingError> {
     let context = PricingErrorContext::from_instrument(swaption).model(model);
     if swaption.vol_model != expected_vol_model {
         return Err(PricingError::invalid_input_with_context(
@@ -87,15 +141,15 @@ fn price_swaption(
     }
 
     if let Some(pv) = swaption
-        .terminal_value(market, as_of)
+        .terminal_value_raw(market, as_of)
         .map_err(|error| PricingError::from_core(error, context.clone()))?
     {
-        return Ok(ValuationResult::stamped(swaption.id(), as_of, pv));
+        return Ok(pv);
     }
 
     let pv = if swaption.sabr_params.is_some() {
         swaption
-            .price_sabr_before_expiry(market, as_of)
+            .price_sabr_before_expiry_raw(market, as_of)
             .map_err(|error| {
                 PricingError::model_failure_with_context(error.to_string(), context.clone())
             })?
@@ -117,11 +171,11 @@ fn price_swaption(
             })?;
 
         swaption
-            .price_with_vol_at(market, as_of, forward, time_to_expiry, vol)
+            .price_with_vol_at_raw(market, as_of, forward, time_to_expiry, vol)
             .map_err(|error| PricingError::model_failure_with_context(error.to_string(), context))?
     };
 
-    Ok(ValuationResult::stamped(swaption.id(), as_of, pv))
+    Ok(pv)
 }
 
 #[cfg(test)]

@@ -13,8 +13,10 @@
 
 use crate::ir_future::InterestRateFuture;
 use finstack_quant_core::Result;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+use std::sync::Arc;
 
 /// Register IR Future metrics with the registry
 pub(crate) fn register_ir_future_metrics(
@@ -29,11 +31,51 @@ pub(crate) fn register_ir_future_metrics(
             (FuturesPrice, FuturesPriceCalculator),
             (ImpliedForward, ImpliedForwardCalculator),
             (ConvexityAdjustment, ConvexityAdjustmentCalculator),
-            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, IrFutureDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, IrFutureDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())
+}
+
+/// DV01 wrapper for `InterestRateFuture` that evaluates rate-curve sensitivity
+/// through the model price even when a live `terms.quoted_price` is set.
+///
+/// A quoted future the model cannot price (no convexity source) keeps its
+/// quote-based DV01.
+pub(crate) struct IrFutureDv01Calculator {
+    inner: finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator,
+}
+
+impl IrFutureDv01Calculator {
+    pub(crate) fn new(
+        config: finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig,
+    ) -> Self {
+        Self {
+            inner: finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+                config,
+            ),
+        }
+    }
+}
+
+impl MetricCalculator for IrFutureDv01Calculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let future: &InterestRateFuture = context.instrument_as()?;
+        let live_quote =
+            context.as_of <= future.terms.last_trading_date && future.terms.quoted_price.is_some();
+        if !live_quote || !future.can_price_from_model() {
+            return self.inner.calculate(context);
+        }
+        let mut model_future = future.clone();
+        model_future.terms.quoted_price = None;
+        model_future.validate_for_pricing()?;
+        let model_pv = model_future.base_value(&context.curves, context.as_of)?;
+        context.with_instrument(Arc::new(model_future), |ctx| {
+            ctx.set_base_value(model_pv);
+            self.inner.calculate(ctx)
+        })
+    }
 }
 
 // Pricing diagnostics for interest-rate futures.

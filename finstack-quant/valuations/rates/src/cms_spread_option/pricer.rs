@@ -260,11 +260,18 @@ impl CmsSpreadOptionPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
+        let pv = self.price_internal_raw(inst, market, as_of)?;
+        Money::new(pv, inst.notional.currency())
+    }
+
+    pub(crate) fn price_internal_raw(
+        &self,
+        inst: &CmsSpreadOption,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<f64> {
         let data = self.price_data(inst, market, as_of)?;
-        Money::new(
-            data.expected_payoff * data.discount_factor * inst.notional.amount(),
-            inst.notional.currency(),
-        )
+        Ok(data.expected_payoff * data.discount_factor * inst.notional.amount())
     }
 }
 
@@ -365,15 +372,12 @@ impl Pricer for CmsSpreadOptionPricer {
             instrument,
             InstrumentType::CmsSpreadOption,
         )?;
-        self.price_internal(option, market, as_of)
-            .map(|m| m.amount())
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::from_instrument(instrument)
-                        .model(ModelKey::StaticReplication),
-                )
-            })
+        self.price_internal_raw(option, market, as_of).map_err(|e| {
+            PricingError::model_failure_with_context(
+                e.to_string(),
+                PricingErrorContext::from_instrument(instrument).model(ModelKey::StaticReplication),
+            )
+        })
     }
 }
 

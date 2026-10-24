@@ -99,16 +99,31 @@ impl InterestRateFutureOption {
             )
         })?;
         let delta_channel = self.cash_delta(market, as_of)? * price_change;
+        let discount_horizon = match self.terms.settlement {
+            finstack_quant_valuations_core::instruments::FutureOptionSettlement::Cash {
+                payment_date,
+            } => Some(payment_date),
+            finstack_quant_valuations_core::instruments::FutureOptionSettlement::Future {
+                ..
+            } => self
+                .terms
+                .exercise
+                .filter(|ex| as_of >= ex.date)
+                .map_or(Some(self.terms.expiry), |_| None),
+        };
         let discount_channel = if self.terms.premium_style
             == finstack_quant_valuations_core::instruments::FutureOptionPremiumStyle::PremiumPaid
-            && as_of < self.terms.expiry
         {
-            let t = self.terms.day_count.year_fraction(
-                as_of,
-                self.terms.expiry,
-                DayCountContext::default(),
-            )?;
-            -t * 1.0e-4 * self.npv_raw(market, as_of)?
+            if let Some(horizon) = discount_horizon.filter(|&h| as_of < h) {
+                let t = self.terms.day_count.year_fraction(
+                    as_of,
+                    horizon,
+                    DayCountContext::default(),
+                )?;
+                -t * 1.0e-4 * self.npv_raw(market, as_of)?
+            } else {
+                0.0
+            }
         } else {
             0.0
         };
