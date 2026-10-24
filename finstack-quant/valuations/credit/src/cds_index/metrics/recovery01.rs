@@ -64,19 +64,17 @@ impl MetricCalculator for Recovery01Calculator {
 
         let effective_delta = |idx: &CdsIndex, delta: f64| -> f64 {
             if by_constituent {
-                let deltas: Vec<f64> = idx
-                    .constituents
-                    .iter()
-                    .filter(|con| !con.defaulted)
-                    .map(|con| {
-                        let base = con.credit.recovery_rate;
-                        bumped_recovery(base, delta) - base
-                    })
-                    .collect();
-                if deltas.is_empty() {
+                let mut weighted_delta = 0.0;
+                let mut total_weight = 0.0;
+                for con in idx.constituents.iter().filter(|con| !con.defaulted) {
+                    let base = con.credit.recovery_rate;
+                    weighted_delta += con.weight * (bumped_recovery(base, delta) - base);
+                    total_weight += con.weight;
+                }
+                if total_weight <= 0.0 {
                     0.0
                 } else {
-                    deltas.iter().sum::<f64>() / deltas.len() as f64
+                    weighted_delta / total_weight
                 }
             } else {
                 let base = idx.protection_leg.recovery_rate;

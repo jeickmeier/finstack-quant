@@ -405,6 +405,9 @@ impl ForwardCdsContext {
             1.0
         };
         let realized_loss = option.realized_loss;
+        // A non-knockout option survives a pre-expiry default, so it carries
+        // the loss from any default between `as_of` and expiry, whatever the
+        // delivered CDS's own protection start.
         let front_end_protection = if !option.knockout {
             let fep_start = as_of;
             if fep_start >= option.expiry {

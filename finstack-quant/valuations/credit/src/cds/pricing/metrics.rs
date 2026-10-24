@@ -198,6 +198,9 @@ impl CdsPricer {
                 break;
             }
         }
+        if last_coupon >= as_of {
+            return Ok(0.0);
+        }
 
         if matches!(policy, AccrualDayCountPolicy::CdswInclusive)
             && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360

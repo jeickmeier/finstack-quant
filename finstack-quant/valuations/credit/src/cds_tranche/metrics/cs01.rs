@@ -104,7 +104,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
 
 // Resolve and rebootstrap the credit curves consumed by tranche pricing.
 
-fn active_hazards(index: &CreditIndexData) -> Vec<Arc<HazardCurve>> {
+pub(super) fn active_hazards(index: &CreditIndexData) -> Vec<Arc<HazardCurve>> {
     if let Some(issuers) = index.issuer_credit_curves() {
         // One quote shock per curve, even if several names share its recipe.
         issuers
@@ -118,7 +118,10 @@ fn active_hazards(index: &CreditIndexData) -> Vec<Arc<HazardCurve>> {
     }
 }
 
-fn replace_hazard(index: &CreditIndexData, hazard: Arc<HazardCurve>) -> Result<CreditIndexData> {
+pub(super) fn replace_hazard(
+    index: &CreditIndexData,
+    hazard: Arc<HazardCurve>,
+) -> Result<CreditIndexData> {
     let mut builder = index.to_builder();
     if index.index_credit_curve().id() == hazard.id() {
         builder = builder.index_credit_curve(Arc::clone(&hazard));

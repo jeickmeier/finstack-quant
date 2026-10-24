@@ -540,22 +540,7 @@ impl CreditDefaultSwap {
             )
         })? / 10_000.0;
         let pricer = CdsPricer::new();
-        let payment_accruals = if self.uses_adjusted_premium_accrual_dates() {
-            pricer.premium_cashflow_accruals(self, self.premium_leg.start)?
-        } else {
-            pricer
-                .generate_isda_schedule(self)?
-                .windows(2)
-                .map(|window| {
-                    let accrual = self.premium_leg.day_count.year_fraction(
-                        window[0],
-                        window[1],
-                        finstack_quant_core::dates::DayCountContext::default(),
-                    )?;
-                    Ok((window[1], accrual))
-                })
-                .collect::<finstack_quant_core::Result<Vec<_>>>()?
-        };
+        let payment_accruals = pricer.premium_cashflow_accruals(self, self.premium_leg.start)?;
         let flows = payment_accruals
             .into_iter()
             .map(|(end, accrual)| {

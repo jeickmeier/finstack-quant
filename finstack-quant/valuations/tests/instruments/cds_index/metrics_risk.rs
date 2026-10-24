@@ -88,6 +88,42 @@ fn test_dv01_calculation() {
 }
 
 #[test]
+fn dv01_rebootstraps_calibrated_index_hazard_from_unchanged_spreads() {
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+    let idx = standard_single_curve_index("CDX-DV01-REPLAY", start, end, 10_000_000.0);
+    let ctx = replayable_standard_market_context(as_of);
+
+    let dv01 = metric(
+        &idx,
+        &ctx,
+        as_of,
+        MetricId::Dv01,
+        crate::instruments::test_support::credit::pricing_options(),
+    );
+
+    let pv_at = |bp: f64| {
+        let bumped = ctx
+            .bump([MarketBump::Curve {
+                id: "USD-OIS".into(),
+                spec: BumpSpec::parallel_bp(bp),
+            }])
+            .expect("discount bump");
+        let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
+            &bumped, as_of, "HZ-INDEX", "INDEX", "USD-OIS",
+        )
+        .expect("re-bootstrap on bumped discount");
+        idx.value_raw(&bumped.insert(hazard), as_of).expect("pv")
+    };
+    let expected = (pv_at(1.0) - pv_at(-1.0)) / 2.0;
+    assert!(expected.abs() > 1e-6, "fixture must carry rate risk");
+    relative_eq(dv01, expected, 1e-6, "index DV01 with hazard replay");
+}
+
+#[test]
 fn test_dv01_scales_with_notional() {
     // Test: DV01 scales linearly with notional
     let start = date!(2025 - 01 - 01);

@@ -282,7 +282,7 @@ impl CdsIndex {
     ) -> Result<CashFlowSchedule> {
         let index = self;
         let projected = project_resolved_flows(index, curves, as_of)?;
-        match projected.single_curve {
+        let mut schedule = match projected.single_curve {
             Some(flows) => schedule_from_classified_flows(
                 flows,
                 index.premium_leg.day_count,
@@ -290,7 +290,7 @@ impl CdsIndex {
                     notional_hint: Some(index.notional),
                     ..Default::default()
                 },
-            ),
+            )?,
             None => {
                 let schedules = projected
                     .constituents
@@ -306,13 +306,26 @@ impl CdsIndex {
                         )
                     })
                     .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-                Ok(merge_cashflow_schedules(
+                merge_cashflow_schedules(
                     schedules,
                     Notional::par(index.notional.amount(), index.notional.currency())?,
                     index.premium_leg.day_count,
-                ))
+                )
             }
+        };
+        // The synthetic CDS carries no upfront, so the index upfront is added
+        // and signed only here, with the same side convention as `npv`.
+        if let Some((dt, amount)) = index.upfront.filter(|(dt, _)| *dt >= as_of) {
+            schedule.push_flow(CashFlow::new(
+                dt,
+                None,
+                Money::new(amount.amount() * index.side.sign(), amount.currency())?,
+                CFKind::Fee,
+                0.0,
+                None,
+            ));
         }
+        Ok(schedule)
     }
 
     /// Calculate CS01 under the default parallel credit-spread bump; the
@@ -379,6 +392,8 @@ fn visit_positions(
     mut visit: impl FnMut(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve) -> Result<()>,
 ) -> Result<()> {
     index.validate()?;
+    // A matured index has no live positions; only a pending upfront
+    // (applied in `npv`) can remain.
     if as_of >= index.premium_leg.end {
         return Ok(());
     }
@@ -652,11 +667,6 @@ fn project_cds_flows(
             }
             previous_premium_date = flow.date;
             prev_survival = current_survival;
-        } else if flow.kind == CFKind::Fee {
-            let mut projected_flow = flow.clone();
-            projected_flow.amount =
-                Money::new(flow.amount.amount() * premium_sign, flow.amount.currency())?;
-            projected_flows.push(projected_flow);
         }
     }
 
