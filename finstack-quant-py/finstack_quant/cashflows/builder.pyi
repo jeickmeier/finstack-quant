@@ -4560,10 +4560,12 @@ class RollRule:
     Roll-date rule applied when generating schedule anchors.
 
     Immutable, hashable enum-style type with one class attribute per
-    Rust variant (``NONE``, ``IMM``, ``CDS_IMM``). Both IMM modes override
-    the requested frequency and stub rule with quarterly and short-back
-    conventions for date generation and accrual. Neither supports end-of-month
-    rolling. Schedule construction checks these convention combinations.
+    Rust variant (``NONE``, ``IMM``, ``CDS_IMM``). ``IMM`` is a roll
+    convention on the schedule's own frequency and stub rule; ``CDS_IMM`` is
+    the ISDA standard CDS grid and overrides them with quarterly and
+    short-back conventions for date generation and accrual. Neither supports
+    end-of-month rolling. Schedule construction checks these convention
+    combinations.
 
     Examples
     --------
@@ -4575,11 +4577,14 @@ class RollRule:
     NONE: RollRule
     """Plain tenor stepping from the schedule boundaries (default)."""
     IMM: RollRule
-    """Third Wednesdays of Mar/Jun/Sep/Dec, retaining contractual maturity.
+    """IMM roll convention: third Wednesdays of Mar/Jun/Sep/Dec at the frequency.
 
-    An off-grid maturity produces a terminal stub. A horizon with no interior
-    IMM date produces one stub over the full horizon. ACT/ACT ICMA is rejected
-    because this third-Wednesday grid has no supported nominal reference grid.
+    Regular periods run between IMM dates one frequency apart; the frequency
+    must be a whole number of quarters, and the stub rule picks forward or
+    backward generation. The contractual start and maturity are kept, so an
+    off-grid date produces a stub. A horizon with no interior IMM date
+    produces one stub over the full horizon. ACT/ACT ICMA is rejected because
+    this third-Wednesday grid has no supported nominal reference grid.
     """
     CDS_IMM: RollRule
     """Twentieths of Mar/Jun/Sep/Dec, supporting ACT/ACT ICMA accrual.
@@ -4635,8 +4640,8 @@ class ScheduleParams:
         business_day_convention : BusinessDayConvention | str, optional
             Payment-date rolling convention (default Modified Following).
         stub : StubKind, optional
-            Stub rule (default short-front). IMM and CDS_IMM use short-back
-            regardless of this input. For a plain ACT/ACT ICMA grid, short-front
+            Stub rule (default short-front). CDS_IMM uses short-back
+            regardless of this input; IMM honours it. For a plain ACT/ACT ICMA grid, short-front
             and long-front anchor regular periods on maturity; other rules
             anchor them on the start date.
         end_of_month : bool

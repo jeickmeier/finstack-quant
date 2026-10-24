@@ -15146,21 +15146,23 @@ export type ReturnFloorKind =
 /**
  * Roll-date rule applied when generating schedule anchors.
  *
- * Selects the core `ScheduleBuilder` date-generation mode. The IMM modes
- * force a quarterly grid: the schedule frequency and stub rule configured on
- * [`ScheduleParams`] are overridden with quarterly / short-back, matching
- * `ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.
+ * Selects the core `ScheduleBuilder` date-generation mode.
  *
  * # Variants
  *
  * - **`None`**: plain tenor stepping from the schedule boundaries (default).
- * - **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates
- *   for rate, currency, and equity index futures). Cashflow schedules retain
- *   the contractual maturity as a short final stub when it is off-grid.
- * - **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll
- *   dates). When the start date is not itself a roll date, the first period
- *   accrues from the roll date immediately **preceding** the start (standard
- *   front accrual per the ISDA Big Bang Protocol, April 2009).
+ * - **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on
+ *   the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which
+ *   must be a whole number of quarters; the `stub` rule picks forward or
+ *   backward generation and short or long stubs, as in
+ *   `ScheduleBuilder::imm`. The contractual start and maturity are always
+ *   kept, so an off-cycle date becomes a stub period, and a schedule with no
+ *   IMM date strictly inside it is a single period.
+ * - **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,
+ *   quarterly with a short final stub, overriding the configured `frequency`
+ *   and `stub`. When the start date is not itself a roll date, the first
+ *   period accrues from the roll date immediately **preceding** the start
+ *   (standard front accrual per the ISDA Big Bang Protocol, April 2009).
  *   Interior coupon or payment-program windows start at their declared
  *   boundary; front accrual is applied only once at the instrument start.
  *
@@ -15644,21 +15646,23 @@ export type D_305C1A38Cfd98Cc3Ea44 =
 /**
  * Roll-date rule applied when generating schedule anchors.
  *
- * Selects the core `ScheduleBuilder` date-generation mode. The IMM modes
- * force a quarterly grid: the schedule frequency and stub rule configured on
- * [`ScheduleParams`] are overridden with quarterly / short-back, matching
- * `ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.
+ * Selects the core `ScheduleBuilder` date-generation mode.
  *
  * # Variants
  *
  * - **`None`**: plain tenor stepping from the schedule boundaries (default).
- * - **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates
- *   for rate, currency, and equity index futures). Cashflow schedules retain
- *   the contractual maturity as a short final stub when it is off-grid.
- * - **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll
- *   dates). When the start date is not itself a roll date, the first period
- *   accrues from the roll date immediately **preceding** the start (standard
- *   front accrual per the ISDA Big Bang Protocol, April 2009).
+ * - **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on
+ *   the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which
+ *   must be a whole number of quarters; the `stub` rule picks forward or
+ *   backward generation and short or long stubs, as in
+ *   `ScheduleBuilder::imm`. The contractual start and maturity are always
+ *   kept, so an off-cycle date becomes a stub period, and a schedule with no
+ *   IMM date strictly inside it is a single period.
+ * - **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,
+ *   quarterly with a short final stub, overriding the configured `frequency`
+ *   and `stub`. When the start date is not itself a roll date, the first
+ *   period accrues from the roll date immediately **preceding** the start
+ *   (standard front accrual per the ISDA Big Bang Protocol, April 2009).
  *   Interior coupon or payment-program windows start at their declared
  *   boundary; front accrual is applied only once at the instrument start.
  *
@@ -15816,21 +15820,23 @@ export type D_780B68Ee5D41351B65Ca =
 /**
  * Roll-date rule applied when generating schedule anchors.
  *
- * Selects the core `ScheduleBuilder` date-generation mode. The IMM modes
- * force a quarterly grid: the schedule frequency and stub rule configured on
- * [`ScheduleParams`] are overridden with quarterly / short-back, matching
- * `ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.
+ * Selects the core `ScheduleBuilder` date-generation mode.
  *
  * # Variants
  *
  * - **`None`**: plain tenor stepping from the schedule boundaries (default).
- * - **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates
- *   for rate, currency, and equity index futures). Cashflow schedules retain
- *   the contractual maturity as a short final stub when it is off-grid.
- * - **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll
- *   dates). When the start date is not itself a roll date, the first period
- *   accrues from the roll date immediately **preceding** the start (standard
- *   front accrual per the ISDA Big Bang Protocol, April 2009).
+ * - **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on
+ *   the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which
+ *   must be a whole number of quarters; the `stub` rule picks forward or
+ *   backward generation and short or long stubs, as in
+ *   `ScheduleBuilder::imm`. The contractual start and maturity are always
+ *   kept, so an off-cycle date becomes a stub period, and a schedule with no
+ *   IMM date strictly inside it is a single period.
+ * - **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,
+ *   quarterly with a short final stub, overriding the configured `frequency`
+ *   and `stub`. When the start date is not itself a roll date, the first
+ *   period accrues from the roll date immediately **preceding** the start
+ *   (standard front accrual per the ISDA Big Bang Protocol, April 2009).
  *   Interior coupon or payment-program windows start at their declared
  *   boundary; front accrual is applied only once at the instrument start.
  *
@@ -22283,8 +22289,10 @@ export interface FixedCouponSpec {
   /**
    * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
    *
-   * [`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes
-   * override `frequency`/`stub` with quarterly / short-back; see [`RollRule`].
+   * [`RollRule::None`] (default) keeps plain tenor stepping.
+   * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
+   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
+   * quarterly / short-back grid. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
@@ -22372,8 +22380,10 @@ export interface FloatingCouponSpec {
   /**
    * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
    *
-   * [`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes
-   * override `frequency`/`stub` with quarterly / short-back; see [`RollRule`].
+   * [`RollRule::None`] (default) keeps plain tenor stepping.
+   * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
+   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
+   * quarterly / short-back grid. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
@@ -22633,8 +22643,10 @@ export interface StepUpCouponSpec {
   /**
    * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
    *
-   * [`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes
-   * override `frequency`/`stub` with quarterly / short-back; see [`RollRule`].
+   * [`RollRule::None`] (default) keeps plain tenor stepping.
+   * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
+   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
+   * quarterly / short-back grid. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
@@ -49740,8 +49752,10 @@ export interface ScheduleParams {
   /**
    * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
    *
-   * [`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes
-   * override `frequency`/`stub` with quarterly / short-back; see [`RollRule`].
+   * [`RollRule::None`] (default) keeps plain tenor stepping.
+   * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
+   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
+   * quarterly / short-back grid. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
@@ -58304,8 +58318,10 @@ export interface ScheduleParams1 {
   /**
    * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
    *
-   * [`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes
-   * override `frequency`/`stub` with quarterly / short-back; see [`RollRule`].
+   * [`RollRule::None`] (default) keeps plain tenor stepping.
+   * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
+   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
+   * quarterly / short-back grid. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.

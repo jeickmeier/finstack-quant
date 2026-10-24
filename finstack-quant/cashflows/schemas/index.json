@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
-      "bytes": 78389,
+      "bytes": 78770,
       "kind": "input",
       "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
       "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json",
-      "bytes": 11014,
+      "bytes": 11217,
       "kind": "component",
       "path": "schemas/cashflow/1/coupon_specs.schema.json",
       "summary": "Coupon rate, frequency, day count and stub handling for one leg.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
-      "bytes": 30167,
+      "bytes": 30370,
       "kind": "component",
       "path": "schemas/cashflow/1/floating_coupon_spec.schema.json",
       "summary": "Index, spread, caps and floors, reset rules and schedule for one floating leg.",
@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json",
-      "bytes": 8914,
+      "bytes": 9117,
       "kind": "component",
       "path": "schemas/cashflow/1/schedule_params.schema.json",
       "summary": "Frequency, day count, calendar, roll rules and stub for a payment schedule.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json",
-      "bytes": 12027,
+      "bytes": 12230,
       "kind": "component",
       "path": "schemas/cashflow/1/step_up_coupon_spec.schema.json",
       "summary": "Initial coupon rate, dated rate steps and schedule for one step-up leg.",

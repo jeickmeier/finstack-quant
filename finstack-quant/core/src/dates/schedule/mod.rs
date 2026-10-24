@@ -57,7 +57,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! Standard IMM schedule (quarterly on third Wednesday):
+//! Standard IMM schedule (quarterly rolls on the third Wednesday):
 //! ```rust
 //! use finstack_quant_core::dates::Schedule;
 //! use time::{Date, Month};
@@ -66,12 +66,12 @@
 //! let end = Date::from_calendar_date(2025, Month::December, 31)?;
 //!
 //! let sched = Schedule::builder(start, end)?
-//!     .imm()  // Auto-adjusts start to next IMM date (third Wednesday)
+//!     .imm()  // Regular periods on IMM dates; start and end are kept
 //!     .build()?;
 //!
 //! let dates: Vec<_> = sched.into_iter().collect();
-//! // Jan-15 start plus Mar-19, Jun-18, Sep-17, Dec-17 (2025 third Wednesdays)
-//! assert_eq!(dates.len(), 5);
+//! // Jan-15, Mar-19, Jun-18, Sep-17, Dec-17 (2025 third Wednesdays), Dec-31
+//! assert_eq!(dates.len(), 6);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -115,7 +115,7 @@
 use smallvec::SmallVec;
 use time::Date;
 
-use super::{adjust, next_imm, prev_cds_date, BusinessDayConvention, DateExt, HolidayCalendar};
+use super::{adjust, prev_cds_date, BusinessDayConvention, DateExt, HolidayCalendar};
 use crate::InputError;
 
 use crate::dates::Tenor;

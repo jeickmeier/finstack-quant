@@ -13,36 +13,36 @@ use super::periods::SchedulePeriod;
 use super::specs::RollRule;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
-    adjust, is_cds_date, is_imm_date, next_cds_date, next_imm, prev_cds_date,
-    BusinessDayConvention, Date, DateExt, DayCount, HolidayCalendar, Schedule, StubKind, Tenor,
-    TenorUnit,
+    adjust, is_cds_date, is_imm_date, next_cds_date, prev_cds_date, BusinessDayConvention, Date,
+    DateExt, DayCount, HolidayCalendar, Schedule, StubKind, Tenor, TenorUnit,
 };
 
-/// Resolve conventions overridden by an explicit quarterly roll grid.
+/// Resolve the coupon tenor, which the ISDA standard CDS grid fixes at quarterly.
 ///
 /// # Arguments
 ///
-/// * `frequency` - Requested coupon tenor for a plain schedule.
-/// * `roll_rule` - Explicit IMM rules replace the requested tenor with quarterly.
+/// * `frequency` - Requested coupon tenor; kept for plain and IMM-rolled schedules.
+/// * `roll_rule` - `RollRule::CdsImm` replaces the requested tenor with quarterly.
 pub(crate) fn effective_frequency(frequency: Tenor, roll_rule: RollRule) -> Tenor {
-    if matches!(roll_rule, RollRule::None) {
-        frequency
-    } else {
+    if matches!(roll_rule, RollRule::CdsImm) {
         Tenor::quarterly()
+    } else {
+        frequency
     }
 }
 
-/// Resolve the stub convention used by an explicit quarterly roll grid.
+/// Resolve the stub convention, which the ISDA standard CDS grid fixes at short-back.
 ///
 /// # Arguments
 ///
-/// * `stub` - Requested treatment of off-grid boundaries for a plain schedule.
-/// * `roll_rule` - Explicit IMM rules use a short terminal stub.
+/// * `stub` - Requested treatment of off-grid boundaries; kept for plain and
+///   IMM-rolled schedules.
+/// * `roll_rule` - `RollRule::CdsImm` uses a short terminal stub.
 pub(crate) fn effective_stub(stub: StubKind, roll_rule: RollRule) -> StubKind {
-    if matches!(roll_rule, RollRule::None) {
-        stub
-    } else {
+    if matches!(roll_rule, RollRule::CdsImm) {
         StubKind::ShortBack
+    } else {
+        stub
     }
 }
 
@@ -268,7 +268,7 @@ pub(crate) struct CompiledPeriod {
 ///
 /// * `periods` - Ordered contractual accrual periods and their adjusted payment dates.
 /// * `frequency` - Effective coupon tenor used to classify plain-grid regular coupons.
-/// * `roll_rule` - Explicit quarterly grid distinguishing regular coupons from stubs.
+/// * `roll_rule` - Explicit roll grid distinguishing regular coupons from stubs.
 ///
 /// # Errors
 ///
@@ -286,13 +286,24 @@ pub(crate) fn compile_periods(
             let start = period.unadjusted_start;
             let end = period.unadjusted_end;
             let is_stub = match roll_rule {
-                RollRule::Imm => !is_imm_date(start) || next_imm(start).ok() != Some(end),
+                RollRule::Imm => !is_regular_imm_period(start, end, frequency),
                 RollRule::CdsImm => !is_cds_date(start) || next_cds_date(start).ok() != Some(end),
                 RollRule::None => !is_regular_period(start, end, frequency),
             };
             CompiledPeriod { period, is_stub }
         })
         .collect())
+}
+
+/// An IMM-rolled period is regular when it runs between IMM dates exactly one
+/// `frequency` of months apart.
+fn is_regular_imm_period(start: Date, end: Date, frequency: Tenor) -> bool {
+    let month_index = |date: Date| i64::from(date.year()) * 12 + i64::from(u8::from(date.month()));
+    is_imm_date(start)
+        && is_imm_date(end)
+        && frequency
+            .months()
+            .is_some_and(|months| month_index(end) - month_index(start) == i64::from(months))
 }
 
 pub(crate) fn validate_unique_payment_dates(
@@ -361,9 +372,11 @@ pub(crate) fn generate_periods(
 /// Enrichment (day counts and reset dates) remains the caller's job because the
 /// compiler needs raw periods for coupon-specific metadata.
 ///
-/// `roll_rule` selects the core `ScheduleBuilder` anchor mode: the IMM modes
-/// force a quarterly grid (overriding `frequency`/`stub` with quarterly /
-/// short-back), and `RollRule::CdsImm` anchors the first period at the CDS
+/// `roll_rule` selects the core `ScheduleBuilder` anchor mode.
+/// `RollRule::Imm` rolls the regular periods on IMM dates at `frequency` with
+/// `stub`, keeping `start` and `end` (see `ScheduleBuilder::imm`).
+/// `RollRule::CdsImm` is the ISDA standard CDS grid: quarterly with a
+/// short-back final stub whatever `frequency`/`stub` say, anchored at the CDS
 /// roll date preceding `start` (post-Big-Bang front accrual), so the first
 /// accrual start may lie before `start`.
 #[allow(clippy::too_many_arguments)]
@@ -384,28 +397,18 @@ pub(crate) fn generate_periods_with_adjustment(
             "payment_lag_days must be non-negative; got {payment_lag_days}"
         )));
     }
-    let builder = Schedule::builder(start, end)?
-        .frequency(frequency)
-        .stub_rule(stub)
-        .end_of_month(end_of_month);
+    let builder = Schedule::builder(start, end)?;
+    // The CDS grid is fixed by the ISDA standard, so `cds_imm` applies last and
+    // overrides frequency and stub; IMM is a roll convention on the leg's own
+    // frequency and stub.
     let builder = match roll_rule {
-        RollRule::None => builder,
-        RollRule::Imm => builder.imm(),
-        RollRule::CdsImm => builder.cds_imm(),
-    };
-    let cal = calendar_by_id_strict(calendar_id)?;
-
-    // Core's IMM generator lists futures roll dates only. A coupon schedule
-    // must retain its contractual end, including when no roll falls inside it.
-    let mut dates =
-        if matches!(roll_rule, RollRule::Imm) && !next_imm(start).is_ok_and(|next| next <= end) {
-            vec![start, end]
-        } else {
-            builder.build()?.dates
-        };
-    if dates.last().is_some_and(|last| *last < end) {
-        dates.push(end);
+        RollRule::None => builder.frequency(frequency).stub_rule(stub),
+        RollRule::Imm => builder.imm().frequency(frequency).stub_rule(stub),
+        RollRule::CdsImm => builder.frequency(frequency).stub_rule(stub).cds_imm(),
     }
+    .end_of_month(end_of_month);
+    let cal = calendar_by_id_strict(calendar_id)?;
+    let dates = builder.build()?.dates;
 
     if dates.len() < 2 {
         return Ok(Vec::new());

@@ -4,7 +4,8 @@
 //! `BuildPeriodsParams::roll_rule` selects the core `ScheduleBuilder` IMM
 //! modes:
 //!
-//! - `RollRule::Imm`: quarterly third Wednesdays (CME IMM futures dates)
+//! - `RollRule::Imm`: the IMM roll convention (third Wednesdays of
+//!   Mar/Jun/Sep/Dec at the leg frequency, contractual ends kept)
 //! - `RollRule::CdsImm`: 20th of Mar/Jun/Sep/Dec with the post-Big-Bang
 //!   (2009) front accrual anchored at the roll date preceding the start
 //!
@@ -203,6 +204,44 @@ fn imm_coupons_accrue_through_off_grid_maturity() {
                 .all(|flow| flow.kind == CFKind::Fixed));
         }
     }
+}
+
+#[test]
+fn imm_roll_rule_honours_the_leg_frequency_and_stub() {
+    // A semi-annual leg rolled on IMM dates, generated backward from the last
+    // IMM date before maturity: regular periods run IMM to IMM six months
+    // apart, and only the off-cycle start and maturity open stub periods.
+    let mut params = ScheduleParams::quarterly_act360();
+    params.frequency = Tenor::semi_annual();
+    params.stub = StubKind::ShortFront;
+    params.roll_rule = RollRule::Imm;
+    params.business_day_convention = BusinessDayConvention::Unadjusted;
+    let start = d(2025, 1, 15);
+    let end = d(2026, 2, 10);
+
+    let periods = build_periods(BuildPeriodsParams::from_schedule(&params, start, end, None))
+        .expect("semi-annual IMM periods");
+    let bounds: Vec<(Date, Date)> = periods
+        .iter()
+        .map(|period| (period.accrual_start, period.accrual_end))
+        .collect();
+    assert_eq!(
+        bounds,
+        vec![
+            (start, d(2025, 6, 18)),
+            (d(2025, 6, 18), d(2025, 12, 17)),
+            (d(2025, 12, 17), end),
+        ]
+    );
+
+    let schedule = fixed_schedule(start, end, params, None);
+    let kinds: Vec<CFKind> = schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub))
+        .map(|flow| flow.kind)
+        .collect();
+    assert_eq!(kinds, vec![CFKind::Stub, CFKind::Fixed, CFKind::Stub]);
 }
 
 #[test]

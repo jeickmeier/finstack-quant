@@ -68,14 +68,27 @@ pub enum ValidationPolicy {
 /// implementations honour this policy at both ends of the knot range.
 /// Choose based on what behaviour the downstream pricer expects:
 ///
-/// - `FlatZero` (default): hold the boundary value constant. Safe for
-///   discount factors and survival probabilities.
-/// - `FlatForward`: extend the boundary slope. Useful for forward-rate
-///   curves where extrapolated rates should track the local term-structure
-///   slope.
+/// - `FlatZero` (default): hold the boundary value constant.
+/// - `FlatForward`: extend the boundary segment's slope, measured in the
+///   space the interpolation style works in (table below).
 /// - `None`: refuse to extrapolate; return `NaN` and require the caller to
 ///   detect and handle out-of-range queries explicitly. Recommended for
 ///   production risk systems.
+///
+/// What `FlatForward` extends depends on the [`InterpStyle`]:
+///
+/// | Style | `FlatForward` extends | On a discount-factor curve | On a rate-valued curve |
+/// |---|---|---|---|
+/// | `Linear` | the value linearly | - | rates keep trending |
+/// | `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |
+/// | `LogLinear` | `ln(value)` linearly | flat forward rate | - |
+/// | `PiecewiseQuadraticForward` | `ln(value)` linearly | flat forward rate | - |
+/// | `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |
+///
+/// The market-standard tail for a discount-factor curve is a flat forward
+/// rate (`FlatForward` with a log-space style). For a curve that stores
+/// rates, such as [`ForwardCurve`](crate::market_data::term_structures::ForwardCurve),
+/// the market-standard tail holds the last rate flat, which is `FlatZero`.
 ///
 /// `#[non_exhaustive]` so that future policies (e.g. linear-zero,
 /// asymptotic) can be added without breaking downstream code.
@@ -84,10 +97,11 @@ pub enum ValidationPolicy {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ExtrapolationPolicy {
-    /// Constant value extension.
+    /// Hold the boundary value constant.
     #[default]
     FlatZero,
-    /// Tangent/forward extension using boundary slope.
+    /// Extend the boundary segment's slope in the interpolation style's
+    /// working space; see the table on [`ExtrapolationPolicy`].
     FlatForward,
     /// Return `NaN` for queries outside the knot range.
     ///

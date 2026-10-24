@@ -417,7 +417,7 @@ fn rate_period_rejects_non_finite_integrated_arithmetic() {
 
 #[test]
 fn tail_continuity_with_flatforward_extrapolation() {
-    // Test that FlatForward extrapolation maintains stable tail forwards
+    // FlatForward on a linear forward curve extends the last segment's slope
     let base = Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
     let fc = ForwardCurve::builder("USD-SOFR-3M", 0.25)
         .base_date(base)
@@ -431,7 +431,7 @@ fn tail_continuity_with_flatforward_extrapolation() {
     let rate_at_last = fc.rate(5.0);
     let rate_beyond = fc.rate(10.0);
 
-    // FlatForward should maintain the rate (or slope)
+    // The last segment's slope is 0.125%/y, so the 10y tail moves by 0.625%
     let abs_diff = (rate_beyond - rate_at_last).abs();
     assert!(
         abs_diff < 0.01,
@@ -442,22 +442,35 @@ fn tail_continuity_with_flatforward_extrapolation() {
 }
 
 #[test]
-fn default_uses_flatforward_extrapolation() {
-    // Verify new market-standard default extrapolation
+fn default_extrapolation_holds_boundary_forwards_flat() {
+    // Market standard for a projection curve: the last forward is held
+    // constant beyond the final pillar (and the first before the first).
+    let base = Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
+    let fc = ForwardCurve::builder("TEST", 0.25)
+        .base_date(base)
+        .knots([(0.25, 0.03), (1.0, 0.04)])
+        .build()
+        .expect("ForwardCurve builder should succeed with valid test data");
+
+    assert_eq!(fc.extrapolation(), ExtrapolationPolicy::FlatZero);
+    assert!((fc.rate(5.0) - 0.04).abs() < 1e-15);
+    assert!((fc.rate(30.0) - 0.04).abs() < 1e-15);
+    assert!((fc.rate(0.1) - 0.03).abs() < 1e-15);
+}
+
+#[test]
+fn flat_forward_policy_extends_the_rate_slope_on_linear_forward_curves() {
+    // `FlatForward` extends the boundary slope in value space for a linear
+    // rate curve, so the tail trends: 4% + 1%/y * 4y = 8% at 5y.
     let base = Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
     let fc = ForwardCurve::builder("TEST", 0.25)
         .base_date(base)
         .knots([(0.0, 0.03), (1.0, 0.04)])
+        .extrapolation(ExtrapolationPolicy::FlatForward)
         .build()
         .expect("ForwardCurve builder should succeed with valid test data");
 
-    // With FlatForward, tail rate should be stable (not zero)
-    let rate_tail = fc.rate(5.0);
-    assert!(
-        rate_tail > 0.02,
-        "Tail forward should remain positive with FlatForward: {:.6}",
-        rate_tail
-    );
+    assert!((fc.rate(5.0) - 0.08).abs() < 1e-12);
 }
 
 #[test]

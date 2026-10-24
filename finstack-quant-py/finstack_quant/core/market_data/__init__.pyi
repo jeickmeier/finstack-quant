@@ -693,7 +693,9 @@ class ForwardCurve:
         interp : str, optional
             Interpolation style; default ``"linear"``.
         extrapolation : str, optional
-            Extrapolation policy; default ``"flat_forward"``.
+            Extrapolation policy; default ``"flat_zero"``, which holds the
+            first and last forward rate flat (market-standard projection-curve
+            tail). ``"flat_forward"`` extends the boundary rate slope instead.
         projection_grid : Sequence[float], optional
             Contractual reset/end-date boundaries in years. Omit for fixed
             numeric-tenor stepping.

@@ -171,6 +171,18 @@ pub fn next_imm(date: Date) -> crate::Result<Date> {
     scan_months(date, &QUARTERLY_MONTHS, Scan::After, third_wednesday)
 }
 
+/// First standard IMM date (third Wednesday of Mar/Jun/Sep/Dec) on or after
+/// `date`; the anchor of a forward-generated IMM schedule.
+pub(crate) fn imm_on_or_after(date: Date) -> crate::Result<Date> {
+    scan_months(date, &QUARTERLY_MONTHS, Scan::OnOrAfter, third_wednesday)
+}
+
+/// Last standard IMM date on or before `date`; the anchor of a
+/// backward-generated IMM schedule.
+pub(crate) fn imm_on_or_before(date: Date) -> crate::Result<Date> {
+    scan_months(date, &QUARTERLY_MONTHS, Scan::OnOrBefore, third_wednesday)
+}
+
 /// Check if a date is a CDS roll date (20th of Mar/Jun/Sep/Dec).
 ///
 /// # Arguments
