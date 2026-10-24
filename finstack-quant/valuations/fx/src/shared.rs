@@ -360,6 +360,35 @@ where
     Ok((pv_bumped - base_pv) / bump_bp)
 }
 
+/// Option rho on `curve_id` per basis point, zero once the option has expired.
+///
+/// # Arguments
+///
+/// * `instrument` - Option repriced on the bumped market.
+/// * `day_count` - Option day count deciding whether `expiry` has been reached.
+/// * `expiry` - Option expiry date.
+/// * `market` - Unbumped market.
+/// * `as_of` - Valuation date.
+/// * `curve_id` - Domestic or foreign discount curve to bump in parallel.
+/// * `bump_bp` - Bump size in basis points.
+pub(crate) fn discount_rho_greek<I>(
+    instrument: &I,
+    day_count: DayCount,
+    expiry: Date,
+    market: &MarketContext,
+    as_of: Date,
+    curve_id: &CurveId,
+    bump_bp: f64,
+) -> finstack_quant_core::Result<Option<f64>>
+where
+    I: finstack_quant_valuations_core::instruments::Instrument,
+{
+    if greeks_expired(day_count, as_of, expiry)? {
+        return Ok(Some(0.0));
+    }
+    discount_rho_bp(instrument, market, as_of, curve_id, bump_bp).map(Some)
+}
+
 /// Market with the FX matrix `base/quote` rate bumped relatively by `bump_pct`.
 ///
 /// Uses the matrix's own relative bump, which keeps its `FxConfig` (pivot,

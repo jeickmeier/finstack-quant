@@ -264,15 +264,17 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxDig
             | OptionGreekKind::Gamma
             | OptionGreekKind::Vega
             | OptionGreekKind::Theta
-            | OptionGreekKind::Rho => {
+            | OptionGreekKind::Rho
+            | OptionGreekKind::ForeignRho => {
                 let greeks = pricer::compute_greeks(self, market, as_of)?;
                 Ok(OptionGreeks {
                     delta: Some(greeks.delta),
                     gamma: Some(greeks.gamma),
                     vega: Some(greeks.vega),
                     theta: Some(greeks.theta),
-                    // Rho domestic per 1bp.
+                    // Rho domestic and foreign per 1bp.
                     rho_bp: Some(greeks.rho_domestic / 100.0),
+                    foreign_rho_bp: Some(greeks.rho_foreign / 100.0),
                     ..OptionGreeks::default()
                 })
             }

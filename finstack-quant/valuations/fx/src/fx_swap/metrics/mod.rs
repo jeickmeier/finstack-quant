@@ -68,7 +68,7 @@ impl MetricCalculator for CarryPv {
         // Carry PV: model-implied near value minus model-implied far value
         // This captures the benefit/cost of the interest rate differential
         let term1 = if ctx.include_near {
-            ctx.notional * ctx.model_spot * ctx.df_dom_near
+            ctx.notional * ctx.model_spot * ctx.df_for_near
         } else {
             0.0
         };

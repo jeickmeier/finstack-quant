@@ -42,16 +42,24 @@ impl MetricCalculator for FxSwapIr01 {
         let disc = curves.get_discount(curve_id.as_str())?;
 
         // Year fractions for bump application, on the bumped curve's basis.
-        let t_near = disc.day_count().year_fraction(
-            as_of,
-            fx_swap.near_date,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        let t_far = disc.day_count().year_fraction(
-            as_of,
-            fx_swap.far_date,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
+        let t_near = if ctx.include_near {
+            disc.day_count().year_fraction(
+                as_of,
+                fx_swap.near_date,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?
+        } else {
+            0.0
+        };
+        let t_far = if ctx.include_far {
+            disc.day_count().year_fraction(
+                as_of,
+                fx_swap.far_date,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?
+        } else {
+            0.0
+        };
 
         let calculate_pv = |bump: f64| -> Result<f64> {
             // Apply parallel bump to the selected curve: df_bumped = df * exp(-bump * t)
