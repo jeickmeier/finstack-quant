@@ -121,6 +121,10 @@ pub struct TridiagOperator {
     upper: Vec<f64>,
     /// Source term `f(x_i, t)` at each interior point.
     source: Vec<f64>,
+    /// Stencil multiplier converting lower boundary value/slope `g(t)` into `bc_lower_rhs`.
+    bc_lower_scale: f64,
+    /// Stencil multiplier converting upper boundary value/slope `g(t)` into `bc_upper_rhs`.
+    bc_upper_scale: f64,
     /// RHS correction from lower boundary at the first interior point.
     bc_lower_rhs: f64,
     /// RHS correction from upper boundary at the last interior point.
@@ -188,8 +192,9 @@ impl TridiagOperator {
         debug_assert_eq!(upper.len(), n);
         debug_assert_eq!(source.len(), n);
 
-        let bc_lower_rhs = apply_lower_boundary(bc_lower, &mut lower, &mut main, &mut upper, grid);
-        let bc_upper_rhs =
+        let (bc_lower_scale, bc_lower_rhs) =
+            apply_lower_boundary(bc_lower, &mut lower, &mut main, &mut upper, grid);
+        let (bc_upper_scale, bc_upper_rhs) =
             apply_upper_boundary(bc_upper, &mut lower, &mut main, &mut upper, grid, n);
 
         Self {
@@ -197,10 +202,23 @@ impl TridiagOperator {
             main,
             upper,
             source,
+            bc_lower_scale,
+            bc_upper_scale,
             bc_lower_rhs,
             bc_upper_rhs,
             n,
         }
+    }
+
+    /// Refresh the boundary RHS corrections for time-varying boundary values
+    /// while reusing the cached interior tridiagonal matrix.
+    pub(super) fn set_boundary_rhs(
+        &mut self,
+        bc_lower: BoundaryCondition,
+        bc_upper: BoundaryCondition,
+    ) {
+        self.bc_lower_rhs = self.bc_lower_scale * boundary_scalar(bc_lower);
+        self.bc_upper_rhs = self.bc_upper_scale * boundary_scalar(bc_upper);
     }
 
     /// Compute `y = A * x + source` for interior points, writing into `out`.
@@ -389,25 +407,32 @@ impl TridiagOperator {
     }
 }
 
+fn boundary_scalar(bc: BoundaryCondition) -> f64 {
+    match bc {
+        BoundaryCondition::Dirichlet(g) | BoundaryCondition::Neumann(g) => g,
+        BoundaryCondition::Linear | BoundaryCondition::LinearInExp => 0.0,
+    }
+}
+
 /// Apply Dirichlet/Neumann/Linear boundary condition at the lower edge.
 ///
-/// Returns the RHS correction for the first interior point.
+/// Returns `(scale, rhs)` for the first interior point.
 fn apply_lower_boundary(
     bc: BoundaryCondition,
     lower: &mut [f64],
     main: &mut [f64],
     upper: &mut [f64],
     grid: &Grid1D,
-) -> f64 {
-    match bc {
-        BoundaryCondition::Dirichlet(g) => {
+) -> (f64, f64) {
+    let scale = match bc {
+        BoundaryCondition::Dirichlet(_) => {
             // The stencil at the first interior point (k=0) has coupling lower[0]
             // to the boundary. Since u[0] = g, shift to RHS: rhs += lower[0] * g
-            let correction = lower[0] * g;
+            let scale = lower[0];
             lower[0] = 0.0; // no coupling in the tridiagonal system
-            correction
+            scale
         }
-        BoundaryCondition::Neumann(g) => {
+        BoundaryCondition::Neumann(_) => {
             // du/dx at x_min = g, imposed one-sided at the boundary node:
             // (u[1] - u[0]) / h_1 = g  →  u[0] = u[1] - h_1*g,
             // where u[1] is the first interior unknown and h_1 = x[1] - x[0].
@@ -421,10 +446,10 @@ fn apply_lower_boundary(
             // non-uniform grids (see
             // `neumann_preserves_linear_profile_on_nonuniform_grid`).
             let h = grid.h_left(1); // grid[1] - grid[0]
-            let correction = -lower[0] * h * g;
+            let scale = -lower[0] * h;
             main[0] += lower[0];
             lower[0] = 0.0;
-            correction
+            scale
         }
         BoundaryCondition::Linear | BoundaryCondition::LinearInExp => {
             if upper.len() > 1 {
@@ -439,12 +464,13 @@ fn apply_lower_boundary(
             lower[0] = 0.0;
             0.0
         }
-    }
+    };
+    (scale, scale * boundary_scalar(bc))
 }
 
 /// Apply Dirichlet/Neumann/Linear boundary condition at the upper edge.
 ///
-/// Returns the RHS correction for the last interior point.
+/// Returns `(scale, rhs)` for the last interior point.
 fn apply_upper_boundary(
     bc: BoundaryCondition,
     lower: &mut [f64],
@@ -452,24 +478,24 @@ fn apply_upper_boundary(
     upper: &mut [f64],
     grid: &Grid1D,
     n: usize,
-) -> f64 {
+) -> (f64, f64) {
     let last = n - 1;
-    match bc {
-        BoundaryCondition::Dirichlet(g) => {
-            let correction = upper[last] * g;
+    let scale = match bc {
+        BoundaryCondition::Dirichlet(_) => {
+            let scale = upper[last];
             upper[last] = 0.0;
-            correction
+            scale
         }
-        BoundaryCondition::Neumann(g) => {
+        BoundaryCondition::Neumann(_) => {
             // du/dx at x_max = g, imposed one-sided at the boundary node:
             // u[n_grid-1] = u_last + h_n*g, h_n = grid[n-1] - grid[n-2].
             // Mirrors the lower-edge elimination and matches the
             // reconstruction in `boundary_value`/`fill_boundaries`.
             let h = grid.h_right(grid.n() - 2); // grid[n-1] - grid[n-2]
-            let correction = upper[last] * h * g;
+            let scale = upper[last] * h;
             main[last] += upper[last];
             upper[last] = 0.0;
-            correction
+            scale
         }
         BoundaryCondition::Linear | BoundaryCondition::LinearInExp => {
             if last > 0 {
@@ -484,7 +510,8 @@ fn apply_upper_boundary(
             upper[last] = 0.0;
             0.0
         }
-    }
+    };
+    (scale, scale * boundary_scalar(bc))
 }
 
 #[cfg(test)]

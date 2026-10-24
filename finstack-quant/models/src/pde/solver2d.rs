@@ -88,6 +88,7 @@ impl Solver2D {
                 u_int[ii * ny_int + jj] = u_full[(ii + 1) * ny + (jj + 1)];
             }
         }
+        fill_boundaries(problem, &self.grid, &mut u_full, &u_int, maturity);
 
         let levels = self.stepper.time_levels(maturity);
 
@@ -598,5 +599,76 @@ mod tests {
              (rel err {d_rel:.3e})",
             xf.exp(),
         );
+    }
+
+    struct TimeVaryingDirichlet2D {
+        homogeneous_flag: bool,
+    }
+
+    impl PdeProblem2D for TimeVaryingDirichlet2D {
+        fn diffusion_xx(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.02
+        }
+        fn diffusion_yy(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.02
+        }
+        fn mixed_diffusion(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.005
+        }
+        fn convection_x(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.01
+        }
+        fn convection_y(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.01
+        }
+        fn reaction(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            -0.05
+        }
+        fn terminal_condition(&self, x: f64, _y: f64) -> f64 {
+            (1.0 - x).max(0.0)
+        }
+        fn boundary_x_lower(&self, _y: f64, t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet((-0.05 * (1.0 - t)).exp())
+        }
+        fn boundary_x_upper(&self, _y: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet(0.0)
+        }
+        fn boundary_y_lower(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+        fn boundary_y_upper(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+        fn is_time_homogeneous(&self) -> bool {
+            self.homogeneous_flag
+        }
+    }
+
+    #[test]
+    fn time_homogeneous_cache_refreshes_time_varying_boundaries_2d() {
+        let gx = Grid1D::uniform(0.0, 2.0, 15).expect("valid x-grid");
+        let gy = Grid1D::uniform(0.0, 1.0, 11).expect("valid y-grid");
+        let solver = Solver2D::new(Grid2D::new(gx, gy), McsStepper::new(20));
+
+        let cached = solver
+            .solve(
+                &TimeVaryingDirichlet2D {
+                    homogeneous_flag: true,
+                },
+                1.0,
+            )
+            .expect("cached 2d solve");
+        let uncached = solver
+            .solve(
+                &TimeVaryingDirichlet2D {
+                    homogeneous_flag: false,
+                },
+                1.0,
+            )
+            .expect("uncached 2d solve");
+
+        for (a, b) in cached.values.iter().zip(uncached.values.iter()) {
+            assert!((a - b).abs() < 1e-14, "cached {a} != uncached {b}");
+        }
     }
 }
