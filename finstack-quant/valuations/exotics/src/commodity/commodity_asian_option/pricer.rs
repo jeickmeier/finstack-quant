@@ -295,8 +295,8 @@ fn price_arithmetic_tw_commodity(
     let k_eff = (n * strike - hist_sum) / m;
     let scale = m / n;
 
-    // If effective strike is negative, option is deep ITM
-    if k_eff < 0.0 {
+    // If effective strike is non-positive, option is deep ITM
+    if k_eff <= 0.0 {
         let sum_fwd: f64 = future_forwards.iter().map(|(_, f)| f).sum();
         let avg_fwd = (hist_sum + sum_fwd) / n;
         let payoff = match option_type {

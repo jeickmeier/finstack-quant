@@ -178,7 +178,7 @@ pub(crate) fn compute_greeks(
                         let prepaid =
                             lifecycle_value.amount() / (inst.quantity * direction) + strike_pv;
                         let q = -(prepaid / spot).ln() / t;
-                        time_exposure -= q * prepaid;
+                        time_exposure += q * prepaid;
                     } else {
                         for (date, amount) in dividends {
                             let dt = inst.day_count.year_fraction(
@@ -316,6 +316,7 @@ pub(crate) fn compute_greeks(
             };
             tree_finite_difference_greeks(
                 &params,
+                &dividends,
                 inst.quantity,
                 inst.metric_pricing_overrides.theta_days_per_year(),
                 price_fn,
@@ -341,6 +342,7 @@ pub(crate) fn compute_greeks(
             };
             tree_finite_difference_greeks(
                 &params,
+                &dividends,
                 inst.quantity,
                 inst.metric_pricing_overrides.theta_days_per_year(),
                 price_fn,
@@ -411,6 +413,7 @@ fn remaining_dividends(dividends: &[(f64, f64)], elapsed: f64) -> Vec<(f64, f64)
 
 fn tree_finite_difference_greeks(
     params: &OptionMarketParams,
+    dividends: &[(f64, f64)],
     scale: f64,
     theta_days_per_year: f64,
     mut price_fn: impl FnMut(&OptionMarketParams) -> Result<f64>,
@@ -470,6 +473,12 @@ fn tree_finite_difference_greeks(
     let theta_unit = if params.time_to_expiry > dt {
         let mut p_t = params.clone();
         p_t.time_to_expiry -= dt;
+        let dropped_divs: f64 = dividends
+            .iter()
+            .filter(|&&(div_t, _)| div_t > 0.0 && div_t <= dt)
+            .map(|&(_, amount)| amount)
+            .sum();
+        p_t.spot = (p_t.spot - dropped_divs).max(1e-8);
         let price_t = price_fn(&p_t)?;
         price_t - base_price
     } else {

@@ -1,9 +1,14 @@
 //! Cliquet option metrics module.
 //!
 //! Provides full greek coverage for cliquet options using finite difference methods.
-//! Delta and Gamma use generic FD calculators.
+//! Delta, Gamma and Vanna run against the spot-pinned instrument (see
+//! [`crate::spot_pinned`]).
 
 use crate::cliquet_option::CliquetOption;
+use crate::spot_pinned::{SpotPinnable, SpotPinnedFd};
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::types::PriceId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
@@ -11,6 +16,28 @@ use finstack_quant_valuations_core::metrics::sensitivities::config as sens_confi
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
+
+impl SpotPinnable for CliquetOption {
+    fn unpinned_spot(&self) -> Option<(&PriceId, Currency)> {
+        self.initial_level
+            .is_none()
+            .then(|| (&self.spot_id, self.notional.currency()))
+    }
+
+    /// A reset on `as_of` observes today's spot as that reset's fixing (kept
+    /// if one is already recorded); otherwise the spot becomes the initial level.
+    fn pinned_at(&self, spot: f64, as_of: Date) -> Self {
+        let mut pinned = self.clone();
+        if pinned.reset_dates.contains(&as_of) {
+            if crate::past_fixings::fixing_on(&pinned.past_fixings, as_of).is_none() {
+                pinned.past_fixings.push((as_of, spot));
+            }
+        } else {
+            pinned.initial_level = Some(spot);
+        }
+        pinned
+    }
+}
 
 /// Register cliquet option metrics with the registry.
 pub(crate) fn register_cliquet_option_metrics(
@@ -29,9 +56,9 @@ pub(crate) fn register_cliquet_option_metrics(
             (Rho, RhoCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-            (Delta, GenericFdDelta::<crate::cliquet_option::CliquetOption>::default()),
-            (Gamma, GenericFdGamma::<crate::cliquet_option::CliquetOption>::default()),
-            (Vanna, GenericFdVanna::<crate::cliquet_option::CliquetOption>::default()),
+            (Delta, SpotPinnedFd::<CliquetOption, _>::new(GenericFdDelta::<CliquetOption>::default())),
+            (Gamma, SpotPinnedFd::<CliquetOption, _>::new(GenericFdGamma::<CliquetOption>::default())),
+            (Vanna, SpotPinnedFd::<CliquetOption, _>::new(GenericFdVanna::<CliquetOption>::default())),
             (Volga, GenericFdVolga::<crate::cliquet_option::CliquetOption>::default()),
         ]
     }

@@ -66,6 +66,14 @@ impl AsianOptionHestonMcPricer {
 
         let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
         let discount_factor = disc_curve.df_between_dates(as_of, inst.expiry)?;
+        if inst.fixing_dates.iter().all(|&d| d <= as_of) {
+            let pv =
+                super::pricer::expired_value(inst, market, hist_sum, hist_prod_log, hist_count)?;
+            return Ok((
+                Money::new(pv.amount() * discount_factor, inst.currency)?,
+                0.0,
+            ));
+        }
         let r =
             finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
                 discount_factor,

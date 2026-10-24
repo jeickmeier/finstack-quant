@@ -61,20 +61,26 @@ struct EquityReturnModel<'a> {
 }
 
 impl EquityReturnModel<'_> {
-    /// Observed underlying level at the start of the in-progress period.
+    /// Observed underlying level at the start of a period, if recorded.
     ///
     /// Resolution order: `past_fixings` entry for `period_start`, then
-    /// `initial_level` when the period is the first one. Errors otherwise —
-    /// without the observed level the realized move (and hence equity delta)
-    /// cannot be computed.
+    /// `initial_level` when the period is the first one.
+    fn observed_period_start_level(&self, period_start: Date) -> Option<f64> {
+        crate::past_fixings::fixing_on(&self.trs.past_fixings, period_start).or_else(|| {
+            (period_start <= self.trs.schedule.start)
+                .then_some(self.trs.initial_level)
+                .flatten()
+        })
+    }
+
+    /// Observed underlying level at the start of the in-progress period.
+    ///
+    /// Errors when [`Self::observed_period_start_level`] finds none — without
+    /// the observed level the realized move (and hence equity delta) cannot be
+    /// computed.
     fn period_start_level(&self, period_start: Date) -> Result<f64> {
-        if let Some(level) = crate::past_fixings::fixing_on(&self.trs.past_fixings, period_start) {
+        if let Some(level) = self.observed_period_start_level(period_start) {
             return Ok(level);
-        }
-        if period_start <= self.trs.schedule.start {
-            if let Some(level) = self.trs.initial_level {
-                return Ok(level);
-            }
         }
         Err(finstack_quant_core::Error::Validation(format!(
             "EquityTRS '{}': the current return period started {} but no observed level is \
@@ -138,13 +144,16 @@ impl TrsReturnModel for EquityReturnModel<'_> {
         // Price return component. Completed-but-unpaid periods use both
         // contractual reset fixings; in-progress periods combine their start
         // fixing with the live spot projected to period end; future periods
-        // use deterministic carry.
+        // use deterministic carry. A period starting on `as_of` is in progress
+        // once its start fixing is recorded, and fully future until then.
+        let has_locked_start = t_start < 0.0
+            || (t_start == 0.0 && self.observed_period_start_level(period_start).is_some());
         let (fwd_start, fwd_end) = if t_end <= 0.0 {
             (
                 self.period_start_level(period_start)?,
                 self.period_end_level(period_end, as_of)?,
             )
-        } else if t_start < 0.0 {
+        } else if has_locked_start {
             let df_end = disc.as_ref().df_between_dates(as_of, period_end)?;
             let start_level = self.period_start_level(period_start)?;
             let ex_div_spot = self.spot - pv_discrete_dividends_to(period_end)?;
@@ -197,7 +206,7 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             ) / fwd_start)
         } else {
             let dividend_return = self.div_yield * dt * (1.0 - tax_rate);
-            let price_return = if t_start >= 0.0 {
+            let price_return = if !has_locked_start {
                 // Spot cancels analytically for a fully future proportional
                 // return. Evaluate the carry ratio directly to avoid numerical
                 // spot sensitivity from dividing two projected spot levels.

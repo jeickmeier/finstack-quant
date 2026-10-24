@@ -127,6 +127,8 @@ pub mod pe_fund;
 pub(crate) mod piecewise_gbm;
 /// Equity spot module - Equity spot positions.
 pub mod spot;
+/// Spot-pinned finite-difference Greeks for products struck at inception spot.
+pub(crate) mod spot_pinned;
 /// Variance swap module - Variance and volatility swaps.
 pub mod variance_swap;
 /// Volatility index future module.

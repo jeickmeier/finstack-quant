@@ -610,7 +610,6 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
         );
 
         let (sum, log_prod, count) = asian.accumulated_state(as_of);
-        let total_fixings = asian.fixing_dates.len();
 
         if t <= 0.0 {
             let average =
@@ -628,27 +627,12 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             ));
         }
 
-        // Seasoned Geometric Asian requires adjusted strike formula not yet implemented.
-        // The adjustment involves: K_eff = (n·K - G_past) / (n - m) where G_past is the
-        // geometric average of past fixings. For now, fall back to Monte Carlo.
-        if count > 0 {
-            return Err(PricingError::model_failure_with_context(
-                format!(
-                    "Seasoned Geometric Asian analytical pricing not supported ({} of {} fixings already observed). \
-                    For seasoned options, select `ModelKey::MonteCarloGBM` through `price_with_metrics`, or set \
-                    `averaging_method = Arithmetic` which supports seasoning via Turnbull-Wakeman.",
-                    count, total_fixings
-                ),
-                PricingErrorContext::default(),
-            ));
-        }
-
         // Price on the actual fixing schedule. Falling back to the
         // equal-spacing formula would misprice contracts whose fixings are
         // not uniformly spaced over [as_of, expiry] (e.g. averaging windows
         // concentrated near expiry).
         let fixing_times = fixing_year_fractions(asian, as_of)?;
-        let df = (-r * t).exp();
+        let df = inputs.df;
         let is_call = matches!(
             asian.option_type,
             finstack_quant_models::types::OptionType::Call
@@ -664,8 +648,8 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             q,
             sigma,
             df,
-            0.0,
-            0,
+            log_prod,
+            count,
             &fixing_times,
             is_call,
             Some(&drift),
@@ -775,8 +759,8 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let k_eff = numerator / m;
         let scale = m / n;
 
-        let price = if k_eff < 0.0 {
-            // Deep ITM (k_eff < 0): past fixings alone settle the moneyness, so
+        let price = if k_eff <= 0.0 {
+            // Deep ITM (k_eff <= 0): past fixings alone settle the moneyness, so
             // PV = DF_T · max(±(E[A] − K), 0) with E[A] = (Σ past + Σ F_i) / N
             // and each GK forward F_i = S · exp(−q·t_i) / DF(t_i) on date-based DFs.
             let disc_curve = market.get_discount(asian.discount_curve_id.as_str())?;
@@ -1310,7 +1294,7 @@ mod tests {
     }
 
     #[test]
-    fn analytical_geometric_rejects_seasoned_option() {
+    fn analytical_geometric_prices_seasoned_option() {
         let as_of = date(2025, 7, 1);
         let expiry = date(2025, 12, 31);
         let fixing_dates = vec![
@@ -1335,12 +1319,10 @@ mod tests {
             .zip([101.0, 103.0, 102.0])
             .collect();
 
-        let err = AsianOptionAnalyticalGeometricPricer
+        let res = AsianOptionAnalyticalGeometricPricer
             .price_dyn(&option, &market(as_of, 100.0, 0.20, 0.05, 0.0), as_of)
-            .expect_err("seasoned geometric analytical pricing should be rejected");
-        assert!(err
-            .to_string()
-            .contains("Seasoned Geometric Asian analytical pricing not supported"));
+            .expect("seasoned geometric analytical pricing should succeed");
+        assert!(res.value.amount() > 0.0 && res.value.amount().is_finite());
     }
 
     #[test]
