@@ -76,9 +76,9 @@ pub(crate) fn financing_schedules_supported(
 pub(crate) fn outstanding_before(
     out_path: &[(Date, Money)],
     target: Date,
-    currency: Currency,
+    initial: Money,
 ) -> Money {
-    let mut last = Money::from((0_i64, currency));
+    let mut last = initial;
     for (d, amt) in out_path {
         if *d < target {
             last = *amt;
@@ -155,12 +155,12 @@ pub(crate) fn financing_payoff_at_exit(
 fn payoff_at(
     schedules: &[finstack_quant_cashflows::builder::CashFlowSchedule],
     exit: Date,
-    currency: Currency,
+    _currency: Currency,
 ) -> finstack_quant_core::Result<f64> {
     let mut payoff_amt = 0.0;
     for sched in schedules {
         let out_path = sched.outstanding_by_date()?;
-        let payoff = outstanding_before(&out_path, exit, currency);
+        let payoff = outstanding_before(&out_path, exit, sched.get_notional().initial);
         payoff_amt += payoff.amount().abs();
     }
     Ok(payoff_amt)

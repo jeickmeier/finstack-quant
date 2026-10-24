@@ -13,7 +13,9 @@ pub(crate) struct AbsDelinquencyCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsDelinquencyCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context.instrument_as::<StructuredCredit>()?;
+        let abs = context
+            .instrument_as::<StructuredCredit>()?
+            .resolved_for_pricing()?;
         let total_balance = abs.pool.total_balance()?;
         if total_balance.amount() <= 0.0 {
             return Ok(0.0);
@@ -38,7 +40,9 @@ pub struct AbsExcessSpreadCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsExcessSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context.instrument_as::<StructuredCredit>()?;
+        let abs = context
+            .instrument_as::<StructuredCredit>()?
+            .resolved_for_pricing()?;
         let Some(card) = abs.credit_model.card else {
             return Err(finstack_quant_core::Error::Validation(
                 "abs_excess_spread requires credit_model.card (a card portfolio model)".to_string(),
@@ -90,7 +94,9 @@ pub struct AbsPaymentRateCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsPaymentRateCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context.instrument_as::<StructuredCredit>()?;
+        let abs = context
+            .instrument_as::<StructuredCredit>()?
+            .resolved_for_pricing()?;
         let Some(card) = abs.credit_model.card else {
             return Err(finstack_quant_core::Error::Validation(
                 "abs_payment_rate requires credit_model.card (a card portfolio model)".to_string(),
@@ -105,7 +111,9 @@ pub struct AbsChargeOffCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsChargeOffCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context.instrument_as::<StructuredCredit>()?;
+        let abs = context
+            .instrument_as::<StructuredCredit>()?
+            .resolved_for_pricing()?;
 
         let total_balance = abs.pool.total_balance()?;
         if total_balance.amount() > 0.0 {

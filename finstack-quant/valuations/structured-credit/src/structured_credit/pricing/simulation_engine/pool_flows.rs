@@ -995,9 +995,12 @@ pub(super) fn calculate_pool_flows_with_rates(
             let collected = interest.amount() + scheduled_principal + prepay_amt;
             let fee = collected.max(0.0) * request.special_servicing.workout.clamp(0.0, 1.0);
             let from_interest = fee.min(interest.amount().max(0.0));
+            let rem = fee - from_interest;
+            let from_scheduled = rem.min(scheduled_principal.max(0.0));
+            let from_prepay = (rem - from_scheduled).min(prepay_amt.max(0.0));
             total_interest = total_interest.checked_sub(Money::new(from_interest, currency)?)?;
-            total_scheduled =
-                total_scheduled.checked_sub(Money::new(fee - from_interest, currency)?)?;
+            total_scheduled = total_scheduled.checked_sub(Money::new(from_scheduled, currency)?)?;
+            total_prepay = total_prepay.checked_sub(Money::new(from_prepay, currency)?)?;
             special_servicing_fees += fee;
         }
 

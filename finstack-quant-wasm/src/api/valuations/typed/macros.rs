@@ -110,8 +110,10 @@ macro_rules! instrument_pricing {
             /// @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
             /// @param metric_pricing_overrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
             /// @param market_history - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+            /// @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
             /// @returns Structured `ValuationResult` for the selected model.
             /// @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+            #[allow(clippy::too_many_arguments)]
             pub fn price(
                 &self,
                 market_json: JsValue,
@@ -120,14 +122,17 @@ macro_rules! instrument_pricing {
                 metrics: Option<JsValue>,
                 metric_pricing_overrides: Option<JsValue>,
                 market_history: Option<JsValue>,
+                explain: Option<JsValue>,
             ) -> Result<JsValue, JsValue> {
-                let request = $crate::api::valuations::pricing::PriceRequest::from_js(
+                let mut request = $crate::api::valuations::pricing::PriceRequest::from_js(
                     &as_of,
                     model.as_ref(),
                     metrics.as_ref(),
                     metric_pricing_overrides.as_ref(),
                     market_history.as_ref(),
                 )?;
+                request.explain =
+                    crate::utils::input::js_opt_bool(explain.as_ref(), "explain")?.unwrap_or(false);
                 let instrument = request.typed_instrument(Box::new(self.inner.clone()))?;
                 request.price(
                     &instrument,

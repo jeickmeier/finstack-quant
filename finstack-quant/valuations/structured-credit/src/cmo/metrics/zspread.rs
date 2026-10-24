@@ -34,7 +34,8 @@ pub(crate) fn calculate_tranche_zspread(
 
     // The clean quote plus accrued buys the settlement-month accrual onward;
     // the collateral's prior-month in-flight P&I belongs to the seller.
-    let collateral = quote_basis_pool(&resolve_collateral(cmo, as_of)?, as_of)?;
+    let raw_collateral = resolve_collateral(cmo, as_of)?;
+    let collateral = quote_basis_pool(&raw_collateral, as_of)?;
 
     // Tranche interest accrues on the collateral's day count.
     let month_start = Date::from_calendar_date(as_of.year(), as_of.month(), 1)

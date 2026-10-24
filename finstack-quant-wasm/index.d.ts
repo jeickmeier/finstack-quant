@@ -15323,6 +15323,7 @@ export interface Bond extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -15332,7 +15333,8 @@ export interface Bond extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -15751,6 +15753,7 @@ export interface TermLoan extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -15760,7 +15763,8 @@ export interface TermLoan extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -16080,6 +16084,7 @@ export interface AssetBackedFacility extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -16089,7 +16094,8 @@ export interface AssetBackedFacility extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -16375,6 +16381,7 @@ export interface RevolvingCredit extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -16384,7 +16391,8 @@ export interface RevolvingCredit extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -17238,12 +17246,12 @@ export interface AssetBackedFacilityBuilder extends WasmOwned {
   ): AssetBackedFacilityBuilder;
   /**
    * Set the term-out window after revolving.
-   * @param value - `TermOutSpec` plain object, e.g. `{"months": 24}`: the amortization term after the revolving period ends.
+   * @param value - Month count (e.g. `24`) or `TermOutSpec` plain object (`{"months": 24}`): the amortization term after the revolving period ends.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
   termOut(
-    value: NonNullable<generated.valuations.AssetBackedFacility['term_out']>
+    value: number | NonNullable<generated.valuations.AssetBackedFacility['term_out']>
   ): AssetBackedFacilityBuilder;
   /**
    * Set the transaction fees paid through the waterfall ahead of the facility's interest.
@@ -17783,6 +17791,7 @@ export interface InterestRateSwap extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -17792,7 +17801,8 @@ export interface InterestRateSwap extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -18163,6 +18173,7 @@ export interface Swaption extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -18172,7 +18183,8 @@ export interface Swaption extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -18557,6 +18569,7 @@ export interface CapFloor extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -18566,7 +18579,8 @@ export interface CapFloor extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -18993,6 +19007,7 @@ export interface CreditDefaultSwap extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -19002,7 +19017,8 @@ export interface CreditDefaultSwap extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -19381,6 +19397,7 @@ export interface CdsIndex extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -19390,7 +19407,8 @@ export interface CdsIndex extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -19833,6 +19851,7 @@ export interface CdsTranche extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -19842,7 +19861,8 @@ export interface CdsTranche extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -20306,6 +20326,7 @@ export interface CdsOption extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -20315,7 +20336,8 @@ export interface CdsOption extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -20772,6 +20794,7 @@ export interface ConvertibleBond extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -20781,7 +20804,8 @@ export interface ConvertibleBond extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -21210,6 +21234,7 @@ export interface EquityOption extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -21219,7 +21244,8 @@ export interface EquityOption extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -21580,6 +21606,7 @@ export interface StructuredCredit extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
    * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model.
    * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
    */
@@ -21589,7 +21616,8 @@ export interface StructuredCredit extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of the instrument against a market snapshot.
@@ -23755,6 +23783,7 @@ export interface FxHandle extends WasmOwned {
    * @param metrics - Optional canonical metric IDs such as `"delta"`, `"vega"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result.
    * @param metricPricingOverrides - Optional JSON object patch applied before validation. Only supplied fields replace stored overrides; `{}` preserves them. Supplied `bump_config` fields merge into the stored object. Explicit `null` clears nullable fields to their Rust fallback. Omit the argument or pass JavaScript `null`/`undefined` to retain the envelope configuration.
    * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
+   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
    * @returns Structured `ValuationResult` for the selected model, preserving Monte Carlo seeds as lossless JavaScript `BigInt` values.
    * @throws Error - Throws a JavaScript exception if the instrument, market, metric-pricing-override, or market-history JSON is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to JavaScript.
    */
@@ -23764,7 +23793,8 @@ export interface FxHandle extends WasmOwned {
     model?: string | null,
     metrics?: string[] | null,
     metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null
+    marketHistory?: JsonInput | null,
+    explain?: boolean | null
   ): ValuationResult;
   /**
    * Compute one metric of this FX instrument against the supplied market.

@@ -431,11 +431,13 @@ impl PyAssetBackedFacilityBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: RateSpec = if let Ok(rate) = value.extract::<f64>() {
-            RateSpec::Fixed { rate }
-        } else {
-            crate::bindings::module_utils::py_to_serde(py, value, "rate")?
-        };
+        let spec: RateSpec =
+            if value.extract::<&str>().is_ok() || value.cast::<pyo3::types::PyDict>().is_ok() {
+                crate::bindings::module_utils::py_to_serde(py, value, "rate")?
+            } else {
+                let rate = super::super::convert::rate_from_py(value, "rate")?;
+                RateSpec::fixed_rate(rate)
+            };
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.rate(spec))
     }
 
@@ -527,8 +529,22 @@ impl PyAssetBackedFacilityBuilder {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.term_out")]
     #[pyo3(text_signature = "($self, value)")]
-    fn term_out<'py>(mut slf: PyRefMut<'py, Self>, value: u32) -> PyResult<PyRefMut<'py, Self>> {
-        let converted = TermOutSpec { months: value };
+    fn term_out<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'_>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let converted: TermOutSpec = if value.is_instance_of::<pyo3::types::PyBool>() {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "term_out: expected int or TermOutSpec, got bool",
+            ));
+        } else if let Ok(months) = value.extract::<u32>() {
+            TermOutSpec { months }
+        } else if let Ok(spec) = value.cast::<super::facility_terms::PyTermOutSpec>() {
+            spec.borrow().inner
+        } else {
+            crate::bindings::module_utils::py_to_serde(py, value, "term_out")?
+        };
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.term_out(converted))
     }
 

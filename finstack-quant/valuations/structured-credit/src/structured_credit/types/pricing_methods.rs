@@ -187,6 +187,7 @@ impl StructuredCredit {
         result.pv_confidence_interval = (lo.min(hi), lo.max(hi));
         for tranche in &mut result.tranche_results {
             tranche.npv = Money::new(tranche.npv.amount() * factor, tranche.npv.currency())?;
+            tranche.price_pct *= factor;
         }
         Ok(result)
     }
@@ -428,6 +429,16 @@ impl StructuredCredit {
             if *date > as_of {
                 let df = disc.df_between_dates(as_of, *date)?;
                 let flow_pv = Money::new(amount.amount() * df, amount.currency())?;
+                pv = pv.checked_add(flow_pv)?;
+            }
+        }
+        for flow in &cashflows.detailed_flows {
+            if flow.kind == finstack_quant_core::cashflow::CFKind::Notional
+                && flow.amount.amount() < 0.0
+                && flow.date > as_of
+            {
+                let df = disc.df_between_dates(as_of, flow.date)?;
+                let flow_pv = Money::new(flow.amount.amount() * df, flow.amount.currency())?;
                 pv = pv.checked_add(flow_pv)?;
             }
         }

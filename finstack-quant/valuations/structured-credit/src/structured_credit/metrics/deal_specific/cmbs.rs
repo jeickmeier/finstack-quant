@@ -90,7 +90,9 @@ impl Default for CmbsDscrCalculator {
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for CmbsDscrCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let cmbs = context.instrument_as::<StructuredCredit>()?;
+        let cmbs = context
+            .instrument_as::<StructuredCredit>()?
+            .resolved_for_pricing()?;
 
         if cmbs.deal_type != DealType::Cmbs {
             return Err(finstack_quant_core::Error::Validation(

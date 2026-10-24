@@ -178,13 +178,17 @@ pub struct PyCdsOptionBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
-/// Parse a ``decimal.Decimal | str | int | float`` exactly, via its string form.
+/// Parse a ``decimal.Decimal | str | int | float | Bps | Rate`` in basis points.
 fn decimal_arg(value: &Bound<'_, PyAny>) -> PyResult<Decimal> {
     if is_python_decimal(value)? {
         return decimal_from_py(value);
     }
-    let text: String = value.str()?.extract()?;
-    finstack_quant_core::decimal::parse_decimal(&text).map_err(core_to_py)
+    if value.is_instance_of::<pyo3::types::PyString>() {
+        let text: String = value.extract()?;
+        return finstack_quant_core::decimal::parse_decimal(&text).map_err(core_to_py);
+    }
+    let bp = crate::bindings::extract::extract_basis_points(value, "coupon_bp")?;
+    super::super::convert::decimal_from_f64(bp, "coupon_bp")
 }
 
 #[pymethods]

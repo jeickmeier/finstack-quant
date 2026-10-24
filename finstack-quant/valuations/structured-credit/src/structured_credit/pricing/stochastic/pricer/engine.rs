@@ -1142,6 +1142,15 @@ impl PathTrancheMetrics {
                 weighted_duration += flow_pv * t;
             }
         }
+        for flow in &cashflows.detailed_flows {
+            if flow.kind == finstack_quant_core::cashflow::CFKind::Notional
+                && flow.amount.amount() < 0.0
+                && flow.date > as_of
+            {
+                let df = discount_curve.df_between_dates(as_of, flow.date)?;
+                pv += flow.amount.amount() * df;
+            }
+        }
 
         let wal = crate::structured_credit::metrics::calculate_tranche_wal(cashflows, as_of)?;
         let principal: f64 = cashflows
