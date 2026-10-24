@@ -127,10 +127,11 @@ impl ScheduleSpec {
     /// Switch the specification to standard IMM dates, with
     /// [`ScheduleBuilder::imm`] semantics.
     ///
-    /// Sets `frequency` to quarterly, `stub` to [`StubKind::ShortBack`],
-    /// turns `imm_mode` on and `cds_imm_mode` off. As on the builder, a later
-    /// change to `frequency` or `stub` wins: [`ScheduleBuilder::build`] uses
-    /// the stored values as they are.
+    /// Sets the IMM defaults, `frequency` quarterly and `stub`
+    /// [`StubKind::ShortBack`], turns `imm_mode` on and `cds_imm_mode` off. As
+    /// on the builder, a later change to `frequency` or `stub` wins:
+    /// [`ScheduleBuilder::build`] uses the stored values as they are, and in
+    /// IMM mode `frequency` must be a whole number of quarters.
     ///
     /// # Examples
     /// ```rust

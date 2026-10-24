@@ -3641,7 +3641,7 @@ export interface ForwardCurveOptions {
    */
   interp?: string;
   /**
-   * Extrapolation policy beyond the last knot, such as `"flat_forward"`.
+   * Extrapolation policy outside the knots; the Rust builder default is `"flat_zero"`, which holds the first and last forward rate flat (market-standard projection-curve tail). `"flat_forward"` extends the boundary rate slope instead.
    */
   extrapolation?: string;
   /**
@@ -5173,10 +5173,17 @@ export interface ScheduleBuilder extends WasmOwned {
    */
   cdsImm(): ScheduleBuilder;
   /**
-   * Use standard IMM dates (the third Wednesday of quarterly months).
+   * Roll on standard IMM dates (the third Wednesday of Mar, Jun, Sep, Dec).
    *
-   * Same semantics as the Rust `ScheduleBuilder::imm`: sets the frequency
-   * to quarterly and the stub rule to `short_back`.
+   * Same semantics as the Rust `ScheduleBuilder::imm`: sets the IMM
+   * defaults (quarterly frequency, `short_back` stub rule). A later
+   * `frequency` or `stubRule` call wins. `build()` keeps `start` and `end`
+   * as the first and last dates and lays the regular periods on IMM dates
+   * at the frequency, which must be a whole number of quarters: forward
+   * from the first IMM date on or after `start` for back-stub rules,
+   * backward from the last IMM date on or before `end` for front-stub
+   * rules. With no IMM date strictly between `start` and `end` the schedule
+   * is the single period `[start, end]`.
    *
    * @returns This builder, with standard IMM mode on and CDS IMM mode off.
    */

@@ -1604,14 +1604,27 @@ export type FloatingLegCompounding =
  * implementations honour this policy at both ends of the knot range.
  * Choose based on what behaviour the downstream pricer expects:
  *
- * - `FlatZero` (default): hold the boundary value constant. Safe for
- *   discount factors and survival probabilities.
- * - `FlatForward`: extend the boundary slope. Useful for forward-rate
- *   curves where extrapolated rates should track the local term-structure
- *   slope.
+ * - `FlatZero` (default): hold the boundary value constant.
+ * - `FlatForward`: extend the boundary segment's slope, measured in the
+ *   space the interpolation style works in (table below).
  * - `None`: refuse to extrapolate; return `NaN` and require the caller to
  *   detect and handle out-of-range queries explicitly. Recommended for
  *   production risk systems.
+ *
+ * What `FlatForward` extends depends on the [`InterpStyle`]:
+ *
+ * | Style | `FlatForward` extends | On a discount-factor curve | On a rate-valued curve |
+ * |---|---|---|---|
+ * | `Linear` | the value linearly | - | rates keep trending |
+ * | `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |
+ * | `LogLinear` | `ln(value)` linearly | flat forward rate | - |
+ * | `PiecewiseQuadraticForward` | `ln(value)` linearly | flat forward rate | - |
+ * | `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |
+ *
+ * The market-standard tail for a discount-factor curve is a flat forward
+ * rate (`FlatForward` with a log-space style). For a curve that stores
+ * rates, such as [`ForwardCurve`](crate::market_data::term_structures::ForwardCurve),
+ * the market-standard tail holds the last rate flat, which is `FlatZero`.
  *
  * `#[non_exhaustive]` so that future policies (e.g. linear-zero,
  * asymptotic) can be added without breaking downstream code.
@@ -1702,21 +1715,23 @@ export type SwaptionVolConvention =
 /**
  * Roll-date rule applied when generating schedule anchors.
  *
- * Selects the core `ScheduleBuilder` date-generation mode. The IMM modes
- * force a quarterly grid: the schedule frequency and stub rule configured on
- * [`ScheduleParams`] are overridden with quarterly / short-back, matching
- * `ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.
+ * Selects the core `ScheduleBuilder` date-generation mode.
  *
  * # Variants
  *
  * - **`None`**: plain tenor stepping from the schedule boundaries (default).
- * - **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates
- *   for rate, currency, and equity index futures). Cashflow schedules retain
- *   the contractual maturity as a short final stub when it is off-grid.
- * - **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll
- *   dates). When the start date is not itself a roll date, the first period
- *   accrues from the roll date immediately **preceding** the start (standard
- *   front accrual per the ISDA Big Bang Protocol, April 2009).
+ * - **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on
+ *   the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which
+ *   must be a whole number of quarters; the `stub` rule picks forward or
+ *   backward generation and short or long stubs, as in
+ *   `ScheduleBuilder::imm`. The contractual start and maturity are always
+ *   kept, so an off-cycle date becomes a stub period, and a schedule with no
+ *   IMM date strictly inside it is a single period.
+ * - **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,
+ *   quarterly with a short final stub, overriding the configured `frequency`
+ *   and `stub`. When the start date is not itself a roll date, the first
+ *   period accrues from the roll date immediately **preceding** the start
+ *   (standard front accrual per the ISDA Big Bang Protocol, April 2009).
  *   Interior coupon or payment-program windows start at their declared
  *   boundary; front accrual is applied only once at the instrument start.
  *

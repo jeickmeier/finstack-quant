@@ -1,7 +1,7 @@
 //! Schedule anchor generation.
 
 use super::*;
-use time::Month;
+use crate::dates::imm::{imm_on_or_after, imm_on_or_before, is_imm_date};
 
 pub(super) type Buffer = SmallVec<[Date; 32]>;
 
@@ -25,12 +25,24 @@ fn next_roll_index(i: i32) -> crate::Result<i32> {
     i.checked_add(1).ok_or_else(schedule_too_large_error)
 }
 
-#[inline]
-fn maybe_eom(eom: bool, d: Date) -> Date {
-    if eom {
-        d.end_of_month()
-    } else {
-        d
+/// Day-of-month rule applied to the computed (non-contractual) roll dates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum RollDay {
+    /// Keep the day the tenor arithmetic produces.
+    Natural,
+    /// Snap to the last day of the month (`end_of_month`).
+    EndOfMonth,
+    /// Snap to the third Wednesday of the month (standard IMM roll).
+    ThirdWednesday,
+}
+
+impl RollDay {
+    fn apply(self, d: Date) -> crate::Result<Date> {
+        match self {
+            Self::Natural => Ok(d),
+            Self::EndOfMonth => Ok(d.end_of_month()),
+            Self::ThirdWednesday => crate::dates::third_wednesday(d.month(), d.year()),
+        }
     }
 }
 
@@ -39,42 +51,6 @@ fn push_if_new(buf: &mut Buffer, d: Date) {
     if buf.last().copied() != Some(d) {
         buf.push(d)
     }
-}
-/// Generate IMM dates (third Wednesday of Mar/Jun/Sep/Dec) within the given range.
-///
-/// Unlike regular schedule generation which adds fixed intervals, this function
-/// computes the actual third Wednesday of each quarterly month to handle the
-/// variable day-of-month correctly.
-pub(super) fn generate_imm_dates(start: Date, end: Date) -> crate::Result<Vec<Date>> {
-    let mut dates = Vec::new();
-    let last_imm = crate::dates::third_wednesday(Month::December, Date::MAX.year())?;
-    if start > last_imm {
-        return Ok(dates);
-    }
-
-    let first_imm = if crate::dates::imm::is_imm_date(start) {
-        start
-    } else {
-        next_imm(start)?
-    };
-
-    if first_imm > end {
-        return Ok(dates);
-    }
-
-    dates.push(first_imm);
-
-    let mut current = first_imm;
-    while current < end && current < last_imm {
-        let next = next_imm(current)?;
-        if next > end {
-            break;
-        }
-        dates.push(next);
-        current = next;
-    }
-
-    Ok(dates)
 }
 
 /// Enforce strictly increasing, duplicate-free dates while preserving original order.
@@ -103,7 +79,7 @@ pub(super) struct BuilderInternal {
     pub end: Date,
     pub frequency: Tenor,
     pub stub: StubKind,
-    pub eom: bool,
+    pub roll: RollDay,
 }
 
 impl BuilderInternal {
@@ -184,10 +160,89 @@ impl BuilderInternal {
         }
     }
 
-    // EOM convention: `maybe_eom` snaps only the COMPUTED intermediate roll
-    // dates to month-end. The user-provided `start` and `end` dates are
-    // contractual and are emitted verbatim (QuantLib-style); snapping them
-    // (the previous behavior) silently moved the effective date and maturity.
+    /// The `n`-th roll date from `anchor` with the roll-day rule applied.
+    ///
+    /// Only these COMPUTED intermediate dates move to month-end or the third
+    /// Wednesday. The user-provided `start` and `end` dates are contractual
+    /// and are emitted verbatim (QuantLib-style); snapping them silently moves
+    /// the effective date and maturity.
+    fn rolled(self, anchor: Date, n: i32) -> crate::Result<Option<Date>> {
+        self.nth_tenor(anchor, n)?
+            .map(|raw| self.roll.apply(raw))
+            .transpose()
+    }
+
+    /// Standard IMM schedule: a regular grid on the quarterly IMM cycle
+    /// (third Wednesday of Mar/Jun/Sep/Dec) at `frequency`, between the
+    /// contractual `start` and `end`, which are always kept.
+    ///
+    /// This is the IMM roll convention (FpML `RollConventionEnum` `IMM`)
+    /// applied to an ordinary schedule:
+    ///
+    /// - `frequency` must be a whole number of quarters (3M, 6M, 1Y, ...).
+    /// - Back-stub kinds (`ShortBack`, `LongBack`, `None`) anchor the grid on
+    ///   the first IMM date on or after `start` and generate forward, so an
+    ///   off-cycle `end` closes a final stub. Front-stub kinds (`ShortFront`,
+    ///   `LongFront`) anchor on the last IMM date on or before `end` and
+    ///   generate backward, so an off-cycle `start` opens an initial stub.
+    /// - An off-cycle endpoint on the anchor side becomes a short stub to the
+    ///   nearest IMM date, because the regular periods must start and end on
+    ///   IMM dates. With quarterly frequency every IMM date inside the range
+    ///   is a roll date, so both directions give the same dates.
+    /// - A range with no IMM date strictly inside it is a single period.
+    /// - `StubKind::None` requires `start` and `end` on IMM dates and a whole
+    ///   number of periods between them.
+    pub(super) fn generate_imm(self) -> crate::Result<Vec<Date>> {
+        if self.start >= self.end {
+            return Err(crate::InputError::InvalidDateRange.into());
+        }
+        let whole_quarters = match self.frequency.unit() {
+            crate::dates::TenorUnit::Months => self.frequency.count().is_multiple_of(3),
+            crate::dates::TenorUnit::Years => true,
+            crate::dates::TenorUnit::Weeks | crate::dates::TenorUnit::Days => false,
+        };
+        if !whole_quarters {
+            return Err(crate::InputError::InvalidTenor {
+                tenor: self.frequency.to_string(),
+                reason: "IMM schedules roll on the quarterly IMM cycle, so the frequency \
+                         must be a whole number of quarters"
+                    .to_string(),
+            }
+            .into());
+        }
+        if self.stub == StubKind::None && !(is_imm_date(self.start) && is_imm_date(self.end)) {
+            return Err(crate::Error::Validation(format!(
+                "an IMM schedule without stubs needs start ({}) and end ({}) on IMM dates",
+                self.start, self.end
+            )));
+        }
+        let grid = |start: Date, end: Date| BuilderInternal { start, end, ..self }.generate();
+        if matches!(self.stub, StubKind::ShortFront | StubKind::LongFront) {
+            let Some(last_roll) = imm_on_or_before(self.end)
+                .ok()
+                .filter(|&roll| roll > self.start)
+            else {
+                return Ok(vec![self.start, self.end]);
+            };
+            let mut dates = grid(self.start, last_roll)?;
+            if self.end > last_roll {
+                dates.push(self.end);
+            }
+            Ok(dates)
+        } else {
+            let Some(first_roll) = imm_on_or_after(self.start)
+                .ok()
+                .filter(|&roll| roll < self.end)
+            else {
+                return Ok(vec![self.start, self.end]);
+            };
+            let mut dates = grid(first_roll, self.end)?;
+            if self.start < first_roll {
+                dates.insert(0, self.start);
+            }
+            Ok(dates)
+        }
+    }
 
     /// Forward roll grid from `start`, closed by `end`; with `aligned`
     /// (`StubKind::None`), a grid that overshoots or runs out before `end` is
@@ -198,10 +253,7 @@ impl BuilderInternal {
         buf.push(self.start);
         let mut i = 1;
         loop {
-            let dt = match self
-                .nth_tenor(self.start, i)?
-                .map(|raw| maybe_eom(self.eom, raw))
-            {
+            let dt = match self.rolled(self.start, i)? {
                 Some(dt) if dt < self.end => dt,
                 last => {
                     if aligned && last != Some(self.end) {
@@ -225,10 +277,7 @@ impl BuilderInternal {
         push_if_new(&mut buf, anchor);
         let mut i = 1;
         loop {
-            let dt = match self
-                .nth_tenor(anchor, -i)?
-                .map(|raw| maybe_eom(self.eom, raw))
-            {
+            let dt = match self.rolled(anchor, -i)? {
                 Some(dt) if dt > self.start => dt,
                 _ => {
                     push_if_new(&mut buf, self.start);
@@ -252,10 +301,7 @@ impl BuilderInternal {
         let mut anchors: Vec<Date> = vec![self.end];
         let mut i = 1;
         let aligned = loop {
-            let Some(dt) = self
-                .nth_tenor(self.end, -i)?
-                .map(|raw| maybe_eom(self.eom, raw))
-            else {
+            let Some(dt) = self.rolled(self.end, -i)? else {
                 break false;
             };
             if dt <= self.start {
@@ -288,10 +334,7 @@ impl BuilderInternal {
         buf.push(anchor);
         let mut i = 1;
         loop {
-            let Some(next) = self
-                .nth_tenor(anchor, i)?
-                .map(|raw| maybe_eom(self.eom, raw))
-            else {
+            let Some(next) = self.rolled(anchor, i)? else {
                 push_if_new(&mut buf, self.end);
                 check_anchor_count(buf.len())?;
                 break;
@@ -302,9 +345,7 @@ impl BuilderInternal {
                 check_anchor_count(buf.len())?;
                 break;
             }
-            let next_after = self
-                .nth_tenor(anchor, next_roll_index(i)?)?
-                .map(|raw| maybe_eom(self.eom, raw));
+            let next_after = self.rolled(anchor, next_roll_index(i)?)?;
             if next_after.is_none_or(|date| date > self.end) {
                 push_if_new(&mut buf, self.end);
                 check_anchor_count(buf.len())?;

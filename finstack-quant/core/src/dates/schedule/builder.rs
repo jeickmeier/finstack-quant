@@ -68,7 +68,7 @@ use super::*;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
-/// Standard IMM schedule (futures):
+/// Standard IMM roll schedule:
 /// ```rust
 /// use finstack_quant_core::dates::Schedule;
 /// use time::{Date, Month};
@@ -77,9 +77,11 @@ use super::*;
 /// let end = Date::from_calendar_date(2025, Month::December, 31)?;
 ///
 /// let schedule = Schedule::builder(start, end)?
-///     .imm()  // Quarterly on third Wednesday of Mar/Jun/Sep/Dec
+///     .imm()  // Quarterly rolls on the third Wednesday of Mar/Jun/Sep/Dec
 ///     .build()?;
-/// // Generates: Mar-19, Jun-18, Sep-17, Dec-17 (2025 third Wednesdays)
+/// // Jan-15, then Mar-19, Jun-18, Sep-17, Dec-17, then Dec-31: the
+/// // contractual start and end bound a short initial and final stub.
+/// assert_eq!(schedule.dates.len(), 6);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
@@ -216,27 +218,61 @@ impl ScheduleBuilder {
         self
     }
 
-    /// Create a standard IMM schedule (quarterly on third Wednesday: Mar, Jun, Sep, Dec).
+    /// Roll the schedule on standard IMM dates (third Wednesday of Mar, Jun,
+    /// Sep, Dec), the FpML `IMM` roll convention used by IMM swaps, FRA strips
+    /// and futures-aligned legs.
     ///
-    /// This is used for interest rate futures (Eurodollar, SOFR), currency futures,
-    /// and equity index futures that follow CME IMM roll conventions.
+    /// Sets the IMM defaults (quarterly frequency, [`StubKind::ShortBack`]);
+    /// call [`frequency`](Self::frequency) or [`stub_rule`](Self::stub_rule)
+    /// afterwards to change them. Then [`build`](Self::build):
     ///
-    /// Unlike [`cds_imm()`](Self::cds_imm) which uses the 20th of quarterly months,
-    /// standard IMM dates fall on the third Wednesday.
+    /// - keeps the contractual `start` and `end` as the first and last dates;
+    /// - lays the regular periods on the IMM cycle at `frequency`, which must
+    ///   be a whole number of quarters (3M, 6M, 1Y, ...);
+    /// - generates forward from the first IMM date on or after `start` for
+    ///   back-stub rules, or backward from the last IMM date on or before `end`
+    ///   for front-stub rules. An off-cycle `start` or `end` becomes a stub
+    ///   period, so a schedule can have both an initial and a final stub;
+    /// - returns the single period `[start, end]` when no IMM date lies
+    ///   strictly between them;
+    /// - with [`StubKind::None`], requires `start` and `end` on IMM dates.
+    ///
+    /// Unlike [`cds_imm()`](Self::cds_imm), which uses the 20th of quarterly
+    /// months and accrues from the roll date before `start`, standard IMM
+    /// dates fall on the third Wednesday and the schedule starts at `start`.
     ///
     /// # Example
     /// ```rust
-    /// use finstack_quant_core::dates::Schedule;
+    /// use finstack_quant_core::dates::{Schedule, StubKind, Tenor};
     /// use time::{Date, Month};
     ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
-    /// let end = Date::from_calendar_date(2025, Month::December, 31)?;
+    /// let date = |y, m, d| Date::from_calendar_date(y, m, d);
+    /// let start = date(2025, Month::January, 15)?;
+    /// let end = date(2025, Month::December, 31)?;
     ///
-    /// let schedule = Schedule::builder(start, end)?
-    ///     .imm()  // Quarterly on third Wednesday
+    /// let quarterly = Schedule::builder(start, end)?.imm().build()?;
+    /// assert_eq!(
+    ///     quarterly.dates,
+    ///     vec![
+    ///         start,
+    ///         date(2025, Month::March, 19)?,
+    ///         date(2025, Month::June, 18)?,
+    ///         date(2025, Month::September, 17)?,
+    ///         date(2025, Month::December, 17)?,
+    ///         end,
+    ///     ]
+    /// );
+    ///
+    /// // A semi-annual leg generated backward from the last IMM date.
+    /// let semi_annual = Schedule::builder(start, end)?
+    ///     .imm()
+    ///     .frequency(Tenor::semi_annual())
+    ///     .stub_rule(StubKind::ShortFront)
     ///     .build()?;
-    ///
-    /// // Generates: Mar-19, Jun-18, Sep-17, Dec-17 (2025 third Wednesdays)
+    /// assert_eq!(
+    ///     semi_annual.dates,
+    ///     vec![start, date(2025, Month::June, 18)?, date(2025, Month::December, 17)?, end]
+    /// );
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[must_use]
@@ -334,7 +370,8 @@ impl ScheduleBuilder {
     ///
     /// The stored `frequency` and `stub` are used as they are in every mode
     /// ([`imm`](Self::imm) and [`cds_imm`](Self::cds_imm) set the IMM
-    /// defaults). Business-day adjustment is applied only when both a
+    /// defaults, which a later setter overrides; see [`imm`](Self::imm) for
+    /// the IMM roll rules). Business-day adjustment is applied only when both a
     /// convention and a calendar id are set; either alone (possible in a
     /// deserialized [`ScheduleSpec`]) leaves payment dates unadjusted.
     ///
@@ -349,6 +386,8 @@ impl ScheduleBuilder {
     /// - Start date is after end date (and graceful mode is disabled)
     /// - Calendar lookup fails under [`ScheduleErrorPolicy::Strict`]
     /// - EOM is combined with a day/week tenor or an IMM/CDS IMM rule
+    /// - In IMM mode, `frequency` is not a whole number of quarters, or
+    ///   [`StubKind::None`] is used with an off-cycle `start` or `end`
     pub fn build(self) -> crate::Result<Schedule> {
         if self.spec.end_of_month
             && (self.spec.imm_mode
@@ -423,26 +462,14 @@ impl ScheduleBuilder {
 
         // Generate dates based on mode
         let mut dates = if self.spec.imm_mode {
-            // Standard IMM: generate dates using next_imm to get proper third Wednesdays
-            let mut imm_dates = generate_imm_dates(self.spec.start, self.spec.end)?;
-            if imm_dates.is_empty() {
-                // No IMM date falls inside [start, end]: a silently empty
-                // schedule means zero cashflows / PV = 0 downstream. Error
-                // in strict mode (graceful policies convert this to an
-                // empty schedule WITH a warning).
-                return Err(crate::Error::Validation(format!(
-                    "IMM schedule from {} to {} contains no IMM dates \
-                     (first IMM date after start exceeds end)",
-                    self.spec.start, self.spec.end
-                )));
+            BuilderInternal {
+                start: self.spec.start,
+                end: self.spec.end,
+                frequency: self.spec.frequency,
+                stub: self.spec.stub,
+                roll: RollDay::ThirdWednesday,
             }
-            if imm_dates
-                .first()
-                .is_some_and(|&first| self.spec.start < first)
-            {
-                imm_dates.insert(0, self.spec.start);
-            }
-            imm_dates
+            .generate_imm()?
         } else if self.spec.cds_imm_mode {
             // CDS IMM: 20th of quarterly months (unadjusted; any business-day
             // adjustment configured on the builder is applied separately below).
@@ -464,7 +491,7 @@ impl ScheduleBuilder {
                 end: self.spec.end,
                 frequency: self.spec.frequency,
                 stub: self.spec.stub,
-                eom: self.spec.end_of_month,
+                roll: RollDay::Natural,
             };
             builder.generate()?
         } else {
@@ -473,7 +500,11 @@ impl ScheduleBuilder {
                 end: self.spec.end,
                 frequency: self.spec.frequency,
                 stub: self.spec.stub,
-                eom: self.spec.end_of_month,
+                roll: if self.spec.end_of_month {
+                    RollDay::EndOfMonth
+                } else {
+                    RollDay::Natural
+                },
             };
             builder.generate()?
         };

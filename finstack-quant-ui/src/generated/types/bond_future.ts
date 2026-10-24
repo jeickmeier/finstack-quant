@@ -1318,8 +1318,10 @@ export interface FixedCouponSpec {
   /**
    * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
    *
-   * [`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes
-   * override `frequency`/`stub` with quarterly / short-back; see [`RollRule`].
+   * [`RollRule::None`] (default) keeps plain tenor stepping.
+   * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
+   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
+   * quarterly / short-back grid. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
@@ -1404,8 +1406,10 @@ export interface D_0555F752Dff2D680B0B6 {
   /**
    * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
    *
-   * [`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes
-   * override `frequency`/`stub` with quarterly / short-back; see [`RollRule`].
+   * [`RollRule::None`] (default) keeps plain tenor stepping.
+   * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
+   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
+   * quarterly / short-back grid. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
@@ -1659,8 +1663,10 @@ export interface D_7Fdd8D325754C89E8272 {
   /**
    * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
    *
-   * [`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes
-   * override `frequency`/`stub` with quarterly / short-back; see [`RollRule`].
+   * [`RollRule::None`] (default) keeps plain tenor stepping.
+   * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
+   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
+   * quarterly / short-back grid. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.

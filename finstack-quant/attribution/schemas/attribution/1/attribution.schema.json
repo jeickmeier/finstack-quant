@@ -13328,16 +13328,16 @@
       ]
     },
     "ExtrapolationPolicy": {
-      "description": "Extrapolation policy for evaluation outside the knot range.\n\nAll [`InterpolationStrategy`](super::traits::InterpolationStrategy)\nimplementations honour this policy at both ends of the knot range.\nChoose based on what behaviour the downstream pricer expects:\n\n- `FlatZero` (default): hold the boundary value constant. Safe for\n  discount factors and survival probabilities.\n- `FlatForward`: extend the boundary slope. Useful for forward-rate\n  curves where extrapolated rates should track the local term-structure\n  slope.\n- `None`: refuse to extrapolate; return `NaN` and require the caller to\n  detect and handle out-of-range queries explicitly. Recommended for\n  production risk systems.\n\n`#[non_exhaustive]` so that future policies (e.g. linear-zero,\nasymptotic) can be added without breaking downstream code.",
+      "description": "Extrapolation policy for evaluation outside the knot range.\n\nAll [`InterpolationStrategy`](super::traits::InterpolationStrategy)\nimplementations honour this policy at both ends of the knot range.\nChoose based on what behaviour the downstream pricer expects:\n\n- `FlatZero` (default): hold the boundary value constant.\n- `FlatForward`: extend the boundary segment's slope, measured in the\n  space the interpolation style works in (table below).\n- `None`: refuse to extrapolate; return `NaN` and require the caller to\n  detect and handle out-of-range queries explicitly. Recommended for\n  production risk systems.\n\nWhat `FlatForward` extends depends on the [`InterpStyle`]:\n\n| Style | `FlatForward` extends | On a discount-factor curve | On a rate-valued curve |\n|---|---|---|---|\n| `Linear` | the value linearly | - | rates keep trending |\n| `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |\n| `LogLinear` | `ln(value)` linearly | flat forward rate | - |\n| `PiecewiseQuadraticForward` | `ln(value)` linearly | flat forward rate | - |\n| `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |\n\nThe market-standard tail for a discount-factor curve is a flat forward\nrate (`FlatForward` with a log-space style). For a curve that stores\nrates, such as [`ForwardCurve`](crate::market_data::term_structures::ForwardCurve),\nthe market-standard tail holds the last rate flat, which is `FlatZero`.\n\n`#[non_exhaustive]` so that future policies (e.g. linear-zero,\nasymptotic) can be added without breaking downstream code.",
       "oneOf": [
         {
           "const": "flat_zero",
-          "description": "Constant value extension.",
+          "description": "Hold the boundary value constant.",
           "type": "string"
         },
         {
           "const": "flat_forward",
-          "description": "Tangent/forward extension using boundary slope.",
+          "description": "Extend the boundary segment's slope in the interpolation style's\nworking space; see the table on [`ExtrapolationPolicy`].",
           "type": "string"
         },
         {
@@ -13991,7 +13991,7 @@
         },
         "roll_rule": {
           "$ref": "#/$defs/RollRule",
-          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
@@ -14224,7 +14224,7 @@
         },
         "roll_rule": {
           "$ref": "#/$defs/RollRule",
-          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
@@ -26879,7 +26879,7 @@
       ]
     },
     "RollRule": {
-      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures). Cashflow schedules retain\n  the contractual maturity as a short final stub when it is off-grid.\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n- **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,\n  quarterly with a short final stub, overriding the configured `frequency`\n  and `stub`. When the start date is not itself a roll date, the first\n  period accrues from the roll date immediately **preceding** the start\n  (standard front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
       "oneOf": [
         {
           "const": "none",
@@ -27109,7 +27109,7 @@
         },
         "roll_rule": {
           "$ref": "#/$defs/RollRule",
-          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
@@ -27716,7 +27716,7 @@
         },
         "roll_rule": {
           "$ref": "#/$defs/RollRule",
-          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
         },
         "step_schedule": {
           "description": "Step schedule: (effective_date, new_rate). Must be sorted by date.\nEach entry sets the rate from that date forward until the next step.\n\n**Date convention:** `effective_date` is compared against each\naccrual period's *unadjusted* `accrual_start`. Specify dates as\nunadjusted accrual-period boundaries (typically the issue date plus\ninteger multiples of `frequency`); business-day adjustment is not\napplied here. The rate is set at accrual start (per market\nconvention for step-up bonds).",

@@ -6,8 +6,12 @@ impl ForwardCurve {
     /// Start building a forward curve for `id` with tenor `tenor_years`.
     ///
     /// **Defaults:** The builder infers day-count and reset-lag conventions from
-    /// the curve ID when possible, then uses Linear interpolation with FlatForward
-    /// extrapolation.
+    /// the curve ID when possible, then uses Linear interpolation with
+    /// [`ExtrapolationPolicy::FlatZero`] extrapolation. A forward curve stores
+    /// rates, so `FlatZero` holds the first and last forward rate constant
+    /// outside the pillars: the market-standard flat-forward extrapolation of
+    /// a projection curve. [`ExtrapolationPolicy::FlatForward`] would instead
+    /// extend the boundary rate slope, so tail forwards keep trending.
     ///
     /// **Build-vs-query basis trap:** the inferred day-count converts dated
     /// pillars to year fractions at build time and query dates back at lookup
@@ -34,7 +38,7 @@ impl ForwardCurve {
             points: Vec::new(),
             projection_grid: None,
             style: InterpStyle::Linear,
-            extrapolation: ExtrapolationPolicy::FlatForward,
+            extrapolation: ExtrapolationPolicy::FlatZero,
             rate_calibration: None,
             fx_policy: None,
             transform: None,

@@ -1020,19 +1020,19 @@ export default [
   {
     "path": "#/$defs/d_86124daa1d76a07e8682",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy",
-    "description": "Extrapolation policy for evaluation outside the knot range.\n\nAll [`InterpolationStrategy`](super::traits::InterpolationStrategy)\nimplementations honour this policy at both ends of the knot range.\nChoose based on what behaviour the downstream pricer expects:\n\n- `FlatZero` (default): hold the boundary value constant. Safe for\n  discount factors and survival probabilities.\n- `FlatForward`: extend the boundary slope. Useful for forward-rate\n  curves where extrapolated rates should track the local term-structure\n  slope.\n- `None`: refuse to extrapolate; return `NaN` and require the caller to\n  detect and handle out-of-range queries explicitly. Recommended for\n  production risk systems.\n\n`#[non_exhaustive]` so that future policies (e.g. linear-zero,\nasymptotic) can be added without breaking downstream code."
+    "description": "Extrapolation policy for evaluation outside the knot range.\n\nAll [`InterpolationStrategy`](super::traits::InterpolationStrategy)\nimplementations honour this policy at both ends of the knot range.\nChoose based on what behaviour the downstream pricer expects:\n\n- `FlatZero` (default): hold the boundary value constant.\n- `FlatForward`: extend the boundary segment's slope, measured in the\n  space the interpolation style works in (table below).\n- `None`: refuse to extrapolate; return `NaN` and require the caller to\n  detect and handle out-of-range queries explicitly. Recommended for\n  production risk systems.\n\nWhat `FlatForward` extends depends on the [`InterpStyle`]:\n\n| Style | `FlatForward` extends | On a discount-factor curve | On a rate-valued curve |\n|---|---|---|---|\n| `Linear` | the value linearly | - | rates keep trending |\n| `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |\n| `LogLinear` | `ln(value)` linearly | flat forward rate | - |\n| `PiecewiseQuadraticForward` | `ln(value)` linearly | flat forward rate | - |\n| `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |\n\nThe market-standard tail for a discount-factor curve is a flat forward\nrate (`FlatForward` with a log-space style). For a curve that stores\nrates, such as [`ForwardCurve`](crate::market_data::term_structures::ForwardCurve),\nthe market-standard tail holds the last rate flat, which is `FlatZero`.\n\n`#[non_exhaustive]` so that future policies (e.g. linear-zero,\nasymptotic) can be added without breaking downstream code."
   },
   {
     "path": "#/$defs/d_86124daa1d76a07e8682/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy/oneOf/0",
     "const": "flat_zero",
-    "description": "Constant value extension."
+    "description": "Hold the boundary value constant."
   },
   {
     "path": "#/$defs/d_86124daa1d76a07e8682/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy/oneOf/1",
     "const": "flat_forward",
-    "description": "Tangent/forward extension using boundary slope."
+    "description": "Extend the boundary segment's slope in the interpolation style's\nworking space; see the table on [`ExtrapolationPolicy`]."
   },
   {
     "path": "#/$defs/d_86124daa1d76a07e8682/oneOf/2",
