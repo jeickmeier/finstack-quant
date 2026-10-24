@@ -261,33 +261,65 @@ impl FxDeltaVolSurface {
             }
         }
 
-        // RR and BF: finite
-        for &v in rr_25d.iter().chain(bf_25d.iter()) {
-            if !v.is_finite() {
+        // RR and BF: finite, and implied wing volatilities must be strictly positive
+        for ((&atm, &rr), &bf) in atm_vols.iter().zip(rr_25d.iter()).zip(bf_25d.iter()) {
+            if !rr.is_finite() || !bf.is_finite() {
                 return Err(crate::Error::Validation(
                     "25-delta risk reversal and butterfly quotes must be finite".to_string(),
                 ));
             }
-        }
-        if let Some(rr) = rr_10d {
-            for &v in rr {
-                if !v.is_finite() {
-                    return Err(crate::Error::Validation(
-                        "10-delta risk reversal quotes must be finite".to_string(),
-                    ));
-                }
+            let sigma_25d_call = atm + bf + 0.5 * rr;
+            let sigma_25d_put = atm + bf - 0.5 * rr;
+            if !sigma_25d_call.is_finite()
+                || !sigma_25d_put.is_finite()
+                || sigma_25d_call <= 0.0
+                || sigma_25d_put <= 0.0
+            {
+                return Err(InputError::NonPositiveValue.into());
             }
         }
-        if let Some(bf) = bf_10d {
-            for &v in bf {
-                if !v.is_finite() {
+        if let (Some(rr10), Some(bf10)) = (rr_10d, bf_10d) {
+            for ((&atm, &rr), &bf) in atm_vols.iter().zip(rr10.iter()).zip(bf10.iter()) {
+                if !rr.is_finite() || !bf.is_finite() {
                     return Err(crate::Error::Validation(
-                        "10-delta butterfly quotes must be finite".to_string(),
+                        "10-delta risk reversal and butterfly quotes must be finite".to_string(),
                     ));
+                }
+                let sigma_10d_call = atm + bf + 0.5 * rr;
+                let sigma_10d_put = atm + bf - 0.5 * rr;
+                if !sigma_10d_call.is_finite()
+                    || !sigma_10d_put.is_finite()
+                    || sigma_10d_call <= 0.0
+                    || sigma_10d_put <= 0.0
+                {
+                    return Err(InputError::NonPositiveValue.into());
                 }
             }
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FxDeltaVolSurface;
+
+    #[test]
+    fn rejects_quotes_with_non_positive_implied_wing_volatilities() {
+        let err = FxDeltaVolSurface::new(
+            "EURUSD-VOL",
+            vec![0.25, 1.0],
+            vec![0.08, 0.08],
+            vec![0.0, 0.0],
+            vec![-0.09, -0.02],
+            None,
+            None,
+        )
+        .expect_err("negative implied 25d wing vol should be rejected");
+        assert!(matches!(
+            err,
+            crate::Error::Input(crate::InputError::NonPositiveValue)
+        ));
     }
 }

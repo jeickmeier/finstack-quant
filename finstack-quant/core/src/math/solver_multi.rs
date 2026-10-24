@@ -454,6 +454,7 @@ impl LevenbergMarquardtSolver {
             };
         }
         let raise = |lambda: f64| (lambda * LM_LAMBDA_FACTOR).min(LAMBDA_MAX);
+        let mut jacobian_valid = false;
 
         for _iter in 0..self.max_iterations {
             if resid_norm < self.tolerance {
@@ -462,8 +463,11 @@ impl LevenbergMarquardtSolver {
                 return Ok(finish!(reason));
             }
 
-            jacobian_evals += 1;
-            jacobian_func(&params, &mut residual_evals, &mut jacobian);
+            if !jacobian_valid {
+                jacobian_evals += 1;
+                jacobian_func(&params, &mut residual_evals, &mut jacobian);
+                jacobian_valid = true;
+            }
 
             match self.solve_normal_equations_into(
                 &jacobian,
@@ -505,6 +509,13 @@ impl LevenbergMarquardtSolver {
                 resid_vec.copy_from_slice(&new_resid);
                 resid_norm = new_norm;
                 iterations += 1;
+                jacobian_valid = false;
+
+                if resid_norm < self.tolerance {
+                    let reason = LmTerminationReason::ConvergedResidualNorm;
+                    tracing::debug!(iterations, resid_norm, ?reason, "lm: converged");
+                    return Ok(finish!(reason));
+                }
 
                 lambda = (lambda / LM_LAMBDA_FACTOR).max(LAMBDA_MIN);
             } else {
@@ -839,5 +850,23 @@ mod tests {
             .expect("explicit residual count should avoid probe truncation");
 
         assert_eq!(solution.params.len(), 1);
+    }
+
+    #[test]
+    fn test_lm_converges_on_final_accepted_step() {
+        let solver = LevenbergMarquardtSolver::new()
+            .with_tolerance(1e-2)
+            .with_max_iterations(1);
+        let residuals = |params: &[f64], resid: &mut [f64]| {
+            resid[0] = params[0] - 2.0;
+        };
+        let solution = solver
+            .solve_system(residuals, &[0.0], 1)
+            .expect("one damped linear step should reach 1e-2 tolerance");
+        assert_eq!(
+            solution.stats.termination_reason,
+            LmTerminationReason::ConvergedResidualNorm
+        );
+        assert!((solution.params[0] - 2.0).abs() < 1e-2);
     }
 }

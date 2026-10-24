@@ -102,10 +102,11 @@ const BRACKET_EXPANSION: f64 = 2.0;
 pub struct BrentSolver {
     /// Convergence tolerance.
     ///
-    /// Convergence uses dual tolerances: the residual (`|f(x)| < tol`) and the
-    /// bracket/step size. The default `1e-12` is stricter than the `1e-8`
-    /// commonly used by market-facing wrappers such as IRR/XIRR and is intended
-    /// for generic core numerical solving.
+    /// Convergence accepts a root when the residual is within tolerance
+    /// (`|f(x)| <= tol`) or the bracket half-width is within the combined
+    /// relative/absolute tolerance `2 * EPS * |x| + 0.5 * tol`. The default
+    /// `1e-12` is stricter than the `1e-8` commonly used by market-facing
+    /// wrappers such as IRR/XIRR and is intended for generic core numerical solving.
     pub tolerance: f64,
     /// Maximum iterations
     pub max_iterations: usize,
@@ -261,12 +262,26 @@ impl BrentSolver {
             let next_a = (a - width * BRACKET_EXPANSION).max(self.bracket_min);
             let next_b = (b + width * BRACKET_EXPANSION).min(self.bracket_max);
             if next_a < a {
+                let (prev_a, prev_fa) = (a, fa);
                 a = next_a;
                 fa = f(a)?;
+                if fa.is_finite()
+                    && prev_fa.is_finite()
+                    && (fa == 0.0 || prev_fa == 0.0 || fa.signum() != prev_fa.signum())
+                {
+                    return Ok([(a, fa), (prev_a, prev_fa)]);
+                }
             }
             if next_b > b {
+                let (prev_b, prev_fb) = (b, fb);
                 b = next_b;
                 fb = f(b)?;
+                if fb.is_finite()
+                    && prev_fb.is_finite()
+                    && (fb == 0.0 || prev_fb == 0.0 || fb.signum() != prev_fb.signum())
+                {
+                    return Ok([(prev_b, prev_fb), (b, fb)]);
+                }
             }
 
             // Stop if we've hit the bounds
@@ -594,6 +609,9 @@ impl BrentSolver {
                     reason: format!("iteration produced non-finite value: f({b:.6e}) = {fb}"),
                 }
                 .into());
+            }
+            if fb == 0.0 {
+                return Ok(b);
             }
         }
 
@@ -957,5 +975,18 @@ mod tests {
             result.is_err(),
             "Brent should reject non-finite values encountered during iteration"
         );
+    }
+
+    #[test]
+    fn test_brent_find_bracket_catches_one_sided_sign_change() {
+        // Root at x = 0.25; f(x) is positive on (-inf, 0.05) and (0.45, +inf)
+        // and negative only inside (0.05, 0.45), so expanding both sides at
+        // once from [0.0, 0.05] to [-0.08, 0.13] sees a sign change only on
+        // the right expansion interval [0.05, 0.13].
+        let solver = BrentSolver::new().with_initial_bracket_size(Some(0.05));
+        let root = solver
+            .solve(|x| (x - 0.05) * (x - 0.45), 0.025)
+            .expect("should bracket root on the right expansion segment");
+        assert!((root - 0.05).abs() < 1e-10 || (root - 0.45).abs() < 1e-10);
     }
 }

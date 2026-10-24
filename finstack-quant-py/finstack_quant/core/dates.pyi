@@ -280,11 +280,12 @@ class DayCount:
     ACT_365L: DayCount
     """Actual/365L (ICMA Rule 251).
 
-    Annual periods (or periods without a supplied frequency) use denominator
-    366 exactly when February 29 falls in ``(start, end]``; otherwise 365.
-    Non-annual periods use 366 exactly when the end date's year is a leap year;
-    otherwise 365. This is explicitly not ACT/ACT AFB, which uses a different
-    sub-period-splitting algorithm.
+    Requires both ``frequency`` and ``coupon_period`` in ``DayCountContext``.
+    Annual periods use denominator 366 exactly when February 29 falls in
+    ``(coupon_start, coupon_end]``; otherwise 365. Non-annual periods use 366
+    exactly when ``coupon_end``'s year is a leap year; otherwise 365. This is
+    explicitly not ACT/ACT AFB, which uses a different sub-period-splitting
+    algorithm.
     """
     NL_365: DayCount
     """NL/365 (Actual/365 No Leap): actual days excluding every February 29
@@ -1321,12 +1322,12 @@ class Tenor:
     @property
     def unit(self) -> TenorUnit:
         """
-        Calendar unit of this tenor (days, months, or years).
+        Calendar unit of this tenor (days, weeks, months, or years).
 
         Returns
         -------
         TenorUnit
-            Calendar unit of this tenor (days, months, or years).
+            Calendar unit of this tenor (days, weeks, months, or years).
 
         Notes
         -----

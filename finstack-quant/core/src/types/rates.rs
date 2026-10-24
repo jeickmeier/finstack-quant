@@ -309,18 +309,20 @@ impl std::str::FromStr for Rate {
             return Err(invalid());
         }
         let lower = trimmed.to_ascii_lowercase();
-        let (number, divisor) = if let Some(num) = lower.strip_suffix("bps") {
-            (num, BASIS_POINTS_PER_UNIT)
-        } else if let Some(num) = lower.strip_suffix("bp") {
-            (num, BASIS_POINTS_PER_UNIT)
-        } else if let Some(num) = lower.strip_suffix('%') {
+        if let Some(num) = lower
+            .strip_suffix("bps")
+            .or_else(|| lower.strip_suffix("bp"))
+        {
+            let bp: f64 = num.trim().parse().map_err(|_| invalid())?;
+            ensure_finite(bp)?;
+            return Self::from_decimal(scale_decimal(bp, 10_000, true));
+        }
+        if let Some(num) = lower.strip_suffix('%') {
             let percent: f64 = num.trim().parse().map_err(|_| invalid())?;
             return Self::from_percent(percent);
-        } else {
-            (lower.as_str(), 1.0)
-        };
-        let value: f64 = number.trim().parse().map_err(|_| invalid())?;
-        Self::from_decimal(value / divisor)
+        }
+        let value: f64 = lower.trim().parse().map_err(|_| invalid())?;
+        Self::from_decimal(value)
     }
 }
 

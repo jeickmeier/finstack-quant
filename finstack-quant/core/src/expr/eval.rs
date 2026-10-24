@@ -274,7 +274,7 @@ impl CompiledExpr {
                     }
                 }
 
-                // Logical (treat non-zero as true)
+                // Logical (treat non-zero as true, 0.0 as false)
                 BinOp::And => {
                     if l != 0.0 && r != 0.0 {
                         1.0
@@ -329,7 +329,13 @@ impl CompiledExpr {
                 *out_val = f64::NAN;
                 continue;
             };
-            *out_val = if cond != 0.0 { then_val } else { else_val };
+            *out_val = if cond.is_nan() {
+                f64::NAN
+            } else if cond != 0.0 {
+                then_val
+            } else {
+                else_val
+            };
         }
     }
 
@@ -439,5 +445,25 @@ mod tests {
         );
         assert!(CompiledExpr::new(nested).is_err());
         assert!(CompiledExpr::new(Expr::cs_ref("debt", "total")).is_err());
+    }
+
+    #[test]
+    fn nan_condition_propagates_in_if_then_else() {
+        let ctx = SimpleContext::new(["c", "a", "b"]).expect("unique columns");
+        let c = [f64::NAN, 1.0, 0.0];
+        let a = [10.0, 10.0, 10.0];
+        let b = [20.0, 20.0, 20.0];
+        let cols = [c.as_slice(), a.as_slice(), b.as_slice()];
+
+        let ite = CompiledExpr::new(Expr::if_then_else(
+            Expr::column("c"),
+            Expr::column("a"),
+            Expr::column("b"),
+        ))
+        .expect("compiled");
+        let res = ite.eval(&ctx, &cols).expect("eval");
+        assert!(res[0].is_nan());
+        assert_eq!(res[1], 10.0);
+        assert_eq!(res[2], 20.0);
     }
 }

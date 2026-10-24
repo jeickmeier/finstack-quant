@@ -69,11 +69,12 @@ label_enum!(PyDayCount, DayCount, "DayCount", from_name, {
     ACT_360 => Act360,
     /// Actual/365 Fixed.
     ACT_365F => Act365F,
-    /// Actual/365L (ICMA Rule 251). Annual periods (or periods without a
-    /// supplied frequency) use denominator 366 exactly when February 29 falls
-    /// in ``(start, end]``; non-annual periods use 366 exactly when the end
-    /// date's year is a leap year. Otherwise the denominator is 365. This is
-    /// explicitly not ACT/ACT AFB, which uses sub-period splitting.
+    /// Actual/365L (ICMA Rule 251). Requires both ``frequency`` and
+    /// ``coupon_period`` in ``DayCountContext``. Annual periods use denominator
+    /// 366 exactly when February 29 falls in ``(coupon_start, coupon_end]``;
+    /// non-annual periods use 366 exactly when ``coupon_end``'s year is a leap
+    /// year. Otherwise the denominator is 365. This is explicitly not ACT/ACT
+    /// AFB, which uses sub-period splitting.
     ACT_365L => Act365L,
     /// NL/365 (Actual/365 No Leap): actual days excluding every February 29
     /// in ``(start, end]``, divided by 365.

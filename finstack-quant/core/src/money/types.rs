@@ -701,10 +701,10 @@ impl Money {
     /// strictly positive, or `InputError::ConversionOverflow` when the
     /// converted amount cannot be represented as a Decimal.
     pub fn convert_at_rate(self, to: Currency, rate: f64) -> crate::Result<Self> {
+        let rate = crate::money::fx::validate_fx_rate(self.currency, to, rate)?;
         if self.currency == to {
             return Ok(self);
         }
-        let rate = crate::money::fx::validate_fx_rate(self.currency, to, rate)?;
         // Retain full Decimal precision, consistent with `Money::new`. Rounding
         // to the destination minor units here would truncate sub-unit precision
         // mid-calculation, so the result of a chained computation would depend
@@ -1197,5 +1197,18 @@ mod tests {
                 "formatting must not mutate the stored amount"
             );
         }
+    }
+
+    #[test]
+    fn convert_at_rate_validates_rate_on_same_currency() {
+        let usd = Money::new(100.0, Currency::USD).expect("valid money");
+        assert!(usd.convert_at_rate(Currency::USD, 0.0).is_err());
+        assert!(usd.convert_at_rate(Currency::USD, -1.0).is_err());
+        assert!(usd.convert_at_rate(Currency::USD, f64::NAN).is_err());
+        assert_eq!(
+            usd.convert_at_rate(Currency::USD, 1.0)
+                .expect("valid same-currency rate"),
+            usd
+        );
     }
 }
