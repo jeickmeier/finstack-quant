@@ -106,6 +106,11 @@ impl FinancingPeriodProjection {
 /// and return the equivalent simple rate `(∏(1+rᵢ·dᵢ)−1)/τ`, capturing the
 /// daily-compounding convexity the arithmetic average drops.
 ///
+/// A `simple` period that started before `as_of` requires its published
+/// fixing. One that starts on `as_of` uses that day's fixing when the series
+/// already holds it and the forward projection otherwise; later periods are
+/// always projected. Only projected rates are reported as fixing exposures.
+///
 /// For compounded periods that have already started
 /// (`period_start <= as_of < period_end`), the function splices realized daily
 /// fixings (from `fixings`) with projected overnight forwards through the shared
@@ -123,6 +128,7 @@ fn financing_period_projection(
     coupon_frequency: Tenor,
     as_of: Date,
     calendar_id: &str,
+    accrual_bdc: BusinessDayConvention,
     currency: Currency,
     collect_fixings: bool,
 ) -> finstack_quant_core::Result<FinancingPeriodProjection> {
@@ -133,22 +139,31 @@ fn financing_period_projection(
                 .to_string(),
         )),
         FloatingLegCompounding::Simple => {
-            let rate = if period_start <= as_of {
-                finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                    fixings,
-                    financing.forward_curve_id.as_str(),
-                    period_start,
-                    as_of,
-                )?
+            let published = if period_start < as_of {
+                Some(
+                    finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                        fixings,
+                        financing.forward_curve_id.as_str(),
+                        period_start,
+                        as_of,
+                    )?,
+                )
+            } else if period_start == as_of {
+                fixings.and_then(|series| series.value_on_exact(period_start).ok())
             } else {
-                fwd.rate_between_dates(period_start, period_end, period_year_fraction)?
+                None
+            };
+            let is_projected = published.is_none();
+            let rate = match published {
+                Some(rate) => rate,
+                None => fwd.rate_between_dates(period_start, period_end, period_year_fraction)?,
             };
             let mut projection = FinancingPeriodProjection::new(
                 rate,
                 period_year_fraction,
                 1.0 + rate * period_year_fraction,
             )?;
-            if collect_fixings && period_start > as_of {
+            if collect_fixings && is_projected {
                 projection.fixings.push(ProjectedFixing {
                     series_id: fixing_series_id(financing.forward_curve_id.as_str()),
                     date: period_start,
@@ -179,7 +194,7 @@ fn financing_period_projection(
             let (accrual_start, accrual_end) = adjust_overnight_accrual_boundaries(
                 period_start,
                 period_end,
-                BusinessDayConvention::ModifiedFollowing,
+                accrual_bdc,
                 calendar,
             )?;
             if accrual_end <= accrual_start {
@@ -250,6 +265,13 @@ fn for_each_financing_period(
     )
     .ok();
     let period_schedule = schedule.period_schedule()?;
+    // Overnight accrual boundaries always land on business days; unadjusted
+    // schedules fall back to Modified Following for that adjustment.
+    let accrual_bdc = if schedule.params.adjust_accrual_dates {
+        schedule.params.business_day_convention
+    } else {
+        BusinessDayConvention::ModifiedFollowing
+    };
 
     for i in 1..period_schedule.dates.len() {
         let period_start = period_schedule.dates[i - 1];
@@ -279,6 +301,7 @@ fn for_each_financing_period(
             schedule.params.frequency,
             as_of,
             schedule.params.calendar_id.as_str(),
+            accrual_bdc,
             currency,
             collect_fixings,
         )?;
@@ -311,6 +334,7 @@ fn financing_period_rate(
         coupon_frequency,
         as_of,
         calendar_id,
+        BusinessDayConvention::ModifiedFollowing,
         currency,
         false,
     )?
@@ -1483,6 +1507,62 @@ mod tests {
     }
 
     #[test]
+    fn trs_term_rate_period_resetting_on_valuation_date_uses_published_fixing_or_projects() {
+        let as_of = date(2025, 1, 6);
+        let period_end = date(2025, 4, 7);
+        let fwd = ForwardCurve::builder("USD-TERM-3M", 0.25)
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.05), (1.0, 0.05)])
+            .build()
+            .expect("forward curve");
+        let financing = FinancingLegSpec {
+            discount_curve_id: CurveId::new("DISC"),
+            forward_curve_id: CurveId::new("USD-TERM-3M"),
+            spread_bp: Decimal::ZERO,
+            day_count: DayCount::Act360,
+            compounding: FloatingLegCompounding::Simple,
+        };
+        let year_fraction = DayCount::Act360
+            .year_fraction(as_of, period_end, DayCountContext::default())
+            .expect("year fraction");
+        let project = |fixings: Option<&ScalarTimeSeries>| {
+            financing_period_projection(
+                &financing,
+                &fwd,
+                fixings,
+                as_of,
+                period_end,
+                year_fraction,
+                Tenor::quarterly(),
+                as_of,
+                finstack_quant_core::dates::WEEKENDS_ONLY_ID,
+                BusinessDayConvention::ModifiedFollowing,
+                Currency::USD,
+                true,
+            )
+            .expect("projection")
+        };
+
+        let published = ScalarTimeSeries::new("FIXING:USD-TERM-3M", vec![(as_of, 0.041)], None)
+            .expect("fixing series");
+        let fixed = project(Some(&published));
+        assert!((fixed.rate - 0.041).abs() < 1e-14);
+        assert!(
+            fixed.fixings.is_empty(),
+            "a published fixing is not an exposure"
+        );
+
+        let projected = project(None);
+        let expected = fwd
+            .rate_between_dates(as_of, period_end, year_fraction)
+            .expect("forward rate");
+        assert!((projected.rate - expected).abs() < 1e-14);
+        assert_eq!(projected.fixings.len(), 1);
+        assert_eq!(projected.fixings[0].date, as_of);
+    }
+
+    #[test]
     fn trs_financing_leg_overnight_compounding_exceeds_term_rate_on_upward_curve() {
         // On an upward-sloping forward curve, daily-compounding an OIS financing
         // leg picks up positive convexity that the simple term-rate average
@@ -1624,6 +1704,7 @@ mod tests {
             Tenor::quarterly(),
             start,
             "usny",
+            BusinessDayConvention::ModifiedFollowing,
             Currency::USD,
             false,
         )

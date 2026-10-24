@@ -255,15 +255,27 @@ fn ois_swap_iterative_breakeven_observes_crossed_sofr_fixings_at_the_as_of_forwa
         "expected a meaningful breakeven, got {breakeven}"
     );
 
-    // The solved discount-curve shift zeroes the horizon P&L with the crossed
+    // A yield breakeven shifts every discount and forward curve of the swap
+    // in parallel. The solved shift zeroes the horizon P&L with the crossed
     // fixings injected by hand at their unbumped as-of forward, in both the
     // base and the bumped market.
+    let deps = swap.market_dependencies().expect("dependencies").curves;
+    let rate_curves: Vec<_> = deps
+        .discount_curves
+        .iter()
+        .chain(
+            deps.forward_curves
+                .iter()
+                .filter(|id| !deps.discount_curves.contains(id)),
+        )
+        .cloned()
+        .collect();
     let injected = market.insert_series(sofr_fixings(start, rolled));
     let bumped = injected
-        .bump([MarketBump::Curve {
-            id: "USD-OIS".into(),
+        .bump(rate_curves.into_iter().map(|id| MarketBump::Curve {
+            id,
             spec: BumpSpec::parallel_bp(breakeven),
-        }])
+        }))
         .expect("bump");
     let residual = carry + swap.value(&bumped, rolled).expect("bumped PV").amount()
         - swap.value(&injected, rolled).expect("base PV").amount();

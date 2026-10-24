@@ -561,6 +561,39 @@ impl MetricContext {
         self.extensions.clear();
     }
 
+    /// Run `f` against a substitute instrument view, then restore the original.
+    ///
+    /// The original instrument and base value are restored whether `f`
+    /// succeeds or fails, so `f` may also override the base value with
+    /// [`MetricContext::set_base_value`]. Family caches are dropped on entry
+    /// and on exit, as with [`MetricContext::set_instrument`].
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument` - Instrument the context evaluates while `f` runs.
+    /// * `f` - Scoped calculation; its result is returned unchanged.
+    ///
+    /// # Returns
+    ///
+    /// The result of `f`.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error produced by `f`.
+    pub fn with_instrument<R>(
+        &mut self,
+        instrument: Arc<dyn Instrument>,
+        f: impl FnOnce(&mut Self) -> finstack_quant_core::Result<R>,
+    ) -> finstack_quant_core::Result<R> {
+        let orig_instrument = Arc::clone(&self.inputs.instrument);
+        let orig_base_value = self.inputs.base_value;
+        self.set_instrument(instrument);
+        let result = f(self);
+        self.set_instrument(orig_instrument);
+        self.inputs.base_value = orig_base_value;
+        result
+    }
+
     /// Borrow the family cache of type `T` stored on this context, if any.
     ///
     /// Instrument families keep intermediate results that several of their

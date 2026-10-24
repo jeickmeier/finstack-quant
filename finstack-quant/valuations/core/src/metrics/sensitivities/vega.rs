@@ -8,6 +8,7 @@ use crate::metrics::finite_difference::{
     revert_scratch_bumps, volatility_override, VOL_POINTS_PER_ABSOLUTE_VOL,
 };
 use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::sensitivities::fd_greeks::clone_with_crn_seed_if_supported;
 use crate::metrics::MetricCalculator;
 use crate::metrics::{MetricContext, MetricId};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
@@ -83,6 +84,8 @@ where
         let as_of = context.as_of;
 
         let bump_pct = defaults.vol_bump_decimal;
+        let seeded_instrument = clone_with_crn_seed_if_supported(instrument);
+        let instrument = &seeded_instrument;
 
         // Use already-computed Vega when available to keep totals consistent
         let target_total = if let Some(existing) = context.computed.get(&MetricId::Vega) {
@@ -111,7 +114,7 @@ where
                 // Central difference O(h²) — consistent with bucketed approach.
                 let tokens_up =
                     apply_parallel_surface_bumps_in_place(scratch, &vol_surface_ids, bump_pct)?;
-                let pv_up = ctx.reprice_money(scratch, as_of);
+                let pv_up = ctx.reprice_instrument_raw(instrument, scratch, as_of);
                 revert_scratch_bumps(scratch, tokens_up)?;
                 let pv_up = pv_up?;
 
@@ -131,20 +134,18 @@ where
                         "key-rate vega parallel down-bump would clamp σ at 0; \
                          using one-sided forward difference"
                     );
-                    let pv_base = ctx.reprice_money(base_ctx, as_of)?;
-                    Ok((pv_up.amount() - pv_base.amount())
-                        / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
+                    let pv_base = ctx.reprice_instrument_raw(instrument, base_ctx, as_of)?;
+                    Ok((pv_up - pv_base) / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
                 } else {
                     let tokens_down = apply_parallel_surface_bumps_in_place(
                         scratch,
                         &vol_surface_ids,
                         -bump_pct,
                     )?;
-                    let pv_down = ctx.reprice_money(scratch, as_of);
+                    let pv_down = ctx.reprice_instrument_raw(instrument, scratch, as_of);
                     revert_scratch_bumps(scratch, tokens_down)?;
                     let pv_down = pv_down?;
-                    Ok((pv_up.amount() - pv_down.amount())
-                        / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
+                    Ok((pv_up - pv_down) / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
                 }
             })?
         };
@@ -172,6 +173,7 @@ where
             let mut matrix = Vec::new();
             let mut total = NeumaierAccumulator::new();
             let mut rows = Vec::new();
+            let base_raw = ctx.reprice_instrument_raw(instrument, base_ctx, as_of)?;
             for (id, surface, expiries, strikes) in &grids {
                 let one_sided = min_grid_vol(surface).is_some_and(|vol| vol < bump_pct);
                 for &expiry in expiries {
@@ -190,12 +192,11 @@ where
                             strike,
                             bump_pct,
                         )?;
-                        let up = ctx.reprice_money(scratch, as_of);
+                        let up = ctx.reprice_instrument_raw(instrument, scratch, as_of);
                         scratch.revert_scratch_bump(token)?;
-                        let up = up?.amount();
+                        let up = up?;
                         let vega = if one_sided {
-                            (up - ctx.reprice_money(base_ctx, as_of)?.amount())
-                                / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
+                            (up - base_raw) / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
                         } else {
                             let token = scratch.apply_surface_point_absolute_bump_in_place(
                                 id.as_str(),
@@ -203,9 +204,9 @@ where
                                 strike,
                                 -bump_pct,
                             )?;
-                            let down = ctx.reprice_money(scratch, as_of);
+                            let down = ctx.reprice_instrument_raw(instrument, scratch, as_of);
                             scratch.revert_scratch_bump(token)?;
-                            (up - down?.amount()) / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
+                            (up - down?) / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
                         };
                         row[column] = vega;
                         total.add(vega);

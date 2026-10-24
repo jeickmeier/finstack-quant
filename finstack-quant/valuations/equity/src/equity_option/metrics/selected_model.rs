@@ -339,11 +339,15 @@ mod tests {
             Some(finstack_quant_valuations_core::instruments::pricing_overrides::ThetaDayBasis::Trading252);
         let trading = theta(&option);
         assert!((trading / calendar - 365.0 / 252.0).abs() < 1e-12);
-        // The native equity theta API is per day even when generic carry
-        // metrics request a longer horizon.
+        // A longer theta period reports the roll-forward PV change over that
+        // horizon instead of the analytic per-day rate.
         option.metric_pricing_overrides.theta_period =
             Some(finstack_quant_core::dates::Tenor::weekly());
-        assert!((theta(&option) - trading).abs() < 1e-12);
+        let weekly = theta(&option);
+        assert!(
+            (5.0..9.0).contains(&(weekly / calendar)),
+            "weekly theta {weekly} should be about seven calendar days of {calendar}"
+        );
 
         option.expiry = date!(2025 - 01 - 02);
         let last_day = theta(&option);
