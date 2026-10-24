@@ -277,7 +277,26 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxBar
                 greeks.vega = self.option_vega(market, as_of, request.bumps)?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::Rho => {
-                greeks.rho_bp = self.option_rho_bp(market, as_of, request.bumps)?
+                greeks.rho_bp = crate::shared::discount_rho_greek(
+                    self,
+                    self.day_count,
+                    self.expiry,
+                    market,
+                    as_of,
+                    &self.domestic_discount_curve_id,
+                    request.bumps.rate_bump_bp,
+                )?
+            }
+            finstack_quant_valuations_core::instruments::OptionGreekKind::ForeignRho => {
+                greeks.foreign_rho_bp = crate::shared::discount_rho_greek(
+                    self,
+                    self.day_count,
+                    self.expiry,
+                    market,
+                    as_of,
+                    &self.foreign_discount_curve_id,
+                    request.bumps.rate_bump_bp,
+                )?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::Vanna => {
                 greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
@@ -286,7 +305,7 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxBar
                 greeks.volga =
                     self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
             }
-            _ => {}
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Theta => {}
         }
         Ok(greeks)
     }
@@ -392,24 +411,6 @@ impl FxBarrierOption {
         let width =
             2.0 * vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some((pv_up - pv_down) / width))
-    }
-    fn option_rho_bp(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
-            return Ok(Some(0.0));
-        }
-
-        Ok(Some(crate::shared::discount_rho_bp(
-            self,
-            market,
-            as_of,
-            &self.domestic_discount_curve_id,
-            bumps.rate_bump_bp,
-        )?))
     }
     fn option_vanna(
         &self,

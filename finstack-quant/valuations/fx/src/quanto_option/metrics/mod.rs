@@ -62,15 +62,28 @@ impl MetricCalculator for Fx01Calculator {
             return Ok(0.0);
         }
 
-        let fx_spot_id = option.fx_spot_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "QuantoOption {}: fx_spot_id is required to compute FX01",
-                option.id
-            ))
-        })?;
-
-        let market_up = bump_scalar_price(context.curves.as_ref(), fx_spot_id, spot_bump)?;
-        let market_down = bump_scalar_price(context.curves.as_ref(), fx_spot_id, -spot_bump)?;
+        let (market_up, market_down) = match option.fx_spot_id.as_ref() {
+            Some(fx_spot_id) => (
+                bump_scalar_price(context.curves.as_ref(), fx_spot_id, spot_bump)?,
+                bump_scalar_price(context.curves.as_ref(), fx_spot_id, -spot_bump)?,
+            ),
+            None => (
+                crate::shared::fx_matrix_bumped_market(
+                    context.curves.as_ref(),
+                    option.base_currency,
+                    option.quote_currency,
+                    as_of,
+                    spot_bump,
+                )?,
+                crate::shared::fx_matrix_bumped_market(
+                    context.curves.as_ref(),
+                    option.base_currency,
+                    option.quote_currency,
+                    as_of,
+                    -spot_bump,
+                )?,
+            ),
+        };
         let pv_up = option.value(&market_up, as_of)?.amount();
         let pv_down = option.value(&market_down, as_of)?.amount();
 

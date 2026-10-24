@@ -120,22 +120,19 @@ fn input_request<'a>(
 
 /// Greeks for an FX digital option.
 ///
-/// `theta` convention:
-/// - For [`DigitalPayoutType::CashOrNothing`]: analytic `∂V/∂τ × (−1/365)`,
-///   where `τ` is time-to-expiry in years. This is the exact per-calendar-day
-///   value decay from the closed-form Garman–Kohlhagen digital formula.
-/// - For [`DigitalPayoutType::AssetOrNothing`]: a **1-day finite-difference
-///   decay**, `V(τ − 1/365) − V(τ)`. The analytic theta for asset-or-nothing
-///   requires additional partial derivatives and is not yet implemented;
-///   the finite-difference approximation is used as a practical substitute
-///   for P&L-attribution purposes.
+/// `theta` is analytic for both payout types: `−∂V/∂τ / theta_days_per_year`,
+/// where `τ` is time-to-expiry in years, i.e. the per-day value decay from the
+/// closed-form Garman–Kohlhagen digital formula on the theta day basis.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct FxDigitalOptionGreeks {
     pub(crate) delta: f64,
     pub(crate) gamma: f64,
     pub(crate) vega: f64,
     pub(crate) theta: f64,
+    /// PV change per 1% (100bp) parallel move of the domestic rate.
     pub(crate) rho_domestic: f64,
+    /// PV change per 1% (100bp) parallel move of the foreign rate.
+    pub(crate) rho_foreign: f64,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -297,9 +294,11 @@ fn greeks_digital(
             }
             DigitalPayoutType::AssetOrNothing => {
                 let delta = if itm { exp_rf_t * notional } else { 0.0 };
+                let pv = spot * delta;
                 FxDigitalOptionGreeks {
                     delta,
-                    theta: asset_theta(spot * delta),
+                    theta: asset_theta(pv),
+                    rho_foreign: -t * pv / 100.0,
                     ..Default::default()
                 }
             }
@@ -321,9 +320,8 @@ fn greeks_digital(
                 OptionType::Call => exp_rd_t * cdf_d2 * payout_amount,
                 OptionType::Put => exp_rd_t * (1.0 - cdf_d2) * payout_amount,
             };
-            // Analytic theta: exact ∂V/∂τ × (−1/365) from the closed-form
-            // Garman–Kohlhagen formula. This replaces the former one-day
-            // finite-difference approximation V(τ−1/365)−V(τ) (W-46).
+            // Analytic theta: exact −∂V/∂τ / theta_days_per_year from the
+            // closed-form Garman–Kohlhagen formula.
             let theta = analytic_theta_cash_or_nothing(
                 d2,
                 r_d,
@@ -346,6 +344,8 @@ fn greeks_digital(
             let rho_domestic = (-t * base_pv
                 + rho_sign * exp_rd_t * pdf_d2 * (t / sigma_sqrt_t) * payout_amount)
                 / 100.0;
+            let rho_foreign =
+                -rho_sign * exp_rd_t * pdf_d2 * (t / sigma_sqrt_t) * payout_amount / 100.0;
 
             FxDigitalOptionGreeks {
                 delta,
@@ -353,84 +353,33 @@ fn greeks_digital(
                 vega,
                 theta,
                 rho_domestic,
+                rho_foreign,
             }
         }
         DigitalPayoutType::AssetOrNothing => {
+            let delta_sign = match option_type {
+                OptionType::Call => 1.0,
+                OptionType::Put => -1.0,
+            };
             let delta = match option_type {
                 OptionType::Call => exp_rf_t * (cdf_d1 + pdf_d1 / sigma_sqrt_t) * notional,
                 OptionType::Put => exp_rf_t * ((1.0 - cdf_d1) - pdf_d1 / sigma_sqrt_t) * notional,
             };
-
-            let bump = spot * 0.001;
-            let pv_up = price_digital(
-                spot + bump,
-                strike,
-                r_d,
-                r_f,
-                sigma,
-                t,
-                option_type,
-                payout_type,
-                payout_amount,
-                notional,
-            );
-            let pv_dn = price_digital(
-                spot - bump,
-                strike,
-                r_d,
-                r_f,
-                sigma,
-                t,
-                option_type,
-                payout_type,
-                payout_amount,
-                notional,
-            );
-            let pv_base = price_digital(
-                spot,
-                strike,
-                r_d,
-                r_f,
-                sigma,
-                t,
-                option_type,
-                payout_type,
-                payout_amount,
-                notional,
-            );
-            let gamma = (pv_up - 2.0 * pv_base + pv_dn) / (bump * bump);
-
-            let vol_bump = 0.01;
-            let pv_vol_up = price_digital(
-                spot,
-                strike,
-                r_d,
-                r_f,
-                sigma + vol_bump,
-                t,
-                option_type,
-                payout_type,
-                payout_amount,
-                notional,
-            );
-            let vega = (pv_vol_up - pv_base) / (vol_bump * 100.0);
-
-            let theta = asset_theta(pv_base);
-
-            let rate_bump = 0.0001;
-            let pv_rate_up = price_digital(
-                spot,
-                strike,
-                r_d + rate_bump,
-                r_f,
-                sigma,
-                t,
-                option_type,
-                payout_type,
-                payout_amount,
-                notional,
-            );
-            let rho_domestic = (pv_rate_up - pv_base) / rate_bump / 100.0;
+            let pv_base = match option_type {
+                OptionType::Call => spot * exp_rf_t * cdf_d1 * notional,
+                OptionType::Put => spot * exp_rf_t * (1.0 - cdf_d1) * notional,
+            };
+            let gamma =
+                -delta_sign * exp_rf_t * pdf_d1 * d2 * notional / (spot * sigma * sigma * t);
+            let vega = -delta_sign * spot * exp_rf_t * pdf_d1 * (d2 / sigma) * notional / 100.0;
+            let dd1_dt = (r_d - r_f + 0.5 * sigma * sigma) / sigma_sqrt_t - d1 / (2.0 * t);
+            let dv_dt = -r_f * pv_base + delta_sign * spot * exp_rf_t * pdf_d1 * dd1_dt * notional;
+            let theta = -dv_dt / theta_days_per_year;
+            let rho_domestic =
+                delta_sign * spot * exp_rf_t * pdf_d1 * (t / sigma_sqrt_t) * notional / 100.0;
+            let rho_foreign = (-t * pv_base
+                - delta_sign * spot * exp_rf_t * pdf_d1 * (t / sigma_sqrt_t) * notional)
+                / 100.0;
 
             FxDigitalOptionGreeks {
                 delta,
@@ -438,6 +387,7 @@ fn greeks_digital(
                 vega,
                 theta,
                 rho_domestic,
+                rho_foreign,
             }
         }
     })
