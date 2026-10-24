@@ -71,8 +71,11 @@ fn bumped_prepayment_specs(
             };
             let up_vec = shifted(PREPAYMENT_BUMP_CPR);
             let down_vec = shifted(-PREPAYMENT_BUMP_CPR);
-            let achieved =
-                up_vec.first().copied().unwrap_or(0.0) - down_vec.first().copied().unwrap_or(0.0);
+            let achieved = up_vec
+                .iter()
+                .zip(&down_vec)
+                .map(|(u, d)| u - d)
+                .fold(0.0_f64, f64::max);
             (
                 PrepaymentModelSpec::vector(up_vec),
                 PrepaymentModelSpec::vector(down_vec),

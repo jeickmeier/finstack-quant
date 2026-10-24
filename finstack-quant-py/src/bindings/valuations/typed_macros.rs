@@ -22,8 +22,8 @@ macro_rules! instrument_pricing_methods {
         #[pymethods]
         impl $ty {
             #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".price"))]
-            #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
-            #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)")]
+            #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None, explain=false))]
+            #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None, explain=false)")]
             #[allow(clippy::too_many_arguments)]
             fn price(
                 &self,
@@ -34,6 +34,7 @@ macro_rules! instrument_pricing_methods {
                 metrics: Option<Vec<String>>,
                 metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
                 market_history: Option<&Bound<'_, PyAny>>,
+                explain: bool,
             ) -> PyResult<$crate::bindings::valuations::PyValuationResult> {
                 $crate::bindings::valuations::pricing::price_typed(
                     py,
@@ -44,6 +45,7 @@ macro_rules! instrument_pricing_methods {
                     metrics,
                     metric_pricing_overrides,
                     market_history,
+                    explain,
                 )
             }
 

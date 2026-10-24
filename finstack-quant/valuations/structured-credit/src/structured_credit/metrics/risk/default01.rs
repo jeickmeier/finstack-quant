@@ -55,8 +55,11 @@ fn bumped_default_specs(spec: &DefaultModelSpec) -> (DefaultModelSpec, DefaultMo
             };
             let up_vec = shifted(DEFAULT_BUMP_CDR);
             let down_vec = shifted(-DEFAULT_BUMP_CDR);
-            let achieved =
-                up_vec.first().copied().unwrap_or(0.0) - down_vec.first().copied().unwrap_or(0.0);
+            let achieved = up_vec
+                .iter()
+                .zip(&down_vec)
+                .map(|(u, d)| u - d)
+                .fold(0.0_f64, f64::max);
             let up = DefaultModelSpec::Vector {
                 monthly_cdr: up_vec,
             };
@@ -72,6 +75,9 @@ fn bumped_default_specs(spec: &DefaultModelSpec) -> (DefaultModelSpec, DefaultMo
             cumulative_net_loss_pct,
             severity,
         } => {
+            if *severity <= 1e-12 {
+                return (spec.clone(), spec.clone(), 0.0);
+            }
             let terminal = cumulative_net_loss_pct.last().copied().unwrap_or(0.0);
             let delta_pct = DEFAULT_BUMP_CDR * severity * 100.0;
             let scaled = |delta: f64| -> Vec<f64> {

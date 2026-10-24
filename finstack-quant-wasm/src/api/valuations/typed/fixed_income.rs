@@ -1239,10 +1239,10 @@ setters!(JsAssetBackedFacilityBuilder, "AssetBackedFacilityBuilder", {
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         amortization_events as amortizationEvents => from_js_json,
         /// Set the term-out window after revolving.
-        /// @param value - `TermOutSpec` plain object, e.g. `{"months": 24}`: the amortization term after the revolving period ends.
+        /// @param value - Month count (e.g. `24`) or `TermOutSpec` plain object (`{"months": 24}`): the amortization term after the revolving period ends.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        term_out as termOut => from_js_json,
+        term_out as termOut => term_out,
         /// Set the transaction fees paid through the waterfall ahead of the facility's interest.
         /// @param value - `DealFees` serde object (`trustee_fee` Money per annum, `senior_mgmt_fee_bp`, `subordinated_mgmt_fee_bp`, `servicing_fee_bp`, optional `master_servicer_fee_bp` / `workout_fee_pct` / `liquidation_fee_pct` / `special_servicer_fee_bp` / `incentive_fee`).
         /// @returns The builder, for chaining.

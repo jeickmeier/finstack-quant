@@ -655,6 +655,7 @@ pub(crate) const EXPORTS: &[&str] = &[
 ///   validation; `None` keeps the instrument's own overrides.
 /// * `market_history` - Optional `MarketHistory | dict | str` scenarios for
 ///   the historical risk metrics (`hvar`, `expected_shortfall`).
+/// * `explain` - When `true`, attaches a step trace as `result.explanation`.
 // PyO3 binding helper: mirrors the keyword surface of `price_instrument`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn price_typed(
@@ -666,6 +667,7 @@ pub(crate) fn price_typed(
     metrics: Option<Vec<String>>,
     metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
     market_history: Option<&Bound<'_, PyAny>>,
+    explain: bool,
 ) -> PyResult<PyValuationResult> {
     let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
     let instrument = py.detach(move || {
@@ -683,7 +685,7 @@ pub(crate) fn price_typed(
         model,
         metrics,
         market_history,
-        false,
+        explain,
     )
 }
 /// Pricing options shared by the host entry points: the recalibration

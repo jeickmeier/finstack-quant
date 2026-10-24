@@ -323,7 +323,7 @@ impl AssetBackedFacility {
         let currency = self.commitment.currency();
         let mut fees = Vec::with_capacity(facility.accrual_periods.len());
         for period in &facility.accrual_periods {
-            if period.start >= commitment_end || period.opening_balance.amount() <= 0.0 {
+            if period.start >= commitment_end {
                 continue;
             }
             let undrawn = (self.commitment.amount() - period.opening_balance.amount()).max(0.0);
@@ -366,6 +366,7 @@ impl AssetBackedFacility {
             projection
                 .lender_cashflows()?
                 .into_iter()
+                .filter(|(date, _)| *date > as_of)
                 .map(|(date, amount)| (date, amount.amount())),
         );
         finstack_quant_core::cashflow::xirr(

@@ -741,6 +741,7 @@ class Bond:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this bond and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -769,6 +770,8 @@ class Bond:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -3382,6 +3385,7 @@ class TermLoan:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this term loan and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -3405,6 +3409,8 @@ class TermLoan:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -6071,6 +6077,7 @@ class InterestRateSwap:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this swap and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -6094,6 +6101,8 @@ class InterestRateSwap:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -6880,6 +6889,7 @@ class Swaption:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this swaption and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -6903,6 +6913,8 @@ class Swaption:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -7845,6 +7857,7 @@ class CapFloor:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this cap/floor and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -7868,6 +7881,8 @@ class CapFloor:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -9084,6 +9099,7 @@ class CreditDefaultSwap:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -9107,6 +9123,8 @@ class CreditDefaultSwap:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -10085,6 +10103,7 @@ class CdsOption:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -10108,6 +10127,8 @@ class CdsOption:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -11055,14 +11076,14 @@ class CdsOptionBuilder:
             If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
         """
         ...
-    def coupon_bp(self, value: decimal.Decimal | str | int | float) -> CdsOptionBuilder:
+    def coupon_bp(self, value: decimal.Decimal | str | int | float | Bps | Rate) -> CdsOptionBuilder:
         """
         Set the running coupon of the underlying CDS.
 
         Parameters
         ----------
-        value : decimal.Decimal | str | int | float
-            Coupon in basis points (``100`` for CDX.NA.IG), parsed exactly from its string form.
+        value : decimal.Decimal | str | int | float | Bps | Rate
+            Coupon in basis points (``100`` or ``Bps(100)`` for CDX.NA.IG).
 
         Returns
         -------
@@ -11303,6 +11324,7 @@ class CdsIndex:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -11326,6 +11348,8 @@ class CdsIndex:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -12536,6 +12560,7 @@ class CdsTranche:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -12559,6 +12584,8 @@ class CdsTranche:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -13837,6 +13864,7 @@ class ConvertibleBond:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -13860,6 +13888,8 @@ class ConvertibleBond:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -15087,6 +15117,7 @@ class FxForward:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -15110,6 +15141,8 @@ class FxForward:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -16155,6 +16188,7 @@ class FxOption:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -16178,6 +16212,8 @@ class FxOption:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -17241,6 +17277,7 @@ class EquityOption:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -17264,6 +17301,8 @@ class EquityOption:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -26658,6 +26697,7 @@ class StructuredCredit:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this deal and return a typed ``ValuationResult``.
@@ -26684,6 +26724,8 @@ class StructuredCredit:
         market_history : MarketHistory | dict | str | None
             Historical scenarios required by ``hvar`` and
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -28881,6 +28923,7 @@ class AssetBackedFacility:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price the lender's projected flows (interest, principal and commitment fees) and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -28906,6 +28949,8 @@ class AssetBackedFacility:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -29735,14 +29780,14 @@ class AssetBackedFacilityBuilder:
             If ``value`` is neither ``Money`` nor a number.
         """
         ...
-    def rate(self, value: float | dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+    def rate(self, value: float | Rate | Bps | dict[str, Any] | str) -> AssetBackedFacilityBuilder:
         """
         Set the facility coupon.
 
         Parameters
         ----------
-        value : float | dict[str, Any] | str
-            A bare decimal builds a fixed all-in rate (``0.06`` = 6%); a
+        value : float | Rate | Bps | dict[str, Any] | str
+            A bare decimal, ``Rate`` or ``Bps`` builds a fixed all-in rate (``0.06`` = 6%); a
             ``dict`` or JSON ``str`` in the ``RateSpec`` serde shape
             (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
             ``FloatingRateSpec``) is used verbatim.
@@ -29928,15 +29973,15 @@ class AssetBackedFacilityBuilder:
             already consumed.
         """
         ...
-    def term_out(self, value: int) -> AssetBackedFacilityBuilder:
+    def term_out(self, value: int | TermOutSpec | dict[str, Any] | str) -> AssetBackedFacilityBuilder:
         """
         Set the term-out window after revolving.
 
         Parameters
         ----------
-        value : int
+        value : int | TermOutSpec | dict[str, Any] | str
             Months after the revolving end at which the remaining collateral
-            is liquidated to repay the facility.
+            is liquidated to repay the facility, or a ``TermOutSpec`` object / dict.
 
         Returns
         -------
@@ -30621,6 +30666,7 @@ class RevolvingCredit:
         metrics: list[str] | None = None,
         metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
         market_history: MarketHistory | dict[str, Any] | str | None = None,
+        explain: bool = False,
     ) -> ValuationResult:
         """
         Price this facility and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -30646,6 +30692,8 @@ class RevolvingCredit:
         market_history : MarketHistory | dict[str, Any] | str, optional
             ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
+        explain : bool, default False
+            When ``True``, attach a step trace as ``result.explanation``.
 
         Returns
         -------
@@ -31411,14 +31459,14 @@ class RevolvingCreditBuilder:
             If ``value`` is not a date or the builder was already consumed.
         """
         ...
-    def rate(self, value: float | dict[str, Any] | str) -> RevolvingCreditBuilder:
+    def rate(self, value: float | Rate | Bps | dict[str, Any] | str) -> RevolvingCreditBuilder:
         """
         Set the facility coupon.
 
         Parameters
         ----------
-        value : float | dict[str, Any] | str
-            A bare decimal builds a fixed rate (``0.06`` = 6%); a ``dict`` or
+        value : float | Rate | Bps | dict[str, Any] | str
+            A bare decimal, ``Rate`` or ``Bps`` builds a fixed rate (``0.06`` = 6%); a ``dict`` or
             JSON ``str`` in the ``RateSpec`` serde shape
             (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
             ``FloatingRateSpec``) is used verbatim.

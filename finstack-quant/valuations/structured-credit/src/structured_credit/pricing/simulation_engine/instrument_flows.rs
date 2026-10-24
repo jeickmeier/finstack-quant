@@ -879,7 +879,17 @@ pub(super) fn run_period(
                 let cash = par * redemption.price_pct.min(100.0) / 100.0;
                 let premium = par * (redemption.price_pct - 100.0).max(0.0) / 100.0;
                 total_premium += premium;
-                total_default += par - cash;
+                let discount_loss = (par - cash).max(0.0);
+                if discount_loss > 0.0 {
+                    total_default += discount_loss;
+                    let immediate_date = pay_date
+                        .add_months(-i32::try_from(state.recovery_lag_months).unwrap_or(0))?;
+                    flows.workout_claims.push((
+                        immediate_date,
+                        Money::from((0_i64, ccy)),
+                        Money::new(discount_loss, ccy)?,
+                    ));
+                }
                 redeemed = cash;
                 remaining = 0.0;
                 name.retired = true;

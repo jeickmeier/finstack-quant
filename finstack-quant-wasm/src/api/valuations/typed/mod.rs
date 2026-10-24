@@ -161,6 +161,25 @@ pub(super) mod arg {
                 )))
             })
     }
+
+    /// `TermOutSpec` as a month count (`24`) or `{"months": 24}` object/JSON string.
+    pub(crate) fn term_out(
+        value: &JsValue,
+        label: &str,
+    ) -> Result<
+        finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::TermOutSpec,
+        JsValue,
+    > {
+        if value.as_f64().is_some() {
+            Ok(
+                finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::TermOutSpec {
+                    months: js_uint(value, label)?,
+                },
+            )
+        } else {
+            from_js_json(value, label)
+        }
+    }
 }
 
 /// The instrument as its compact canonical v1 envelope.

@@ -325,11 +325,13 @@ impl PyRevolvingCreditBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: RateSpec = if let Ok(rate) = value.extract::<f64>() {
-            RateSpec::Fixed { rate }
-        } else {
-            spec_from_py(py, value, "rate")?
-        };
+        let spec: RateSpec =
+            if value.extract::<&str>().is_ok() || value.cast::<pyo3::types::PyDict>().is_ok() {
+                spec_from_py(py, value, "rate")?
+            } else {
+                let rate = super::super::convert::rate_from_py(value, "rate")?;
+                RateSpec::fixed_rate(rate)
+            };
         let repr = serde_json::to_string(&spec).unwrap_or_default();
         builder_set!(slf, rate, repr, |b: RevolvingCreditBuilder| b.rate(spec))
     }

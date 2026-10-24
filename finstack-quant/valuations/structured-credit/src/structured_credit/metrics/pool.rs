@@ -11,7 +11,9 @@ pub struct CloWarfCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for CloWarfCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let clo = context.instrument_as::<crate::structured_credit::StructuredCredit>()?;
+        let clo = context
+            .instrument_as::<crate::structured_credit::StructuredCredit>()?
+            .resolved_for_pricing()?;
 
         let mut weighted_sum = 0.0;
         let mut total_balance = 0.0;
@@ -49,7 +51,9 @@ pub(crate) struct CloWasCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for CloWasCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let clo = context.instrument_as::<crate::structured_credit::StructuredCredit>()?;
+        let clo = context
+            .instrument_as::<crate::structured_credit::StructuredCredit>()?
+            .resolved_for_pricing()?;
 
         Ok(clo.pool.weighted_avg_spread_bp())
     }
