@@ -106,6 +106,7 @@ test('FxBarrierOption.greeks includes theta for an option quoted through fx_spot
     'vega',
     'theta',
     'rho',
+    'foreign_rho',
     'vanna',
     'volga',
   ]);

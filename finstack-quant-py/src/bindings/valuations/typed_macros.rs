@@ -23,7 +23,7 @@ macro_rules! instrument_pricing_methods {
         impl $ty {
             #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".price"))]
             #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None, explain=false))]
-            #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None, explain=false)")]
+            #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None, explain=False)")]
             #[allow(clippy::too_many_arguments)]
             fn price(
                 &self,

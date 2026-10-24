@@ -5274,6 +5274,7 @@
     "statics": ["fromJson"],
     "methods": [
       "delta",
+      "foreignRho",
       "free",
       "gamma",
       "greeks",
@@ -5292,6 +5293,7 @@
     "statics": ["fromJson"],
     "methods": [
       "delta",
+      "foreignRho",
       "free",
       "gamma",
       "greeks",
@@ -5310,6 +5312,7 @@
     "statics": ["fromJson"],
     "methods": [
       "delta",
+      "foreignRho",
       "free",
       "gamma",
       "greeks",

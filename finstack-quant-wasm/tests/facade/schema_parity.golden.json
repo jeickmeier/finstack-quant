@@ -119,7 +119,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 231856
+            "bytes": 232846
           },
           {
             "path": "schemas/attribution/1/attribution_result.schema.json",
@@ -2707,7 +2707,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
             "type_name": "StandardDealParams",
             "kind": "component",
-            "bytes": 229452
+            "bytes": 232405
           },
           {
             "path": "schemas/common/1/swaption_conventions.schema.json",
@@ -3407,7 +3407,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
             "type_name": "SimulationRun",
             "kind": "output",
-            "bytes": 33933
+            "bytes": 36503
           },
           {
             "path": "schemas/results/1/tranche_cashflows.schema.json",
@@ -3584,7 +3584,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 231856
+            "bytes": 232846
           },
           {
             "domain": "attribution",
@@ -4728,7 +4728,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
             "type_name": "StandardDealParams",
             "kind": "component",
-            "bytes": 229452
+            "bytes": 232405
           },
           {
             "domain": "valuations",
@@ -5528,7 +5528,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
             "type_name": "SimulationRun",
             "kind": "output",
-            "bytes": 33933
+            "bytes": 36503
           },
           {
             "domain": "valuations",

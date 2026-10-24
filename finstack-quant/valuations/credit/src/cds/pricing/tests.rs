@@ -933,3 +933,37 @@ fn production_cds_option_audit_premium_frequency_and_stub_are_effective() {
         vec![date!(2025 - 10 - 01), end]
     );
 }
+
+#[test]
+fn cdsw_accrued_counts_the_step_in_day_on_an_imm_coupon_date() {
+    use super::metrics::AccrualDayCountPolicy;
+    let cds = create_test_cds(
+        "IMM-ACCRUED",
+        date!(2024 - 03 - 20),
+        date!(2029 - 06 - 20),
+        100.0,
+        0.4,
+    );
+    let pricer = CdsPricer::new();
+    let accrued = |as_of, policy| {
+        pricer
+            .coupon_accrued_fraction(&cds, as_of, policy)
+            .expect("accrued")
+    };
+    let coupon_date = date!(2024 - 06 - 20);
+    assert_eq!(
+        accrued(coupon_date, AccrualDayCountPolicy::CdswInclusive),
+        1.0 / 360.0
+    );
+    assert_eq!(
+        accrued(
+            coupon_date + Duration::days(1),
+            AccrualDayCountPolicy::CdswInclusive
+        ),
+        2.0 / 360.0
+    );
+    assert_eq!(
+        accrued(coupon_date, AccrualDayCountPolicy::IsdaStandard),
+        0.0
+    );
+}

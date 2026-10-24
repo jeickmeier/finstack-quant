@@ -529,7 +529,7 @@ fn valuations_dts_exposes_direct_fx_instruments() {
     assert!(fx_instrument.contains("readonly id: string;"));
     assert!(contains_ignoring_ws(
         fx_instrument,
-        "price(marketJson: JsonInput, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null): ValuationResult;",
+        "price(marketJson: JsonInput, asOf: string, model?: string | null, metrics?: string[] | null, metricPricingOverrides?: JsonInput | null, marketHistory?: JsonInput | null, explain?: boolean | null): ValuationResult;",
     ));
 }
 

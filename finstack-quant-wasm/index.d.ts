@@ -24262,6 +24262,15 @@ export interface FxDigitalOption extends FxHandle {
    */
   rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
+   * Foreign-rate rho of the option under the selected model.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
+   */
+  foreignRho(marketJson: JsonInput, asOf: string, model?: string | null): number;
+  /**
    * Named first-order greeks produced by the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -24321,6 +24330,15 @@ export interface FxTouchOption extends FxHandle {
    * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
+  /**
+   * Foreign-rate rho of the option under the selected model.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
+   */
+  foreignRho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Named first-order greeks produced by the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.

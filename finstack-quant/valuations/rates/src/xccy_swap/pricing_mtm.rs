@@ -200,8 +200,8 @@ fn project_mtm_cashflows(
     let end_c = swap.adjusted_leg_end(constant_leg)?;
     let end_r = swap.adjusted_leg_end(resetting_leg)?;
 
-    let resetting_ccy = resetting_leg.notional.currency();
-    let constant_ccy = constant_leg.notional.currency();
+    let resetting_currency = resetting_leg.notional.currency();
+    let constant_currency = constant_leg.notional.currency();
 
     // Period `j`'s notional still drives an unsettled flow: its coupon, the
     // rebalancing exchange at the next period start, or the final exchange.
@@ -221,7 +221,12 @@ fn project_mtm_cashflows(
     // reset on `as_of`, or a past one nothing depends on, keeps the contractual
     // resetting notional.
     let n_r_initial = if constant_leg.leg.start <= as_of {
-        match observed_fx_reset(context, resetting_ccy, constant_ccy, constant_leg.leg.start) {
+        match observed_fx_reset(
+            context,
+            resetting_currency,
+            constant_currency,
+            constant_leg.leg.start,
+        ) {
             Some(historical_fx) => {
                 require_positive_finite(
                     historical_fx,
@@ -234,8 +239,8 @@ fn project_mtm_cashflows(
                 && (start_r > as_of || period_needs_notional(0)) =>
             {
                 return Err(missing_fx_reset(
-                    resetting_ccy,
-                    constant_ccy,
+                    resetting_currency,
+                    constant_currency,
                     constant_leg.leg.start,
                     as_of,
                 ));
@@ -311,7 +316,12 @@ fn project_mtm_cashflows(
         let n_r_j = if j == 0 {
             n_r_initial
         } else if period.accrual_start < as_of {
-            match observed_fx_reset(context, resetting_ccy, constant_ccy, period.accrual_start) {
+            match observed_fx_reset(
+                context,
+                resetting_currency,
+                constant_currency,
+                period.accrual_start,
+            ) {
                 Some(historical_fx) => {
                     require_positive_finite(
                         historical_fx,
@@ -322,8 +332,8 @@ fn project_mtm_cashflows(
                 }
                 None if period_needs_notional(j) => {
                     return Err(missing_fx_reset(
-                        resetting_ccy,
-                        constant_ccy,
+                        resetting_currency,
+                        constant_currency,
                         period.accrual_start,
                         as_of,
                     ));
