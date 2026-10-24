@@ -207,6 +207,7 @@ line-length = 120
 target-version = "py312"
 src = ["."]
 exclude = [
+    ".agents/skills/**",
     ".cursor/**",
     ".ty_cache/**",
     ".pytest_cache/**",

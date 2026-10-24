@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
-from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "worktree_inventory.py"
 
@@ -44,9 +44,9 @@ class WorktreeInventoryTests(unittest.TestCase):
         (self.repo / "new.py").write_text("print('new')\n", encoding="utf-8")
         self.git("add", "new.py")
         result = self.inventory()
-        self.assertFalse(result["has_head_commit"])
-        self.assertEqual(result["counts"]["staged"], 1)
-        self.assertEqual(result["entries"][0]["path"], "new.py")
+        assert not result["has_head_commit"]
+        assert result["counts"]["staged"] == 1
+        assert result["entries"][0]["path"] == "new.py"
 
     def test_staged_unstaged_untracked_and_rename(self) -> None:
         self.commit_initial()
@@ -57,24 +57,24 @@ class WorktreeInventoryTests(unittest.TestCase):
         (self.repo / "untracked file.py").write_text("# new\n", encoding="utf-8")
         result = self.inventory()
         by_path = {item["path"]: item for item in result["entries"]}
-        self.assertTrue(result["has_head_commit"])
-        self.assertTrue(by_path["tracked.py"]["staged"])
-        self.assertTrue(by_path["tracked.py"]["unstaged"])
-        self.assertEqual(by_path["renamed module.py"]["old_path"], "old module.py")
-        self.assertTrue(by_path["untracked file.py"]["untracked"])
-        self.assertEqual(result["counts"]["changed_paths"], 3)
+        assert result["has_head_commit"]
+        assert by_path["tracked.py"]["staged"]
+        assert by_path["tracked.py"]["unstaged"]
+        assert by_path["renamed module.py"]["old_path"] == "old module.py"
+        assert by_path["untracked file.py"]["untracked"]
+        assert result["counts"]["changed_paths"] == 3
 
     def test_clean_repository_and_explicit_deletion(self) -> None:
         self.commit_initial()
-        self.assertEqual(self.inventory()["counts"]["changed_paths"], 0)
+        assert self.inventory()["counts"]["changed_paths"] == 0
         self.git("rm", "old module.py")
         by_path = {item["path"]: item for item in self.inventory()["entries"]}
-        self.assertTrue(by_path["old module.py"]["deleted"])
-        self.assertTrue(by_path["old module.py"]["staged"])
+        assert by_path["old module.py"]["deleted"]
+        assert by_path["old module.py"]["staged"]
 
     def test_unicode_name(self) -> None:
         (self.repo / "résumé one.py").write_text("x = 1\n", encoding="utf-8")
-        self.assertEqual(self.inventory()["entries"][0]["path"], "résumé one.py")
+        assert self.inventory()["entries"][0]["path"] == "résumé one.py"
 
 
 if __name__ == "__main__":
