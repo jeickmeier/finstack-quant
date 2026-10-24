@@ -3,7 +3,7 @@
 
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 
-use super::{invalid_return_series, Performance};
+use super::Performance;
 use crate::drawdown::{
     burke_ratio, deepest, max_drawdown_duration, mean_episode_drawdown, pain_index, pain_ratio,
     sterling_ratio, ulcer_index, worst_episode_depths,
@@ -11,7 +11,7 @@ use crate::drawdown::{
 use crate::returns::comp_total;
 use crate::risk_metrics;
 use crate::risk_metrics::CagrDayCount;
-use finstack_quant_core::dates::HolidayCalendar;
+use finstack_quant_core::dates::{DayCount, HolidayCalendar};
 use finstack_quant_core::math::stats::{mean, variance};
 
 impl Performance {
@@ -36,13 +36,12 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// One CAGR per ticker in column order.
+    /// One CAGR per ticker in column order, or [`f64::NAN`] for any ticker
+    /// with no active observations in the current date window.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) if the active range has
-    /// no valid positive holding period. Propagates day-count errors,
-    /// including a missing calendar for Bus/252.
+    /// Propagates day-count errors, including a missing calendar for Bus/252.
     ///
     /// # Examples
     ///
@@ -69,18 +68,13 @@ impl Performance {
         day_count: CagrDayCount,
         calendar: Option<&dyn HolidayCalendar>,
     ) -> finstack_quant_core::Result<Vec<f64>> {
+        if matches!(day_count, CagrDayCount::DayCount(DayCount::Bus252)) && calendar.is_none() {
+            return Err(finstack_quant_core::InputError::MissingCalendarForBus252.into());
+        }
         (0..self.ticker_names.len())
             .map(|i| {
                 let Some((start, end)) = self.active_holding_period_for_ticker(i) else {
-                    return Err(invalid_return_series(
-                        self.ticker_names[i].as_str(),
-                        self.start_idx,
-                        format!(
-                            "active range [{}..{}] has no positive holding period for ticker {}",
-                            self.start_idx, self.end_idx, self.ticker_names[i]
-                        ),
-                    )
-                    .into());
+                    return Ok(f64::NAN);
                 };
                 risk_metrics::cagr(self.active_returns(i), start, end, day_count, calendar)
             })

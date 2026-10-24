@@ -5042,6 +5042,118 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Inputs for the standard structured-credit registry constructor.",
+  "examples": [
+    {
+      "calendar_id": "nyse",
+      "closing_date": "2024-01-01",
+      "discount_curve_id": "USD-OIS",
+      "id": "CLO-EXAMPLE",
+      "maturity": "2034-01-01",
+      "pool": {
+        "assets": [
+          {
+            "acquisition_date": null,
+            "asset_type": {
+              "type": "high_yield_bond"
+            },
+            "balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "contractual_payment": null,
+            "day_count": "act_360",
+            "default_date": null,
+            "defaulted": false,
+            "forward_curve_id": null,
+            "id": "COLLATERAL-1",
+            "industry": null,
+            "maturity": "2034-01-01",
+            "mdr_override": null,
+            "obligor_id": null,
+            "origination_date": null,
+            "purchase_price": null,
+            "rate": 0.07,
+            "rating": null,
+            "recovery_amount": null,
+            "recovery_rate": null,
+            "smm_override": null,
+            "spread_bp": null
+          }
+        ],
+        "collection_account": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_defaults": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_prepayments": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_recoveries": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_scheduled_amortization": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "currency": "USD",
+        "deal_type": "clo",
+        "excess_spread_account": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "id": "POOL-1",
+        "reinvestment_period": null,
+        "rep_lines": null,
+        "reserve_account": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "tranches": {
+        "tranches": [
+          {
+            "attach_pct": 0.0,
+            "attributes": {},
+            "coupon": {
+              "fixed": {
+                "rate": 0.06
+              }
+            },
+            "current_balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "day_count": "act_360",
+            "deferred_interest": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "detach_pct": 100.0,
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "ic_trigger": null,
+            "id": "CLONOTES-A",
+            "maturity": "2034-01-01",
+            "oc_trigger": null,
+            "original_balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "pik_enabled": false,
+            "rating": null,
+            "seniority": "senior"
+          }
+        ]
+      }
+    }
+  ],
   "properties": {
     "calendar_id": {
       "anyOf": [

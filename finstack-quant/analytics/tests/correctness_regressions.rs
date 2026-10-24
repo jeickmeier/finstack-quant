@@ -784,6 +784,22 @@ fn single_observation_windows_surface_nan_not_signed_infinity() {
         perf.treynor(0.02)[0].is_nan(),
         "treynor on 1 obs must be NaN"
     );
+    assert!(
+        perf.m_squared(0.02)[0].is_nan(),
+        "m_squared on 1 obs must be NaN"
+    );
+    assert!(
+        perf.parametric_var(0.95, None).expect("confidence")[0].is_nan(),
+        "parametric_var on 1 obs must be NaN"
+    );
+    assert!(
+        perf.cornish_fisher_var(0.95, None).expect("confidence")[0].is_nan(),
+        "cornish_fisher_var on 1 obs must be NaN"
+    );
+    assert!(
+        perf.modified_sharpe(0.02, 0.95).expect("confidence")[0].is_nan(),
+        "modified_sharpe on 1 obs must be NaN"
+    );
     let beta = &perf.beta()[0];
     assert!(beta.beta.is_nan());
     assert!(beta.std_err.is_nan());
@@ -800,7 +816,7 @@ fn single_observation_windows_surface_nan_not_signed_infinity() {
 #[test]
 fn performance_regression_outputs_are_nan_for_empty_overlap() {
     let dates: Vec<Date> = (1..=4).map(|day| d(2024, Month::January, day)).collect();
-    let perf = Performance::from_returns(
+    let mut perf = Performance::from_returns(
         dates,
         vec![
             vec![0.01, 0.02, f64::NAN, f64::NAN],
@@ -818,6 +834,7 @@ fn performance_regression_outputs_are_nan_for_empty_overlap() {
     assert!(beta.ci_lower.is_nan());
     assert!(beta.ci_upper.is_nan());
     assert!(perf.treynor(0.0)[1].is_nan());
+    assert!(perf.m_squared(0.02)[1].is_nan());
     assert!(perf.r_squared()[1].is_nan());
 
     let greeks = &perf.greeks(0.0)[1];
@@ -825,6 +842,15 @@ fn performance_regression_outputs_are_nan_for_empty_overlap() {
     assert!(greeks.beta.is_nan());
     assert!(greeks.r_squared.is_nan());
     assert!(greeks.adjusted_r_squared.is_nan());
+
+    // Restricting the window to the first two days excludes PORT; panel CAGR
+    // and dependent ratios must emit NaN for PORT rather than erroring.
+    perf.reset_date_range(d(2024, Month::January, 1), d(2024, Month::January, 2));
+    let cagrs = perf.cagr(CagrDayCount::default(), None).expect("cagr");
+    assert!(cagrs[0].is_finite());
+    assert!(cagrs[1].is_nan());
+    assert!(perf.calmar().expect("calmar")[1].is_nan());
+    assert!(perf.summary(0.02, 0.95).is_ok());
 }
 
 #[test]
@@ -845,6 +871,7 @@ fn performance_regression_outputs_are_nan_for_constant_benchmark() {
     assert!(beta.ci_lower.is_nan());
     assert!(beta.ci_upper.is_nan());
     assert!(perf.treynor(0.0)[0].is_nan());
+    assert!(perf.m_squared(0.02)[0].is_nan());
     assert!(perf.r_squared()[0].is_nan());
 
     let greeks = &perf.greeks(0.0)[0];

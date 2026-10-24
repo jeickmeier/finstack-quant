@@ -647,6 +647,8 @@ pub(crate) fn rolling_greeks(
     let mut acc_sb2 = seeded_accumulator(seed_sb2);
     let mut steps_since_recompute = 0usize;
     let mut variance_scale = 0.0_f64;
+    let mut cov_scale = 0.0_f64;
+    let mut r_scale = 0.0_f64;
 
     for i in window..=n {
         // Shifted sums: correct for beta (shift-invariant) as they stand.
@@ -662,7 +664,13 @@ pub(crate) fn rolling_greeks(
         // remaining sums themselves are tiny. This relative trigger rebuilds
         // the window; it never declares small but nonzero variance invalid.
         variance_scale = variance_scale.max((w * sb2).abs() + sb * sb);
-        let cancellation = variance_scale > 0.0 && denom <= f64::EPSILON.sqrt() * variance_scale;
+        cov_scale = cov_scale.max((w * srb).abs() + (sb * sr).abs());
+        r_scale = r_scale.max(sr.abs());
+        let cancellation = (variance_scale > 0.0 && denom <= f64::EPSILON.sqrt() * variance_scale)
+            || (cov_scale > 0.0 && (w * srb - sb * sr).abs() <= f64::EPSILON.sqrt() * cov_scale)
+            || (r_scale > 0.0
+                && (sr.abs() <= f64::EPSILON.sqrt() * r_scale
+                    || (sr + w * shift_r).abs() <= f64::EPSILON.sqrt() * sr.abs()));
         let sums_non_finite =
             !(sr.is_finite() && sb.is_finite() && srb.is_finite() && sb2.is_finite());
         if cancellation
@@ -684,6 +692,8 @@ pub(crate) fn rolling_greeks(
             acc_sb2 = seeded_accumulator(sb2);
             steps_since_recompute = 0;
             variance_scale = (w * sb2).abs() + sb * sb;
+            cov_scale = (w * srb).abs() + (sb * sr).abs();
+            r_scale = sr.abs();
             denom = w * sb2 - sb * sb;
         }
         // Degenerate window (e.g. constant benchmark or NaN inputs) cannot
@@ -945,8 +955,8 @@ pub(crate) fn treynor(ann_return: f64, risk_free_rate: f64, beta: f64, ann_facto
 ///
 /// # Returns
 ///
-/// The linearly annualized M-squared return. For zero portfolio volatility,
-/// returns the decompounded periodic cash rate multiplied by `ann_factor`.
+/// The linearly annualized M-squared return, or [`f64::NAN`] when either
+/// volatility is zero or any input is non-finite.
 ///
 /// # References
 ///
@@ -964,11 +974,10 @@ pub(crate) fn m_squared(
         || !ann_return.is_finite()
         || !ann_vol.is_finite()
         || !bench_vol.is_finite()
+        || ann_vol.abs() < 1e-10
+        || bench_vol.abs() < 1e-10
     {
         return f64::NAN;
-    }
-    if ann_vol.abs() < 1e-10 {
-        return cash;
     }
     cash + (ann_return - cash) * (bench_vol / ann_vol)
 }
@@ -1414,7 +1423,7 @@ mod tests {
                     (f64::NAN, f64::NAN)
                 } else {
                     let beta = (w * srb - sb * sr) / denom;
-                    let alpha = (sr / w - beta * sb / w) * ann_factor;
+                    let alpha = (mean_r - beta * mean_b) * ann_factor;
                     (alpha, beta)
                 };
                 alphas.push(alpha);
@@ -1461,6 +1470,34 @@ mod tests {
             "max beta diff too large: {max_beta_diff}"
         );
         assert!(rolling.alphas.iter().all(|alpha| alpha.is_finite()));
+
+        // A departing portfolio-side outlier (while benchmark stays smooth)
+        // must trigger an immediate rebuild rather than polluting beta/alpha
+        // over the remaining recompute interval.
+        let mut r_spike: Vec<f64> = b.iter().map(|&bi| 2.0 * (bi - 500_000.0) + 0.001).collect();
+        let b_smooth: Vec<f64> = b.iter().map(|&bi| bi - 500_000.0).collect();
+        r_spike[0] = 1.0e9;
+        r_spike[3] = -1.0e9;
+        let spike_rolling = rolling_greeks(&r_spike, &b_smooth, &dates, window, ann_factor, 0.0);
+        let (expected_alphas, expected_spike_betas) =
+            exact_rolling_greeks(&r_spike, &b_smooth, window, ann_factor);
+        for (idx, ((&a, &ea), (&bt, &ebt))) in spike_rolling
+            .alphas
+            .iter()
+            .zip(expected_alphas.iter())
+            .zip(spike_rolling.betas.iter().zip(expected_spike_betas.iter()))
+            .enumerate()
+            .skip(4)
+        {
+            assert!(
+                (bt - ebt).abs() < 1e-10,
+                "beta mismatch at {idx}: {bt} vs {ebt}"
+            );
+            assert!(
+                (a - ea).abs() < 1e-10,
+                "alpha mismatch at {idx}: {a} vs {ea}"
+            );
+        }
     }
 
     #[test]
@@ -1623,7 +1660,8 @@ mod tests {
 
     #[test]
     fn m_squared_zero_vol() {
-        assert_eq!(m_squared(0.10, 0.0, 0.15, 0.02, 1.0), 0.02);
+        assert!(m_squared(0.10, 0.0, 0.15, 0.02, 1.0).is_nan());
+        assert!(m_squared(0.10, 0.20, 0.0, 0.02, 1.0).is_nan());
     }
 
     #[test]

@@ -147,10 +147,13 @@ if parser.parse_args().write:
             f"T={t} ACT/365F, A={base[3]} years, N={notional:.0f} USD. Reference NPV={base[0]} USD, "
             f"vega={base[1]} USD per 100bp normal vol, signed DV01={dv01} USD per 1bp. "
             "This reference isolates option quote-unit/pricing/risk correctness; its calibration and underlying "
-            "forward are not an independent external curve benchmark. The calibrated input volatility can move "
-            "slightly with floating-point solver changes: this recapture follows numerical calibration updates "
-            "that shifted sigmaN from 0.006869675711573747 while leaving the underlying forward and annuity "
-            "unchanged to floating-point precision. Contract terms, market quotes, and tolerances are unchanged. "
+            "forward are not an independent external curve benchmark. This recapture follows the 2026-10-23 "
+            "forward-calibration extrapolation change (c69d13e5a4): calibrated forward curves now hold the last "
+            "forward rate constant past the final reset (FlatZero) instead of extending the last segment's slope "
+            "(FlatForward). The fixture's FRA quotes end at t=1.02y while the underlying swap runs 2027-2032, so "
+            "its forward is extrapolation-dominated: F moved from 0.05849967094365875 to the value above and the "
+            "SABR normal vol refitted at the lower forward, while the discount curve and annuity are unchanged. "
+            "Contract terms, market quotes, and tolerances are unchanged. "
             "Old self-captured million-dollar price used a lognormal-equivalent vol as a normal quote."
         ),
     )

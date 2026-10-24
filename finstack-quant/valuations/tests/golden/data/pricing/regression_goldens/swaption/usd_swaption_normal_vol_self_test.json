@@ -3,14 +3,14 @@
   "metadata": {
     "name": "usd_swaption_normal_vol_self_test",
     "domain": "rates.swaption",
-    "description": "Independent Bachelier reference for a 10MM USD out-of-the-money 1Y-into-5Y receiver swaption on the three-step calibrated rates/normal-SABR market. Contractual strike 3.766225%; projected forward 5.849967094365854%. The original ATM description was incorrect.",
+    "description": "Independent Bachelier reference for a 10MM USD out-of-the-money 1Y-into-5Y receiver swaption on the three-step calibrated rates/normal-SABR market. Contractual strike 3.766225%; projected forward 5.339268554469429%. The original ATM description was incorrect.",
     "valuation_date": "2026-05-08",
     "source": "formula",
-    "source_detail": "Independent formula recapture 2026-10-17: scripts/golden/normal_swaption_reference.py calibrates the original market envelope and takes its forward and normal cube quote as inputs. It independently sums contractual ACT/360 annual fixed accruals times payment-date discount factors, computes receiver Bachelier N*A*((K-F)*Phi(-d)+sigmaN*sqrt(T)*phi(d)) with Python math.erfc, computes vega per 0.01 normal-vol change, and centrally reprices +/-1bp continuous discount-zero-rate and additive forward-rate shocks using that same independent formula. Discount shocks preserve the source interpolation and multiply DF(t) by exp(-dr*t); off-pillar identities are checked during regeneration. Formula reference: https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/blackformula.cpp (bachelierBlackFormula). Inputs: F=0.05849967094365875, K=0.03766225, sigmaN=0.0068696747482368 decimal rate/sqrt(year), T=0.9917808219178083 ACT/365F, A=4.252728930362284 years, N=10000000 USD. Reference NPV=94.49400877899727 USD, vega=1634.354655922626 USD per 100bp normal vol, signed DV01=-5.24510482514777 USD per 1bp. This reference isolates option quote-unit/pricing/risk correctness; its calibration and underlying forward are not an independent external curve benchmark. The calibrated input volatility can move slightly with floating-point solver changes: this recapture follows numerical calibration updates that shifted sigmaN from 0.006869675711573747 while leaving the underlying forward and annuity unchanged to floating-point precision. Contract terms, market quotes, and tolerances are unchanged. Old self-captured million-dollar price used a lognormal-equivalent vol as a normal quote.",
+    "source_detail": "Independent formula recapture 2026-10-24: scripts/golden/normal_swaption_reference.py calibrates the original market envelope and takes its forward and normal cube quote as inputs. It independently sums contractual ACT/360 annual fixed accruals times payment-date discount factors, computes receiver Bachelier N*A*((K-F)*Phi(-d)+sigmaN*sqrt(T)*phi(d)) with Python math.erfc, computes vega per 0.01 normal-vol change, and centrally reprices +/-1bp continuous discount-zero-rate and additive forward-rate shocks using that same independent formula. Discount shocks preserve the source interpolation and multiply DF(t) by exp(-dr*t); off-pillar identities are checked during regeneration. Formula reference: https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/blackformula.cpp (bachelierBlackFormula). Inputs: F=0.05339268554469429, K=0.03766225, sigmaN=0.008171634700681399 decimal rate/sqrt(year), T=0.9917808219178083 ACT/365F, A=4.252728930362284 years, N=10000000 USD. Reference NPV=3510.2262230781007 USD, vega=26088.365724369185 USD per 100bp normal vol, signed DV01=-120.72083723376954 USD per 1bp. This reference isolates option quote-unit/pricing/risk correctness; its calibration and underlying forward are not an independent external curve benchmark. This recapture follows the 2026-10-23 forward-calibration extrapolation change (c69d13e5a4): calibrated forward curves now hold the last forward rate constant past the final reset (FlatZero) instead of extending the last segment's slope (FlatForward). The fixture's FRA quotes end at t=1.02y while the underlying swap runs 2027-2032, so its forward is extrapolation-dominated: F moved from 0.05849967094365875 to the value above and the SABR normal vol refitted at the lower forward, while the discount curve and annuity are unchanged. Contract terms, market quotes, and tolerances are unchanged. Old self-captured million-dollar price used a lognormal-equivalent vol as a normal quote.",
     "captured_by": "Codex independent formula verification",
-    "captured_on": "2026-10-17",
+    "captured_on": "2026-10-24",
     "last_reviewed_by": "Codex",
-    "last_reviewed_on": "2026-10-17",
+    "last_reviewed_on": "2026-10-24",
     "review_interval_months": 12,
     "regen_command": "uv run --no-sync python scripts/golden/normal_swaption_reference.py --write",
     "screenshots": []
@@ -678,9 +678,9 @@
     }
   },
   "expected": {
-    "npv": 94.49400877899727,
-    "vega": 1634.354655922626,
-    "dv01": -5.24510482514777
+    "npv": 3510.2262230781007,
+    "vega": 26088.365724369185,
+    "dv01": -120.72083723376954
   },
   "tolerances": {
     "npv": {

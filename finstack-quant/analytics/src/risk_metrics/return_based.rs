@@ -530,8 +530,9 @@ pub(crate) fn gain_to_pain(returns: &[f64]) -> f64 {
 ///
 /// # Returns
 ///
-/// The Modified Sharpe ratio. Returns `0.0` for empty slices and
-/// [`f64::NAN`] when the Cornish-Fisher VaR is unexpectedly non-negative.
+/// The Modified Sharpe ratio. Returns [`f64::NAN`] for fewer than two
+/// observations, zero volatility, or when the Cornish-Fisher VaR is
+/// unexpectedly non-negative.
 ///
 /// # References
 ///
@@ -543,14 +544,15 @@ pub(crate) fn modified_sharpe(
     confidence: f64,
     ann_factor: f64,
 ) -> f64 {
-    if returns.is_empty() {
-        return 0.0;
+    if returns.len() < 2 {
+        return f64::NAN;
     }
-    let excess_return = crate::returns::annualized_excess_return(
-        mean_return(returns, true, ann_factor),
-        risk_free_rate,
-        ann_factor,
-    );
+    let (ann_return, ann_vol) = mean_vol_annualized(returns, ann_factor);
+    if !ann_return.is_finite() || !ann_vol.is_finite() || ann_vol == 0.0 {
+        return f64::NAN;
+    }
+    let excess_return =
+        crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
     let cf_var = cornish_fisher_var(returns, confidence, Some(ann_factor));
     if cf_var >= 0.0 {
         return f64::NAN;
@@ -952,7 +954,9 @@ mod tests {
 
     #[test]
     fn modified_sharpe_empty() {
-        assert_eq!(modified_sharpe(&[], 0.02, 0.95, 252.0), 0.0);
+        assert!(modified_sharpe(&[], 0.02, 0.95, 252.0).is_nan());
+        assert!(modified_sharpe(&[-0.01], 0.0, 0.95, 252.0).is_nan());
+        assert!(modified_sharpe(&[-0.01; 12], 0.0, 0.95, 12.0).is_nan());
     }
 
     #[test]
