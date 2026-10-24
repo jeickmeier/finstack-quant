@@ -125,7 +125,7 @@ macro_rules! fx_option_class {
 }
 
 /// An FX option class whose Greek methods start with spot delta, gamma, vega,
-/// theta and domestic rho.
+/// theta, domestic rho and foreign rho.
 ///
 /// `$theta_returns` documents the class's theta; each `$extra` appends one
 /// more Greek entry in the `fx_option_class!` form.
@@ -142,6 +142,7 @@ macro_rules! fx_option {
                 (vega, vega, "vega", "Vega of the option.", "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."),
                 (theta, theta, "theta", "Theta of the option.", $theta_returns),
                 (rho, rho, "rho", "Domestic rate rho of the option.", "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."),
+                (foreign_rho, foreignRho, "foreign_rho", "Foreign rate rho of the option.", "@returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate."),
                 $($extra),*
             ]
         );
@@ -166,13 +167,12 @@ fx_class!(
     instruments::fx::fx_variance_swap::FxVarianceSwap
 );
 
-/// An FX option class exposing every standard Greek: the `fx_option!` five
-/// plus foreign rho, vanna and volga.
+/// An FX option class exposing every standard Greek: the `fx_option!` six
+/// plus vanna and volga.
 macro_rules! fx_option_with_all_greeks {
     ($rust_name:ident, $js_name:literal, $rust_ty:ty, $instrument_type:ident, $theta_returns:literal) => {
         fx_option!(
             $rust_name, $js_name, $rust_ty, $instrument_type, $theta_returns,
-            (foreign_rho, foreignRho, "foreign_rho", "Foreign rate rho of the option.", "@returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate."),
             (vanna, vanna, "vanna", "Vanna of the option.", "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."),
             (volga, volga, "volga", "Volga of the option.", "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."),
         );
@@ -203,14 +203,12 @@ fx_option!(
     FxTouchOption,
     "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
 );
-fx_option!(
+fx_option_with_all_greeks!(
     JsFxBarrierOption,
     "FxBarrierOption",
     instruments::fx::fx_barrier_option::FxBarrierOption,
     FxBarrierOption,
-    "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized.",
-    (vanna, vanna, "vanna", "Vanna of the option.", "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."),
-    (volga, volga, "volga", "Volga of the option.", "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."),
+    "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
 );
 
 #[wasm_bindgen(js_class = FxForward)]

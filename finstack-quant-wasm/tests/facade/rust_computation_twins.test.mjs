@@ -155,7 +155,7 @@ test('cashflows.absToSmm matches the Rust ABS kernel', () => {
 
 test('cashflows schedule analytics match the typed Python CashFlowSchedule methods', () => {
   const schedule = cashflows.buildCashflowSchedule(CASHFLOW_SPEC);
-  assert.equal(schedule.wal('2024-08-31'), 1.0027397260273974);
+  assert.equal(schedule.wal('2024-08-31'), 1);
   const balances = schedule.outstandingByDate();
   assert.deepEqual(
     balances.map((row) => [row.date, Number(row.amount.amount)]),

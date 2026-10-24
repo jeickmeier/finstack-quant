@@ -318,6 +318,7 @@ fn fx_price_with_metrics_validates_merged_overrides_before_market() {
                 r#"{"bump_config":{"vol_bump_decimal":-0.20}}"#.to_string(),
             )),
             None,
+            None,
         )
         .unwrap_err();
     let message = error_message(error);
