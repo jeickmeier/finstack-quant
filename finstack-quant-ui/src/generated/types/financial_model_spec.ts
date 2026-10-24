@@ -1690,9 +1690,10 @@ export interface D_7Af15F20A258D1Def9Dd {
    */
   compounding?: D_872965Bd151A7E141244 | null;
   /**
-   * Policy when forward curve lookup fails during emission.
+   * Policy when projecting a coupon fails; see [`FloatingRateFallback`]
+   * for when it applies and what it replaces.
    *
-   * Defaults to `Error`, which surfaces curve lookup failures.
+   * Defaults to `Error`, which surfaces projection failures.
    * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
    * to use a fixed index rate.
    */
@@ -1771,16 +1772,15 @@ export interface D_7Af15F20A258D1Def9Dd {
    */
   index_floor_bp?: DB375E274438Ab847F1Fc | null;
   /**
-   * Explicit term-index tenor when no forward curve resolves.
+   * Expected term-index tenor, checked against the resolved forward curve.
    *
    * The named forward curve is already the term index (for example a 3M
-   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
-   * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
-   * when no forward curve resolves. Ignored for overnight-compounded
-   * legs. When set, the builder warns at build time if it disagrees with
-   * the resolved curve's tenor by more than 10% — the curve remains
-   * authoritative.
+   * EURIBOR curve) and owns the quoted tenor. Projection is
+   * `fwd.rate(reset_date)`, not a FRA-style average over
+   * `[reset, reset + tenor]`. The builder only uses this field to warn at
+   * build time when it disagrees with the resolved curve's tenor by more
+   * than 10%; the curve remains authoritative. Ignored for
+   * overnight-compounded legs.
    */
   index_tenor?: DCc937Fbaa12E32D4187E2 | null;
   /**
@@ -3371,19 +3371,28 @@ export interface DD5Bd42D8B6Ec6C31D7862 {
 export interface DBba0Ef481F913F00873A {
   /**
    * Holiday calendar IDs used for schedule adjustments.
+   *
+   * Informational: carried through merge and host views, but no Rust
+   * engine reads it; accrual uses each flow's `accrual.calendar_id`.
    */
   calendar_ids: string[];
   /**
    * Total facility commitment for revolving and delayed-draw facilities;
    * `None` for instruments without one.
+   *
+   * Informational: carried through merge and host views, but no Rust
+   * engine reads it.
    */
   commitment?: DD5Bd42D8B6Ec6C31D7861 | null;
   /**
-   * Issue date of the instrument, when known.
+   * Issue date of the instrument.
    *
-   * Used by the accrual engine to establish the first coupon period start
-   * date precisely, avoiding the inverse day count approximation that can
-   * be off by 1-2 days.
+   * Required by accrual and by `outstanding_by_date` /
+   * `outstanding_at_dates`, which return an error when it is missing rather
+   * than infer the first coupon period start from flow dates. `validate`
+   * and the public lifecycle normalization instead fall back to the first
+   * flow date to locate the issue funding row. Merging schedules keeps it
+   * only when every input carries the same date.
    */
   issue_date?: D_2331411247Fb4Fdd46Dd | null;
   /**
@@ -7544,9 +7553,10 @@ export interface D_12Fd8E2C005F5987500B {
 /**
  * Fee tier for utilization-based fee structures.
  *
- * Tiers are evaluated in order: the first tier where utilization >= threshold applies.
- * Tiers must be sorted by threshold (ascending); [`evaluate_fee_tiers`]
- * rejects unordered tiers.
+ * The tier with the highest threshold not exceeding utilization applies, so
+ * a higher utilization moves into a higher tier; below the lowest threshold
+ * no tier applies. Tiers must be sorted by threshold (strictly ascending);
+ * [`evaluate_fee_tiers`] rejects unordered tiers.
  */
 export interface D_743B3Dc0Bceb8C74B135 {
   /**
@@ -8314,12 +8324,14 @@ export interface D_3B1170Fe3280Aa725Fb4 {
  *
  * The all-in rate is computed as:
  * 1. Look up forward rate from `forward_curve_id` curve for the accrual period
- * 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
- * 3. Add `spread_bp` to get base rate
- * 4. Multiply by `gearing` (typically 1.0)
- * 5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing
+ * 2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),
+ *    BEFORE adding spread
+ * 3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by
+ *    default, `index * gearing + spread` when `gearing_includes_spread` is false
+ * 4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),
+ *    AFTER spread and gearing
  *
- * Formula: `cap(gearing * (floor(index) + spread))`
+ * Default formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`
  *
  * # Negative Rate Handling
  *
@@ -8356,11 +8368,11 @@ export interface D_3B1170Fe3280Aa725Fb4 {
  * An observation exactly on the cutoff prefers a published same-day fixing
  * when the series has one, otherwise projects on the curve clock.
  *
- * The [`FloatingRateFallback`] policy applies only when **no** fixing
- * series is provided: `Error` (the default) fails the build with a
- * descriptive message naming the date, index, and expected series id;
- * `FixedRate(r)` uses `r` as the index rate for the affected coupon;
- * `SpreadOnly` projects spread-only.
+ * The [`FloatingRateFallback`] policy applies when projection fails and never
+ * fills a gap in a supplied fixing series (see its doc): `Error` (the
+ * default) fails the build with a descriptive message naming the date,
+ * index, and expected series id; `FixedRate(r)` uses `r` as the index rate
+ * for the whole coupon; `SpreadOnly` projects spread-only.
  *
  * # Example
  *
@@ -8414,9 +8426,10 @@ export interface D_7Af15F20A258D1Def9Dd1 {
    */
   compounding?: D_872965Bd151A7E141244 | null;
   /**
-   * Policy when forward curve lookup fails during emission.
+   * Policy when projecting a coupon fails; see [`FloatingRateFallback`]
+   * for when it applies and what it replaces.
    *
-   * Defaults to `Error`, which surfaces curve lookup failures.
+   * Defaults to `Error`, which surfaces projection failures.
    * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
    * to use a fixed index rate.
    */
@@ -8495,16 +8508,15 @@ export interface D_7Af15F20A258D1Def9Dd1 {
    */
   index_floor_bp?: DB375E274438Ab847F1Fc | null;
   /**
-   * Explicit term-index tenor when no forward curve resolves.
+   * Expected term-index tenor, checked against the resolved forward curve.
    *
    * The named forward curve is already the term index (for example a 3M
-   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
-   * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
-   * when no forward curve resolves. Ignored for overnight-compounded
-   * legs. When set, the builder warns at build time if it disagrees with
-   * the resolved curve's tenor by more than 10% — the curve remains
-   * authoritative.
+   * EURIBOR curve) and owns the quoted tenor. Projection is
+   * `fwd.rate(reset_date)`, not a FRA-style average over
+   * `[reset, reset + tenor]`. The builder only uses this field to warn at
+   * build time when it disagrees with the resolved curve's tenor by more
+   * than 10%; the curve remains authoritative. Ignored for
+   * overnight-compounded legs.
    */
   index_tenor?: DCc937Fbaa12E32D4187E2 | null;
   /**

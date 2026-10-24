@@ -165,9 +165,9 @@ impl JsCashFlowSchedule {
         to_js_value(&self.inner.coupons().collect::<Vec<_>>())
     }
 
-    /// Unique flow dates in ascending order.
+    /// One date per flow, in schedule order.
     ///
-    /// @returns ISO-8601 dates on which at least one flow falls.
+    /// @returns ISO-8601 flow dates aligned with `getFlows()`: a date repeats when several flows fall on it.
     /// @throws If the dates cannot be serialized.
     #[wasm_bindgen]
     pub fn dates(&self) -> Result<JsValue, JsValue> {
@@ -235,13 +235,17 @@ impl JsCashFlowSchedule {
 
     /// Weighted average life in years from a date.
     ///
-    /// WAL over the positive principal flows (amortization, notional and
-    /// prepayment) dated after `asOf`, with time measured as actual days / 365
-    /// (the SIFMA convention), not the schedule's accrual day count.
+    /// WAL over the principal repayments (amortization, notional, prepayment
+    /// and revolver repayment), with time measured as actual days / 365 (the
+    /// SIFMA convention), not the schedule's accrual day count. Each repayment
+    /// is timed at its balance-effective date (its principal date, else its
+    /// payment date) and weighted by its par principal (the principal delta,
+    /// else the cash amount), so a payment lag or a premium/OID cash amount
+    /// does not move WAL.
     ///
-    /// @param as_of - ISO-8601 measurement date; only principal flows strictly after it count.
-    /// @returns WAL in years; `0` when no principal flow falls after `asOf`.
-    /// @throws If `asOf` is not an ISO-8601 string (kind `invalid_type` or `validation`) or a year fraction cannot be computed.
+    /// @param as_of - ISO-8601 measurement date; only repayments whose balance-effective date is strictly after it count.
+    /// @returns WAL in years; `0` when no repayment falls after `asOf`.
+    /// @throws If `asOf` is not an ISO-8601 string (kind `invalid_type` or `validation`), contributing repayments mix currencies, or a year fraction cannot be computed.
     #[wasm_bindgen]
     pub fn wal(&self, as_of: JsValue) -> Result<f64, JsValue> {
         self.inner.wal(js_date(&as_of, "asOf")?).map_err(to_js_err)
@@ -320,6 +324,15 @@ impl JsCashFlowSchedule {
 /// in place and returns it, so calls chain. A setter whose argument is
 /// rejected throws and leaves the builder unchanged. Setter errors are
 /// recorded and reported by `build`.
+///
+/// Window boundaries: the dates of `addFixedWindow`, `addFloatingWindow`,
+/// `fixedToFloat`, `floatMarginSteps`, `addPaymentWindow` and
+/// `paymentSplitProgram` all cut the principal horizon, and coupon dates are
+/// generated independently between adjacent cut points. With the default
+/// front stub the coupon dates before an off-cycle boundary roll back from it
+/// rather than from issue; with no stub such a boundary is rejected.
+/// `stepUpCf` keeps one full-horizon grid instead. Snap off-cycle dates onto
+/// the accrual grid first when coupon dates must not move.
 #[wasm_bindgen(js_name = CashFlowBuilder)]
 #[derive(Clone, Debug)]
 pub struct JsCashFlowBuilder {
@@ -448,6 +461,9 @@ impl JsCashFlowBuilder {
 
     /// Add a fixed coupon leg that applies only inside a date window.
     ///
+    /// `start` and `end` cut the coupon horizon; see the window-boundary rule
+    /// on `CashFlowBuilder`.
+    ///
     /// @param start - ISO-8601 start of the window (inclusive).
     /// @param end - ISO-8601 end of the window (exclusive).
     /// @param spec - `FixedCouponSpec` wire object for the window.
@@ -469,6 +485,9 @@ impl JsCashFlowBuilder {
     }
 
     /// Add a floating coupon leg that applies only inside a date window.
+    ///
+    /// `start` and `end` cut the coupon horizon; see the window-boundary rule
+    /// on `CashFlowBuilder`.
     ///
     /// @param start - ISO-8601 start of the window (inclusive).
     /// @param end - ISO-8601 end of the window (exclusive).
@@ -492,6 +511,10 @@ impl JsCashFlowBuilder {
 
     /// Set the cash/PIK split of coupons paid inside a date window.
     ///
+    /// `start` and `end` also cut the coupon horizon, so an off-cycle date
+    /// moves the coupon dates around it; see the window-boundary rule on
+    /// `CashFlowBuilder`.
+    ///
     /// @param start - ISO-8601 start of the window (inclusive).
     /// @param end - ISO-8601 end of the window (exclusive).
     /// @param split - `CouponType` wire value: `"cash"`, `"pik"` or `{ split: { cash_fraction, pik_fraction } }`.
@@ -514,6 +537,9 @@ impl JsCashFlowBuilder {
 
     /// Set a sequence of cash/PIK splits, each applying until its end date.
     ///
+    /// Step dates cut the coupon horizon; see the window-boundary rule on
+    /// `CashFlowBuilder`.
+    ///
     /// @param steps - `[isoDate, CouponType]` pairs ordered by date: each split applies up to (not including) its date; periods after the last step pay cash.
     /// @returns The builder, for chaining.
     /// @throws If `steps` is not an array of `[isoDate, CouponType]` pairs (kind `validation`).
@@ -525,6 +551,9 @@ impl JsCashFlowBuilder {
     }
 
     /// Pay a fixed coupon until a switch date, then a floating coupon.
+    ///
+    /// The switch date cuts the coupon horizon, so each leg gets its own
+    /// schedule; see the window-boundary rule on `CashFlowBuilder`.
     ///
     /// @param switch_date - ISO-8601 date on which the leg switches from fixed to floating (Rust and Python name it `switch`, a reserved word in JavaScript).
     /// @param fixed - `FixedCouponSpec` wire object used before the switch.
@@ -547,6 +576,10 @@ impl JsCashFlowBuilder {
     }
 
     /// Add a floating leg whose margin steps on listed dates.
+    ///
+    /// Each step date cuts the coupon horizon, so an off-cycle date
+    /// regenerates the coupon dates on both sides of it; see the
+    /// window-boundary rule on `CashFlowBuilder`.
     ///
     /// @param steps - `[isoDate, decimalString]` pairs with strictly increasing dates: the spread in basis points in force from each date.
     /// @param base_spec - `FloatingCouponSpec` wire object supplying index, schedule and conventions; its own spread applies before the first step.

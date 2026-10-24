@@ -1128,9 +1128,10 @@ export interface D_14E8725A09F7B41C7021 {
    */
   compounding?: D_3D3908223688Cf141275 | null;
   /**
-   * Policy when forward curve lookup fails during emission.
+   * Policy when projecting a coupon fails; see [`FloatingRateFallback`]
+   * for when it applies and what it replaces.
    *
-   * Defaults to `Error`, which surfaces curve lookup failures.
+   * Defaults to `Error`, which surfaces projection failures.
    * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
    * to use a fixed index rate.
    */
@@ -1166,16 +1167,15 @@ export interface D_14E8725A09F7B41C7021 {
    */
   index_floor_bp?: Decimal5 | null;
   /**
-   * Explicit term-index tenor when no forward curve resolves.
+   * Expected term-index tenor, checked against the resolved forward curve.
    *
    * The named forward curve is already the term index (for example a 3M
-   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
-   * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
-   * when no forward curve resolves. Ignored for overnight-compounded
-   * legs. When set, the builder warns at build time if it disagrees with
-   * the resolved curve's tenor by more than 10% — the curve remains
-   * authoritative.
+   * EURIBOR curve) and owns the quoted tenor. Projection is
+   * `fwd.rate(reset_date)`, not a FRA-style average over
+   * `[reset, reset + tenor]`. The builder only uses this field to warn at
+   * build time when it disagrees with the resolved curve's tenor by more
+   * than 10%; the curve remains authoritative. Ignored for
+   * overnight-compounded legs.
    */
   index_tenor?: Tenor2 | null;
   /**

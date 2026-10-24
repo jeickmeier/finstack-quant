@@ -109,14 +109,19 @@ pub struct BuildPeriodsParams<'a> {
     pub day_count: DayCount,
     /// Non-negative payment lag in business days after the adjusted accrual end.
     pub payment_lag_days: i32,
-    /// Optional non-negative reset lag in business days before accrual start.
+    /// Optional non-negative reset lag in business days before accrual start,
+    /// counted on `calendar_id`. There is no separate fixing calendar here, so
+    /// callers whose index fixes on another calendar (the cashflow builder
+    /// uses `FloatingRateSpec::fixing_calendar_id`) must compute those resets
+    /// themselves.
     pub reset_lag_days: Option<i32>,
     /// Adjust accrual start/end boundaries with the business-day convention.
     pub adjust_accrual_dates: bool,
     /// Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
     ///
-    /// The IMM modes override `frequency`/`stub` with quarterly / short-back;
-    /// see [`RollRule`]. Third-Wednesday IMM with ACT/ACT ICMA is unsupported
+    /// [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
+    /// [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
+    /// quarterly / short-back grid. Third-Wednesday IMM with ACT/ACT ICMA is unsupported
     /// because that day count requires nominal month-grid reference coupons.
     pub roll_rule: RollRule,
 }
@@ -361,8 +366,10 @@ fn enrich_periods(
 
 /// Build one canonical schedule period from explicit start and end dates.
 ///
-/// This helper applies the same calendar resolution, lag handling, reset-date
-/// logic, and accrual-factor calculation used by the full schedule builder.
+/// This helper applies the same date adjustment, payment-lag handling and
+/// accrual-factor calculation as the full schedule builder. Its reset date
+/// lags on `params.calendar_id`; the builder lags on the coupon's fixing
+/// calendar, so the two differ when that calendar is set separately.
 ///
 /// # Arguments
 ///

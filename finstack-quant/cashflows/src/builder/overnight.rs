@@ -4,6 +4,15 @@
 //! resulting schedule can then replay historical, projected, or simulated
 //! observation rates for the full accrual period or for a partial accrual that
 //! ends on an exercise date.
+//!
+//! This is the overnight engine of the cashflow builder (bonds, term loans,
+//! structured coupons) and the bond LSMC pricer. Swap-style instruments (IRS,
+//! basis, cross-currency, futures, cap/floor, TRS, revolver) compound through
+//! `finstack_quant_valuations_core::instruments::pricing::overnight` instead,
+//! which also implements lookback, observation shift and lockout. The two
+//! differ in at least one convention: the IRS path snaps accrual endpoints to
+//! business days before compounding, while this module carries a non-business
+//! start as a leading slice. Mirror convention changes in both.
 
 use finstack_quant_core::dates::{Date, DateExt, DayCount, HolidayCalendar};
 use finstack_quant_core::{Error, Result};

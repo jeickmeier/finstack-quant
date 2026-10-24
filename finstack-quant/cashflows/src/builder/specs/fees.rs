@@ -97,9 +97,10 @@ pub enum FeeBase {
 
 /// Fee tier for utilization-based fee structures.
 ///
-/// Tiers are evaluated in order: the first tier where utilization >= threshold applies.
-/// Tiers must be sorted by threshold (ascending); [`evaluate_fee_tiers`]
-/// rejects unordered tiers.
+/// The tier with the highest threshold not exceeding utilization applies, so
+/// a higher utilization moves into a higher tier; below the lowest threshold
+/// no tier applies. Tiers must be sorted by threshold (strictly ascending);
+/// [`evaluate_fee_tiers`] rejects unordered tiers.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]

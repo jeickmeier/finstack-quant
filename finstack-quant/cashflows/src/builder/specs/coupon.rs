@@ -262,10 +262,19 @@ fn default_reset_lag() -> i32 {
 
 /// Policy for handling floating rate projection failures.
 ///
-/// Controls what happens when a forward curve lookup fails during
-/// cashflow emission. The default (`Error`) surfaces failures explicitly;
-/// the other variants are explicit opt-in degradation modes for callers
-/// that intentionally want a projected schedule without a forward curve.
+/// The cashflow builder consults it whenever projecting a floating coupon
+/// fails: a missing forward curve, a pre-cutoff observation with no
+/// `FIXING:{forward_curve_id}` series supplied, a reset before the curve base
+/// date, or an overnight or day-count projection error. It never fills a gap
+/// in recorded history: when a curve and a fixing series are both supplied, a
+/// missing pre-cutoff observation is an error under every policy.
+///
+/// A non-`Error` policy replaces the index for the whole coupon (every
+/// overnight observation of the period, not only a failing one), logs
+/// `warn!`, and the coupon still records the substituted index as its
+/// `projected_index_rate`. The default (`Error`) surfaces failures
+/// explicitly; the other variants are explicit opt-in degradation modes. The
+/// bond LSMC pricer applies the policy per overnight observation instead.
 ///
 /// # References
 ///
@@ -283,7 +292,7 @@ pub enum FloatingRateFallback {
     /// (plus any floors/caps/gearing). An explicit opt-in for spread-only
     /// projection when no forward curve is available; emits `warn!`.
     SpreadOnly,
-    /// Use a fixed rate as the index component. Emits `info!`.
+    /// Use a fixed rate as the index component; emits `warn!`.
     ///
     /// The value is a **decimal annual rate**, not basis points: `0.045`
     /// means 4.5%. This differs from the bp-denominated spread/floor/cap
@@ -367,12 +376,14 @@ impl OvernightIndexConstraintApplication {
 ///
 /// The all-in rate is computed as:
 /// 1. Look up forward rate from `forward_curve_id` curve for the accrual period
-/// 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
-/// 3. Add `spread_bp` to get base rate
-/// 4. Multiply by `gearing` (typically 1.0)
-/// 5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing
+/// 2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),
+///    BEFORE adding spread
+/// 3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by
+///    default, `index * gearing + spread` when `gearing_includes_spread` is false
+/// 4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),
+///    AFTER spread and gearing
 ///
-/// Formula: `cap(gearing * (floor(index) + spread))`
+/// Default formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`
 ///
 /// # Negative Rate Handling
 ///
@@ -409,11 +420,11 @@ impl OvernightIndexConstraintApplication {
 /// An observation exactly on the cutoff prefers a published same-day fixing
 /// when the series has one, otherwise projects on the curve clock.
 ///
-/// The [`FloatingRateFallback`] policy applies only when **no** fixing
-/// series is provided: `Error` (the default) fails the build with a
-/// descriptive message naming the date, index, and expected series id;
-/// `FixedRate(r)` uses `r` as the index rate for the affected coupon;
-/// `SpreadOnly` projects spread-only.
+/// The [`FloatingRateFallback`] policy applies when projection fails and never
+/// fills a gap in a supplied fixing series (see its doc): `Error` (the
+/// default) fails the build with a descriptive message naming the date,
+/// index, and expected series id; `FixedRate(r)` uses `r` as the index rate
+/// for the whole coupon; `SpreadOnly` projects spread-only.
 ///
 /// # Example
 ///
@@ -457,9 +468,12 @@ pub struct FloatingRateSpec {
     )]
     pub spread_bp: Decimal,
 
-    /// Gearing/leverage multiplier applied to the all-in rate (default: 1.0).
+    /// Gearing/leverage multiplier (default: 1.0), applied before the all-in
+    /// floor and cap; [`Self::gearing_includes_spread`] sets whether it also
+    /// scales the spread.
     ///
-    /// Example: gearing = 2.0 means the rate is doubled.
+    /// Example: gearing = 2.0 with the default `gearing_includes_spread`
+    /// doubles `index + spread`.
     ///
     /// **Restriction:** gearing must be strictly positive (`gearing > 0`);
     /// projection rejects zero or negative gearing, so inverse floaters
@@ -533,25 +547,23 @@ pub struct FloatingRateSpec {
     )]
     pub overnight_index_constraints: OvernightIndexConstraintApplication,
 
-    /// Fallback term-index tenor when [`Self::index_tenor`] is absent.
+    /// Index reset cadence, for instruments that reset inside a payment period.
     ///
-    /// The bare cashflow builder observes one term fixing at each coupon
-    /// period's accrual start, with the configured reset lag. This field does
-    /// not create additional resets inside a payment period. The resolved
-    /// forward curve owns the quoted index tenor; overnight methods observe
-    /// their compiled daily fixing schedule independently of this field.
+    /// The bare cashflow builder does not read it: it observes one term fixing
+    /// at each coupon period's accrual start, with the configured reset lag,
+    /// and overnight methods observe their compiled daily fixing schedule. The
+    /// revolving credit facility builds its intra-period reset grid from it.
     pub reset_frequency: Tenor,
 
-    /// Explicit term-index tenor when no forward curve resolves.
+    /// Expected term-index tenor, checked against the resolved forward curve.
     ///
     /// The named forward curve is already the term index (for example a 3M
-    /// EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
-    /// average over `[reset, reset + tenor]`. This field (or
-    /// [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
-    /// when no forward curve resolves. Ignored for overnight-compounded
-    /// legs. When set, the builder warns at build time if it disagrees with
-    /// the resolved curve's tenor by more than 10% — the curve remains
-    /// authoritative.
+    /// EURIBOR curve) and owns the quoted tenor. Projection is
+    /// `fwd.rate(reset_date)`, not a FRA-style average over
+    /// `[reset, reset + tenor]`. The builder only uses this field to warn at
+    /// build time when it disagrees with the resolved curve's tenor by more
+    /// than 10%; the curve remains authoritative. Ignored for
+    /// overnight-compounded legs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_tenor: Option<Tenor>,
 
@@ -589,9 +601,10 @@ pub struct FloatingRateSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overnight_basis: Option<DayCount>,
 
-    /// Policy when forward curve lookup fails during emission.
+    /// Policy when projecting a coupon fails; see [`FloatingRateFallback`]
+    /// for when it applies and what it replaces.
     ///
-    /// Defaults to `Error`, which surfaces curve lookup failures.
+    /// Defaults to `Error`, which surfaces projection failures.
     /// Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
     /// to use a fixed index rate.
     #[serde(default, skip_serializing_if = "FloatingRateFallback::is_default")]

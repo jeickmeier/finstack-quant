@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1003357,
+      "bytes": 1004905,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -182,7 +182,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
-      "bytes": 232697,
+      "bytes": 234245,
       "kind": "component",
       "path": "schemas/common/1/standard_deal_params.schema.json",
       "summary": "Inputs for the standard structured-credit registry constructor.",
@@ -299,7 +299,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1011270,
+      "bytes": 1012818,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -416,7 +416,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
-      "bytes": 189744,
+      "bytes": 191292,
       "kind": "input",
       "path": "schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
       "summary": "Property equity net of its financing stack.",
@@ -497,7 +497,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1010247,
+      "bytes": 1011795,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -578,7 +578,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
-      "bytes": 279401,
+      "bytes": 280949,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
       "summary": "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.",
@@ -587,7 +587,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
-      "bytes": 95287,
+      "bytes": 96564,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond.schema.json",
       "summary": "Fixed- or floating-rate cash bond with a coupon schedule.",
@@ -596,7 +596,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
-      "bytes": 108907,
+      "bytes": 110184,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond_future.schema.json",
       "summary": "Exchange-traded bond future with a deliverable basket and CTD.",
@@ -605,7 +605,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
-      "bytes": 75725,
+      "bytes": 76539,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/convertible_bond.schema.json",
       "summary": "Corporate bond convertible into a fixed number of shares.",
@@ -632,7 +632,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
-      "bytes": 62665,
+      "bytes": 63750,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/revolving_credit.schema.json",
       "summary": "Committed revolver with drawn/undrawn balances and commitment fees.",
@@ -641,7 +641,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 395181,
+      "bytes": 396729,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -650,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
-      "bytes": 65116,
+      "bytes": 66111,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/term_loan.schema.json",
       "summary": "Amortising leveraged loan with call protection and covenants.",
@@ -776,7 +776,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1101249,
+      "bytes": 1102797,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -956,7 +956,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1012878,
+      "bytes": 1014426,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
@@ -974,7 +974,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
-      "bytes": 52257,
+      "bytes": 52720,
       "kind": "output",
       "path": "schemas/results/1/enhanced_monte_carlo_result.schema.json",
       "summary": "Revolving-credit Monte Carlo value with per-path details.",

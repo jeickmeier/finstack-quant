@@ -377,10 +377,19 @@ export type FloatingLegCompounding =
 /**
  * Policy for handling floating rate projection failures.
  *
- * Controls what happens when a forward curve lookup fails during
- * cashflow emission. The default (`Error`) surfaces failures explicitly;
- * the other variants are explicit opt-in degradation modes for callers
- * that intentionally want a projected schedule without a forward curve.
+ * The cashflow builder consults it whenever projecting a floating coupon
+ * fails: a missing forward curve, a pre-cutoff observation with no
+ * `FIXING:{forward_curve_id}` series supplied, a reset before the curve base
+ * date, or an overnight or day-count projection error. It never fills a gap
+ * in recorded history: when a curve and a fixing series are both supplied, a
+ * missing pre-cutoff observation is an error under every policy.
+ *
+ * A non-`Error` policy replaces the index for the whole coupon (every
+ * overnight observation of the period, not only a failing one), logs
+ * `warn!`, and the coupon still records the substituted index as its
+ * `projected_index_rate`. The default (`Error`) surfaces failures
+ * explicitly; the other variants are explicit opt-in degradation modes. The
+ * bond LSMC pricer applies the policy per overnight observation instead.
  *
  * # References
  *
@@ -763,25 +772,35 @@ export interface CashFlowAccrual {
 /**
  * Metadata shared by an entire cashflow schedule.
  *
- * Tracks referenced calendar IDs, optional facility limits, and the instrument's
- * issue date for use by downstream engines (e.g., accrual calculation).
+ * Carries the representation tag, the issue and maturity dates, projected
+ * fixings for time rolls, and two informational fields (`calendar_ids`,
+ * `commitment`) that no Rust engine reads.
  */
 export interface CashFlowMeta {
   /**
    * Holiday calendar IDs used for schedule adjustments.
+   *
+   * Informational: carried through merge and host views, but no Rust
+   * engine reads it; accrual uses each flow's `accrual.calendar_id`.
    */
   calendar_ids: string[];
   /**
    * Total facility commitment for revolving and delayed-draw facilities;
    * `None` for instruments without one.
+   *
+   * Informational: carried through merge and host views, but no Rust
+   * engine reads it.
    */
   commitment?: valuations.Money | null;
   /**
-   * Issue date of the instrument, when known.
+   * Issue date of the instrument.
    *
-   * Used by the accrual engine to establish the first coupon period start
-   * date precisely, avoiding the inverse day count approximation that can
-   * be off by 1-2 days.
+   * Required by accrual and by `outstanding_by_date` /
+   * `outstanding_at_dates`, which return an error when it is missing rather
+   * than infer the first coupon period start from flow dates. `validate`
+   * and the public lifecycle normalization instead fall back to the first
+   * flow date to locate the issue funding row. Merging schedules keeps it
+   * only when every input carries the same date.
    */
   issue_date?: valuations.DateWire | null;
   /**
@@ -1086,12 +1105,14 @@ export interface FloatingCouponSpec {
  *
  * The all-in rate is computed as:
  * 1. Look up forward rate from `forward_curve_id` curve for the accrual period
- * 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
- * 3. Add `spread_bp` to get base rate
- * 4. Multiply by `gearing` (typically 1.0)
- * 5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing
+ * 2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),
+ *    BEFORE adding spread
+ * 3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by
+ *    default, `index * gearing + spread` when `gearing_includes_spread` is false
+ * 4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),
+ *    AFTER spread and gearing
  *
- * Formula: `cap(gearing * (floor(index) + spread))`
+ * Default formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`
  *
  * # Negative Rate Handling
  *
@@ -1128,11 +1149,11 @@ export interface FloatingCouponSpec {
  * An observation exactly on the cutoff prefers a published same-day fixing
  * when the series has one, otherwise projects on the curve clock.
  *
- * The [`FloatingRateFallback`] policy applies only when **no** fixing
- * series is provided: `Error` (the default) fails the build with a
- * descriptive message naming the date, index, and expected series id;
- * `FixedRate(r)` uses `r` as the index rate for the affected coupon;
- * `SpreadOnly` projects spread-only.
+ * The [`FloatingRateFallback`] policy applies when projection fails and never
+ * fills a gap in a supplied fixing series (see its doc): `Error` (the
+ * default) fails the build with a descriptive message naming the date,
+ * index, and expected series id; `FixedRate(r)` uses `r` as the index rate
+ * for the whole coupon; `SpreadOnly` projects spread-only.
  */
 export interface FloatingRateSpec {
   /**
@@ -1158,9 +1179,10 @@ export interface FloatingRateSpec {
    */
   compounding?: FloatingLegCompounding | null;
   /**
-   * Policy when forward curve lookup fails during emission.
+   * Policy when projecting a coupon fails; see [`FloatingRateFallback`]
+   * for when it applies and what it replaces.
    *
-   * Defaults to `Error`, which surfaces curve lookup failures.
+   * Defaults to `Error`, which surfaces projection failures.
    * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
    * to use a fixed index rate.
    */
@@ -1176,9 +1198,12 @@ export interface FloatingRateSpec {
    */
   forward_curve_id: valuations.Id;
   /**
-   * Gearing/leverage multiplier applied to the all-in rate (default: 1.0).
+   * Gearing/leverage multiplier (default: 1.0), applied before the all-in
+   * floor and cap; [`Self::gearing_includes_spread`] sets whether it also
+   * scales the spread.
    *
-   * Example: gearing = 2.0 means the rate is doubled.
+   * Example: gearing = 2.0 with the default `gearing_includes_spread`
+   * doubles `index + spread`.
    *
    * **Restriction:** gearing must be strictly positive (`gearing > 0`);
    * projection rejects zero or negative gearing, so inverse floaters
@@ -1203,16 +1228,15 @@ export interface FloatingRateSpec {
    */
   index_floor_bp?: valuations.DecimalWire | null;
   /**
-   * Explicit term-index tenor when no forward curve resolves.
+   * Expected term-index tenor, checked against the resolved forward curve.
    *
    * The named forward curve is already the term index (for example a 3M
-   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
-   * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
-   * when no forward curve resolves. Ignored for overnight-compounded
-   * legs. When set, the builder warns at build time if it disagrees with
-   * the resolved curve's tenor by more than 10% — the curve remains
-   * authoritative.
+   * EURIBOR curve) and owns the quoted tenor. Projection is
+   * `fwd.rate(reset_date)`, not a FRA-style average over
+   * `[reset, reset + tenor]`. The builder only uses this field to warn at
+   * build time when it disagrees with the resolved curve's tenor by more
+   * than 10%; the curve remains authoritative. Ignored for
+   * overnight-compounded legs.
    */
   index_tenor?: valuations.Tenor | null;
   /**
@@ -1239,13 +1263,12 @@ export interface FloatingRateSpec {
    */
   overnight_index_constraints?: OvernightIndexConstraintApplication;
   /**
-   * Fallback term-index tenor when [`Self::index_tenor`] is absent.
+   * Index reset cadence, for instruments that reset inside a payment period.
    *
-   * The bare cashflow builder observes one term fixing at each coupon
-   * period's accrual start, with the configured reset lag. This field does
-   * not create additional resets inside a payment period. The resolved
-   * forward curve owns the quoted index tenor; overnight methods observe
-   * their compiled daily fixing schedule independently of this field.
+   * The bare cashflow builder does not read it: it observes one term fixing
+   * at each coupon period's accrual start, with the configured reset lag,
+   * and overnight methods observe their compiled daily fixing schedule. The
+   * revolving credit facility builds its intra-period reset grid from it.
    */
   reset_frequency: valuations.Tenor;
   /**

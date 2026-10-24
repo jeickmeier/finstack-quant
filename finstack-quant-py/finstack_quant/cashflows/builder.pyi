@@ -464,6 +464,17 @@ class CashFlowBuilder:
     Configuration errors on individual calls (e.g. an invalid principal
     event sign) are deferred and surfaced from :meth:`build`.
 
+    Window boundaries: coupon windows (:meth:`add_fixed_window`,
+    :meth:`add_floating_window`, :meth:`fixed_to_float`,
+    :meth:`float_margin_steps`) and payment windows
+    (:meth:`add_payment_window`, :meth:`payment_split_program`) all cut the
+    principal horizon, and coupon dates are generated independently between
+    adjacent cut points. With the default front stub, the coupon dates before
+    an off-cycle boundary roll back from it rather than from issue; with
+    ``StubKind.NONE`` such a boundary is rejected. :meth:`step_up_cf` keeps
+    one full-horizon grid instead. Snap off-cycle dates onto the accrual grid
+    first when coupon dates must not move.
+
     Examples
     --------
     >>> import datetime
@@ -507,8 +518,9 @@ class CashFlowBuilder:
         Raises
         ------
         ValueError
-            If *issue_date* is not strictly before *maturity*, or a date
-            cannot be converted from the supplied value.
+            If a date cannot be converted from the supplied value (raised
+            immediately), or *issue_date* is not strictly before *maturity*
+            (deferred and raised from :meth:`build`).
         """
         ...
 
@@ -580,7 +592,8 @@ class CashFlowBuilder:
         ------
         ValueError
             If the amortization schedule is inconsistent with the
-            principal set via :meth:`principal`.
+            principal set via :meth:`principal`. The error is deferred and
+            raised from :meth:`build`.
         """
         ...
 
@@ -726,6 +739,9 @@ class CashFlowBuilder:
         """
         Add a fixed-rate coupon over the half-open window ``[start, end)``.
 
+        ``start`` and ``end`` cut the coupon horizon; see the window-boundary
+        rule on :class:`CashFlowBuilder`.
+
         Parameters
         ----------
         start : datetime.date
@@ -745,7 +761,8 @@ class CashFlowBuilder:
         ------
         ValueError
             If *start* is not strictly before *end*, or the coupon
-            schedule cannot be generated over the window.
+            schedule cannot be generated over the window. The error is
+            deferred and raised from :meth:`build`.
         """
         ...
 
@@ -757,6 +774,9 @@ class CashFlowBuilder:
     ) -> CashFlowBuilder:
         """
         Add a floating-rate coupon over the half-open window ``[start, end)``.
+
+        ``start`` and ``end`` cut the coupon horizon; see the window-boundary
+        rule on :class:`CashFlowBuilder`.
 
         Parameters
         ----------
@@ -777,7 +797,8 @@ class CashFlowBuilder:
         ------
         ValueError
             If *start* is not strictly before *end*, or the coupon
-            schedule cannot be generated over the window.
+            schedule cannot be generated over the window. The error is
+            deferred and raised from :meth:`build`.
         """
         ...
 
@@ -789,6 +810,10 @@ class CashFlowBuilder:
     ) -> CashFlowBuilder:
         """
         Set the payment split (cash/PIK/split) over ``[start, end)``.
+
+        ``start`` and ``end`` also cut the coupon horizon, so an off-cycle
+        date moves the coupon dates around it; see the window-boundary rule
+        on :class:`CashFlowBuilder`.
 
         Parameters
         ----------
@@ -807,7 +832,8 @@ class CashFlowBuilder:
         Raises
         ------
         ValueError
-            If *start* is not strictly before *end*.
+            If *start* is not strictly before *end*. The error is deferred
+            and raised from :meth:`build`.
         """
         ...
 
@@ -821,8 +847,10 @@ class CashFlowBuilder:
         Parameters
         ----------
         steps : list[tuple[datetime.date, CouponType]]
-            Ordered ``(effective_date, split)`` pairs describing successive
-            cash/PIK toggle windows.
+            Ordered ``(end_date, split)`` pairs: each split applies up to (not
+            including) its date, and periods after the last step pay cash.
+            Step dates cut the coupon horizon; see the window-boundary rule
+            on :class:`CashFlowBuilder`.
 
         Returns
         -------
@@ -832,7 +860,8 @@ class CashFlowBuilder:
         Raises
         ------
         ValueError
-            If the step dates are not strictly increasing.
+            If the step dates are not strictly increasing. The error is
+            deferred and raised from :meth:`build`.
         """
         ...
 
@@ -844,6 +873,9 @@ class CashFlowBuilder:
     ) -> CashFlowBuilder:
         """
         Switch from a fixed coupon to a floating coupon at ``switch``.
+
+        ``switch`` cuts the coupon horizon, so each leg gets its own schedule;
+        see the window-boundary rule on :class:`CashFlowBuilder`.
 
         Parameters
         ----------
@@ -883,7 +915,9 @@ class CashFlowBuilder:
             ``(effective_from, spread_bp)`` pairs in strictly increasing date
             order. Each spread (bp over the index, ``250`` = 2.50%) replaces
             the base spread from its date until the next step; the last runs
-            to maturity. An off-cycle date splits the enclosing period.
+            to maturity. An off-cycle date regenerates the coupon dates on
+            both sides of it; see the window-boundary rule on
+            :class:`CashFlowBuilder`.
         base_spec : FloatingCouponSpec
             Base floating spec; its ``spread_bp`` applies from issue until
             the first step.
@@ -910,9 +944,11 @@ class CashFlowBuilder:
         ----------
         market : MarketContext, optional
             Market context supplying observed fixings and forward curves for
-            floating coupons. Complete observed history can supply a coupon
-            without a forward curve. Fixed coupons and deterministic fees do
-            not require a market context.
+            floating coupons. Every floating coupon needs its forward curve,
+            even when the fixing series covers it, unless an explicit
+            fallback applies. Without ``as_of`` each forward curve's base date
+            is the observation cutoff. Fixed coupons and deterministic fees
+            do not require a market context.
 
         Returns
         -------
@@ -932,8 +968,10 @@ class CashFlowBuilder:
             ACT/ACT ICMA end-of-month grid whose regular anchor is not month-end.
             Supplied fixing history must contain exact-date observations
             before the forward curve's base date, under every fallback policy.
-            An explicit fallback can handle an absent fixing series or missing
-            curve; curve, date, day-count and arithmetic errors still propagate.
+            An explicit fallback replaces the whole coupon when its projection
+            fails (missing curve, absent fixing series, a reset before the
+            curve base date, or a projection day-count error); errors outside
+            coupon projection still propagate.
         RuntimeError
             If an operational or numerical computation failure occurs during
             construction; a fallback policy does not suppress it.
@@ -998,11 +1036,15 @@ class CashFlowMeta:
             One of ``"contractual"``, ``"projected"``, ``"placeholder"``,
             ``"no_residual"``.
         calendar_ids : list[str], optional
-            Holiday calendar identifiers used by the schedule.
+            Holiday calendar identifiers used by the schedule. Informational:
+            no Rust engine reads it.
         commitment : Money, optional
             Facility limit / commitment for revolving structures.
+            Informational: no Rust engine reads it.
         issue_date : datetime.date or str, optional
-            Instrument issue date.
+            Instrument issue date. Accrual and the ``outstanding_*`` methods
+            raise ``ValueError`` without it; validation falls back to the
+            first flow date.
         maturity : datetime.date or str, optional
             Contractual maturity date.
         projected_fixings : list[ProjectedFixing], optional
@@ -1083,8 +1125,8 @@ class CashFlowMeta:
         Returns
         -------
         datetime.date, optional
-            The issue date used by the accrual engine to establish the
-            first coupon period start, or ``None`` when unset.
+            The issue date, which accrual and the ``outstanding_*`` methods
+            require as the first coupon period start, or ``None`` when unset.
 
         Notes
         -----
@@ -1375,12 +1417,17 @@ class CashFlowSchedule:
         Weighted Average Life (WAL) in years from ``as_of``.
 
         Computed on an Act/365F basis regardless of the schedule's accrual
-        day count, matching conventional desk reporting.
+        day count, matching conventional desk reporting. Each repayment is
+        timed at its balance-effective date (the principal date, else the
+        payment date) and weighted by its par principal (the principal
+        delta, else the cash amount), so a payment lag or a premium/OID cash
+        amount does not move WAL.
 
         Parameters
         ----------
         as_of : datetime.date
-            Valuation date from which the WAL is measured.
+            Valuation date from which the WAL is measured; only repayments
+            whose balance-effective date is after it contribute.
 
         Returns
         -------
@@ -3007,16 +3054,17 @@ class FloatingCouponSpec:
 
 class FloatingRateFallback:
     """
-    Policy for missing floating-rate market data.
+    Policy for floating coupons that cannot be projected.
 
     ``ERROR`` and ``SPREAD_ONLY`` are class-attribute singletons;
     :meth:`fixed_rate` constructs the data-carrying ``FixedRate`` variant.
-    An explicit fallback can handle an absent fixing series or missing curve.
-    Supplied observations take precedence, so complete observed history can
-    supply a coupon without a curve even with ``ERROR``. When a curve supplies
-    the historical cutoff, gaps in a supplied series before its base date
-    remain exact-date errors under every policy. Curve, date, day-count and
-    arithmetic failures also propagate.
+    The builder consults the policy whenever projecting a coupon fails: a
+    missing forward curve (even when the fixing series covers the coupon), a
+    pre-cutoff observation with no fixing series, a reset before the curve
+    base date, or a projection day-count error. A non-error policy replaces
+    the index for the whole coupon and logs a warning. It never fills a gap
+    in recorded history: when a curve and a fixing series are both supplied,
+    a missing pre-cutoff observation raises under every policy.
 
     Examples
     --------
@@ -3039,10 +3087,9 @@ class FloatingRateFallback:
         ----------
         rate : decimal.Decimal | float
             Decimal annual index rate (e.g. ``0.045`` for 4.5%), not basis
-            points. Used for an absent fixing series or missing curve;
-            existing observations remain authoritative. It cannot replace
-            gaps in supplied history before an available curve's base date,
-            or suppress curve, date, day-count or arithmetic failures.
+            points. Used as the index for the whole coupon when projecting
+            it fails (see :class:`FloatingRateFallback`). It cannot replace
+            gaps in supplied history before an available curve's base date.
 
         Returns
         -------
@@ -3127,15 +3174,16 @@ class FloatingRateSpec:
         spread_bp : decimal.Decimal | float
             Spread/margin over the index in basis points.
         reset_frequency : Tenor | str
-            Fallback compiled term tenor when ``index_tenor`` is omitted and
-            no forward curve resolves; the term tenor must be positive. The
-            bare builder observes one term fixing per coupon accrual start,
-            with ``reset_lag_days``; this field does not add resets inside
-            a payment period. A resolved curve owns the quoted index tenor,
-            while overnight coupons use their daily observation schedule.
+            Index reset cadence, for instruments that reset inside a payment
+            period. The bare builder does not read it: it observes one term
+            fixing per coupon accrual start, with ``reset_lag_days``, and
+            overnight coupons use their daily observation schedule. The
+            revolving credit facility builds its intra-period reset grid from
+            it.
         gearing : decimal.Decimal | float, optional
-            Leverage multiplier applied to the all-in rate (default ``1``);
-            is stored as an exact decimal.
+            Leverage multiplier (default ``1``), applied before the all-in
+            floor and cap; ``gearing_includes_spread`` sets whether it also
+            scales the spread. Stored as an exact decimal.
         gearing_includes_spread : bool
             Whether gearing multiplies ``(index + spread)`` (``True``,
             default) or only the index component (``False``).
@@ -3155,11 +3203,10 @@ class FloatingRateSpec:
             is allocated uniformly over contractual accrual time, preserving
             raw daily compound increments.
         index_tenor : Tenor | str, optional
-            Explicit compiled term tenor when no forward curve resolves;
-            when omitted, ``reset_frequency`` supplies it. The compiled
-            term tenor must be positive. A resolved forward
-            curve's quoted tenor remains authoritative. Ignored for overnight
-            coupons; a disagreement with the curve exceeding 10% warns at build.
+            Expected term-index tenor. The builder only uses it to warn at
+            build when it disagrees with the resolved forward curve's tenor
+            by more than 10%; the curve's quoted tenor remains authoritative.
+            Ignored for overnight coupons.
         reset_lag_days : int
             Nonnegative reset lag in business days (default ``2``, T-2
             convention). Negative values raise ``ValueError`` immediately.
@@ -3171,14 +3218,19 @@ class FloatingRateSpec:
             let a pricing instrument resolve it from the rate-index registry
             (the bare cashflow builder then projects one term forward).
         overnight_basis : DayCount, optional
-            Day-count basis for the overnight compounding denominator
-            (default Act/360).
+            Day-count basis for the overnight compounding denominator. When
+            omitted for an overnight ``compounding`` method, the coupon
+            schedule's day count is used if it is Act/360 or Act/365F; any
+            other schedule day count makes :meth:`CashFlowBuilder.build` raise
+            ``ValueError`` unless an explicit Act/360 or Act/365F basis is
+            given. Ignored for non-overnight compounding.
         fallback : FloatingRateFallback, optional
-            Policy for an absent fixing series or missing forward curve
-            (default ``ERROR``). Complete supplied observations require no
-            curve. Gaps in supplied history before an available curve's base
-            date remain exact-date errors; curve, date, day-count and arithmetic
-            failures propagate under every policy.
+            Policy when projecting a coupon fails (default ``ERROR``): a
+            missing forward curve, an absent fixing series, a reset before
+            the curve base date, or a projection day-count error. A non-error
+            policy replaces the index for the whole coupon. Gaps in supplied
+            history before an available curve's base date remain exact-date
+            errors under every policy.
 
         Raises
         ------
@@ -3357,17 +3409,16 @@ class FloatingRateSpec:
     @property
     def reset_frequency(self) -> Tenor:
         """
-        Return the fallback tenor for compiled term-observation metadata.
+        Return the index reset cadence.
 
         Returns
         -------
         Tenor
-            Compiled term tenor used and validated when ``index_tenor`` is
-            absent and no forward curve resolves. Term coupons observe one
-            fixing at each accrual start,
-            subject to reset lag; this value does not create extra resets.
-            Forward curves own their quoted tenor and overnight coupons use
-            their daily fixing schedule.
+            Reset cadence for instruments that reset inside a payment period
+            (the revolving credit facility's reset grid). The bare builder
+            does not read it: term coupons observe one fixing at each accrual
+            start, subject to reset lag, and overnight coupons use their
+            daily fixing schedule.
 
         Notes
         -----
@@ -3378,15 +3429,15 @@ class FloatingRateSpec:
     @property
     def index_tenor(self) -> Tenor | None:
         """
-        Return the explicit fallback tenor for term-observation metadata, if set.
+        Return the expected term-index tenor, if set.
 
         Returns
         -------
         Tenor | None
-            Compiled term tenor used and validated when no forward curve
-            resolves, or None to use ``reset_frequency``. A resolved curve's
-            quoted tenor remains authoritative; a disagreement exceeding
-            10% warns at build. Overnight coupons ignore this value.
+            Tenor checked against the resolved forward curve: a disagreement
+            exceeding 10% warns at build, and the curve's quoted tenor
+            remains authoritative. ``None`` skips the check. Overnight
+            coupons ignore this value.
 
         Notes
         -----
@@ -3450,7 +3501,8 @@ class FloatingRateSpec:
         Returns
         -------
         DayCount | None
-            Overnight compounding day count, if set.
+            Overnight compounding day count, or ``None`` to use the coupon
+            schedule's day count (which must then be Act/360 or Act/365F).
 
         Notes
         -----
@@ -3461,12 +3513,13 @@ class FloatingRateSpec:
     @property
     def fallback(self) -> FloatingRateFallback:
         """
-        Missing-curve fallback policy.
+        Projection-failure fallback policy.
 
         Returns
         -------
         FloatingRateFallback
-            Missing-curve fallback policy.
+            Policy applied when a coupon cannot be projected; see
+            :class:`FloatingRateFallback`.
 
         Notes
         -----
@@ -4443,12 +4496,15 @@ class RecoveryModelSpec:
         Parameters
         ----------
         seasoning_months : int
-            Months since origination (zero-based index into the vector).
+            Months since origination of the defaulting month, one-based:
+            months 0 and 1 read the first vector entry, and months past the
+            end hold the last one.
 
         Returns
         -------
         float
-            ``1 - severity`` from the vector when present, else ``rate``.
+            ``1 - severity`` from the vector when present, else ``rate``,
+            clamped to ``[0, 1]``.
 
         Raises
         ------

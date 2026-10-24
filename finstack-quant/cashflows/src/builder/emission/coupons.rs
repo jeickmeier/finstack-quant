@@ -473,17 +473,19 @@ fn project_segment_indices(
 /// Emit floating coupon cashflows on a specific date.
 ///
 /// Processes all floating coupon schedules for the given date, looking up forward
-/// rates from the optional market context and computing coupon amounts based on
-/// `forward_rate * gearing + margin`. Splits into cash/PIK according to coupon type.
-/// Cash and PIK flows are appended directly into the provided `out_flows` buffer.
+/// rates from the optional market context and computing coupon rates with
+/// [`crate::builder::calculate_floating_rate`] (by default
+/// `(index + spread) * gearing`). Splits into cash/PIK according to coupon type.
+/// Cash and PIK flows are appended to the build state's flow buffer.
 ///
 /// Seasoned coupons (observation dates before the valuation cutoff) resolve
 /// realized index fixings from `market.fixings`, the per-schedule
 /// `FIXING:{forward_curve_id}` series aligned with `market.curves` (exact-date
 /// observations for both overnight and term resets). The cutoff is the curve
-/// base date under `build` and `as_of` under `build_as_of`. Without a series,
-/// pre-cutoff observations route through the spec's
-/// [`crate::builder::FloatingRateFallback`] policy.
+/// base date under `build` and `as_of` under `build_as_of`. A failed
+/// projection, including pre-cutoff observations with no series, routes the
+/// whole coupon through the spec's [`crate::builder::FloatingRateFallback`]
+/// policy.
 ///
 /// # Returns
 ///

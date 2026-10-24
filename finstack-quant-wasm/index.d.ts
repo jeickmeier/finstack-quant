@@ -13399,9 +13399,9 @@ export interface CashFlowSchedule extends WasmOwned {
    */
   coupons(): generated.cashflows.CashFlow[];
   /**
-   * Unique flow dates in ascending order.
+   * One date per flow, in schedule order.
    *
-   * @returns ISO-8601 dates on which at least one flow falls.
+   * @returns ISO-8601 flow dates aligned with `getFlows()`: a date repeats when several flows fall on it.
    * @throws If the dates cannot be serialized.
    */
   dates(): generated.core.DateWire[];
@@ -13446,13 +13446,17 @@ export interface CashFlowSchedule extends WasmOwned {
   /**
    * Weighted average life in years from a date.
    *
-   * WAL over the positive principal flows (amortization, notional and
-   * prepayment) dated after `asOf`, with time measured as actual days / 365
-   * (the SIFMA convention), not the schedule's accrual day count.
+   * WAL over the principal repayments (amortization, notional, prepayment
+   * and revolver repayment), with time measured as actual days / 365 (the
+   * SIFMA convention), not the schedule's accrual day count. Each repayment
+   * is timed at its balance-effective date (its principal date, else its
+   * payment date) and weighted by its par principal (the principal delta,
+   * else the cash amount), so a payment lag or a premium/OID cash amount
+   * does not move WAL.
    *
-   * @param asOf - ISO-8601 measurement date; only principal flows strictly after it count.
-   * @returns WAL in years; `0` when no principal flow falls after `asOf`.
-   * @throws If `asOf` is not an ISO-8601 string (kind `invalid_type` or `validation`) or a year fraction cannot be computed.
+   * @param asOf - ISO-8601 measurement date; only repayments whose balance-effective date is strictly after it count.
+   * @returns WAL in years; `0` when no repayment falls after `asOf`.
+   * @throws If `asOf` is not an ISO-8601 string (kind `invalid_type` or `validation`), contributing repayments mix currencies, or a year fraction cannot be computed.
    */
   wal(asOf: string): number;
   /**
@@ -13560,6 +13564,15 @@ export interface CashFlowScheduleConstructor {
  * in place and returns it, so calls chain. A setter whose argument is
  * rejected throws and leaves the builder unchanged. Setter errors are
  * recorded and reported by `build`.
+ *
+ * Window boundaries: the dates of `addFixedWindow`, `addFloatingWindow`,
+ * `fixedToFloat`, `floatMarginSteps`, `addPaymentWindow` and
+ * `paymentSplitProgram` all cut the principal horizon, and coupon dates are
+ * generated independently between adjacent cut points. With the default
+ * front stub the coupon dates before an off-cycle boundary roll back from it
+ * rather than from issue; with no stub such a boundary is rejected.
+ * `stepUpCf` keeps one full-horizon grid instead. Snap off-cycle dates onto
+ * the accrual grid first when coupon dates must not move.
  */
 export interface CashFlowBuilder extends WasmOwned {
   /**
@@ -13641,6 +13654,9 @@ export interface CashFlowBuilder extends WasmOwned {
   /**
    * Add a fixed coupon leg that applies only inside a date window.
    *
+   * `start` and `end` cut the coupon horizon; see the window-boundary rule
+   * on `CashFlowBuilder`.
+   *
    * @param start - ISO-8601 start of the window (inclusive).
    * @param end - ISO-8601 end of the window (exclusive).
    * @param spec - `FixedCouponSpec` wire object for the window.
@@ -13654,6 +13670,9 @@ export interface CashFlowBuilder extends WasmOwned {
   ): CashFlowBuilder;
   /**
    * Add a floating coupon leg that applies only inside a date window.
+   *
+   * `start` and `end` cut the coupon horizon; see the window-boundary rule
+   * on `CashFlowBuilder`.
    *
    * @param start - ISO-8601 start of the window (inclusive).
    * @param end - ISO-8601 end of the window (exclusive).
@@ -13669,6 +13688,10 @@ export interface CashFlowBuilder extends WasmOwned {
   /**
    * Set the cash/PIK split of coupons paid inside a date window.
    *
+   * `start` and `end` also cut the coupon horizon, so an off-cycle date
+   * moves the coupon dates around it; see the window-boundary rule on
+   * `CashFlowBuilder`.
+   *
    * @param start - ISO-8601 start of the window (inclusive).
    * @param end - ISO-8601 end of the window (exclusive).
    * @param split - `CouponType` wire value: `"cash"`, `"pik"` or `{ split: { cash_fraction, pik_fraction } }`.
@@ -13683,6 +13706,9 @@ export interface CashFlowBuilder extends WasmOwned {
   /**
    * Set a sequence of cash/PIK splits, each applying until its end date.
    *
+   * Step dates cut the coupon horizon; see the window-boundary rule on
+   * `CashFlowBuilder`.
+   *
    * @param steps - `[isoDate, CouponType]` pairs ordered by date: each split applies up to (not including) its date; periods after the last step pay cash.
    * @returns The builder, for chaining.
    * @throws If `steps` is not an array of `[isoDate, CouponType]` pairs (kind `validation`).
@@ -13692,6 +13718,9 @@ export interface CashFlowBuilder extends WasmOwned {
   ): CashFlowBuilder;
   /**
    * Pay a fixed coupon until a switch date, then a floating coupon.
+   *
+   * The switch date cuts the coupon horizon, so each leg gets its own
+   * schedule; see the window-boundary rule on `CashFlowBuilder`.
    *
    * @param switchDate - ISO-8601 date on which the leg switches from fixed to floating (Rust and Python name it `switch`, a reserved word in JavaScript).
    * @param fixed - `FixedCouponSpec` wire object used before the switch.
@@ -13706,6 +13735,10 @@ export interface CashFlowBuilder extends WasmOwned {
   ): CashFlowBuilder;
   /**
    * Add a floating leg whose margin steps on listed dates.
+   *
+   * Each step date cuts the coupon horizon, so an off-cycle date
+   * regenerates the coupon dates on both sides of it; see the
+   * window-boundary rule on `CashFlowBuilder`.
    *
    * @param steps - `[isoDate, decimalString]` pairs with strictly increasing dates: the spread in basis points in force from each date.
    * @param baseSpec - `FloatingCouponSpec` wire object supplying index, schedule and conventions; its own spread applies before the first step.
@@ -13862,10 +13895,12 @@ export interface CashflowsNamespace {
    * start otherwise); the opposite endpoint may be irregular. Negative payment
    * and reset lags are rejected.
    *
-   * Complete supplied fixing observations can build a floating coupon without
-   * a forward curve. Explicit fallback applies to missing curves or absent
-   * fixing series. Supplied historical gaps before a resolved curve's base date
-   * always fail, as do curve, date, day-count and arithmetic errors.
+   * Every floating coupon needs its forward curve, even when the supplied
+   * fixing observations cover it, unless an explicit fallback applies. An
+   * explicit fallback replaces the whole coupon when its projection fails
+   * (missing curve, absent fixing series, a reset before the curve base date,
+   * or a projection day-count error). Supplied historical gaps before a
+   * resolved curve's base date always fail.
    *
    * @param specJson - JSON-encoded `CashflowScheduleBuildSpec`. Optional `principal_exchange` is `"none"` or `"initial_and_final"` (default). `principal_events` entries require both economic `date` and cash `payment_date`. `linear_between` amortization uses coupon accrual boundaries in `(start, end]`; `end` must be an actual boundary no later than the terminal accrual date. Installments use outstanding after start-date PIK and principal movements, and the final installment clears the live balance. Cash settles on the corresponding adjusted, lagged payment dates. Term legs observe one fixing per coupon period at its lagged accrual start; `rate_spec.reset_frequency` and `index_tenor` do not add intraperiod resets or override the named forward curve's index tenor. Overnight legs use daily observations; `overnight_index_constraints` selects daily or final-period index bounds. Final-period index and all-in rate adjustments are allocated uniformly over contractual accrual time when principal changes.
    * @param marketJson - Optional JSON-encoded market context for floating-rate lookups.
@@ -14322,7 +14357,7 @@ export interface CashflowsNamespace {
    * @param spec - `RecoveryModelSpec` wire object.
    * @param seasoningMonths - Months since origination of the defaulting balance (non-negative integer).
    * @returns Recovery as a decimal fraction of defaulted par: `1 − severity` for the month when a severity vector is set, otherwise the flat `rate`.
-   * @throws If `spec` is not a `RecoveryModelSpec` (kind `validation`) or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+   * @throws If `spec` is not a `RecoveryModelSpec`, its `rate` is outside `[0, 1]` or its severity vector is empty or out of range (kind `validation`; the spec is validated before the query, as Python validates at construction), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
    */
   recoveryModelSpecRecoveryRate(
     spec: generated.cashflows.RecoveryModelSpec,

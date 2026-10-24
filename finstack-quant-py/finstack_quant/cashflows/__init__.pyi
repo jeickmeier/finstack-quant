@@ -132,10 +132,11 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
         ``principal_exchange``). Each principal event requires economic ``date``
         and cash ``payment_date``; these dates may differ after payment adjustment.
     market : MarketContext or str, optional
-        Market context (or its JSON) for floating-rate projection. Complete
-        supplied observations need no forward curve. Explicit fallback covers
-        missing curves or absent fixing series, never supplied historical gaps
-        before a resolved curve's base date or genuine projection errors.
+        Market context (or its JSON) for floating-rate projection. Every
+        floating coupon needs its forward curve, even when supplied
+        observations cover it, unless an explicit fallback applies. Explicit
+        fallback covers any failed coupon projection, never supplied
+        historical gaps before a resolved curve's base date.
 
     Returns
     -------
@@ -309,10 +310,11 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
         fees, and schedule rules.
     market_json : str, optional
         JSON-encoded ``MarketContext`` for floating-rate index lookups. Omit
-        when the schedule uses fixed coupons only. Complete supplied observations
-        need no forward curve. Explicit fallback covers missing curves or absent
-        fixing series, never supplied historical gaps before a resolved curve's
-        base date or genuine projection errors.
+        when the schedule uses fixed coupons only. Every floating coupon needs
+        its forward curve, even when supplied observations cover it, unless an
+        explicit fallback applies. Explicit fallback covers any failed coupon
+        projection, never supplied historical gaps before a resolved curve's
+        base date.
 
     Returns
     -------

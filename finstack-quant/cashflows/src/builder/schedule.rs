@@ -186,8 +186,9 @@ pub enum CashflowRepresentation {
 
 /// Metadata shared by an entire cashflow schedule.
 ///
-/// Tracks referenced calendar IDs, optional facility limits, and the instrument's
-/// issue date for use by downstream engines (e.g., accrual calculation).
+/// Carries the representation tag, the issue and maturity dates, projected
+/// fixings for time rolls, and two informational fields (`calendar_ids`,
+/// `commitment`) that no Rust engine reads.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -200,15 +201,24 @@ pub struct CashFlowMeta {
     #[serde(default)]
     pub representation: CashflowRepresentation,
     /// Holiday calendar IDs used for schedule adjustments.
+    ///
+    /// Informational: carried through merge and host views, but no Rust
+    /// engine reads it; accrual uses each flow's `accrual.calendar_id`.
     pub calendar_ids: Vec<String>,
     /// Total facility commitment for revolving and delayed-draw facilities;
     /// `None` for instruments without one.
-    pub commitment: Option<Money>,
-    /// Issue date of the instrument, when known.
     ///
-    /// Used by the accrual engine to establish the first coupon period start
-    /// date precisely, avoiding the inverse day count approximation that can
-    /// be off by 1-2 days.
+    /// Informational: carried through merge and host views, but no Rust
+    /// engine reads it.
+    pub commitment: Option<Money>,
+    /// Issue date of the instrument.
+    ///
+    /// Required by accrual and by `outstanding_by_date` /
+    /// `outstanding_at_dates`, which return an error when it is missing rather
+    /// than infer the first coupon period start from flow dates. `validate`
+    /// and the public lifecycle normalization instead fall back to the first
+    /// flow date to locate the issue funding row. Merging schedules keeps it
+    /// only when every input carries the same date.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "json-schema",
@@ -715,9 +725,13 @@ impl CashFlowSchedule {
     ///
     /// WAL = Σ(principal_i × t_i) / Σ(principal_i)
     ///
-    /// where t_i is the year fraction from `as_of` to the payment date,
-    /// and the sum runs over all principal flows (Amortization, Notional,
-    /// PrePayment, RevolvingRepayment) with positive amounts after `as_of`.
+    /// where the sum runs over principal repayment flows (Amortization,
+    /// Notional, PrePayment, RevolvingRepayment). Each is timed at its
+    /// balance-effective date (`principal_date`, else the payment date) and
+    /// weighted by its par principal (the negated `principal_delta`, else the
+    /// cash amount), so a payment lag or a premium/OID cash amount does not
+    /// move WAL. t_i is the year fraction from `as_of` to that date; only
+    /// positive amounts dated after `as_of` contribute.
     ///
     /// WAL is computed on an Act/365F basis regardless of the schedule's
     /// accrual day count, matching conventional desk reporting. This avoids
@@ -737,12 +751,14 @@ impl CashFlowSchedule {
     ///
     /// # Errors
     ///
-    /// Returns an error if the day-count year-fraction calculation fails.
+    /// Returns `CurrencyMismatch` if contributing repayments use more than one
+    /// currency, or an error if the day-count year-fraction calculation fails.
     ///
     /// # Arguments
     ///
-    /// * `as_of` - Valuation date; only principal cash repayments strictly
-    ///   after this date contribute to Act/365F weighted average life.
+    /// * `as_of` - Valuation date; only principal repayments whose
+    ///   balance-effective date is strictly after it contribute to Act/365F
+    ///   weighted average life.
     pub fn wal(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
         weighted_average_life_from_principal(
             self.flows
@@ -998,8 +1014,12 @@ fn merge_matching_option<T: Copy + PartialEq>(current: &mut Option<Option<T>>, v
 /// - `representation`: `Projected` dominates mixed inputs, followed by
 ///   `Placeholder`, `Contractual`, and `NoResidual`.
 /// - `calendar_ids`: union of all inputs, sorted and deduplicated.
-/// - `commitment`: kept only if every input agrees; mismatches → `None`.
-/// - `issue_date`: kept only if every input agrees; mismatches → `None`.
+/// - `commitment`, `issue_date`, `maturity`: kept only if every input agrees,
+///   where an input without a value disagrees with one that has it;
+///   mismatches → `None`. A merged schedule without `issue_date` fails
+///   accrual and `outstanding_by_date`, so give every input the same
+///   `issue_date` (for example by copying the instrument's meta).
+/// - `projected_fixings`: union of all inputs, normalized.
 ///
 /// Empty input yields an empty schedule with default metadata.
 pub fn merge_cashflow_schedules<I>(

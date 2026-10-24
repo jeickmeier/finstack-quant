@@ -1592,9 +1592,10 @@ export interface D_21E99Cfd351458495Cc5 {
 /**
  * Fee tier for utilization-based fee structures.
  *
- * Tiers are evaluated in order: the first tier where utilization >= threshold applies.
- * Tiers must be sorted by threshold (ascending); [`evaluate_fee_tiers`]
- * rejects unordered tiers.
+ * The tier with the highest threshold not exceeding utilization applies, so
+ * a higher utilization moves into a higher tier; below the lowest threshold
+ * no tier applies. Tiers must be sorted by threshold (strictly ascending);
+ * [`evaluate_fee_tiers`] rejects unordered tiers.
  */
 export interface DE10F396F3Ee032Fe0173 {
   bp: Decimal1;
@@ -3338,12 +3339,14 @@ export interface D_2E0Bc1103181D92528Ce {
  *
  * The all-in rate is computed as:
  * 1. Look up forward rate from `forward_curve_id` curve for the accrual period
- * 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
- * 3. Add `spread_bp` to get base rate
- * 4. Multiply by `gearing` (typically 1.0)
- * 5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing
+ * 2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),
+ *    BEFORE adding spread
+ * 3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by
+ *    default, `index * gearing + spread` when `gearing_includes_spread` is false
+ * 4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),
+ *    AFTER spread and gearing
  *
- * Formula: `cap(gearing * (floor(index) + spread))`
+ * Default formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`
  *
  * # Negative Rate Handling
  *
@@ -3380,11 +3383,11 @@ export interface D_2E0Bc1103181D92528Ce {
  * An observation exactly on the cutoff prefers a published same-day fixing
  * when the series has one, otherwise projects on the curve clock.
  *
- * The [`FloatingRateFallback`] policy applies only when **no** fixing
- * series is provided: `Error` (the default) fails the build with a
- * descriptive message naming the date, index, and expected series id;
- * `FixedRate(r)` uses `r` as the index rate for the affected coupon;
- * `SpreadOnly` projects spread-only.
+ * The [`FloatingRateFallback`] policy applies when projection fails and never
+ * fills a gap in a supplied fixing series (see its doc): `Error` (the
+ * default) fails the build with a descriptive message naming the date,
+ * index, and expected series id; `FixedRate(r)` uses `r` as the index rate
+ * for the whole coupon; `SpreadOnly` projects spread-only.
  *
  * # Example
  *
@@ -3438,9 +3441,10 @@ export interface D_879C942D15Cfcad2445B {
    */
   compounding?: D_553B276D4726518Cb3Ad | null;
   /**
-   * Policy when forward curve lookup fails during emission.
+   * Policy when projecting a coupon fails; see [`FloatingRateFallback`]
+   * for when it applies and what it replaces.
    *
-   * Defaults to `Error`, which surfaces curve lookup failures.
+   * Defaults to `Error`, which surfaces projection failures.
    * Set to `SpreadOnly` for spread-only projection, or `FixedRate(r)`
    * to use a fixed index rate.
    */
@@ -3476,16 +3480,15 @@ export interface D_879C942D15Cfcad2445B {
    */
   index_floor_bp?: Decimal4 | null;
   /**
-   * Explicit term-index tenor when no forward curve resolves.
+   * Expected term-index tenor, checked against the resolved forward curve.
    *
    * The named forward curve is already the term index (for example a 3M
-   * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
-   * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
-   * when no forward curve resolves. Ignored for overnight-compounded
-   * legs. When set, the builder warns at build time if it disagrees with
-   * the resolved curve's tenor by more than 10% — the curve remains
-   * authoritative.
+   * EURIBOR curve) and owns the quoted tenor. Projection is
+   * `fwd.rate(reset_date)`, not a FRA-style average over
+   * `[reset, reset + tenor]`. The builder only uses this field to warn at
+   * build time when it disagrees with the resolved curve's tenor by more
+   * than 10%; the curve remains authoritative. Ignored for
+   * overnight-compounded legs.
    */
   index_tenor?: Tenor1 | null;
   /**

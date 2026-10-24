@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json",
-      "bytes": 32122,
+      "bytes": 32585,
       "kind": "output",
       "path": "schemas/cashflow/1/cashflow_schedule.schema.json",
       "summary": "Ordered classified cashflows with their notional, day count and schedule metadata.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
-      "bytes": 78770,
+      "bytes": 79584,
       "kind": "input",
       "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
       "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
-      "bytes": 30370,
+      "bytes": 31184,
       "kind": "component",
       "path": "schemas/cashflow/1/floating_coupon_spec.schema.json",
       "summary": "Index, spread, caps and floors, reset rules and schedule for one floating leg.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_build_opts.schema.json",
-      "bytes": 5652,
+      "bytes": 6115,
       "kind": "input",
       "path": "schemas/cashflow/1/schedule_build_opts.schema.json",
       "summary": "Notional hint and metadata stamped on a schedule built from dated or classified flows.",

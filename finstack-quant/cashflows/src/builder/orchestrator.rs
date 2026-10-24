@@ -344,6 +344,22 @@ fn compute_redemption_dates(
 ///
 /// Fluent methods live in `coupon_api`; build orchestration lives in this
 /// module.
+///
+/// # Window boundaries
+///
+/// Coupon windows (`add_fixed_window`, `add_floating_window`,
+/// `fixed_to_float`, `float_margin_steps`) and payment windows
+/// (`add_payment_window`, `payment_split_program`) all add their dates to one
+/// set of horizon cut points. Coupon dates are then generated independently
+/// between each pair of adjacent cut points with that piece's
+/// `ScheduleParams`; one issue-anchored grid is not split. With the default
+/// `ShortFront` stub a piece's regular dates roll back from its end, so an
+/// off-cycle boundary moves every earlier coupon date of that piece onto the
+/// boundary's roll and puts the stub at the piece's start. With
+/// `StubKind::None` a boundary that does not leave whole periods is rejected.
+/// `step_up_cf` keeps one full-horizon grid instead: each step applies from
+/// the first period starting on or after its date. Snap off-cycle dates onto
+/// the accrual grid first when coupon dates must not move.
 #[derive(Debug, Clone, Default)]
 pub struct CashFlowBuilder {
     pub(super) initial_principal: Option<Money>,
@@ -386,10 +402,18 @@ impl CashFlowBuilder {
     /// Build the cashflow schedule with optional market curves for floating rate projection.
     ///
     /// When curves are provided, floating rate coupons use forward rates:
-    /// `coupon = outstanding * (forward_rate * gearing + spread_bp * 1e-4) * year_fraction`
+    /// `coupon = outstanding * calculate_floating_rate(index, params) * year_fraction`,
+    /// which by default is `(index + spread_bp * 1e-4) * gearing` within any
+    /// floors and caps (see [`calculate_floating_rate`](crate::builder::calculate_floating_rate)).
     ///
-    /// Without curves, the fallback policy on each floating spec controls behavior
-    /// (default: error; `SpreadOnly` uses just margin; `FixedRate(r)` uses a fixed index).
+    /// Without `as_of`, each forward curve's base date is the observation
+    /// cutoff: resets before it need exact fixings under `FIXING:{forward_curve_id}`.
+    /// Use [`build_as_of`](Self::build_as_of) to set the cutoff explicitly.
+    ///
+    /// When a coupon cannot be projected (for example its forward curve is not
+    /// in `curves`), the fallback policy on its floating spec controls behavior
+    /// (default: error; `SpreadOnly` uses just margin; `FixedRate(r)` uses a fixed
+    /// index); see [`FloatingRateFallback`](crate::builder::FloatingRateFallback).
     ///
     /// The builder compiles dates, coupon programs, fees, and principal events
     /// into a canonical ordered [`CashFlowSchedule`]. `curves` is used only for

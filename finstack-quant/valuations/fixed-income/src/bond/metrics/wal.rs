@@ -25,6 +25,12 @@ use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 /// selects only `CFKind::Amortization` and positive `CFKind::Notional` flows.
 /// This correctly excludes coupons, PIK accruals, and the initial negative
 /// notional draw, giving an accurate principal-only WAL.
+///
+/// This differs from `CashFlowSchedule::wal`, which also counts prepayments
+/// and revolver repayments and times each repayment at its balance-effective
+/// date with its par amount. Here each flow is timed at its cash payment date
+/// with its cash amount, so the two disagree under a payment lag or a
+/// premium/OID redemption.
 pub(crate) struct BondWalCalculator;
 
 impl MetricCalculator for BondWalCalculator {
