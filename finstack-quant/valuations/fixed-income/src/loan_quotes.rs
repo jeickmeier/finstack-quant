@@ -412,13 +412,13 @@ pub fn oid_eir_schedule_from_flows(
     let (start_date, start_bucket) = iter
         .next()
         .ok_or(finstack_quant_core::InputError::TooFewPoints)?;
-    // The opening carrying amount is the notional funding only; fees or
-    // interest in the first bucket would overstate it.
-    let mut opening_balance = -start_bucket.notional;
+    // The opening carrying amount is the net initial cash outflow (notional
+    // funding net of any upfront fee or OID in the first bucket).
+    let mut opening_balance = -start_bucket.total;
     let mut prev = *start_date;
     for (date, bucket) in iter {
         let yf = day_count.year_fraction(prev, *date, DayCountContext::default())?;
-        let interest_income = opening_balance * effective_rate * yf;
+        let interest_income = opening_balance * ((1.0 + effective_rate).powf(yf) - 1.0);
         let closing_balance = opening_balance + interest_income - bucket.total;
         let oid_amortization = interest_income - bucket.interest;
         periods.push(OidEirPeriod {

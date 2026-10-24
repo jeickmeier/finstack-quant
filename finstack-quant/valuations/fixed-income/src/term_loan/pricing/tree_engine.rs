@@ -906,6 +906,26 @@ impl TermLoanTreePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
+        if let Some(px) = loan
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct
+        {
+            let schedule = super::discounting::TermLoanDiscountingPricer::pricing_schedule(
+                loan, market, as_of,
+            )?;
+            let settlement_value =
+                crate::term_loan::metrics::irr_helpers::quoted_dirty_from_clean_px(
+                    loan, &schedule, as_of, px,
+                )?;
+            return super::discounting::TermLoanDiscountingPricer::value_at_as_of(
+                loan,
+                market,
+                as_of,
+                &schedule,
+                settlement_value,
+            );
+        }
         let oas_bp = Self::quoted_oas_bp(loan);
         if !oas_bp.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(

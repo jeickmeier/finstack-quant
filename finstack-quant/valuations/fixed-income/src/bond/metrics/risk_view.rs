@@ -87,12 +87,6 @@ pub(crate) fn with_bond_risk_view<R>(
 ) -> finstack_quant_core::Result<R> {
     match bond_risk_view(context)? {
         None => f(context),
-        Some(risk_bond) => {
-            let orig_instrument = Arc::clone(&context.instrument);
-            context.set_instrument(Arc::new(risk_bond) as Arc<dyn Instrument>);
-            let result = f(context);
-            context.set_instrument(orig_instrument);
-            result
-        }
+        Some(risk_bond) => context.with_instrument(Arc::new(risk_bond), f),
     }
 }

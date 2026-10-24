@@ -656,7 +656,11 @@ impl<'a> CashflowEngine<'a> {
             flows,
             self.facility.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
-                notional_hint: Some(Money::from((0_i64, self.facility.commitment.currency()))),
+                notional_hint: Some(if self.facility.issue_date <= self.as_of {
+                    self.facility.drawn
+                } else {
+                    Money::from((0_i64, self.facility.commitment.currency()))
+                }),
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {
                     projected_fixings,
                     ..self.schedule_meta()

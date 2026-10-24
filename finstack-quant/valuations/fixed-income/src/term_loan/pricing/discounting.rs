@@ -178,6 +178,15 @@ impl TermLoanDiscountingPricer {
         let (settlement_date, flows) = Self::pricing_flows(loan, schedule, as_of)?;
         let disc = market.get_discount(loan.discount_curve_id.as_str())?;
 
+        if let Some(px) = loan
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct
+        {
+            return crate::term_loan::metrics::irr_helpers::quoted_dirty_from_clean_px(
+                loan, schedule, as_of, px,
+            );
+        }
         if let Some(spread) = loan
             .instrument_pricing_overrides
             .market_quotes

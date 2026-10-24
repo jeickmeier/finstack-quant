@@ -424,17 +424,34 @@ pub(crate) fn settlement_asw_components(
     let schedule = bond.full_cashflow_schedule(market)?;
     let ex_coupon = bond.accrual_config().ex_coupon;
     let mut coupon_pv = 0.0;
-    for flow in schedule.get_flows().iter().filter(|flow| {
-        flow.date > settlement && flow.kind.is_interest_like() && flow.kind != CFKind::Pik
-    }) {
-        if let Some(rule) = &ex_coupon {
-            if rule.is_ex_coupon(flow.date, settlement)? {
-                continue;
+    let mut principal_pv = 0.0;
+    let mut has_principal_flows = false;
+    for flow in schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.date > settlement && flow.kind != CFKind::Pik)
+    {
+        if flow.kind.is_interest_like() {
+            if let Some(rule) = &ex_coupon {
+                if rule.is_ex_coupon(flow.date, settlement)? {
+                    continue;
+                }
             }
+            coupon_pv += flow.amount.amount() * disc.df_on_date(flow.date)?
+                / df_settlement
+                / bond.notional.amount();
+        } else if matches!(flow.kind, CFKind::Amortization | CFKind::Notional)
+            && flow.amount.amount() > 0.0
+        {
+            has_principal_flows = true;
+            principal_pv += flow.amount.amount() * disc.df_on_date(flow.date)?
+                / df_settlement
+                / bond.notional.amount();
         }
-        coupon_pv += flow.amount.amount() * disc.df_on_date(flow.date)?
-            / df_settlement
-            / bond.notional.amount();
+    }
+    if has_principal_flows {
+        let df_maturity = disc.df_on_date(bond.maturity)? / df_settlement;
+        coupon_pv += principal_pv - df_maturity;
     }
     // Forward curve for the asset-swap floating leg; `None` selects the
     // discount-ratio fallback.
