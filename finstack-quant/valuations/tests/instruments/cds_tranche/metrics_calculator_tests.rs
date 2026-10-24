@@ -303,6 +303,65 @@ fn test_dv01_metric_via_price_with_metrics() {
 }
 
 #[test]
+fn test_dv01_rebootstraps_calibrated_index_hazard_from_unchanged_spreads() {
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use std::sync::Arc;
+
+    let tranche = mezzanine_tranche();
+    let market = replayable_market_context();
+    let as_of = base_date();
+
+    let dv01 = *tranche
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Dv01],
+            crate::instruments::test_support::credit::pricing_options(),
+        )
+        .expect("DV01")
+        .measures
+        .get("dv01")
+        .expect("dv01 should be in measures");
+
+    let pv_at = |bp: f64| {
+        let bumped = market
+            .bump([MarketBump::Curve {
+                id: "USD-OIS".into(),
+                spec: BumpSpec::parallel_bp(bp),
+            }])
+            .expect("discount bump");
+        let hazard = Arc::new(
+            crate::instruments::test_support::credit::calibrated_hazard_curve(
+                &bumped,
+                as_of,
+                "CDX.NA.IG.42",
+                "CDX.NA.IG.42",
+                "USD-OIS",
+            )
+            .expect("re-bootstrap on bumped discount"),
+        );
+        let index = bumped
+            .get_credit_index("CDX.NA.IG.42")
+            .expect("index")
+            .to_builder()
+            .index_credit_curve(Arc::clone(&hazard))
+            .build()
+            .expect("rebuilt index");
+        let rebuilt = bumped
+            .insert(Arc::clone(&hazard))
+            .insert_credit_index("CDX.NA.IG.42", index)
+            .expect("rebuilt index dependencies");
+        tranche.value_raw(&rebuilt, as_of).expect("pv")
+    };
+    let expected = (pv_at(1.0) - pv_at(-1.0)) / 2.0;
+    assert!(expected.abs() > 1e-6, "fixture must carry rate risk");
+    assert!(
+        (dv01 - expected).abs() <= 1e-6 * expected.abs(),
+        "tranche DV01 with hazard replay {dv01} vs re-bootstrapped {expected}"
+    );
+}
+
+#[test]
 fn test_theta_metric_via_price_with_metrics() {
     // Arrange
     let tranche = mezzanine_tranche();

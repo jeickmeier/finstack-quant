@@ -422,6 +422,21 @@ impl CdsTranchePricer {
                 index_data_arc.index_credit_curve().base_date()
             )));
         }
+        if as_of < tranche.maturity {
+            if let Some(issuer_curves) = index_data_arc.issuer_credit_curves() {
+                for (issuer_id, curve) in issuer_curves {
+                    if curve.base_date() != as_of {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "CDS tranche '{}' requires issuer credit curve '{}' to be based on valuation date {}; got {}. Rebase the curve or provide a conditionally rebased credit index.",
+                            tranche.id,
+                            issuer_id,
+                            as_of,
+                            curve.base_date()
+                        )));
+                    }
+                }
+            }
+        }
         let valuation_date = self.calculate_settlement_date(tranche, market_ctx, as_of)?;
         let periods: Vec<_> = self
             .generate_coupon_periods(tranche, valuation_date)?

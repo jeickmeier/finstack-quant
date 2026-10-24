@@ -13,6 +13,7 @@
 //! - Recovery01 (per 1% recovery change)
 
 mod cs01;
+mod dv01;
 mod recovery01;
 
 use crate::cds_tranche::{CdsTranche, CdsTranchePricer};
@@ -39,7 +40,7 @@ pub(crate) fn register_cds_tranche_metrics(
             (ParSpread, ParSpreadCalculator),
             (ExpectedLoss, ExpectedLossCalculator),
             (JumpToDefault, JumpToDefaultCalculator),
-            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, dv01::CdsTrancheDv01Calculator),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
