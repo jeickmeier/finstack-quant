@@ -86,6 +86,27 @@ impl Operators2D {
             cross_deriv,
         }
     }
+
+    /// Refresh the boundary RHS corrections for time-varying boundary values
+    /// along all x- and y-lines at time `t`.
+    pub(super) fn set_boundary_rhs(&mut self, problem: &dyn PdeProblem2D, grid: &Grid2D, t: f64) {
+        let x_pts = grid.x().points();
+        let y_pts = grid.y().points();
+        for (jj, op) in self.op_x.iter_mut().enumerate() {
+            let y = y_pts[jj + 1];
+            op.set_boundary_rhs(
+                problem.boundary_x_lower(y, t),
+                problem.boundary_x_upper(y, t),
+            );
+        }
+        for (ii, op) in self.op_y.iter_mut().enumerate() {
+            let x = x_pts[ii + 1];
+            op.set_boundary_rhs(
+                problem.boundary_y_lower(x, t),
+                problem.boundary_y_upper(x, t),
+            );
+        }
+    }
 }
 
 /// Assemble one directional tridiagonal operator along `line_grid`.

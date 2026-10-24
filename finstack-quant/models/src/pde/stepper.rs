@@ -219,7 +219,7 @@ impl ThetaStepper {
         u: &mut [f64],
         (t_from, t_to): (f64, f64),
         step_index: usize,
-        cached_op: Option<&TridiagOperator>,
+        cached_op: Option<&mut TridiagOperator>,
     ) -> Result<(), StepperError> {
         let theta = if step_index < self.implicit_steps {
             1.0
@@ -357,7 +357,7 @@ fn theta_step(
     t_from: f64,
     t_to: f64,
     theta: f64,
-    cached_op: Option<&TridiagOperator>,
+    cached_op: Option<&mut TridiagOperator>,
 ) -> Result<(), StepperError> {
     let dt = t_from - t_to;
     // A non-positive or non-finite dt would otherwise propagate as silent
@@ -385,12 +385,16 @@ fn theta_step(
 
     let is_homogeneous = problem.is_time_homogeneous();
 
-    let op_from_owned;
+    let mut op_from_owned;
     let op_from = if let Some(op) = cached_op {
+        op.set_boundary_rhs(
+            problem.lower_boundary(t_from),
+            problem.upper_boundary(t_from),
+        );
         op
     } else {
         op_from_owned = TridiagOperator::assemble(problem, grid, t_from);
-        &op_from_owned
+        &mut op_from_owned
     };
 
     // Explicit part: y = (I + (1-theta)*dt * A_from) * u + (1-theta)*dt*(source + bc)
@@ -399,7 +403,8 @@ fn theta_step(
 
     let op_to_owned;
     let op_to = if is_homogeneous {
-        op_from
+        op_from.set_boundary_rhs(problem.lower_boundary(t_to), problem.upper_boundary(t_to));
+        &*op_from
     } else {
         op_to_owned = TridiagOperator::assemble(problem, grid, t_to);
         &op_to_owned

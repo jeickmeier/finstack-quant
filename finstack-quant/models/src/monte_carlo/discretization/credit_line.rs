@@ -229,6 +229,10 @@ impl Discretization<CreditLineProcess> for CreditLineDiscretization {
             0 // No workspace needed if no correlation
         }
     }
+
+    fn applies_correlation_internally(&self) -> bool {
+        self.cholesky_factor.is_some()
+    }
 }
 
 #[cfg(test)]
@@ -290,6 +294,21 @@ mod tests {
         let correlation = [[1.0, 0.2, 0.1], [0.2, 1.0, 0.3], [0.1, 0.3, 1.0]];
         let disc = CreditLineDiscretization::new(Some(&correlation)).expect("should succeed");
         assert!(disc.cholesky_factor.is_some());
+        assert!(disc.applies_correlation_internally());
+
+        let params = CreditLineProcessParams::new(
+            UtilizationParams::new(0.5, 0.6, 0.1).expect("utilization"),
+            InterestRateSpec::Fixed { rate: 0.05 },
+            CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).expect("credit spread"),
+        )
+        .with_correlation(correlation);
+        let process = CreditLineProcess::new(params);
+        let engine_factor = crate::monte_carlo::engine::build_correlation_factor(&process, &disc)
+            .expect("valid correlation check");
+        assert!(
+            engine_factor.is_none(),
+            "engine must not apply Cholesky a second time when CreditLineDiscretization correlates internally"
+        );
     }
 
     #[test]

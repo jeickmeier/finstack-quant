@@ -179,7 +179,7 @@ impl Solver1D {
         }
 
         let mut exercise_boundary: Vec<(f64, f64)> = Vec::new();
-        let cached_op = problem
+        let mut cached_op = problem
             .is_time_homogeneous()
             .then(|| super::operator::TridiagOperator::assemble(problem, &self.grid, levels[0]));
 
@@ -194,7 +194,7 @@ impl Solver1D {
                 &mut u,
                 (t_from, t_to),
                 i,
-                cached_op.as_ref(),
+                cached_op.as_mut(),
             )?;
 
             // Apply the obstacle on eligible time levels. American exercise
@@ -1088,6 +1088,65 @@ mod tests {
                 (v - expected).abs() < 1e-8,
                 "linear profile not preserved at x={x}: got {v}, want {expected}"
             );
+        }
+    }
+
+    struct TimeVaryingDirichlet1D {
+        homogeneous_flag: bool,
+    }
+
+    impl PdeProblem1D for TimeVaryingDirichlet1D {
+        fn diffusion(&self, _x: f64, _t: f64) -> f64 {
+            0.02
+        }
+        fn convection(&self, _x: f64, _t: f64) -> f64 {
+            0.03
+        }
+        fn reaction(&self, _x: f64, _t: f64) -> f64 {
+            -0.05
+        }
+        fn terminal_condition(&self, x: f64) -> f64 {
+            (100.0 - x.exp()).max(0.0)
+        }
+        fn lower_boundary(&self, t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet(100.0 * (-0.05 * (1.0 - t)).exp())
+        }
+        fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet(0.0)
+        }
+        fn is_time_homogeneous(&self) -> bool {
+            self.homogeneous_flag
+        }
+    }
+
+    #[test]
+    fn time_homogeneous_cache_refreshes_time_varying_boundaries_1d() {
+        let grid = Grid1D::uniform(3.5, 5.5, 41).expect("valid grid");
+        let solver = Solver1D::builder()
+            .grid(grid)
+            .crank_nicolson(40)
+            .build()
+            .expect("valid solver");
+
+        let cached = solver
+            .solve(
+                &TimeVaryingDirichlet1D {
+                    homogeneous_flag: true,
+                },
+                1.0,
+            )
+            .expect("cached solve");
+        let uncached = solver
+            .solve(
+                &TimeVaryingDirichlet1D {
+                    homogeneous_flag: false,
+                },
+                1.0,
+            )
+            .expect("uncached solve");
+
+        for (a, b) in cached.values.iter().zip(uncached.values.iter()) {
+            assert!((a - b).abs() < 1e-14, "cached {a} != uncached {b}");
         }
     }
 }

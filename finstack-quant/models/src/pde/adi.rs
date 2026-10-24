@@ -361,23 +361,45 @@ impl McsStepper {
 
         let ops_from_owned;
         let ops_to_owned;
-        let (ops, ops_impl) = if problem.is_time_homogeneous() {
+        let ops_impl = if problem.is_time_homogeneous() {
             let cached =
                 cached_ops.get_or_insert_with(|| Operators2D::assemble(problem, grid, t_from));
-            (&*cached, &*cached)
+            cached.set_boundary_rhs(problem, grid, t_from);
+            // F_0(t_n, u^n): the mixed (cross-derivative) term applied to u^n.
+            apply_cross_derivative(cross, &cached.cross_deriv, u_full, grid);
+            // F_1(t_n, u^n) = A_x * u^n  (for each y-line).
+            apply_x_operator(cached, u_int, nx_int, ny_int, x_line, line_out, ax_u);
+            // F_2(t_n, u^n) = A_y * u^n  (for each x-line).
+            apply_y_operator(cached, u_int, nx_int, ny_int, y_line, line_out, ay_u);
+            cached.set_boundary_rhs(problem, grid, t_to);
+            &*cached
         } else {
             ops_from_owned = Operators2D::assemble(problem, grid, t_from);
             ops_to_owned = Operators2D::assemble(problem, grid, t_to);
-            (&ops_from_owned, &ops_to_owned)
+            // F_0(t_n, u^n): the mixed (cross-derivative) term applied to u^n.
+            apply_cross_derivative(cross, &ops_from_owned.cross_deriv, u_full, grid);
+            // F_1(t_n, u^n) = A_x * u^n  (for each y-line).
+            apply_x_operator(
+                &ops_from_owned,
+                u_int,
+                nx_int,
+                ny_int,
+                x_line,
+                line_out,
+                ax_u,
+            );
+            // F_2(t_n, u^n) = A_y * u^n  (for each x-line).
+            apply_y_operator(
+                &ops_from_owned,
+                u_int,
+                nx_int,
+                ny_int,
+                y_line,
+                line_out,
+                ay_u,
+            );
+            &ops_to_owned
         };
-
-        // F_0(t_n, u^n): the mixed (cross-derivative) term applied to u^n.
-        apply_cross_derivative(cross, &ops.cross_deriv, u_full, grid);
-
-        // F_1(t_n, u^n) = A_x * u^n  (for each y-line).
-        apply_x_operator(ops, u_int, nx_int, ny_int, x_line, line_out, ax_u);
-        // F_2(t_n, u^n) = A_y * u^n  (for each x-line).
-        apply_y_operator(ops, u_int, nx_int, ny_int, y_line, line_out, ay_u);
 
         // --- Predictor: Y_0 = u^n + dt * F(t_n, u^n) ---
         // The reaction term c*u is split into the directional operators
