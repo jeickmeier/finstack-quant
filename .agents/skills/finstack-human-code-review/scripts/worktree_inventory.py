@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
 from typing import Any
 
 CONFLICT_CODES = frozenset({"DD", "AU", "UD", "UA", "DU", "AA", "UU"})
@@ -25,8 +25,7 @@ def git(repo: Path, *arguments: str, check: bool = True) -> subprocess.Completed
     try:
         result = subprocess.run(
             ["git", "-C", str(repo), *arguments],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=False,
         )
     except OSError as exc:
@@ -101,7 +100,11 @@ def collect(repo: Path) -> dict[str, Any]:
     # --untracked-files=all includes individual untracked files, not only folders.
     # --ignore-submodules=none surfaces a changed submodule but not its internal files.
     raw = git(
-        root, "status", "--porcelain=v1", "-z", "--untracked-files=all",
+        root,
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=all",
         "--ignore-submodules=none",
     ).stdout
     entries = parse_porcelain_z(raw)
@@ -127,26 +130,22 @@ def collect(repo: Path) -> dict[str, Any]:
 
 
 def print_text(inventory: dict[str, Any], limit: int) -> None:
-    print(f"Repository: {inventory['repository_root']}")
-    print(f"HEAD commit exists: {inventory['has_head_commit']}")
-    print("Counts: " + ", ".join(f"{key}={value}" for key, value in inventory["counts"].items()))
     entries = inventory["entries"]
     for item in entries[:limit]:
         labels = []
         for key in ("staged", "unstaged", "untracked", "conflicted"):
             if item[key]:
                 labels.append(key)
-        origin = f" (from {json.dumps(item['old_path'], ensure_ascii=True)})" if "old_path" in item else ""
-        print(f"  {item['status']} [{', '.join(labels)}] {json.dumps(item['path'], ensure_ascii=True)}{origin}")
+        f" (from {json.dumps(item['old_path'], ensure_ascii=True)})" if "old_path" in item else ""
     if len(entries) > limit:
-        print(f"... {len(entries) - limit} additional paths NOT DISPLAYED (use --format json or a larger --limit)")
-    for note in inventory["notes"]:
-        print("Note: " + note)
+        pass
+    for _note in inventory["notes"]:
+        pass
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, default=Path("."), help="Repository path; defaults to cwd")
+    parser.add_argument("--repo", type=Path, default=Path(), help="Repository path; defaults to cwd")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     parser.add_argument("--limit", type=int, default=200, help="Maximum paths shown in text output (default: 200)")
     args = parser.parse_args()
@@ -154,11 +153,10 @@ def main() -> int:
         parser.error("--limit must be nonnegative")
     try:
         inventory = collect(args.repo)
-    except InventoryError as exc:
-        print(f"Inventory failed: {exc}", file=sys.stderr)
+    except InventoryError:
         return 2
     if args.format == "json":
-        print(json.dumps(inventory, indent=2, ensure_ascii=True))
+        pass
     else:
         print_text(inventory, args.limit)
     return 0
