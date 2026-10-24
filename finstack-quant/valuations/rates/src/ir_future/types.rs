@@ -850,6 +850,15 @@ impl InterestRateFuture {
         let convexity = 0.5 * vol_estimate * vol_estimate * t1 * t2;
         Ok(forward_rate + convexity)
     }
+
+    /// `true` when the model can price the future without a quote: a fixed
+    /// convexity adjustment or a vol surface is supplied, or the compounded
+    /// (overnight) contract needs neither.
+    pub(crate) fn can_price_from_model(&self) -> bool {
+        self.contract_specs.convexity_adjustment.is_some()
+            || self.vol_surface_id.is_some()
+            || !matches!(self.compounding, FloatingLegCompounding::Simple)
+    }
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for InterestRateFuture {
@@ -864,9 +873,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for InterestRateFut
 
     fn validate_for_pricing(&self) -> finstack_quant_core::Result<()> {
         self.validate()?;
-        if self.contract_specs.convexity_adjustment.is_none()
-            && self.vol_surface_id.is_none()
-            && matches!(self.compounding, FloatingLegCompounding::Simple)
+        if !self.can_price_from_model()
             && self.terms.quoted_price.is_none()
             && self.terms.settlement_price.is_none()
         {
@@ -893,6 +900,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for InterestRateFut
                 ),
             );
         }
+        deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+            self.resolved_index_id(),
+        ));
         Ok(deps)
     }
 

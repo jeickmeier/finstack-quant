@@ -532,6 +532,22 @@ impl Repo {
         )
     }
 
+    /// Compute unrounded present value of the repo using curves in the market context.
+    pub fn pv_raw(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        let (_, adj_maturity) = self.adjusted_dates()?;
+        if as_of >= adj_maturity {
+            return Ok(0.0);
+        }
+
+        let disc_curve = market.get_discount(self.discount_curve_id.as_str())?;
+        let flows = self.dated_cashflows(market, as_of)?;
+
+        flows.into_iter().try_fold(0.0, |acc, (date, amount)| {
+            let df = disc_curve.df_between_dates(as_of, date)?;
+            Ok(acc + amount.amount() * df)
+        })
+    }
+
     /// Calculate repo interest amount.
     ///
     /// # Market Standard
@@ -623,6 +639,10 @@ impl Instrument for Repo {
         self.pv(context, as_of)
     }
 
+    fn base_value_raw(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
+        self.pv_raw(context, as_of)
+    }
+
     fn as_marginable(&self) -> Option<&dyn finstack_quant_margin::Marginable> {
         Some(self)
     }
@@ -687,7 +707,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
-                ..Default::default()
+                meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                    issue_date: Some(adj_start),
+                    ..Default::default()
+                },
             },
         )?;
         Ok(schedule.with_representation(

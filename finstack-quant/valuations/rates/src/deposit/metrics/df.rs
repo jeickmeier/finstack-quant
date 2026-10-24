@@ -67,7 +67,11 @@ impl MetricCalculator for DfCalculator {
         let target_date = self.selector.resolve(context)?;
 
         let disc = context.curves.get_discount(&discount_id)?;
-        disc.df_on_date(target_date)
+        finstack_quant_core::market_data::traits::Discounting::df_between_dates(
+            disc.as_ref(),
+            context.as_of,
+            target_date,
+        )
     }
 }
 

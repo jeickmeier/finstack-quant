@@ -58,9 +58,6 @@ impl MetricCalculator for FraParRateCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let fra: &ForwardRateAgreement = context.instrument_as()?;
 
-        // Forward rate over [t_start, t_end]
-        let fwd = context.curves.get_forward(fra.forward_curve_id.as_str())?;
-
         let period_length = (fra.maturity - fra.start_date).whole_days();
         if period_length == 0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -69,15 +66,8 @@ impl MetricCalculator for FraParRateCalculator {
             )));
         }
 
-        fwd.as_ref().rate_between_dates(
-            fra.start_date,
-            fra.maturity,
-            fra.day_count.year_fraction(
-                fra.start_date,
-                fra.maturity,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?,
-        )
+        let (rate, _) = fra.resolved_forward_rate(&context.curves, context.as_of)?;
+        Ok(rate)
     }
 }
 
@@ -100,11 +90,12 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
         let fra: &ForwardRateAgreement = context.instrument_as()?;
         let market = context.curves.as_ref();
         let discount = market.get_discount(fra.discount_curve_id.as_str())?;
-        let forward = market.get_forward(fra.forward_curve_id.as_str())?;
+        let forward = market.get_forward(fra.forward_curve_id.as_str()).ok();
 
         let replayable = discount.rate_calibration().is_some()
             && forward
-                .rate_calibration()
+                .as_ref()
+                .and_then(|f| f.rate_calibration())
                 .is_some_and(|recipe| !uses_basis_quotes(recipe));
         if !replayable {
             return generic_fallback(context);

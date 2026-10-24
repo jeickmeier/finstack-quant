@@ -417,12 +417,12 @@ impl CapFloor {
     /// * `market` - Market context holding `discount_curve_id`, used to
     ///   discount the premium from its payment date to `as_of`.
     /// * `as_of` - Valuation date; only premiums paid strictly after it count.
-    pub(crate) fn net_of_premium(
+    pub(crate) fn net_of_premium_raw(
         &self,
-        option_value: Money,
+        option_value: f64,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<Money> {
+    ) -> finstack_quant_core::Result<f64> {
         let Some((payment_date, premium)) = self
             .premium
             .filter(|(payment_date, _)| *payment_date > as_of)
@@ -431,10 +431,7 @@ impl CapFloor {
         };
         let discount = market.get_discount(self.discount_curve_id.clone())?;
         let discount_factor = discount.df_between_dates(as_of, payment_date)?;
-        Money::new(
-            option_value.amount() - premium.amount() * discount_factor,
-            option_value.currency(),
-        )
+        Ok(option_value - premium.amount() * discount_factor)
     }
 
     /// Index margin as a decimal rate (`spread_bp / 10_000`).
@@ -832,8 +829,18 @@ impl finstack_quant_valuations_core::instruments::Instrument for CapFloor {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let option_value = crate::cap_floor::pricing::pricer::price_cap_floor(self, curves, as_of)?;
-        self.net_of_premium(option_value, curves, as_of)
+        let pv = self.base_value_raw(curves, as_of)?;
+        finstack_quant_core::money::Money::new(pv, self.notional.currency())
+    }
+
+    fn base_value_raw(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let option_value =
+            crate::cap_floor::pricing::pricer::price_cap_floor_raw(self, curves, as_of)?;
+        self.net_of_premium_raw(option_value, curves, as_of)
     }
 
     fn market_dependencies(

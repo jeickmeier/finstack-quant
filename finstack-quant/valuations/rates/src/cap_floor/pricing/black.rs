@@ -29,7 +29,6 @@
 //!   *Journal of Financial Economics*, 3(1-2), 167-179. `docs/REFERENCES.md#black-1976`
 
 use super::CapletFloorletInputs;
-use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::{
     black_call, black_delta_call, black_delta_put, black_put,
 };
@@ -61,10 +60,10 @@ fn intrinsic_value(inputs: &CapletFloorletInputs) -> f64 {
 ///
 /// # Returns
 ///
-/// `Ok(Money)` with the caplet/floorlet PV, or `Err` if inputs are invalid.
-pub(crate) fn price_caplet_floorlet(
+/// `Ok(f64)` with the unrounded caplet/floorlet PV, or `Err` if inputs are invalid.
+pub(crate) fn price_caplet_floorlet_raw(
     inputs: CapletFloorletInputs,
-) -> finstack_quant_core::Result<Money> {
+) -> finstack_quant_core::Result<f64> {
     let is_cap = inputs.is_cap;
     let notional = inputs.notional;
     let strike = inputs.strike;
@@ -76,17 +75,16 @@ pub(crate) fn price_caplet_floorlet(
         )?;
     let t_fix = inputs.time_to_fixing;
     let tau = inputs.accrual_year_fraction;
-    let ccy = inputs.currency;
 
     // Edge case: Option is at or past fixing -> intrinsic value
     if t_fix <= 0.0 {
-        return Money::new(intrinsic_value(&inputs), ccy);
+        return Ok(intrinsic_value(&inputs));
     }
 
     // Edge case: Zero or negative volatility -> intrinsic value
     // This handles the case where vol surface returns 0 or negative due to extrapolation
     if sigma == 0.0 {
-        return Money::new(intrinsic_value(&inputs), ccy);
+        return Ok(intrinsic_value(&inputs));
     }
 
     // Edge case: Non-positive forward rate
@@ -127,7 +125,7 @@ pub(crate) fn price_caplet_floorlet(
         )));
     }
 
-    Money::new(pv, ccy)
+    Ok(pv)
 }
 
 /// Black forward delta (per unit forward).

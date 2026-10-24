@@ -191,6 +191,20 @@ impl Pricer for CapFloorHullWhitePricer {
 
         self.price_internal(cap_floor, market, as_of)
     }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let cap_floor = finstack_quant_valuations_core::pricer::expect_inst::<CapFloor>(
+            instrument,
+            InstrumentType::CapFloor,
+        )?;
+
+        self.price_internal_raw(cap_floor, market, as_of)
+    }
 }
 
 impl CapFloorHullWhitePricer {
@@ -201,6 +215,19 @@ impl CapFloorHullWhitePricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
+        let pv_raw = self.price_internal_raw(cap_floor, market, as_of)?;
+        let pv = Money::new(pv_raw, cap_floor.notional.currency()).map_err(|error| {
+            PricingError::from_core(error, PricingErrorContext::from_instrument(cap_floor))
+        })?;
+        Ok(ValuationResult::stamped(cap_floor.id.as_str(), as_of, pv))
+    }
+
+    fn price_internal_raw(
+        &self,
+        cap_floor: &CapFloor,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
         let ctx = DayCountContext::default();
         cap_floor.validate_for_pricing()?;
 
@@ -224,17 +251,16 @@ impl CapFloorHullWhitePricer {
 
         let periods = cap_floor.pricing_periods()?;
 
-        let net_result = |option_value: Money| {
+        let net_result = |option_value: f64| {
             cap_floor
-                .net_of_premium(option_value, market, as_of)
-                .map(|pv| ValuationResult::stamped(cap_floor.id.as_str(), as_of, pv))
+                .net_of_premium_raw(option_value, market, as_of)
                 .map_err(|error| {
                     PricingError::from_core(error, PricingErrorContext::from_instrument(cap_floor))
                 })
         };
 
         if periods.is_empty() {
-            return net_result(Money::from((0_i64, cap_floor.notional.currency())));
+            return net_result(0.0);
         }
 
         let strike = cap_floor.strike_f64()?;
@@ -245,7 +271,7 @@ impl CapFloorHullWhitePricer {
 
         // Resolve a complete HW1F input from either explicit overrides or
         // pre-fitted MarketContext parameters. Missing/partial inputs fail.
-        let hw_model = resolve_capfloor_hw1f_model_params(cap_floor, market)?;
+        let hw_model = resolve_capfloor_hw1f_model_params(cap_floor, market, as_of)?;
 
         // Price each caplet/floorlet in closed form (Bachelier with the
         // HW1F-implied normal vol); no tree is built.
@@ -280,18 +306,19 @@ impl CapFloorHullWhitePricer {
 
             let caplet_pv = if projection.is_compounded_overnight {
                 let moment_match = hw1f_compounded_rfr_moment_match(as_of, &hw_model, projection)?;
-                crate::cap_floor::pricing::normal::price_caplet_floorlet(CapletFloorletInputs {
-                    is_cap,
-                    notional,
-                    strike,
-                    forward,
-                    discount_factor: df,
-                    sigma: moment_match.normal_vol,
-                    time_to_fixing: t_fix,
-                    accrual_year_fraction: tau,
-                    currency: cap_floor.notional.currency(),
-                })?
-                .amount()
+                crate::cap_floor::pricing::normal::price_caplet_floorlet_raw(
+                    CapletFloorletInputs {
+                        is_cap,
+                        notional,
+                        strike,
+                        forward,
+                        discount_factor: df,
+                        sigma: moment_match.normal_vol,
+                        time_to_fixing: t_fix,
+                        accrual_year_fraction: tau,
+                        currency: cap_floor.notional.currency(),
+                    },
+                )?
             } else {
                 let fwd = fwd.as_ref().ok_or_else(|| {
                     PricingError::missing_market_data_with_context(
@@ -339,11 +366,7 @@ impl CapFloorHullWhitePricer {
             total_pv += caplet_pv;
         }
 
-        net_result(
-            Money::new(total_pv, cap_floor.notional.currency()).map_err(|error| {
-                PricingError::from_core(error, PricingErrorContext::from_instrument(cap_floor))
-            })?,
-        )
+        net_result(total_pv)
     }
 }
 
@@ -372,6 +395,7 @@ pub(crate) fn resolve_capfloor_hw1f_params(
 pub(crate) fn resolve_capfloor_hw1f_model_params(
     cap_floor: &CapFloor,
     market: &MarketContext,
+    as_of: Date,
 ) -> finstack_quant_core::Result<HullWhiteParams> {
     if let Some(schedule) = &cap_floor
         .instrument_pricing_overrides
@@ -437,18 +461,26 @@ pub(crate) fn resolve_capfloor_hw1f_model_params(
                     ))
                 })?;
             let discount = market.get_discount(cap_floor.discount_curve_id.as_str())?;
+            let anchor = as_of.max(discount.base_date());
             let observations = series.observations();
-            let times = observations
+            let mut times = Vec::with_capacity(observations.len());
+            let mut values = Vec::with_capacity(observations.len());
+            if let Some((_, active_sigma)) = observations
                 .iter()
-                .map(|(date, _)| {
-                    DayCount::Act365F.year_fraction(
-                        discount.base_date(),
-                        *date,
-                        DayCountContext::default(),
-                    )
-                })
-                .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-            let values = observations.iter().map(|(_, sigma)| *sigma).collect();
+                .rfind(|(date, _)| *date <= anchor)
+                .or_else(|| observations.first())
+            {
+                times.push(0.0);
+                values.push(*active_sigma);
+            }
+            for (date, sigma) in observations.iter().filter(|(date, _)| *date > anchor) {
+                times.push(DayCount::Act365F.year_fraction(
+                    anchor,
+                    *date,
+                    DayCountContext::default(),
+                )?);
+                values.push(*sigma);
+            }
             return HullWhiteParams::new(
                 kappa,
                 finstack_quant_core::math::piecewise::PiecewiseConstantCurve::new(times, values)?,
@@ -1612,7 +1644,7 @@ mod tests {
             .insert_price(&kappa_key, MarketScalar::Unitless(0.05))
             .insert_series(schedule);
 
-        let model = resolve_capfloor_hw1f_model_params(&caplet, &market).expect("model");
+        let model = resolve_capfloor_hw1f_model_params(&caplet, &market, as_of).expect("model");
 
         assert_eq!(model.get_times()[0], 0.0);
         assert_eq!(model.get_values(), &[0.01, 0.02]);

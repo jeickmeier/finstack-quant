@@ -64,6 +64,15 @@ pub(crate) fn price_caplet_quote(
     inputs: CapletFloorletInputs,
     quote: finstack_quant_valuations_core::instruments::common_impl::vol_resolution::ResolvedVolatility,
 ) -> finstack_quant_core::Result<Money> {
+    let ccy = inputs.currency;
+    let pv = price_caplet_quote_raw(inputs, quote)?;
+    Money::new(pv, ccy)
+}
+
+pub(crate) fn price_caplet_quote_raw(
+    inputs: CapletFloorletInputs,
+    quote: finstack_quant_valuations_core::instruments::common_impl::vol_resolution::ResolvedVolatility,
+) -> finstack_quant_core::Result<f64> {
     use crate::cap_floor::pricing::{black, normal};
     use finstack_quant_models::volatility::VolatilityConvention;
     let (forward, strike) = quote.model_rates(inputs.forward, inputs.strike)?;
@@ -74,22 +83,32 @@ pub(crate) fn price_caplet_quote(
         ..inputs
     };
     match quote.convention {
-        VolatilityConvention::Normal => normal::price_caplet_floorlet(inputs),
-        _ => black::price_caplet_floorlet(inputs),
+        VolatilityConvention::Normal => normal::price_caplet_floorlet_raw(inputs),
+        _ => black::price_caplet_floorlet_raw(inputs),
     }
 }
 
+#[cfg(test)]
 pub(crate) fn price_cap_floor(
     cap_floor: &CapFloor,
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
+    let pv = price_cap_floor_raw(cap_floor, curves, as_of)?;
+    Money::new(pv, cap_floor.notional.currency())
+}
+
+pub(crate) fn price_cap_floor_raw(
+    cap_floor: &CapFloor,
+    curves: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64> {
     use finstack_quant_models::volatility::VolatilityConvention;
     use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::ResolvedVolatility;
 
     cap_floor.validate_for_pricing()?;
 
-    let mut total_pv = Money::from((0_i64, cap_floor.notional.currency()));
+    let mut total_pv = 0.0;
     let is_cap = cap_floor.rate_option_type.is_cap();
     for caplet in unpaid_caplets(cap_floor, curves, as_of)? {
         let UnpaidCaplet {
@@ -132,8 +151,8 @@ pub(crate) fn price_cap_floor(
             accrual_year_fraction: tau,
             currency: cap_floor.notional.currency(),
         };
-        let leg_pv = price_caplet_quote(inputs, quote)?;
-        total_pv = total_pv.checked_add(leg_pv)?;
+        let leg_pv = price_caplet_quote_raw(inputs, quote)?;
+        total_pv += leg_pv;
     }
 
     Ok(total_pv)
@@ -164,5 +183,18 @@ impl Pricer for SimpleCapFloorBlackPricer {
         let pv = cap_floor.base_value(market, as_of)?;
 
         Ok(ValuationResult::stamped(cap_floor.id(), as_of, pv))
+    }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let cap_floor = finstack_quant_valuations_core::pricer::expect_inst::<CapFloor>(
+            instrument,
+            InstrumentType::CapFloor,
+        )?;
+        Ok(cap_floor.base_value_raw(market, as_of)?)
     }
 }

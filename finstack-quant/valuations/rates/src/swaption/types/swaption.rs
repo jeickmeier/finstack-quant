@@ -1,6 +1,6 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::irs::InterestRateSwap;
+use crate::irs::{resolve_fixed_leg, resolve_float_leg, InterestRateSwap};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
@@ -386,11 +386,22 @@ impl Swaption {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Option<Money>> {
+        match self.terminal_value_raw(curves, as_of)? {
+            Some(pv) => Ok(Some(Money::new(pv, self.notional.currency())?)),
+            None => Ok(None),
+        }
+    }
+
+    pub(crate) fn terminal_value_raw(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> Result<Option<f64>> {
         if as_of < self.expiry {
             return Ok(None);
         }
         if as_of > self.expiry {
-            return Ok(Some(Money::from((0_i64, self.notional.currency()))));
+            return Ok(Some(0.0));
         }
 
         let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
@@ -402,10 +413,7 @@ impl Swaption {
             OptionType::Put => (strike - forward).max(0.0),
         };
 
-        Ok(Some(Money::new(
-            intrinsic * annuity * self.notional.amount(),
-            self.notional.currency(),
-        )?))
+        Ok(Some(intrinsic * annuity * self.notional.amount()))
     }
 
     /// Pre-expiry PV from a resolved quote, with the forward swap rate and the
@@ -418,6 +426,18 @@ impl Swaption {
         forward_rate: f64,
         time_to_expiry: f64,
     ) -> Result<Money> {
+        let pv = self.price_quote_at_raw(curves, quote, as_of, forward_rate, time_to_expiry)?;
+        Money::new(pv, self.notional.currency())
+    }
+
+    fn price_quote_at_raw(
+        &self,
+        curves: &MarketContext,
+        quote: ResolvedVolatility,
+        as_of: Date,
+        forward_rate: f64,
+        time_to_expiry: f64,
+    ) -> Result<f64> {
         use finstack_quant_models::closed_form::bachelier_price_with_annuity;
         use finstack_quant_models::closed_form::{black_call, black_put};
 
@@ -439,10 +459,7 @@ impl Swaption {
                 OptionType::Put => black_put(forward, strike, sigma, time_to_expiry),
             },
         };
-        Money::new(
-            unit * annuity * self.notional.amount(),
-            self.notional.currency(),
-        )
+        Ok(unit * annuity * self.notional.amount())
     }
 
     /// PV from a resolved quote: the terminal value at or after expiry, else
@@ -494,14 +511,14 @@ impl Swaption {
 
     /// Pre-expiry PV in the configured `vol_model` for an already-resolved
     /// volatility, reusing the caller's forward swap rate and expiry time.
-    pub(crate) fn price_with_vol_at(
+    pub(crate) fn price_with_vol_at_raw(
         &self,
         market: &MarketContext,
         as_of: Date,
         forward_rate: f64,
         time_to_expiry: f64,
         volatility: f64,
-    ) -> Result<Money> {
+    ) -> Result<f64> {
         let quote = match self.vol_model {
             VolatilityModel::Black => self.black_quote(market, volatility, time_to_expiry)?,
             VolatilityModel::Normal => ResolvedVolatility {
@@ -509,7 +526,7 @@ impl Swaption {
                 convention: VolatilityConvention::Normal,
             },
         };
-        self.price_quote_at(market, quote, as_of, forward_rate, time_to_expiry)
+        self.price_quote_at_raw(market, quote, as_of, forward_rate, time_to_expiry)
     }
 
     /// Pre-expiry SABR PV (callers handle `terminal_value`).
@@ -518,10 +535,19 @@ impl Swaption {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
+        let pv = self.price_sabr_before_expiry_raw(market, as_of)?;
+        Money::new(pv, self.notional.currency())
+    }
+
+    pub(crate) fn price_sabr_before_expiry_raw(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<f64> {
         let forward_rate = self.forward_swap_rate(market, as_of)?;
         let time_to_expiry = self.time_to_expiry(as_of)?;
         let quote = self.resolve_volatility_quote(market, forward_rate, time_to_expiry)?;
-        self.price_quote_at(market, quote, as_of, forward_rate, time_to_expiry)
+        self.price_quote_at_raw(market, quote, as_of, forward_rate, time_to_expiry)
     }
 
     /// Black PV using the configured SABR/cube displacement on both rates.
@@ -648,7 +674,11 @@ impl Swaption {
     fn fixed_schedule_periods(
         &self,
     ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
-        let fixed = &self.underlying_fixed_leg;
+        let fixed = resolve_fixed_leg(
+            &self.underlying_fixed_leg,
+            &self.underlying_float_leg.forward_curve_id,
+            &format_args!("Swaption '{}'", self.id),
+        )?;
         finstack_quant_cashflows::builder::build_periods(fixed.schedule_params(false))
     }
 
@@ -796,7 +826,10 @@ impl Swaption {
         as_of: Date,
         fixed_annuity: f64,
     ) -> Result<f64> {
-        let float = &self.underlying_float_leg;
+        let float = resolve_float_leg(
+            &self.underlying_float_leg,
+            &format_args!("Swaption '{}'", self.id),
+        )?;
         let periods = finstack_quant_cashflows::builder::build_periods(float.schedule_params(
             float.calendar_or_weekends(),
             Some(float.reset_lag_days),
@@ -1026,20 +1059,29 @@ impl finstack_quant_valuations_core::instruments::Instrument for Swaption {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        let pv = self.base_value_raw(curves, as_of)?;
+        Money::new(pv, self.notional.currency())
+    }
+
+    fn base_value_raw(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
         // `validate_invariants` already ran at the lifecycle boundary.
-        if let Some(value) = self.terminal_value(curves, as_of)? {
+        if let Some(value) = self.terminal_value_raw(curves, as_of)? {
             return Ok(value);
         }
 
         // SABR (if enabled) overrides the basic model choice.
         if self.sabr_params.is_some() {
-            return self.price_sabr_before_expiry(curves, as_of);
+            return self.price_sabr_before_expiry_raw(curves, as_of);
         }
 
         let time_to_expiry = self.time_to_expiry(as_of)?;
         let forward = self.forward_swap_rate(curves, as_of)?;
         let vol = self.resolve_volatility(curves, forward, time_to_expiry)?;
-        self.price_with_vol_at(curves, as_of, forward, time_to_expiry, vol)
+        self.price_with_vol_at_raw(curves, as_of, forward, time_to_expiry, vol)
     }
 
     fn market_dependencies(

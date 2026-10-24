@@ -299,6 +299,16 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSpreadOption
             .price_internal(self, market, as_of)
     }
 
+    fn base_value_raw(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
+        crate::cms_spread_option::pricer::CmsSpreadOptionPricer::new()
+            .price_internal_raw(self, market, as_of)
+    }
+
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 

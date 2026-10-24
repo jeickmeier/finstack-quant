@@ -51,12 +51,16 @@ pub(crate) struct DeltaCalculator;
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
-        let option: &CmsOption = context.instrument_as()?;
-        let base_pv = context.base_value.amount();
+        let forward_curve_id = context
+            .instrument_as::<CmsOption>()?
+            .forward_curve_id
+            .clone();
+        let base_pv =
+            context.reprice_raw(&std::sync::Arc::clone(&context.curves), context.as_of)?;
 
         // Parallel shift of the curve that drives the forward swap rate.
         let curves_bumped = context.curves.bump([MarketBump::Curve {
-            id: option.forward_curve_id.clone(),
+            id: forward_curve_id,
             spec: BumpSpec::parallel_bp(bump_bp),
         }])?;
 
@@ -75,23 +79,25 @@ pub(crate) struct VegaCalculator;
 impl MetricCalculator for VegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
-        let option: &CmsOption = context.instrument_as()?;
         let as_of = context.as_of;
-        let base_pv = context.base_value.amount();
-
-        let final_date = option.fixing_dates.last().copied().unwrap_or(as_of);
-        let t = option.day_count.year_fraction(
-            as_of,
-            final_date,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
-            return Ok(0.0);
-        }
+        let vol_surface_id = {
+            let option: &CmsOption = context.instrument_as()?;
+            option.validate()?;
+            if !option
+                .fixing_dates
+                .iter()
+                .zip(&option.payment_dates)
+                .any(|(&fix, &pay)| pay > as_of && fix > as_of)
+            {
+                return Ok(0.0);
+            }
+            option.vol_surface_id.clone()
+        };
+        let base_pv = context.reprice_raw(&std::sync::Arc::clone(&context.curves), as_of)?;
 
         // Bump volatility surface by an absolute vol amount (vol points).
         let curves_bumped =
-            bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;
+            bump_surface_vol_absolute(&context.curves, vol_surface_id.as_str(), vol_bump)?;
 
         // Reprice with bumped vol
         let pv_bumped = context.reprice_raw(&curves_bumped, as_of)?;
@@ -114,23 +120,20 @@ pub(crate) struct RhoCalculator;
 impl MetricCalculator for RhoCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
-        let option: &CmsOption = context.instrument_as()?;
         let as_of = context.as_of;
-        let base_pv = context.base_value.amount();
-
-        let final_date = option.fixing_dates.last().copied().unwrap_or(as_of);
-        let t = option.day_count.year_fraction(
-            as_of,
-            final_date,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
-            return Ok(0.0);
-        }
+        let discount_curve_id = {
+            let option: &CmsOption = context.instrument_as()?;
+            option.validate()?;
+            if !option.payment_dates.iter().any(|&pay| pay > as_of) {
+                return Ok(0.0);
+            }
+            option.discount_curve_id.clone()
+        };
+        let base_pv = context.reprice_raw(&std::sync::Arc::clone(&context.curves), as_of)?;
 
         // The helper's argument is in basis points (1.0 = 1bp).
         let curves_bumped =
-            bump_discount_curve_parallel(&context.curves, &option.discount_curve_id, bump_bp)?;
+            bump_discount_curve_parallel(&context.curves, &discount_curve_id, bump_bp)?;
 
         // Reprice with bumped curve
         let pv_bumped = context.reprice_raw(&curves_bumped, as_of)?;
@@ -147,6 +150,56 @@ pub(crate) struct VannaCalculator;
 
 impl MetricCalculator for VannaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        if context.pricing_model()
+            == Some(finstack_quant_valuations_core::pricer::ModelKey::StaticReplication)
+        {
+            let cfg = sens_config::resolve(context)?;
+            let rate_bump_bp = cfg.rate_bump_bp;
+            let vol_bump = cfg.vol_bump_decimal;
+            let as_of = context.as_of;
+            let (forward_curve_id, vol_surface_id) = {
+                let option: &CmsOption = context.instrument_as()?;
+                option.validate()?;
+                if !option
+                    .fixing_dates
+                    .iter()
+                    .zip(&option.payment_dates)
+                    .any(|(&fix, &pay)| pay > as_of && fix > as_of)
+                {
+                    return Ok(0.0);
+                }
+                (
+                    option.forward_curve_id.clone(),
+                    option.vol_surface_id.clone(),
+                )
+            };
+            let curves_ru = context.curves.bump([MarketBump::Curve {
+                id: forward_curve_id.clone(),
+                spec: BumpSpec::parallel_bp(rate_bump_bp),
+            }])?;
+            let curves_rd = context.curves.bump([MarketBump::Curve {
+                id: forward_curve_id,
+                spec: BumpSpec::parallel_bp(-rate_bump_bp),
+            }])?;
+            let curves_uu =
+                bump_surface_vol_absolute(&curves_ru, vol_surface_id.as_str(), vol_bump)?;
+            let curves_ud =
+                bump_surface_vol_absolute(&curves_ru, vol_surface_id.as_str(), -vol_bump)?;
+            let curves_du =
+                bump_surface_vol_absolute(&curves_rd, vol_surface_id.as_str(), vol_bump)?;
+            let curves_dd =
+                bump_surface_vol_absolute(&curves_rd, vol_surface_id.as_str(), -vol_bump)?;
+
+            let pv_uu = context.reprice_raw(&curves_uu, as_of)?;
+            let pv_ud = context.reprice_raw(&curves_ud, as_of)?;
+            let pv_du = context.reprice_raw(&curves_du, as_of)?;
+            let pv_dd = context.reprice_raw(&curves_dd, as_of)?;
+
+            let rate_step = rate_bump_bp * finstack_quant_core::math::units::ONE_BASIS_POINT;
+            let vol_step_pts = vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL;
+            return Ok((pv_uu - pv_ud - pv_du + pv_dd) / (4.0 * rate_step * vol_step_pts));
+        }
+
         let inst = context.instrument_as::<CmsOption>()?;
         let curves = &context.curves;
         let as_of = context.as_of;
@@ -270,28 +323,30 @@ pub(crate) struct VolgaCalculator;
 
 impl MetricCalculator for VolgaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let option: &CmsOption = context.instrument_as()?;
         let as_of = context.as_of;
-        let base_pv = context.base_value.amount();
-
-        let final_date = option.fixing_dates.last().copied().unwrap_or(as_of);
-        let t = option.day_count.year_fraction(
-            as_of,
-            final_date,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
-            return Ok(0.0);
-        }
+        let vol_surface_id = {
+            let option: &CmsOption = context.instrument_as()?;
+            option.validate()?;
+            if !option
+                .fixing_dates
+                .iter()
+                .zip(&option.payment_dates)
+                .any(|(&fix, &pay)| pay > as_of && fix > as_of)
+            {
+                return Ok(0.0);
+            }
+            option.vol_surface_id.clone()
+        };
+        let base_pv = context.reprice_raw(&std::sync::Arc::clone(&context.curves), as_of)?;
 
         let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
 
         let curves_vol_up =
-            bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;
+            bump_surface_vol_absolute(&context.curves, vol_surface_id.as_str(), vol_bump)?;
         let pv_vol_up = context.reprice_raw(&curves_vol_up, as_of)?;
 
         let curves_vol_down =
-            bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), -vol_bump)?;
+            bump_surface_vol_absolute(&context.curves, vol_surface_id.as_str(), -vol_bump)?;
         let pv_vol_down = context.reprice_raw(&curves_vol_down, as_of)?;
 
         // Volga per **vol point squared** (consistent with `MetricId::Volga`):

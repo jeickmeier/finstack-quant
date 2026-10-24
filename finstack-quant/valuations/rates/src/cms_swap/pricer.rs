@@ -45,10 +45,22 @@ impl CmsSwapPricer {
         as_of: Date,
         convexity_scale: f64,
     ) -> Result<Money> {
+        let npv = self.price_internal_with_convexity_raw(inst, market, as_of, convexity_scale)?;
+        Money::new(npv, inst.notional.currency())
+    }
+
+    pub(crate) fn price_internal_with_convexity_raw(
+        &self,
+        inst: &CmsSwap,
+        market: &MarketContext,
+        as_of: Date,
+        convexity_scale: f64,
+    ) -> Result<f64> {
+        inst.validate()?;
         let pv_cms = self.pv_cms_leg(inst, market, as_of, convexity_scale)?;
         let pv_funding = self.pv_funding_leg(inst, market, as_of)?;
 
-        let npv = match inst.side {
+        Ok(match inst.side {
             finstack_quant_valuations_core::instruments::PayReceive::Pay => {
                 // Pay CMS, receive funding
                 pv_funding - pv_cms
@@ -57,9 +69,7 @@ impl CmsSwapPricer {
                 // Receive CMS, pay funding
                 pv_cms - pv_funding
             }
-        };
-
-        Money::new(npv, inst.notional.currency())
+        })
     }
 
     /// Compute PV of the CMS leg.
@@ -149,6 +159,19 @@ impl Pricer for CmsSwapPricer {
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let cms = finstack_quant_valuations_core::pricer::expect_inst::<CmsSwap>(
+            instrument,
+            InstrumentType::CmsSwap,
+        )?;
+        Ok(self.price_internal_with_convexity_raw(cms, market, as_of, 1.0)?)
+    }
 }
 
 /// CMS swap pricer using exact static replication (Andersen-Piterbarg §16.2).
@@ -197,15 +220,24 @@ impl CmsSwapReplicationPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
+        let npv = self.price_internal_raw(inst, market, as_of)?;
+        Money::new(npv, inst.notional.currency())
+    }
+
+    pub(crate) fn price_internal_raw(
+        &self,
+        inst: &CmsSwap,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<f64> {
+        inst.validate()?;
         let pv_cms = self.pv_cms_leg_replication(inst, market, as_of)?;
         let pv_funding = CmsSwapPricer.pv_funding_leg(inst, market, as_of)?;
 
-        let npv = match inst.side {
+        Ok(match inst.side {
             finstack_quant_valuations_core::instruments::PayReceive::Pay => pv_funding - pv_cms,
             finstack_quant_valuations_core::instruments::PayReceive::Receive => pv_cms - pv_funding,
-        };
-
-        Money::new(npv, inst.notional.currency())
+        })
     }
 
     /// PV of the CMS leg with each coupon's expected rate from static
@@ -316,6 +348,19 @@ impl Pricer for CmsSwapReplicationPricer {
         let pv = self.price_internal(cms, market, as_of)?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
+    }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let cms = finstack_quant_valuations_core::pricer::expect_inst::<CmsSwap>(
+            instrument,
+            InstrumentType::CmsSwap,
+        )?;
+        Ok(self.price_internal_raw(cms, market, as_of)?)
     }
 }
 

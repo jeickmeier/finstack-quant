@@ -265,6 +265,16 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsOption {
             .price_internal_with_convexity(self, market, as_of, 1.0)
     }
 
+    fn base_value_raw(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
+        crate::cms_option::pricer::CmsOptionPricer
+            .price_internal_with_convexity_raw(self, market, as_of, 1.0)
+    }
+
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 

@@ -298,80 +298,111 @@ const NOTIONAL_EPSILON: f64 = 1e-6;
 /// are far beyond any reasonable market scenario.
 const MAX_RATE_MAGNITUDE: f64 = 100.0;
 
+/// Look up the conventions of the rate index projected on `forward_curve_id`.
+///
+/// Returns `Ok(None)` if the global registry is initialized but does not contain
+/// the index (legitimate for curves whose id isn't a registered convention key);
+/// returns `Err` only if the registry itself isn't initialized. Callers that need
+/// to RESOLVE a sentinel value MUST treat the `None` case as a hard error.
+fn rate_index_conventions(
+    forward_curve_id: &CurveId,
+) -> finstack_quant_core::Result<
+    Option<finstack_quant_valuations_core::market::conventions::RateIndexConventions>,
+> {
+    let registry = ConventionRegistry::try_global()?;
+    let idx = IndexId::new(forward_curve_id.as_str());
+    Ok(registry.require_rate_index(&idx).ok().cloned())
+}
+
+/// Resolve a swap fixed leg, applying convention defaults for sentinel values.
+///
+/// A negative lag (e.g. `payment_lag_days < 0`) is a sentinel meaning "use the
+/// default of the float leg's rate index". Returns `Err` if a sentinel is present
+/// and the registry cannot provide a default, rather than leaving the sentinel to
+/// produce wildly wrong schedules downstream. A leg running end-of-month to
+/// end-of-month is rolled end-of-month.
+///
+/// # Arguments
+///
+/// * `fixed` - Fixed leg as specified on the instrument.
+/// * `index_curve_id` - Forward curve of the float leg, naming the rate index
+///   whose conventions supply the defaults.
+/// * `owner` - Instrument label prefixing error messages (e.g. `IRS 'X'`).
+pub(crate) fn resolve_fixed_leg(
+    fixed: &FixedLegSpec,
+    index_curve_id: &CurveId,
+    owner: &dyn std::fmt::Display,
+) -> finstack_quant_core::Result<FixedLegSpec> {
+    let mut fixed = fixed.clone();
+    if fixed.start.end_of_month() == fixed.start && fixed.end.end_of_month() == fixed.end {
+        fixed.end_of_month = true;
+    }
+    // Hit the convention registry only when a sentinel (`< 0`) actually needs
+    // resolution. Calibration calls this repeatedly on the hot path, and the common
+    // case (lags resolved at construction time) should not pay for a registry lookup
+    // and `RateIndexConventions` clone.
+    if fixed.payment_lag_days < 0 {
+        let conv = rate_index_conventions(index_curve_id)?.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "{owner}: fixed-leg payment_lag_days sentinel {} requires resolution \
+                 but rate index '{index_curve_id}' is not registered in the convention registry",
+                fixed.payment_lag_days
+            ))
+        })?;
+        fixed.payment_lag_days = conv.default_payment_lag_days;
+    }
+    Ok(fixed)
+}
+
+/// Resolve a swap float leg, applying convention defaults for sentinel values.
+///
+/// Negative `reset_lag_days` / `payment_lag_days` are sentinels resolved from the
+/// leg's own rate index; see [`resolve_fixed_leg`] for the error and
+/// end-of-month rules.
+///
+/// # Arguments
+///
+/// * `float` - Float leg as specified on the instrument.
+/// * `owner` - Instrument label prefixing error messages (e.g. `IRS 'X'`).
+pub(crate) fn resolve_float_leg(
+    float: &FloatLegSpec,
+    owner: &dyn std::fmt::Display,
+) -> finstack_quant_core::Result<FloatLegSpec> {
+    let mut float = float.clone();
+    if float.start.end_of_month() == float.start && float.end.end_of_month() == float.end {
+        float.end_of_month = true;
+    }
+    if float.reset_lag_days < 0 || float.payment_lag_days < 0 {
+        let conv = rate_index_conventions(&float.forward_curve_id)?.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "{owner}: float-leg sentinel(s) (reset_lag={}, payment_lag={}) require \
+                 resolution but rate index '{}' is not registered in the convention registry",
+                float.reset_lag_days, float.payment_lag_days, float.forward_curve_id
+            ))
+        })?;
+        if float.reset_lag_days < 0 {
+            float.reset_lag_days = conv.default_reset_lag_days;
+        }
+        if float.payment_lag_days < 0 {
+            float.payment_lag_days = conv.default_payment_lag_days;
+        }
+    }
+    Ok(float)
+}
+
 impl InterestRateSwap {
-    /// Look up the rate-index conventions used by the float leg. Returns `Ok(None)` if
-    /// the global registry is initialized but does not contain the index (legitimate for
-    /// curves whose forward_curve_id isn't a registered convention key); returns `Err`
-    /// only if the registry itself isn't initialized. Callers that need to RESOLVE a
-    /// sentinel value MUST treat the `None` case as a hard error.
-    fn rate_index_conventions(
-        &self,
-    ) -> finstack_quant_core::Result<
-        Option<finstack_quant_valuations_core::market::conventions::RateIndexConventions>,
-    > {
-        let registry = ConventionRegistry::try_global()?;
-        let idx = IndexId::new(self.float_leg.forward_curve_id.as_str());
-        Ok(registry.require_rate_index(&idx).ok().cloned())
-    }
-
-    /// Resolve the fixed leg, applying convention defaults for any sentinel values.
-    /// Returns `Err` if a sentinel (e.g. `payment_lag_days < 0`) is present and the
-    /// registry cannot provide a default — previously this silently left the sentinel
-    /// in place, producing wildly wrong schedules downstream.
+    /// Fixed leg with convention defaults applied; see [`resolve_fixed_leg`].
     pub(crate) fn resolved_fixed_leg(&self) -> finstack_quant_core::Result<FixedLegSpec> {
-        let mut fixed = self.fixed_leg.clone();
-        let is_eom_swap =
-            fixed.start.end_of_month() == fixed.start && fixed.end.end_of_month() == fixed.end;
-        if is_eom_swap && !fixed.end_of_month {
-            fixed.end_of_month = true;
-        }
-        // Hit the convention registry only when a sentinel (`< 0`) actually needs
-        // resolution. Calibration calls this repeatedly on the hot path, and the common
-        // case (lags resolved at construction time) should not pay for a registry lookup
-        // and `RateIndexConventions` clone.
-        if fixed.payment_lag_days < 0 {
-            let conv = self.rate_index_conventions()?.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "IRS '{}': fixed-leg payment_lag_days sentinel {} requires resolution \
-                     but rate index '{}' is not registered in the convention registry",
-                    self.id, fixed.payment_lag_days, self.float_leg.forward_curve_id
-                ))
-            })?;
-            fixed.payment_lag_days = conv.default_payment_lag_days;
-        }
-        Ok(fixed)
+        resolve_fixed_leg(
+            &self.fixed_leg,
+            &self.float_leg.forward_curve_id,
+            &format_args!("IRS '{}'", self.id),
+        )
     }
 
-    /// Resolve the float leg, applying convention defaults for any sentinel values.
-    /// Errors loudly if a sentinel can't be resolved — see [`Self::resolved_fixed_leg`].
+    /// Float leg with convention defaults applied; see [`resolve_float_leg`].
     pub(crate) fn resolved_float_leg(&self) -> finstack_quant_core::Result<FloatLegSpec> {
-        let mut float = self.float_leg.clone();
-        let is_eom_swap =
-            float.start.end_of_month() == float.start && float.end.end_of_month() == float.end;
-        if is_eom_swap && !float.end_of_month {
-            float.end_of_month = true;
-        }
-        // Same short-circuit as `resolved_fixed_leg`: skip the registry hit unless we
-        // actually need to apply a default.
-        if float.reset_lag_days < 0 || float.payment_lag_days < 0 {
-            let conv = self.rate_index_conventions()?.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "IRS '{}': float-leg sentinel(s) (reset_lag={}, payment_lag={}) require \
-                     resolution but rate index '{}' is not registered in the convention registry",
-                    self.id,
-                    float.reset_lag_days,
-                    float.payment_lag_days,
-                    self.float_leg.forward_curve_id
-                ))
-            })?;
-            if float.reset_lag_days < 0 {
-                float.reset_lag_days = conv.default_reset_lag_days;
-            }
-            if float.payment_lag_days < 0 {
-                float.payment_lag_days = conv.default_payment_lag_days;
-            }
-        }
-        Ok(float)
+        resolve_float_leg(&self.float_leg, &format_args!("IRS '{}'", self.id))
     }
 
     /// Validate swap parameters for market-standard compliance.
