@@ -76,6 +76,22 @@ def test_matching_version_is_a_no_op(tmp_path: Path) -> None:
     assert member.read_bytes() == before
 
 
+def test_skips_manifest_symlinked_outside_root(tmp_path: Path) -> None:
+    """A Cargo.toml symlink that resolves outside the workspace is never rewritten."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    _workspace(root)
+    outside = tmp_path / "outside.toml"
+    outside.write_text('dep = { path = "../x", version = "0.12.0" }\n', encoding="utf-8")
+    linked = root / "crates" / "linked"
+    linked.mkdir(parents=True)
+    (linked / "Cargo.toml").symlink_to(outside)
+
+    assert stamp_version(root, "0.12.0-rc.1")
+
+    assert 'version = "0.12.0"' in outside.read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize("version", ["v0.12.0", "0.12", "0.12.0+build.1", "0.12.0rc1"])
 def test_rejects_non_semver(tmp_path: Path, version: str) -> None:
     """Tags, partial versions, build metadata, and PEP 440 forms are rejected."""
