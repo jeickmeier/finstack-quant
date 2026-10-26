@@ -160,6 +160,11 @@ impl From<ScheduleSpec> for ScheduleBuilder {
 
 impl ScheduleBuilder {
     /// Set coupon/payment frequency.
+    ///
+    /// # Arguments
+    ///
+    /// * `frequency` - Regular period length between unadjusted roll dates
+    ///   (for example `Tenor::quarterly()` for a 3M coupon leg).
     #[must_use]
     pub fn frequency(mut self, frequency: Tenor) -> Self {
         self.spec.frequency = frequency;
