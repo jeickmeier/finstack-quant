@@ -27,8 +27,8 @@ export function stripCommentDelimiters(documentationText) {
  */
 export function stripRawStringDocPrefixes(declarationText) {
   return declarationText
-    .replace(/^(\s*\*) r#" ?(.*)"#$/gm, (_, star, text) => (text ? `${star} ${text}` : star))
-    .replace(/^(\s*\*) r" ?(.*)$/gm, (_, star, text) => (text ? `${star} ${text}` : star));
+    .replace(/^([ \t]*\*) r#" ?(.*)"#$/gm, (_, star, text) => (text ? `${star} ${text}` : star))
+    .replace(/^([ \t]*\*) r" ?(.*)$/gm, (_, star, text) => (text ? `${star} ${text}` : star));
 }
 
 export function documentationBlocks(documentationText) {

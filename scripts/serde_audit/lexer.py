@@ -64,7 +64,6 @@ _CFG_SELECTOR = re.compile(r'(feature|target_arch|target_os)="([^"]+)"')
 _DERIVE = re.compile(r"\bderive\s*\((.*?)\)", flags=re.DOTALL)
 _DEFAULT_WORD = re.compile(r"\bdefault\b")
 _DECLARATION_BOUNDARY = re.compile(r"[{;]")
-_USE_ALIAS = re.compile(r"(?<!\s)\s+as\s+")
 _WHITESPACE = re.compile(r"\s+")
 
 
@@ -479,8 +478,7 @@ def _split_top_level(value: str) -> list[str]:
 
 
 def _expand_use_tree(value: str) -> tuple[str, ...]:
-    value = _USE_ALIAS.sub("@AS@", value)
-    value = _WHITESPACE.sub("", value)
+    value = _WHITESPACE.sub(" ", value.strip()).replace(" as ", "@AS@").replace(" ", "")
     open_index = value.find("{")
     if open_index < 0:
         return (value,)

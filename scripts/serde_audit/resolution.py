@@ -21,8 +21,8 @@ from .lexer import (
 from .models import AuditConfigurationError, PublicType
 
 _TRAILING_GENERICS = re.compile(r"<.*>$")
-_PUBLIC_USE = re.compile(r"\bpub\s+use\s+(?P<body>[^;]+);", flags=re.DOTALL)
-_ANY_USE = re.compile(r"\b(?:pub\s+)?use\s+(?P<body>[^;]+);", flags=re.DOTALL)
+_PUBLIC_USE = re.compile(r"\bpub\s+use\s+(?P<body>[^;\s][^;]*);", flags=re.DOTALL)
+_ANY_USE = re.compile(r"\b(?:pub\s+)?use\s+(?P<body>[^;\s][^;]*);", flags=re.DOTALL)
 _MODULE_DECLARATION = re.compile(r"\b(?P<vis>pub\s+)?mod\s+(?P<name>[A-Za-z_]\w*)\s*;")
 
 

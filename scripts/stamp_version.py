@@ -37,8 +37,11 @@ def workspace_version(root: Path) -> str:
 
 
 def _cargo_manifests(root: Path) -> list[Path]:
+    resolved_root = root.resolve()
     return sorted(
-        path for path in root.rglob("Cargo.toml") if not _SKIPPED_DIRS.intersection(path.relative_to(root).parts)
+        path
+        for path in root.rglob("Cargo.toml")
+        if not _SKIPPED_DIRS.intersection(path.relative_to(root).parts) and path.resolve().is_relative_to(resolved_root)
     )
 
 
