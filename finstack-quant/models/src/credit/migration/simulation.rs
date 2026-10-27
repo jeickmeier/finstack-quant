@@ -371,56 +371,11 @@ fn simulate_gillespie<R: RandomNumberGenerator + ?Sized>(
     rng: &mut R,
     mut on_transition: impl FnMut(f64, usize),
 ) -> usize {
-    let n = gen.n_states();
     let mut t = 0.0;
     let mut state = initial_state;
 
-    loop {
-        let lambda: f64 = (0..n)
-            .filter(|&j| j != state)
-            .map(|j| gen.data[(state, j)].max(0.0))
-            .sum();
-
-        // Absorbing state: stop.
-        if lambda < 1e-15 {
-            break;
-        }
-
-        // Draw holding time from Exp(lambda).
-        let u1: f64 = rng.uniform();
-        let holding = -u1.ln() / lambda;
-
-        if t + holding > horizon {
-            break;
-        }
-
-        t += holding;
-
-        // Draw next state from Categorical(q_sj / lambda for j != s).
-        let u2: f64 = rng.uniform();
-        let mut cumulative = 0.0;
-        let mut next_state = state; // fallback — should always be reassigned below
-
-        for j in 0..n {
-            if j == state {
-                continue;
-            }
-            cumulative += gen.data[(state, j)].max(0.0) / lambda;
-            if u2 < cumulative {
-                next_state = j;
-                break;
-            }
-        }
-        // If floating-point rounding left u2 >= total, assign the last valid state.
-        if next_state == state {
-            if let Some(j) = (0..n)
-                .rev()
-                .find(|&j| j != state && gen.data[(state, j)] > 0.0)
-            {
-                next_state = j;
-            }
-        }
-
+    while let Some((jump_time, next_state)) = next_jump(gen, state, t, horizon, rng) {
+        t = jump_time;
         state = next_state;
         on_transition(t, state);
 
@@ -431,6 +386,54 @@ fn simulate_gillespie<R: RandomNumberGenerator + ?Sized>(
     }
 
     state
+}
+
+/// Draw the next `(time, state)` jump out of `state` at time `t`.
+///
+/// Returns `None` when `state` has no positive exit intensity or when the
+/// Exp(lambda) holding time would carry the path past `horizon`. Draws one
+/// uniform for the holding time and, when the jump lands inside the horizon,
+/// one for the destination.
+fn next_jump<R: RandomNumberGenerator + ?Sized>(
+    gen: &GeneratorMatrix,
+    state: usize,
+    t: f64,
+    horizon: f64,
+    rng: &mut R,
+) -> Option<(f64, usize)> {
+    let n = gen.n_states();
+    let lambda: f64 = (0..n)
+        .filter(|&j| j != state)
+        .map(|j| gen.data[(state, j)].max(0.0))
+        .sum();
+    if lambda < 1e-15 {
+        return None;
+    }
+
+    let u1: f64 = rng.uniform();
+    let holding = -u1.ln() / lambda;
+    if t + holding > horizon {
+        return None;
+    }
+
+    // Draw the destination from Categorical(q_sj / lambda for j != s). If
+    // floating-point rounding leaves u2 above the cumulative total, take the
+    // last state with a positive intensity.
+    let u2: f64 = rng.uniform();
+    let mut cumulative = 0.0;
+    let next_state = (0..n)
+        .filter(|&j| j != state)
+        .find(|&j| {
+            cumulative += gen.data[(state, j)].max(0.0) / lambda;
+            u2 < cumulative
+        })
+        .or_else(|| {
+            (0..n)
+                .rev()
+                .find(|&j| j != state && gen.data[(state, j)] > 0.0)
+        })
+        .unwrap_or(state);
+    Some((t + holding, next_state))
 }
 
 /// Simulate a single rating path using Gillespie's competing exponentials.
