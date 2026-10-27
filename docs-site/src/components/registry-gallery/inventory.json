@@ -729,7 +729,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "b63c042855b10969ab8e2b40b4dbb2cd1c9f267ffae1d3cd8e169b7e607330ea"
+      "sha256": "4ddeb97403c0e25b8484b1024545d3e2e8181798551a3dbed101066e47585694"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
