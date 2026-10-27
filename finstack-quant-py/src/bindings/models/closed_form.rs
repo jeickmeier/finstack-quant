@@ -39,7 +39,7 @@ const BS_GREEK_LABELS: [&str; 6] = ["delta", "gamma", "vega", "theta", "rho_r", 
 
 // BsGreeks
 
-#[doc = pydoc!("finstack_quant.models", "BsGreeks")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks")]
 #[pyclass(
     name = "BsGreeks",
     module = "finstack_quant.models",
@@ -60,54 +60,54 @@ impl PyBsGreeks {
 
 #[pymethods]
 impl PyBsGreeks {
-    #[doc = pydoc!("finstack_quant.models", "BsGreeks.delta")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.delta")]
     #[getter]
     fn delta(&self) -> f64 {
         self.inner.delta
     }
 
-    #[doc = pydoc!("finstack_quant.models", "BsGreeks.gamma")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.gamma")]
     #[getter]
     fn gamma(&self) -> f64 {
         self.inner.gamma
     }
 
-    #[doc = pydoc!("finstack_quant.models", "BsGreeks.vega")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.vega")]
     #[getter]
     fn vega(&self) -> f64 {
         self.inner.vega
     }
 
-    #[doc = pydoc!("finstack_quant.models", "BsGreeks.theta")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.theta")]
     #[getter]
     fn theta(&self) -> f64 {
         self.inner.theta
     }
 
-    #[doc = pydoc!("finstack_quant.models", "BsGreeks.rho_r")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.rho_r")]
     #[getter]
     fn rho_r(&self) -> f64 {
         self.inner.rho_r
     }
 
-    #[doc = pydoc!("finstack_quant.models", "BsGreeks.rho_q")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.rho_q")]
     #[getter]
     fn rho_q(&self) -> f64 {
         self.inner.rho_q
     }
 
-    #[doc = pydoc!("finstack_quant.models", "BsGreeks.is_valid")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.is_valid")]
     fn is_valid(&self) -> bool {
         self.inner.is_valid()
     }
 
-    #[doc = pydoc!("finstack_quant.models", "BsGreeks.to_series")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.to_series")]
     fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let labels: Vec<String> = BS_GREEK_LABELS.iter().map(|s| (*s).to_string()).collect();
         labeled_values_to_series(py, &labels, self.values(), "bs_greeks")
     }
 
-    #[doc = pydoc!("finstack_quant.models", "BsGreeks.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
@@ -121,7 +121,7 @@ wire_methods!(
     PyBsGreeks,
     BsGreeks,
     "BsGreeks",
-    module = "finstack_quant.models"
+    module = "finstack_quant.models._closed_form"
 );
 
 impl PyBsGreeks {
@@ -141,7 +141,7 @@ impl PyBsGreeks {
 
 const FORWARD_GREEK_LABELS: [&str; 3] = ["delta", "gamma", "vega"];
 
-#[doc = pydoc!("finstack_quant.models", "ForwardGreeks")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks")]
 #[pyclass(
     name = "ForwardGreeks",
     module = "finstack_quant.models",
@@ -156,25 +156,25 @@ pub struct PyForwardGreeks {
 
 #[pymethods]
 impl PyForwardGreeks {
-    #[doc = pydoc!("finstack_quant.models", "ForwardGreeks.delta")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.delta")]
     #[getter]
     fn delta(&self) -> f64 {
         self.inner.delta
     }
 
-    #[doc = pydoc!("finstack_quant.models", "ForwardGreeks.gamma")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.gamma")]
     #[getter]
     fn gamma(&self) -> f64 {
         self.inner.gamma
     }
 
-    #[doc = pydoc!("finstack_quant.models", "ForwardGreeks.vega")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.vega")]
     #[getter]
     fn vega(&self) -> f64 {
         self.inner.vega
     }
 
-    #[doc = pydoc!("finstack_quant.models", "ForwardGreeks.to_series")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.to_series")]
     fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let labels: Vec<String> = FORWARD_GREEK_LABELS
             .iter()
@@ -184,7 +184,7 @@ impl PyForwardGreeks {
         labeled_values_to_series(py, &labels, values, "forward_greeks")
     }
 
-    #[doc = pydoc!("finstack_quant.models", "ForwardGreeks.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
@@ -198,12 +198,12 @@ wire_methods!(
     PyForwardGreeks,
     ForwardGreeks,
     "ForwardGreeks",
-    module = "finstack_quant.models"
+    module = "finstack_quant.models._closed_form"
 );
 
 // bs_price
 
-#[doc = pydoc!("finstack_quant.models", "bs_price")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "bs_price")]
 #[pyfunction(name = "bs_price")]
 #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call))]
 fn bs_price_wrapper(
@@ -227,7 +227,7 @@ fn bs_price_wrapper(
     .map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.models", "vanilla_expiry_payoff")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "vanilla_expiry_payoff")]
 #[pyfunction(name = "vanilla_expiry_payoff")]
 #[pyo3(signature = (spot, strike, is_call))]
 fn vanilla_expiry_payoff_wrapper(spot: f64, strike: f64, is_call: bool) -> PyResult<f64> {
@@ -236,7 +236,7 @@ fn vanilla_expiry_payoff_wrapper(spot: f64, strike: f64, is_call: bool) -> PyRes
 
 // bs_greeks
 
-#[doc = pydoc!("finstack_quant.models", "bs_greeks")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "bs_greeks")]
 #[pyfunction(name = "bs_greeks")]
 #[pyo3(
     signature = (spot, strike, rate, div_yield, vol, expiry, is_call, theta_days_per_year=DEFAULT_THETA_DAYS_PER_YEAR),
@@ -270,7 +270,7 @@ fn bs_greeks_wrapper(
 
 // bs_implied_vol
 
-#[doc = pydoc!("finstack_quant.models", "bs_implied_vol")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "bs_implied_vol")]
 #[pyfunction(name = "bs_implied_vol")]
 #[pyo3(signature = (spot, strike, rate, div_yield, expiry, price, is_call))]
 fn bs_implied_vol_wrapper(
@@ -296,7 +296,7 @@ fn bs_implied_vol_wrapper(
 
 // black76_implied_vol
 
-#[doc = pydoc!("finstack_quant.models", "black76_implied_vol")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "black76_implied_vol")]
 #[pyfunction(name = "black76_implied_vol")]
 #[pyo3(signature = (forward, strike, df, expiry, price, is_call))]
 fn black76_implied_vol_wrapper(
@@ -320,7 +320,7 @@ fn black76_implied_vol_wrapper(
 
 // black76_price / black76_greeks
 
-#[doc = pydoc!("finstack_quant.models", "black76_price")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "black76_price")]
 #[pyfunction(name = "black76_price")]
 #[pyo3(signature = (forward, strike, df, vol, expiry, is_call))]
 fn black76_price_wrapper(
@@ -334,7 +334,7 @@ fn black76_price_wrapper(
     black76_price(forward, strike, df, vol, expiry, OptionType::from(is_call)).map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.models", "black76_greeks")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "black76_greeks")]
 #[pyfunction(name = "black76_greeks")]
 #[pyo3(signature = (forward, strike, vol, expiry, is_call))]
 fn black76_greeks_wrapper(
@@ -351,7 +351,7 @@ fn black76_greeks_wrapper(
 
 // bachelier_price / bachelier_greeks
 
-#[doc = pydoc!("finstack_quant.models", "bachelier_price")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "bachelier_price")]
 #[pyfunction(name = "bachelier_price")]
 #[pyo3(signature = (forward, strike, normal_vol, expiry, is_call))]
 fn bachelier_price_wrapper(
@@ -371,7 +371,7 @@ fn bachelier_price_wrapper(
     .map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.models", "bachelier_greeks")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "bachelier_greeks")]
 #[pyfunction(name = "bachelier_greeks")]
 #[pyo3(signature = (forward, strike, normal_vol, expiry, is_call))]
 fn bachelier_greeks_wrapper(
@@ -394,7 +394,7 @@ fn bachelier_greeks_wrapper(
 
 // black_shifted_price / black_shifted_vega
 
-#[doc = pydoc!("finstack_quant.models", "black_shifted_price")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "black_shifted_price")]
 #[pyfunction(name = "black_shifted_price")]
 #[pyo3(signature = (forward, strike, vol, expiry, shift, is_call))]
 fn black_shifted_price_wrapper(
@@ -416,7 +416,7 @@ fn black_shifted_price_wrapper(
     .map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.models", "black_shifted_vega")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "black_shifted_vega")]
 #[pyfunction(name = "black_shifted_vega")]
 #[pyo3(signature = (forward, strike, vol, expiry, shift))]
 fn black_shifted_vega_wrapper(
@@ -431,7 +431,7 @@ fn black_shifted_vega_wrapper(
 
 // barrier_option_price
 
-#[doc = pydoc!("finstack_quant.models", "barrier_option_price")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "barrier_option_price")]
 #[pyfunction(name = "barrier_option_price")]
 #[pyo3(signature = (spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock, is_call=true))]
 #[allow(clippy::too_many_arguments)]
@@ -462,7 +462,7 @@ fn barrier_option_price_wrapper(
     .map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.models", "asian_option_price")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "asian_option_price")]
 #[pyfunction(name = "asian_option_price")]
 #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging=None, is_call=true))]
 #[allow(clippy::too_many_arguments)]
@@ -496,7 +496,7 @@ fn asian_option_wrapper(
     .map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.models", "lookback_option_price")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "lookback_option_price")]
 #[pyfunction(name = "lookback_option_price")]
 #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, extremum, strike_type=DEFAULT_LOOKBACK_STRIKE_TYPE, is_call=true))]
 #[allow(clippy::too_many_arguments)]
@@ -525,7 +525,7 @@ fn lookback_option_wrapper(
     .map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.models", "quanto_option_price")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "quanto_option_price")]
 #[pyfunction(name = "quanto_option_price")]
 #[pyo3(signature = (spot, strike, expiry, rate_domestic, rate_foreign, div_yield, vol_asset, vol_fx, correlation, is_call=true))]
 #[allow(clippy::too_many_arguments)]
@@ -558,7 +558,7 @@ fn quanto_option_wrapper(
 
 // heston_price
 
-#[doc = pydoc!("finstack_quant.models", "heston_price")]
+#[doc = pydoc!("finstack_quant.models._closed_form", "heston_price")]
 #[pyfunction(name = "heston_price")]
 #[pyo3(signature = (spot, strike, expiry, rate, div_yield, kappa, theta, sigma_v, rho, v0, is_call=true))]
 #[allow(clippy::too_many_arguments)]

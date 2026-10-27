@@ -18,7 +18,7 @@ use finstack_quant_valuations::metrics::risk::{MarketHistory, MarketScenario};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides")]
 #[pyclass(
     name = "MetricPricingOverrides",
     module = "finstack_quant.valuations.instruments",
@@ -33,7 +33,7 @@ pub(crate) struct PyMetricPricingOverrides {
 
 #[pymethods]
 impl PyMetricPricingOverrides {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.__init__")]
     #[new]
     #[pyo3(signature = (*, bump_config=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, theta_day_basis=None, var_config=None))]
     #[pyo3(
@@ -86,13 +86,13 @@ impl PyMetricPricingOverrides {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.bump_config")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.bump_config")]
     #[getter]
     fn bump_config<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.bump_config)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.breakeven_config")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.breakeven_config")]
     #[getter]
     fn breakeven_config<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -102,7 +102,7 @@ impl PyMetricPricingOverrides {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.bond_risk_basis")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.bond_risk_basis")]
     #[getter]
     fn bond_risk_basis(&self) -> PyResult<Option<String>> {
         self.inner
@@ -112,7 +112,7 @@ impl PyMetricPricingOverrides {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.theta_day_basis")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.theta_day_basis")]
     #[getter]
     fn theta_day_basis(&self) -> PyResult<Option<String>> {
         self.inner
@@ -122,7 +122,7 @@ impl PyMetricPricingOverrides {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.var_config")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.var_config")]
     #[getter]
     fn var_config<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -132,7 +132,7 @@ impl PyMetricPricingOverrides {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -143,13 +143,13 @@ impl PyMetricPricingOverrides {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -198,12 +198,12 @@ impl PyMetricPricingOverrides {
 }
 
 crate::bindings::macros::py_getters!(PyMetricPricingOverrides |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MetricPricingOverrides.theta_period")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.theta_period")]
     theta_period -> Option<crate::bindings::core::dates::tenor::PyTenor> =
         s.inner.theta_period.map(crate::bindings::core::dates::tenor::PyTenor::from_inner);
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory")]
 #[pyclass(
     name = "MarketHistory",
     module = "finstack_quant.valuations.instruments",
@@ -217,7 +217,7 @@ pub(crate) struct PyMarketHistory {
 
 #[pymethods]
 impl PyMarketHistory {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.__init__")]
     #[new]
     #[pyo3(text_signature = "(base_date, window_days, scenarios)")]
     fn new(
@@ -233,7 +233,7 @@ impl PyMarketHistory {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory.from_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.from_dict")]
     #[staticmethod]
     #[pyo3(text_signature = "(data)")]
     fn from_dict(py: Python<'_>, data: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -242,13 +242,13 @@ impl PyMarketHistory {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory.base_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.base_date")]
     #[getter]
     fn base_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.base_date)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory.scenarios")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.scenarios")]
     #[getter]
     fn scenarios<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.scenarios)
@@ -258,7 +258,7 @@ impl PyMarketHistory {
         self.inner.len()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::core::table::envelope_to_pandas(
@@ -267,7 +267,7 @@ impl PyMarketHistory {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -277,13 +277,13 @@ impl PyMarketHistory {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -300,7 +300,7 @@ impl PyMarketHistory {
 }
 
 crate::bindings::macros::py_getters!(PyMarketHistory |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MarketHistory.window_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.window_days")]
     window_days -> u32 = s.inner.window_days;
 });
 
@@ -374,7 +374,7 @@ pub(crate) fn market_history_json(
     py_to_json_string(py, obj, "market_history").map(Some)
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "price_instrument")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "price_instrument")]
 #[pyfunction]
 #[pyo3(signature = (instrument, market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None, explain=false))]
 #[pyo3(
@@ -411,19 +411,19 @@ fn price_instrument(
     )
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "list_standard_metrics")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "list_standard_metrics")]
 #[pyfunction]
 fn list_standard_metrics() -> Vec<String> {
     finstack_quant_valuations::pricer::list_standard_metrics()
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "list_standard_metrics_grouped")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "list_standard_metrics_grouped")]
 #[pyfunction]
 fn list_standard_metrics_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
     finstack_quant_valuations::pricer::list_standard_metrics_grouped()
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "metric_metadata")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "metric_metadata")]
 #[pyfunction]
 #[pyo3(text_signature = "(keys)")]
 fn metric_metadata<'py>(py: Python<'py>, keys: Vec<String>) -> PyResult<Bound<'py, PyAny>> {
@@ -431,19 +431,19 @@ fn metric_metadata<'py>(py: Python<'py>, keys: Vec<String>) -> PyResult<Bound<'p
     serde_to_py(py, &metadata)
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "list_models")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "list_models")]
 #[pyfunction]
 fn list_models() -> Vec<String> {
     finstack_quant_valuations::pricer::list_models()
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "list_models_grouped")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "list_models_grouped")]
 #[pyfunction]
 fn list_models_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
     finstack_quant_valuations::pricer::list_models_grouped()
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "instrument_cashflows")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "instrument_cashflows")]
 #[pyfunction]
 #[pyo3(text_signature = "(instrument, market, as_of, model)")]
 fn instrument_cashflows(
@@ -473,7 +473,7 @@ fn instrument_cashflows(
     .map(|inner| PyInstrumentCashflowEnvelope { inner })
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope")]
 #[pyclass(
     name = "InstrumentCashflowEnvelope",
     module = "finstack_quant.valuations.instruments",
@@ -517,19 +517,19 @@ const CASHFLOW_ROW_COLUMNS: &[(&str, &str)] = &[
 
 #[pymethods]
 impl PyInstrumentCashflowEnvelope {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.as_of")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.as_of")]
     #[getter]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.as_of)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.flows")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.flows")]
     #[getter]
     fn flows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.flows)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let frame =
@@ -542,7 +542,7 @@ impl PyInstrumentCashflowEnvelope {
         frame.call_method("assign", (), Some(&parsed))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -553,13 +553,13 @@ impl PyInstrumentCashflowEnvelope {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -577,31 +577,31 @@ impl PyInstrumentCashflowEnvelope {
 }
 
 crate::bindings::macros::py_getters!(PyInstrumentCashflowEnvelope |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.instrument_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.instrument_id")]
     instrument_id -> String = s.inner.instrument_id.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.model")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.model")]
     model -> String = s.inner.model.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.credit_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.credit_curve_id")]
     credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.recovery_rate")]
     recovery_rate -> Option<f64> = s.inner.recovery_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.scenario_price_shock_decimal")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.scenario_price_shock_decimal")]
     scenario_price_shock_decimal -> Option<f64> = s.inner.scenario_price_shock_decimal;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.total_pv")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.total_pv")]
     total_pv -> f64 = s.inner.total_pv;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InstrumentCashflowEnvelope.reconciles_with_base_value")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.reconciles_with_base_value")]
     reconciles_with_base_value -> bool = s.inner.reconciles_with_base_value;
 });
 

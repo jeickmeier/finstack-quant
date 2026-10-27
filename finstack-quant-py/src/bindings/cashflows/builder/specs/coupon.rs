@@ -17,7 +17,7 @@ use crate::bindings::date_utils::date_to_py;
 use crate::bindings::repr_support::{enum_repr_from_serde as enum_repr, repr_from_serde};
 use crate::errors::core_to_py;
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "CouponType")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "CouponType")]
 #[pyclass(
     name = "CouponType",
     module = "finstack_quant.cashflows.builder",
@@ -45,7 +45,7 @@ impl PyCouponType {
         inner: CouponType::Pik,
     };
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CouponType.split")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "CouponType.split")]
     #[staticmethod]
     #[pyo3(text_signature = "(cash_fraction, pik_fraction)")]
     fn split(cash_fraction: &Bound<'_, PyAny>, pik_fraction: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -57,7 +57,7 @@ impl PyCouponType {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CouponType.cash_fraction")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "CouponType.cash_fraction")]
     #[getter]
     fn cash_fraction<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let value = match self.inner {
@@ -68,7 +68,7 @@ impl PyCouponType {
         decimal_to_py(py, value)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CouponType.pik_fraction")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "CouponType.pik_fraction")]
     #[getter]
     fn pik_fraction<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let value = match self.inner {
@@ -85,7 +85,7 @@ impl PyCouponType {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingLegCompounding")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingLegCompounding")]
 #[pyclass(
     name = "FloatingLegCompounding",
     module = "finstack_quant.cashflows.builder",
@@ -113,7 +113,7 @@ impl PyFloatingLegCompounding {
         inner: FloatingLegCompounding::SimpleAverage,
     };
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingLegCompounding.compounded_in_arrears")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingLegCompounding.compounded_in_arrears")]
     #[staticmethod]
     #[pyo3(text_signature = "(lookback_days)")]
     fn compounded_in_arrears(lookback_days: u32) -> Self {
@@ -122,7 +122,7 @@ impl PyFloatingLegCompounding {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingLegCompounding.compounded_with_observation_shift")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingLegCompounding.compounded_with_observation_shift")]
     #[staticmethod]
     #[pyo3(text_signature = "(shift_days)")]
     fn compounded_with_observation_shift(shift_days: u32) -> Self {
@@ -131,7 +131,7 @@ impl PyFloatingLegCompounding {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingLegCompounding.sofr_observation_shift")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingLegCompounding.sofr_observation_shift")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn sofr_observation_shift() -> Self {
@@ -140,7 +140,7 @@ impl PyFloatingLegCompounding {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingLegCompounding.sonia_observation_shift")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingLegCompounding.sonia_observation_shift")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn sonia_observation_shift() -> Self {
@@ -149,7 +149,7 @@ impl PyFloatingLegCompounding {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingLegCompounding.rate_cutoff")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingLegCompounding.rate_cutoff")]
     #[staticmethod]
     #[pyo3(text_signature = "(cutoff_days)")]
     fn rate_cutoff(cutoff_days: u32) -> Self {
@@ -158,7 +158,7 @@ impl PyFloatingLegCompounding {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingLegCompounding.is_overnight")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingLegCompounding.is_overnight")]
     #[pyo3(text_signature = "(self)")]
     fn is_overnight(&self) -> bool {
         self.inner.is_overnight()
@@ -170,7 +170,7 @@ impl PyFloatingLegCompounding {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "OvernightIndexConstraintApplication")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "OvernightIndexConstraintApplication")]
 #[pyclass(
     name = "OvernightIndexConstraintApplication",
     module = "finstack_quant.cashflows.builder",
@@ -204,7 +204,7 @@ impl PyOvernightIndexConstraintApplication {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateFallback")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateFallback")]
 #[pyclass(
     name = "FloatingRateFallback",
     module = "finstack_quant.cashflows.builder",
@@ -232,7 +232,7 @@ impl PyFloatingRateFallback {
         inner: FloatingRateFallback::SpreadOnly,
     };
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateFallback.fixed_rate")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateFallback.fixed_rate")]
     #[staticmethod]
     #[pyo3(text_signature = "(rate)")]
     fn fixed_rate(rate: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -241,7 +241,7 @@ impl PyFloatingRateFallback {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateFallback.rate")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateFallback.rate")]
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         match self.inner {
@@ -256,7 +256,7 @@ impl PyFloatingRateFallback {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "FixedCouponSpec")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FixedCouponSpec")]
 #[pyclass(
     name = "FixedCouponSpec",
     module = "finstack_quant.cashflows.builder",
@@ -273,12 +273,12 @@ wire_methods!(
     PyFixedCouponSpec,
     FixedCouponSpec,
     "FixedCouponSpec",
-    module = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder._specs.coupon"
 );
 
 #[pymethods]
 impl PyFixedCouponSpec {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FixedCouponSpec.__init__")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FixedCouponSpec.__init__")]
     #[new]
     #[pyo3(
         signature = (rate, schedule, coupon_type=None),
@@ -298,19 +298,19 @@ impl PyFixedCouponSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FixedCouponSpec.rate")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FixedCouponSpec.rate")]
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         decimal_to_py(py, self.inner.rate)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FixedCouponSpec.schedule")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FixedCouponSpec.schedule")]
     #[getter]
     fn schedule(&self) -> PyScheduleParams {
         PyScheduleParams::from_inner(self.inner.schedule.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FixedCouponSpec.coupon_type")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FixedCouponSpec.coupon_type")]
     #[getter]
     fn coupon_type(&self) -> PyCouponType {
         PyCouponType {
@@ -324,7 +324,7 @@ impl PyFixedCouponSpec {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec")]
 #[pyclass(
     name = "FloatingRateSpec",
     module = "finstack_quant.cashflows.builder",
@@ -341,13 +341,13 @@ wire_methods!(
     PyFloatingRateSpec,
     FloatingRateSpec,
     "FloatingRateSpec",
-    module = "finstack_quant.cashflows.builder",
+    module = "finstack_quant.cashflows.builder._specs.coupon",
     validate
 );
 
 #[pymethods]
 impl PyFloatingRateSpec {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.__init__")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.__init__")]
     #[new]
     #[pyo3(
         signature = (forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=FloatingRateSpec::DEFAULT_GEARING_INCLUDES_SPREAD, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=FloatingRateSpec::DEFAULT_RESET_LAG_DAYS, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback=None),
@@ -396,7 +396,7 @@ impl PyFloatingRateSpec {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.sofr")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.sofr")]
     #[staticmethod]
     #[pyo3(text_signature = "(spread_bp)")]
     fn sofr(spread_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -405,7 +405,7 @@ impl PyFloatingRateSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.sonia")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.sonia")]
     #[staticmethod]
     #[pyo3(text_signature = "(spread_bp)")]
     fn sonia(spread_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -414,7 +414,7 @@ impl PyFloatingRateSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.euribor_3m")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.euribor_3m")]
     #[staticmethod]
     #[pyo3(text_signature = "(spread_bp)")]
     fn euribor_3m(spread_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -423,55 +423,55 @@ impl PyFloatingRateSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.forward_curve_id")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.forward_curve_id")]
     #[getter]
     fn forward_curve_id(&self) -> String {
         self.inner.forward_curve_id.to_string()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.spread_bp")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.spread_bp")]
     #[getter]
     fn spread_bp<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         decimal_to_py(py, self.inner.spread_bp)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.gearing")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.gearing")]
     #[getter]
     fn gearing<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         decimal_to_py(py, self.inner.gearing)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.gearing_includes_spread")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.gearing_includes_spread")]
     #[getter]
     fn gearing_includes_spread(&self) -> bool {
         self.inner.gearing_includes_spread
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.index_floor_bp")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.index_floor_bp")]
     #[getter]
     fn index_floor_bp<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         decimal_opt_to_py(py, self.inner.index_floor_bp)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.all_in_floor_bp")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.all_in_floor_bp")]
     #[getter]
     fn all_in_floor_bp<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         decimal_opt_to_py(py, self.inner.all_in_floor_bp)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.all_in_cap_bp")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.all_in_cap_bp")]
     #[getter]
     fn all_in_cap_bp<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         decimal_opt_to_py(py, self.inner.all_in_cap_bp)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.index_cap_bp")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.index_cap_bp")]
     #[getter]
     fn index_cap_bp<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         decimal_opt_to_py(py, self.inner.index_cap_bp)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.overnight_index_constraints")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.overnight_index_constraints")]
     #[getter]
     fn overnight_index_constraints(&self) -> PyOvernightIndexConstraintApplication {
         PyOvernightIndexConstraintApplication {
@@ -479,25 +479,25 @@ impl PyFloatingRateSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.reset_frequency")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.reset_frequency")]
     #[getter]
     fn reset_frequency(&self) -> PyTenor {
         PyTenor::from_inner(self.inner.reset_frequency)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.index_tenor")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.index_tenor")]
     #[getter]
     fn index_tenor(&self) -> Option<PyTenor> {
         self.inner.index_tenor.map(PyTenor::from_inner)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.reset_lag_days")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.reset_lag_days")]
     #[getter]
     fn reset_lag_days(&self) -> i32 {
         self.inner.reset_lag_days
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.fixing_calendar_id")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.fixing_calendar_id")]
     #[getter]
     fn fixing_calendar_id(&self) -> Option<String> {
         self.inner
@@ -506,7 +506,7 @@ impl PyFloatingRateSpec {
             .map(ToString::to_string)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.compounding")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.compounding")]
     #[getter]
     fn compounding(&self) -> Option<PyFloatingLegCompounding> {
         self.inner
@@ -514,13 +514,13 @@ impl PyFloatingRateSpec {
             .map(|inner| PyFloatingLegCompounding { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.overnight_basis")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.overnight_basis")]
     #[getter]
     fn overnight_basis(&self) -> Option<PyDayCount> {
         self.inner.overnight_basis.map(PyDayCount::from_inner)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.fallback")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.fallback")]
     #[getter]
     fn fallback(&self) -> PyFloatingRateFallback {
         PyFloatingRateFallback {
@@ -528,7 +528,7 @@ impl PyFloatingRateSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingRateSpec.validate")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.validate")]
     #[pyo3(text_signature = "(self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
@@ -540,7 +540,7 @@ impl PyFloatingRateSpec {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingCouponSpec")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingCouponSpec")]
 #[pyclass(
     name = "FloatingCouponSpec",
     module = "finstack_quant.cashflows.builder",
@@ -557,12 +557,12 @@ wire_methods!(
     PyFloatingCouponSpec,
     FloatingCouponSpec,
     "FloatingCouponSpec",
-    module = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder._specs.coupon"
 );
 
 #[pymethods]
 impl PyFloatingCouponSpec {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingCouponSpec.__init__")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingCouponSpec.__init__")]
     #[new]
     #[pyo3(
         signature = (rate_spec, schedule, coupon_type=None),
@@ -582,7 +582,7 @@ impl PyFloatingCouponSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingCouponSpec.rate_spec")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingCouponSpec.rate_spec")]
     #[getter]
     fn rate_spec(&self) -> PyFloatingRateSpec {
         PyFloatingRateSpec {
@@ -590,13 +590,13 @@ impl PyFloatingCouponSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingCouponSpec.schedule")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingCouponSpec.schedule")]
     #[getter]
     fn schedule(&self) -> PyScheduleParams {
         PyScheduleParams::from_inner(self.inner.schedule.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FloatingCouponSpec.coupon_type")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingCouponSpec.coupon_type")]
     #[getter]
     fn coupon_type(&self) -> PyCouponType {
         PyCouponType {
@@ -610,7 +610,7 @@ impl PyFloatingCouponSpec {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "StepUpCouponSpec")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "StepUpCouponSpec")]
 #[pyclass(
     name = "StepUpCouponSpec",
     module = "finstack_quant.cashflows.builder",
@@ -627,12 +627,12 @@ wire_methods!(
     PyStepUpCouponSpec,
     StepUpCouponSpec,
     "StepUpCouponSpec",
-    module = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder._specs.coupon"
 );
 
 #[pymethods]
 impl PyStepUpCouponSpec {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "StepUpCouponSpec.__init__")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "StepUpCouponSpec.__init__")]
     #[new]
     #[pyo3(
         signature = (initial_rate, step_schedule, schedule, coupon_type=None),
@@ -654,13 +654,13 @@ impl PyStepUpCouponSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "StepUpCouponSpec.initial_rate")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "StepUpCouponSpec.initial_rate")]
     #[getter]
     fn initial_rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         decimal_to_py(py, self.inner.initial_rate)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "StepUpCouponSpec.step_schedule")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "StepUpCouponSpec.step_schedule")]
     #[getter]
     fn step_schedule<'py>(
         &self,
@@ -673,13 +673,13 @@ impl PyStepUpCouponSpec {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "StepUpCouponSpec.schedule")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "StepUpCouponSpec.schedule")]
     #[getter]
     fn schedule(&self) -> PyScheduleParams {
         PyScheduleParams::from_inner(self.inner.schedule.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "StepUpCouponSpec.coupon_type")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "StepUpCouponSpec.coupon_type")]
     #[getter]
     fn coupon_type(&self) -> PyCouponType {
         PyCouponType {

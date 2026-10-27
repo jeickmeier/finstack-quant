@@ -201,7 +201,7 @@ impl PyCheckConfig {
         self.inner.materiality_threshold
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "CheckConfig.min_severity")]
+    #[doc = pydoc!("finstack_quant.statements._checks", "CheckConfig.min_severity")]
     #[getter]
     fn min_severity(&self) -> PyResult<String> {
         crate::bindings::extract::label(&self.inner.min_severity)
@@ -317,13 +317,13 @@ impl PyFormulaCheckSpec {
         &self.inner.message_template
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "FormulaCheckSpec.category")]
+    #[doc = pydoc!("finstack_quant.statements._checks", "FormulaCheckSpec.category")]
     #[getter]
     fn category(&self) -> PyResult<String> {
         crate::bindings::extract::label(&self.inner.category)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "FormulaCheckSpec.severity")]
+    #[doc = pydoc!("finstack_quant.statements._checks", "FormulaCheckSpec.severity")]
     #[getter]
     fn severity(&self) -> PyResult<String> {
         crate::bindings::extract::label(&self.inner.severity)
@@ -570,7 +570,7 @@ impl PyCheckFinding {
         &self.inner.check_id
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "CheckFinding.severity")]
+    #[doc = pydoc!("finstack_quant.statements._checks", "CheckFinding.severity")]
     #[getter]
     fn severity(&self) -> PyResult<String> {
         crate::bindings::extract::label(&self.inner.severity)
@@ -730,7 +730,7 @@ impl PyCheckReport {
         self.inner.has_warnings()
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "CheckReport.findings_by_severity")]
+    #[doc = pydoc!("finstack_quant.statements._checks", "CheckReport.findings_by_severity")]
     #[pyo3(text_signature = "($self, severity)")]
     fn findings_by_severity(&self, severity: &str) -> PyResult<Vec<PyCheckFinding>> {
         let severity = parse_severity(severity)?;

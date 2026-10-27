@@ -21,7 +21,7 @@ use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_p
 
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "EquityOption",
@@ -35,16 +35,23 @@ pub struct PyEquityOption {
 }
 
 instrument_envelope_methods!(
-    PyEquityOption("EquityOption"),
+    PyEquityOption(
+        "EquityOption",
+        module = "finstack_quant.valuations.instruments._typed_equity"
+    ),
     EquityOption,
     builder = PyEquityOptionBuilder("EquityOptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::equity::equity_option::EquityOption::builder(),
 );
-instrument_pricing_methods!(PyEquityOption, "EquityOption");
+instrument_pricing_methods!(
+    PyEquityOption,
+    "EquityOption",
+    module = "finstack_quant.valuations.instruments._typed_equity"
+);
 
 #[pymethods]
 impl PyEquityOption {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -53,7 +60,7 @@ impl PyEquityOption {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.european")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.european")]
     #[staticmethod]
     #[pyo3(signature = (id, ticker, strike, expiry, quantity, currency, option_type, *, discount_curve_id="USD-OIS",
                         spot_id="EQUITY-SPOT", vol_surface_id="EQUITY-VOL",
@@ -100,7 +107,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.implied_vol")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.implied_vol")]
     #[pyo3(text_signature = "($self, market, as_of, target_price)")]
     fn implied_vol(
         &self,
@@ -116,7 +123,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.greeks")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.greeks")]
     #[pyo3(signature = (market, as_of, model="default"))]
     fn greeks<'py>(
         &self,
@@ -128,13 +135,13 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         typed_option_greeks(py, Box::new(self.inner.clone()), market, as_of, model)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.expiry)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.exercise")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.exercise")]
     #[getter]
     fn exercise<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
         let Some(exercise) = self.inner.exercise else {
@@ -148,7 +155,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         Ok(Some(out))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.discrete_dividends")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.discrete_dividends")]
     #[getter]
     fn discrete_dividends<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
         self.inner
@@ -158,7 +165,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.exercise_dates")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.exercise_dates")]
     #[getter]
     fn exercise_dates<'py>(&self, py: Python<'py>) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
         self.inner
@@ -185,45 +192,45 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
 }
 
 crate::bindings::macros::py_getters!(PyEquityOption |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.underlying_ticker")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.underlying_ticker")]
     underlying_ticker -> String = s.inner.underlying_ticker.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.strike")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.strike")]
     strike -> f64 = s.inner.strike;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.option_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.option_type")]
     option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.exercise_style")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.exercise_style")]
     exercise_style -> PyResult<String> = enum_to_py_string(&s.inner.exercise_style);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.quantity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.quantity")]
     quantity -> f64 = s.inner.quantity;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.day_count")]
     day_count -> crate::bindings::core::dates::daycount::PyDayCount =
         crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.settlement")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.settlement")]
     settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.spot_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.spot_id")]
     spot_id -> String = s.inner.spot_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOption.div_yield_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.div_yield_id")]
     div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(|id| id.to_string());
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "EquityOptionBuilder",
@@ -236,14 +243,14 @@ pub struct PyEquityOptionBuilder {
 
 #[pymethods]
 impl PyEquityOptionBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, id, format!("{value:?}"), |b: EquityOptionBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.underlying_ticker")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.underlying_ticker")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_ticker<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -257,14 +264,14 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.strike")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.strike")]
     #[pyo3(text_signature = "($self, value)")]
     fn strike<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, strike, float_repr(value), |b: EquityOptionBuilder| b
             .strike(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.option_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.option_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn option_type<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -279,7 +286,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.exercise_style")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.exercise_style")]
     #[pyo3(text_signature = "($self, value)")]
     fn exercise_style<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -294,7 +301,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.expiry")]
     #[pyo3(text_signature = "($self, value)")]
     fn expiry<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -305,7 +312,7 @@ impl PyEquityOptionBuilder {
             .expiry(expiry))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -320,7 +327,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.settlement")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.settlement")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
@@ -332,7 +339,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.exercise")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.exercise")]
     #[pyo3(text_signature = "($self, date, spot, settlement_date, exercised)")]
     fn exercise<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -358,7 +365,7 @@ impl PyEquityOptionBuilder {
             .exercise(exercise))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.quantity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.quantity")]
     #[pyo3(text_signature = "($self, value)")]
     fn quantity<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -369,7 +376,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.currency")]
     #[pyo3(text_signature = "($self, value)")]
     fn currency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -384,7 +391,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -398,7 +405,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.spot_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.spot_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn spot_id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -409,7 +416,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -423,7 +430,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.div_yield_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.div_yield_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn div_yield_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -437,7 +444,7 @@ impl PyEquityOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.discrete_dividends")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.discrete_dividends")]
     #[pyo3(text_signature = "($self, value)")]
     fn discrete_dividends<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -459,7 +466,7 @@ impl PyEquityOptionBuilder {
             .discrete_dividends(dividends))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.exercise_dates")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.exercise_dates")]
     #[pyo3(text_signature = "($self, value)")]
     fn exercise_dates<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -478,7 +485,7 @@ impl PyEquityOptionBuilder {
             .exercise_dates(dates))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityOptionBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOptionBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

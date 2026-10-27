@@ -193,7 +193,7 @@ impl PyForecastMethod {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ForecastMethod.kind")]
+    #[doc = pydoc!("finstack_quant.statements._types", "ForecastMethod.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         crate::bindings::extract::label(&self.inner)
@@ -361,7 +361,7 @@ impl PyForecastSpec {
         ))
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ForecastSpec.overrides")]
+    #[doc = pydoc!("finstack_quant.statements._types", "ForecastSpec.overrides")]
     #[staticmethod]
     #[pyo3(text_signature = "(overrides)")]
     fn overrides(overrides: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -608,7 +608,7 @@ impl PyNodeType {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "NodeType.kind")]
+    #[doc = pydoc!("finstack_quant.statements._types", "NodeType.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         crate::bindings::extract::label(&self.inner)
@@ -1093,7 +1093,7 @@ impl PyFinancialModelSpec {
             .transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "FinancialModelSpec.content_hash")]
+    #[doc = pydoc!("finstack_quant.statements._types", "FinancialModelSpec.content_hash")]
     #[pyo3(text_signature = "($self)")]
     fn content_hash(&self) -> PyResult<String> {
         self.inner.content_hash().map_err(core_to_py)
@@ -1108,7 +1108,7 @@ impl PyFinancialModelSpec {
         self.inner.schema_version.into()
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "FinancialModelSpec.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.statements._types", "FinancialModelSpec.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self

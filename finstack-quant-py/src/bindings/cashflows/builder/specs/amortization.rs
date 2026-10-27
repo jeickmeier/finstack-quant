@@ -15,7 +15,7 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::repr_support::enum_repr_from_serde as enum_repr;
 use crate::errors::core_to_py;
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec")]
 #[pyclass(
     name = "AmortizationSpec",
     module = "finstack_quant.cashflows.builder",
@@ -34,7 +34,7 @@ wire_methods!(
     PyAmortizationSpec,
     AmortizationSpec,
     "AmortizationSpec",
-    module = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder._specs.amortization"
 );
 
 #[pymethods]
@@ -45,7 +45,7 @@ impl PyAmortizationSpec {
         inner: AmortizationSpec::None,
     };
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.linear_to")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.linear_to")]
     #[staticmethod]
     #[pyo3(text_signature = "(final_notional)")]
     fn linear_to(final_notional: PyMoney) -> Self {
@@ -56,7 +56,7 @@ impl PyAmortizationSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.step_remaining")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.step_remaining")]
     #[staticmethod]
     #[pyo3(text_signature = "(schedule)")]
     fn step_remaining(schedule: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Self> {
@@ -67,7 +67,7 @@ impl PyAmortizationSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.percent_of_original_per_period")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.percent_of_original_per_period")]
     #[staticmethod]
     #[pyo3(text_signature = "(pct)")]
     fn percent_of_original_per_period(pct: f64) -> Self {
@@ -76,7 +76,7 @@ impl PyAmortizationSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.percent_of_remaining_per_period")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.percent_of_remaining_per_period")]
     #[staticmethod]
     #[pyo3(text_signature = "(pct)")]
     fn percent_of_remaining_per_period(pct: f64) -> Self {
@@ -85,7 +85,7 @@ impl PyAmortizationSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.linear_between")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.linear_between")]
     #[staticmethod]
     #[pyo3(text_signature = "(start, end)")]
     fn linear_between(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -97,7 +97,7 @@ impl PyAmortizationSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.custom_principal")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.custom_principal")]
     #[staticmethod]
     #[pyo3(text_signature = "(items)")]
     fn custom_principal(items: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Self> {
@@ -108,13 +108,13 @@ impl PyAmortizationSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.kind")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.final_notional")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.final_notional")]
     #[getter]
     fn final_notional(&self) -> Option<PyMoney> {
         match self.inner {
@@ -125,7 +125,7 @@ impl PyAmortizationSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.schedule")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.schedule")]
     #[getter]
     fn schedule<'py>(&self, py: Python<'py>) -> PyResult<Option<DateMoneyRows<'py>>> {
         match &self.inner {
@@ -136,7 +136,7 @@ impl PyAmortizationSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.pct")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.pct")]
     #[getter]
     fn pct(&self) -> Option<f64> {
         match self.inner {
@@ -146,7 +146,7 @@ impl PyAmortizationSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.window")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.window")]
     #[getter]
     fn window<'py>(
         &self,
@@ -160,7 +160,7 @@ impl PyAmortizationSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "AmortizationSpec.items")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.items")]
     #[getter]
     fn items<'py>(&self, py: Python<'py>) -> PyResult<Option<DateMoneyRows<'py>>> {
         match &self.inner {
@@ -175,7 +175,7 @@ impl PyAmortizationSpec {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "Notional")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional")]
 #[pyclass(
     name = "Notional",
     module = "finstack_quant.cashflows.builder",
@@ -199,13 +199,13 @@ wire_methods!(
     PyNotional,
     Notional,
     "Notional",
-    module = "finstack_quant.cashflows.builder",
+    module = "finstack_quant.cashflows.builder._specs.amortization",
     validate
 );
 
 #[pymethods]
 impl PyNotional {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "Notional.__init__")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.__init__")]
     #[new]
     #[pyo3(signature = (initial, amort=None), text_signature = "(initial, amort=None)")]
     fn new(initial: PyMoney, amort: Option<PyRef<'_, PyAmortizationSpec>>) -> PyResult<Self> {
@@ -217,7 +217,7 @@ impl PyNotional {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "Notional.par")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.par")]
     #[staticmethod]
     #[pyo3(text_signature = "(amount, currency)")]
     fn par(amount: f64, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -227,13 +227,13 @@ impl PyNotional {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "Notional.initial")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.initial")]
     #[getter]
     fn initial(&self) -> PyMoney {
         PyMoney::from_inner(self.inner.initial)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "Notional.amort")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.amort")]
     #[getter]
     fn amort(&self) -> PyAmortizationSpec {
         PyAmortizationSpec {
@@ -241,13 +241,13 @@ impl PyNotional {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "Notional.currency")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.currency")]
     #[pyo3(text_signature = "(self)")]
     fn currency(&self, py: Python<'_>) -> PyResult<Py<PyCurrency>> {
         Py::new(py, PyCurrency::from_inner(self.inner.currency()))
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "Notional.validate")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.validate")]
     #[pyo3(text_signature = "(self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)

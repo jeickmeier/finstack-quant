@@ -13,7 +13,7 @@ use finstack_quant_valuations::instruments::{
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikMode")]
 #[pyclass(
     name = "PikMode",
     module = "finstack_quant.valuations.instruments",
@@ -32,7 +32,7 @@ impl PyPikMode {
 
 #[pymethods]
 impl PyPikMode {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.cash")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikMode.cash")]
     #[staticmethod]
     fn cash() -> Self {
         Self {
@@ -40,7 +40,7 @@ impl PyPikMode {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.pik")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikMode.pik")]
     #[staticmethod]
     fn pik() -> Self {
         Self {
@@ -48,7 +48,7 @@ impl PyPikMode {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.split")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikMode.split")]
     #[staticmethod]
     fn split(cash_fraction: f64, pik_fraction: f64) -> Self {
         Self {
@@ -59,7 +59,7 @@ impl PyPikMode {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.toggle")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikMode.toggle")]
     #[staticmethod]
     fn toggle() -> Self {
         Self {
@@ -67,7 +67,7 @@ impl PyPikMode {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikMode.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -77,7 +77,7 @@ impl PyPikMode {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikMode.to_json")]
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
@@ -98,14 +98,14 @@ impl PyPikMode {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikMode.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikMode.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikSchedule")]
 #[pyclass(
     name = "PikSchedule",
     module = "finstack_quant.valuations.instruments",
@@ -118,7 +118,7 @@ pub(crate) struct PyPikSchedule {
 
 #[pymethods]
 impl PyPikSchedule {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.uniform")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikSchedule.uniform")]
     #[staticmethod]
     fn uniform(mode: PyRef<'_, PyPikMode>) -> Self {
         Self {
@@ -126,7 +126,7 @@ impl PyPikSchedule {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.stepped")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikSchedule.stepped")]
     #[staticmethod]
     fn stepped(steps: &Bound<'_, PyAny>) -> PyResult<Self> {
         let list = steps.cast::<PyList>()?;
@@ -140,12 +140,12 @@ impl PyPikSchedule {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.mode_at")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikSchedule.mode_at")]
     fn mode_at(&self, t: f64) -> PyPikMode {
         PyPikMode::from_inner(self.inner.mode_at(t))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikSchedule.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -155,7 +155,7 @@ impl PyPikSchedule {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikSchedule.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
@@ -177,14 +177,14 @@ impl PyPikSchedule {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PikSchedule.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PikSchedule.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "BarrierCrossing")]
 #[pyclass(
     name = "BarrierCrossing",
     module = "finstack_quant.valuations.instruments",
@@ -197,7 +197,7 @@ pub(crate) struct PyBarrierCrossing {
 
 #[pymethods]
 impl PyBarrierCrossing {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.discrete")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "BarrierCrossing.discrete")]
     #[staticmethod]
     fn discrete() -> Self {
         Self {
@@ -205,7 +205,7 @@ impl PyBarrierCrossing {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.brownian_bridge")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "BarrierCrossing.brownian_bridge")]
     #[staticmethod]
     fn brownian_bridge() -> Self {
         Self {
@@ -213,7 +213,7 @@ impl PyBarrierCrossing {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "BarrierCrossing.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -223,7 +223,7 @@ impl PyBarrierCrossing {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "BarrierCrossing.to_json")]
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
@@ -237,14 +237,14 @@ impl PyBarrierCrossing {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BarrierCrossing.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "BarrierCrossing.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PathStatistics")]
 #[pyclass(
     name = "PathStatistics",
     module = "finstack_quant.valuations.instruments",
@@ -277,23 +277,23 @@ impl PyPathStatistics {
 }
 
 crate::bindings::macros::py_getters!(PyPathStatistics |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.default_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PathStatistics.default_rate")]
     default_rate -> f64 = s.inner.default_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.avg_default_time")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PathStatistics.avg_default_time")]
     avg_default_time -> f64 = s.inner.avg_default_time;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.avg_terminal_notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PathStatistics.avg_terminal_notional")]
     avg_terminal_notional -> f64 = s.inner.avg_terminal_notional;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.avg_recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PathStatistics.avg_recovery_rate")]
     avg_recovery_rate -> f64 = s.inner.avg_recovery_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PathStatistics.pik_exercise_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "PathStatistics.pik_exercise_rate")]
     pik_exercise_rate -> f64 = s.inner.pik_exercise_rate;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult")]
 #[pyclass(
     name = "MertonMcResult",
     module = "finstack_quant.valuations.instruments",
@@ -313,7 +313,7 @@ impl PyMertonMcResult {
 
 #[pymethods]
 impl PyMertonMcResult {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::core::table::envelope_to_pandas(
@@ -322,7 +322,7 @@ impl PyMertonMcResult {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult._repr_html_")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult._repr_html_")]
     fn _repr_html_<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.to_dataframe(py)?.call_method0("_repr_html_")
     }
@@ -340,39 +340,39 @@ impl PyMertonMcResult {
 }
 
 crate::bindings::macros::py_getters!(PyMertonMcResult |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.clean_price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.clean_price_pct")]
     clean_price_pct -> f64 = s.inner.clean_price_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.dirty_price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.dirty_price_pct")]
     dirty_price_pct -> f64 = s.inner.dirty_price_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.expected_loss")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.expected_loss")]
     expected_loss -> f64 = s.inner.expected_loss;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.unexpected_loss")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.unexpected_loss")]
     unexpected_loss -> f64 = s.inner.unexpected_loss;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.expected_shortfall_95")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.expected_shortfall_95")]
     expected_shortfall_95 -> f64 = s.inner.expected_shortfall_95;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.average_pik_fraction")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.average_pik_fraction")]
     average_pik_fraction -> f64 = s.inner.average_pik_fraction;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.effective_spread_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.effective_spread_bp")]
     effective_spread_bp -> f64 = s.inner.effective_spread_bp;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.path_statistics")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.path_statistics")]
     path_statistics -> PyPathStatistics =
         PyPathStatistics::from_inner(s.inner.path_statistics.clone());
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.num_paths")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.num_paths")]
     num_paths -> usize = s.inner.num_paths;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcResult.standard_error")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.standard_error")]
     standard_error -> f64 = s.inner.standard_error;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec")]
 #[pyclass(
     name = "MertonMcCalibrationSpec",
     module = "finstack_quant.valuations.instruments",
@@ -386,7 +386,7 @@ pub(crate) struct PyMertonMcCalibrationSpec {
 
 #[pymethods]
 impl PyMertonMcCalibrationSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.__init__")]
     #[new]
     #[pyo3(signature = (target, parameter, low_paths=None, max_iterations=None, tolerance_pv=None, bracket=None, seed=None))]
     #[pyo3(
@@ -423,13 +423,13 @@ impl PyMertonMcCalibrationSpec {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.target")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.target")]
     #[getter]
     fn target<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.target)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -438,19 +438,19 @@ impl PyMertonMcCalibrationSpec {
             .map_err(|e| crate::errors::serde_json_to_py(e, "invalid MertonMcCalibrationSpec JSON"))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -469,26 +469,26 @@ impl PyMertonMcCalibrationSpec {
 }
 
 crate::bindings::macros::py_getters!(PyMertonMcCalibrationSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.parameter")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.parameter")]
     parameter -> PyResult<String> = super::convert::enum_to_py_string(&s.inner.parameter);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.low_paths")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.low_paths")]
     low_paths -> usize = s.inner.low_paths;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.max_iterations")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.max_iterations")]
     max_iterations -> usize = s.inner.max_iterations;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.tolerance_pv")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.tolerance_pv")]
     tolerance_pv -> f64 = s.inner.tolerance_pv;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.bracket")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.bracket")]
     bracket -> Option<(f64, f64)> = s.inner.bracket;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcCalibrationSpec.seed")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.seed")]
     seed -> Option<u64> = s.inner.seed;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig")]
 #[pyclass(
     name = "MertonMcConfig",
     module = "finstack_quant.valuations.instruments",
@@ -501,7 +501,7 @@ pub(crate) struct PyMertonMcConfig {
 
 #[pymethods]
 impl PyMertonMcConfig {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.__init__")]
     #[new]
     #[pyo3(text_signature = "(merton, recovery_rate)")]
     fn new(merton: PyRef<'_, PyMertonModel>, recovery_rate: f64) -> PyResult<Self> {
@@ -510,7 +510,7 @@ impl PyMertonMcConfig {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.pik_schedule")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.pik_schedule")]
     #[pyo3(text_signature = "($self, s)")]
     fn pik_schedule(&self, s: PyRef<'_, PyPikSchedule>) -> Self {
         Self {
@@ -518,7 +518,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.steps_per_year")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.steps_per_year")]
     #[pyo3(text_signature = "($self, n)")]
     fn steps_per_year(&self, n: usize) -> Self {
         Self {
@@ -526,7 +526,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.barrier_crossing")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.barrier_crossing")]
     #[pyo3(text_signature = "($self, p)")]
     fn barrier_crossing(&self, p: PyRef<'_, PyBarrierCrossing>) -> Self {
         Self {
@@ -534,7 +534,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.recovery_rate")]
     #[pyo3(text_signature = "($self, r)")]
     fn recovery_rate(&self, r: f64) -> PyResult<Self> {
         Ok(Self {
@@ -542,7 +542,7 @@ impl PyMertonMcConfig {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.endogenous_hazard")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.endogenous_hazard")]
     #[pyo3(text_signature = "($self, h)")]
     fn endogenous_hazard(&self, h: PyRef<'_, PyEndogenousHazardSpec>) -> Self {
         Self {
@@ -550,7 +550,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.dynamic_recovery")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.dynamic_recovery")]
     #[pyo3(text_signature = "($self, r)")]
     fn dynamic_recovery(&self, r: PyRef<'_, PyDynamicRecoverySpec>) -> Self {
         Self {
@@ -558,7 +558,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.toggle_model")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.toggle_model")]
     #[pyo3(text_signature = "($self, t)")]
     fn toggle_model(&self, t: PyRef<'_, PyToggleExerciseModel>) -> Self {
         Self {
@@ -566,7 +566,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.calibration")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.calibration")]
     #[pyo3(text_signature = "($self, spec)")]
     fn calibration(&self, spec: PyRef<'_, PyMertonMcCalibrationSpec>) -> Self {
         Self {
@@ -574,7 +574,7 @@ impl PyMertonMcConfig {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.cashflow_dfs")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.cashflow_dfs")]
     #[pyo3(text_signature = "($self, dfs)")]
     fn cashflow_dfs(&self, dfs: Vec<(f64, f64)>) -> Self {
         Self {
@@ -582,13 +582,13 @@ impl PyMertonMcConfig {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -598,7 +598,7 @@ impl PyMertonMcConfig {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
@@ -626,7 +626,7 @@ impl PyMertonMcConfig {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "MertonMcConfig.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)

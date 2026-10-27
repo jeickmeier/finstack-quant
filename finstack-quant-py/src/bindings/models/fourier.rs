@@ -18,7 +18,7 @@ use finstack_quant_models::fourier::cos::{
 use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
 
-#[doc = pydoc!("finstack_quant.models", "bs_cos_price")]
+#[doc = pydoc!("finstack_quant.models._fourier", "bs_cos_price")]
 #[pyfunction]
 #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]
@@ -50,7 +50,7 @@ fn bs_cos_price(
     })
 }
 
-#[doc = pydoc!("finstack_quant.models", "vg_cos_price")]
+#[doc = pydoc!("finstack_quant.models._fourier", "vg_cos_price")]
 #[pyfunction]
 #[pyo3(signature = (spot, strike, rate, div_yield, sigma, theta, nu, expiry, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]
@@ -86,7 +86,7 @@ fn vg_cos_price(
     })
 }
 
-#[doc = pydoc!("finstack_quant.models", "merton_jump_cos_price")]
+#[doc = pydoc!("finstack_quant.models._fourier", "merton_jump_cos_price")]
 #[pyfunction]
 #[pyo3(signature = (spot, strike, rate, div_yield, sigma, mu_jump, sigma_jump, lambda_, expiry, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]

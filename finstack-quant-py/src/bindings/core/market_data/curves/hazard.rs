@@ -319,7 +319,7 @@ impl PyHazardCurve {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!(
-        "finstack_quant.core.market_data",
+        "finstack_quant.core.market_data._curves.hazard",
         "HazardCurve.conditional_default_prob"
     )]
     #[pyo3(text_signature = "(self, start, end)")]

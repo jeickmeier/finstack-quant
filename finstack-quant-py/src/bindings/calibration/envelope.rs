@@ -140,7 +140,7 @@ fn fields(pairs: Vec<(&str, Value)>) -> Map<String, Value> {
 
 #[pymethods]
 impl PyCalibrationStep {
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.discount")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.discount")]
     #[staticmethod]
     #[pyo3(signature = (id, currency, base_date, quote_set = None, curve_id = None, **params))]
     #[pyo3(text_signature = "(id, currency, base_date, quote_set=None, curve_id=None, **params)")]
@@ -165,7 +165,7 @@ impl PyCalibrationStep {
         Self::build(py, "discount", id, quote_set, f, params)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.forward")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.forward")]
     #[staticmethod]
     #[pyo3(signature = (id, currency, base_date, tenor_years, discount_curve_id, quote_set = None, curve_id = None, **params))]
     #[pyo3(
@@ -196,7 +196,7 @@ impl PyCalibrationStep {
         Self::build(py, "forward", id, quote_set, f, params)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.hazard")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.hazard")]
     #[staticmethod]
     #[pyo3(signature = (id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority = None, quote_set = None, curve_id = None, **params))]
     #[pyo3(
@@ -231,7 +231,7 @@ impl PyCalibrationStep {
         Self::build(py, "hazard", id, quote_set, f, params)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.inflation")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.inflation")]
     #[staticmethod]
     #[pyo3(signature = (id, currency, base_date, discount_curve_id, index, observation_lag, base_cpi, quote_set = None, curve_id = None, **params))]
     #[pyo3(
@@ -315,7 +315,7 @@ impl PyCalibrationStep {
         Self::build(py, "vol_surface", id, quote_set, f, params)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.swaption_vol")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.swaption_vol")]
     #[staticmethod]
     #[pyo3(signature = (id, base_date, discount_curve_id, currency, quote_set = None, vol_surface_id = None, **params))]
     #[pyo3(
@@ -347,7 +347,7 @@ impl PyCalibrationStep {
         Self::build(py, "swaption_vol", id, quote_set, f, params)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.base_correlation")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.base_correlation")]
     #[staticmethod]
     #[pyo3(signature = (id, index_id, series, maturity_years, base_date, discount_curve_id, currency, quote_set = None, **params))]
     #[pyo3(
@@ -426,7 +426,7 @@ impl PyCalibrationStep {
         Self::build(py, "student_t", id, quote_set, f, params)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.hull_white")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.hull_white")]
     #[staticmethod]
     #[pyo3(signature = (id, curve_id, currency, base_date, quote_set = None, **params))]
     #[pyo3(text_signature = "(id, curve_id, currency, base_date, quote_set=None, **params)")]
@@ -451,7 +451,7 @@ impl PyCalibrationStep {
         Self::build(py, "hull_white", id, quote_set, f, params)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.cap_floor_hull_white")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.cap_floor_hull_white")]
     #[staticmethod]
     #[pyo3(signature = (id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quote_set = None, **params))]
     #[pyo3(
@@ -528,7 +528,7 @@ impl PyCalibrationStep {
         Self::build(py, "svi_surface", id, quote_set, f, params)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationStep.xccy_basis")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.xccy_basis")]
     #[staticmethod]
     #[pyo3(signature = (id, currency, base_date, fx_spot, domestic_discount_id, quote_set = None, curve_id = None, **params))]
     #[pyo3(
@@ -821,7 +821,7 @@ impl PyCalibrationEnvelope {
 
 #[pymethods]
 impl PyCalibrationEnvelope {
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationEnvelope.__init__")]
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.__init__")]
     #[new]
     #[pyo3(signature = (plan, market_data = None, prior_market = None))]
     #[pyo3(text_signature = "(plan, market_data=None, prior_market=None)")]

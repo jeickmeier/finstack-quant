@@ -15,7 +15,7 @@ use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
 use crate::bindings::repr_support::{enum_repr_from_serde as enum_repr, repr_from_serde};
 use crate::errors::core_to_py;
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "RollRule")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "RollRule")]
 #[pyclass(
     name = "RollRule",
     module = "finstack_quant.cashflows.builder",
@@ -54,7 +54,7 @@ impl PyRollRule {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "PrincipalExchange")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "PrincipalExchange")]
 #[pyclass(
     name = "PrincipalExchange",
     module = "finstack_quant.cashflows.builder",
@@ -88,7 +88,7 @@ impl PyPrincipalExchange {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams")]
 #[pyclass(
     name = "ScheduleParams",
     module = "finstack_quant.cashflows.builder",
@@ -114,7 +114,7 @@ macro_rules! schedule_params_presets {
         impl PyScheduleParams {
             $(
                 #[doc = pydoc!(
-                    "finstack_quant.cashflows.builder",
+                    "finstack_quant.cashflows.builder._specs.schedule",
                     concat!("ScheduleParams.", stringify!($name))
                 )]
                 #[staticmethod]
@@ -144,13 +144,13 @@ wire_methods!(
     PyScheduleParams,
     ScheduleParams,
     "ScheduleParams",
-    module = "finstack_quant.cashflows.builder",
+    module = "finstack_quant.cashflows.builder._specs.schedule",
     validate
 );
 
 #[pymethods]
 impl PyScheduleParams {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.__init__")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.__init__")]
     #[new]
     #[pyo3(
         signature = (frequency, day_count, calendar_id, business_day_convention=None, stub=None, end_of_month=false, payment_lag_days=0, adjust_accrual_dates=false, roll_rule=None),
@@ -187,61 +187,61 @@ impl PyScheduleParams {
         Ok(Self::from_inner(inner))
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.validate")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.validate")]
     #[pyo3(text_signature = "(self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.frequency")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.frequency")]
     #[getter]
     fn frequency(&self) -> PyTenor {
         PyTenor::from_inner(self.inner.frequency)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.day_count")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.day_count")]
     #[getter]
     fn day_count(&self) -> PyDayCount {
         PyDayCount::from_inner(self.inner.day_count)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.business_day_convention")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.business_day_convention")]
     #[getter]
     fn business_day_convention(&self) -> PyBusinessDayConvention {
         PyBusinessDayConvention::from_inner(self.inner.business_day_convention)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.calendar_id")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.calendar_id")]
     #[getter]
     fn calendar_id(&self) -> String {
         self.inner.calendar_id.to_string()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.stub")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.stub")]
     #[getter]
     fn stub(&self) -> PyStubKind {
         PyStubKind::from_inner(self.inner.stub)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.payment_lag_days")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.payment_lag_days")]
     #[getter]
     fn payment_lag_days(&self) -> i32 {
         self.inner.payment_lag_days
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.end_of_month")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.end_of_month")]
     #[getter]
     fn end_of_month(&self) -> bool {
         self.inner.end_of_month
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.adjust_accrual_dates")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.adjust_accrual_dates")]
     #[getter]
     fn adjust_accrual_dates(&self) -> bool {
         self.inner.adjust_accrual_dates
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "ScheduleParams.roll_rule")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.roll_rule")]
     #[getter]
     fn roll_rule(&self) -> PyRollRule {
         PyRollRule {

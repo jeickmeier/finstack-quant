@@ -43,7 +43,7 @@ fn extract_structured_credit(
         .map_err(core_to_py)
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_discount_margin")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "tranche_discount_margin")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_discount_margin",
@@ -67,7 +67,7 @@ fn tranche_discount_margin(
     .map_err(core_to_py)
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_breakeven_cdr")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "tranche_breakeven_cdr")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_breakeven_cdr",
@@ -88,7 +88,7 @@ fn tranche_breakeven_cdr(
         .map_err(core_to_py)
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_oas")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "tranche_oas")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_oas",
@@ -131,7 +131,7 @@ fn tranche_oas(
     Ok(PyOasResult { inner })
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_metrics")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "tranche_metrics")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_metrics",
@@ -172,7 +172,7 @@ fn tranche_metrics(
     Ok(PyTrancheMetrics { inner })
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "tranche_scenario_table")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "tranche_scenario_table")]
 #[pyfunction]
 #[pyo3(
     name = "tranche_scenario_table",
@@ -199,7 +199,7 @@ fn tranche_scenario_table(
     Ok(PyScenarioTable { inner })
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "OasResult",
@@ -218,13 +218,13 @@ impl PyOasResult {
         self.to_dataframe(py)?.call_method0("_repr_html_")
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -232,13 +232,13 @@ impl PyOasResult {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe_with_schema(
@@ -264,23 +264,23 @@ impl PyOasResult {
 }
 
 crate::bindings::macros::py_getters!(PyOasResult |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.oas")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.oas")]
     oas -> f64 = s.inner.oas;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.model_price")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.model_price")]
     model_price -> f64 = s.inner.model_price;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.market_price")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.market_price")]
     market_price -> f64 = s.inner.market_price;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.num_paths")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.num_paths")]
     num_paths -> usize = s.inner.num_paths;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "OasResult.price_std_error")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.price_std_error")]
     price_std_error -> f64 = s.inner.price_std_error;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TrancheMetrics",
@@ -299,13 +299,13 @@ impl PyTrancheMetrics {
         self.to_dataframe(py)?.call_method0("_repr_html_")
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -313,13 +313,13 @@ impl PyTrancheMetrics {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.metrics")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.metrics")]
     #[getter]
     fn metrics(&self) -> BTreeMap<String, f64> {
         self.inner
@@ -329,7 +329,7 @@ impl PyTrancheMetrics {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe_with_schema(
@@ -370,68 +370,68 @@ impl PyTrancheMetrics {
 }
 
 crate::bindings::macros::py_getters!(PyTrancheMetrics |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.tranche_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.tranche_id")]
     tranche_id -> &str = &s.inner.tranche_id;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.pv")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.pv")]
     pv -> f64 = s.inner.pv;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.clean_price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.clean_price_pct")]
     clean_price_pct -> f64 = s.inner.clean_price_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.dirty_price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.dirty_price_pct")]
     dirty_price_pct -> f64 = s.inner.dirty_price_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.accrued")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.accrued")]
     accrued -> f64 = s.inner.accrued;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.factor")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.factor")]
     factor -> f64 = s.inner.factor;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.wal")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.wal")]
     wal -> f64 = s.inner.wal;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.ytm")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.ytm")]
     ytm -> Option<f64> = s.inner.ytm;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.z_spread_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.z_spread_bp")]
     z_spread_bp -> f64 = s.inner.z_spread_bp;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.cs01")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.cs01")]
     cs01 -> f64 = s.inner.cs01;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.spread_duration")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.spread_duration")]
     spread_duration -> f64 = s.inner.spread_duration;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.spread_convexity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.spread_convexity")]
     spread_convexity -> f64 = s.inner.spread_convexity;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.effective_duration")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.effective_duration")]
     effective_duration -> f64 = s.inner.effective_duration;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.effective_convexity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.effective_convexity")]
     effective_convexity -> f64 = s.inner.effective_convexity;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.dm_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.dm_bp")]
     dm_bp -> Option<f64> = s.inner.dm_bp;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.target_price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.target_price_pct")]
     target_price_pct -> f64 = s.inner.target_price_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.wal_to_call")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.wal_to_call")]
     wal_to_call -> Option<f64> = s.inner.wal_to_call;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.z_spread_to_call_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.z_spread_to_call_bp")]
     z_spread_to_call_bp -> Option<f64> = s.inner.z_spread_to_call_bp;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheMetrics.dm_to_call_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.dm_to_call_bp")]
     dm_to_call_bp -> Option<f64> = s.inner.dm_to_call_bp;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ScenarioTable",
@@ -450,13 +450,13 @@ impl PyScenarioTable {
         self.to_dataframe(py)?.call_method0("_repr_html_")
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -464,13 +464,13 @@ impl PyScenarioTable {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.cells")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.cells")]
     #[getter]
     fn cells(&self) -> Vec<BTreeMap<String, f64>> {
         self.inner
@@ -489,7 +489,7 @@ impl PyScenarioTable {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self
@@ -522,7 +522,7 @@ impl PyScenarioTable {
 }
 
 crate::bindings::macros::py_getters!(PyScenarioTable |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ScenarioTable.tranche_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.tranche_id")]
     tranche_id -> &str = &s.inner.tranche_id;
 });
 

@@ -30,7 +30,7 @@ struct ViolationRow<'a> {
     description: &'a str,
 }
 
-#[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport")]
+#[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport")]
 #[pyclass(
     name = "ArbitrageReport",
     module = "finstack_quant.models.volatility",
@@ -44,43 +44,43 @@ pub struct PyArbitrageReport {
 
 #[pymethods]
 impl PyArbitrageReport {
-    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.vol_surface_id")]
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.vol_surface_id")]
     #[getter]
     fn vol_surface_id(&self) -> &str {
         &self.inner.vol_surface_id
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.passed")]
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.passed")]
     #[getter]
     fn passed(&self) -> bool {
         self.inner.passed
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.total_violations")]
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.total_violations")]
     #[getter]
     fn total_violations(&self) -> usize {
         self.inner.violations.len()
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.violations")]
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.violations")]
     #[getter]
     fn violations<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.violations)
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.by_severity")]
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.by_severity")]
     #[getter]
     fn by_severity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.counts_by_severity)
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.by_type")]
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.by_type")]
     #[getter]
     fn by_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.counts_by_type)
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "ArbitrageReport.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = self
             .inner
@@ -116,10 +116,10 @@ wire_methods!(
     PyArbitrageReport,
     ArbitrageReport,
     "ArbitrageReport",
-    module = "finstack_quant.models.volatility"
+    module = "finstack_quant.models.volatility._volatility_arbitrage"
 );
 
-#[doc = pydoc!("finstack_quant.models.volatility", "check_butterfly_grid")]
+#[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "check_butterfly_grid")]
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_butterfly_grid<'py>(
@@ -141,7 +141,7 @@ fn check_butterfly_grid<'py>(
     serde_to_py(py, &violations)
 }
 
-#[doc = pydoc!("finstack_quant.models.volatility", "check_calendar_spread_grid")]
+#[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "check_calendar_spread_grid")]
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_calendar_spread_grid<'py>(
@@ -163,7 +163,7 @@ fn check_calendar_spread_grid<'py>(
     serde_to_py(py, &violations)
 }
 
-#[doc = pydoc!("finstack_quant.models.volatility", "check_local_vol_density_grid")]
+#[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "check_local_vol_density_grid")]
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices))]
 fn check_local_vol_density_grid<'py>(
@@ -179,7 +179,7 @@ fn check_local_vol_density_grid<'py>(
     serde_to_py(py, &violations)
 }
 
-#[doc = pydoc!("finstack_quant.models.volatility", "check_surface_grid")]
+#[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "check_surface_grid")]
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_surface_grid(

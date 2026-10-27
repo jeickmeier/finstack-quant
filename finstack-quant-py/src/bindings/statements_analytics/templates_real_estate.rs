@@ -404,7 +404,7 @@ impl PyLeaseSpec {
             .map_err(crate::errors::statements_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.statements_analytics", "LeaseSpec.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.statements_analytics._templates_real_estate", "LeaseSpec.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let row = serde_json::json!({
             "node_id": self.inner.node_id,

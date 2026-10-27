@@ -172,13 +172,13 @@ impl PyMonteCarloResults {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "MonteCarloResults.metrics")]
+    #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.metrics")]
     #[getter]
     fn metrics(&self) -> Vec<String> {
         self.inner.percentile_results.keys().cloned().collect()
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "MonteCarloResults.warnings")]
+    #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.warnings")]
     #[getter]
     fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.warnings)
@@ -217,7 +217,7 @@ impl PyMonteCarloResults {
         Ok(Some(series))
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "MonteCarloResults.breach_probability")]
+    #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.breach_probability")]
     #[pyo3(text_signature = "($self, metric, threshold)")]
     fn breach_probability(&self, metric: &str, threshold: f64) -> Option<f64> {
         self.inner.breach_probability(metric, threshold)

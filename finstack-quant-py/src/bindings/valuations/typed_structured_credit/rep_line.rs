@@ -7,7 +7,7 @@ use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
 use crate::bindings::valuations::convert::{money_from_py, money_to_py, opt_repr};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "RepLine",
@@ -22,7 +22,7 @@ pub struct PyRepLine {
 
 #[pymethods]
 impl PyRepLine {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.__init__")]
     #[new]
     #[pyo3(signature = (id, balance, rate, maturity, seasoning_months, day_count, *, asset_type,
                         spread_bp = None, forward_curve_id = None, index_floor_bp = None, cpr = None,
@@ -85,7 +85,7 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -94,31 +94,31 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.asset_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.asset_type")]
     #[getter]
     fn asset_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.asset_type)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
@@ -139,45 +139,45 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
 }
 
 crate::bindings::macros::py_getters!(PyRepLine |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.id")]
     id -> String = s.inner.id.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.balance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.balance")]
     balance -> PyMoney = money_to_py(s.inner.balance);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.rate")]
     rate -> f64 = s.inner.rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.spread_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.spread_bp")]
     spread_bp -> Option<f64> = s.inner.spread_bp;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.forward_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.forward_curve_id")]
     forward_curve_id -> Option<String> = s.inner.forward_curve_id.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.index_floor_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.index_floor_bp")]
     index_floor_bp -> Option<f64> = s.inner.index_floor_bp;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.contractual_payment")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.contractual_payment")]
     contractual_payment -> Option<PyMoney> = s.inner.contractual_payment.map(money_to_py);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.amortization_term_months")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.amortization_term_months")]
     amortization_term_months -> Option<u32> = s.inner.amortization_term_months;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.io_months")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.io_months")]
     io_months -> Option<u32> = s.inner.io_months;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.seasoning_months")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.seasoning_months")]
     seasoning_months -> u32 = s.inner.seasoning_months;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.cpr")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.cpr")]
     cpr -> Option<f64> = s.inner.cpr;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.cdr")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.cdr")]
     cdr -> Option<f64> = s.inner.cdr;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RepLine.recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.recovery_rate")]
     recovery_rate -> Option<f64> = s.inner.recovery_rate;
 });

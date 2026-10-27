@@ -26,7 +26,7 @@ fn extract_history(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<MarketHis
     spec_from_py(py, obj, "MarketHistory")
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "calculate_var")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "calculate_var")]
 #[pyfunction]
 #[pyo3(signature = (instruments, market, history, as_of, config=None, model="default"))]
 #[pyo3(text_signature = "(instruments, market, history, as_of, config=None, model='default')")]
@@ -71,7 +71,7 @@ fn calculate_var(
     .map_err(core_to_py)
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult")]
 #[pyclass(
     name = "VarResult",
     module = "finstack_quant.valuations.instruments",
@@ -86,7 +86,7 @@ pub(crate) struct PyVarResult {
 
 #[pymethods]
 impl PyVarResult {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
@@ -100,7 +100,7 @@ impl PyVarResult {
         dict_to_dataframe(py, &data, None)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -110,13 +110,13 @@ impl PyVarResult {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
@@ -134,19 +134,19 @@ impl PyVarResult {
 }
 
 crate::bindings::macros::py_getters!(PyVarResult |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.var")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.var")]
     var -> f64 = s.inner.var;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.expected_shortfall")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.expected_shortfall")]
     expected_shortfall -> f64 = s.inner.expected_shortfall;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.pnl_distribution")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.pnl_distribution")]
     pnl_distribution -> Vec<f64> = s.inner.pnl_distribution.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.num_scenarios")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.num_scenarios")]
     num_scenarios -> usize = s.inner.num_scenarios;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "VarResult.confidence_level")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.confidence_level")]
     confidence_level -> f64 = s.inner.confidence_level;
 });
 

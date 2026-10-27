@@ -7,7 +7,7 @@ use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::valuations::convert::opt_repr;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::EquityMetrics;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "EquityMetrics",
@@ -24,13 +24,13 @@ crate::bindings::macros::wire_methods!(
     PyEquityMetrics,
     EquityMetrics,
     "EquityMetrics",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics",
     to_dict
 );
 
 #[pymethods]
 impl PyEquityMetrics {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.cash_on_cash")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.cash_on_cash")]
     #[getter]
     fn cash_on_cash<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
         self.inner
@@ -40,7 +40,7 @@ impl PyEquityMetrics {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self
@@ -74,21 +74,21 @@ impl PyEquityMetrics {
 }
 
 crate::bindings::macros::py_getters!(PyEquityMetrics |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.tranche_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.tranche_id")]
     tranche_id -> String = s.inner.tranche_id.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.invested")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.invested")]
     invested -> f64 = s.inner.invested;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.irr")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.irr")]
     irr -> Option<f64> = s.inner.irr;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.moic")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.moic")]
     moic -> f64 = s.inner.moic;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "EquityMetrics.nav_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.nav_pct")]
     nav_pct -> f64 = s.inner.nav_pct;
 });

@@ -9,7 +9,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
 use pyo3::prelude::*;
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "simulate_paths")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._engine", "simulate_paths")]
 #[pyfunction]
 #[pyo3(text_signature = "(spec)")]
 fn simulate_paths(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPathSummary> {
@@ -22,7 +22,7 @@ fn simulate_paths(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPathSum
     .map(PyPathSummary::from_inner)
 }
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "heston_satisfies_feller")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._engine", "heston_satisfies_feller")]
 #[pyfunction]
 fn heston_satisfies_feller(kappa: f64, theta: f64, vol_of_vol: f64) -> bool {
     finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller(
@@ -40,7 +40,7 @@ pub(super) fn extract_optional_currency(
     currency.map(extract_currency).transpose()
 }
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "price_heston")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._engine", "price_heston")]
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, is_call, num_paths=None, seed=None, num_steps=None, currency=None))]

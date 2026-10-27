@@ -201,7 +201,7 @@ def _stub_docstrings(module: str) -> dict[str, str]:
                 and isinstance(node, ast.ImportFrom)
                 and node.module is not None
                 and node.module.startswith(module + ".")
-                and node.module.rsplit(".", 1)[-1].startswith("_")
+                and node.module[len(module) + 1 :].startswith("_")
             ):
                 private_docs = _stub_docstrings(node.module)
                 for alias in node.names:
@@ -335,6 +335,7 @@ def test_private_stub_reexports_keep_public_runtime_owners(tmp_path: Path, monke
     (package / "__init__.pyi").write_text(
         '"""Public credit namespace."""\n'
         "from finstack_quant.models.credit._impl import Internal as Public\n"
+        "from finstack_quant.models.credit._nested.leaf import Leaf as Leaf\n"
         "from finstack_quant.models.credit.other import Ignore\n"
     )
     (package / "_impl.pyi").write_text(
@@ -345,9 +346,14 @@ def test_private_stub_reexports_keep_public_runtime_owners(tmp_path: Path, monke
         '        """Return the selected value."""\n'
         "        ...\n"
     )
+    (package / "_nested").mkdir()
+    (package / "_nested" / "leaf.pyi").write_text(
+        '"""Nested private fragment."""\nclass Leaf:\n    """Nested fragment guidance."""\n'
+    )
     monkeypatch.setattr(importlib.import_module(__name__), "PACKAGE_DIR", tmp_path)
     assert _stub_docstrings("finstack_quant.models.credit") == {
         "__module__": "Public credit namespace.",
         "Public": "Shared class guidance.",
         "Public.value": "Return the selected value.",
+        "Leaf": "Nested fragment guidance.",
     }

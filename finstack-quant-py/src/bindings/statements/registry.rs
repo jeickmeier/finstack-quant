@@ -59,7 +59,7 @@ impl PyMetricDefinition {
         self.inner.category.as_deref()
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "MetricDefinition.unit_type")]
+    #[doc = pydoc!("finstack_quant.statements._registry", "MetricDefinition.unit_type")]
     #[getter]
     fn unit_type(&self) -> PyResult<Option<String>> {
         self.inner
@@ -177,7 +177,7 @@ impl PyRegistry {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "Registry.get_dependencies")]
+    #[doc = pydoc!("finstack_quant.statements._registry", "Registry.get_dependencies")]
     #[pyo3(text_signature = "($self, qualified_id)")]
     fn get_dependencies(&self, qualified_id: &str) -> PyResult<Vec<String>> {
         self.inner

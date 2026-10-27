@@ -288,7 +288,7 @@ wire_methods!(
     validate
 );
 
-#[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig")]
+#[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig")]
 #[pyclass(
     name = "CalibrationConfig",
     module = "finstack_quant.calibration",
@@ -308,7 +308,7 @@ impl PyCalibrationConfig {
 
 #[pymethods]
 impl PyCalibrationConfig {
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.__init__")]
+    #[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig.__init__")]
     #[new]
     #[pyo3(signature = (**overrides))]
     #[pyo3(text_signature = "(**overrides)")]
@@ -323,49 +323,49 @@ impl PyCalibrationConfig {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.solver")]
+    #[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig.solver")]
     #[getter]
     fn solver(&self) -> PySolverConfig {
         PySolverConfig::from_inner(self.inner.solver.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.use_parallel")]
+    #[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig.use_parallel")]
     #[getter]
     fn use_parallel(&self) -> bool {
         self.inner.use_parallel
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.fail_on_bad_fit")]
+    #[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig.fail_on_bad_fit")]
     #[getter]
     fn fail_on_bad_fit(&self) -> bool {
         self.inner.fail_on_bad_fit
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.compute_diagnostics")]
+    #[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig.compute_diagnostics")]
     #[getter]
     fn compute_diagnostics(&self) -> bool {
         self.inner.compute_diagnostics
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.validation_mode")]
+    #[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig.validation_mode")]
     #[getter]
     fn validation_mode(&self) -> String {
         self.inner.validation_mode.as_str().to_string()
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.rate_bounds")]
+    #[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig.rate_bounds")]
     #[getter]
     fn rate_bounds(&self) -> PyRateBounds {
         PyRateBounds::from_inner(self.inner.rate_bounds.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.validation")]
+    #[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig.validation")]
     #[getter]
     fn validation(&self) -> PyValidationConfig {
         PyValidationConfig::from_inner(self.inner.validation.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.to_dict")]
+    #[doc = pydoc!("finstack_quant.calibration._config", "CalibrationConfig.to_dict")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
@@ -379,6 +379,6 @@ wire_methods!(
     PyCalibrationConfig,
     CalibrationConfig,
     "CalibrationConfig",
-    module = "finstack_quant.calibration",
+    module = "finstack_quant.calibration._config",
     validate
 );

@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 
 use finstack_quant_calibration::validation as rust_validation;
 
-#[doc = pydoc!("finstack_quant.calibration", "validate_surface")]
+#[doc = pydoc!("finstack_quant.calibration._validation", "validate_surface")]
 #[pyfunction]
 #[pyo3(text_signature = "(surface, config, forwards)")]
 pub(crate) fn validate_surface(
@@ -23,7 +23,7 @@ pub(crate) fn validate_surface(
     rust_validation::validate_surface(&surface.inner, &config.inner, &forwards).map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.calibration", "validate_calendar_spread")]
+#[doc = pydoc!("finstack_quant.calibration._validation", "validate_calendar_spread")]
 #[pyfunction]
 #[pyo3(text_signature = "(surface, config, forwards)")]
 pub(crate) fn validate_calendar_spread(
@@ -35,7 +35,7 @@ pub(crate) fn validate_calendar_spread(
         .map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.calibration", "validate_butterfly_spread")]
+#[doc = pydoc!("finstack_quant.calibration._validation", "validate_butterfly_spread")]
 #[pyfunction]
 #[pyo3(text_signature = "(surface, config, forwards)")]
 pub(crate) fn validate_butterfly_spread(
@@ -47,7 +47,7 @@ pub(crate) fn validate_butterfly_spread(
         .map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.calibration", "validate_vol_bounds")]
+#[doc = pydoc!("finstack_quant.calibration._validation", "validate_vol_bounds")]
 #[pyfunction]
 #[pyo3(text_signature = "(surface, config)")]
 pub(crate) fn validate_vol_bounds(

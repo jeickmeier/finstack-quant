@@ -27,7 +27,7 @@ use crate::bindings::extract::extract_basis_points;
 
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsTrancheParams",
@@ -42,7 +42,7 @@ pub struct PyCdsTrancheParams {
 
 #[pymethods]
 impl PyCdsTrancheParams {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.__init__")]
     #[new]
     #[pyo3(signature = (index_name, series, attach_pct, detach_pct, notional, maturity, coupon_bp, realized_loss=0.0))]
     #[pyo3(
@@ -74,7 +74,7 @@ impl PyCdsTrancheParams {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.equity_tranche")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.equity_tranche")]
     #[staticmethod]
     #[pyo3(text_signature = "(index_name, series, notional, maturity, coupon_bp)")]
     fn equity_tranche(
@@ -95,7 +95,7 @@ impl PyCdsTrancheParams {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.mezzanine_tranche")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.mezzanine_tranche")]
     #[staticmethod]
     #[pyo3(text_signature = "(index_name, series, notional, maturity, coupon_bp)")]
     fn mezzanine_tranche(
@@ -116,7 +116,7 @@ impl PyCdsTrancheParams {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
@@ -139,29 +139,29 @@ impl PyCdsTrancheParams {
 }
 
 crate::bindings::macros::py_getters!(PyCdsTrancheParams |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.index_name")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.index_name")]
     index_name -> String = s.inner.index_name.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.series")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.series")]
     series -> u16 = s.inner.series;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.attach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.attach_pct")]
     attach_pct -> f64 = s.inner.attach_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.detach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.detach_pct")]
     detach_pct -> f64 = s.inner.detach_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.coupon_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.coupon_bp")]
     coupon_bp -> f64 = s.inner.coupon_bp;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheParams.realized_loss")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.realized_loss")]
     realized_loss -> f64 = s.inner.realized_loss;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsTranche",
@@ -176,16 +176,20 @@ pub struct PyCdsTranche {
 }
 
 instrument_envelope_methods!(
-    PyCdsTranche("CdsTranche"),
+    PyCdsTranche("CdsTranche", module = "finstack_quant.valuations.instruments._typed_credit.cds_tranche"),
     CdsTranche,
     builder = PyCdsTrancheBuilder("CdsTrancheBuilder", fields),
     seed = finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::builder().realized_loss(0.0),
 );
-instrument_pricing_methods!(PyCdsTranche, "CdsTranche");
+instrument_pricing_methods!(
+    PyCdsTranche,
+    "CdsTranche",
+    module = "finstack_quant.valuations.instruments._typed_credit.cds_tranche"
+);
 
 #[pymethods]
 impl PyCdsTranche {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -195,7 +199,7 @@ impl PyCdsTranche {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.standard")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.standard")]
     #[staticmethod]
     #[pyo3(text_signature = "(id, params, discount_curve_id, credit_index_id, side)")]
     fn standard(
@@ -217,19 +221,19 @@ impl PyCdsTranche {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.start_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.start_date")]
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner.start_date.map(|d| date_to_py(py, d)).transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.upfront")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.upfront")]
     #[getter]
     fn upfront<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -238,7 +242,7 @@ impl PyCdsTranche {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         Instrument::expiry(&self.inner)
@@ -264,57 +268,57 @@ impl PyCdsTranche {
 }
 
 crate::bindings::macros::py_getters!(PyCdsTranche |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.index_name")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.index_name")]
     index_name -> String = s.inner.index_name.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.series")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.series")]
     series -> u16 = s.inner.series;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.attach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.attach_pct")]
     attach_pct -> f64 = s.inner.attach_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.detach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.detach_pct")]
     detach_pct -> f64 = s.inner.detach_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.coupon_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.coupon_bp")]
     coupon_bp -> f64 = s.inner.coupon_bp;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.credit_index_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.credit_index_id")]
     credit_index_id -> String = s.inner.credit_index_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.side")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.side")]
     side -> PyResult<String> = enum_to_py_string(&s.inner.side);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.realized_loss")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.realized_loss")]
     realized_loss -> f64 = s.inner.realized_loss;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.roll_rule")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.roll_rule")]
     roll_rule -> PyRollRule = PyRollRule { inner: s.inner.roll_rule };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTranche.stub")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsTrancheBuilder",
@@ -327,14 +331,14 @@ pub struct PyCdsTrancheBuilder {
 
 #[pymethods]
 impl PyCdsTrancheBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, id, format!("{value:?}"), |b: CdsTrancheBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.index_name")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.index_name")]
     #[pyo3(text_signature = "($self, value)")]
     fn index_name<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -345,14 +349,14 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.series")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.series")]
     #[pyo3(text_signature = "($self, value)")]
     fn series<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, series, value.to_string(), |b: CdsTrancheBuilder| b
             .series(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.attach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.attach_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn attach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -363,7 +367,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.detach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.detach_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn detach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -374,7 +378,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -385,7 +389,7 @@ impl PyCdsTrancheBuilder {
             .notional(money))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -400,7 +404,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.coupon_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.coupon_bp")]
     #[pyo3(text_signature = "($self, value)")]
     fn coupon_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -411,7 +415,7 @@ impl PyCdsTrancheBuilder {
             .coupon_bp(bp))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -426,7 +430,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -441,7 +445,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.business_day_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -457,7 +461,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -471,7 +475,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -485,7 +489,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.credit_index_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.credit_index_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_index_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -499,7 +503,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.side")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.side")]
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side: PayReceive = enum_from_str(value, "side")?;
@@ -507,7 +511,7 @@ impl PyCdsTrancheBuilder {
             .side(side))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.start_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.start_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn start_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -522,7 +526,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.realized_loss")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.realized_loss")]
     #[pyo3(text_signature = "($self, value)")]
     fn realized_loss<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -536,7 +540,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.roll_rule")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.roll_rule")]
     #[pyo3(text_signature = "($self, value)")]
     fn roll_rule<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -551,7 +555,7 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.stub")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.stub")]
     #[pyo3(text_signature = "($self, value)")]
     fn stub<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -562,7 +566,7 @@ impl PyCdsTrancheBuilder {
             .stub(stub))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.upfront")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.upfront")]
     #[pyo3(text_signature = "($self, value)")]
     fn upfront<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -574,7 +578,7 @@ impl PyCdsTrancheBuilder {
             .upfront((date, money)))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsTrancheBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

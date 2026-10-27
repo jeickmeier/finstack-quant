@@ -36,7 +36,7 @@ fn tagged_enum_from_py<T: serde::de::DeserializeOwned + Send>(
     crate::bindings::module_utils::py_to_serde(py, value, label)
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "AssetPool",
@@ -51,7 +51,7 @@ pub struct PyAssetPool {
 
 #[pymethods]
 impl PyAssetPool {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.__init__")]
     #[new]
     #[pyo3(text_signature = "(id, deal_type, currency)")]
     fn new(id: &str, deal_type: &str, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -61,7 +61,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_rep_lines")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_rep_lines")]
     #[pyo3(text_signature = "($self, rep_lines)")]
     fn with_rep_lines(&self, rep_lines: Vec<PyRef<'_, PyRepLine>>) -> Self {
         let mut inner = self.inner.clone();
@@ -69,7 +69,7 @@ impl PyAssetPool {
         Self { inner }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_assets")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_assets")]
     #[pyo3(text_signature = "($self, value)")]
     fn with_assets(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         let assets = typed_list_from_py(py, value, "assets", |asset: &PyPoolAsset| {
@@ -80,7 +80,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_instruments")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_instruments")]
     #[pyo3(signature = (bonds=None, term_loans=None, revolvers=None, call_exercise=None, put_exercise=None, overrides=None))]
     #[pyo3(
         text_signature = "($self, bonds=None, term_loans=None, revolvers=None, call_exercise=None, put_exercise=None, overrides=None)"
@@ -134,7 +134,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_reserve")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_reserve")]
     #[pyo3(signature = (reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None))]
     #[pyo3(
         text_signature = "($self, reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None)"
@@ -161,7 +161,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_reinvestment_period")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_reinvestment_period")]
     #[pyo3(text_signature = "($self, value)")]
     fn with_reinvestment_period(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         let period: ReinvestmentPeriod = if let Ok(text) = value.extract::<String>() {
@@ -175,7 +175,7 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.with_accounts")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_accounts")]
     #[pyo3(signature = (*, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None))]
     #[pyo3(
         text_signature = "($self, *, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None)"
@@ -217,7 +217,7 @@ impl PyAssetPool {
         Self { inner }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -226,31 +226,31 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.asset_records")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.asset_records")]
     #[getter]
     fn asset_records<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.assets)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.assets")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.assets")]
     #[getter]
     fn assets(&self) -> Vec<PyPoolAsset> {
         self.inner
@@ -262,7 +262,7 @@ impl PyAssetPool {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.rep_lines")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.rep_lines")]
     #[getter]
     fn rep_lines(&self) -> Option<Vec<PyRepLine>> {
         self.inner.rep_lines.as_ref().map(|lines| {
@@ -275,13 +275,13 @@ impl PyAssetPool {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reserve_interest_destination")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.reserve_interest_destination")]
     #[getter]
     fn reserve_interest_destination<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.reserve_interest_destination)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.instruments")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.instruments")]
     #[getter]
     fn instruments<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -291,7 +291,7 @@ impl PyAssetPool {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reinvestment_period")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.reinvestment_period")]
     #[getter]
     fn reinvestment_period<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -301,7 +301,7 @@ impl PyAssetPool {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.total_balance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.total_balance")]
     #[pyo3(text_signature = "($self)")]
     fn total_balance(&self) -> PyResult<PyMoney> {
         self.inner
@@ -310,7 +310,7 @@ impl PyAssetPool {
             .map_err(crate::errors::core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.performing_balance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.performing_balance")]
     #[pyo3(text_signature = "($self)")]
     fn performing_balance(&self) -> PyResult<PyMoney> {
         self.inner
@@ -319,19 +319,19 @@ impl PyAssetPool {
             .map_err(crate::errors::core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.wac")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.wac")]
     #[pyo3(text_signature = "($self)")]
     fn wac(&self) -> f64 {
         self.inner.wac()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.weighted_avg_spread_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.weighted_avg_spread_bp")]
     #[pyo3(text_signature = "($self)")]
     fn weighted_avg_spread_bp(&self) -> f64 {
         self.inner.weighted_avg_spread_bp()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.weighted_avg_maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.weighted_avg_maturity")]
     #[pyo3(text_signature = "($self, as_of)")]
     fn weighted_avg_maturity(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
@@ -340,13 +340,13 @@ impl PyAssetPool {
             .map_err(crate::errors::core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.diversity_score")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.diversity_score")]
     #[pyo3(text_signature = "($self)")]
     fn diversity_score(&self) -> f64 {
         self.inner.diversity_score()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.assets_by_obligor")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.assets_by_obligor")]
     #[pyo3(text_signature = "($self, obligor_id)")]
     fn assets_by_obligor(&self, obligor_id: &str) -> Vec<PyPoolAsset> {
         self.inner
@@ -358,7 +358,7 @@ impl PyAssetPool {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.assets_by_industry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.assets_by_industry")]
     #[pyo3(text_signature = "($self, industry)")]
     fn assets_by_industry(&self, industry: &str) -> Vec<PyPoolAsset> {
         self.inner
@@ -393,43 +393,43 @@ impl PyAssetPool {
 }
 
 crate::bindings::macros::py_getters!(PyAssetPool |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.id")]
     id -> String = s.inner.id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.deal_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.deal_type")]
     deal_type -> PyResult<String> = enum_to_py_string(&s.inner.deal_type);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.cumulative_defaults")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.cumulative_defaults")]
     cumulative_defaults -> PyMoney = money_to_py(s.inner.cumulative_defaults);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.cumulative_recoveries")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.cumulative_recoveries")]
     cumulative_recoveries -> PyMoney = money_to_py(s.inner.cumulative_recoveries);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.cumulative_prepayments")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.cumulative_prepayments")]
     cumulative_prepayments -> PyMoney = money_to_py(s.inner.cumulative_prepayments);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.cumulative_scheduled_amortization")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.cumulative_scheduled_amortization")]
     cumulative_scheduled_amortization -> PyMoney =
         money_to_py(s.inner.cumulative_scheduled_amortization);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.original_balance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.original_balance")]
     original_balance -> Option<PyMoney> = s.inner.original_balance.map(money_to_py);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.collection_account")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.collection_account")]
     collection_account -> PyMoney = money_to_py(s.inner.collection_account);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reserve_account")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.reserve_account")]
     reserve_account -> PyMoney = money_to_py(s.inner.reserve_account);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reserve_account_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.reserve_account_rate")]
     reserve_account_rate -> f64 = s.inner.reserve_account_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.reserve_target")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.reserve_target")]
     reserve_target -> Option<PyMoney> = s.inner.reserve_target.map(money_to_py);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetPool.excess_spread_account")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.excess_spread_account")]
     excess_spread_account -> PyMoney = money_to_py(s.inner.excess_spread_account);
 });

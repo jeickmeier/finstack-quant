@@ -304,6 +304,24 @@ def delegated_module_docstring(path: Path, tree: ast.Module) -> str | None:
     return None
 
 
+def is_private_fragment(path: Path) -> bool:
+    """Return whether ``path`` is a private stub fragment such as ``_foo.pyi`` or ``_dir/foo.pyi``.
+
+    Args:
+        path: Stub or Python file; components are taken relative to the binding
+            package when the file lives under it, otherwise only the file name counts.
+
+    Returns:
+        ``True`` when a non-dunder component of the path starts with ``_``.
+    """
+    resolved = path.resolve()
+    try:
+        parts = resolved.relative_to(PACKAGE_ROOT).with_suffix("").parts
+    except ValueError:
+        parts = (resolved.stem,)
+    return any(part.startswith("_") and not part.startswith("__") for part in parts)
+
+
 class PublicCallableVisitor:
     """Collect complete API-documentation errors without visiting private helpers."""
 
@@ -320,6 +338,11 @@ class PublicCallableVisitor:
 
     def inspect_module(self, tree: ast.Module) -> None:
         """Inspect module-level docs and every public class or callable."""
+        if is_private_fragment(self.path):
+            # The public module's `__init__.pyi` owns the module docs; a
+            # fragment only contributes members.
+            self.inspect_body(tree.body)
+            return
         docstring = ast.get_docstring(tree)
         if docstring is None:
             docstring = delegated_module_docstring(self.path, tree)

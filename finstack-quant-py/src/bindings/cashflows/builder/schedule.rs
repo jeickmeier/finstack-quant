@@ -28,7 +28,7 @@ use super::orchestrator::PyCashFlowBuilder;
 use super::specs::PyNotional;
 use crate::bindings::cashflows::fixings::PyProjectedFixing;
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta")]
 #[pyclass(
     name = "CashFlowMeta",
     module = "finstack_quant.cashflows.builder",
@@ -43,7 +43,7 @@ pub struct PyCashFlowMeta {
 
 #[pymethods]
 impl PyCashFlowMeta {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.__init__")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.__init__")]
     #[new]
     #[pyo3(
         signature = (representation="contractual", calendar_ids=None, commitment=None, issue_date=None, maturity=None, projected_fixings=None),
@@ -73,37 +73,37 @@ impl PyCashFlowMeta {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.representation")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.representation")]
     #[getter]
     fn representation(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(&self.inner.representation).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.calendar_ids")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.calendar_ids")]
     #[getter]
     fn calendar_ids(&self) -> Vec<String> {
         self.inner.calendar_ids.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.commitment")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.commitment")]
     #[getter]
     fn commitment(&self) -> Option<PyMoney> {
         self.inner.commitment.map(PyMoney::from_inner)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.issue_date")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner.issue_date.map(|d| date_to_py(py, d)).transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.maturity")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner.maturity.map(|d| date_to_py(py, d)).transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowMeta.projected_fixings")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowMeta.projected_fixings")]
     #[getter]
     fn projected_fixings(&self) -> Vec<PyProjectedFixing> {
         self.inner
@@ -124,10 +124,10 @@ wire_methods!(
     PyCashFlowMeta,
     CashFlowMeta,
     "CashFlowMeta",
-    module = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder._schedule"
 );
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule")]
 #[pyclass(
     name = "CashFlowSchedule",
     module = "finstack_quant.cashflows.builder",
@@ -151,7 +151,7 @@ wire_methods!(
     PyCashFlowSchedule,
     CashFlowSchedule,
     "CashFlowSchedule",
-    module = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder._schedule"
 );
 
 /// Extract one string column of a DataFrame-like object as Python objects.
@@ -281,7 +281,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
 
 #[pymethods]
 impl PyCashFlowSchedule {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.builder")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.builder")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn builder() -> PyCashFlowBuilder {
@@ -290,7 +290,7 @@ impl PyCashFlowSchedule {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.from_flows")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.from_flows")]
     #[staticmethod]
     #[pyo3(
         signature = (flows, notional, day_count, meta=None),
@@ -312,7 +312,7 @@ impl PyCashFlowSchedule {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.with_representation")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.with_representation")]
     #[pyo3(text_signature = "(self, representation)")]
     fn with_representation(&self, representation: &str) -> PyResult<Self> {
         Ok(Self::from_inner(self.inner.clone().with_representation(
@@ -320,13 +320,13 @@ impl PyCashFlowSchedule {
         )))
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.with_notional")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.with_notional")]
     #[pyo3(text_signature = "(self, notional)")]
     fn with_notional(&self, notional: PyRef<'_, PyNotional>) -> Self {
         Self::from_inner(self.inner.clone().with_notional(notional.inner.clone()))
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.get_flows")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.get_flows")]
     #[pyo3(text_signature = "(self)")]
     fn get_flows(&self) -> Vec<PyCashFlow> {
         self.inner
@@ -336,7 +336,7 @@ impl PyCashFlowSchedule {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.coupons")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.coupons")]
     #[pyo3(text_signature = "(self)")]
     fn coupons(&self) -> Vec<PyCashFlow> {
         self.inner
@@ -345,7 +345,7 @@ impl PyCashFlowSchedule {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.dates")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.dates")]
     #[pyo3(text_signature = "(self)")]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         self.inner
@@ -355,19 +355,19 @@ impl PyCashFlowSchedule {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.get_notional")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.get_notional")]
     #[pyo3(text_signature = "(self)")]
     fn get_notional(&self) -> PyNotional {
         PyNotional::from_inner(self.inner.get_notional().clone())
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.get_day_count")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.get_day_count")]
     #[pyo3(text_signature = "(self)")]
     fn get_day_count(&self) -> PyDayCount {
         PyDayCount::from_inner(self.inner.get_day_count())
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.get_meta")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.get_meta")]
     #[pyo3(text_signature = "(self)")]
     fn get_meta(&self) -> PyCashFlowMeta {
         PyCashFlowMeta {
@@ -375,13 +375,13 @@ impl PyCashFlowSchedule {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.validate")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.validate")]
     #[pyo3(text_signature = "(self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.scale_amounts")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.scale_amounts")]
     #[pyo3(text_signature = "(self, scale)")]
     fn scale_amounts(&self, scale: f64) -> PyResult<Self> {
         self.inner
@@ -391,13 +391,13 @@ impl PyCashFlowSchedule {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.wal")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.wal")]
     #[pyo3(text_signature = "(self, as_of)")]
     fn wal(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
         self.inner.wal(py_to_date(as_of)?).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.outstanding_by_date")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.outstanding_by_date")]
     #[pyo3(text_signature = "(self)")]
     fn outstanding_by_date<'py>(
         &self,
@@ -406,7 +406,7 @@ impl PyCashFlowSchedule {
         date_money_to_py(py, &self.inner.outstanding_by_date().map_err(core_to_py)?)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.pv_by_period")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.pv_by_period")]
     #[pyo3(
         signature = (periods, market, disc_curve_id, base, credit_curve_id=None),
         text_signature = "(self, periods, market, disc_curve_id, base, credit_curve_id=None)"
@@ -434,7 +434,7 @@ impl PyCashFlowSchedule {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.calendar_year_ladder")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.calendar_year_ladder")]
     #[pyo3(text_signature = "(self, pvs)")]
     fn calendar_year_ladder<'py>(
         &self,
@@ -456,7 +456,7 @@ impl PyCashFlowSchedule {
         crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.to_dataframe")]
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(signature = (outstanding=false), text_signature = "(self, outstanding=False)")]
     fn to_dataframe<'py>(&self, py: Python<'py>, outstanding: bool) -> PyResult<Bound<'py, PyAny>> {
@@ -546,14 +546,14 @@ impl PyCashFlowSchedule {
         )
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowSchedule._repr_html_")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule._repr_html_")]
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
         let frame = self.to_dataframe(py, false).ok()?;
         frame.call_method0("_repr_html_").ok()?.extract().ok()
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "merge_cashflow_schedules")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "merge_cashflow_schedules")]
 #[pyfunction]
 #[pyo3(text_signature = "(schedules, notional, day_count)")]
 pub(crate) fn merge_cashflow_schedules(

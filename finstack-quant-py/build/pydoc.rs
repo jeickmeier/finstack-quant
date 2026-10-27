@@ -4,7 +4,8 @@
 //! docstring. This module extracts each docstring (module, class, function,
 //! method, property) and writes it to
 //! `$OUT_DIR/pydoc/<module>/<qualified name>.txt`, where `<module>` is the
-//! public dotted path (`finstack_quant.valuations.market`) and the qualified
+//! stub's dotted path (`finstack_quant.valuations.market`, or a private
+//! fragment such as `finstack_quant.portfolio._optimization.enums`) and the qualified
 //! name is `Class`, `Class.member` or `function`; the module docstring is
 //! `__module__`. The crate's `pydoc!` macro (`src/bindings/pydoc.rs`) expands
 //! to `include_str!` of that file, so a key with no stub docstring is a compile
@@ -108,8 +109,9 @@ fn collect_stubs(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Public dotted module path of a stub (`valuations/market/__init__.pyi` ->
-/// `finstack_quant.valuations.market`).
+/// Dotted module path of a stub (`valuations/market/__init__.pyi` ->
+/// `finstack_quant.valuations.market`, `portfolio/_brinson.pyi` ->
+/// `finstack_quant.portfolio._brinson`).
 fn module_name(package_root: &Path, stub: &Path) -> String {
     let relative = stub
         .strip_prefix(package_root)

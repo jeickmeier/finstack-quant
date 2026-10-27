@@ -38,7 +38,7 @@ pub(crate) fn compounding_from_py(
     crate::bindings::module_utils::py_to_serde(py, obj, "compounding")
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FixedLegSpec",
@@ -60,7 +60,7 @@ impl PyFixedLegSpec {
 
 #[pymethods]
 impl PyFixedLegSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.__init__")]
     #[new]
     #[pyo3(signature = (discount_curve_id, rate, frequency, day_count, start, end, *,
                         business_day_convention = "modified_following", calendar_id = None,
@@ -108,13 +108,13 @@ payment_lag_days=0, end_of_month=False)"
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -124,25 +124,25 @@ payment_lag_days=0, end_of_month=False)"
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.start")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.start")]
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.end")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.end")]
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end)
@@ -170,36 +170,36 @@ payment_lag_days={}, end_of_month={})",
 }
 
 crate::bindings::macros::py_getters!(PyFixedLegSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.rate")]
     rate -> f64 = s.inner.rate.to_f64().unwrap_or(f64::NAN);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.stub")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.payment_lag_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.payment_lag_days")]
     payment_lag_days -> i32 = s.inner.payment_lag_days;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FixedLegSpec.end_of_month")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.end_of_month")]
     end_of_month -> bool = s.inner.end_of_month;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FloatLegSpec",
@@ -221,7 +221,7 @@ impl PyFloatLegSpec {
 
 #[pymethods]
 impl PyFloatLegSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.__init__")]
     #[new]
     #[pyo3(signature = (discount_curve_id, forward_curve_id, spread_bp, frequency, day_count,
                         start, end, *, business_day_convention = "modified_following", calendar_id = None,
@@ -285,13 +285,13 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -301,31 +301,31 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.start")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.start")]
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.end")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.end")]
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.compounding")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.compounding")]
     #[getter]
     fn compounding<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.compounding)
@@ -368,46 +368,46 @@ reset_lag_days={}, fixing_calendar_id={}, compounding={}, payment_lag_days={}, e
 }
 
 crate::bindings::macros::py_getters!(PyFloatLegSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.forward_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.forward_curve_id")]
     forward_curve_id -> String = s.inner.forward_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.spread_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.spread_bp")]
     spread_bp -> f64 = s.inner.spread_bp.to_f64().unwrap_or(f64::NAN);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.stub")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.reset_lag_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.reset_lag_days")]
     reset_lag_days -> i32 = s.inner.reset_lag_days;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.fixing_calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.fixing_calendar_id")]
     fixing_calendar_id -> Option<String> =
         s.inner.fixing_calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.payment_lag_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.payment_lag_days")]
     payment_lag_days -> i32 = s.inner.payment_lag_days;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FloatLegSpec.end_of_month")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.end_of_month")]
     end_of_month -> bool = s.inner.end_of_month;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "PremiumLegSpec",
@@ -422,7 +422,7 @@ pub struct PyPremiumLegSpec {
 
 #[pymethods]
 impl PyPremiumLegSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.__init__")]
     #[new]
     #[pyo3(signature = (start, end, frequency, day_count, coupon_bp, discount_curve_id, *, roll_rule,
                         stub = None, business_day_convention = "modified_following", calendar_id = None))]
@@ -465,13 +465,13 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -480,25 +480,25 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.start")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.start")]
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.end")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.end")]
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end)
@@ -523,33 +523,33 @@ discount_curve_id={:?}, stub={:?}, business_day_convention={:?}, calendar_id={})
 }
 
 crate::bindings::macros::py_getters!(PyPremiumLegSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.roll_rule")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.roll_rule")]
     roll_rule -> PyRollRule = PyRollRule { inner: s.inner.roll_rule };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.stub")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.coupon_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.coupon_bp")]
     coupon_bp -> f64 = s.inner.coupon_bp.to_f64().unwrap_or(f64::NAN);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PremiumLegSpec.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ProtectionLegSpec",
@@ -564,7 +564,7 @@ pub struct PyProtectionLegSpec {
 
 #[pymethods]
 impl PyProtectionLegSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.__init__")]
     #[new]
     #[pyo3(text_signature = "(credit_curve_id, recovery_rate, settlement_delay)")]
     fn new(credit_curve_id: &str, recovery_rate: f64, settlement_delay: u16) -> PyResult<Self> {
@@ -577,13 +577,13 @@ impl PyProtectionLegSpec {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -594,13 +594,13 @@ impl PyProtectionLegSpec {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
@@ -618,13 +618,13 @@ impl PyProtectionLegSpec {
 }
 
 crate::bindings::macros::py_getters!(PyProtectionLegSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.credit_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.credit_curve_id")]
     credit_curve_id -> String = s.inner.credit_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.recovery_rate")]
     recovery_rate -> f64 = s.inner.recovery_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ProtectionLegSpec.settlement_delay")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.settlement_delay")]
     settlement_delay -> u16 = s.inner.settlement_delay;
 });
 

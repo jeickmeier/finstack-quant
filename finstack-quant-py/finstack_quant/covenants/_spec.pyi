@@ -1,0 +1,1554 @@
+"""Stub declarations mirroring ``finstack-quant-py/src/bindings/covenants/spec.rs``."""
+
+from __future__ import annotations
+
+import datetime
+from finstack_quant.core.dates import Tenor
+from finstack_quant.covenants import DateLike
+
+class CovenantType:
+    """
+    Type of financial or operational covenant with its static threshold.
+
+    Build with the classmethod matching the Rust variant. Ratio covenants take
+    a threshold in turns; ``max_capex`` / ``min_liquidity`` / ``basket`` take
+    reporting-currency amounts; ``custom`` takes a caller-defined metric with
+    a ``"maximum"`` or ``"minimum"`` bound; ``negative`` / ``affirmative``
+    are never tested numerically. Instances compare equal by value and
+    pickle via their JSON form.
+
+    Examples
+    --------
+    >>> from finstack_quant.covenants import CovenantType
+    >>> ct = CovenantType.max_debt_to_ebitda(4.5)
+    >>> ct.covenant_id, ct.threshold, ct.bound_kind
+    ('max_debt_ebitda', 4.5, 'at_most')
+    >>> str(CovenantType.custom("ltv", "maximum", 0.75))
+    'ltv <= 0.75'
+    """
+
+    @staticmethod
+    def max_debt_to_ebitda(threshold: float) -> CovenantType:
+        """
+        Maximum gross Debt/EBITDA covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Maximum allowed ratio in turns (``4.5`` means 4.5x).
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"max_debt_ebitda"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.max_debt_to_ebitda(4.5).threshold
+        4.5
+        """
+
+    @staticmethod
+    def min_interest_coverage(threshold: float) -> CovenantType:
+        """
+        Minimum interest coverage (EBIT / interest) covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Minimum required coverage in turns.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"min_interest_coverage"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.min_interest_coverage(2.0).bound_kind
+        'at_least'
+        """
+
+    @staticmethod
+    def min_fixed_charge_coverage(threshold: float) -> CovenantType:
+        """
+        Minimum fixed-charge coverage covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Minimum required coverage in turns.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"min_fcc"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.min_fixed_charge_coverage(1.1).covenant_id
+        'min_fcc'
+        """
+
+    @staticmethod
+    def max_total_leverage(threshold: float) -> CovenantType:
+        """
+        Maximum total leverage covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Maximum allowed leverage in turns.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"max_total_leverage"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> str(CovenantType.max_total_leverage(7.0))
+        'Total Leverage <= 7.00x'
+        """
+
+    @staticmethod
+    def max_senior_leverage(threshold: float) -> CovenantType:
+        """
+        Maximum senior leverage covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Maximum allowed senior leverage in turns.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"max_senior_leverage"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.max_senior_leverage(4.5).threshold
+        4.5
+        """
+
+    @staticmethod
+    def min_asset_coverage(threshold: float) -> CovenantType:
+        """
+        Minimum asset coverage covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Minimum required coverage in turns.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"min_asset_coverage"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.min_asset_coverage(1.5).covenant_id
+        'min_asset_coverage'
+        """
+
+    @staticmethod
+    def negative(restriction: str) -> CovenantType:
+        """
+        Negative covenant (a prohibition); never tested numerically.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        restriction : str
+            Description of the restriction.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"negative"`` and no threshold.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.negative("No additional liens").threshold is None
+        True
+        """
+
+    @staticmethod
+    def affirmative(requirement: str) -> CovenantType:
+        """
+        Affirmative covenant (a requirement); never tested numerically.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        requirement : str
+            Description of the requirement.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"affirmative"`` and no threshold.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.affirmative("Deliver audited accounts").bound_kind is None
+        True
+        """
+
+    @staticmethod
+    def custom(metric: str, test: str, value: float) -> CovenantType:
+        """
+        Custom covenant testing a caller-defined metric against a bound.
+
+        Parameters
+        ----------
+        metric : str
+            Metric id looked up at evaluation when the spec has no
+            ``metric_id`` of its own.
+        test : str
+            ``"maximum"`` (pass when metric <= ``value``) or ``"minimum"``
+            (pass when metric >= ``value``).
+        value : float
+            Bound in the metric's own units (decimal fraction for rate-style
+            metrics such as LTV).
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"custom"``.
+
+        Raises
+        ------
+        ValueError
+            If ``test`` is neither ``"maximum"`` nor ``"minimum"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.custom("ltv", "maximum", 0.75).bound_kind
+        'at_most'
+        """
+
+    @staticmethod
+    def basket(name: str, limit: float) -> CovenantType:
+        """
+        Basket covenant: utilization must stay at or below the limit.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        name : str
+            Basket identifier, also the default metric id.
+        limit : float
+            Maximum utilization as a reporting-currency amount.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"basket"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.basket("general_debt_basket", 25_000_000.0).threshold
+        25000000.0
+        """
+
+    @staticmethod
+    def min_dscr(threshold: float) -> CovenantType:
+        """
+        Minimum debt service coverage ratio (EBITDA / debt service) covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Minimum required coverage in turns.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"min_dscr"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> str(CovenantType.min_dscr(1.25))
+        'DSCR >= 1.25x'
+        """
+
+    @staticmethod
+    def max_net_debt_to_ebitda(threshold: float) -> CovenantType:
+        """
+        Maximum net Debt/EBITDA (net of cash) covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Maximum allowed ratio in turns.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"max_net_debt_ebitda"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.max_net_debt_to_ebitda(4.0).covenant_id
+        'max_net_debt_ebitda'
+        """
+
+    @staticmethod
+    def max_capex(threshold: float) -> CovenantType:
+        """
+        Maximum capital expenditure covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Maximum capex as a reporting-currency amount.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"max_capex"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.max_capex(50_000_000.0).bound_kind
+        'at_most'
+        """
+
+    @staticmethod
+    def min_liquidity(threshold: float) -> CovenantType:
+        """
+        Minimum liquidity (cash plus available revolver) covenant.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        threshold : float
+            Minimum liquidity as a reporting-currency amount.
+
+        Returns
+        -------
+        CovenantType
+            Covenant type with ``covenant_id`` ``"min_liquidity"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.min_liquidity(10_000_000.0).bound_kind
+        'at_least'
+        """
+
+    @staticmethod
+    def from_json(json: str) -> CovenantType:
+        """
+        Deserialize from the externally-tagged JSON form.
+
+        Parameters
+        ----------
+        json : str
+            JSON such as ``{"max_debt_to_ebitda": {"threshold": 4.5}}``.
+
+        Returns
+        -------
+        CovenantType
+            Parsed covenant type.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or names an unknown variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantType
+        >>> CovenantType.from_json('{"min_dscr": {"threshold": 1.2}}').threshold
+        1.2
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Externally-tagged JSON, e.g. ``{"max_debt_to_ebitda":{"threshold":4.5}}``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+
+    @property
+    def covenant_id(self) -> str:
+        """
+        Stable variant identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            ``"max_debt_ebitda"``, ``"min_interest_coverage"``, ``"min_fcc"``,
+            ``"max_total_leverage"``, ``"max_senior_leverage"``,
+            ``"min_asset_coverage"``, ``"min_dscr"``, ``"max_net_debt_ebitda"``,
+            ``"max_capex"``, ``"min_liquidity"``, ``"negative"``,
+            ``"affirmative"``, ``"custom"`` or ``"basket"``. Thresholds are not
+            part of it.
+        """
+
+    @property
+    def threshold(self) -> float | None:
+        """
+        Static threshold or limit.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | None
+            ``None`` for negative / affirmative covenants.
+        """
+
+    @property
+    def bound_kind(self) -> str | None:
+        """
+        Inequality direction of the numeric test.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            ``"at_most"``, ``"at_least"``, or ``None`` for non-numeric covenants.
+        """
+
+    @property
+    def description(self) -> str:
+        """
+        Human-readable description.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            For example ``"Debt/EBITDA <= 4.50x"``.
+        """
+
+    def __eq__(self, other: object) -> bool: ...
+    def __str__(self) -> str: ...
+
+class CovenantConsequence:
+    """
+    Consequence applied when a covenant breach is not cured in time.
+
+    Build with the classmethod matching the Rust variant. Instances compare
+    equal by value and pickle via JSON.
+
+    Examples
+    --------
+    >>> from finstack_quant.covenants import CovenantConsequence
+    >>> CovenantConsequence.rate_increase(200.0).kind
+    'rate_increase'
+    >>> CovenantConsequence.default() == CovenantConsequence.from_json('"default"')
+    True
+    """
+
+    @staticmethod
+    def default() -> CovenantConsequence:
+        """
+        Event of default.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Returns
+        -------
+        CovenantConsequence
+            Consequence with ``kind`` ``"default"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantConsequence
+        >>> CovenantConsequence.default().kind
+        'default'
+        """
+
+    @staticmethod
+    def rate_increase(bp_increase: float) -> CovenantConsequence:
+        """
+        Interest margin step-up.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        bp_increase : float
+            Margin increase in basis points (``200.0`` is 2.00%).
+
+        Returns
+        -------
+        CovenantConsequence
+            Consequence with ``kind`` ``"rate_increase"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantConsequence
+        >>> CovenantConsequence.rate_increase(200.0).to_json()
+        '{"rate_increase":{"bp_increase":200.0}}'
+        """
+
+    @staticmethod
+    def cash_sweep(sweep_percentage: float) -> CovenantConsequence:
+        """
+        Mandatory sweep of excess cash flow.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        sweep_percentage : float
+            Share of excess cash swept as a decimal fraction (``1.0`` is 100%).
+
+        Returns
+        -------
+        CovenantConsequence
+            Consequence with ``kind`` ``"cash_sweep"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantConsequence
+        >>> CovenantConsequence.cash_sweep(0.5).kind
+        'cash_sweep'
+        """
+
+    @staticmethod
+    def block_distributions() -> CovenantConsequence:
+        """
+        Block distributions to equity holders.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Returns
+        -------
+        CovenantConsequence
+            Consequence with ``kind`` ``"block_distributions"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantConsequence
+        >>> CovenantConsequence.block_distributions().kind
+        'block_distributions'
+        """
+
+    @staticmethod
+    def require_collateral(description: str) -> CovenantConsequence:
+        """
+        Require additional collateral.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        description : str
+            Description of the collateral requirement.
+
+        Returns
+        -------
+        CovenantConsequence
+            Consequence with ``kind`` ``"require_collateral"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantConsequence
+        >>> CovenantConsequence.require_collateral("Pledge receivables").kind
+        'require_collateral'
+        """
+
+    @staticmethod
+    def accelerate_maturity(new_maturity: DateLike) -> CovenantConsequence:
+        """
+        Accelerate the loan maturity.
+
+        Parameters
+        ----------
+        new_maturity : datetime.date | str
+            New maturity date (``datetime.date``, ``pandas.Timestamp`` or ISO
+            ``YYYY-MM-DD`` string).
+
+        Returns
+        -------
+        CovenantConsequence
+            Consequence with ``kind`` ``"accelerate_maturity"``.
+
+        Raises
+        ------
+        ValueError
+            If the date string is not valid ISO 8601.
+        TypeError
+            If ``new_maturity`` is neither a string nor date-like.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantConsequence
+        >>> CovenantConsequence.accelerate_maturity("2027-12-31").kind
+        'accelerate_maturity'
+        """
+
+    @staticmethod
+    def from_json(json: str) -> CovenantConsequence:
+        """
+        Deserialize from JSON.
+
+        Parameters
+        ----------
+        json : str
+            ``"default"``, ``"block_distributions"`` or an externally-tagged
+            object such as ``{"rate_increase": {"bp_increase": 200.0}}``.
+
+        Returns
+        -------
+        CovenantConsequence
+            Parsed consequence.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantConsequence
+        >>> CovenantConsequence.from_json('{"cash_sweep": {"sweep_percentage": 1.0}}').kind
+        'cash_sweep'
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            JSON string in the externally-tagged serde form.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+
+    @property
+    def kind(self) -> str:
+        """
+        Consequence variant name in snake_case.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            ``"default"``, ``"rate_increase"``, ``"cash_sweep"``,
+            ``"block_distributions"``, ``"require_collateral"`` or
+            ``"accelerate_maturity"``.
+        """
+
+    def __eq__(self, other: object) -> bool: ...
+
+class SpringingCondition:
+    """
+    Activation condition for a springing covenant.
+
+    The covenant is tested only while ``metric_id`` satisfies the condition
+    on the test date; otherwise it reports a pass with an explanatory
+    ``details``. The activation metric must be present in the metrics passed
+    to ``evaluate``.
+
+    Examples
+    --------
+    >>> from finstack_quant.covenants import SpringingCondition
+    >>> cond = SpringingCondition("revolver_utilization", "minimum", 0.30)
+    >>> cond.metric_id, cond.test, cond.value
+    ('revolver_utilization', 'minimum', 0.3)
+    """
+
+    def __init__(self, metric_id: str, test: str, value: float) -> None:
+        """
+        Create a springing condition.
+
+        Parameters
+        ----------
+        metric_id : str
+            Metric that controls activation (for example revolver utilization).
+        test : str
+            ``"minimum"`` (active when metric >= ``value``) or ``"maximum"``
+            (active when metric <= ``value``).
+        value : float
+            Activation bound in the metric's own units.
+
+        Raises
+        ------
+        ValueError
+            If ``test`` is neither ``"maximum"`` nor ``"minimum"``.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> SpringingCondition:
+        """
+        Deserialize from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON such as ``{"metric_id": "revolver_utilization", "test": {"minimum": 0.3}}``.
+
+        Returns
+        -------
+        SpringingCondition
+            Parsed condition.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import SpringingCondition
+        >>> SpringingCondition.from_json('{"metric_id": "u", "test": {"maximum": 0.5}}').test
+        'maximum'
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            JSON string.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+
+    @property
+    def metric_id(self) -> str:
+        """
+        Activation metric id.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Metric key looked up in the evaluation metrics.
+        """
+
+    @property
+    def test(self) -> str:
+        """
+        Direction the activation metric is tested in.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            ``"maximum"`` or ``"minimum"``.
+        """
+
+    @property
+    def value(self) -> float:
+        """
+        Activation bound.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Bound compared against the activation metric.
+        """
+
+    def __eq__(self, other: object) -> bool: ...
+
+class Covenant:
+    """
+    Financial covenant with test frequency, cure period, consequences, scope
+    and optional springing condition.
+
+    ``label`` is the covenant's identity: reports, breaches and waivers key
+    off it, so two covenants of the same type must carry distinct labels.
+    Defaults: 30-day cure period, no consequences, active, maintenance scope,
+    no springing condition. The ``with_*`` methods return modified copies.
+
+    Examples
+    --------
+    >>> from finstack_quant.covenants import Covenant, CovenantConsequence, CovenantType
+    >>> cov = (
+    ...     Covenant(CovenantType.max_debt_to_ebitda(4.5), "3M", "max_total_leverage")
+    ...     .with_cure_period(60)
+    ...     .with_consequence(CovenantConsequence.rate_increase(200.0))
+    ...     .with_scope("maintenance")
+    ... )
+    >>> cov.label, cov.cure_period_days, str(cov.test_frequency), cov.scope
+    ('max_total_leverage', 60, '3M', 'maintenance')
+    >>> [c.kind for c in cov.consequences]
+    ['rate_increase']
+    """
+
+    def __init__(self, covenant_type: CovenantType, test_frequency: Tenor | str, label: str) -> None:
+        """
+        Create a covenant.
+
+        Parameters
+        ----------
+        covenant_type : CovenantType
+            Covenant type carrying the static threshold.
+        test_frequency : Tenor | str
+            Descriptive test frequency, a ``Tenor`` or tenor string such as
+            ``"3M"`` / ``"1Y"``; the engine does not enforce it.
+        label : str
+            Instance label used as the report / breach / waiver key.
+
+        Raises
+        ------
+        ValueError
+            If the tenor string cannot be parsed.
+        TypeError
+            If ``test_frequency`` is neither a ``Tenor`` nor a string.
+        """
+
+    def with_cure_period(self, days: int | None) -> Covenant:
+        """
+        Return a copy with a different cure period.
+
+        This method builds a value in memory and does not raise.
+
+        Parameters
+        ----------
+        days : int | None
+            Cure period in days; ``None`` removes it so a breach is
+            immediate. Negative values fail engine validation.
+
+        Returns
+        -------
+        Covenant
+            Modified copy.
+        """
+
+    def with_consequence(self, consequence: CovenantConsequence) -> Covenant:
+        """
+        Return a copy with ``consequence`` appended.
+
+        This method builds a value in memory and does not raise.
+
+        Parameters
+        ----------
+        consequence : CovenantConsequence
+            Consequence applied after an uncured breach.
+
+        Returns
+        -------
+        Covenant
+            Modified copy.
+        """
+
+    def with_scope(self, scope: str) -> Covenant:
+        """
+        Return a copy with a different scope.
+
+        Parameters
+        ----------
+        scope : str
+            ``"maintenance"`` (tested on a schedule) or ``"incurrence"``
+            (tested on specific actions).
+
+        Returns
+        -------
+        Covenant
+            Modified copy.
+
+        Raises
+        ------
+        ValueError
+            If ``scope`` is any other string.
+        """
+
+    def with_springing_condition(self, condition: SpringingCondition) -> Covenant:
+        """
+        Return a copy that is active only while ``condition`` is met.
+
+        This method builds a value in memory and does not raise.
+
+        Parameters
+        ----------
+        condition : SpringingCondition
+            Activation condition.
+
+        Returns
+        -------
+        Covenant
+            Modified copy.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> Covenant:
+        """
+        Deserialize from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON matching the ``Covenant`` wire schema (``test_frequency`` is
+            ``{"count": 3, "unit": "months"}``; unknown fields are rejected).
+
+        Returns
+        -------
+        Covenant
+            Parsed covenant.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import Covenant, CovenantType
+        >>> cov = Covenant(CovenantType.min_dscr(1.2), "3M", "min_dscr")
+        >>> Covenant.from_json(cov.to_json()) == cov
+        True
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            JSON string.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+
+    @property
+    def covenant_type(self) -> CovenantType:
+        """
+        Covenant type and static threshold.
+
+        This property does not raise.
+
+        Returns
+        -------
+        CovenantType
+            The covenant type.
+        """
+
+    @property
+    def test_frequency(self) -> Tenor:
+        """
+        Descriptive test frequency.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Tenor
+            Tenor such as ``3M``; metadata only.
+        """
+
+    @property
+    def cure_period_days(self) -> int | None:
+        """
+        Cure period in days.
+
+        This property does not raise.
+
+        Returns
+        -------
+        int | None
+            ``None`` when a breach is immediate.
+        """
+
+    @property
+    def consequences(self) -> list[CovenantConsequence]:
+        """
+        Consequences applied after an uncured breach.
+
+        This property does not raise.
+
+        Returns
+        -------
+        list[CovenantConsequence]
+            In the order they were added.
+        """
+
+    @property
+    def is_active(self) -> bool:
+        """
+        Whether the covenant is active.
+
+        This property does not raise.
+
+        Returns
+        -------
+        bool
+            Inactive covenants report a pass with ``details`` ``"Covenant inactive"``.
+        """
+
+    @property
+    def scope(self) -> str:
+        """
+        When the covenant is tested during the facility's life.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            ``"maintenance"`` or ``"incurrence"``.
+        """
+
+    @property
+    def springing_condition(self) -> SpringingCondition | None:
+        """
+        Activation condition.
+
+        This property does not raise.
+
+        Returns
+        -------
+        SpringingCondition | None
+            ``None`` for an always-on covenant.
+        """
+
+    @property
+    def label(self) -> str:
+        """
+        Label this covenant is keyed by in reports and breaches.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Key under which reports and breaches are returned.
+        """
+
+    @property
+    def description(self) -> str:
+        """
+        Human-readable description of the covenant type.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            For example ``"Debt/EBITDA <= 4.50x"``.
+        """
+
+    def __eq__(self, other: object) -> bool: ...
+
+class ThresholdSchedule:
+    """
+    Piecewise-constant threshold step-down schedule.
+
+    Attached to a :class:`CovenantSpec` it overrides the static threshold:
+    the threshold in force on a test date is the last entry whose effective
+    date is on or before it, and before the first effective date the static
+    threshold applies.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.covenants import ThresholdSchedule
+    >>> schedule = ThresholdSchedule([("2026-01-01", 6.5), (datetime.date(2027, 1, 1), 6.0)])
+    >>> schedule.threshold_for("2026-06-30"), schedule.threshold_for("2025-12-31")
+    (6.5, None)
+    >>> len(schedule)
+    2
+    """
+
+    def __init__(self, entries: list[tuple[DateLike, float]]) -> None:
+        """
+        Create a schedule.
+
+        Parameters
+        ----------
+        entries : list[tuple[datetime.date | str, float]]
+            ``(effective_date, threshold)`` pairs in any order; thresholds in
+            the covenant's units (turns for ratios).
+
+        Raises
+        ------
+        ValueError
+            If a threshold is NaN / infinite, two entries share a date, or a
+            date string is not ISO 8601.
+        TypeError
+            If a date is neither a string nor date-like.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> ThresholdSchedule:
+        """
+        Deserialize from the JSON array form.
+
+        Parameters
+        ----------
+        json : str
+            JSON such as ``[["2026-01-01", 6.5], ["2027-01-01", 6.0]]``.
+
+        Returns
+        -------
+        ThresholdSchedule
+            Parsed schedule.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import ThresholdSchedule
+        >>> ThresholdSchedule.from_json('[["2026-01-01", 6.5]]').entries[0][1]
+        6.5
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            JSON array of ``[date, threshold]`` pairs.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+
+    def threshold_for(self, test_date: DateLike) -> float | None:
+        """
+        Threshold in force on a date.
+
+        Parameters
+        ----------
+        test_date : datetime.date | str
+            Covenant test date.
+
+        Returns
+        -------
+        float | None
+            Last threshold effective on or before ``test_date``, or ``None``
+            before the first effective date.
+
+        Raises
+        ------
+        ValueError
+            If a date string is not ISO 8601.
+        """
+
+    @property
+    def entries(self) -> list[tuple[datetime.date, float]]:
+        """
+        Schedule entries.
+
+        This property does not raise.
+
+        Returns
+        -------
+        list[tuple[datetime.date, float]]
+            ``(effective_date, threshold)`` pairs in ascending date order.
+        """
+
+    def __len__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+
+class CovenantWaiver:
+    """
+    Lender waiver or amendment for one covenant instance.
+
+    A waiver without ``amended_threshold`` suppresses the test (the report
+    passes with ``details`` ``"Waived by lender agreement"``); with a
+    threshold it is an amendment and the covenant is tested against the
+    amended value instead. ``expiry_date=None`` makes it permanent.
+
+    Examples
+    --------
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantWaiver, lbo_standard
+    >>> engine = CovenantEngine.from_specs(lbo_standard(4.5, 2.0, 1.1, 50.0))
+    >>> waiver = CovenantWaiver("max_debt_ebitda", "2026-01-01", "2026-12-31", amended_threshold=6.0)
+    >>> _ = engine.add_waiver(waiver)
+    >>> metrics = {"debt_to_ebitda": 5.0, "interest_coverage": 3.0, "fixed_charge_coverage": 1.5, "capex": 10.0}
+    >>> engine.evaluate(metrics, "2026-03-31")["max_debt_ebitda"].threshold
+    6.0
+    >>> engine.evaluate(metrics, "2027-03-31")["max_debt_ebitda"].passed
+    False
+    """
+
+    def __init__(
+        self,
+        covenant_id: str,
+        effective_date: DateLike,
+        expiry_date: DateLike | None = None,
+        amended_threshold: float | None = None,
+        description: str = "",
+    ) -> None:
+        """
+        Create a waiver.
+
+        Parameters
+        ----------
+        covenant_id : str
+            ``Covenant.label`` of the waived covenant.
+        effective_date : datetime.date | str
+            First date the waiver applies.
+        expiry_date : datetime.date | str | None
+            Last date the waiver applies; ``None`` for a permanent amendment.
+        amended_threshold : float | None
+            Amended threshold in the covenant's units; ``None`` for a full
+            waiver.
+        description : str
+            Free-text description of the waiver terms.
+
+        Raises
+        ------
+        ValueError
+            If a date string is not ISO 8601.
+        TypeError
+            If a date is neither a string nor date-like.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> CovenantWaiver:
+        """
+        Deserialize from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON matching the ``CovenantWaiver`` wire schema.
+
+        Returns
+        -------
+        CovenantWaiver
+            Parsed waiver.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantWaiver
+        >>> w = CovenantWaiver("max_debt_ebitda", "2026-01-01")
+        >>> CovenantWaiver.from_json(w.to_json()).expiry_date is None
+        True
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            JSON string.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+
+    @property
+    def covenant_id(self) -> str:
+        """
+        Label of the waived covenant.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Matches ``Covenant.label``.
+        """
+
+    @property
+    def effective_date(self) -> datetime.date:
+        """
+        First date the waiver applies.
+
+        This property does not raise.
+
+        Returns
+        -------
+        datetime.date
+            Effective date.
+        """
+
+    @property
+    def expiry_date(self) -> datetime.date | None:
+        """
+        Last date the waiver applies.
+
+        This property does not raise.
+
+        Returns
+        -------
+        datetime.date | None
+            ``None`` for a permanent amendment.
+        """
+
+    @property
+    def amended_threshold(self) -> float | None:
+        """
+        Amended threshold.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | None
+            ``None`` for a full waiver.
+        """
+
+    @property
+    def description(self) -> str:
+        """
+        Free-text description of the negotiated waiver terms.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Free text, possibly empty.
+        """
+
+    def __eq__(self, other: object) -> bool: ...
+
+class CovenantSpec:
+    """
+    A covenant paired with the metric it is tested against and an optional
+    step-down schedule.
+
+    Examples
+    --------
+    >>> from finstack_quant.covenants import Covenant, CovenantEngine, CovenantSpec, CovenantType, ThresholdSchedule
+    >>> cov = Covenant(CovenantType.max_debt_to_ebitda(7.0), "3M", "max_leverage")
+    >>> spec = CovenantSpec(cov, "debt_to_ebitda").with_threshold_schedule(
+    ...     ThresholdSchedule([("2026-01-01", 6.5), ("2027-01-01", 6.0)])
+    ... )
+    >>> engine = CovenantEngine.from_specs([spec])
+    >>> engine.evaluate({"debt_to_ebitda": 6.2}, "2025-12-31")["max_leverage"].threshold
+    7.0
+    >>> engine.evaluate({"debt_to_ebitda": 6.2}, "2026-03-31")["max_leverage"].threshold
+    6.5
+    >>> engine.evaluate({"debt_to_ebitda": 6.2}, "2027-03-31")["max_leverage"].passed
+    False
+    """
+
+    def __init__(self, covenant: Covenant, metric_id: str | None = None) -> None:
+        """
+        Pair a covenant with its metric; net debt/EBITDA also selects ``ebitda``
+        as its required earnings denominator.
+
+        Inputs are stored verbatim, so this constructor does not raise.
+
+        Parameters
+        ----------
+        covenant : Covenant
+            Covenant to evaluate.
+        metric_id : str | None
+            Key looked up in the evaluation metrics. ``None`` falls back to the
+            covenant type's conventional metric (``debt_to_ebitda``,
+            ``interest_coverage``, ``fixed_charge_coverage``,
+            ``total_leverage``, ``senior_leverage``, ``asset_coverage``,
+            ``dscr``, ``net_debt_to_ebitda``, ``capex``, ``liquidity``) or to
+            the ``metric`` / ``name`` of a custom or basket covenant.
+        """
+
+    def with_denominator_metric(self, metric_id: str) -> CovenantSpec:
+        """Return a copy using the named earnings denominator for a leverage test.
+
+        This method stores the identifier and does not raise.
+
+        Parameters
+        ----------
+        metric_id : str
+            Finite earnings metric for the same reporting period as the ratio.
+            Net-debt constructors default to ``ebitda``. Non-positive earnings
+            produce a breach with no meaningful ratio or headroom.
+
+        Returns
+        -------
+        CovenantSpec
+            Copy with the selected denominator metric.
+        """
+
+    @property
+    def denominator_metric_id(self) -> str | None:
+        """Earnings metric used to distinguish net cash from non-positive earnings.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Selected denominator, or ``None`` when no separate denominator is used.
+        """
+
+    def with_threshold_schedule(self, schedule: ThresholdSchedule) -> CovenantSpec:
+        """
+        Return a copy whose threshold follows a step-down schedule.
+
+        This method builds a value in memory and does not raise.
+
+        Parameters
+        ----------
+        schedule : ThresholdSchedule
+            Effective-dated thresholds overriding the static one.
+
+        Returns
+        -------
+        CovenantSpec
+            Modified copy.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> CovenantSpec:
+        """
+        Deserialize from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON matching the ``CovenantSpec`` wire schema, for example one
+            element of ``lbo_standard_json(...)``.
+
+        Returns
+        -------
+        CovenantSpec
+            Parsed spec.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> import json
+        >>> from finstack_quant.covenants import CovenantSpec, lbo_standard_json
+        >>> raw = json.loads(lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0))[0]
+        >>> CovenantSpec.from_json(json.dumps(raw)).metric_id
+        'debt_to_ebitda'
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            JSON string accepted by ``validate_covenant_spec_json``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+
+    @property
+    def covenant(self) -> Covenant:
+        """
+        The covenant being evaluated.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Covenant
+            Covenant definition.
+        """
+
+    @property
+    def metric_id(self) -> str | None:
+        """
+        Metric key looked up at evaluation.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            ``None`` when the covenant type's conventional metric is used.
+        """
+
+    @property
+    def threshold_schedule(self) -> ThresholdSchedule | None:
+        """
+        Step-down schedule.
+
+        This property does not raise.
+
+        Returns
+        -------
+        ThresholdSchedule | None
+            ``None`` when the static threshold applies.
+        """
+
+    def __eq__(self, other: object) -> bool: ...
