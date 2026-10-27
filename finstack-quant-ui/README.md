@@ -186,13 +186,65 @@ Install `@finstack/finstack-theme`, then import `styles/finstack/theme.css` afte
 Tailwind. Set `data-theme="light"` or `"dark"` and `data-density="compact"` or
 `"comfortable"` on the application root. Compact is the default. UI, table and
 chart wrappers share these properties; numeric text uses `finstack-numeric`.
-Tenant CSS loads after the theme and overrides the same variables.
 
 The single token source includes the Fontsource package versions, selected faces
 and SIL OFL-1.1 licences. `npm run generate` emits CSS and registry metadata; `ui-check`
-checks drift, literal colours/fonts and contrast, including the tenant example.
-`node finstack-quant-ui/tests/browser/theme.mjs` builds and statically serves an installed theme
-fixture, checking actual font loading and the theme/density switches.
+checks drift, literal colours/fonts and contrast, including the brand example
+and the tenant example.
+
+### Branding
+
+Every colour, font family and chart palette the registry renders is a CSS
+variable declared from `registry/theme/finstack-theme/tokens.json`, and so are
+the type scale, spacing, radius and density that the Tailwind utilities and the
+component rules use. Components use the semantic utilities mapped to those
+variables; `check-tokens` rejects literal colours and fonts in `src/` and
+`registry/`, and the theme test proves every colour literal in the generated
+stylesheet other than `transparent` is a token value. A few fixed label sizes
+remain in component rules, and the stock controls take their shadows from
+Tailwind's translucent black. The native chart tooltip, crosshair and focus
+overlays read the same variables through the chart library's hooks. The
+registry ships no logo or wordmark (`PricingWorkbench` renders one only
+through its `brand` prop), so a brand is the token set. Two paths apply one:
+
+- **Brand file, for a complete rebrand.** Write a JSON file with the sections of
+  the token file (`theme`, `light`, `dark`, `density`, `fonts`, plus an
+  optional `name` label) listing only the keys you change;
+  `registry/theme/finstack-theme/brand.example.json` is a worked example. After
+  `mise run ui-sync`, run `mise run ui-brand -- <brand.json> <out.css>` from any
+  directory in this repository (paths are relative to where you run it), or
+  `node finstack-quant-ui/scripts/gen-theme.mjs --brand <brand.json> --out <out.css>`
+  from the repository root. The generator merges the file over the defaults,
+  rejects unknown sections, unknown keys and palette keys set in only one mode,
+  runs the same contrast rules as the default theme (`checkContrast` and
+  `checkStockContrast` in `scripts/check-tokens.mjs`), and writes a complete
+  stylesheet to install in the application in place of
+  `styles/finstack/theme.css`; Tailwind utilities, component rules, chart
+  palettes, tooltips and printed reports all follow. The brand file is the
+  durable source: re-adding `finstack-theme` overwrites the installed
+  stylesheet, so regenerate it after every re-add. A `fonts` list replaces the
+  Fontsource imports: each entry needs `package`, `version`, `family`,
+  `faces` and `license`, the application must install every listed
+  `package@version` (the generator prints the list), and a non-empty list must
+  still supply each family that `theme.font-sans` and `theme.font-mono` name.
+  An empty list means the application loads its own fonts and sets both theme
+  fonts.
+- **Runtime overrides, for tweaks.** A stylesheet loaded after `theme.css` may
+  redeclare any variable on `:root, [data-theme="light"]` and
+  `[data-theme="dark"]` (`tests/shared/fixtures/tenant.css`). Declare light
+  values on `[data-theme="light"]`, not only `:root`, because the printed
+  report region switches to the light theme. Runtime overrides are not
+  contrast-checked; prefer a brand file when more than a few keys change.
+
+Popups and chart tooltips render in a portal, so they follow a section-scoped
+`data-theme` only through the `finstack-surface` item, which the registry
+primitives stamp on their portaled content; a theme set on the application
+root needs nothing more. The theme item ships no `cssVars`, so the shadcn CLI
+writes no token block into the application stylesheet that could override a
+brand. Known limit: inside a dark application, Tailwind `dark:` variants from
+the dark ancestor still apply within the printed report region after it
+switches to `data-theme="light"`; the palette variables are re-declared there,
+so colours stay the light tokens.
 
 ## Display formatting
 

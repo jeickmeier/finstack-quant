@@ -21,6 +21,7 @@ function WorkbenchRoute() {
       <FinstackQueryProvider>
         <PricingWorkbench
           defaultRequest={data.bond.request}
+          brand="finstack"
           key={type ?? "default"}
           surfaceOptions={() => ({ colorDomain: [0, 1] })}
           cubeOptions={() => ({

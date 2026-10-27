@@ -1,0 +1,20 @@
+{
+  "name": "example-brand",
+  "theme": {
+    "radius": "0.5rem"
+  },
+  "light": {
+    "primary": "#5146a5",
+    "primary-foreground": "#ffffff",
+    "ring": "#5146a5",
+    "accent": "#e6e3f5",
+    "chart-1": "#5146a5"
+  },
+  "dark": {
+    "primary": "#b7acf2",
+    "primary-foreground": "#181526",
+    "ring": "#b7acf2",
+    "accent": "#2f2a4a",
+    "chart-1": "#9d90e8"
+  }
+}

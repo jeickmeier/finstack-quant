@@ -53,7 +53,9 @@ Version 0.2.0 composes unmodified shadcn Base UI `base-nova` controls. Remove
 selectors that depend on the previous custom control internals. Keep the stock
 controls unchanged; compose them into application components and use theme
 variables for presentation. Re-add related items together so shared hooks,
-contracts and theme files remain consistent.
+contracts and theme files remain consistent. Re-adding `finstack-theme`
+overwrites a brand-generated `theme.css`; regenerate it from the brand file
+afterwards ([Theming and branding](/docs/registry/theming)).
 
 A valuation-version warning indicates that the returned native version differs
 from the version compiled into the installed hooks. Align the native package and

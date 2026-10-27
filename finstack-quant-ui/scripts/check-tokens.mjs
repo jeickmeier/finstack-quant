@@ -119,6 +119,117 @@ export function checkLiterals(source, name) {
     visit(ast);
   }
 }
+/** Keys a brand file may set, each with the same shape as tokens.json. */
+const brandSections = new Set(["theme", "light", "dark", "density", "fonts"]);
+const fontFields = ["package", "version", "family", "faces", "license"];
+const isPlainObject = (value) =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
+function brandFont(font) {
+  if (!isPlainObject(font))
+    throw new Error("Each brand font must be an object");
+  for (const key of Object.keys(font))
+    if (!fontFields.includes(key))
+      throw new Error(`Unknown brand font field: ${key}`);
+  for (const field of fontFields) {
+    if (!Object.hasOwn(font, field))
+      throw new Error(`Brand font is missing ${field}`);
+    const value = font[field];
+    if (field === "faces") {
+      if (
+        !Array.isArray(value) ||
+        value.length === 0 ||
+        value.some((face) => typeof face !== "string" || face.trim() === "")
+      )
+        throw new Error(
+          "Brand font faces must be a non-empty list of stylesheet names",
+        );
+    } else if (typeof value !== "string" || value.trim() === "")
+      throw new Error(`Brand font ${field} must be a non-empty string`);
+  }
+  return structuredClone(font);
+}
+
+/**
+ * Merge a brand file over the default tokens. Only existing keys may be set;
+ * `fonts` replaces the Fontsource list (an empty list means the host supplies
+ * its fonts) and a non-empty list must still supply every family the theme
+ * fonts name; a palette key set in one mode must be set in the other so a
+ * brand cannot ship a half-themed dark mode.
+ */
+export function mergeBrand(tokens, brand) {
+  if (!isPlainObject(brand))
+    throw new Error("A brand file must hold a JSON object");
+  if (Object.hasOwn(brand, "name") && typeof brand.name !== "string")
+    throw new Error("Brand name must be a string");
+  const merged = structuredClone(tokens);
+  for (const section of Object.keys(brand)) {
+    if (section === "name") continue;
+    if (!brandSections.has(section))
+      throw new Error(`Unknown brand section: ${section}`);
+    const values = brand[section];
+    if (section === "fonts") {
+      if (!Array.isArray(values))
+        throw new Error("Brand fonts must be an array of Fontsource entries");
+      merged.fonts = values.map(brandFont);
+      continue;
+    }
+    if (!isPlainObject(values))
+      throw new Error(`Brand ${section} must be an object`);
+    const scopes =
+      section === "density"
+        ? Object.keys(values).map((mode) => [
+            `density.${mode}`,
+            Object.hasOwn(merged.density, mode) ? merged.density[mode] : null,
+            values[mode],
+          ])
+        : [[section, merged[section], values]];
+    for (const [label, target, entries] of scopes) {
+      if (!isPlainObject(target))
+        throw new Error(`Unknown brand section: ${label}`);
+      if (!isPlainObject(entries))
+        throw new Error(`Brand ${label} must be an object`);
+      for (const key of Object.keys(entries)) {
+        if (!Object.hasOwn(target, key))
+          throw new Error(`Unknown ${label} token: ${key}`);
+        const value = entries[key];
+        if (typeof value !== "string" || value.trim() === "")
+          throw new Error(`Brand ${label}.${key} must be a non-empty string`);
+        target[key] = value;
+      }
+    }
+  }
+  const light = Object.keys(brand.light ?? {}).sort(byCodeUnit);
+  const dark = Object.keys(brand.dark ?? {}).sort(byCodeUnit);
+  if (light.join() !== dark.join())
+    throw new Error(
+      "Brand palette keys must be set in both light and dark modes",
+    );
+  if (merged.fonts.length) {
+    const supplied = new Set(merged.fonts.map((font) => font.family));
+    for (const { family } of tokens.fonts)
+      if (!supplied.has(family))
+        for (const key of ["font-sans", "font-mono"])
+          if (merged.theme[key].includes(family))
+            throw new Error(
+              `Brand fonts no longer supply "${family}", which theme.${key} names; add its package or set theme.${key}`,
+            );
+  }
+  return merged;
+}
+
+/** Key parity plus the contrast rules every shipped palette must meet. */
+export function validateTokens(tokens) {
+  if (
+    Object.keys(tokens.light).sort(byCodeUnit).join() !==
+    Object.keys(tokens.dark).sort(byCodeUnit).join()
+  )
+    throw new Error("Light/dark token keys differ");
+  for (const mode of ["light", "dark"]) {
+    checkContrast(tokens[mode]);
+    checkStockContrast(tokens[mode], mode);
+  }
+}
 export function tenantPalettes(tokens, css) {
   const palettes = { light: { ...tokens.light }, dark: { ...tokens.dark } };
   postcss.parse(css).walkRules((rule) => {
@@ -144,15 +255,18 @@ export async function checkTokens(root) {
       "utf8",
     ),
   );
-  if (
-    Object.keys(tokens.light).sort(byCodeUnit).join() !==
-    Object.keys(tokens.dark).sort(byCodeUnit).join()
-  )
-    throw new Error("Light/dark token keys differ");
-  for (const mode of ["light", "dark"]) {
-    checkContrast(tokens[mode]);
-    checkStockContrast(tokens[mode], mode);
-  }
+  validateTokens(tokens);
+  validateTokens(
+    mergeBrand(
+      tokens,
+      JSON.parse(
+        await readFile(
+          path.join(root, "registry/theme/finstack-theme/brand.example.json"),
+          "utf8",
+        ),
+      ),
+    ),
+  );
   const tenant = tenantPalettes(
     tokens,
     await readFile(path.join(root, "tests/shared/fixtures/tenant.css"), "utf8"),
@@ -184,5 +298,7 @@ if (
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   await checkTokens(fileURLToPath(new URL("../", import.meta.url)));
-  console.log("Checked theme, tenant contrast and source token usage.");
+  console.log(
+    "Checked theme, brand example, tenant contrast and source token usage.",
+  );
 }

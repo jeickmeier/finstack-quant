@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { InstrumentForm } from "@/components/finstack/valuations/components/instrument-form/instrument-form";
@@ -47,6 +48,7 @@ export function PricingWorkbench({
   fxOptions,
   calibrationChartOptions,
   scenario,
+  brand,
 }: {
   /** Complete initial instrument request and canonical market snapshot. Remount to load another document. */
   defaultRequest: PriceRequest;
@@ -81,6 +83,8 @@ export function PricingWorkbench({
     CalibrationFitChartProps,
     "stepId" | "report" | "marketData" | "link"
   >;
+  /** Wordmark or logo for the workbench bar; the registry ships none. */
+  brand?: ReactNode;
 }) {
   const {
     initial,
@@ -203,7 +207,9 @@ export function PricingWorkbench({
             className="finstack-workbench font-sans text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           >
             <header className="finstack-workbench__bar print:hidden">
-              <h2 className="finstack-workbench__brand">finstack</h2>
+              {brand != null && (
+                <h2 className="finstack-workbench__brand">{brand}</h2>
+              )}
               <span className="finstack-workbench__id">
                 {shown?.result.instrument_id ?? type}
               </span>
