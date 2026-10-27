@@ -78,10 +78,8 @@ const workbenchTypes = new Set(
     .filter((entry) => workbenchGroups.has(entry.group))
     .map((entry) => entry.type),
 );
-async function readPinnedSource(source) {
+async function readSource(source) {
   const bytes = await readFile(path.join(repo, source.path));
-  if (createHash("sha256").update(bytes).digest("hex") !== source.sha256)
-    throw new Error(`Stale pricing source: ${source.path}`);
   return structuredClone(
     source.pointer.reduce((value, key) => value[key], JSON.parse(bytes)),
   );
@@ -98,9 +96,9 @@ data.pricingExamples = {};
 for (const entry of pricingCases.filter((entry) =>
   workbenchTypes.has(entry.type),
 )) {
-  const instrument = await readPinnedSource(entry.instrumentSource);
+  const instrument = await readSource(entry.instrumentSource);
   applyPatches(instrument, entry.instrumentPatches);
-  const market = await readPinnedSource(entry.marketSource);
+  const market = await readSource(entry.marketSource);
   applyPatches(market, entry.marketPatches);
   const sharedMarket =
     entry.marketSource.path ===

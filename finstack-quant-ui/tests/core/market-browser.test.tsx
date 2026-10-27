@@ -53,9 +53,10 @@ it("retains the realistic CDX calibration and native canonical supplemental fixt
     ),
     "utf8",
   );
-  expect(createHash("sha256").update(source).digest("hex")).toBe(
-    fixture.sha256,
-  );
+  expect(
+    createHash("sha256").update(source).digest("hex"),
+    `${fixture.source} changed since tests/core/market-browser/generate.mjs ran; rerun mise run ui-fixtures`,
+  ).toBe(fixture.sha256);
   expect(native.calibrate(source).result.final_market).toEqual(
     fixture.calibrated,
   );

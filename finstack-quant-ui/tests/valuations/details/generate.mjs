@@ -1,8 +1,8 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import prettier from "prettier";
 import { serializeHost } from "../../../src/codec.mjs";
+import { emit } from "../../../scripts/fixture-output.mjs";
 const repository = new URL("../../../../", import.meta.url);
 const native = createRequire(import.meta.url)(
   "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -15,15 +15,10 @@ const commodityPath =
   "finstack-quant/valuations/tests/fixtures/valuation_binding_regressions.json";
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
 const manifest = await read(manifestPath);
-const sources = new Set([
-  manifestPath,
-  commodityPath,
-  bondPath,
-  "finstack-quant-wasm/tests/facade/covenants.test.mjs",
-  "finstack-quant-wasm/index.d.ts",
-  "finstack-quant-wasm/src/utils/mod.rs",
-  "finstack-quant/core/src/explain.rs",
-]);
+// Pinned inputs: only the JSON files each case is built from. The manifest's
+// request fields and patches are covered by `--check`; binding sources are not
+// pinned because the test re-prices every case through the native package.
+const sources = new Set([commodityPath, bondPath]);
 async function source(source) {
   sources.add(source.path);
   let value = await read(source.path);
@@ -54,14 +49,7 @@ for (const type of [
   "structured_credit",
   "bond",
 ]) {
-  const entry = manifest.cases.find((c) => c.type === type);
-  let instrument = patch(
-    await source(entry.instrumentSource),
-    entry.instrumentPatches,
-  );
-  let market = patch(await source(entry.marketSource), entry.marketPatches);
-  let asOf = entry.request.asOf,
-    model = entry.request.model;
+  let instrument, market, asOf, model;
   if (type === "commodity_spot_option") {
     const fixture = await read(commodityPath);
     instrument = fixture.commodity;
@@ -69,19 +57,27 @@ for (const type of [
     instrument.instrument.spec.instrument_pricing_overrides.model_config.mc_paths = 64;
     asOf = "2025-01-02";
     model = "monte_carlo_schwartz_smith";
-  }
-  if (type === "structured_credit") {
-    instrument.instrument.spec.instrument_pricing_overrides = {
-      model_config: { mc_paths: 8 },
-    };
-    model = "structured_credit_stochastic";
-  }
-  if (type === "bond") {
+  } else if (type === "bond") {
     const fixture = await read(bondPath);
     instrument = JSON.parse(fixture.request.instrumentJson);
     market = JSON.parse(fixture.request.marketJson);
     asOf = fixture.request.asOf;
     model = "rates_credit";
+  } else {
+    const entry = manifest.cases.find((c) => c.type === type);
+    instrument = patch(
+      await source(entry.instrumentSource),
+      entry.instrumentPatches,
+    );
+    market = patch(await source(entry.marketSource), entry.marketPatches);
+    asOf = entry.request.asOf;
+    model = entry.request.model;
+    if (type === "structured_credit") {
+      instrument.instrument.spec.instrument_pricing_overrides = {
+        model_config: { mc_paths: 8 },
+      };
+      model = "structured_credit_stochastic";
+    }
   }
   const request = {
     instrumentJson: JSON.stringify(instrument),
@@ -146,7 +142,4 @@ const output = {
   covenantRequest,
   covenantReportsJson: serializeHost(reports),
 };
-await writeFile(
-  new URL("cases.json", import.meta.url),
-  await prettier.format(JSON.stringify(output), { parser: "json" }),
-);
+await emit(new URL("cases.json", import.meta.url), JSON.stringify(output));

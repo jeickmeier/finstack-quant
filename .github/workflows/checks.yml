@@ -1,8 +1,8 @@
 name: Checks
 
 # The fast tier: lint, generated-artifact drift, the uninstrumented fast tests
-# on all three surfaces, and the supply-chain audit, all in parallel after
-# prime-cache. Budget: under 15 minutes wall clock on a warm master cache. No
+# on all three surfaces, the component-registry check, and the supply-chain
+# audit, all in parallel after prime-cache. Budget: under 15 minutes wall clock on a warm master cache. No
 # coverage, doctests or slow tests; full-checks.yml runs those. Every job runs a
 # canonical mise task, so a failure reproduces locally with the same command
 # (`mise run all-ci` runs the set); the per-test time cap is CI-only and
@@ -403,3 +403,65 @@ jobs:
       - name: Report WASM test results
         if: always()
         run: python3 scripts/ci_report.py wasm
+
+  # ============================================
+  # Test UI — registry generator drift, native fixture drift, formatting,
+  # tokens, registry closure, tsc and Vitest against the dev WASM packages
+  # ============================================
+  test-ui:
+    name: Test UI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: prime-cache
+
+    env:
+      # Byte-identical to Test WASM's env on purpose: rust-cache hashes CARGO_*
+      # into its key, and this job restores Test WASM's cache read-only (below).
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+      # Must include the getrandom cfg: this env replaces crate `.cargo/config.toml`
+      # rustflags rather than appending. `debuginfo=0` avoids the rust-lld
+      # SIGBUS on huge wasm-bindgen describe-export lists (LLVM #195482).
+      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: "--cfg getrandom_backend=\"wasm_js\" -C debuginfo=0"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        with:
+          cache: true
+          cache_save: false
+        env:
+          MISE_JOBS: "1"
+
+      # Keeps the image's Rust out of the rust-cache key (see Lint).
+      - name: Remove the runner image's Rust toolchain
+        run: rustup toolchain uninstall stable
+
+      # Test WASM builds the same dev packages and is the single writer of this key.
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          shared-key: test-wasm
+          save-if: false
+
+      - name: Install component registry dependencies
+        run: mise run ui-sync
+
+      # ui-check's Vitest imports the dev web and Node packages, the same ones
+      # wasm-test builds.
+      - name: Build the development WASM packages
+        run: |
+          mise run wasm-build
+          mise run wasm-build-node
+
+      - name: Check the component registry
+        run: mise run ui-check

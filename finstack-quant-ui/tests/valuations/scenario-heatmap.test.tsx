@@ -47,6 +47,7 @@ it("matches direct native cells for original and factor-adjusted tranches on cur
       createHash("sha256")
         .update(readFileSync(resolve(root, source!)))
         .digest("hex"),
+      `${source} changed since tests/valuations/scenario-table/generate.mjs ran; rerun mise run ui-fixtures`,
     ).toBe(hash);
   const market = readFileSync(resolve(root, fixture.marketSource), "utf8");
   for (const c of fixture.cases) {

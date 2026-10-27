@@ -2,20 +2,16 @@
   "description": "UI form-to-worker routing cases. Captured native values are regression anchors, not independent economic benchmarks. All market numbers are test inputs, not live quotes.",
   "marketProvenance": [
     {
-      "path": "finstack-quant-ui/registry/core/components/curve-link-example/market.json",
-      "sha256": "a5c9d2da14d3a15a226acc589d03b601f827f61a7866bcce90bc9b32f7b46f0c"
+      "path": "finstack-quant-ui/registry/core/components/curve-link-example/market.json"
     },
     {
-      "path": "finstack-quant/valuations/tests/fixtures/production_equity.json",
-      "sha256": "0a50b142d5a6772032a5de01f504a5e34d6b5922eb2936a7ff0f5849f8752bf5"
+      "path": "finstack-quant/valuations/tests/fixtures/production_equity.json"
     },
     {
-      "path": "finstack-quant/valuations/tests/fixtures/production_cds_option.json",
-      "sha256": "75cd96080c88d3fdf4efb121492b7fe50bbbaab1fbdde13b59e4183e23d990ad"
+      "path": "finstack-quant/valuations/tests/fixtures/production_cds_option.json"
     },
     {
-      "path": "finstack-quant/valuations/tests/fixtures/production_inflation.json",
-      "sha256": "4d002dccf37aac89611607d295beb1154e89c823871fdb948b72732d78b2ee81"
+      "path": "finstack-quant/valuations/tests/fixtures/production_inflation.json"
     }
   ],
   "marketConstruction": "Shared market copies the canonical discount, forward, price, hazard, inflation, vol-index and surface shapes. Explicit registry test quotes cover the canonical examples; base is 2023-12-28, discount factors are [0,1], [1,0.97], [40,0.3], rates/volatilities/FX and fixing inputs are stored literally. Instrument-specific production fixtures retain their market and as-of. No pricing formula is implemented here. Protected linker routing explicitly uses a zero CPI-ratio volatility surface for this deterministic fixture.",
@@ -24,13 +20,11 @@
       "type": "agency_cmo",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_cmo.json",
-        "sha256": "23ec1ff50166b38bf93822e6ca37c68512544a1d4f7552263be45c6c77267e82",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -48,27 +42,19 @@
         "description": "Change waterfall.tranches.0.coupon from 0.035 to 0.036; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "40593053.20381211",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "40737428.17085773",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "40593053.20381211", "currency": "USD" },
+        "edited": { "amount": "40737428.17085773", "currency": "USD" }
       }
     },
     {
       "type": "agency_mbs_passthrough",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_mbs_passthrough.json",
-        "sha256": "08df264a963b321fa82375a6c8bcbfbc7f480ccfb9c5a57a8182bef68de81df2",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -86,27 +72,19 @@
         "description": "Change prepayment_spec.speed_multiplier from 1 to 1.1; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "1021513.365242683",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1019005.912902719",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "1021513.365242683", "currency": "USD" },
+        "edited": { "amount": "1019005.912902719", "currency": "USD" }
       }
     },
     {
       "type": "agency_tba",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_tba.json",
-        "sha256": "de74543efee2e1992714a28591dc80aba70a0f1ad1e5a81bdb0f8196db9b1128",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -124,27 +102,19 @@
         "description": "Change trade_price from 98.5 to 99; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "893572.677143404",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "848183.070220579",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "893572.677143404", "currency": "USD" },
+        "edited": { "amount": "848183.070220579", "currency": "USD" }
       }
     },
     {
       "type": "asian_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/asian_option.json",
-        "sha256": "d82ed2735c59cad2b663a70bd826e70c3fc17337a0dee24fad8ac654a95aeb60",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -162,27 +132,19 @@
         "description": "Change quantity from 100000 to 110000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "17261902.82704145",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "18988093.1097456",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "17261902.82704145", "currency": "USD" },
+        "edited": { "amount": "18988093.1097456", "currency": "USD" }
       }
     },
     {
       "type": "asset_backed_facility",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/asset_backed_facility.json",
-        "sha256": "d7991e5bf0ee77f68c722f0ac07593d98837ceba824f608e1d84fbdffbbd7b9a",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -214,7 +176,6 @@
       "type": "autocallable",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/autocallable.json",
-        "sha256": "c25a36e614fc8594c3425489b0e0c3f44a86fefe54b30e93355102c6c655aa66",
         "pointer": []
       },
       "instrumentPatches": [
@@ -232,7 +193,6 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -250,27 +210,19 @@
         "description": "Change notional.amount from 100000 to 110000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "102574.9852619932",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "112832.4837881925",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "102574.9852619932", "currency": "USD" },
+        "edited": { "amount": "112832.4837881925", "currency": "USD" }
       }
     },
     {
       "type": "barrier_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/barrier_option.json",
-        "sha256": "2d3bfe45ddcc153889333c20f7f4358106aa26d0042abb53cf27555444cdff0a",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -288,27 +240,19 @@
         "description": "Change quantity from 100000 to 110000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "779780.860087613",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "857756.076021825",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "779780.860087613", "currency": "USD" },
+        "edited": { "amount": "857756.076021825", "currency": "USD" }
       }
     },
     {
       "type": "basis_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/basis_swap.json",
-        "sha256": "63204d6e442e17edc2dd002cb27de1cb19e4457a3f271a24dcc23ae29b3fe5a2",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -326,27 +270,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "250615.751208322",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "275677.326329154",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "250615.751208322", "currency": "USD" },
+        "edited": { "amount": "275677.326329154", "currency": "USD" }
       }
     },
     {
       "type": "basket",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/basket.json",
-        "sha256": "0e1c23b8c7122cc38db0ed346b6d36904987f61f662bda4f1b5ce93191a32a4f",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -364,27 +300,19 @@
         "description": "Change expense_ratio from 0.0025 to 0.0035; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "147198992.4709103",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "147198589.4592744",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "147198992.4709103", "currency": "USD" },
+        "edited": { "amount": "147198589.4592744", "currency": "USD" }
       }
     },
     {
       "type": "bermudan_swaption",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_hw.json",
-        "sha256": "965eca0d897842980fe5ab0e46c0de4846d71d405fc79a828ddbc52269deb50e",
         "pointer": ["instrument"]
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_hw.json",
-        "sha256": "965eca0d897842980fe5ab0e46c0de4846d71d405fc79a828ddbc52269deb50e",
         "pointer": ["market"]
       },
       "marketPatches": [],
@@ -402,27 +330,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "486151.115710305",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "534766.227281336",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "486151.115710305", "currency": "USD" },
+        "edited": { "amount": "534766.227281336", "currency": "USD" }
       }
     },
     {
       "type": "bond",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/bond.json",
-        "sha256": "3004830e4297c3a7840a60c2e85005359b8f823b11153af44902f001e10d00f7",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -440,21 +360,14 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "1102021.868928519",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1212224.05582137",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "1102021.868928519", "currency": "USD" },
+        "edited": { "amount": "1212224.05582137", "currency": "USD" }
       }
     },
     {
       "type": "bond_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/bond_future.json",
-        "sha256": "242e6f039859129e29bc22a08bc04853bd8db3eabebc6d73fba169cb7d19f021",
         "pointer": []
       },
       "instrumentPatches": [
@@ -470,10 +383,7 @@
                 "coupon_type": "cash",
                 "day_count": "act_act_isma",
                 "end_of_month": false,
-                "frequency": {
-                  "count": 6,
-                  "unit": "months"
-                },
+                "frequency": { "count": 6, "unit": "months" },
                 "payment_lag_days": 0,
                 "rate": "0.0425",
                 "stub": "short_front"
@@ -486,17 +396,13 @@
             "id": "US91282CJL54",
             "issue_date": "2024-01-15",
             "maturity": "2034-01-15",
-            "notional": {
-              "amount": "1000000",
-              "currency": "USD"
-            },
+            "notional": { "amount": "1000000", "currency": "USD" },
             "settlement_days": 1
           }
         }
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -514,21 +420,14 @@
         "description": "Change terms.entry_price from 112.25 to 113; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "199482.6318626201",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "191982.6318626201",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "199482.6318626201", "currency": "USD" },
+        "edited": { "amount": "191982.6318626201", "currency": "USD" }
       }
     },
     {
       "type": "callable_range_accrual",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/callable_range_accrual.json",
-        "sha256": "11d760fb95c4405c1bf8eb85ae34aa83ca8ac2cbb664816ca940d82a4ba39b7d",
         "pointer": []
       },
       "instrumentPatches": [
@@ -546,7 +445,6 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -564,27 +462,19 @@
         "description": "Change range_accrual.notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "931476.795406835",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1024624.474947518",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "931476.795406835", "currency": "USD" },
+        "edited": { "amount": "1024624.474947518", "currency": "USD" }
       }
     },
     {
       "type": "cap_floor",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cap_floor.json",
-        "sha256": "06d867e32c4799d7fdd061c9990549b16c068b3ec939f53e206e24c8956d66fa",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -602,27 +492,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "493110.00123153598",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "542421.00135468960",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "493110.00123153598", "currency": "USD" },
+        "edited": { "amount": "542421.00135468960", "currency": "USD" }
       }
     },
     {
       "type": "cds_index",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cds_index.json",
-        "sha256": "a7dbc7382f096a833276718288c8d909d5a3090639801de8a8f6c9fbf9d58674",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -640,27 +522,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "293220.0338076418",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "322542.037188406",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "293220.0338076418", "currency": "USD" },
+        "edited": { "amount": "322542.037188406", "currency": "USD" }
       }
     },
     {
       "type": "cds_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cds_option.json",
-        "sha256": "f44138dfaa6a5024b7cbd3d60c24d91495f27e18a0ba56dfe8c3cbdd64b10bdd",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -678,27 +552,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "298840.2000795052",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "328724.2200874557",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "298840.2000795052", "currency": "USD" },
+        "edited": { "amount": "328724.2200874557", "currency": "USD" }
       }
     },
     {
       "type": "cds_tranche",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_credit_tranche.json",
-        "sha256": "a97ed70d447dd9f88d1b3962963dadaab2a4f6f8244e8396cf689ed755f9cd4d",
         "pointer": ["instrument"]
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_credit_tranche.json",
-        "sha256": "a97ed70d447dd9f88d1b3962963dadaab2a4f6f8244e8396cf689ed755f9cd4d",
         "pointer": ["market"]
       },
       "marketPatches": [],
@@ -716,21 +582,14 @@
         "description": "Change notional.amount from 30000 to 33000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "4849.05383245252",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "5333.95921569777",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "4849.05383245252", "currency": "USD" },
+        "edited": { "amount": "5333.95921569777", "currency": "USD" }
       }
     },
     {
       "type": "cliquet_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cliquet_option.json",
-        "sha256": "603a6a6157837138e0b41b8ff5fb63584ebce8d9172081593df0839fa2258f1e",
         "pointer": []
       },
       "instrumentPatches": [
@@ -748,7 +607,6 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -766,27 +624,19 @@
         "description": "Change notional.amount from 100000 to 110000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "7707.57358918795",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "8478.33094810675",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "7707.57358918795", "currency": "USD" },
+        "edited": { "amount": "8478.33094810675", "currency": "USD" }
       }
     },
     {
       "type": "cms_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cms_option.json",
-        "sha256": "4d0f8a20634d5be8295e5224111d6499783ef8b14593cf4af2692fd6286e55c6",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -804,27 +654,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "147738.4488021919",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "162512.2936824111",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "147738.4488021919", "currency": "USD" },
+        "edited": { "amount": "162512.2936824111", "currency": "USD" }
       }
     },
     {
       "type": "cms_spread_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cms_spread_option.json",
-        "sha256": "e71875432036f4acf85b9339f64458986e08e54692dcaa3782580ace969f0a77",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -842,27 +684,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "14329.01531811941",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "15761.91684993135",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "14329.01531811941", "currency": "USD" },
+        "edited": { "amount": "15761.91684993135", "currency": "USD" }
       }
     },
     {
       "type": "cms_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cms_swap.json",
-        "sha256": "02d6b087c5c58b1aacf9bb133e5e6a4bfe0fa23dd1a650082697321ffd8d9ae6",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -880,27 +714,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "-99606.9359312007",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-109567.6295243207",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "-99606.9359312007", "currency": "USD" },
+        "edited": { "amount": "-109567.6295243207", "currency": "USD" }
       }
     },
     {
       "type": "commodity_asian_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_asian_option.json",
-        "sha256": "5f0c62e9983b24dd61f1d1c683d9e92087193b63bc9235f6da42bded84ae59b1",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -918,32 +744,21 @@
         "description": "Change quantity from 1000 to 1100; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "12310.52677394831",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "13541.57945134314",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "12310.52677394831", "currency": "USD" },
+        "edited": { "amount": "13541.57945134314", "currency": "USD" }
       }
     },
     {
       "type": "commodity_forward",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_forward.json",
-        "sha256": "ba56c47e2c1736cda249e5a02372fedf9d8701dde7212e3c64b8a796347f9f52",
         "pointer": []
       },
       "instrumentPatches": [
-        {
-          "path": ["instrument", "spec", "contract_price"],
-          "value": 75
-        }
+        { "path": ["instrument", "spec", "contract_price"], "value": 75 }
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -961,27 +776,19 @@
         "description": "Change contract_price from 75 to 76; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "4817.72188146454",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "3854.177505171635",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "4817.72188146454", "currency": "USD" },
+        "edited": { "amount": "3854.177505171635", "currency": "USD" }
       }
     },
     {
       "type": "commodity_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_future.json",
-        "sha256": "1ffe72657a39e451e32d8d33d68173b3be635283e5234e2928ea92845bb1dac8",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -999,27 +806,19 @@
         "description": "Change terms.entry_price from 105.25 to 106; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "4750",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "4000",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "4750", "currency": "USD" },
+        "edited": { "amount": "4000", "currency": "USD" }
       }
     },
     {
       "type": "commodity_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_future_option.json",
-        "sha256": "aea4f80bd0de55e43739edd0595b4cb08b93e7a4cada11d9b0a7c8e65cb1fb45",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1037,27 +836,19 @@
         "description": "Change terms.futures_price from 100 to 101; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "12.49876349147231",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "13.02361271945624",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "12.49876349147231", "currency": "USD" },
+        "edited": { "amount": "13.02361271945624", "currency": "USD" }
       }
     },
     {
       "type": "commodity_spot_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_spot_option.json",
-        "sha256": "e2e05570a6659562db11e3753473889f1a51c897f5b37d6d39e2815a32b3527a",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1075,27 +866,19 @@
         "description": "Change quantity from 1000 to 1100; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "13239.89239416742",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "14563.88163358417",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "13239.89239416742", "currency": "USD" },
+        "edited": { "amount": "14563.88163358417", "currency": "USD" }
       }
     },
     {
       "type": "commodity_spread_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_spread_option.json",
-        "sha256": "ddd17de8d09d3df37f7c681cefe9908f17e2aa332754f54f4fa43a76cc6477b0",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1113,27 +896,19 @@
         "description": "Change quantity from 10000 to 11000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "95804.2888470027",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "105384.7177317029",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "95804.2888470027", "currency": "USD" },
+        "edited": { "amount": "105384.7177317029", "currency": "USD" }
       }
     },
     {
       "type": "commodity_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_swap.json",
-        "sha256": "ab21f2db94f3caa4b1c69b66666518b872389606478c3cb48ff448ed987aa072",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1151,27 +926,19 @@
         "description": "Change fixed_price from 3.5 to 3.6; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "57241.779109393",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "45793.4232875144",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "57241.779109393", "currency": "USD" },
+        "edited": { "amount": "45793.4232875144", "currency": "USD" }
       }
     },
     {
       "type": "commodity_swaption",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_swaption.json",
-        "sha256": "2aa504104fcb4501ecd81a46e67d2a31c1e7f4914bd7a6d42e1096701a6e3260",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1189,27 +956,19 @@
         "description": "Change quantity from 10000 to 11000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "93156.8068996923",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "102472.4875896615",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "93156.8068996923", "currency": "USD" },
+        "edited": { "amount": "102472.4875896615", "currency": "USD" }
       }
     },
     {
       "type": "composite",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/composite.json",
-        "sha256": "9b508c9851488d6ff79d9c9f9fe75b1a309b8a67417f2922f97061d638355f13",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1227,27 +986,19 @@
         "description": "Change state.resolved_legs.0.quantity from 1 to 1.1; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "10",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "20.00000000000001",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "10", "currency": "USD" },
+        "edited": { "amount": "20.00000000000001", "currency": "USD" }
       }
     },
     {
       "type": "convertible_bond",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_convertible.json",
-        "sha256": "fb792892b8bf8053c7b379d165b8e30ca29bba970b0ae03dc2b3e10ed845ef8d",
         "pointer": ["instrument"]
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_convertible.json",
-        "sha256": "fb792892b8bf8053c7b379d165b8e30ca29bba970b0ae03dc2b3e10ed845ef8d",
         "pointer": ["market"]
       },
       "marketPatches": [],
@@ -1265,27 +1016,19 @@
         "description": "Change notional.amount from 1000 to 1100; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "1012.328767123288",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1113.561643835617",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "1012.328767123288", "currency": "USD" },
+        "edited": { "amount": "1113.561643835617", "currency": "USD" }
       }
     },
     {
       "type": "credit_default_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/credit_default_swap.json",
-        "sha256": "2ccaf96011be18f5e48d4dc04a424596a06a0d39cd40e9890b111d96287fa376",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1303,27 +1046,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "82667.8321605278",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "90934.6153765805",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "82667.8321605278", "currency": "USD" },
+        "edited": { "amount": "90934.6153765805", "currency": "USD" }
       }
     },
     {
       "type": "deposit",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/deposit.json",
-        "sha256": "5cffcc3b025813b71a68a7809361aa46b42df4fc2e96b623d1e78341e5544120",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1341,27 +1076,19 @@
         "description": "Change notional.amount from 100000 to 110000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "725.2194690658727500000",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "797.7414159724600250000",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "725.2194690658727500000", "currency": "USD" },
+        "edited": { "amount": "797.7414159724600250000", "currency": "USD" }
       }
     },
     {
       "type": "discounted_cash_flow",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/discounted_cash_flow.json",
-        "sha256": "a6ebbe4d1ee5eef9051892d3959f13bc10c3a632abb96a54dc8f0d69af1673ac",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1379,27 +1106,19 @@
         "description": "Change wacc from 0.1 to 0.11; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "76708462.6603578",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "66398388.4064043",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "76708462.6603578", "currency": "USD" },
+        "edited": { "amount": "66398388.4064043", "currency": "USD" }
       }
     },
     {
       "type": "dollar_roll",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/dollar_roll.json",
-        "sha256": "a4d846dd6e53ab0b499831bc5ebff879747df1bcce8ca4f7263d4521cc21fd58",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1417,27 +1136,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "45529.489867531",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "50082.438854296",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "45529.489867531", "currency": "USD" },
+        "edited": { "amount": "50082.438854296", "currency": "USD" }
       }
     },
     {
       "type": "equity",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity.json",
-        "sha256": "670e5fccf1f37358fe00174f1d9144ad3a7641626082599bc893451760e01327",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1455,27 +1166,19 @@
         "description": "Change quantity from 100 to 110; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "18000",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "19800",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "18000", "currency": "USD" },
+        "edited": { "amount": "19800", "currency": "USD" }
       }
     },
     {
       "type": "equity_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_future.json",
-        "sha256": "86c7833f5b10bed8860f8a6756668e90357de51887497c4442317fa3ab614d22",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1493,27 +1196,19 @@
         "description": "Change terms.entry_price from 5200 to 5300; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "3567.93632059198",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-1432.06367940802",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "3567.93632059198", "currency": "USD" },
+        "edited": { "amount": "-1432.06367940802", "currency": "USD" }
       }
     },
     {
       "type": "equity_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_future_option.json",
-        "sha256": "6c967d92e874665e05a07bd191850ede2625749c3e1517e4d78a1f611762b8b2",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1531,27 +1226,19 @@
         "description": "Change terms.futures_price from 100 to 101; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "12.49876349147231",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "13.02361271945624",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "12.49876349147231", "currency": "USD" },
+        "edited": { "amount": "13.02361271945624", "currency": "USD" }
       }
     },
     {
       "type": "equity_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",
-        "sha256": "bb728c8ffcf3c8ee6136e4c1956bf2333eda6e168f4e3b590af9a2fd1abbbfdd",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1569,27 +1256,19 @@
         "description": "Change quantity from 100 to 110; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "25748.36114047357",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "28323.19725452093",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "25748.36114047357", "currency": "USD" },
+        "edited": { "amount": "28323.19725452093", "currency": "USD" }
       }
     },
     {
       "type": "equity_total_return_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_total_return_future.json",
-        "sha256": "a082d11c9eb7d1ec21211bb1042c1fdf1afe0a1e78ed63fa73dbe55b4bdab7c8",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1607,27 +1286,19 @@
         "description": "Change terms.entry_price from 5250 to 5260; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "132020.833333333",
-          "currency": "EUR"
-        },
-        "edited": {
-          "amount": "122020.833333333",
-          "currency": "EUR"
-        }
+        "baseline": { "amount": "132020.833333333", "currency": "EUR" },
+        "edited": { "amount": "122020.833333333", "currency": "EUR" }
       }
     },
     {
       "type": "forward_rate_agreement",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/forward_rate_agreement.json",
-        "sha256": "37a2364c9c01479fec91673480de12e28ca92ab8aac29204cdd984b6f7fa35f2",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1645,27 +1316,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "13776.07680118625",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "15153.68448130488",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "13776.07680118625", "currency": "USD" },
+        "edited": { "amount": "15153.68448130488", "currency": "USD" }
       }
     },
     {
       "type": "fx_barrier_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_barrier_option.json",
-        "sha256": "beeb989b0c0925f766b033fd35a9932a5a9a6e12ff45f930772b1f935703cf95",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1683,27 +1346,19 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "2023.539716960121",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "2225.893688656133",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "2023.539716960121", "currency": "USD" },
+        "edited": { "amount": "2225.893688656133", "currency": "USD" }
       }
     },
     {
       "type": "fx_digital_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_digital_option.json",
-        "sha256": "206f28f75f42d39b6f5fd39c949eb41c454b7a73301053b6db1751de755db798",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1721,27 +1376,19 @@
         "description": "Change payout_amount.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "333802.7415487137",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "367183.0157035851",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "333802.7415487137", "currency": "USD" },
+        "edited": { "amount": "367183.0157035851", "currency": "USD" }
       }
     },
     {
       "type": "fx_forward",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_forward.json",
-        "sha256": "3f1ba368e613f460204d817a531038536cf79e3a7c5ccfe0ace865ba8ab0db6b",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1759,27 +1406,19 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "-19130.01375666101",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-21043.01513232711",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "-19130.01375666101", "currency": "USD" },
+        "edited": { "amount": "-21043.01513232711", "currency": "USD" }
       }
     },
     {
       "type": "fx_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_future.json",
-        "sha256": "df29e0b4c9c662b7bb19a7f99937daf4b79c91ae24d7c880aadf407c27dcfd70",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1797,27 +1436,19 @@
         "description": "Change terms.entry_price from 1.1 to 1.11; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "0",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-5000.00000000001",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "0", "currency": "USD" },
+        "edited": { "amount": "-5000.00000000001", "currency": "USD" }
       }
     },
     {
       "type": "fx_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_future_option.json",
-        "sha256": "5103c5c842b51e1d631ad5f2dea6a1b2cc02206b79c901d3716cb1ff637e55d0",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1835,27 +1466,19 @@
         "description": "Change terms.futures_price from 100 to 101; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "12.49876349147231",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "13.02361271945624",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "12.49876349147231", "currency": "USD" },
+        "edited": { "amount": "13.02361271945624", "currency": "USD" }
       }
     },
     {
       "type": "fx_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_option.json",
-        "sha256": "05f87b98d6066442510b6b421c73afa9fa3a48dd78bafb488ec106af55b8305b",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1873,27 +1496,19 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "130200.8917953093",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "143220.9809748402",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "130200.8917953093", "currency": "USD" },
+        "edited": { "amount": "143220.9809748402", "currency": "USD" }
       }
     },
     {
       "type": "fx_spot",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_spot.json",
-        "sha256": "ed3d24f5fb165e364328ad7570efef44c27b7696e47994e33df8284aaadff8a5",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1911,27 +1526,19 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "1100000",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1210000",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "1100000", "currency": "USD" },
+        "edited": { "amount": "1210000", "currency": "USD" }
       }
     },
     {
       "type": "fx_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_swap.json",
-        "sha256": "620aa24abb8f31aa833cfb2d5cc692e6d2c38cec8260049781552bba2a369a73",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1949,27 +1556,19 @@
         "description": "Change far_rate from 1.12 to 1.13; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "19685.39117022118",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "29528.08675533164",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "19685.39117022118", "currency": "USD" },
+        "edited": { "amount": "29528.08675533164", "currency": "USD" }
       }
     },
     {
       "type": "fx_touch_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_touch_option.json",
-        "sha256": "5bbae200fb8ac80b06ebf213d1b1e143c4e95912949baf373661f2d348ff99fb",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -1987,27 +1586,19 @@
         "description": "Change payout_amount.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "759096.812060421",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "835006.493266464",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "759096.812060421", "currency": "USD" },
+        "edited": { "amount": "835006.493266464", "currency": "USD" }
       }
     },
     {
       "type": "fx_variance_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_variance_swap.json",
-        "sha256": "9a550304a0265be18c3f769614b69e06740bb95c3e7c2a86ba31fed2d4481625",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2039,13 +1630,11 @@
       "type": "inflation_cap_floor",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/inflation_cap_floor.json",
-        "sha256": "5187ed0b936b96a8761675c990fe8ea532611b3e4c99e0db9fd55f1ac3e44fa1",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2063,21 +1652,14 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "3742.853205610149",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "4117.138526171165",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "3742.853205610149", "currency": "USD" },
+        "edited": { "amount": "4117.138526171165", "currency": "USD" }
       }
     },
     {
       "type": "inflation_linked_bond",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/inflation_linked_bond.json",
-        "sha256": "166d1f868bc519de371f43af3bb17ec4f45b108bc3a332b9b14cf783f578e800",
         "pointer": []
       },
       "instrumentPatches": [
@@ -2088,15 +1670,9 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
-      "marketPatches": [
-        {
-          "path": ["inflation_indices"],
-          "value": []
-        }
-      ],
+      "marketPatches": [{ "path": ["inflation_indices"], "value": [] }],
       "request": {
         "asOf": "2023-12-28",
         "model": "discounting",
@@ -2125,13 +1701,11 @@
       "type": "inflation_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_inflation.json",
-        "sha256": "4d002dccf37aac89611607d295beb1154e89c823871fdb948b72732d78b2ee81",
         "pointer": ["instrument"]
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_inflation.json",
-        "sha256": "4d002dccf37aac89611607d295beb1154e89c823871fdb948b72732d78b2ee81",
         "pointer": ["market"]
       },
       "marketPatches": [],
@@ -2149,27 +1723,19 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "-4080.8031999999000000",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-4488.8835199998900000",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "-4080.8031999999000000", "currency": "USD" },
+        "edited": { "amount": "-4488.8835199998900000", "currency": "USD" }
       }
     },
     {
       "type": "interest_rate_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_future.json",
-        "sha256": "b697d8a04fb3fb09f680c6f930c3a2586731344b6f25791b4ad9e8c30835fa02",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2187,27 +1753,19 @@
         "description": "Change terms.contracts from 1.0 to 1.1; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "1387.013524110294",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1525.714876521324",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "1387.013524110294", "currency": "USD" },
+        "edited": { "amount": "1525.714876521324", "currency": "USD" }
       }
     },
     {
       "type": "interest_rate_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_future_option.json",
-        "sha256": "ab1b73d2a285534f63e9ab8ccc8256546c57d50ef12f13ac82751e82cbd4ad5e",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2225,27 +1783,19 @@
         "description": "Change terms.futures_price from 100 to 101; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "12.49876349147231",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "13.02361271945624",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "12.49876349147231", "currency": "USD" },
+        "edited": { "amount": "13.02361271945624", "currency": "USD" }
       }
     },
     {
       "type": "interest_rate_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
-        "sha256": "75ccf0330466b637a2869e34652dd502cf8505e76293d0178d7b9d4976550885",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2263,27 +1813,19 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "8912.21632401529",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "9803.43795641675",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "8912.21632401529", "currency": "USD" },
+        "edited": { "amount": "9803.43795641675", "currency": "USD" }
       }
     },
     {
       "type": "levered_real_estate_equity",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/levered_real_estate_equity.json",
-        "sha256": "2ef661259b46e30f84a838562910753199ee3d369e7184297e32ac5af822ad89",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2301,27 +1843,19 @@
         "description": "Change asset.discount_rate from 0.08 to 0.09; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "1636404.266927017",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1570347.519752272",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "1636404.266927017", "currency": "USD" },
+        "edited": { "amount": "1570347.519752272", "currency": "USD" }
       }
     },
     {
       "type": "lookback_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/lookback_option.json",
-        "sha256": "17e40822cbaba51462aec252577c44359e3e98c260f3c4b13298bc36d0922213",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2339,27 +1873,19 @@
         "description": "Change quantity from 100000 to 110000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "76081876.5219297",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "83690064.1741227",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "76081876.5219297", "currency": "USD" },
+        "edited": { "amount": "83690064.1741227", "currency": "USD" }
       }
     },
     {
       "type": "ndf",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/ndf.json",
-        "sha256": "8c9bf2e605799bdf2422fa80a6877ca8bf0fa51ff38bcb7c9eb783363760e8ed",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2377,27 +1903,19 @@
         "description": "Change contract_rate from 7.25 to 7.2; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "0",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-9231.63511050586",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "0", "currency": "USD" },
+        "edited": { "amount": "-9231.63511050586", "currency": "USD" }
       }
     },
     {
       "type": "private_markets_fund",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/private_markets_fund.json",
-        "sha256": "16a922db0cb38afa2d9e8f190e28ebf5059790ed0a9b937aa90c8dd12cb982e1",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2415,27 +1933,19 @@
         "description": "Change events.0.amount.amount from 5000000 to 5500000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "432737.378418057000000",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-66512.136422467500000",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "432737.378418057000000", "currency": "USD" },
+        "edited": { "amount": "-66512.136422467500000", "currency": "USD" }
       }
     },
     {
       "type": "quanto_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/quanto_option.json",
-        "sha256": "e678f132f0167ea6771c41e449964fc7f9a25b0dbdd08a47c558ce8340ad0b23",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2453,27 +1963,19 @@
         "description": "Change correlation from -0.2 to -0.1; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "257243.9712687773",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "248460.9333715297",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "257243.9712687773", "currency": "USD" },
+        "edited": { "amount": "248460.9333715297", "currency": "USD" }
       }
     },
     {
       "type": "range_accrual",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/range_accrual.json",
-        "sha256": "f0028d25f9729855cbb66e2f978ccbcd24cd2f88b31bc6b324904d571dfe3605",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2491,27 +1993,19 @@
         "description": "Change notional.amount from 100000 to 110000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "2372.532870288641",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "2609.786157317505",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "2372.532870288641", "currency": "USD" },
+        "edited": { "amount": "2609.786157317505", "currency": "USD" }
       }
     },
     {
       "type": "real_estate_asset",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/real_estate_asset.json",
-        "sha256": "fa5e4bb02961cfefa920af01bf70becfcd2d894b7a3612d2f78767947015b303",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2529,27 +2023,19 @@
         "description": "Change discount_rate from 0.08 to 0.09; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "1636404.266927017",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1570347.519752272",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "1636404.266927017", "currency": "USD" },
+        "edited": { "amount": "1570347.519752272", "currency": "USD" }
       }
     },
     {
       "type": "repo",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/repo.json",
-        "sha256": "8f8fa999bdbf5962e72b04a56df7b3e0483e2f23f7fac15107ad85ccbf9907f1",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2571,23 +2057,18 @@
           "amount": "4360.765951188097086669658",
           "currency": "USD"
         },
-        "edited": {
-          "amount": "4846.390514966586938883904",
-          "currency": "USD"
-        }
+        "edited": { "amount": "4846.390514966586938883904", "currency": "USD" }
       }
     },
     {
       "type": "revolving_credit",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/revolving_credit.json",
-        "sha256": "319b7cf315f71204f8a2059a5ec1ab5f832d6460223252c7fc6d4b0d570f6d02",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2605,21 +2086,14 @@
         "description": "Change drawn.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "1691943.088976571",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1787458.245415196",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "1691943.088976571", "currency": "USD" },
+        "edited": { "amount": "1787458.245415196", "currency": "USD" }
       }
     },
     {
       "type": "snowball",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/snowball.json",
-        "sha256": "7034b24b7367f0cec76660a92572f3ab5f371e39019104b23d9859b7be338532",
         "pointer": []
       },
       "instrumentPatches": [
@@ -2637,7 +2111,6 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2655,27 +2128,19 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "1000019.046674638",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "1100020.951342102",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "1000019.046674638", "currency": "USD" },
+        "edited": { "amount": "1100020.951342102", "currency": "USD" }
       }
     },
     {
       "type": "structured_credit",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
-        "sha256": "e9d9d5e91e3fa883e21c003bf92de64bf4bd5e0ed8af881b71bad9b2f1120c5e",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2716,13 +2181,11 @@
       "type": "swaption",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/swaption.json",
-        "sha256": "4e617673ced3a51b7405f881a7fb8ab6889745fee6df344f607ae2bd608e9491",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2740,21 +2203,14 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "183103.9217506218",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "201414.313925684",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "183103.9217506218", "currency": "USD" },
+        "edited": { "amount": "201414.313925684", "currency": "USD" }
       }
     },
     {
       "type": "tarn",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/tarn.json",
-        "sha256": "bd82eb5fb2b172521652f70c4749e2f157a812f880062db1c98cc35b3518f5ef",
         "pointer": []
       },
       "instrumentPatches": [
@@ -2772,7 +2228,6 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2790,27 +2245,19 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "885144.104968204",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "973658.515465024",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "885144.104968204", "currency": "USD" },
+        "edited": { "amount": "973658.515465024", "currency": "USD" }
       }
     },
     {
       "type": "term_loan",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/term_loan.json",
-        "sha256": "791c96b1b97d1c29373efc136a8817f2e1cf0e8cbb802db3716e0b9c6da8955b",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2842,13 +2289,11 @@
       "type": "trs_equity",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/trs_equity.json",
-        "sha256": "3e2215f491e560119a93366a8688d593a4781de622057c413e01e615dc049825",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2866,27 +2311,19 @@
         "description": "Change notional.amount from 5000000 to 5500000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "-84275.0537253775",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-92702.5590979153",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "-84275.0537253775", "currency": "USD" },
+        "edited": { "amount": "-92702.5590979153", "currency": "USD" }
       }
     },
     {
       "type": "trs_fixed_income_index",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/trs_fixed_income_index.json",
-        "sha256": "8876f21c0839eb98fe8ecdfd022289a78cfdd0d9fc3b69ea450fc9558f215c05",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2904,27 +2341,19 @@
         "description": "Change notional.amount from 5000000 to 5500000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "4317.5712041354",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "4749.3283245491",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "4317.5712041354", "currency": "USD" },
+        "edited": { "amount": "4749.3283245491", "currency": "USD" }
       }
     },
     {
       "type": "variance_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/variance_swap.json",
-        "sha256": "277104faf9f13c9cfa1fd124478c6cad74b84248be0d93ca2ddb8816a5fe3223",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2956,13 +2385,11 @@
       "type": "volatility_index_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/volatility_index_future.json",
-        "sha256": "ca351146e86051b318b36c3beff6151af19605f4ea4aefc09d88bf648f02a88b",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -2980,27 +2407,19 @@
         "description": "Change terms.contracts from 4.651162790697675 to 5.116279069767442; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "-6691.94010831475",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-7361.13411914623",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "-6691.94010831475", "currency": "USD" },
+        "edited": { "amount": "-7361.13411914623", "currency": "USD" }
       }
     },
     {
       "type": "volatility_index_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/volatility_index_future_option.json",
-        "sha256": "1ee0292b6dd819ef7674fd8805b9a4e6fbe5f841a395538d21069936de74613b",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -3018,27 +2437,19 @@
         "description": "Change terms.futures_price from 20 to 21; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "466.819137077964",
-          "currency": "EUR"
-        },
-        "edited": {
-          "amount": "534.518652477421",
-          "currency": "EUR"
-        }
+        "baseline": { "amount": "466.819137077964", "currency": "EUR" },
+        "edited": { "amount": "534.518652477421", "currency": "EUR" }
       }
     },
     {
       "type": "xccy_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/xccy_swap.json",
-        "sha256": "f27bf15ac2194c1147df4a84da48a4240d2fc0370b777f49e40b3c2cb1f2fb5f",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -3056,27 +2467,19 @@
         "description": "Change leg2.leg.spread_bp from 10 to 20; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "415230.53614508373",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "367773.0719061626",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "415230.53614508373", "currency": "USD" },
+        "edited": { "amount": "367773.0719061626", "currency": "USD" }
       }
     },
     {
       "type": "yoy_inflation_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/yoy_inflation_swap.json",
-        "sha256": "362a5abebb98dc77088b35e3a64c3f135703295f6c5d3c1e5837c392325b78db",
         "pointer": []
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
         "pointer": []
       },
       "marketPatches": [],
@@ -3094,21 +2497,14 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": {
-          "amount": "-13354.31626472641",
-          "currency": "USD"
-        },
-        "edited": {
-          "amount": "-14689.74789119904",
-          "currency": "USD"
-        }
+        "baseline": { "amount": "-13354.31626472641", "currency": "USD" },
+        "edited": { "amount": "-14689.74789119904", "currency": "USD" }
       }
     }
   ],
   "instrumentDependencies": [
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/bond.json",
-      "sha256": "3004830e4297c3a7840a60c2e85005359b8f823b11153af44902f001e10d00f7",
       "usage": "Bond future embeds this CTD spec with its id set to the selected deliverable."
     }
   ]

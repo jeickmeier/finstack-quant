@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { checking, emit } from "../../../scripts/fixture-output.mjs";
 const native = createRequire(import.meta.url)(
   "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -48,28 +49,23 @@ const cases = [instrument, factor].map((input, index) => {
     deal.free();
   }
 });
-await writeFile(
+await emit(
   new URL("./cases.json", import.meta.url),
-  JSON.stringify(
-    {
-      instrumentSource,
-      instrumentSha256: createHash("sha256")
-        .update(instrumentJson)
-        .digest("hex"),
-      marketSource,
-      marketSha256: createHash("sha256").update(marketJson).digest("hex"),
-      asOf,
-      trancheId,
-      grid,
-      cases,
-    },
-    null,
-    2,
-  ) + "\n",
+  JSON.stringify({
+    instrumentSource,
+    instrumentSha256: createHash("sha256").update(instrumentJson).digest("hex"),
+    marketSource,
+    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    asOf,
+    trancheId,
+    grid,
+    cases,
+  }),
 );
-console.log(
-  cases.map((c) => ({
-    name: c.name,
-    prices: c.table.cells.map((cell) => cell.price),
-  })),
-);
+if (!checking)
+  console.log(
+    cases.map((c) => ({
+      name: c.name,
+      prices: c.table.cells.map((cell) => cell.price),
+    })),
+  );

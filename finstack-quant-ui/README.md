@@ -65,6 +65,21 @@ schemas are projected to the TypeScript generator's supported tuple syntax.
 Original bundles remain unchanged by these projections. Ajv 2020-12 is a
 test-only oracle for the supported construct and boundary corpus.
 
+## Native fixtures
+
+`mise run ui-fixtures` runs the nine native fixture generators under
+`tests/**/generate.mjs` in dependency order (results → cashflows → details;
+curves → market-browser; cubes, calibration, scenario-table, statements), then
+refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
+`finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
+`mise run wasm-pkg` (release). `mise run ui-fixtures --check` verifies that every
+committed fixture matches a fresh regeneration, ignoring formatting and key
+order, and names the generator to rerun;
+`ui-check` runs that check before vitest. Fixtures record only the SHA-256 of the
+JSON inputs they were built from; no binding source or WASM binary is pinned. A
+Rust pricing change that moves a fixture is regenerated in the same commit, with
+the reason in the commit message.
+
 ## Validation boundary
 
 These validators establish JSON structure, not financial validity. Rust/WASM
@@ -420,11 +435,13 @@ visual categories are Primitive Components, Individual Components and Blocks.
 `scripts/gen-metadata.mjs` derives these fields from package metadata and the
 existing schema/provenance inventory, and `ui-check` rejects drift.
 
-The **Publish Component Registry** workflow validates the registry, exports its
-docs at the deployment base path, deploys GitHub Pages and exercises public CLI
-and MCP discovery from an empty Ubuntu consumer. Its public-consumer artifact
-records the URL and commands. `scripts/verify-public.mjs <base-url>` provides the
-same check locally; local-host success does not close the public-site gate.
+CI runs `mise run ui-check` in the `Test UI` job on every pull request. The
+gallery export, screenshot suite, installation matrix and publishing check are
+local gates: `mise run ui-docs-build`, `mise run ui-e2e`, `mise run ui-install`
+and `mise run ui-publish-check`. No workflow deploys the public namespace URL in
+`components.json` today; `scripts/verify-public.mjs <base-url>` is the local
+check of a served registry, and local-host success does not close the
+public-site gate.
 
 `mise run ui-docs-build` installs all registry items into the docs consumer and
 exports `/registry-gallery/` with the production Next build. The generated
@@ -451,8 +468,9 @@ Playwright defaults to **no snapshot updates**. For an intentional visual change
 run `mise run ui-e2e -- --update-snapshots`, inspect the changed PNGs, record the
 reason in the pull request, and then rerun `mise run ui-e2e` without that flag.
 Baselines use pinned Chromium 145, local Fontsource faces, UTC and en-US at 1×.
-Only the volatile calculation timestamp is masked. The CI gallery job uses macOS;
-these baselines do not certify rendering on other operating systems.
+Only the volatile calculation timestamp is masked. Baselines are recorded on
+macOS with the pinned Chromium and do not certify rendering on other operating
+systems.
 
 The shared docs gallery proves composition. Independent installation and desktop
 publishing have separate gates and evidence.
@@ -490,8 +508,8 @@ consumers (default 1). A focused diagnostic run can invoke
 `REGISTRY_INSTALL_ITEMS=finstack-chart,cashflow-viewer`; its report is explicitly a
 subset and cannot satisfy `ui-install`. The faster workbench check,
 `node finstack-quant-ui/tests/browser/install-smoke.mjs` after
-`mise run ui-docs-install`, remains available. The dedicated CI `ui-install` job consumes the gallery
-job's fresh native packages and runs the complete gate.
+`mise run ui-docs-install`, remains available. `mise run ui-install` is a local
+gate run on demand against fresh native packages, not a CI job.
 
 ## Printing completed valuations
 

@@ -1,7 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import prettier from "prettier";
+import { emit } from "../../../scripts/fixture-output.mjs";
 const repository = new URL("../../../../", import.meta.url);
 const read = async (path) =>
   JSON.parse(await readFile(new URL(path, repository), "utf8"));
@@ -12,7 +12,12 @@ const manifestPath =
   "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json";
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
 const manifest = await read(manifestPath);
+// Pinned inputs: the JSON files this fixture is built from. The manifest also
+// supplies request fields and patches; drift there is caught by `--check`, not
+// by this pin list, so its other cases do not invalidate these flows.
+const paths = new Set([bondPath]);
 async function source(source) {
+  paths.add(source.path);
   let value = await read(source.path);
   for (const key of source.pointer) value = value[key];
   return value;
@@ -67,13 +72,6 @@ const cases = inputs.map(({ type, request }) => {
   }
   return { type, request, pricedValue: priced.value, cashflows, error };
 });
-const paths = new Set([manifestPath, bondPath]);
-for (const entry of manifest.cases.filter(
-  (c) => inputs.some((i) => i.type === c.type) && c.type !== "bond",
-)) {
-  paths.add(entry.instrumentSource.path);
-  paths.add(entry.marketSource.path);
-}
 const sources = await Promise.all(
   [...paths].map(async (path) => ({
     path,
@@ -82,19 +80,12 @@ const sources = await Promise.all(
       .digest("hex"),
   })),
 );
-const output = await prettier.format(
+await emit(
+  new URL("cases.json", import.meta.url),
   JSON.stringify({
     description:
       "Serialized native cashflow envelopes; no inferred row schema or financial reconciliation.",
     sources,
     cases,
   }),
-  { parser: "json" },
 );
-const target = new URL("cases.json", import.meta.url);
-if (process.argv.includes("--check")) {
-  if ((await readFile(target, "utf8")) !== output)
-    throw new Error(
-      "Cashflow fixtures drifted; review canonical changes before regenerating.",
-    );
-} else await writeFile(target, output);

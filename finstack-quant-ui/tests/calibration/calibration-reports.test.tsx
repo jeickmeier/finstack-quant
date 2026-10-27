@@ -41,7 +41,10 @@ it("covers every discovered calibration envelope and original source digest", ()
     const source = readFileSync(
       resolve(dirname(fileURLToPath(import.meta.url)), "../../..", c.source),
     );
-    expect(createHash("sha256").update(source).digest("hex")).toBe(c.sha256);
+    expect(
+      createHash("sha256").update(source).digest("hex"),
+      `${c.source} changed since tests/calibration/generate.mjs ran; rerun mise run ui-fixtures`,
+    ).toBe(c.sha256);
   }
 });
 it("plots every native signed residual by its original step/quote label with a zero target", () => {

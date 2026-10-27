@@ -8,15 +8,14 @@ Upgrade by re-adding the items you use; no in-place update or compatibility laye
 is provided. The registry's version and matching WASM version are included in
 each item's metadata.
 
-Version **0.2.0** is prepared for publication. Public installation is available
-only after the registry has merged and deployed from `master`. Until then, use
-the local source workflow below.
+Version **0.2.0** is prepared for publication. No workflow deploys the public
+namespace today, so use the local source workflow below.
 
 ## Review and re-add
 
 Commit your application's current source first. Review each item's metadata and
-the CLI preview, including changes to shared dependencies. Once the public
-registry is deployed, a presentation-only item can be reviewed and re-added with:
+the CLI preview, including changes to shared dependencies. Against a served
+registry, a presentation-only item can be reviewed and re-added with:
 
 ```sh
 npx --yes shadcn@4.21.0 view @finstack/finstack-chart

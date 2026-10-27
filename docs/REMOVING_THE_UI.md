@@ -59,8 +59,11 @@ uv run --no-sync python scripts/generation_digest.py --write-manifest
 manifest paragraph in `scripts/README.md` describes the instrument JSON
 examples and the WASM TypeScript declarations, so it stays accurate.
 
-In `.github/workflows/checks.yml`, delete the lint job step
-`Install component registry dependencies` (`mise run ui-sync`).
+In `.github/workflows/checks.yml`, delete the `Test UI` job and the
+Generated artifacts job step `Install component registry dependencies`
+(`mise run ui-sync`); drop the `Test UI` row, the fast-tier mentions of the
+component-registry check and the `ui-check` sentence from
+`.github/workflows/README.md`.
 
 ## Keep the analyst reader, drop the gallery
 
@@ -94,7 +97,8 @@ Then edit:
 ## Remove tasks
 
 Delete the `[tasks.ui-*]` block in `mise.toml`, from `ui-sync` through
-`ui-publish-check`, including the section header that introduces it.
+`ui-publish-check`, including the section header that introduces it, and the
+`{ task = "ui-check" }` entry in `all-ci`.
 
 ## Delete the package
 
@@ -107,8 +111,8 @@ Update the remaining mentions:
 - `README.md`: the tree entry for `finstack-quant-ui/` and the
   "UI components and docs site" section. Keep the `docs-site/` description
   for the analyst reader.
-- `AGENTS.md`: the two bullets that tell agents to regenerate UI
-  valuation-detail and cashflow fixtures after WASM source changes.
+- `AGENTS.md`: the bullet that tells agents to regenerate UI native fixtures
+  with `mise run ui-fixtures` after a WASM rebuild.
 
 Search the tree for `finstack-quant-ui` and `ui-docs-install`. The OSV
 scan in `mise.toml` lists `Cargo.lock`, `uv.lock`, and

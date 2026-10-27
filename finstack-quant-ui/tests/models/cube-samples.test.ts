@@ -67,9 +67,10 @@ it("uses the fresh native 07 calibration output, with missing shifts preserved i
     fileURLToPath(new URL(`../../../${fixture.source}`, import.meta.url)),
     "utf8",
   );
-  expect(createHash("sha256").update(source).digest("hex")).toBe(
-    fixture.sha256,
-  );
+  expect(
+    createHash("sha256").update(source).digest("hex"),
+    `${fixture.source} changed since tests/core/cubes/generate.mjs ran; rerun mise run ui-fixtures`,
+  ).toBe(fixture.sha256);
   const actual = native.calibrate(source).result.final_market.vol_cubes[0];
   expect(cubes.find((c) => c.id === actual.id)).toEqual(actual);
 });

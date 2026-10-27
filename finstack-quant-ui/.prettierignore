@@ -6,6 +6,7 @@ src/contract-provenance.json
 
 public/r
 .consumer-*
+.worker-test-*
 
 test-results/
 playwright-report/

@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { emit } from "../../../scripts/fixture-output.mjs";
 const native = createRequire(import.meta.url)(
   "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -71,18 +72,14 @@ const supplemental = {
 };
 const handle = native.MarketContext.fromJson(JSON.stringify(supplemental));
 try {
-  await writeFile(
+  await emit(
     new URL("./cases.json", import.meta.url),
-    JSON.stringify(
-      {
-        source,
-        sha256: createHash("sha256").update(input).digest("hex"),
-        calibrated,
-        supplemental: JSON.parse(handle.toJson()),
-      },
-      null,
-      2,
-    ) + "\n",
+    JSON.stringify({
+      source,
+      sha256: createHash("sha256").update(input).digest("hex"),
+      calibrated,
+      supplemental: JSON.parse(handle.toJson()),
+    }),
   );
 } finally {
   handle.free();

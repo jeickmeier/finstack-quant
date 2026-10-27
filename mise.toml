@@ -124,6 +124,8 @@ run = [
   { task = "pre-commit-run" },
   { task = "gen-check" },
   { task = "all-test" },
+  # ui-check's Vitest needs the dev web and Node WASM packages all-test builds.
+  { task = "ui-check" },
   { task = "all-audit" },
   '''
   if [ "${usage_full:-false}" = "true" ] || [ "${usage_release:-false}" = "true" ]; then
@@ -584,6 +586,11 @@ run = [
 description = "Build the WASM web package for development (wasm-pkg for release)"
 run = "wasm-pack build finstack-quant-wasm --target web --dev --out-dir pkg"
 
+[tasks.wasm-build-node]
+# The Node twin of wasm-build; wasm-test runs both.
+description = "Build the WASM Node package for development (wasm-pkg for release)"
+run = "wasm-pack build finstack-quant-wasm --target nodejs --dev --out-dir pkg-node"
+
 [tasks.wasm-pkg]
 description = "Build the release WASM packages (web + node targets)"
 run = [
@@ -605,7 +612,7 @@ if [ "${usage_doctest:-false}" = "true" ]; then
 fi
 npm --prefix finstack-quant-wasm run test
 mise run wasm-build
-wasm-pack build finstack-quant-wasm --target nodejs --dev --out-dir pkg-node
+mise run wasm-build-node
 npm --prefix finstack-quant-wasm run test:facade
 npm --prefix finstack-quant-wasm run docs:check-sync
 '''
@@ -660,8 +667,21 @@ description = "Run the UI Vitest tests"
 run = "npm --prefix finstack-quant-ui run test --"
 
 [tasks.ui-check]
-description = "Check registry generation drift, types and focused tests"
+description = "Check registry generation drift, native fixtures, types and focused tests"
 run = "npm --prefix finstack-quant-ui run check"
+
+[tasks.ui-fixtures]
+# Needs the Node WASM package (finstack-quant-wasm/pkg-node): wasm-build-node
+# (also run by wasm-test) or wasm-pkg.
+description = "Regenerate the native UI fixtures in dependency order (--check verifies the committed ones)"
+usage = 'flag "--check" help="Verify every committed fixture matches a fresh regeneration instead of writing"'
+run = '''
+set -e
+if [ "${usage_check:-false}" = "true" ]; then
+  exec node finstack-quant-ui/scripts/run-fixtures.mjs --check
+fi
+node finstack-quant-ui/scripts/run-fixtures.mjs
+'''
 
 [tasks.ui-build]
 description = "Build the component-registry distribution"
