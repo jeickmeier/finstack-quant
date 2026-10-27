@@ -1,8 +1,6 @@
 import { createRequire } from "node:module";
-import { readFile, writeFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import prettier from "prettier";
 import { pricingCases } from "../../browser/cases.mjs";
+import { checking, emit } from "../../../scripts/fixture-output.mjs";
 const native = createRequire(import.meta.url)(
   "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -17,7 +15,6 @@ const result = native.priceInstrument(
   request.metricPricingOverrides,
   request.marketHistory,
 );
-const root = new URL("../../../src/fixtures/results/", import.meta.url);
 const fixture = {
   request,
   result,
@@ -32,19 +29,11 @@ const fixture = {
     "bucketed_dv01::USD-OIS::30y",
     "bucketed_dv01::USD-OIS::10y",
   ]),
-  facadeWasmSha256: createHash("sha256")
-    .update(
-      await readFile(
-        new URL(
-          "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm_bg.wasm",
-          import.meta.url,
-        ),
-      ),
-    )
-    .digest("hex"),
 };
-await writeFile(
-  new URL("bond.json", root),
-  await prettier.format(JSON.stringify(fixture), { parser: "json" }),
+await emit(
+  new URL("../../../src/fixtures/results/bond.json", import.meta.url),
+  JSON.stringify(fixture),
 );
-console.log("Generated native bond valuation fixture and metric groups.");
+console.log(
+  `${checking ? "Checked" : "Generated"} the native bond valuation fixture and metric groups.`,
+);

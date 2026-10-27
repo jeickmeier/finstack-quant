@@ -82,6 +82,7 @@ it("pins authoritative fixture sources and exact current native exports", () => 
       createHash("sha256")
         .update(readFileSync(resolve(repository, source.path)))
         .digest("hex"),
+      `${source.path} changed since tests/valuations/cashflows/generate.mjs ran; rerun mise run ui-fixtures`,
     ).toBe(source.sha256);
   for (const entry of fixture.cases) {
     const r = entry.request;

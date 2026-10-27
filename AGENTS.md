@@ -42,8 +42,7 @@
 - CI additionally runs OSV-Scanner across `Cargo.lock`, `uv.lock`, and `package-lock.json` for cross-ecosystem CVE coverage
 - Clippy runs with `-D warnings`; all warnings are treated as errors
 - Do not run `cargo test` or `cargo clippy` directly during agent work; use the scoped `mise run rust-*` tasks
-- UI valuation-detail fixtures pin WASM source hashes. After intentional source changes and rebuilding WASM, regenerate with `node finstack-quant-ui/tests/valuations/details/generate.mjs`, then refresh their gallery copies with `node finstack-quant-ui/scripts/gen-gallery.mjs`; verify with `mise run ui-test -- tests/valuations/details.test.tsx`.
-- UI cashflow and valuation-detail fixtures also pin the exact bytes of `finstack-quant-ui/src/fixtures/results/bond.json`. After changing or formatting that fixture, refresh its dependents with `node finstack-quant-ui/tests/valuations/cashflows/generate.mjs` and `node finstack-quant-ui/tests/valuations/details/generate.mjs`, review the result diffs, then run `node finstack-quant-ui/scripts/gen-gallery.mjs`. `ui-fmt` does not refresh these provenance hashes.
+- UI native fixtures (the `tests/**/cases.json` and `tests/calibration/failure.json` outputs of `finstack-quant-ui/tests/**/generate.mjs`, `src/fixtures/results/bond.json`, the statements `analyst-result.json` and `analyst-check-report.json`, and the curve-link example `market.json`) are regenerated in dependency order by `mise run ui-fixtures` after a WASM rebuild; `mise run ui-fixtures --check` (part of `mise run ui-check`) verifies them and names the generator to rerun. Regenerate them in the same commit as the Rust change that moves them. `ui-fmt` does not refresh them.
 
 ## Clippy Strictness
 

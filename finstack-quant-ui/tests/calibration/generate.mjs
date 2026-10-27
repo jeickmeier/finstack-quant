@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { emit } from "../../scripts/fixture-output.mjs";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -32,10 +33,7 @@ cases.push({
   input: diagnosticInput,
   result: native.calibrate(JSON.stringify(diagnosticInput)),
 });
-await writeFile(
-  new URL("./cases.json", import.meta.url),
-  JSON.stringify(cases, null, 2) + "\n",
-);
+await emit(new URL("./cases.json", import.meta.url), JSON.stringify(cases));
 
 const solver = structuredClone(
   cases.find((c) => c.source.includes("08_equity")).input,
@@ -48,7 +46,7 @@ try {
   throw new Error("Expected solver failure");
 } catch (error) {
   if (error.kind !== "solver_not_converged") throw error;
-  await writeFile(
+  await emit(
     new URL("./failure.json", import.meta.url),
     JSON.stringify(
       Object.fromEntries(
@@ -56,8 +54,6 @@ try {
           .filter((key) => key !== "stack" && error[key] !== undefined)
           .map((key) => [key, error[key]]),
       ),
-      null,
-      2,
-    ) + "\n",
+    ),
   );
 }

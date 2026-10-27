@@ -100,8 +100,11 @@ it("retains native constructor/evaluator failures and frees handles after evalua
       resources(): Promise<{ fxConstructed: number; fxFreed: number }>;
     }
   ).resources();
-  expect(after.fxConstructed - before.fxConstructed).toBe(3);
-  expect(after.fxFreed - before.fxFreed).toBe(3);
+  // The native constructor rejects two variants before a handle exists (the
+  // rr_10d/bf_10d pairing and the wing validation of an absurd rr_25d); the
+  // negative strike and the NaN forward fail in the evaluator after construction.
+  expect(after.fxConstructed - before.fxConstructed).toBe(2);
+  expect(after.fxFreed - before.fxFreed).toBe(2);
 });
 it("snapshots complete request keys, disables missing requests and distinguishes non-finite native inputs", async () => {
   const seen: FxDeltaSampleRequest[] = [];

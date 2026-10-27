@@ -10,7 +10,10 @@
     "schema_version": 1,
     "instrument_id": "US912828XG33",
     "as_of": "2025-01-01",
-    "value": { "amount": "1000438.964391248", "currency": "USD" },
+    "value": {
+      "amount": "1000438.964391248",
+      "currency": "USD"
+    },
     "measures": {
       "ytm": 0.04192805926047216,
       "dv01": -99.2633986165165,
@@ -34,7 +37,9 @@
         "mode": "bankers",
         "ingest_scale_by_currency": {},
         "output_scale_by_currency": {},
-        "tolerances": { "generic_epsilon": 1e-10 },
+        "tolerances": {
+          "generic_epsilon": 1e-10
+        },
         "version": 1
       },
       "fx_policy_applied": null,
@@ -434,6 +439,5 @@
       "group": "Sensitivity",
       "bucketed": true
     }
-  ],
-  "facadeWasmSha256": "99fa6424bbcd4bb3ad9edeb0b33cf4935b217e84d72f75e2efec8aa976aedb1e"
+  ]
 }

@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { writeFile } from "node:fs/promises";
+import { emit } from "../../../scripts/fixture-output.mjs";
 import { pricingCases } from "../../browser/cases.mjs";
 const native = createRequire(import.meta.url)(
   "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -107,12 +107,12 @@ market.curves.push(
 );
 const state = native.MarketContext.fromJson(JSON.stringify(market));
 try {
-  await writeFile(
+  await emit(
     new URL(
       "../../../registry/core/components/curve-link-example/market.json",
       import.meta.url,
     ),
-    JSON.stringify(JSON.parse(state.toJson()), null, 2) + "\n",
+    state.toJson(),
   );
 } finally {
   state.free();

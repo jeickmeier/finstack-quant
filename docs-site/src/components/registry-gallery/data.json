@@ -440,8 +440,7 @@
         "group": "Sensitivity",
         "bucketed": true
       }
-    ],
-    "facadeWasmSha256": "99fa6424bbcd4bb3ad9edeb0b33cf4935b217e84d72f75e2efec8aa976aedb1e"
+    ]
   },
   "market": {
     "source": "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json",
@@ -1707,7 +1706,7 @@
             1.0194444444444444, 1.525
           ],
           "interp_style": "linear",
-          "extrapolation": "flat_forward",
+          "extrapolation": "flat_zero",
           "rate_calibration": {
             "currency": "USD",
             "method": {
@@ -1840,64 +1839,64 @@
           "tenors": [2, 5, 10],
           "params": [
             {
-              "alpha": 0.006723139967310844,
+              "alpha": 0.006496448518064836,
               "beta": 0,
-              "rho": 0.4793626551753536,
-              "nu": 1.0928190711751329
+              "rho": 0.32101691434637747,
+              "nu": 0.9649698822311166
             },
             {
-              "alpha": 0.0066107798139045295,
+              "alpha": 0.006062816228028858,
               "beta": 0,
-              "rho": 0.39986987343960156,
-              "nu": 0.4615772966385814
+              "rho": 0.3400112844829468,
+              "nu": 0.9381206569591877
             },
             {
-              "alpha": 0.006200289347217021,
+              "alpha": 0.005622065965942041,
               "beta": 0,
-              "rho": 0.99,
-              "nu": 0.034512472936540285
+              "rho": 0.35710071642903807,
+              "nu": 0.9063292466423503
             },
             {
-              "alpha": 0.0069904243735239265,
+              "alpha": 0.006453468797085423,
               "beta": 0,
-              "rho": 0.39496148667319836,
-              "nu": 0.6770947953045241
+              "rho": 0.2993946129288222,
+              "nu": 0.8778945981594537
             },
             {
-              "alpha": 0.006793413854226229,
+              "alpha": 0.006042817812337274,
               "beta": 0,
-              "rho": 0.3325143901329624,
-              "nu": 0.3351530368681173
+              "rho": 0.3109821550365346,
+              "nu": 0.8544190793995216
             },
             {
-              "alpha": 0.006400049571223851,
+              "alpha": 0.005536668439191563,
               "beta": 0,
-              "rho": 0.99,
-              "nu": 0.034724632751183426
+              "rho": 0.35243742604897205,
+              "nu": 0.8928554355277157
             },
             {
-              "alpha": 0.007756567398446069,
+              "alpha": 0.006247005290583878,
               "beta": 0,
-              "rho": 0.2955215329100774,
-              "nu": 0.29407829807191527
+              "rho": 0.2871259678796235,
+              "nu": 0.8172841326234701
             },
             {
-              "alpha": 0.007300463942612639,
+              "alpha": 0.005833429937059842,
               "beta": 0,
-              "rho": 0.29004832782638107,
-              "nu": 0.19308127863044847
+              "rho": 0.2992937277367013,
+              "nu": 0.7973256120131195
             },
             {
-              "alpha": 0.0066937800930470075,
+              "alpha": 0.005341987763042076,
               "beta": 0,
-              "rho": 0.4223563650092893,
-              "nu": 0.05388895612160349
+              "rho": 0.3156917798967264,
+              "nu": 0.7724834379379659
             }
           ],
           "forwards": [
-            0.0547125361247418, 0.057797454939160615, 0.06259508935136313,
-            0.0568251428472219, 0.059771595860979694, 0.06440796416051164,
-            0.06300824410944643, 0.06594397504458184, 0.07054742772529951
+            0.05295767699261977, 0.053008678319534756, 0.05302443450182165,
+            0.053006466073848346, 0.053020571564816044, 0.05301983418772423,
+            0.05303257494679471, 0.0530294414011275, 0.053039025037775196
           ],
           "interpolation_mode": "vol"
         }
@@ -2345,7 +2344,7 @@
     },
     {
       "source": "finstack-quant/calibration/examples/market_bootstrap/02_usd_3m_forward_curve.json",
-      "sha256": "3275b6522ba581709d113755c8ae9c1a8f7914c9c8875ae922bddbae8661dcd1",
+      "sha256": "616f3203a91c34dedddd6b7d63be83bd60b44be496d0e4c0070da4590d12cd06",
       "input": {
         "$schema": "../../schemas/calibration/1/calibration.schema.json",
         "schema": "finstack_quant.calibration/1",
@@ -2401,7 +2400,7 @@
                   "use_analytical_jacobian": false
                 }
               },
-              "interpolation": "monotone_convex",
+              "interpolation": "cubic_hermite",
               "conventions": {
                 "curve_day_count": null,
                 "ois_compounding": null
@@ -2761,8 +2760,8 @@
                   0, 0.2611111111111111, 0.5138888888888888, 0.7666666666666667,
                   1.0194444444444444, 1.525
                 ],
-                "interp_style": "monotone_convex",
-                "extrapolation": "flat_forward",
+                "interp_style": "cubic_hermite",
+                "extrapolation": "flat_zero",
                 "rate_calibration": {
                   "currency": "USD",
                   "method": {
@@ -2982,11 +2981,11 @@
                 "invalid_eval_count": "0",
                 "lm_final_step_norm": "0.00e0",
                 "lm_final_weighted_resid_l2_norm": "8.79e-18",
-                "lm_jacobian_evals": "1",
+                "lm_jacobian_evals": "0",
                 "lm_lambda_final": "1.00e-3",
                 "lm_termination_reason": "ConvergedResidualNorm",
-                "residual_closure_evals": "11",
-                "residual_evals": "11",
+                "residual_closure_evals": "1",
+                "residual_evals": "1",
                 "solver_max_iterations": "100",
                 "solver_tolerance": "1.00e-12",
                 "tolerance_definition": "max_abs_residual",
@@ -7047,7 +7046,7 @@
                 "calibrated_expiry_count": "3",
                 "expiry_extrapolation_policy": "clamp",
                 "sabr_parameters_at_bounds": "T=0.109589:nu;T=0.361644:nu;T=0.610959:nu",
-                "sabr_residual_evaluations": "T=0.109589:388;T=0.361644:347;T=0.610959:371",
+                "sabr_residual_evaluations": "T=0.109589:208;T=0.361644:185;T=0.610959:197",
                 "sabr_winning_iterations": "T=0.109589:26;T=0.361644:22;T=0.610959:23",
                 "sabr_winning_starts": "T=0.109589:alpha=0.36030000,nu=0.40000000,rho=0.60000000;T=0.361644:alpha=0.37000000,nu=0.90000000,rho=0.00000000;T=0.610959:alpha=0.38000000,nu=0.90000000,rho=0.60000000",
                 "solver_max_iterations": "100",
@@ -7978,7 +7977,7 @@
                   1.0194444444444444, 1.525
                 ],
                 "interp_style": "linear",
-                "extrapolation": "flat_forward",
+                "extrapolation": "flat_zero",
                 "rate_calibration": {
                   "currency": "USD",
                   "method": {
@@ -8074,64 +8073,65 @@
                 "tenors": [2, 5, 10],
                 "params": [
                   {
-                    "alpha": 0.006723139967310844,
+                    "alpha": 0.006496448518064836,
                     "beta": 0,
-                    "rho": 0.4793626551753536,
-                    "nu": 1.0928190711751329
+                    "rho": 0.32101691434637747,
+                    "nu": 0.9649698822311166
                   },
                   {
-                    "alpha": 0.0066107798139045295,
+                    "alpha": 0.006062816228028858,
                     "beta": 0,
-                    "rho": 0.39986987343960156,
-                    "nu": 0.4615772966385814
+                    "rho": 0.3400112844829468,
+                    "nu": 0.9381206569591877
                   },
                   {
-                    "alpha": 0.006200289347217021,
+                    "alpha": 0.005622065965942041,
                     "beta": 0,
-                    "rho": 0.99,
-                    "nu": 0.034512472936540285
+                    "rho": 0.35710071642903807,
+                    "nu": 0.9063292466423503
                   },
                   {
-                    "alpha": 0.0069904243735239265,
+                    "alpha": 0.006453468797085423,
                     "beta": 0,
-                    "rho": 0.39496148667319836,
-                    "nu": 0.6770947953045241
+                    "rho": 0.2993946129288222,
+                    "nu": 0.8778945981594537
                   },
                   {
-                    "alpha": 0.006793413854226229,
+                    "alpha": 0.006042817812337274,
                     "beta": 0,
-                    "rho": 0.3325143901329624,
-                    "nu": 0.3351530368681173
+                    "rho": 0.3109821550365346,
+                    "nu": 0.8544190793995216
                   },
                   {
-                    "alpha": 0.006400049571223851,
+                    "alpha": 0.005536668439191563,
                     "beta": 0,
-                    "rho": 0.99,
-                    "nu": 0.034724632751183426
+                    "rho": 0.35243742604897205,
+                    "nu": 0.8928554355277157
                   },
                   {
-                    "alpha": 0.007756567398446069,
+                    "alpha": 0.006247005290583878,
                     "beta": 0,
-                    "rho": 0.2955215329100774,
-                    "nu": 0.29407829807191527
+                    "rho": 0.2871259678796235,
+                    "nu": 0.8172841326234701
                   },
                   {
-                    "alpha": 0.007300463942612639,
+                    "alpha": 0.005833429937059842,
                     "beta": 0,
-                    "rho": 0.29004832782638107,
-                    "nu": 0.19308127863044847
+                    "rho": 0.2992937277367013,
+                    "nu": 0.7973256120131195
                   },
                   {
-                    "alpha": 0.0066937800930470075,
+                    "alpha": 0.005341987763042076,
                     "beta": 0,
-                    "rho": 0.4223563650092893,
-                    "nu": 0.05388895612160349
+                    "rho": 0.3156917798967264,
+                    "nu": 0.7724834379379659
                   }
                 ],
                 "forwards": [
-                  0.0547125361247418, 0.057797454939160615, 0.06259508935136313,
-                  0.0568251428472219, 0.059771595860979694, 0.06440796416051164,
-                  0.06300824410944643, 0.06594397504458184, 0.07054742772529951
+                  0.05295767699261977, 0.053008678319534756,
+                  0.05302443450182165, 0.053006466073848346,
+                  0.053020571564816044, 0.05301983418772423,
+                  0.05303257494679471, 0.0530294414011275, 0.053039025037775196
                 ],
                 "interpolation_mode": "vol"
               }
@@ -8152,40 +8152,40 @@
               "USD-SOFR-3M:FRA-SOFR-3M-3X6:tolerance_ratio": 1.7088872182083668e-10,
               "USD-SOFR-3M:FRA-SOFR-3M-6X9:tolerance_ratio": 3.375262698809081e-10,
               "USD-SOFR-3M:FRA-SOFR-3M-9X12:tolerance_ratio": 6.666502761828351e-10,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.045:tolerance_ratio": 0.0033765388191218013,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.055:tolerance_ratio": 0.028979976854293214,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.05:tolerance_ratio": 0.0038412372780598455,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.045:tolerance_ratio": 0.21609031443078733,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.055:tolerance_ratio": 0.15065553076828475,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.05:tolerance_ratio": 0.18865169341658605,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.045:tolerance_ratio": 0.20363927706323545,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.055:tolerance_ratio": 0.08708781105321087,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.05:tolerance_ratio": 0.3215806260034078,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.045:tolerance_ratio": 0.07602974842240683,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.055:tolerance_ratio": 0.15070697580326445,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.05:tolerance_ratio": 0.103494455472927,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.045:tolerance_ratio": 0.15587875921554684,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.055:tolerance_ratio": 0.14132422365252933,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.05:tolerance_ratio": 0.2036342672342359,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.045:tolerance_ratio": 0.22652000739596204,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.055:tolerance_ratio": 0.10894110110412115,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.05:tolerance_ratio": 0.29921078729152245,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.045:tolerance_ratio": 0.12871064056519815,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.055:tolerance_ratio": 0.16154421480519693,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.05:tolerance_ratio": 0.2231830196647051,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.045:tolerance_ratio": 0.14755606358607917,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.055:tolerance_ratio": 0.1417308984539376,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.05:tolerance_ratio": 0.24060142607778243,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.045:tolerance_ratio": 0.16846869995836705,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.055:tolerance_ratio": 0.10910534831939933,
-              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.05:tolerance_ratio": 0.260089284947829
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.045:tolerance_ratio": 0.049848892617861476,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.055:tolerance_ratio": 0.09180918973159385,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.05:tolerance_ratio": 0.09959881406830749,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.045:tolerance_ratio": 0.0549154603912474,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.055:tolerance_ratio": 0.09305082582818959,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.05:tolerance_ratio": 0.09636910376473416,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.045:tolerance_ratio": 0.06188518069473979,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.055:tolerance_ratio": 0.09310506024497467,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.05:tolerance_ratio": 0.09434283984546012,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.045:tolerance_ratio": 0.03472882514942629,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.055:tolerance_ratio": 0.08695342139363078,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.05:tolerance_ratio": 0.08432147719610386,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.045:tolerance_ratio": 0.03514575517246076,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.055:tolerance_ratio": 0.0853415647188091,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.05:tolerance_ratio": 0.08345929329877631,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.045:tolerance_ratio": 0.04593994419992085,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.055:tolerance_ratio": 0.10211206987029905,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.05:tolerance_ratio": 0.09443684469615081,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.045:tolerance_ratio": 0.02734075927204524,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.055:tolerance_ratio": 0.08356139106382766,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.05:tolerance_ratio": 0.08425224989656865,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.045:tolerance_ratio": 0.0284393779444615,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.055:tolerance_ratio": 0.08456596938752742,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.05:tolerance_ratio": 0.08369885653763433,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.045:tolerance_ratio": 0.028531421313581863,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.055:tolerance_ratio": 0.08411633588982619,
+              "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.05:tolerance_ratio": 0.08284471705440517
             },
-            "iterations": 1173,
-            "objective_value": 0.1483344882200064,
-            "max_residual": 0.0004823709390051117,
-            "rmse": 0.0002225017307931504,
-            "max_residual_ratio": 0.3215806260034078,
-            "rmse_ratio": 0.1483344882200064,
+            "iterations": 910,
+            "objective_value": 0.06500151529977147,
+            "max_residual": 0.00015316810480544858,
+            "rmse": 0.0000975022694425202,
+            "max_residual_ratio": 0.10211206987029905,
+            "rmse_ratio": 0.06500151529977147,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -8214,8 +8214,8 @@
               "fx_policy_applied": null,
               "version": "0.11.0"
             },
-            "worst_quote_id": "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.05:tolerance_ratio",
-            "worst_quote_residual": 0.3215806260034078,
+            "worst_quote_id": "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.055:tolerance_ratio",
+            "worst_quote_residual": 0.10211206987029905,
             "solver_method": "plan_execution",
             "residual_units": "absolute_residual_over_step_tolerance"
           },
@@ -8293,11 +8293,11 @@
                 "invalid_eval_count": "0",
                 "lm_final_step_norm": "0.00e0",
                 "lm_final_weighted_resid_l2_norm": "8.79e-18",
-                "lm_jacobian_evals": "1",
+                "lm_jacobian_evals": "0",
                 "lm_lambda_final": "1.00e-3",
                 "lm_termination_reason": "ConvergedResidualNorm",
-                "residual_closure_evals": "11",
-                "residual_evals": "11",
+                "residual_closure_evals": "1",
+                "residual_evals": "1",
                 "solver_max_iterations": "100",
                 "solver_tolerance": "1.00e-12",
                 "tolerance_definition": "max_abs_residual",
@@ -8331,40 +8331,40 @@
             "USD-SWAPTION-NORMAL-VOL-STEP": {
               "success": true,
               "residuals": {
-                "USD-SWPTN-VOL-20270508-20290511-0.045": -0.000005064808228682702,
-                "USD-SWPTN-VOL-20270508-20290511-0.05": 0.0000057618559170897685,
-                "USD-SWPTN-VOL-20270508-20290511-0.055": 0.00004346996528143982,
-                "USD-SWPTN-VOL-20270508-20320511-0.045": -0.000324135471646181,
-                "USD-SWPTN-VOL-20270508-20320511-0.05": 0.0002829775401248791,
-                "USD-SWPTN-VOL-20270508-20320511-0.055": -0.00022598329615242715,
-                "USD-SWPTN-VOL-20270508-20370511-0.045": -0.0003054589155948532,
-                "USD-SWPTN-VOL-20270508-20370511-0.05": 0.0004823709390051117,
-                "USD-SWPTN-VOL-20270508-20370511-0.055": -0.0001306317165798163,
-                "USD-SWPTN-VOL-20280508-20300510-0.045": -0.00011404462263361025,
-                "USD-SWPTN-VOL-20280508-20300510-0.05": 0.0001552416832093905,
-                "USD-SWPTN-VOL-20280508-20300510-0.055": -0.00022606046370489668,
-                "USD-SWPTN-VOL-20280508-20330510-0.045": -0.00023381813882332025,
-                "USD-SWPTN-VOL-20280508-20330510-0.05": 0.00030545140085135383,
-                "USD-SWPTN-VOL-20280508-20330510-0.055": -0.000211986335478794,
-                "USD-SWPTN-VOL-20280508-20380510-0.045": -0.00033978001109394307,
-                "USD-SWPTN-VOL-20280508-20380510-0.05": 0.0004488161809372837,
-                "USD-SWPTN-VOL-20280508-20380510-0.055": -0.00016341165165618173,
-                "USD-SWPTN-VOL-20310508-20330512-0.045": -0.00019306596084779724,
-                "USD-SWPTN-VOL-20310508-20330512-0.05": 0.00033477452949705767,
-                "USD-SWPTN-VOL-20310508-20330512-0.055": -0.0002423163222077954,
-                "USD-SWPTN-VOL-20310508-20360512-0.045": -0.00022133409537911878,
-                "USD-SWPTN-VOL-20310508-20360512-0.05": 0.00036090213911667366,
-                "USD-SWPTN-VOL-20310508-20360512-0.055": -0.00021259634768090643,
-                "USD-SWPTN-VOL-20310508-20410512-0.045": -0.0002527030499375506,
-                "USD-SWPTN-VOL-20310508-20410512-0.05": 0.00039013392742174354,
-                "USD-SWPTN-VOL-20310508-20410512-0.055": -0.000163658022479099
+                "USD-SWPTN-VOL-20270508-20290511-0.045": -0.00007477333892679221,
+                "USD-SWPTN-VOL-20270508-20290511-0.05": 0.00014939822110246123,
+                "USD-SWPTN-VOL-20270508-20290511-0.055": 0.00013771378459739077,
+                "USD-SWPTN-VOL-20270508-20320511-0.045": -0.0000823731905868711,
+                "USD-SWPTN-VOL-20270508-20320511-0.05": 0.00014455365564710124,
+                "USD-SWPTN-VOL-20270508-20320511-0.055": 0.00013957623874228439,
+                "USD-SWPTN-VOL-20270508-20370511-0.045": -0.00009282777104210969,
+                "USD-SWPTN-VOL-20270508-20370511-0.05": 0.00014151425976819017,
+                "USD-SWPTN-VOL-20270508-20370511-0.055": 0.000139657590367462,
+                "USD-SWPTN-VOL-20280508-20300510-0.045": -0.000052093237724139436,
+                "USD-SWPTN-VOL-20280508-20300510-0.05": 0.0001264822157941558,
+                "USD-SWPTN-VOL-20280508-20300510-0.055": 0.00013043013209044618,
+                "USD-SWPTN-VOL-20280508-20330510-0.045": -0.00005271863275869114,
+                "USD-SWPTN-VOL-20280508-20330510-0.05": 0.00012518893994816448,
+                "USD-SWPTN-VOL-20280508-20330510-0.055": 0.00012801234707821366,
+                "USD-SWPTN-VOL-20280508-20380510-0.045": -0.00006890991629988127,
+                "USD-SWPTN-VOL-20280508-20380510-0.05": 0.00014165526704422622,
+                "USD-SWPTN-VOL-20280508-20380510-0.055": 0.00015316810480544858,
+                "USD-SWPTN-VOL-20310508-20330512-0.045": -0.00004101113890806786,
+                "USD-SWPTN-VOL-20310508-20330512-0.05": 0.00012637837484485298,
+                "USD-SWPTN-VOL-20310508-20330512-0.055": 0.0001253420865957415,
+                "USD-SWPTN-VOL-20310508-20360512-0.045": -0.00004265906691669225,
+                "USD-SWPTN-VOL-20310508-20360512-0.05": 0.0001255482848064515,
+                "USD-SWPTN-VOL-20310508-20360512-0.055": 0.00012684895408129112,
+                "USD-SWPTN-VOL-20310508-20410512-0.045": -0.0000427971319703728,
+                "USD-SWPTN-VOL-20310508-20410512-0.05": 0.00012426707558160777,
+                "USD-SWPTN-VOL-20310508-20410512-0.055": 0.00012617450383473928
               },
-              "iterations": 967,
-              "objective_value": 0.00026396315454343017,
-              "max_residual": 0.0004823709390051117,
-              "rmse": 0.00026396315454343017,
+              "iterations": 704,
+              "objective_value": 0.00011567104006538106,
+              "max_residual": 0.00015316810480544858,
+              "rmse": 0.00011567104006538106,
               "validation_passed": true,
-              "convergence_reason": "swaption vol calibration converged: max_residual (4.82e-4) within tolerance (1.50e-3)",
+              "convergence_reason": "swaption vol calibration converged: max_residual (1.53e-4) within tolerance (1.50e-3)",
               "metadata": {
                 "allow_sabr_missing_bucket_fallback": "false",
                 "calibrated_buckets": "9",
@@ -8372,10 +8372,10 @@
                 "failed_buckets": "0",
                 "interpolated_target_points": "6",
                 "sabr_extrapolation_policy": "clamp",
-                "sabr_parameters_at_bounds": "T=1.000000,tenor=10.000000:rho;T=2.002740,tenor=10.000000:rho",
-                "sabr_residual_evaluations": "T=1.000000,tenor=2.000000:85;T=1.000000,tenor=5.000000:210;T=1.000000,tenor=10.000000:160;T=2.002740,tenor=2.000000:125;T=2.002740,tenor=5.000000:165;T=2.002740,tenor=10.000000:160;T=5.002740,tenor=2.000000:160;T=5.002740,tenor=5.000000:140;T=5.002740,tenor=10.000000:140",
-                "sabr_winning_iterations": "T=1.000000,tenor=2.000000:5;T=1.000000,tenor=5.000000:16;T=1.000000,tenor=10.000000:11;T=2.002740,tenor=2.000000:7;T=2.002740,tenor=5.000000:11;T=2.002740,tenor=10.000000:11;T=5.002740,tenor=2.000000:11;T=5.002740,tenor=5.000000:9;T=5.002740,tenor=10.000000:10",
-                "sabr_winning_starts": "T=1.000000,tenor=2.000000:alpha=0.00716161,nu=0.90000000,rho=0.00000000;T=1.000000,tenor=5.000000:alpha=0.00670000,nu=0.40000000,rho=-0.60000000;T=1.000000,tenor=10.000000:alpha=0.00620000,nu=0.15000000,rho=0.60000000;T=2.002740,tenor=2.000000:alpha=0.00740000,nu=0.90000000,rho=0.60000000;T=2.002740,tenor=5.000000:alpha=0.00690000,nu=0.15000000,rho=0.60000000;T=2.002740,tenor=10.000000:alpha=0.00640000,nu=0.90000000,rho=-0.60000000;T=5.002740,tenor=2.000000:alpha=0.00800000,nu=0.15000000,rho=0.00000000;T=5.002740,tenor=5.000000:alpha=0.00740000,nu=0.40000000,rho=0.00000000;T=5.002740,tenor=10.000000:alpha=0.00670000,nu=0.40000000,rho=0.00000000",
+                "sabr_parameters_at_bounds": "",
+                "sabr_residual_evaluations": "T=1.000000,tenor=2.000000:51;T=1.000000,tenor=5.000000:57;T=1.000000,tenor=10.000000:57;T=2.002740,tenor=2.000000:57;T=2.002740,tenor=5.000000:57;T=2.002740,tenor=10.000000:80;T=5.002740,tenor=2.000000:63;T=5.002740,tenor=5.000000:69;T=5.002740,tenor=10.000000:59",
+                "sabr_winning_iterations": "T=1.000000,tenor=2.000000:6;T=1.000000,tenor=5.000000:7;T=1.000000,tenor=10.000000:7;T=2.002740,tenor=2.000000:7;T=2.002740,tenor=5.000000:7;T=2.002740,tenor=10.000000:11;T=5.002740,tenor=2.000000:8;T=5.002740,tenor=5.000000:9;T=5.002740,tenor=10.000000:8",
+                "sabr_winning_starts": "T=1.000000,tenor=2.000000:alpha=0.00692263,nu=0.90000000,rho=0.60000000;T=1.000000,tenor=5.000000:alpha=0.00643035,nu=0.40000000,rho=0.00000000;T=1.000000,tenor=10.000000:alpha=0.00593330,nu=0.15000000,rho=0.00000000;T=2.002740,tenor=2.000000:alpha=0.00717148,nu=0.15000000,rho=0.00000000;T=2.002740,tenor=5.000000:alpha=0.00667193,nu=0.15000000,rho=0.00000000;T=2.002740,tenor=10.000000:alpha=0.00613576,nu=0.15000000,rho=0.60000000;T=5.002740,tenor=2.000000:alpha=0.00777105,nu=0.15000000,rho=0.00000000;T=5.002740,tenor=5.000000:alpha=0.00717136,nu=0.40000000,rho=0.60000000;T=5.002740,tenor=10.000000:alpha=0.00647180,nu=0.90000000,rho=0.00000000",
                 "solver_max_iterations": "100",
                 "solver_tolerance": "1.00e-12",
                 "type": "swaption_vol"
@@ -8398,8 +8398,8 @@
                 "fx_policy_applied": null,
                 "version": "0.11.0"
               },
-              "worst_quote_id": "USD-SWPTN-VOL-20270508-20370511-0.05",
-              "worst_quote_residual": 0.0004823709390051117,
+              "worst_quote_id": "USD-SWPTN-VOL-20280508-20380510-0.055",
+              "worst_quote_residual": 0.00015316810480544858,
               "success_tolerance": 0.0015,
               "solver_method": "per_slice_least_squares",
               "residual_units": "quoted_volatility"
@@ -9069,7 +9069,7 @@
                 "calibrated_expiry_count": "3",
                 "expiry_extrapolation_policy": "clamp",
                 "sabr_parameters_at_bounds": "T=0.252055:rho;T=0.504110:rho;T=1.000000:rho",
-                "sabr_residual_evaluations": "T=0.252055:188;T=0.504110:167;T=1.000000:196",
+                "sabr_residual_evaluations": "T=0.252055:92;T=0.504110:83;T=1.000000:100",
                 "sabr_winning_iterations": "T=0.252055:10;T=0.504110:9;T=1.000000:11",
                 "sabr_winning_starts": "T=0.252055:alpha=3.29160147,nu=0.40000000,rho=-0.60000000;T=0.504110:alpha=3.14325364,nu=0.90000000,rho=0.00000000;T=1.000000:alpha=2.97542361,nu=0.90000000,rho=0.00000000",
                 "solver_max_iterations": "100",
@@ -10683,8 +10683,8 @@
                 "id": "CDX-NA-IG-46_CORR",
                 "detachment_points": [3, 7.000000000000001, 10, 15, 30],
                 "correlations": [
-                  0, 0.16623408332560208, 0.16623408332560208,
-                  0.24864321049650606, 0.24864321049650606
+                  0, 0.16621187961590472, 0.16621187961590472,
+                  0.24862320402891414, 0.24862320402891414
                 ]
               },
               {
@@ -10837,11 +10837,11 @@
           "report": {
             "success": true,
             "residuals": {
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 0.07938758779392774,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 0.0920952226787266,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 0.09209852527834393,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 0.0920953914079845,
-              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 0.09209052211715603,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 0.07938757899179627,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 0.09209522090829379,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 0.09209852661075034,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 0.09209539260831015,
+              "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 0.09209053110071791,
               "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 0.00008897298621869752,
               "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 0.00006845897497001271,
               "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.00009808402725205979,
@@ -10854,12 +10854,12 @@
               "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 0.00002261867848574184,
               "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 0.00004894227458862588
             },
-            "iterations": 951,
-            "objective_value": 0.05014249753913647,
-            "max_residual": 0.00009209852527834393,
-            "rmse": 0.00005014247381015223,
-            "max_residual_ratio": 0.09209852527834393,
-            "rmse_ratio": 0.05014249753913647,
+            "iterations": 950,
+            "objective_value": 0.05014249778684267,
+            "max_residual": 0.00009209852661075034,
+            "rmse": 0.00005014247405785856,
+            "max_residual_ratio": 0.09209852661075034,
+            "rmse_ratio": 0.05014249778684267,
             "validation_passed": true,
             "convergence_reason": "Plan execution completed",
             "metadata": {
@@ -10889,7 +10889,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio",
-            "worst_quote_residual": 0.09209852527834393,
+            "worst_quote_residual": 0.09209852661075034,
             "solver_method": "plan_execution",
             "residual_units": "absolute_residual_over_step_tolerance"
           },
@@ -10945,16 +10945,16 @@
             "CDX-NA-IG-46-BASE-CORR-STEP": {
               "success": true,
               "residuals": {
-                "CDX-IG-46-0-3": -0.00007938758779392774,
-                "CDX-IG-46-10-15": -0.00009209522267872659,
-                "CDX-IG-46-15-30": -0.00009209852527834393,
-                "CDX-IG-46-3-7": -0.0000920953914079845,
-                "CDX-IG-46-7-10": -0.00009209052211715604
+                "CDX-IG-46-0-3": -0.00007938757899179627,
+                "CDX-IG-46-10-15": -0.00009209522090829379,
+                "CDX-IG-46-15-30": -0.00009209852661075034,
+                "CDX-IG-46-3-7": -0.00009209539260831015,
+                "CDX-IG-46-7-10": -0.00009209053110071791
               },
-              "iterations": 305,
-              "objective_value": 0.00008969758399960262,
-              "max_residual": 0.00009209852527834393,
-              "rmse": 0.00008969758399960262,
+              "iterations": 304,
+              "objective_value": 0.00008969758444271317,
+              "max_residual": 0.00009209852661075034,
+              "rmse": 0.00008969758444271317,
               "validation_passed": true,
               "convergence_reason": "generic bootstrap calibration converged: max_residual (9.21e-5) within tolerance (1.00e-3)",
               "metadata": {
@@ -10982,7 +10982,7 @@
                 "version": "0.11.0"
               },
               "worst_quote_id": "CDX-IG-46-15-30",
-              "worst_quote_residual": -0.00009209852527834393,
+              "worst_quote_residual": -0.00009209852661075034,
               "success_tolerance": 0.001,
               "solver_method": "sequential_bootstrap",
               "residual_units": "discounted_upfront_fraction"
@@ -12055,28 +12055,24 @@
     "description": "Serialized native cashflow envelopes; no inferred row schema or financial reconciliation.",
     "sources": [
       {
-        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-        "sha256": "567c909e02b4e8017b5bd26f0a646364853f03e44aecdeaf5016e6134d2672ca"
-      },
-      {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "00097ad3f67daa576167d30f2e82efeb25353f506214028099c9cacbee78a35d"
-      },
-      {
-        "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",
-        "sha256": "bb728c8ffcf3c8ee6136e4c1956bf2333eda6e168f4e3b590af9a2fd1abbbfdd"
-      },
-      {
-        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
+        "sha256": "258d9b9fe1903364892bdac6ed0fd14bc9448de6bd156925132a7083be06f71c"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_swap.json",
         "sha256": "620aa24abb8f31aa833cfb2d5cc692e6d2c38cec8260049781552bba2a369a73"
       },
       {
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
+      },
+      {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/xccy_swap.json",
         "sha256": "f27bf15ac2194c1147df4a84da48a4240d2fc0370b777f49e40b3c2cb1f2fb5f"
+      },
+      {
+        "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",
+        "sha256": "bb728c8ffcf3c8ee6136e4c1956bf2333eda6e168f4e3b590af9a2fd1abbbfdd"
       }
     ],
     "cases": [
@@ -12156,44 +12152,20 @@
     "description": "Actual native results. hostBigIntPaths record transport kinds emitted by the binding serializer, not domain types inferred from examples. Reconstruct through the canonical wire codec then restore these exact integer leaves; tests compare with a fresh native call.",
     "sources": [
       {
-        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-        "sha256": "567c909e02b4e8017b5bd26f0a646364853f03e44aecdeaf5016e6134d2672ca"
-      },
-      {
         "path": "finstack-quant/valuations/tests/fixtures/valuation_binding_regressions.json",
         "sha256": "1e34fc0689856f1ae419c6a5c707bd7420689a99bc7b334a4dbf865c2f839d55"
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "00097ad3f67daa576167d30f2e82efeb25353f506214028099c9cacbee78a35d"
-      },
-      {
-        "path": "finstack-quant-wasm/tests/facade/covenants.test.mjs",
-        "sha256": "d421256f6a20f40bd23624c12841cdc9f36a618809de829a19c7f37e2629d09e"
-      },
-      {
-        "path": "finstack-quant-wasm/index.d.ts",
-        "sha256": "6de6ae7893f6ce54bc9ec44f6221326bfc3f9f7c3bdbe7674e9cdc74fda5b8ce"
-      },
-      {
-        "path": "finstack-quant-wasm/src/utils/mod.rs",
-        "sha256": "40d7706a968e6c26b37fd55b5e18fe1b677a8581f2580ce8f37dfc3e58561abf"
-      },
-      {
-        "path": "finstack-quant/core/src/explain.rs",
-        "sha256": "4d6a98e8d47b480789c38c0332de4dd03a43b5229e4b3abfc6496332710d1e28"
-      },
-      {
-        "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_spot_option.json",
-        "sha256": "e2e05570a6659562db11e3753473889f1a51c897f5b37d6d39e2815a32b3527a"
-      },
-      {
-        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
+        "sha256": "258d9b9fe1903364892bdac6ed0fd14bc9448de6bd156925132a7083be06f71c"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/composite.json",
         "sha256": "9b508c9851488d6ff79d9c9f9fe75b1a309b8a67417f2922f97061d638355f13"
+      },
+      {
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/credit_default_swap.json",
@@ -12206,10 +12178,6 @@
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
         "sha256": "e9d9d5e91e3fa883e21c003bf92de64bf4bd5e0ed8af881b71bad9b2f1120c5e"
-      },
-      {
-        "path": "finstack-quant/valuations/tests/instruments/json_examples/bond.json",
-        "sha256": "3004830e4297c3a7840a60c2e85005359b8f823b11153af44902f001e10d00f7"
       }
     ],
     "cases": [

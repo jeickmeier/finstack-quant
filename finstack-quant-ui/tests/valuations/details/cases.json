@@ -2,44 +2,20 @@
   "description": "Actual native results. hostBigIntPaths record transport kinds emitted by the binding serializer, not domain types inferred from examples. Reconstruct through the canonical wire codec then restore these exact integer leaves; tests compare with a fresh native call.",
   "sources": [
     {
-      "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-      "sha256": "567c909e02b4e8017b5bd26f0a646364853f03e44aecdeaf5016e6134d2672ca"
-    },
-    {
       "path": "finstack-quant/valuations/tests/fixtures/valuation_binding_regressions.json",
       "sha256": "1e34fc0689856f1ae419c6a5c707bd7420689a99bc7b334a4dbf865c2f839d55"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "00097ad3f67daa576167d30f2e82efeb25353f506214028099c9cacbee78a35d"
-    },
-    {
-      "path": "finstack-quant-wasm/tests/facade/covenants.test.mjs",
-      "sha256": "d421256f6a20f40bd23624c12841cdc9f36a618809de829a19c7f37e2629d09e"
-    },
-    {
-      "path": "finstack-quant-wasm/index.d.ts",
-      "sha256": "6de6ae7893f6ce54bc9ec44f6221326bfc3f9f7c3bdbe7674e9cdc74fda5b8ce"
-    },
-    {
-      "path": "finstack-quant-wasm/src/utils/mod.rs",
-      "sha256": "40d7706a968e6c26b37fd55b5e18fe1b677a8581f2580ce8f37dfc3e58561abf"
-    },
-    {
-      "path": "finstack-quant/core/src/explain.rs",
-      "sha256": "4d6a98e8d47b480789c38c0332de4dd03a43b5229e4b3abfc6496332710d1e28"
-    },
-    {
-      "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_spot_option.json",
-      "sha256": "e2e05570a6659562db11e3753473889f1a51c897f5b37d6d39e2815a32b3527a"
-    },
-    {
-      "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-      "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
+      "sha256": "258d9b9fe1903364892bdac6ed0fd14bc9448de6bd156925132a7083be06f71c"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/composite.json",
       "sha256": "9b508c9851488d6ff79d9c9f9fe75b1a309b8a67417f2922f97061d638355f13"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+      "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/credit_default_swap.json",
@@ -52,10 +28,6 @@
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
       "sha256": "e9d9d5e91e3fa883e21c003bf92de64bf4bd5e0ed8af881b71bad9b2f1120c5e"
-    },
-    {
-      "path": "finstack-quant/valuations/tests/instruments/json_examples/bond.json",
-      "sha256": "3004830e4297c3a7840a60c2e85005359b8f823b11153af44902f001e10d00f7"
     }
   ],
   "cases": [

@@ -35,15 +35,16 @@ npx --yes shadcn@4.21.0 mcp init --client claude
 The second command writes a local `.mcp.json`; it does not install the workbench
 or publish the WASM package. Restart the MCP client after reviewing its generated
 configuration. The server can list `@finstack` items and retrieve their source
-and dependency metadata. The release workflow verifies those operations from an
-empty Linux consumer against the actual deployed URL. A local preflight alone is
-not evidence of public availability.
+and dependency metadata. No workflow deploys or verifies the public namespace
+today; `scripts/verify-public.mjs <base-url>` in `finstack-quant-ui` is the
+local check against a served registry. A local preflight alone is not evidence
+of public availability.
 
-The local clean-consumer preflight passed for all 150 items: every served item
-matched the built artifact, CLI view and MCP initialization exited successfully,
-and actual MCP list/view requests returned the workbench. Public verification is
-pending merge and deployment from `master`. Publication is restricted to `master`;
-PR branches run verification only and retain the existing Pages environment policy.
+The 2026-09-20 local clean-consumer preflight passed for the 150 items then
+published: every served item matched the built artifact, CLI view and MCP initialization exited
+successfully, and actual MCP list/view requests returned the workbench. Pull
+requests run `mise run ui-check` in CI; the gallery export, screenshot suite,
+installation matrix and publishing check are local gates run on demand.
 
 ## Install native-backed components
 
