@@ -19,8 +19,8 @@ import json
 import math
 import os
 from pathlib import Path
+import secrets
 import sys
-import tempfile
 from typing import Any, Final
 
 from jsonschema import validators
@@ -377,19 +377,12 @@ Signed on: **{signed_on.isoformat()}**
 def write_report(path: Path, content: str) -> None:
     """Atomically replace the report after all checks have passed."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        text=True,
-    )
-    temporary_path = Path(temporary_name)
+    # An exclusive create takes the process umask, so the published report has
+    # the same permissions as any other file the user writes.
+    temporary_path = path.with_name(f".{path.name}.{secrets.token_hex(8)}")
+    output = temporary_path.open("x", encoding="utf-8")
     try:
-        # `mkstemp` creates the file mode 0600. Fix the mode on the open
-        # descriptor (not via a post-replace `chmod`, which would leave a
-        # window where a reader could observe the wrong permissions on the
-        # published path) so the replaced report stays ordinarily readable.
-        os.fchmod(descriptor, 0o644)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+        with output:
             output.write(content)
             output.flush()
             os.fsync(output.fileno())

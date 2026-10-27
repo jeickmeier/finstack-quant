@@ -167,7 +167,6 @@ export function PricingWorkbench({
         >
           <section
             aria-label="Pricing workbench"
-            tabIndex={0}
             onKeyDown={(event) => {
               const target = event.target as Element;
               if (

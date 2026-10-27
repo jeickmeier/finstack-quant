@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { StatementResult } from "finstack-quant-wasm";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 import type { LinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
@@ -48,6 +48,11 @@ export function StatementGrid({
   const [edit, setEdit] = useState<Edit | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const editInput = useRef<HTMLInputElement>(null);
+  const editCell = edit ? statementCellKey(edit.nodeId, edit.periodId) : null;
+  useEffect(() => {
+    editInput.current?.focus();
+  }, [editCell]);
   const presentation = useMemo(() => {
     try {
       const checked = adaptStatementResult(result);
@@ -197,7 +202,7 @@ export function StatementGrid({
                           <div className="min-w-40 py-1 text-left">
                             <div className="flex items-center gap-1">
                               <input
-                                autoFocus
+                                ref={editInput}
                                 aria-label={`${row.name} ${period.id} exact value`}
                                 className="w-32 rounded border border-primary bg-background px-2 py-1 text-right font-mono text-xs"
                                 inputMode="decimal"

@@ -100,12 +100,13 @@ it("opens complete statements, applies an explicit edit, and rolls forward from 
   fireEvent.click(
     within(income).getByRole("button", { name: "Revenue 2024Q1, edit value" }),
   );
-  fireEvent.change(
-    screen.getByRole("textbox", { name: "Revenue 2024Q1 exact value" }),
-    {
-      target: { value: "190000000" },
-    },
-  );
+  const exactValue = screen.getByRole("textbox", {
+    name: "Revenue 2024Q1 exact value",
+  });
+  expect(document.activeElement).toBe(exactValue);
+  fireEvent.change(exactValue, {
+    target: { value: "190000000" },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Save Revenue 2024Q1" }));
   await waitFor(() => expect(accepted).toHaveBeenCalledTimes(2));
   expect(
