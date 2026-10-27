@@ -9,7 +9,7 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec")]
 #[pyclass(
     name = "DefaultModelSpec",
     module = "finstack_quant.cashflows.builder",
@@ -26,13 +26,13 @@ wire_methods!(
     PyDefaultModelSpec,
     DefaultModelSpec,
     "DefaultModelSpec",
-    module = "finstack_quant.cashflows.builder",
+    module = "finstack_quant.cashflows.builder._specs.default",
     validate
 );
 
 #[pymethods]
 impl PyDefaultModelSpec {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.constant_cdr")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.constant_cdr")]
     #[staticmethod]
     #[pyo3(text_signature = "(cdr)")]
     fn constant_cdr(cdr: f64) -> PyResult<Self> {
@@ -41,7 +41,7 @@ impl PyDefaultModelSpec {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.sda")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.sda")]
     #[staticmethod]
     #[pyo3(text_signature = "(speed_multiplier)")]
     fn sda(speed_multiplier: f64) -> PyResult<Self> {
@@ -50,7 +50,7 @@ impl PyDefaultModelSpec {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.vector")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.vector")]
     #[staticmethod]
     #[pyo3(text_signature = "(monthly_cdr)")]
     fn vector(monthly_cdr: Vec<f64>) -> PyResult<Self> {
@@ -59,7 +59,7 @@ impl PyDefaultModelSpec {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.cumulative_loss")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.cumulative_loss")]
     #[staticmethod]
     #[pyo3(text_signature = "(cumulative_net_loss_pct, severity)")]
     fn cumulative_loss(cumulative_net_loss_pct: Vec<f64>, severity: f64) -> PyResult<Self> {
@@ -68,7 +68,7 @@ impl PyDefaultModelSpec {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.timing")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.timing")]
     #[staticmethod]
     #[pyo3(text_signature = "(cumulative_default_rate, annual_pct)")]
     fn timing(cumulative_default_rate: f64, annual_pct: Vec<f64>) -> PyResult<Self> {
@@ -77,24 +77,24 @@ impl PyDefaultModelSpec {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.validate")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.validate")]
     #[pyo3(text_signature = "(self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.to_dict")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.to_dict")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.mdr")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.mdr")]
     #[pyo3(text_signature = "(self, seasoning_months)")]
     fn mdr(&self, seasoning_months: u32) -> PyResult<f64> {
         self.inner.mdr(seasoning_months).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.mdr_with_survival")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.mdr_with_survival")]
     #[pyo3(text_signature = "(self, seasoning_months, surviving_balance_fraction)")]
     fn mdr_with_survival(
         &self,
@@ -106,7 +106,7 @@ impl PyDefaultModelSpec {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "DefaultModelSpec.cumulative_default_fraction")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.default", "DefaultModelSpec.cumulative_default_fraction")]
     #[pyo3(text_signature = "(self, seasoning_months)")]
     fn cumulative_default_fraction(&self, seasoning_months: u32) -> PyResult<Option<f64>> {
         self.inner

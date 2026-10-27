@@ -8,7 +8,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CallAssumption, CallScope,
 };
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.call_assumption", "CallAssumption")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CallAssumption",
@@ -25,13 +25,13 @@ crate::bindings::macros::wire_methods!(
     PyCallAssumption,
     CallAssumption,
     "CallAssumption",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.call_assumption",
     to_dict
 );
 
 #[pymethods]
 impl PyCallAssumption {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.call_assumption", "CallAssumption.__init__")]
     #[new]
     #[pyo3(signature = (date, price_pct, tranche_id=None))]
     #[pyo3(text_signature = "(date, price_pct, tranche_id=None)")]
@@ -44,13 +44,13 @@ impl PyCallAssumption {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.call_assumption", "CallAssumption.date")]
     #[getter]
     fn date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.date)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.scope_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.call_assumption", "CallAssumption.scope_spec")]
     #[getter]
     fn scope_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.scope)
@@ -69,14 +69,14 @@ impl PyCallAssumption {
 }
 
 crate::bindings::macros::py_getters!(PyCallAssumption |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.call_assumption", "CallAssumption.price_pct")]
     price_pct -> f64 = s.inner.price_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.scope")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.call_assumption", "CallAssumption.scope")]
     scope -> &'static str =
         match s.inner.scope { CallScope::Deal => "deal", CallScope::Tranche(_) => "tranche" };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallAssumption.tranche_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.call_assumption", "CallAssumption.tranche_id")]
     tranche_id -> Option<String> = match &s.inner.scope {
         CallScope::Deal => None,
         CallScope::Tranche(id) => Some(id.clone()),

@@ -18,7 +18,7 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::repr_support::enum_repr_from_serde as enum_repr;
 use crate::errors::core_to_py;
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "FeeAccrualBasis")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeAccrualBasis")]
 #[pyclass(
     name = "FeeAccrualBasis",
     module = "finstack_quant.cashflows.builder",
@@ -52,7 +52,7 @@ impl PyFeeAccrualBasis {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "FeeBase")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeBase")]
 #[pyclass(
     name = "FeeBase",
     module = "finstack_quant.cashflows.builder",
@@ -69,7 +69,7 @@ wire_methods!(
     PyFeeBase,
     FeeBase,
     "FeeBase",
-    module = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder._specs.fees"
 );
 
 #[pymethods]
@@ -80,7 +80,7 @@ impl PyFeeBase {
         inner: FeeBase::Drawn,
     };
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeBase.undrawn")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeBase.undrawn")]
     #[staticmethod]
     #[pyo3(text_signature = "(commitment)")]
     fn undrawn(commitment: PyMoney) -> Self {
@@ -91,13 +91,13 @@ impl PyFeeBase {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeBase.kind")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeBase.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeBase.commitment")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeBase.commitment")]
     #[getter]
     fn commitment(&self) -> Option<PyMoney> {
         match self.inner {
@@ -112,7 +112,7 @@ impl PyFeeBase {
     }
 }
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec")]
 #[pyclass(
     name = "FeeSpec",
     module = "finstack_quant.cashflows.builder",
@@ -129,12 +129,12 @@ wire_methods!(
     PyFeeSpec,
     FeeSpec,
     "FeeSpec",
-    module = "finstack_quant.cashflows.builder"
+    module = "finstack_quant.cashflows.builder._specs.fees"
 );
 
 #[pymethods]
 impl PyFeeSpec {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.fixed")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.fixed")]
     #[staticmethod]
     #[pyo3(text_signature = "(date, amount)")]
     fn fixed(date: &Bound<'_, PyAny>, amount: PyMoney) -> PyResult<Self> {
@@ -146,7 +146,7 @@ impl PyFeeSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.periodic_bp")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.periodic_bp")]
     #[staticmethod]
     #[pyo3(
         signature = (base, bp, frequency, day_count, calendar_id, business_day_convention=None, stub=None, accrual_basis=None),
@@ -180,13 +180,13 @@ impl PyFeeSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.kind")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.date")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.date")]
     #[getter]
     fn date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         match self.inner {
@@ -195,7 +195,7 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.amount")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.amount")]
     #[getter]
     fn amount(&self) -> Option<PyMoney> {
         match self.inner {
@@ -204,7 +204,7 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.base")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.base")]
     #[getter]
     fn base(&self) -> Option<PyFeeBase> {
         match &self.inner {
@@ -215,7 +215,7 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.bp")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.bp")]
     #[getter]
     fn bp<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         match self.inner {
@@ -224,7 +224,7 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.frequency")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.frequency")]
     #[getter]
     fn frequency(&self) -> Option<PyTenor> {
         match self.inner {
@@ -233,7 +233,7 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.day_count")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.day_count")]
     #[getter]
     fn day_count(&self) -> Option<PyDayCount> {
         match self.inner {
@@ -242,7 +242,7 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.business_day_convention")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.business_day_convention")]
     #[getter]
     fn business_day_convention(&self) -> Option<PyBusinessDayConvention> {
         match self.inner {
@@ -254,7 +254,7 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.calendar_id")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.calendar_id")]
     #[getter]
     fn calendar_id(&self) -> Option<String> {
         match &self.inner {
@@ -263,7 +263,7 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.stub")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.stub")]
     #[getter]
     fn stub(&self) -> Option<PyStubKind> {
         match self.inner {
@@ -272,7 +272,7 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "FeeSpec.accrual_basis")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.accrual_basis")]
     #[getter]
     fn accrual_basis(&self) -> Option<PyFeeAccrualBasis> {
         match &self.inner {

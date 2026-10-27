@@ -28,7 +28,7 @@ use crate::bindings::extract::extract_basis_points;
 
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsIndexParams",
@@ -44,7 +44,7 @@ pub struct PyCdsIndexParams {
 
 #[pymethods]
 impl PyCdsIndexParams {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.__init__")]
     #[new]
     #[pyo3(signature = (index_name, series, version, coupon_bp, convention="isda_na", num_constituents=None))]
     #[pyo3(
@@ -71,7 +71,7 @@ impl PyCdsIndexParams {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.cdx_na_ig")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.cdx_na_ig")]
     #[staticmethod]
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn cdx_na_ig(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -84,7 +84,7 @@ impl PyCdsIndexParams {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.cdx_na_hy")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.cdx_na_hy")]
     #[staticmethod]
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn cdx_na_hy(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -97,7 +97,7 @@ impl PyCdsIndexParams {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.itraxx_europe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.itraxx_europe")]
     #[staticmethod]
     #[pyo3(text_signature = "(series, version, coupon_bp)")]
     fn itraxx_europe(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -125,26 +125,26 @@ impl PyCdsIndexParams {
 }
 
 crate::bindings::macros::py_getters!(PyCdsIndexParams |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.index_name")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.index_name")]
     index_name -> String = s.inner.index_name.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.series")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.series")]
     series -> u16 = s.inner.series;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.version")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.version")]
     version -> u16 = s.inner.version;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.coupon_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.coupon_bp")]
     coupon_bp -> f64 = s.inner.coupon_bp;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.convention")]
     convention -> PyResult<String> = enum_to_py_string(&s.inner.convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexParams.num_constituents")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexParams.num_constituents")]
     num_constituents -> Option<u32> = s.inner.num_constituents;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexConstituent")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsIndexConstituent",
@@ -159,7 +159,7 @@ pub struct PyCdsIndexConstituent {
 
 #[pymethods]
 impl PyCdsIndexConstituent {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexConstituent.__init__")]
     #[new]
     #[pyo3(signature = (reference_entity, recovery_rate, credit_curve_id, weight, defaulted=false))]
     #[pyo3(
@@ -199,23 +199,23 @@ impl PyCdsIndexConstituent {
 }
 
 crate::bindings::macros::py_getters!(PyCdsIndexConstituent |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.reference_entity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexConstituent.reference_entity")]
     reference_entity -> String = s.inner.credit.reference_entity.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexConstituent.recovery_rate")]
     recovery_rate -> f64 = s.inner.credit.recovery_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.credit_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexConstituent.credit_curve_id")]
     credit_curve_id -> String = s.inner.credit.credit_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.weight")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexConstituent.weight")]
     weight -> f64 = s.inner.weight;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexConstituent.defaulted")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexConstituent.defaulted")]
     defaulted -> bool = s.inner.defaulted;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsIndex",
@@ -230,18 +230,25 @@ pub struct PyCdsIndex {
 }
 
 instrument_envelope_methods!(
-    PyCdsIndex("CdsIndex"),
+    PyCdsIndex(
+        "CdsIndex",
+        module = "finstack_quant.valuations.instruments._typed_credit.cds_index"
+    ),
     CdsIndex,
     builder = PyCdsIndexBuilder("CdsIndexBuilder", fields),
     seed =
         finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::builder()
             .constituents(Vec::new()),
 );
-instrument_pricing_methods!(PyCdsIndex, "CdsIndex");
+instrument_pricing_methods!(
+    PyCdsIndex,
+    "CdsIndex",
+    module = "finstack_quant.valuations.instruments._typed_credit.cds_index"
+);
 
 #[pymethods]
 impl PyCdsIndex {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -251,7 +258,7 @@ impl PyCdsIndex {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.from_preset")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.from_preset")]
     #[staticmethod]
     #[pyo3(
         text_signature = "(preset, id, notional, side, start, end, recovery_rate, discount_curve_id, credit_curve_id)"
@@ -284,7 +291,7 @@ impl PyCdsIndex {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.par_spread")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.par_spread")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn par_spread(
         &self,
@@ -297,7 +304,7 @@ impl PyCdsIndex {
         self.inner.par_spread(&market, as_of).map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.risky_pv01")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.risky_pv01")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn risky_pv01(
         &self,
@@ -310,7 +317,7 @@ impl PyCdsIndex {
         self.inner.risky_pv01(&market, as_of).map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.cs01")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.cs01")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn cs01(
         &self,
@@ -327,7 +334,7 @@ impl PyCdsIndex {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.constituents")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.constituents")]
     #[getter]
     fn constituents(&self) -> Vec<PyCdsIndexConstituent> {
         self.inner
@@ -337,7 +344,7 @@ impl PyCdsIndex {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.upfront")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.upfront")]
     #[getter]
     fn upfront<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -346,7 +353,7 @@ impl PyCdsIndex {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.margin_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -356,7 +363,7 @@ impl PyCdsIndex {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         Instrument::expiry(&self.inner)
@@ -381,42 +388,42 @@ impl PyCdsIndex {
 }
 
 crate::bindings::macros::py_getters!(PyCdsIndex |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.index_name")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.index_name")]
     index_name -> String = s.inner.index_name.clone();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.series")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.series")]
     series -> u16 = s.inner.series;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.version")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.version")]
     version -> u16 = s.inner.version;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.index_factor")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.index_factor")]
     index_factor -> f64 = s.inner.index_factor;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.side")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.side")]
     side -> PyResult<String> = enum_to_py_string(&s.inner.side);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.convention")]
     convention -> PyResult<String> = enum_to_py_string(&s.inner.convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.premium_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.premium_leg")]
     premium_leg -> PyPremiumLegSpec = PyPremiumLegSpec { inner: s.inner.premium_leg.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.protection_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.protection_leg")]
     protection_leg -> PyProtectionLegSpec =
         PyProtectionLegSpec { inner: s.inner.protection_leg.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.pricing")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.pricing")]
     pricing -> PyResult<String> = enum_to_py_string(&s.inner.pricing);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndex.num_constituents")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.num_constituents")]
     num_constituents -> Option<u32> = s.inner.num_constituents;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CdsIndexBuilder",
@@ -429,14 +436,14 @@ pub struct PyCdsIndexBuilder {
 
 #[pymethods]
 impl PyCdsIndexBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, id, format!("{value:?}"), |b: CdsIndexBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.index_name")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.index_name")]
     #[pyo3(text_signature = "($self, value)")]
     fn index_name<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -447,21 +454,21 @@ impl PyCdsIndexBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.series")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.series")]
     #[pyo3(text_signature = "($self, value)")]
     fn series<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, series, value.to_string(), |b: CdsIndexBuilder| b
             .series(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.version")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.version")]
     #[pyo3(text_signature = "($self, value)")]
     fn version<'py>(mut slf: PyRefMut<'py, Self>, value: u16) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, version, value.to_string(), |b: CdsIndexBuilder| b
             .version(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -472,7 +479,7 @@ impl PyCdsIndexBuilder {
             .notional(money))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.index_factor")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.index_factor")]
     #[pyo3(text_signature = "($self, value)")]
     fn index_factor<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -486,7 +493,7 @@ impl PyCdsIndexBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.side")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.side")]
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
@@ -494,7 +501,7 @@ impl PyCdsIndexBuilder {
             .side(side))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn convention<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let convention = enum_from_str::<CdsConvention>(value, "convention")?;
@@ -506,7 +513,7 @@ impl PyCdsIndexBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.premium_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.premium_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn premium_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -523,7 +530,7 @@ impl PyCdsIndexBuilder {
             .premium_leg(leg))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.protection_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.protection_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn protection_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -539,7 +546,7 @@ impl PyCdsIndexBuilder {
             .protection_leg(leg))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.pricing")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.pricing")]
     #[pyo3(text_signature = "($self, value)")]
     fn pricing<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let pricing: IndexPricing = enum_from_str(value, "pricing")?;
@@ -547,7 +554,7 @@ impl PyCdsIndexBuilder {
             .pricing(pricing))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.constituents")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.constituents")]
     #[pyo3(text_signature = "($self, value)")]
     fn constituents<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -563,7 +570,7 @@ impl PyCdsIndexBuilder {
             .constituents(constituents))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.num_constituents")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.num_constituents")]
     #[pyo3(text_signature = "($self, value)")]
     fn num_constituents<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -577,7 +584,7 @@ impl PyCdsIndexBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.upfront")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.upfront")]
     #[pyo3(text_signature = "($self, value)")]
     fn upfront<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -589,7 +596,7 @@ impl PyCdsIndexBuilder {
             .upfront((date, money)))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.margin_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.margin_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn margin_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -602,7 +609,7 @@ impl PyCdsIndexBuilder {
             .margin_spec(spec))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CdsIndexBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -626,5 +633,5 @@ crate::bindings::macros::wire_methods!(
     PyCdsIndexConstituent,
     CdsIndexConstituent,
     "CdsIndexConstituent",
-    module = "finstack_quant.valuations.instruments"
+    module = "finstack_quant.valuations.instruments._typed_credit.cds_index"
 );

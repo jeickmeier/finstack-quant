@@ -9,7 +9,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 
 use super::PyTranche;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_structure", "TrancheStructure")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TrancheStructure",
@@ -24,7 +24,7 @@ pub struct PyTrancheStructure {
 
 #[pymethods]
 impl PyTrancheStructure {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_structure", "TrancheStructure.__init__")]
     #[new]
     #[pyo3(text_signature = "(tranches)")]
     fn new(tranches: Vec<PyRef<'_, PyTranche>>) -> PyResult<Self> {
@@ -33,7 +33,7 @@ impl PyTrancheStructure {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.from_balances")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_structure", "TrancheStructure.from_balances")]
     #[staticmethod]
     #[pyo3(text_signature = "(tranches)")]
     fn from_balances(tranches: Vec<PyRef<'_, PyTranche>>) -> PyResult<Self> {
@@ -47,7 +47,7 @@ impl PyTrancheStructure {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_structure", "TrancheStructure.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -56,25 +56,25 @@ impl PyTrancheStructure {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_structure", "TrancheStructure.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_structure", "TrancheStructure.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_structure", "TrancheStructure.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.tranches")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_structure", "TrancheStructure.tranches")]
     #[getter]
     fn tranches(&self) -> Vec<PyTranche> {
         self.inner
@@ -95,7 +95,7 @@ impl PyTrancheStructure {
 }
 
 crate::bindings::macros::py_getters!(PyTrancheStructure |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheStructure.total_size")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_structure", "TrancheStructure.total_size")]
     total_size -> PyResult<PyMoney> =
         s.inner.total_size().map(money_to_py).map_err(crate::errors::core_to_py);
 });

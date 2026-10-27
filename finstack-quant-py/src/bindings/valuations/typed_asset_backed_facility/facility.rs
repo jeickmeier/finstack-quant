@@ -34,7 +34,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Dea
 
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacilityBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "AssetBackedFacility",
@@ -47,16 +47,23 @@ pub struct PyAssetBackedFacility {
 }
 
 instrument_envelope_methods!(
-    PyAssetBackedFacility("AssetBackedFacility"),
+    PyAssetBackedFacility(
+        "AssetBackedFacility",
+        module = "finstack_quant.valuations.instruments._typed_asset_backed_facility.facility"
+    ),
     AssetBackedFacility,
     builder = PyAssetBackedFacilityBuilder("AssetBackedFacilityBuilder", no_fields),
     seed = AssetBackedFacility::builder(),
 );
-instrument_pricing_methods!(PyAssetBackedFacility, "AssetBackedFacility");
+instrument_pricing_methods!(
+    PyAssetBackedFacility,
+    "AssetBackedFacility",
+    module = "finstack_quant.valuations.instruments._typed_asset_backed_facility.facility"
+);
 
 #[pymethods]
 impl PyAssetBackedFacility {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -65,21 +72,21 @@ impl PyAssetBackedFacility {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.borrowing_base")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.borrowing_base")]
     #[pyo3(text_signature = "($self)")]
     fn borrowing_base<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let report = self.inner.borrowing_base().map_err(core_to_py)?;
         serde_to_py(py, &report)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.synthesized_deal")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.synthesized_deal")]
     #[pyo3(text_signature = "($self)")]
     fn synthesized_deal(&self) -> PyResult<PyStructuredCredit> {
         let inner = self.inner.synthesized_deal().map_err(core_to_py)?;
         Ok(PyStructuredCredit { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.project")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.project")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn project(
         &self,
@@ -96,7 +103,7 @@ impl PyAssetBackedFacility {
         Ok(PyFacilityProjection { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.facility_irr")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.facility_irr")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn facility_irr(
         &self,
@@ -109,55 +116,55 @@ impl PyAssetBackedFacility {
         self.inner.facility_irr(&market, as_of).map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.borrowing_base_rules")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.borrowing_base_rules")]
     #[getter]
     fn borrowing_base_rules<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.borrowing_base_rules)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.rate")]
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.rate)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.closing_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.closing_date")]
     #[getter]
     fn closing_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.closing_date)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.revolving_end")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.revolving_end")]
     #[getter]
     fn revolving_end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.revolving_end)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.effective_revolving_end")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.effective_revolving_end")]
     #[getter]
     fn effective_revolving_end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.effective_revolving_end())
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.repayment_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.repayment_date")]
     #[getter]
     fn repayment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.repayment_date().map_err(core_to_py)?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.amortization_events")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.amortization_events")]
     #[getter]
     fn amortization_events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.amortization_events)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.term_out")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.term_out")]
     #[getter]
     fn term_out<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -167,7 +174,7 @@ impl PyAssetBackedFacility {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.fees")]
     #[getter]
     fn fees<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -177,13 +184,13 @@ impl PyAssetBackedFacility {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.draws")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.draws")]
     #[getter]
     fn draws<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.draws)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.credit_model")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.credit_model")]
     #[getter]
     fn credit_model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.credit_model)
@@ -203,54 +210,54 @@ impl PyAssetBackedFacility {
 }
 
 crate::bindings::macros::py_getters!(PyAssetBackedFacility |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.collateral")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.collateral")]
     collateral -> PyAssetPool = PyAssetPool { inner: s.inner.collateral.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.commitment")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.commitment")]
     commitment -> PyMoney = money_to_py(s.inner.commitment);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.drawn")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.drawn")]
     drawn -> PyMoney = money_to_py(s.inner.drawn);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.undrawn")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.undrawn")]
     undrawn -> PyResult<PyMoney> = s.inner.undrawn().map(money_to_py).map_err(core_to_py);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.commitment_fee_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.commitment_fee_bp")]
     commitment_fee_bp -> f64 =
         rust_decimal::prelude::ToPrimitive::to_f64(&s.inner.commitment_fee_bp).unwrap_or_default();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.frequency")]
     frequency -> PyTenor = PyTenor { inner: s.inner.frequency };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.day_count")]
     day_count -> PyDayCount = PyDayCount { inner: s.inner.day_count };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.liquidation_price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.liquidation_price_pct")]
     liquidation_price_pct -> Option<f64> = s.inner.liquidation_price_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.readvance_to_borrowing_base")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.readvance_to_borrowing_base")]
     readvance_to_borrowing_base -> bool = s.inner.readvance_to_borrowing_base;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.prepayment_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.prepayment_spec")]
     prepayment_spec -> PyPrepaymentModelSpec =
         PyPrepaymentModelSpec { inner: s.inner.credit_model.prepayment_spec.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.default_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.default_spec")]
     default_spec -> PyDefaultModelSpec =
         PyDefaultModelSpec { inner: s.inner.credit_model.default_spec.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacility.recovery_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacility.recovery_spec")]
     recovery_spec -> PyRecoveryModelSpec =
         PyRecoveryModelSpec { inner: s.inner.credit_model.recovery_spec.clone() };
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FacilityProjection",
@@ -264,7 +271,7 @@ pub struct PyFacilityProjection {
 
 #[pymethods]
 impl PyFacilityProjection {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -273,25 +280,25 @@ impl PyFacilityProjection {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.commitment_fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.commitment_fees")]
     #[getter]
     fn commitment_fees<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -301,7 +308,7 @@ impl PyFacilityProjection {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.draws")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.draws")]
     #[getter]
     fn draws<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -311,7 +318,7 @@ impl PyFacilityProjection {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.lender_cashflows")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.lender_cashflows")]
     #[getter]
     fn lender_cashflows<'py>(
         &self,
@@ -325,7 +332,7 @@ impl PyFacilityProjection {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::core::table::envelope_to_pandas(
@@ -347,18 +354,18 @@ impl PyFacilityProjection {
 }
 
 crate::bindings::macros::py_getters!(PyFacilityProjection |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.facility")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.facility")]
     facility -> PyTrancheCashflows = PyTrancheCashflows { inner: s.inner.facility.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.residual")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.residual")]
     residual -> PyTrancheCashflows = PyTrancheCashflows { inner: s.inner.residual.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FacilityProjection.diagnostics")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.diagnostics")]
     diagnostics -> PySimulationDiagnostics =
         PySimulationDiagnostics { inner: s.inner.diagnostics.clone() };
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "AssetBackedFacilityBuilder",
@@ -370,14 +377,14 @@ pub struct PyAssetBackedFacilityBuilder {
 
 #[pymethods]
 impl PyAssetBackedFacilityBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let converted = InstrumentId::new(value.to_string());
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.id(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.collateral")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.collateral")]
     #[pyo3(text_signature = "($self, value)")]
     fn collateral<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -387,7 +394,7 @@ impl PyAssetBackedFacilityBuilder {
             .collateral(value.inner.clone()))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.borrowing_base_rules")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.borrowing_base_rules")]
     #[pyo3(text_signature = "($self, value)")]
     fn borrowing_base_rules<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -400,7 +407,7 @@ impl PyAssetBackedFacilityBuilder {
             .borrowing_base_rules(rules))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.commitment")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.commitment")]
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn commitment<'py>(
@@ -412,7 +419,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.commitment(money))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.drawn")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.drawn")]
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn drawn<'py>(
@@ -424,7 +431,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.drawn(money))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -441,7 +448,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.rate(spec))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.commitment_fee_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.commitment_fee_bp")]
     #[pyo3(text_signature = "($self, value)")]
     fn commitment_fee_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -453,7 +460,7 @@ impl PyAssetBackedFacilityBuilder {
             .commitment_fee_bp(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.closing_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.closing_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn closing_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -463,7 +470,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.closing_date(date))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.revolving_end")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.revolving_end")]
     #[pyo3(text_signature = "($self, value)")]
     fn revolving_end<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -473,7 +480,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.revolving_end(date))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -483,7 +490,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.maturity(date))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -493,7 +500,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.frequency(tenor))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -503,7 +510,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.day_count(day_count))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -514,7 +521,7 @@ impl PyAssetBackedFacilityBuilder {
             .calendar_id(converted.into()))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.amortization_events")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.amortization_events")]
     #[pyo3(text_signature = "($self, value)")]
     fn amortization_events<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -527,7 +534,7 @@ impl PyAssetBackedFacilityBuilder {
             .amortization_events(events))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.term_out")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.term_out")]
     #[pyo3(text_signature = "($self, value)")]
     fn term_out<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -548,7 +555,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.term_out(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.fees")]
     #[pyo3(text_signature = "($self, value)")]
     fn fees<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -559,7 +566,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.fees(fees))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.draws")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.draws")]
     #[pyo3(text_signature = "($self, value)")]
     fn draws<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -570,7 +577,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.draws(draws))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.readvance_to_borrowing_base")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.readvance_to_borrowing_base")]
     #[pyo3(text_signature = "($self, value)")]
     fn readvance_to_borrowing_base<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -580,7 +587,7 @@ impl PyAssetBackedFacilityBuilder {
             .readvance_to_borrowing_base(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.liquidation_price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.liquidation_price_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn liquidation_price_pct<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -591,7 +598,7 @@ impl PyAssetBackedFacilityBuilder {
             .liquidation_price_pct(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -602,7 +609,7 @@ impl PyAssetBackedFacilityBuilder {
             .discount_curve_id(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.credit_model")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.credit_model")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_model<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -614,7 +621,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.credit_model(model))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.prepayment_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.prepayment_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn prepayment_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -629,7 +636,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.prepayment_spec(spec))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.default_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.default_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn default_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -644,7 +651,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.default_spec(spec))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.recovery_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.recovery_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn recovery_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -659,7 +666,7 @@ impl PyAssetBackedFacilityBuilder {
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.recovery_spec(spec))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AssetBackedFacilityBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "AssetBackedFacilityBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

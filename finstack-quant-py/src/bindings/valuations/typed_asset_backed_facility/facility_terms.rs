@@ -9,7 +9,7 @@ use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility:
     AmortizationEvent, TermOutSpec,
 };
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermOutSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "TermOutSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TermOutSpec",
@@ -26,13 +26,13 @@ crate::bindings::macros::wire_methods!(
     PyTermOutSpec,
     TermOutSpec,
     "TermOutSpec",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms",
     to_dict
 );
 
 #[pymethods]
 impl PyTermOutSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermOutSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "TermOutSpec.__init__")]
     #[new]
     #[pyo3(text_signature = "(months)")]
     fn new(months: u32) -> Self {
@@ -48,11 +48,11 @@ impl PyTermOutSpec {
 }
 
 crate::bindings::macros::py_getters!(PyTermOutSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TermOutSpec.months")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "TermOutSpec.months")]
     months -> u32 = s.inner.months;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AmortizationEvent")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "AmortizationEvent")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "AmortizationEvent",
@@ -69,13 +69,13 @@ crate::bindings::macros::wire_methods!(
     PyAmortizationEvent,
     AmortizationEvent,
     "AmortizationEvent",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms",
     to_dict
 );
 
 #[pymethods]
 impl PyAmortizationEvent {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AmortizationEvent.date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "AmortizationEvent.date")]
     #[staticmethod]
     #[pyo3(text_signature = "(date)")]
     fn date(date: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -86,7 +86,7 @@ impl PyAmortizationEvent {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AmortizationEvent.cumulative_loss")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "AmortizationEvent.cumulative_loss")]
     #[staticmethod]
     #[pyo3(text_signature = "(max_cumulative_loss)")]
     fn cumulative_loss(max_cumulative_loss: f64) -> PyResult<Self> {
@@ -97,7 +97,7 @@ impl PyAmortizationEvent {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AmortizationEvent.excess_spread")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "AmortizationEvent.excess_spread")]
     #[staticmethod]
     #[pyo3(text_signature = "(min_excess_spread_3m)")]
     fn excess_spread(min_excess_spread_3m: f64) -> PyResult<Self> {
@@ -108,7 +108,7 @@ impl PyAmortizationEvent {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AmortizationEvent.kind")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "AmortizationEvent.kind")]
     #[getter]
     fn kind(&self) -> &'static str {
         match self.inner {
@@ -118,7 +118,7 @@ impl PyAmortizationEvent {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AmortizationEvent.date_value")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "AmortizationEvent.date_value")]
     #[getter]
     fn date_value<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         match self.inner {
@@ -127,7 +127,7 @@ impl PyAmortizationEvent {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AmortizationEvent.max_cumulative_loss")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "AmortizationEvent.max_cumulative_loss")]
     #[getter]
     fn max_cumulative_loss(&self) -> Option<f64> {
         match self.inner {
@@ -138,7 +138,7 @@ impl PyAmortizationEvent {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "AmortizationEvent.min_excess_spread_3m")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms", "AmortizationEvent.min_excess_spread_3m")]
     #[getter]
     fn min_excess_spread_3m(&self) -> Option<f64> {
         match self.inner {

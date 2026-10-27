@@ -9,7 +9,7 @@ use crate::bindings::valuations::convert::money_to_py;
 use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::SimulationDiagnostics;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "SimulationDiagnostics",
@@ -24,7 +24,7 @@ pub struct PySimulationDiagnostics {
 
 #[pymethods]
 impl PySimulationDiagnostics {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -33,25 +33,25 @@ impl PySimulationDiagnostics {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.reserve_balance_path")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.reserve_balance_path")]
     #[getter]
     fn reserve_balance_path<'py>(
         &self,
@@ -64,7 +64,7 @@ impl PySimulationDiagnostics {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.reserve_interest_paid")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.reserve_interest_paid")]
     #[getter]
     fn reserve_interest_paid<'py>(
         &self,
@@ -77,7 +77,7 @@ impl PySimulationDiagnostics {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.early_amortization_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.early_amortization_date")]
     #[getter]
     fn early_amortization_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -86,7 +86,7 @@ impl PySimulationDiagnostics {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.tranche_draws")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.tranche_draws")]
     #[getter]
     fn tranche_draws<'py>(
         &self,
@@ -101,13 +101,13 @@ impl PySimulationDiagnostics {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.periods")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.periods")]
     #[getter]
     fn periods<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.periods)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::table_to_dataframe(
@@ -116,7 +116,7 @@ impl PySimulationDiagnostics {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.coverage_tests_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.coverage_tests_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn coverage_tests_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self
@@ -162,15 +162,15 @@ impl PySimulationDiagnostics {
 }
 
 crate::bindings::macros::py_getters!(PySimulationDiagnostics |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.draws_from_reserve")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.draws_from_reserve")]
     draws_from_reserve -> PyMoney = money_to_py(s.inner.draws_from_reserve);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.draws_from_principal")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.draws_from_principal")]
     draws_from_principal -> PyMoney = money_to_py(s.inner.draws_from_principal);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.unfunded_draws")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.unfunded_draws")]
     unfunded_draws -> PyMoney = money_to_py(s.inner.unfunded_draws);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SimulationDiagnostics.reserve_replenished")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.reserve_replenished")]
     reserve_replenished -> PyMoney = money_to_py(s.inner.reserve_replenished);
 });

@@ -25,7 +25,7 @@ use super::super::typed_macros::{
 
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwapBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CreditDefaultSwap",
@@ -40,18 +40,25 @@ pub struct PyCreditDefaultSwap {
 }
 
 instrument_envelope_methods!(
-    PyCreditDefaultSwap("CreditDefaultSwap"),
+    PyCreditDefaultSwap(
+        "CreditDefaultSwap",
+        module = "finstack_quant.valuations.instruments._typed_credit.cds"
+    ),
     CreditDefaultSwap,
     builder = PyCreditDefaultSwapBuilder("CreditDefaultSwapBuilder", fields),
     seed =
         finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap::builder(
         ),
 );
-instrument_pricing_methods!(PyCreditDefaultSwap, "CreditDefaultSwap");
+instrument_pricing_methods!(
+    PyCreditDefaultSwap,
+    "CreditDefaultSwap",
+    module = "finstack_quant.valuations.instruments._typed_credit.cds"
+);
 
 #[pymethods]
 impl PyCreditDefaultSwap {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -61,7 +68,7 @@ impl PyCreditDefaultSwap {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.par_spread")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.par_spread")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn par_spread(
         &self,
@@ -74,7 +81,7 @@ impl PyCreditDefaultSwap {
         self.inner.par_spread(&market, as_of).map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.upfront")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.upfront")]
     #[getter]
     fn upfront<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -83,7 +90,7 @@ impl PyCreditDefaultSwap {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.protection_effective_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.protection_effective_date")]
     #[getter]
     fn protection_effective_date<'py>(
         &self,
@@ -95,13 +102,13 @@ impl PyCreditDefaultSwap {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.protection_start")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.protection_start")]
     #[getter]
     fn protection_start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.protection_start())
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.margin_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -111,7 +118,7 @@ impl PyCreditDefaultSwap {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         Instrument::expiry(&self.inner)
@@ -135,34 +142,34 @@ impl PyCreditDefaultSwap {
 }
 
 crate::bindings::macros::py_getters!(PyCreditDefaultSwap |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.side")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.side")]
     side -> PyResult<String> = enum_to_py_string(&s.inner.side);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.convention")]
     convention -> PyResult<String> = enum_to_py_string(&s.inner.convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.premium_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.premium_leg")]
     premium_leg -> PyPremiumLegSpec = PyPremiumLegSpec { inner: s.inner.premium_leg.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.protection_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.protection_leg")]
     protection_leg -> PyProtectionLegSpec =
         PyProtectionLegSpec { inner: s.inner.protection_leg.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.valuation_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.valuation_convention")]
     valuation_convention -> PyResult<String> = enum_to_py_string(&s.inner.valuation_convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.doc_clause")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.doc_clause")]
     doc_clause -> PyResult<Option<String>> =
         s.inner.doc_clause.map(|clause| enum_to_py_string(&clause)).transpose();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwap.doc_clause_effective")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.doc_clause_effective")]
     doc_clause_effective -> PyResult<String> = enum_to_py_string(&s.inner.doc_clause_effective());
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CreditDefaultSwapBuilder",
@@ -175,7 +182,7 @@ pub struct PyCreditDefaultSwapBuilder {
 
 #[pymethods]
 impl PyCreditDefaultSwapBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -186,7 +193,7 @@ impl PyCreditDefaultSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -201,7 +208,7 @@ impl PyCreditDefaultSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.side")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.side")]
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
@@ -213,7 +220,7 @@ impl PyCreditDefaultSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn convention<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let convention = enum_from_str::<CdsConvention>(value, "convention")?;
@@ -225,7 +232,7 @@ impl PyCreditDefaultSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.premium_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.premium_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn premium_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -242,7 +249,7 @@ impl PyCreditDefaultSwapBuilder {
             .premium_leg(leg))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.protection_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.protection_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn protection_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -258,7 +265,7 @@ impl PyCreditDefaultSwapBuilder {
             .protection_leg(leg))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.valuation_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.valuation_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn valuation_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -273,7 +280,7 @@ impl PyCreditDefaultSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.upfront")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.upfront")]
     #[pyo3(text_signature = "($self, value)")]
     fn upfront<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -285,7 +292,7 @@ impl PyCreditDefaultSwapBuilder {
             .upfront((date, money)))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.doc_clause")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.doc_clause")]
     #[pyo3(text_signature = "($self, value)")]
     fn doc_clause<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let clause: CdsDocClause = enum_from_str(value, "doc_clause")?;
@@ -297,7 +304,7 @@ impl PyCreditDefaultSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.protection_effective_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.protection_effective_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn protection_effective_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -312,7 +319,7 @@ impl PyCreditDefaultSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.margin_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.margin_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn margin_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -325,7 +332,7 @@ impl PyCreditDefaultSwapBuilder {
             .margin_spec(spec))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CreditDefaultSwapBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

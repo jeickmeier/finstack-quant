@@ -15,7 +15,7 @@ use super::specs::{
     PyFloatingCouponSpec, PyPrincipalExchange, PyStepUpCouponSpec,
 };
 
-#[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder")]
+#[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder")]
 #[pyclass(
     name = "CashFlowBuilder",
     module = "finstack_quant.cashflows.builder",
@@ -29,7 +29,7 @@ pub struct PyCashFlowBuilder {
 
 #[pymethods]
 impl PyCashFlowBuilder {
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.principal")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.principal")]
     #[pyo3(text_signature = "(self, initial, issue_date, maturity)")]
     fn principal<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -43,7 +43,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.principal_exchange")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.principal_exchange")]
     #[pyo3(text_signature = "(self, exchange)")]
     fn principal_exchange<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -53,7 +53,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.amortization")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.amortization")]
     #[pyo3(text_signature = "(self, spec)")]
     fn amortization<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -64,7 +64,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.add_principal_event")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.add_principal_event")]
     #[pyo3(
         signature = (date, payment_date, delta, kind, cash=None),
         text_signature = "(self, date, payment_date, delta, kind, cash=None)"
@@ -90,7 +90,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.fixed_cf")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.fixed_cf")]
     #[pyo3(text_signature = "(self, spec)")]
     fn fixed_cf<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -101,7 +101,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.floating_cf")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.floating_cf")]
     #[pyo3(text_signature = "(self, spec)")]
     fn floating_cf<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -112,7 +112,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.step_up_cf")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.step_up_cf")]
     #[pyo3(text_signature = "(self, spec)")]
     fn step_up_cf<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -123,7 +123,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.fee")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.fee")]
     #[pyo3(text_signature = "(self, spec)")]
     fn fee<'py>(mut slf: PyRefMut<'py, Self>, spec: PyRef<'py, PyFeeSpec>) -> PyRefMut<'py, Self> {
         let inner_spec = spec.inner.clone();
@@ -131,7 +131,7 @@ impl PyCashFlowBuilder {
         slf
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.add_fixed_window")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.add_fixed_window")]
     #[pyo3(text_signature = "(self, start, end, spec)")]
     fn add_fixed_window<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -145,7 +145,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.add_floating_window")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.add_floating_window")]
     #[pyo3(text_signature = "(self, start, end, spec)")]
     fn add_floating_window<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -159,7 +159,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.add_payment_window")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.add_payment_window")]
     #[pyo3(text_signature = "(self, start, end, split)")]
     fn add_payment_window<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -173,7 +173,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.payment_split_program")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.payment_split_program")]
     #[pyo3(text_signature = "(self, steps)")]
     fn payment_split_program<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -187,7 +187,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.fixed_to_float")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.fixed_to_float")]
     #[pyo3(text_signature = "(self, switch, fixed, floating)")]
     fn fixed_to_float<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -202,7 +202,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.float_margin_steps")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.float_margin_steps")]
     #[pyo3(text_signature = "(self, steps, base_spec)")]
     fn float_margin_steps<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -216,7 +216,7 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.build")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.build")]
     #[pyo3(signature = (market=None), text_signature = "(self, market=None)")]
     fn build(
         &self,
@@ -230,7 +230,7 @@ impl PyCashFlowBuilder {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder", "CashFlowBuilder.build_as_of")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder.build_as_of")]
     fn build_as_of(
         &self,
         py: Python<'_>,

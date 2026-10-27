@@ -30,7 +30,7 @@ use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_p
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForwardBuilder;
 use finstack_quant_valuations::instruments::fx::fx_option::FxOptionBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FxForward",
@@ -44,16 +44,23 @@ pub struct PyFxForward {
 }
 
 instrument_envelope_methods!(
-    PyFxForward("FxForward"),
+    PyFxForward(
+        "FxForward",
+        module = "finstack_quant.valuations.instruments._typed_fx"
+    ),
     FxForward,
     builder = PyFxForwardBuilder("FxForwardBuilder", fields),
     seed = finstack_quant_valuations::instruments::fx::fx_forward::FxForward::builder(),
 );
-instrument_pricing_methods!(PyFxForward, "FxForward");
+instrument_pricing_methods!(
+    PyFxForward,
+    "FxForward",
+    module = "finstack_quant.valuations.instruments._typed_fx"
+);
 
 #[pymethods]
 impl PyFxForward {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -62,7 +69,7 @@ impl PyFxForward {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.from_trade_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.from_trade_date")]
     #[staticmethod]
     #[pyo3(signature = (id, base_currency, quote_currency, trade_date, tenor, notional,
                         domestic_discount_curve_id, foreign_discount_curve_id, *,
@@ -117,7 +124,7 @@ end_of_month=False)"
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.with_forward_points")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.with_forward_points")]
     #[pyo3(text_signature = "($self, spot_rate, forward_points)")]
     fn with_forward_points(&self, spot_rate: f64, forward_points: f64) -> PyResult<Self> {
         self.inner
@@ -127,7 +134,7 @@ end_of_month=False)"
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.with_forward_pips")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.with_forward_pips")]
     #[pyo3(text_signature = "($self, spot_rate, pips)")]
     fn with_forward_pips(&self, spot_rate: f64, pips: f64) -> PyResult<Self> {
         self.inner
@@ -137,7 +144,7 @@ end_of_month=False)"
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.market_forward_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.market_forward_rate")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn market_forward_rate(
         &self,
@@ -152,13 +159,13 @@ end_of_month=False)"
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         Instrument::expiry(&self.inner)
@@ -181,36 +188,36 @@ end_of_month=False)"
 }
 
 crate::bindings::macros::py_getters!(PyFxForward |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.base_currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.base_currency")]
     base_currency -> PyCurrency = PyCurrency::from_inner(s.inner.base_currency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.quote_currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.quote_currency")]
     quote_currency -> PyCurrency = PyCurrency::from_inner(s.inner.quote_currency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.contract_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.contract_rate")]
     contract_rate -> Option<f64> = s.inner.contract_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.domestic_discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.domestic_discount_curve_id")]
     domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.foreign_discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.foreign_discount_curve_id")]
     foreign_discount_curve_id -> String = s.inner.foreign_discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.quoted_spot")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.quoted_spot")]
     quoted_spot -> Option<f64> = s.inner.quoted_spot;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.base_calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.base_calendar_id")]
     base_calendar_id -> Option<String> = s.inner.base_calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForward.quote_calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.quote_calendar_id")]
     quote_calendar_id -> Option<String> =
         s.inner.quote_calendar_id.as_ref().map(ToString::to_string);
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FxForwardBuilder",
@@ -223,14 +230,14 @@ pub struct PyFxForwardBuilder {
 
 #[pymethods]
 impl PyFxForwardBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, id, format!("{value:?}"), |b: FxForwardBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.base_currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.base_currency")]
     #[pyo3(text_signature = "($self, value)")]
     fn base_currency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -245,7 +252,7 @@ impl PyFxForwardBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.quote_currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.quote_currency")]
     #[pyo3(text_signature = "($self, value)")]
     fn quote_currency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -260,7 +267,7 @@ impl PyFxForwardBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -271,7 +278,7 @@ impl PyFxForwardBuilder {
             .maturity(maturity))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -282,7 +289,7 @@ impl PyFxForwardBuilder {
             .notional(money))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.contract_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.contract_rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn contract_rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -296,7 +303,7 @@ impl PyFxForwardBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.domestic_discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.domestic_discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn domestic_discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -310,7 +317,7 @@ impl PyFxForwardBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.foreign_discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.foreign_discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn foreign_discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -324,7 +331,7 @@ impl PyFxForwardBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.quoted_spot")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.quoted_spot")]
     #[pyo3(text_signature = "($self, value)")]
     fn quoted_spot<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -335,7 +342,7 @@ impl PyFxForwardBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.base_calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.base_calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn base_calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -349,7 +356,7 @@ impl PyFxForwardBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.quote_calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.quote_calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn quote_calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -363,7 +370,7 @@ impl PyFxForwardBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxForwardBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -376,7 +383,7 @@ impl PyFxForwardBuilder {
     }
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FxOption",
@@ -390,12 +397,19 @@ pub struct PyFxOption {
 }
 
 instrument_envelope_methods!(
-    PyFxOption("FxOption"),
+    PyFxOption(
+        "FxOption",
+        module = "finstack_quant.valuations.instruments._typed_fx"
+    ),
     FxOption,
     builder = PyFxOptionBuilder("FxOptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::fx::fx_option::FxOption::builder(),
 );
-instrument_pricing_methods!(PyFxOption, "FxOption");
+instrument_pricing_methods!(
+    PyFxOption,
+    "FxOption",
+    module = "finstack_quant.valuations.instruments._typed_fx"
+);
 
 /// Build an `FxDeltaConvention` from the loose Python inputs.
 fn delta_convention_from_parts(
@@ -414,7 +428,7 @@ fn delta_convention_from_parts(
 
 #[pymethods]
 impl PyFxOption {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -423,7 +437,7 @@ impl PyFxOption {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.european")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.european")]
     #[staticmethod]
     #[pyo3(signature = (id, base_currency, quote_currency, strike, expiry, notional, vol_surface_id,
                         option_type, delta_convention_kind, premium_currency, venue))]
@@ -463,7 +477,7 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.implied_vol")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.implied_vol")]
     #[pyo3(text_signature = "($self, market, as_of, target_price)")]
     fn implied_vol(
         &self,
@@ -479,7 +493,7 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.greeks")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.greeks")]
     #[pyo3(signature = (market, as_of, model="default"))]
     fn greeks<'py>(
         &self,
@@ -491,7 +505,7 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         typed_option_greeks(py, Box::new(self.inner.clone()), market, as_of, model)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.delta_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.delta_convention")]
     #[getter]
     fn delta_convention<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let out = PyDict::new(py);
@@ -504,7 +518,7 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         Ok(out)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.expiry)
@@ -526,36 +540,36 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
 }
 
 crate::bindings::macros::py_getters!(PyFxOption |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.base_currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.base_currency")]
     base_currency -> PyCurrency = PyCurrency::from_inner(s.inner.base_currency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.quote_currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.quote_currency")]
     quote_currency -> PyCurrency = PyCurrency::from_inner(s.inner.quote_currency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.strike")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.strike")]
     strike -> f64 = s.inner.strike;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.option_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.option_type")]
     option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.day_count")]
     day_count -> crate::bindings::core::dates::daycount::PyDayCount =
         crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.domestic_discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.domestic_discount_curve_id")]
     domestic_discount_curve_id -> String = s.inner.domestic_discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.foreign_discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.foreign_discount_curve_id")]
     foreign_discount_curve_id -> String = s.inner.foreign_discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOption.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FxOptionBuilder",
@@ -568,14 +582,14 @@ pub struct PyFxOptionBuilder {
 
 #[pymethods]
 impl PyFxOptionBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, id, format!("{value:?}"), |b: FxOptionBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.base_currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.base_currency")]
     #[pyo3(text_signature = "($self, value)")]
     fn base_currency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -590,7 +604,7 @@ impl PyFxOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.quote_currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.quote_currency")]
     #[pyo3(text_signature = "($self, value)")]
     fn quote_currency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -605,14 +619,14 @@ impl PyFxOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.strike")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.strike")]
     #[pyo3(text_signature = "($self, value)")]
     fn strike<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, strike, float_repr(value), |b: FxOptionBuilder| b
             .strike(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.option_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.option_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn option_type<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -627,7 +641,7 @@ impl PyFxOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.delta_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.delta_convention")]
     #[pyo3(text_signature = "($self, kind, premium_currency, venue)")]
     fn delta_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -644,7 +658,7 @@ impl PyFxOptionBuilder {
             .delta_convention(convention))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.expiry")]
     #[pyo3(text_signature = "($self, value)")]
     fn expiry<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -655,7 +669,7 @@ impl PyFxOptionBuilder {
             .expiry(expiry))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -670,7 +684,7 @@ impl PyFxOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -681,7 +695,7 @@ impl PyFxOptionBuilder {
             .notional(money))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.domestic_discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.domestic_discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn domestic_discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -695,7 +709,7 @@ impl PyFxOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.foreign_discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.foreign_discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn foreign_discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -709,7 +723,7 @@ impl PyFxOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -723,7 +737,7 @@ impl PyFxOptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "FxOptionBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

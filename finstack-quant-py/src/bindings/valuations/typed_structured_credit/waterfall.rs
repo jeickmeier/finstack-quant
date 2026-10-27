@@ -7,7 +7,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Wat
 
 use super::PyCoverageRules;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.waterfall", "Waterfall")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "Waterfall",
@@ -24,19 +24,19 @@ crate::bindings::macros::wire_methods!(
     PyWaterfall,
     Waterfall,
     "Waterfall",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.waterfall",
     to_dict
 );
 
 #[pymethods]
 impl PyWaterfall {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall.tiers")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.waterfall", "Waterfall.tiers")]
     #[getter]
     fn tiers<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.tiers)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall.coverage_tests")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.waterfall", "Waterfall.coverage_tests")]
     #[pyo3(text_signature = "($self)")]
     fn coverage_tests<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let specs: Vec<_> = self.inner.coverage_tests().cloned().collect();
@@ -54,10 +54,10 @@ impl PyWaterfall {
 }
 
 crate::bindings::macros::py_getters!(PyWaterfall |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall.currency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.waterfall", "Waterfall.currency")]
     currency -> String = s.inner.currency.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Waterfall.coverage_rules")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.waterfall", "Waterfall.coverage_rules")]
     coverage_rules -> Option<PyCoverageRules> =
         s.inner.coverage_rules.clone().map(|inner| PyCoverageRules { inner });
 });

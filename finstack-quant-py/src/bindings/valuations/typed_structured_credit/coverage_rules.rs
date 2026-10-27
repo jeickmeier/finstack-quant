@@ -6,7 +6,7 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageRules;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CoverageRules")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CoverageRules",
@@ -23,13 +23,13 @@ crate::bindings::macros::wire_methods!(
     PyCoverageRules,
     CoverageRules,
     "CoverageRules",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules",
     to_dict
 );
 
 #[pymethods]
 impl PyCoverageRules {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CoverageRules.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules.__init__")]
     #[new]
     #[pyo3(signature = (rating_haircuts=None, defaulted_valuation=None, ccc_bucket=None, discount_obligation=None))]
     #[pyo3(
@@ -69,7 +69,7 @@ impl PyCoverageRules {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CoverageRules.clo_standard")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules.clo_standard")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn clo_standard() -> Self {
@@ -78,19 +78,19 @@ impl PyCoverageRules {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CoverageRules.rating_haircuts")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules.rating_haircuts")]
     #[getter]
     fn rating_haircuts<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.rating_haircuts)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CoverageRules.defaulted_valuation")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules.defaulted_valuation")]
     #[getter]
     fn defaulted_valuation<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.defaulted_valuation)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CoverageRules.ccc_bucket")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules.ccc_bucket")]
     #[getter]
     fn ccc_bucket<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -100,7 +100,7 @@ impl PyCoverageRules {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CoverageRules.discount_obligation")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules.discount_obligation")]
     #[getter]
     fn discount_obligation<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -110,7 +110,7 @@ impl PyCoverageRules {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CoverageRules.validate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules.validate")]
     #[pyo3(text_signature = "($self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)

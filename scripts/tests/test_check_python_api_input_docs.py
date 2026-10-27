@@ -459,3 +459,19 @@ def test_delegated_module_docs_still_validate_content_and_local_functions(tmp_pa
     fixture.write_text(_NATIVE_DELEGATE + "def scale(value):\n    return value * 2\n")
     errors = _MODULE.public_callable_errors(fixture)
     assert any(error.symbol == "scale" and error.message == "missing callable docstring" for error in errors)
+
+
+def test_private_fragment_skips_module_docs_but_checks_members(tmp_path: Path) -> None:
+    """A private stub fragment needs no module example; its members are still checked."""
+    fixture = tmp_path / "_fragment.pyi"
+    fixture.write_text(
+        '"""Stub declarations mirroring one Rust binding file."""\n\n'
+        "def scale(value: float) -> float:\n"
+        '    """Scale a finite value by two."""\n'
+        "    ...\n",
+        encoding="utf-8",
+    )
+
+    errors = _MODULE.public_callable_errors(fixture)
+    assert errors
+    assert all(error.symbol == "scale" for error in errors)

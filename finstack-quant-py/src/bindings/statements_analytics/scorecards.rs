@@ -262,7 +262,7 @@ pub struct PyScorecardReport {
 
 #[pymethods]
 impl PyScorecardReport {
-    #[doc = pydoc!("finstack_quant.statements_analytics", "ScorecardReport.status")]
+    #[doc = pydoc!("finstack_quant.statements_analytics._scorecards", "ScorecardReport.status")]
     #[getter]
     fn status(&self) -> PyResult<String> {
         crate::bindings::extract::label(&self.inner.status)
@@ -302,7 +302,7 @@ impl PyScorecardReport {
         serde_json::to_string(&self.inner.data).map_err(display_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.statements_analytics", "ScorecardReport.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.statements_analytics._scorecards", "ScorecardReport.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let row = serde_json::json!({
             "status": self.status()?,

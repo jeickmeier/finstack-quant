@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 import math
-from pathlib import Path
 import pickle
 
 import pandas as pd
@@ -29,6 +28,7 @@ from finstack_quant.analytics import (
     RollingGreeks,
 )
 from finstack_quant.core.dates import FiscalConfig
+from tests.stub_helpers import stub_text as read_stub_text
 
 # Fixtures
 
@@ -537,16 +537,14 @@ class TestStubs:
     """Smoke tests that the `.pyi` stays in sync with the registered API."""
 
     def test_stub_lists_performance_first(self) -> None:
-        stub_path = Path(__file__).resolve().parents[1] / "finstack_quant" / "analytics" / "__init__.pyi"
-        stub_text = stub_path.read_text()
+        stub_text = read_stub_text("finstack_quant.analytics")
         assert "class Performance:" in stub_text
         assert "from_returns" in stub_text
         assert "rolling_returns" in stub_text
         assert '"Performance"' in stub_text
 
     def test_stub_drops_legacy_freestanding_functions(self) -> None:
-        stub_path = Path(__file__).resolve().parents[1] / "finstack_quant" / "analytics" / "__init__.pyi"
-        stub_text = stub_path.read_text()
+        stub_text = read_stub_text("finstack_quant.analytics")
         # These freestanding functions were deleted; ensure the stub matches the runtime.
         assert "def estimate_ruin" not in stub_text
         assert "def fit_garch11" not in stub_text

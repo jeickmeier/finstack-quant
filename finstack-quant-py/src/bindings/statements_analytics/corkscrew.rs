@@ -268,7 +268,7 @@ pub struct PyCorkscrewReport {
 
 #[pymethods]
 impl PyCorkscrewReport {
-    #[doc = pydoc!("finstack_quant.statements_analytics", "CorkscrewReport.status")]
+    #[doc = pydoc!("finstack_quant.statements_analytics._corkscrew", "CorkscrewReport.status")]
     #[getter]
     fn status(&self) -> PyResult<String> {
         crate::bindings::extract::label(&self.inner.status)
@@ -307,7 +307,7 @@ impl PyCorkscrewReport {
         serde_json::to_string(&self.inner.data).map_err(display_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.statements_analytics", "CorkscrewReport.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.statements_analytics._corkscrew", "CorkscrewReport.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let row = serde_json::json!({
             "status": self.status()?,

@@ -25,7 +25,7 @@ use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_p
 
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBondBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConversionSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ConversionSpec",
@@ -40,7 +40,7 @@ pub struct PyConversionSpec {
 
 #[pymethods]
 impl PyConversionSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConversionSpec.__init__")]
     #[new]
     #[pyo3(signature = (ratio=None, price=None, *, policy, anti_dilution, dividend_adjustment, dilution_events=None))]
     #[pyo3(
@@ -82,13 +82,13 @@ impl PyConversionSpec {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.policy")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConversionSpec.policy")]
     #[getter]
     fn policy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.policy)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.dilution_events")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConversionSpec.dilution_events")]
     #[getter]
     fn dilution_events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.dilution_events)
@@ -109,20 +109,20 @@ impl PyConversionSpec {
 }
 
 crate::bindings::macros::py_getters!(PyConversionSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.ratio")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConversionSpec.ratio")]
     ratio -> Option<f64> = s.inner.ratio;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.price")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConversionSpec.price")]
     price -> Option<f64> = s.inner.price;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.anti_dilution")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConversionSpec.anti_dilution")]
     anti_dilution -> PyResult<String> = enum_to_py_string(&s.inner.anti_dilution);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConversionSpec.dividend_adjustment")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConversionSpec.dividend_adjustment")]
     dividend_adjustment -> PyResult<String> = enum_to_py_string(&s.inner.dividend_adjustment);
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallPutSchedule")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "CallPutSchedule")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CallPutSchedule",
@@ -146,7 +146,7 @@ fn windows_from_py(
 
 #[pymethods]
 impl PyCallPutSchedule {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallPutSchedule.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "CallPutSchedule.__init__")]
     #[new]
     #[pyo3(signature = (calls=None, puts=None))]
     #[pyo3(text_signature = "(calls=None, puts=None)")]
@@ -163,13 +163,13 @@ impl PyCallPutSchedule {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallPutSchedule.calls")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "CallPutSchedule.calls")]
     #[getter]
     fn calls<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.calls)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CallPutSchedule.puts")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "CallPutSchedule.puts")]
     #[getter]
     fn puts<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.puts)
@@ -185,7 +185,7 @@ impl PyCallPutSchedule {
     }
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ConvertibleBond",
@@ -200,18 +200,25 @@ pub struct PyConvertibleBond {
 }
 
 instrument_envelope_methods!(
-    PyConvertibleBond("ConvertibleBond"),
+    PyConvertibleBond(
+        "ConvertibleBond",
+        module = "finstack_quant.valuations.instruments._typed_convertible"
+    ),
     ConvertibleBond,
     builder = PyConvertibleBondBuilder("ConvertibleBondBuilder", fields),
     seed =
         finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond::builder(
         ),
 );
-instrument_pricing_methods!(PyConvertibleBond, "ConvertibleBond");
+instrument_pricing_methods!(
+    PyConvertibleBond,
+    "ConvertibleBond",
+    module = "finstack_quant.valuations.instruments._typed_convertible"
+);
 
 #[pymethods]
 impl PyConvertibleBond {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -221,7 +228,7 @@ impl PyConvertibleBond {
         .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.example_mandatory")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.example_mandatory")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_mandatory() -> PyResult<Self> {
@@ -230,14 +237,14 @@ impl PyConvertibleBond {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.parity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.parity")]
     #[pyo3(text_signature = "($self, market)")]
     fn parity(&self, py: Python<'_>, market: &Bound<'_, PyAny>) -> PyResult<f64> {
         let market = extract_market(py, market)?;
         self.inner.parity(&market).map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.conversion_premium")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.conversion_premium")]
     #[pyo3(text_signature = "($self, market, bond_price)")]
     fn conversion_premium(
         &self,
@@ -251,7 +258,7 @@ impl PyConvertibleBond {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.greeks")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.greeks")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn greeks<'py>(
         &self,
@@ -265,19 +272,19 @@ impl PyConvertibleBond {
         serde_to_py(py, &greeks)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.issue_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.issue_date)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.soft_call_trigger")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.soft_call_trigger")]
     #[getter]
     fn soft_call_trigger<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -287,7 +294,7 @@ impl PyConvertibleBond {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.resolved_settlement")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.resolved_settlement")]
     #[getter]
     fn resolved_settlement<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -297,13 +304,13 @@ impl PyConvertibleBond {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.cashflow_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.cashflow_spec")]
     #[getter]
     fn cashflow_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.cashflow_spec)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         Instrument::expiry(&self.inner)
@@ -326,45 +333,45 @@ impl PyConvertibleBond {
 }
 
 crate::bindings::macros::py_getters!(PyConvertibleBond |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.credit_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.credit_curve_id")]
     credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(|id| id.to_string());
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.conversion")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.conversion")]
     conversion -> PyConversionSpec = PyConversionSpec { inner: s.inner.conversion.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.conversion_ratio")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.conversion_ratio")]
     conversion_ratio -> Option<f64> = s.inner.conversion_ratio();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.effective_conversion_ratio")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.effective_conversion_ratio")]
     effective_conversion_ratio -> Option<f64> = s.inner.effective_conversion_ratio();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.spot_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.spot_id")]
     spot_id -> String = s.inner.spot_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.div_yield_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.div_yield_id")]
     div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(|id| id.to_string());
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.call_put")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.call_put")]
     call_put -> Option<PyCallPutSchedule> =
         s.inner.call_put.as_ref().map(|inner| PyCallPutSchedule { inner: inner.clone() });
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.settlement_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.settlement_days")]
     settlement_days -> Option<u32> = s.inner.settlement_days;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBond.recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBond.recovery_rate")]
     recovery_rate -> Option<f64> = s.inner.recovery_rate;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "ConvertibleBondBuilder",
@@ -377,7 +384,7 @@ pub struct PyConvertibleBondBuilder {
 
 #[pymethods]
 impl PyConvertibleBondBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -388,7 +395,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.notional")]
     #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -403,7 +410,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.issue_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.issue_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn issue_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -418,7 +425,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -433,7 +440,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -447,7 +454,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.credit_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.credit_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -461,7 +468,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.conversion")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.conversion")]
     #[pyo3(text_signature = "($self, value)")]
     fn conversion<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -481,7 +488,7 @@ impl PyConvertibleBondBuilder {
             .conversion(conversion))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.spot_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.spot_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn spot_id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -492,7 +499,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -506,7 +513,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.div_yield_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.div_yield_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn div_yield_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -520,7 +527,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.call_put")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.call_put")]
     #[pyo3(text_signature = "($self, value)")]
     fn call_put<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -541,7 +548,7 @@ impl PyConvertibleBondBuilder {
             .call_put(call_put))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.soft_call_trigger")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.soft_call_trigger")]
     #[pyo3(text_signature = "($self, value)")]
     fn soft_call_trigger<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -563,7 +570,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.settlement_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.settlement_days")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement_days<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -577,7 +584,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.recovery_rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn recovery_rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -591,7 +598,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.resolved_settlement")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.resolved_settlement")]
     #[pyo3(text_signature = "($self, value)")]
     fn resolved_settlement<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -607,7 +614,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.cashflow_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.cashflow_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn cashflow_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -624,7 +631,7 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "ConvertibleBondBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_convertible", "ConvertibleBondBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -659,11 +666,11 @@ crate::bindings::macros::wire_methods!(
     PyConversionSpec,
     ConversionSpec,
     "ConversionSpec",
-    module = "finstack_quant.valuations.instruments"
+    module = "finstack_quant.valuations.instruments._typed_convertible"
 );
 crate::bindings::macros::wire_methods!(
     PyCallPutSchedule,
     CallPutSchedule,
     "CallPutSchedule",
-    module = "finstack_quant.valuations.instruments"
+    module = "finstack_quant.valuations.instruments._typed_convertible"
 );

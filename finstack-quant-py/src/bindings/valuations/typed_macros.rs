@@ -15,13 +15,13 @@
 /// Expands to a `#[pymethods]` block with `price`, `metric`,
 /// `market_dependencies`, `default_model`, `attributes` and `to_dict`. The
 /// wrapper must expose `pub(crate) inner` (the Rust instrument); `$name` is its
-/// Python class name, which keys the per-class docstrings in the
-/// `finstack_quant.valuations.instruments` stub.
+/// Python class name and `module` the stub module holding its docstrings (the
+/// private fragment that mirrors the wrapper's Rust file).
 macro_rules! instrument_pricing_methods {
-    ($ty:ident, $name:literal) => {
+    ($ty:ident, $name:literal, module = $module:literal) => {
         #[pymethods]
         impl $ty {
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".price"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".price"))]
             #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None, explain=false))]
             #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None, explain=False)")]
             #[allow(clippy::too_many_arguments)]
@@ -49,7 +49,7 @@ macro_rules! instrument_pricing_methods {
                 )
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".metric"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".metric"))]
             #[pyo3(signature = (market, as_of, metric_id, model="default"))]
             #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default')")]
             fn metric(
@@ -70,7 +70,7 @@ macro_rules! instrument_pricing_methods {
                 )
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".market_dependencies"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".market_dependencies"))]
             #[pyo3(text_signature = "($self)")]
             fn market_dependencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
                 let deps = finstack_quant_valuations::instruments::Instrument::market_dependencies(
@@ -80,14 +80,14 @@ macro_rules! instrument_pricing_methods {
                 $crate::bindings::pandas_utils::serde_to_py(py, &deps)
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".default_model"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".default_model"))]
             #[getter]
             fn default_model(&self) -> String {
                 finstack_quant_valuations::instruments::Instrument::default_model(&self.inner)
                     .to_string()
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".attributes"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".attributes"))]
             #[getter]
             fn attributes(&self) -> $crate::bindings::core::types::PyAttributes {
                 $crate::bindings::valuations::convert::attributes_to_py(
@@ -95,7 +95,7 @@ macro_rules! instrument_pricing_methods {
                 )
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".to_dict"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_dict"))]
             #[pyo3(text_signature = "($self)")]
             fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
                 $crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
@@ -111,14 +111,15 @@ pub(crate) use instrument_pricing_methods;
 /// `to_json` and `id`. On its builder wrapper `$builder`: `build`,
 /// `__repr__` and the three
 /// `*_pricing_overrides` setters (with the matching getters on `$ty`; see
-/// `pricing_override_methods!`). Docstrings come from the
-/// `finstack_quant.valuations.instruments` stub, keyed by the Python class names.
+/// `pricing_override_methods!`). Docstrings come from the `module` stub,
+/// keyed by the Python class names.
 ///
 /// Arguments, in order:
 ///
-/// * `$ty($name)` — the Python instrument wrapper and its Python class name; the
-///   wrapper must expose `pub(crate) inner` (the Rust instrument, convertible
-///   with `InstrumentJson::from`).
+/// * `$ty($name, module = $module)` — the Python instrument wrapper, its Python
+///   class name, and the stub module holding the docstrings of the instrument
+///   and its builder; the wrapper must expose `pub(crate) inner` (the Rust
+///   instrument, convertible with `InstrumentJson::from`).
 /// * `$variant` — the Rust type name, used in the `to_json` error context
 ///   (`"failed to serialize {variant} instrument envelope"`).
 /// * `builder = $builder($builder_name, $shape)` — the Python builder wrapper
@@ -129,15 +130,15 @@ pub(crate) use instrument_pricing_methods;
 /// * `seed = $seed` — an expression producing the seeded Rust builder.
 macro_rules! instrument_envelope_methods {
     (
-        $ty:ident($name:literal), $variant:ident,
+        $ty:ident($name:literal, module = $module:literal), $variant:ident,
         builder = $builder:ident($builder_name:literal, $shape:ident),
         seed = $seed:expr $(,)?
     ) => {
         $crate::bindings::valuations::typed_macros::instrument_envelope_methods!(
-            @impl $ty, $name, $variant, $builder, $builder_name, $shape, $seed
+            @impl $ty, $name, $module, $variant, $builder, $builder_name, $shape, $seed
         );
         $crate::bindings::valuations::typed_macros::pricing_override_methods!(
-            $ty, $name, $builder, $builder_name, $shape
+            $ty, $name, $builder, $builder_name, $shape, module = $module
         );
     };
     (@new_builder fields, $builder:ident, $seed:expr) => {
@@ -159,12 +160,12 @@ macro_rules! instrument_envelope_methods {
         )
     };
     (
-        @impl $ty:ident, $name:literal, $variant:ident, $builder:ident,
+        @impl $ty:ident, $name:literal, $module:literal, $variant:ident, $builder:ident,
         $builder_name:literal, $shape:ident, $seed:expr
     ) => {
         #[pymethods]
         impl $ty {
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".builder"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".builder"))]
             #[staticmethod]
             #[pyo3(text_signature = "()")]
             fn builder() -> $builder {
@@ -173,20 +174,20 @@ macro_rules! instrument_envelope_methods {
                 )
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".__reduce__"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".__reduce__"))]
             fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
                 let from_json = py.get_type::<Self>().getattr("from_json")?;
                 $crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".from_json"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json"))]
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]
             fn from_json(json: &str) -> PyResult<Self> {
                 $crate::bindings::valuations::convert::parse_typed_instrument_json(json).map(|inner| Self { inner })
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".to_json"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json"))]
             #[pyo3(text_signature = "($self)")]
             fn to_json(&self) -> PyResult<String> {
                 $crate::bindings::valuations::convert::serialize_typed_instrument_json(
@@ -197,7 +198,7 @@ macro_rules! instrument_envelope_methods {
                 )
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".id"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".id"))]
             #[getter]
             fn id(&self) -> String {
                 self.inner.id.to_string()
@@ -206,7 +207,7 @@ macro_rules! instrument_envelope_methods {
 
         #[pymethods]
         impl $builder {
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($builder_name, ".build"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($builder_name, ".build"))]
             #[pyo3(text_signature = "($self)")]
             fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<$ty> {
                 let b = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
@@ -233,16 +234,19 @@ pub(crate) use instrument_envelope_methods;
 /// and its Python class name, the Python builder wrapper
 /// (`inner: Option<RustBuilder>`) and its Python class name, and `fields` when
 /// the builder records set fields for `__repr__` in a `fields` vector
-/// (`no_fields` otherwise). Docstrings come from the instruments stub.
+/// (`no_fields` otherwise), then `module = ` the stub module holding the docstrings.
 macro_rules! pricing_override_methods {
     (@record fields, $slf:ident, $name:literal) => {
         $slf.fields.push(($name, "{...}".to_string()));
     };
     (@record no_fields, $slf:ident, $name:literal) => {};
-    ($instrument:ty, $name:literal, $builder:ty, $builder_name:literal, $record:ident) => {
+    (
+        $instrument:ty, $name:literal, $builder:ty, $builder_name:literal, $record:ident,
+        module = $module:literal
+    ) => {
         #[pyo3::pymethods]
         impl $instrument {
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".instrument_pricing_overrides"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".instrument_pricing_overrides"))]
             #[getter]
             fn instrument_pricing_overrides<'py>(
                 &self,
@@ -254,7 +258,7 @@ macro_rules! pricing_override_methods {
                 )
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".metric_pricing_overrides"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".metric_pricing_overrides"))]
             #[getter]
             fn metric_pricing_overrides<'py>(
                 &self,
@@ -266,7 +270,7 @@ macro_rules! pricing_override_methods {
                 )
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".scenario_pricing_overrides"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".scenario_pricing_overrides"))]
             #[getter]
             fn scenario_pricing_overrides<'py>(
                 &self,
@@ -281,7 +285,7 @@ macro_rules! pricing_override_methods {
 
         #[pyo3::pymethods]
         impl $builder {
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($builder_name, ".instrument_pricing_overrides"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($builder_name, ".instrument_pricing_overrides"))]
             #[pyo3(text_signature = "($self, value)")]
             fn instrument_pricing_overrides<'py>(
                 mut slf: pyo3::PyRefMut<'py, Self>,
@@ -302,7 +306,7 @@ macro_rules! pricing_override_methods {
                 Ok(slf)
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($builder_name, ".metric_pricing_overrides"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($builder_name, ".metric_pricing_overrides"))]
             #[pyo3(text_signature = "($self, value)")]
             fn metric_pricing_overrides<'py>(
                 mut slf: pyo3::PyRefMut<'py, Self>,
@@ -321,7 +325,7 @@ macro_rules! pricing_override_methods {
                 Ok(slf)
             }
 
-            #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($builder_name, ".scenario_pricing_overrides"))]
+            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($builder_name, ".scenario_pricing_overrides"))]
             #[pyo3(text_signature = "($self, value)")]
             fn scenario_pricing_overrides<'py>(
                 mut slf: pyo3::PyRefMut<'py, Self>,

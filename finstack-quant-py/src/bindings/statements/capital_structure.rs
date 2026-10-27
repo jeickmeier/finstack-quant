@@ -206,7 +206,7 @@ wire_methods!(PyPikToggleSpec, PikToggleSpec, "PikToggleSpec");
 
 #[pymethods]
 impl PyPikToggleSpec {
-    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.__init__")]
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.__init__")]
     #[new]
     #[pyo3(signature = (liquidity_metric, threshold, target_instrument_ids, min_periods_in_pik=0))]
     fn new(
@@ -225,30 +225,30 @@ impl PyPikToggleSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.validate")]
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.validate")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(statements_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.liquidity_metric")]
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.liquidity_metric")]
     #[getter]
     fn liquidity_metric(&self) -> &str {
         &self.inner.liquidity_metric
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.threshold")]
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.threshold")]
     #[getter]
     fn threshold(&self) -> f64 {
         self.inner.threshold
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.target_instrument_ids")]
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.target_instrument_ids")]
     #[getter]
     fn target_instrument_ids(&self) -> Vec<String> {
         self.inner.target_instrument_ids.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.min_periods_in_pik")]
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.min_periods_in_pik")]
     #[getter]
     fn min_periods_in_pik(&self) -> usize {
         self.inner.min_periods_in_pik
@@ -619,7 +619,7 @@ impl PyCapitalStructureCashflows {
         self.inner.reporting_currency.map(|c| c.to_string())
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "CapitalStructureCashflows.get_component")]
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.get_component")]
     #[pyo3(text_signature = "($self, component, instrument_or_total, period_id)")]
     fn get_component(
         &self,

@@ -31,7 +31,7 @@ use super::{
 
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "StructuredCredit",
@@ -45,16 +45,23 @@ pub struct PyStructuredCredit {
 }
 
 instrument_envelope_methods!(
-    PyStructuredCredit("StructuredCredit"),
+    PyStructuredCredit(
+        "StructuredCredit",
+        module = "finstack_quant.valuations.instruments._typed_structured_credit.structured_credit"
+    ),
     StructuredCredit,
     builder = PyStructuredCreditBuilder("StructuredCreditBuilder", no_fields),
     seed = StructuredCredit::builder(),
 );
-instrument_pricing_methods!(PyStructuredCredit, "StructuredCredit");
+instrument_pricing_methods!(
+    PyStructuredCredit,
+    "StructuredCredit",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.structured_credit"
+);
 
 #[pymethods]
 impl PyStructuredCredit {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.new_standard")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.new_standard")]
     #[staticmethod]
     #[pyo3(text_signature = "(deal_type, params)")]
     fn new_standard(
@@ -67,7 +74,7 @@ impl PyStructuredCredit {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.price_stochastic")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.price_stochastic")]
     #[pyo3(signature = (market, as_of, num_paths=None, antithetic=None))]
     #[pyo3(text_signature = "($self, market, as_of, num_paths=None, antithetic=None)")]
     fn price_stochastic(
@@ -87,7 +94,7 @@ impl PyStructuredCredit {
         Ok(PyStochasticPricingResult { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.run_simulation")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.run_simulation")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn run_simulation(
         &self,
@@ -104,19 +111,19 @@ impl PyStructuredCredit {
         Ok(PySimulationRun { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.closing_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.closing_date")]
     #[getter]
     fn closing_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.closing_date)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.first_payment_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.first_payment_date")]
     #[getter]
     fn first_payment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.first_payment_date)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.quote_settlement_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.quote_settlement_date")]
     #[getter]
     fn quote_settlement_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -125,13 +132,13 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.with_standard_fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.with_standard_fees")]
     #[pyo3(text_signature = "($self)")]
     fn with_standard_fees(&self) -> Self {
         Self {
@@ -139,7 +146,7 @@ impl PyStructuredCredit {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.enable_stochastic")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.enable_stochastic")]
     #[pyo3(text_signature = "($self)")]
     fn enable_stochastic(&self) -> PyResult<Self> {
         let mut deal = self.inner.clone();
@@ -147,14 +154,14 @@ impl PyStructuredCredit {
         Ok(Self { inner: deal })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.create_waterfall")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.create_waterfall")]
     #[pyo3(text_signature = "($self)")]
     fn create_waterfall(&self) -> PyResult<PyWaterfall> {
         let inner = self.inner.create_waterfall().map_err(core_to_py)?;
         Ok(PyWaterfall { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.tranche_cashflows")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.tranche_cashflows")]
     #[pyo3(text_signature = "($self, tranche_id, market, as_of)")]
     fn tranche_cashflows(
         &self,
@@ -173,7 +180,7 @@ impl PyStructuredCredit {
         Ok(PyTrancheCashflows { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.equity_metrics")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.equity_metrics")]
     #[pyo3(signature = (market, as_of, purchase_price_pct=None))]
     #[pyo3(text_signature = "($self, market, as_of, purchase_price_pct=None)")]
     fn equity_metrics(
@@ -192,7 +199,7 @@ impl PyStructuredCredit {
         Ok(PyEquityMetrics { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.business_day_convention")]
     #[getter]
     fn business_day_convention(&self) -> PyResult<Option<String>> {
         self.inner
@@ -202,13 +209,13 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.credit_model")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.credit_model")]
     #[getter]
     fn credit_model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.credit_model)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.stochastic_prepay_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.stochastic_prepay_spec")]
     #[getter]
     fn stochastic_prepay_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -219,7 +226,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.stochastic_default_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.stochastic_default_spec")]
     #[getter]
     fn stochastic_default_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -230,7 +237,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.stochastic_recovery_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.stochastic_recovery_spec")]
     #[getter]
     fn stochastic_recovery_spec<'py>(
         &self,
@@ -244,7 +251,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.correlation_structure")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.correlation_structure")]
     #[getter]
     fn correlation_structure<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -255,7 +262,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.delinquency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.delinquency")]
     #[getter]
     fn delinquency<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -266,7 +273,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.card")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.card")]
     #[getter]
     fn card<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -277,19 +284,19 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.market_conditions")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.market_conditions")]
     #[getter]
     fn market_conditions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.market_conditions)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.deal_metadata")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.deal_metadata")]
     #[getter]
     fn deal_metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.deal_metadata)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.hedge_swaps")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.hedge_swaps")]
     #[getter]
     fn hedge_swaps(&self) -> Vec<PyHedgeSwap> {
         self.inner
@@ -301,7 +308,7 @@ impl PyStructuredCredit {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.fees")]
     #[getter]
     fn fees<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -311,13 +318,13 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.coverage_triggers")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.coverage_triggers")]
     #[getter]
     fn coverage_triggers<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.coverage_triggers)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.loss_allocation")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.loss_allocation")]
     #[getter]
     fn loss_allocation(&self) -> PyResult<Option<String>> {
         self.inner
@@ -327,13 +334,13 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.tranche_draws")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.tranche_draws")]
     #[getter]
     fn tranche_draws<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.tranche_draws)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.tranche_readvance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.tranche_readvance")]
     #[getter]
     fn tranche_readvance<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -343,7 +350,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.loss_recognition")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.loss_recognition")]
     #[getter]
     fn loss_recognition(&self) -> PyResult<Option<String>> {
         self.inner
@@ -353,7 +360,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.waterfall_rules")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.waterfall_rules")]
     #[getter]
     fn waterfall_rules<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -363,7 +370,7 @@ impl PyStructuredCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -372,13 +379,13 @@ impl PyStructuredCredit {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.disable_stochastic")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.disable_stochastic")]
     #[pyo3(text_signature = "($self)")]
     fn disable_stochastic(&self) -> Self {
         let mut deal = self.inner.clone();
@@ -397,73 +404,73 @@ impl PyStructuredCredit {
 }
 
 crate::bindings::macros::py_getters!(PyStructuredCredit |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.deal_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.deal_type")]
     deal_type -> PyResult<String> = enum_to_py_string(&s.inner.deal_type);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.pool")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.pool")]
     pool -> PyAssetPool = PyAssetPool { inner: s.inner.pool.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.tranches")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.tranches")]
     tranches -> PyTrancheStructure = PyTrancheStructure { inner: s.inner.tranches.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.frequency")]
     frequency -> PyTenor = PyTenor { inner: s.inner.frequency };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.prepayment_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.prepayment_spec")]
     prepayment_spec -> PyPrepaymentModelSpec =
         PyPrepaymentModelSpec { inner: s.inner.credit_model.prepayment_spec.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.default_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.default_spec")]
     default_spec -> PyDefaultModelSpec =
         PyDefaultModelSpec { inner: s.inner.credit_model.default_spec.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.recovery_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.recovery_spec")]
     recovery_spec -> PyRecoveryModelSpec =
         PyRecoveryModelSpec { inner: s.inner.credit_model.recovery_spec.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.cleanup_call_decimal")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.cleanup_call_decimal")]
     cleanup_call_decimal -> Option<f64> = s.inner.cleanup_call_decimal;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.call_assumption")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.call_assumption")]
     call_assumption -> Option<PyCallAssumption> =
         s.inner.call_assumption.clone().map(|inner| PyCallAssumption { inner });
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.liquidation_price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.liquidation_price_pct")]
     liquidation_price_pct -> Option<f64> = s.inner.liquidation_price_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.principal_covers_senior_interest")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.principal_covers_senior_interest")]
     principal_covers_senior_interest -> Option<bool> = s.inner.principal_covers_senior_interest;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.coverage_rules")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.coverage_rules")]
     coverage_rules -> Option<PyCoverageRules> =
         s.inner.coverage_rules.clone().map(|inner| PyCoverageRules { inner });
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.waterfall")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.waterfall")]
     waterfall -> Option<PyWaterfall> = s.inner.waterfall.clone().map(|inner| PyWaterfall { inner });
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.is_stochastic")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.is_stochastic")]
     is_stochastic -> bool = s.inner.is_stochastic();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.effective_loss_allocation")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.effective_loss_allocation")]
     effective_loss_allocation -> PyResult<String> =
         enum_to_py_string(&s.inner.effective_loss_allocation());
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.effective_loss_recognition")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.effective_loss_recognition")]
     effective_loss_recognition -> PyResult<String> =
         enum_to_py_string(&s.inner.effective_loss_recognition());
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.effective_principal_covers_senior_interest")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCredit.effective_principal_covers_senior_interest")]
     effective_principal_covers_senior_interest -> bool =
         s.inner.effective_principal_covers_senior_interest();
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "StructuredCreditBuilder",
@@ -475,21 +482,21 @@ pub struct PyStructuredCreditBuilder {
 
 #[pymethods]
 impl PyStructuredCreditBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, |b: StructuredCreditBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.deal_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.deal_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn deal_type<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let deal_type: DealType = enum_from_str(value, "deal_type")?;
         builder_set!(slf, |b: StructuredCreditBuilder| b.deal_type(deal_type))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.pool")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.pool")]
     #[pyo3(text_signature = "($self, value)")]
     fn pool<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -499,7 +506,7 @@ impl PyStructuredCreditBuilder {
             .pool(value.inner.clone()))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.tranches")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.tranches")]
     #[pyo3(text_signature = "($self, value)")]
     fn tranches<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -509,7 +516,7 @@ impl PyStructuredCreditBuilder {
             .tranches(value.inner.clone()))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.closing_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.closing_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn closing_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -519,7 +526,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.closing_date(date))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.first_payment_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.first_payment_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn first_payment_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -529,7 +536,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.first_payment_date(date))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.quote_settlement_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.quote_settlement_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn quote_settlement_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -540,7 +547,7 @@ impl PyStructuredCreditBuilder {
             .quote_settlement_date(date))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -550,7 +557,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.maturity(date))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -560,7 +567,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.frequency(frequency))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -570,7 +577,7 @@ impl PyStructuredCreditBuilder {
             .calendar_id(value.into()))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.business_day_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -582,7 +589,7 @@ impl PyStructuredCreditBuilder {
             .business_day_convention(business_day_convention))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -592,7 +599,7 @@ impl PyStructuredCreditBuilder {
             .discount_curve_id(CurveId::new(value.to_string())))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.market_conditions")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.market_conditions")]
     #[pyo3(text_signature = "($self, value)")]
     fn market_conditions<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -605,7 +612,7 @@ impl PyStructuredCreditBuilder {
             .market_conditions(market_conditions))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.waterfall_rules")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.waterfall_rules")]
     #[pyo3(text_signature = "($self, value)")]
     fn waterfall_rules<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -618,7 +625,7 @@ impl PyStructuredCreditBuilder {
             .waterfall_rules(waterfall_rules))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.fees")]
     #[pyo3(text_signature = "($self, value)")]
     fn fees<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -629,7 +636,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.fees(fees))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.credit_model")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.credit_model")]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_model<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -641,7 +648,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.credit_model(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.prepayment_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.prepayment_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn prepayment_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -658,7 +665,7 @@ impl PyStructuredCreditBuilder {
             .prepayment_spec(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.default_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.default_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn default_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -673,7 +680,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.default_spec(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.recovery_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.recovery_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn recovery_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -688,7 +695,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.recovery_spec(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.stochastic_prepay_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.stochastic_prepay_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn stochastic_prepay_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -701,7 +708,7 @@ impl PyStructuredCreditBuilder {
             .stochastic_prepay_spec(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.stochastic_default_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.stochastic_default_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn stochastic_default_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -714,7 +721,7 @@ impl PyStructuredCreditBuilder {
             .stochastic_default_spec(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.stochastic_recovery_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.stochastic_recovery_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn stochastic_recovery_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -727,7 +734,7 @@ impl PyStructuredCreditBuilder {
             .stochastic_recovery_spec(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.correlation_structure")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.correlation_structure")]
     #[pyo3(text_signature = "($self, value)")]
     fn correlation_structure<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -740,7 +747,7 @@ impl PyStructuredCreditBuilder {
             .correlation_structure(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.delinquency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.delinquency")]
     #[pyo3(text_signature = "($self, value)")]
     fn delinquency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -752,7 +759,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.delinquency(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.card")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.card")]
     #[pyo3(text_signature = "($self, value)")]
     fn card<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -764,7 +771,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.card(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.coverage_triggers")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.coverage_triggers")]
     #[pyo3(text_signature = "($self, value)")]
     fn coverage_triggers<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -777,7 +784,7 @@ impl PyStructuredCreditBuilder {
             .coverage_triggers(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.coverage_rules")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.coverage_rules")]
     #[pyo3(text_signature = "($self, value)")]
     fn coverage_rules<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -793,7 +800,7 @@ impl PyStructuredCreditBuilder {
             .coverage_rules(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.call_assumption")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.call_assumption")]
     #[pyo3(text_signature = "($self, value)")]
     fn call_assumption<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -809,7 +816,7 @@ impl PyStructuredCreditBuilder {
             .call_assumption(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.waterfall")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.waterfall")]
     #[pyo3(text_signature = "($self, value)")]
     fn waterfall<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -824,7 +831,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.waterfall(converted))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.hedge_swaps")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.hedge_swaps")]
     #[pyo3(text_signature = "($self, value)")]
     fn hedge_swaps<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -837,7 +844,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.hedge_swaps(hedges))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.cleanup_call_decimal")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.cleanup_call_decimal")]
     #[pyo3(text_signature = "($self, value)")]
     fn cleanup_call_decimal<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -847,7 +854,7 @@ impl PyStructuredCreditBuilder {
             .cleanup_call_decimal(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.liquidation_price_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.liquidation_price_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn liquidation_price_pct<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -857,7 +864,7 @@ impl PyStructuredCreditBuilder {
             .liquidation_price_pct(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.loss_allocation")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.loss_allocation")]
     #[pyo3(text_signature = "($self, value)")]
     fn loss_allocation<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -867,7 +874,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.loss_allocation(policy))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.tranche_draws")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.tranche_draws")]
     #[pyo3(text_signature = "($self, value)")]
     fn tranche_draws<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -879,7 +886,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.tranche_draws(draws))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.tranche_readvance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.tranche_readvance")]
     #[pyo3(text_signature = "($self, value)")]
     fn tranche_readvance<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -891,7 +898,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.tranche_readvance(spec))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.loss_recognition")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.loss_recognition")]
     #[pyo3(text_signature = "($self, value)")]
     fn loss_recognition<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -901,7 +908,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.loss_recognition(timing))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.principal_covers_senior_interest")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.principal_covers_senior_interest")]
     #[pyo3(text_signature = "($self, value)")]
     fn principal_covers_senior_interest<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -911,7 +918,7 @@ impl PyStructuredCreditBuilder {
             .principal_covers_senior_interest(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.deal_metadata")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.deal_metadata")]
     #[pyo3(text_signature = "($self, value)")]
     fn deal_metadata<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -923,7 +930,7 @@ impl PyStructuredCreditBuilder {
         builder_set!(slf, |b: StructuredCreditBuilder| b.deal_metadata(metadata))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCreditBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.structured_credit", "StructuredCreditBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

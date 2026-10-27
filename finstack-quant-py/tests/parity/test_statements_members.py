@@ -1,16 +1,17 @@
 """Every public statements class member has a matching published declaration."""
 
 import ast
-from pathlib import Path
+
+from tests.stub_helpers import stub_definitions
 
 from finstack_quant import statements
 
 
 def test_statements_class_members_match_published_stub() -> None:
-    stub = Path(statements.__file__).with_suffix(".pyi")
-    tree = ast.parse(stub.read_text(encoding="utf-8"))
+    definitions = stub_definitions("finstack_quant.statements")
+    assert any(isinstance(node, ast.ClassDef) for node in definitions)
     differences = []
-    for node in tree.body:
+    for node in definitions:
         if not isinstance(node, ast.ClassDef):
             continue
         runtime_class = getattr(statements, node.name)

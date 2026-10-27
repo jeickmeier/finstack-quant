@@ -86,7 +86,7 @@ impl PyAdjustment {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "Adjustment.with_cap")]
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "Adjustment.with_cap")]
     #[pyo3(text_signature = "($self, base_node, value, base_mode)")]
     fn with_cap(&self, base_node: Option<String>, value: f64, base_mode: &str) -> PyResult<Self> {
         let mode = parse_cap_base_mode(base_mode)?;
@@ -152,7 +152,7 @@ impl PyAdjustment {
         self.inner.cap.as_ref().map(|cap| cap.value)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "Adjustment.cap_base_mode")]
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "Adjustment.cap_base_mode")]
     #[getter]
     fn cap_base_mode(&self) -> PyResult<Option<String>> {
         self.inner

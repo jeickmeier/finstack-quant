@@ -25,10 +25,11 @@ def module_name_for(path: Path) -> str:
     parts = list(rel.with_suffix("").parts)
     if parts[-1] == "__init__":
         parts = parts[:-1]
-    elif parts[-1].startswith("_"):
-        # Private stub fragments organize declarations for their public parent
-        # namespace; they are not runtime submodules of the extension.
-        parts = parts[:-1]
+    private = next((i for i, part in enumerate(parts) if part.startswith("_")), None)
+    if private is not None:
+        # Private stub fragments (`_foo.pyi`, `_dir/foo.pyi`) declare members of
+        # the public module above them; they are not runtime submodules.
+        parts = parts[:private]
     return ".".join(["finstack_quant", *parts])
 
 

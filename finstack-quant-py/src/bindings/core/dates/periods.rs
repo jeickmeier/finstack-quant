@@ -10,7 +10,7 @@ use finstack_quant_core::dates::{
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyIterator, PyList, PyModule, PyType};
 
-#[doc = pydoc!("finstack_quant.core.dates", "PeriodKind")]
+#[doc = pydoc!("finstack_quant.core.dates._periods", "PeriodKind")]
 #[pyclass(
     name = "PeriodKind",
     module = "finstack_quant.core.dates",
@@ -49,7 +49,7 @@ label_enum!(PyPeriodKind, PeriodKind, "PeriodKind", {
 
 #[pymethods]
 impl PyPeriodKind {
-    #[doc = pydoc!("finstack_quant.core.dates", "PeriodKind.from_name")]
+    #[doc = pydoc!("finstack_quant.core.dates._periods", "PeriodKind.from_name")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, name)")]
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
@@ -58,13 +58,13 @@ impl PyPeriodKind {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.core.dates", "PeriodKind.periods_per_year")]
+    #[doc = pydoc!("finstack_quant.core.dates._periods", "PeriodKind.periods_per_year")]
     #[getter]
     fn periods_per_year(&self) -> u16 {
         self.inner.periods_per_year()
     }
 
-    #[doc = pydoc!("finstack_quant.core.dates", "PeriodKind.prior_observation_date")]
+    #[doc = pydoc!("finstack_quant.core.dates._periods", "PeriodKind.prior_observation_date")]
     #[pyo3(text_signature = "(self, first)")]
     fn prior_observation_date<'py>(
         &self,

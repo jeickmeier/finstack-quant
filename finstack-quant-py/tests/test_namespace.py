@@ -9,6 +9,7 @@ import pytest
 
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.portfolio import aggregate_full_cashflows
+from tests.stub_helpers import stub_text
 
 CONTRACT_PATH = Path(__file__).parents[1] / "parity_contract.toml"
 CONTRACT = tomllib.loads(CONTRACT_PATH.read_text())
@@ -510,8 +511,7 @@ class TestCalibrationNamespace:
 
     def test_models_stub_exports_fourier_pricers(self) -> None:
         """Models stubs should declare the runtime Fourier pricing exports."""
-        stub_path = Path(__file__).parents[1] / "finstack_quant" / "models" / "__init__.pyi"
-        stub = stub_path.read_text()
+        stub = stub_text("finstack_quant.models")
         for name in ("bs_cos_price", "vg_cos_price", "merton_jump_cos_price"):
             assert f'"{name}"' in stub
             assert f"def {name}(" in stub

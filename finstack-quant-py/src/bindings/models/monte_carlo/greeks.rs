@@ -42,7 +42,7 @@ fn spec_from_args(
     })
 }
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "finite_diff_delta")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._greeks", "finite_diff_delta")]
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (
@@ -74,7 +74,7 @@ fn finite_diff_delta(
         .map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "finite_diff_gamma")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._greeks", "finite_diff_gamma")]
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (

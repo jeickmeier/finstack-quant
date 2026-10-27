@@ -20,7 +20,7 @@ fn py_bool(value: bool) -> &'static str {
     }
 }
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer")]
 #[pyclass(
     name = "EuropeanPricer",
     module = "finstack_quant.models.monte_carlo",
@@ -32,7 +32,7 @@ pub struct PyEuropeanPricer {
 
 #[pymethods]
 impl PyEuropeanPricer {
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.__init__")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.__init__")]
     #[new]
     #[pyo3(signature = (num_paths=None, seed=None, use_parallel=None))]
     fn new(
@@ -45,23 +45,23 @@ impl PyEuropeanPricer {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.num_paths")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths()
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.seed")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.seed")]
     #[getter]
     fn seed(&self) -> u64 {
         self.inner.seed()
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.use_parallel")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.use_parallel")]
     #[getter]
     fn use_parallel(&self) -> bool {
         self.inner.use_parallel()
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "EuropeanPricer.price_gbm")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.price_gbm")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
     fn price_gbm(
@@ -106,7 +106,7 @@ impl PyEuropeanPricer {
     }
 }
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer")]
 #[pyclass(
     name = "PathDependentPricer",
     module = "finstack_quant.models.monte_carlo",
@@ -118,7 +118,7 @@ pub struct PyPathDependentPricer {
 
 #[pymethods]
 impl PyPathDependentPricer {
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.__init__")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.__init__")]
     #[new]
     #[pyo3(signature = (
         num_paths=None, seed=None, use_parallel=None,
@@ -144,7 +144,7 @@ impl PyPathDependentPricer {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.price_asian")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.price_asian")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
     fn price_asian(
@@ -179,7 +179,7 @@ impl PyPathDependentPricer {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.price_with_lrm_greeks")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.price_with_lrm_greeks")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
     fn price_with_lrm_greeks(
@@ -214,32 +214,32 @@ impl PyPathDependentPricer {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.num_paths")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.config().num_paths
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.seed")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.seed")]
     #[getter]
     fn seed(&self) -> u64 {
         self.inner.config().seed
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.use_parallel")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.use_parallel")]
     #[getter]
     fn use_parallel(&self) -> bool {
         self.inner.config().use_parallel
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.antithetic")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.antithetic")]
     #[getter]
     fn antithetic(&self) -> bool {
         self.inner.config().antithetic
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.use_sobol")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.use_sobol")]
     #[getter]
     fn use_sobol(&self) -> bool {
         self.inner.config().use_sobol
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathDependentPricer.use_brownian_bridge")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.use_brownian_bridge")]
     #[getter]
     fn use_brownian_bridge(&self) -> bool {
         self.inner.config().use_brownian_bridge
@@ -259,7 +259,7 @@ impl PyPathDependentPricer {
     }
 }
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer")]
 #[pyclass(
     name = "LsmcPricer",
     module = "finstack_quant.models.monte_carlo",
@@ -271,7 +271,7 @@ pub struct PyLsmcPricer {
 
 #[pymethods]
 impl PyLsmcPricer {
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.__init__")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.__init__")]
     #[new]
     #[pyo3(signature = (
         num_paths=None,
@@ -304,38 +304,38 @@ impl PyLsmcPricer {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.num_paths")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.pricer().config().num_paths
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.seed")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.seed")]
     #[getter]
     fn seed(&self) -> u64 {
         self.inner.pricer().config().seed
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.use_parallel")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.use_parallel")]
     #[getter]
     fn use_parallel(&self) -> bool {
         self.inner.pricer().config().use_parallel
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.antithetic")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.antithetic")]
     #[getter]
     fn antithetic(&self) -> bool {
         self.inner.pricer().config().antithetic
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.basis")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.basis")]
     #[getter]
     fn basis(&self) -> &'static str {
         self.inner.basis().as_str()
     }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.basis_degree")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.basis_degree")]
     #[getter]
     fn basis_degree(&self) -> usize {
         self.inner.basis_degree()
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.price_american")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.price_american")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, currency=None, num_steps=None, basis=None, basis_degree=None))]
     fn price_american(
@@ -375,7 +375,7 @@ impl PyLsmcPricer {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LsmcPricer.price_american_unbiased")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.price_american_unbiased")]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         spot, strike, rate, div_yield, vol, expiry, is_call, pricing_seed, currency=None,

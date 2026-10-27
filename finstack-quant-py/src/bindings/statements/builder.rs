@@ -23,13 +23,13 @@ use finstack_quant_statements::capital_structure::{
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
 use pyo3::prelude::*;
 
-#[doc = pydoc!("finstack_quant.statements", "ModelBuilder")]
+#[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder")]
 #[pyclass(name = "ModelBuilder", module = "finstack_quant.statements")]
 pub struct PyModelBuilder {
     inner: Option<ModelBuilder>,
 }
 
-#[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder")]
+#[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder")]
 #[pyclass(name = "MixedNodeBuilder", module = "finstack_quant.statements")]
 pub struct PyMixedNodeBuilder {
     inner: Option<MixedNodeBuilder>,
@@ -37,7 +37,7 @@ pub struct PyMixedNodeBuilder {
 
 #[pymethods]
 impl PyMixedNodeBuilder {
-    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.values")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder.values")]
     #[pyo3(text_signature = "($self, values)")]
     fn values<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -48,7 +48,7 @@ impl PyMixedNodeBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.values_money")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder.values_money")]
     #[pyo3(text_signature = "($self, values)")]
     fn values_money<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -62,7 +62,7 @@ impl PyMixedNodeBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.forecast")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder.forecast")]
     fn forecast<'py>(
         mut slf: PyRefMut<'py, Self>,
         forecast_spec: PyRef<'_, PyForecastSpec>,
@@ -71,7 +71,7 @@ impl PyMixedNodeBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.formula")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder.formula")]
     fn formula<'py>(mut slf: PyRefMut<'py, Self>, formula: &str) -> PyResult<PyRefMut<'py, Self>> {
         slf.builder_mut()?
             .formula(formula)
@@ -79,13 +79,13 @@ impl PyMixedNodeBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.name")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder.name")]
     fn name<'py>(mut slf: PyRefMut<'py, Self>, name: &str) -> PyResult<PyRefMut<'py, Self>> {
         slf.builder_mut()?.name(name);
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.build")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder.build")]
     fn build(&mut self) -> PyResult<PyModelBuilder> {
         let builder = self.take()?;
         let ready = builder.build().map_err(statements_to_py)?;
@@ -117,7 +117,7 @@ impl PyMixedNodeBuilder {
 
 #[pymethods]
 impl PyModelBuilder {
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.__init__")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.__init__")]
     #[new]
     #[pyo3(text_signature = "(id)")]
     fn new(id: &str) -> Self {
@@ -126,7 +126,7 @@ impl PyModelBuilder {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.from_spec")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.from_spec")]
     #[staticmethod]
     fn from_spec(spec: &PyFinancialModelSpec) -> PyResult<Self> {
         let builder = ModelBuilder::from_spec(spec.inner.clone()).map_err(statements_to_py)?;
@@ -135,7 +135,7 @@ impl PyModelBuilder {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.periods")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.periods")]
     #[pyo3(signature = (range, actuals_until=None), text_signature = "($self, range, actuals_until=None)")]
     fn periods<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -152,7 +152,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.periods_explicit")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.periods_explicit")]
     #[pyo3(text_signature = "($self, periods)")]
     fn periods_explicit<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -165,7 +165,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.value")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.value")]
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -177,7 +177,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.value_scalar")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.value_scalar")]
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value_scalar<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -189,7 +189,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.value_money")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.value_money")]
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value_money<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -201,7 +201,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.from_dataframe")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.from_dataframe")]
     #[pyo3(signature = (df, actuals_until=None, node_id_column=None), text_signature = "($self, df, actuals_until=None, node_id_column=None)")]
     fn from_dataframe<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -261,7 +261,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.availability_dates")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.availability_dates")]
     #[pyo3(text_signature = "($self, node_id, availability_dates)")]
     fn availability_dates<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -278,7 +278,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.compute")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.compute")]
     #[pyo3(text_signature = "($self, node_id, formula)")]
     fn compute<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -291,7 +291,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.insert_node")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.insert_node")]
     #[pyo3(text_signature = "($self, node)")]
     fn insert_node<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -302,7 +302,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.mixed")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.mixed")]
     #[pyo3(text_signature = "($self, node_id)")]
     fn mixed(&mut self, node_id: &str) -> PyResult<PyMixedNodeBuilder> {
         let state = self.take()?;
@@ -311,7 +311,7 @@ impl PyModelBuilder {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.forecast")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.forecast")]
     #[pyo3(text_signature = "($self, node_id, forecast_spec)")]
     fn forecast<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -323,7 +323,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.where_clause")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.where_clause")]
     #[pyo3(text_signature = "($self, where_clause)")]
     fn where_clause<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -333,7 +333,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.with_meta")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.with_meta")]
     #[pyo3(text_signature = "($self, key, value)")]
     fn with_meta<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -346,7 +346,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.with_builtin_metrics")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.with_builtin_metrics")]
     #[pyo3(text_signature = "($self)")]
     fn with_builtin_metrics(mut slf: PyRefMut<'_, Self>) -> PyResult<PyRefMut<'_, Self>> {
         slf.builder_mut()?
@@ -355,7 +355,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_metric_from_registry")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_metric_from_registry")]
     #[pyo3(text_signature = "($self, qualified_id, registry)")]
     fn add_metric_from_registry<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -371,7 +371,7 @@ impl PyModelBuilder {
     #[pyo3(
         text_signature = "($self, id, notional, coupon_rate, issue_date, maturity_date, discount_curve_id)"
     )]
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_bond")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_bond")]
     fn add_bond<'py>(
         mut slf: PyRefMut<'py, Self>,
         id: &str,
@@ -400,7 +400,7 @@ impl PyModelBuilder {
     #[pyo3(
         text_signature = "($self, id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id)"
     )]
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_swap")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_swap")]
     #[allow(clippy::too_many_arguments)]
     fn add_swap<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -433,7 +433,7 @@ impl PyModelBuilder {
     #[pyo3(
         text_signature = "($self, id, notional, coupon_rate, issue_date, maturity_date, convention, discount_curve_id)"
     )]
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_bond_with_convention")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_bond_with_convention")]
     #[allow(clippy::too_many_arguments)]
     fn add_bond_with_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -477,7 +477,7 @@ impl PyModelBuilder {
         signature = (id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id, fixed_frequency, fixed_day_count, float_frequency, float_day_count, business_day_convention=None),
         text_signature = "($self, id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id, fixed_frequency, fixed_day_count, float_frequency, float_day_count, business_day_convention=None)"
     )]
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_swap_with_conventions")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_swap_with_conventions")]
     #[allow(clippy::too_many_arguments)]
     fn add_swap_with_conventions<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -529,7 +529,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_debt")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_debt")]
     #[pyo3(text_signature = "($self, id, instrument)")]
     fn add_debt<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -544,7 +544,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.reporting_currency")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.reporting_currency")]
     #[pyo3(text_signature = "($self, currency)")]
     fn reporting_currency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -555,7 +555,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.fx_policy")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.fx_policy")]
     #[pyo3(text_signature = "($self, policy)")]
     fn fx_policy<'py>(mut slf: PyRefMut<'py, Self>, policy: &str) -> PyResult<PyRefMut<'py, Self>> {
         let parsed: FxConversionPolicy =
@@ -568,7 +568,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.waterfall")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.waterfall")]
     #[pyo3(text_signature = "($self, waterfall_spec)")]
     fn waterfall<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -579,7 +579,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.build")]
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.build")]
     #[pyo3(text_signature = "($self)")]
     fn build(&mut self) -> PyResult<PyFinancialModelSpec> {
         let state = self.take()?;

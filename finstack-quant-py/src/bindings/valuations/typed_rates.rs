@@ -40,7 +40,7 @@ fn decimal_f64(value: rust_decimal::Decimal) -> f64 {
     value.to_f64().unwrap_or(f64::NAN)
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "InterestRateSwap",
@@ -54,16 +54,23 @@ pub struct PyInterestRateSwap {
 }
 
 instrument_envelope_methods!(
-    PyInterestRateSwap("InterestRateSwap"),
+    PyInterestRateSwap(
+        "InterestRateSwap",
+        module = "finstack_quant.valuations.instruments._typed_rates"
+    ),
     InterestRateSwap,
     builder = PyInterestRateSwapBuilder("InterestRateSwapBuilder", fields),
     seed = finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::builder(),
 );
-instrument_pricing_methods!(PyInterestRateSwap, "InterestRateSwap");
+instrument_pricing_methods!(
+    PyInterestRateSwap,
+    "InterestRateSwap",
+    module = "finstack_quant.valuations.instruments._typed_rates"
+);
 
 #[pymethods]
 impl PyInterestRateSwap {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.from_conventions")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.from_conventions")]
     #[staticmethod]
     #[pyo3(signature = (id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency = None))]
     #[pyo3(
@@ -102,7 +109,7 @@ impl PyInterestRateSwap {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -111,13 +118,13 @@ impl PyInterestRateSwap {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.margin_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.margin_spec.as_ref())
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
@@ -139,26 +146,26 @@ impl PyInterestRateSwap {
 }
 
 crate::bindings::macros::py_getters!(PyInterestRateSwap |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.side")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.side")]
     side -> PyResult<String> = enum_to_py_string(&s.inner.side);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.fixed_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.fixed_leg")]
     fixed_leg -> PyFixedLegSpec = PyFixedLegSpec::from_inner(s.inner.fixed_leg.clone());
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.float_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.float_leg")]
     float_leg -> PyFloatLegSpec = PyFloatLegSpec::from_inner(s.inner.float_leg.clone());
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.adjust_fixed_accrual_dates")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.adjust_fixed_accrual_dates")]
     adjust_fixed_accrual_dates -> bool = s.inner.adjust_fixed_accrual_dates;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwap.adjust_float_accrual_dates")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.adjust_float_accrual_dates")]
     adjust_float_accrual_dates -> bool = s.inner.adjust_float_accrual_dates;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "InterestRateSwapBuilder",
@@ -171,7 +178,7 @@ pub struct PyInterestRateSwapBuilder {
 
 #[pymethods]
 impl PyInterestRateSwapBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -182,7 +189,7 @@ impl PyInterestRateSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.notional")]
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn notional<'py>(
@@ -199,7 +206,7 @@ impl PyInterestRateSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.side")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.side")]
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
@@ -211,7 +218,7 @@ impl PyInterestRateSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.fixed_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.fixed_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn fixed_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -225,7 +232,7 @@ impl PyInterestRateSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.float_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.float_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn float_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -239,7 +246,7 @@ impl PyInterestRateSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.adjust_fixed_accrual_dates")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.adjust_fixed_accrual_dates")]
     #[pyo3(text_signature = "($self, value)")]
     fn adjust_fixed_accrual_dates<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -253,7 +260,7 @@ impl PyInterestRateSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.adjust_float_accrual_dates")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.adjust_float_accrual_dates")]
     #[pyo3(text_signature = "($self, value)")]
     fn adjust_float_accrual_dates<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -267,7 +274,7 @@ impl PyInterestRateSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.margin_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.margin_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn margin_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -283,7 +290,7 @@ impl PyInterestRateSwapBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "InterestRateSwapBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -299,7 +306,7 @@ impl PyInterestRateSwapBuilder {
     }
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "Swaption",
@@ -313,16 +320,23 @@ pub struct PySwaption {
 }
 
 instrument_envelope_methods!(
-    PySwaption("Swaption"),
+    PySwaption(
+        "Swaption",
+        module = "finstack_quant.valuations.instruments._typed_rates"
+    ),
     Swaption,
     builder = PySwaptionBuilder("SwaptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::rates::swaption::Swaption::builder(),
 );
-instrument_pricing_methods!(PySwaption, "Swaption");
+instrument_pricing_methods!(
+    PySwaption,
+    "Swaption",
+    module = "finstack_quant.valuations.instruments._typed_rates"
+);
 
 #[pymethods]
 impl PySwaption {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -332,7 +346,7 @@ impl PySwaption {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.forward_swap_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.forward_swap_rate")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn forward_swap_rate(
         &self,
@@ -347,31 +361,31 @@ impl PySwaption {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.get_strike")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.get_strike")]
     #[pyo3(text_signature = "($self)")]
     fn get_strike(&self) -> f64 {
         decimal_f64(self.inner.get_strike())
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.get_underlying_start_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.get_underlying_start_date")]
     #[pyo3(text_signature = "($self)")]
     fn get_underlying_start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.get_underlying_start_date())
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.get_underlying_maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.get_underlying_maturity")]
     #[pyo3(text_signature = "($self)")]
     fn get_underlying_maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.get_underlying_maturity())
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.expiry)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.sabr_params")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.sabr_params")]
     #[getter]
     fn sabr_params<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.sabr_params.as_ref())
@@ -394,34 +408,34 @@ impl PySwaption {
 }
 
 crate::bindings::macros::py_getters!(PySwaption |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.option_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.option_type")]
     option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.settlement")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.settlement")]
     settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.cash_settlement_method")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.cash_settlement_method")]
     cash_settlement_method -> PyResult<String> = enum_to_py_string(&s.inner.cash_settlement_method);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.vol_model")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.vol_model")]
     vol_model -> PyResult<String> = enum_to_py_string(&s.inner.vol_model);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.underlying_fixed_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.underlying_fixed_leg")]
     underlying_fixed_leg -> PyFixedLegSpec =
         PyFixedLegSpec::from_inner(s.inner.underlying_fixed_leg.clone());
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Swaption.underlying_float_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "Swaption.underlying_float_leg")]
     underlying_float_leg -> PyFloatLegSpec =
         PyFloatLegSpec::from_inner(s.inner.underlying_float_leg.clone());
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "SwaptionBuilder",
@@ -434,14 +448,14 @@ pub struct PySwaptionBuilder {
 
 #[pymethods]
 impl PySwaptionBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, id, format!("{value:?}"), |b: SwaptionBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.option_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.option_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn option_type<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -456,7 +470,7 @@ impl PySwaptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.notional")]
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn notional<'py>(
@@ -469,7 +483,7 @@ impl PySwaptionBuilder {
             .notional(money))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.expiry")]
     #[pyo3(text_signature = "($self, value)")]
     fn expiry<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -480,7 +494,7 @@ impl PySwaptionBuilder {
             .expiry(expiry))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.settlement")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.settlement")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
@@ -492,7 +506,7 @@ impl PySwaptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.cash_settlement_method")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.cash_settlement_method")]
     #[pyo3(text_signature = "($self, value)")]
     fn cash_settlement_method<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -507,7 +521,7 @@ impl PySwaptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.vol_model")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.vol_model")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_model<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let vol_model = enum_from_str(value, "vol_model")?;
@@ -519,7 +533,7 @@ impl PySwaptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -533,7 +547,7 @@ impl PySwaptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.underlying_fixed_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.underlying_fixed_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_fixed_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -547,7 +561,7 @@ impl PySwaptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.underlying_float_leg")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.underlying_float_leg")]
     #[pyo3(text_signature = "($self, value)")]
     fn underlying_float_leg<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -561,7 +575,7 @@ impl PySwaptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.sabr_params")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.sabr_params")]
     #[pyo3(text_signature = "($self, value)")]
     fn sabr_params<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -578,7 +592,7 @@ impl PySwaptionBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SwaptionBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -594,7 +608,7 @@ impl PySwaptionBuilder {
     }
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CapFloor",
@@ -608,16 +622,23 @@ pub struct PyCapFloor {
 }
 
 instrument_envelope_methods!(
-    PyCapFloor("CapFloor"),
+    PyCapFloor(
+        "CapFloor",
+        module = "finstack_quant.valuations.instruments._typed_rates"
+    ),
     CapFloor,
     builder = PyCapFloorBuilder("CapFloorBuilder", fields),
     seed = finstack_quant_valuations::instruments::rates::cap_floor::CapFloor::builder(),
 );
-instrument_pricing_methods!(PyCapFloor, "CapFloor");
+instrument_pricing_methods!(
+    PyCapFloor,
+    "CapFloor",
+    module = "finstack_quant.valuations.instruments._typed_rates"
+);
 
 #[pymethods]
 impl PyCapFloor {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -626,25 +647,25 @@ impl PyCapFloor {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.start_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.start_date")]
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start_date)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.overnight_coupon")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.overnight_coupon")]
     #[getter]
     fn overnight_coupon<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         opt_serde_to_py(py, self.inner.overnight_coupon.as_ref())
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.premium")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.premium")]
     #[getter]
     fn premium<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
@@ -653,7 +674,7 @@ impl PyCapFloor {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
@@ -676,57 +697,57 @@ impl PyCapFloor {
 }
 
 crate::bindings::macros::py_getters!(PyCapFloor |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.rate_option_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.rate_option_type")]
     rate_option_type -> PyResult<String> = enum_to_py_string(&s.inner.rate_option_type);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.strike")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.strike")]
     strike -> f64 = decimal_f64(s.inner.strike);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.spread_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.spread_bp")]
     spread_bp -> f64 = decimal_f64(s.inner.spread_bp);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.stub")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.exercise_style")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.exercise_style")]
     exercise_style -> PyResult<String> = enum_to_py_string(&s.inner.exercise_style);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.settlement")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.settlement")]
     settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.forward_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.forward_curve_id")]
     forward_curve_id -> String = s.inner.forward_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.vol_surface_id")]
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.vol_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.vol_type")]
     vol_type -> PyResult<String> = enum_to_py_string(&s.inner.vol_type);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloor.vol_shift")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloor.vol_shift")]
     vol_shift -> f64 = s.inner.vol_shift;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "CapFloorBuilder",
@@ -739,14 +760,14 @@ pub struct PyCapFloorBuilder {
 
 #[pymethods]
 impl PyCapFloorBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, id, format!("{value:?}"), |b: CapFloorBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.rate_option_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.rate_option_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn rate_option_type<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -761,7 +782,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.notional")]
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn notional<'py>(
@@ -774,7 +795,7 @@ impl PyCapFloorBuilder {
             .notional(money))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.strike")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.strike")]
     #[pyo3(text_signature = "($self, value)")]
     fn strike<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -786,7 +807,7 @@ impl PyCapFloorBuilder {
             .strike(strike))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.spread_bp")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.spread_bp")]
     #[pyo3(text_signature = "($self, value)")]
     fn spread_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -802,7 +823,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.premium")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.premium")]
     #[pyo3(signature = (payment_date, amount, currency = None))]
     #[pyo3(text_signature = "($self, payment_date, amount, currency=None)")]
     fn premium<'py>(
@@ -821,7 +842,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.start_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.start_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn start_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -836,7 +857,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -847,7 +868,7 @@ impl PyCapFloorBuilder {
             .maturity(maturity))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -858,7 +879,7 @@ impl PyCapFloorBuilder {
             .frequency(tenor))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -874,7 +895,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.stub")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.stub")]
     #[pyo3(text_signature = "($self, value)")]
     fn stub<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -889,7 +910,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.business_day_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -904,7 +925,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.calendar_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -918,7 +939,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.exercise_style")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.exercise_style")]
     #[pyo3(text_signature = "($self, value)")]
     fn exercise_style<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -933,7 +954,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.settlement")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.settlement")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
@@ -945,7 +966,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -959,7 +980,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.forward_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.forward_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn forward_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -973,7 +994,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.vol_surface_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.vol_surface_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -987,7 +1008,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.vol_type")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.vol_type")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_type<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let vol_type = enum_from_str(value, "vol_type")?;
@@ -995,14 +1016,14 @@ impl PyCapFloorBuilder {
             .vol_type(vol_type))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.vol_shift")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.vol_shift")]
     #[pyo3(text_signature = "($self, value)")]
     fn vol_shift<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, vol_shift, value.to_string(), |b: CapFloorBuilder| b
             .vol_shift(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.overnight_coupon")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.overnight_coupon")]
     #[pyo3(text_signature = "($self, value)")]
     fn overnight_coupon<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1019,7 +1040,7 @@ impl PyCapFloorBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "CapFloorBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

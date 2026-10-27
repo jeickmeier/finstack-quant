@@ -11,7 +11,7 @@ use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "PathSummary")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary")]
 #[pyclass(
     name = "PathSummary",
     module = "finstack_quant.models.monte_carlo",
@@ -29,43 +29,43 @@ impl PyPathSummary {
 
 #[pymethods]
 impl PyPathSummary {
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathSummary.num_paths")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathSummary.num_simulated_paths")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.num_simulated_paths")]
     #[getter]
     fn num_simulated_paths(&self) -> usize {
         self.inner.num_simulated_paths
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathSummary.dim")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.dim")]
     #[getter]
     fn dim(&self) -> usize {
         self.inner.dim
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathSummary.times")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.times")]
     #[getter]
     fn times(&self) -> Vec<f64> {
         self.inner.times.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathSummary.factor_names")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.factor_names")]
     #[getter]
     fn factor_names(&self) -> Vec<String> {
         self.inner.factor_names.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathSummary.values")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.values")]
     #[getter]
     fn values(&self) -> Vec<f64> {
         self.inner.values.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "PathSummary.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let summary = &self.inner;
         let dim = summary.factor_names.len();
@@ -119,11 +119,11 @@ wire_methods!(
     PyPathSummary,
     PathSummary,
     "PathSummary",
-    module = "finstack_quant.models.monte_carlo"
+    module = "finstack_quant.models.monte_carlo._results"
 );
 impl_repr_html_via_dataframe!(PyPathSummary);
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate")]
 #[pyclass(
     name = "MoneyEstimate",
     module = "finstack_quant.models.monte_carlo",
@@ -141,79 +141,79 @@ impl PyMoneyEstimate {
 
 #[pymethods]
 impl PyMoneyEstimate {
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.mean")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.mean")]
     #[getter]
     fn mean(&self) -> PyMoney {
         PyMoney::from_inner(self.inner.mean)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.stderr")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.stderr")]
     #[getter]
     fn stderr(&self) -> f64 {
         self.inner.stderr
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.std_dev")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.std_dev")]
     #[getter]
     fn std_dev(&self) -> Option<f64> {
         self.inner.std_dev
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.ci_lower")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.ci_lower")]
     #[getter]
     fn ci_lower(&self) -> PyMoney {
         PyMoney::from_inner(self.inner.ci_95.0)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.ci_upper")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.ci_upper")]
     #[getter]
     fn ci_upper(&self) -> PyMoney {
         PyMoney::from_inner(self.inner.ci_95.1)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.num_paths")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.num_simulated_paths")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.num_simulated_paths")]
     #[getter]
     fn num_simulated_paths(&self) -> usize {
         self.inner.num_simulated_paths
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.median")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.median")]
     #[getter]
     fn median(&self) -> Option<f64> {
         self.inner.median
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.percentile_25")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.percentile_25")]
     #[getter]
     fn percentile_25(&self) -> Option<f64> {
         self.inner.percentile_25
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.percentile_75")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.percentile_75")]
     #[getter]
     fn percentile_75(&self) -> Option<f64> {
         self.inner.percentile_75
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.min")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.min")]
     #[getter]
     fn min(&self) -> Option<f64> {
         self.inner.min
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.max")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.max")]
     #[getter]
     fn max(&self) -> Option<f64> {
         self.inner.max
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "MoneyEstimate.relative_stderr")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate.relative_stderr")]
     fn relative_stderr(&self) -> f64 {
         self.inner.relative_stderr()
     }
@@ -230,10 +230,10 @@ wire_methods!(
     PyMoneyEstimate,
     MoneyEstimate,
     "MoneyEstimate",
-    module = "finstack_quant.models.monte_carlo"
+    module = "finstack_quant.models.monte_carlo._results"
 );
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate")]
 #[pyclass(
     name = "Estimate",
     module = "finstack_quant.models.monte_carlo",
@@ -253,73 +253,73 @@ impl PyEstimate {
 
 #[pymethods]
 impl PyEstimate {
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.mean")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.mean")]
     #[getter]
     fn mean(&self) -> f64 {
         self.inner.mean
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.stderr")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.stderr")]
     #[getter]
     fn stderr(&self) -> f64 {
         self.inner.stderr
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.std_dev")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.std_dev")]
     #[getter]
     fn std_dev(&self) -> Option<f64> {
         self.inner.std_dev
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.ci_lower")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.ci_lower")]
     #[getter]
     fn ci_lower(&self) -> f64 {
         self.inner.ci_95.0
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.ci_upper")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.ci_upper")]
     #[getter]
     fn ci_upper(&self) -> f64 {
         self.inner.ci_95.1
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.num_paths")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.num_simulated_paths")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.num_simulated_paths")]
     #[getter]
     fn num_simulated_paths(&self) -> usize {
         self.inner.num_simulated_paths
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.median")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.median")]
     #[getter]
     fn median(&self) -> Option<f64> {
         self.inner.median
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.percentile_25")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.percentile_25")]
     #[getter]
     fn percentile_25(&self) -> Option<f64> {
         self.inner.percentile_25
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.percentile_75")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.percentile_75")]
     #[getter]
     fn percentile_75(&self) -> Option<f64> {
         self.inner.percentile_75
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.min")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.min")]
     #[getter]
     fn min(&self) -> Option<f64> {
         self.inner.min
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "Estimate.max")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "Estimate.max")]
     #[getter]
     fn max(&self) -> Option<f64> {
         self.inner.max
@@ -337,10 +337,10 @@ wire_methods!(
     PyEstimate,
     finstack_quant_models::monte_carlo::estimate::Estimate,
     "Estimate",
-    module = "finstack_quant.models.monte_carlo"
+    module = "finstack_quant.models.monte_carlo._results"
 );
 
-#[doc = pydoc!("finstack_quant.models.monte_carlo", "LrmGreeks")]
+#[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LrmGreeks")]
 #[pyclass(
     name = "LrmGreeks",
     module = "finstack_quant.models.monte_carlo",
@@ -358,25 +358,25 @@ impl PyLrmGreeks {
 
 #[pymethods]
 impl PyLrmGreeks {
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LrmGreeks.price")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LrmGreeks.price")]
     #[getter]
     fn price(&self) -> PyMoneyEstimate {
         PyMoneyEstimate::from_inner(self.inner.price.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LrmGreeks.delta")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LrmGreeks.delta")]
     #[getter]
     fn delta(&self) -> PyEstimate {
         PyEstimate::from_inner(self.inner.delta.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LrmGreeks.vega")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LrmGreeks.vega")]
     #[getter]
     fn vega(&self) -> PyEstimate {
         PyEstimate::from_inner(self.inner.vega.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo", "LrmGreeks.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LrmGreeks.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let greeks = &self.inner;
         let price = &greeks.price;
@@ -424,7 +424,7 @@ wire_methods!(
     PyLrmGreeks,
     LrmGreeks,
     "LrmGreeks",
-    module = "finstack_quant.models.monte_carlo"
+    module = "finstack_quant.models.monte_carlo._results"
 );
 impl_repr_html_via_dataframe!(PyLrmGreeks);
 

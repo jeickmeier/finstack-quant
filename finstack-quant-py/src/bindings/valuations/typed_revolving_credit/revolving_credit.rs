@@ -32,7 +32,7 @@ use super::PyEnhancedMonteCarloResult;
 
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "RevolvingCredit",
@@ -46,16 +46,23 @@ pub struct PyRevolvingCredit {
 }
 
 instrument_envelope_methods!(
-    PyRevolvingCredit("RevolvingCredit"),
+    PyRevolvingCredit(
+        "RevolvingCredit",
+        module = "finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit"
+    ),
     RevolvingCredit,
     builder = PyRevolvingCreditBuilder("RevolvingCreditBuilder", fields),
     seed = RevolvingCredit::builder(),
 );
-instrument_pricing_methods!(PyRevolvingCredit, "RevolvingCredit");
+instrument_pricing_methods!(
+    PyRevolvingCredit,
+    "RevolvingCredit",
+    module = "finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit"
+);
 
 #[pymethods]
 impl PyRevolvingCredit {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.example")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -64,7 +71,7 @@ impl PyRevolvingCredit {
             .map_err(core_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.price_with_paths")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.price_with_paths")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn price_with_paths(
         &self,
@@ -81,7 +88,7 @@ impl PyRevolvingCredit {
         Ok(PyEnhancedMonteCarloResult { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.expected_cashflows")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.expected_cashflows")]
     #[pyo3(text_signature = "($self, market, as_of)")]
     fn expected_cashflows(
         &self,
@@ -98,49 +105,49 @@ impl PyRevolvingCredit {
         Ok(PyCashFlowSchedule::from_inner(schedule))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.issue_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.issue_date")]
     #[getter]
     fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.issue_date)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.rate")]
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.rate)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.fees")]
     #[getter]
     fn fees<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.fees)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.commitment_steps")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.commitment_steps")]
     #[getter]
     fn commitment_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.commitment_steps)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.margin_steps")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.margin_steps")]
     #[getter]
     fn margin_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.margin_steps)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.scheduled_fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.scheduled_fees")]
     #[getter]
     fn scheduled_fees<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.scheduled_fees)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.oid_eir")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.oid_eir")]
     #[getter]
     fn oid_eir<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -150,7 +157,7 @@ impl PyRevolvingCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.lc")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.lc")]
     #[getter]
     fn lc<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -160,13 +167,13 @@ impl PyRevolvingCredit {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.draw_repay_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.draw_repay_spec")]
     #[getter]
     fn draw_repay_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.draw_repay_spec)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.expiry")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.expiry")]
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         instrument_expiry(py, &self.inner)
@@ -186,51 +193,51 @@ impl PyRevolvingCredit {
 }
 
 crate::bindings::macros::py_getters!(PyRevolvingCredit |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.commitment")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.commitment")]
     commitment -> PyMoney = money_to_py(s.inner.commitment);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.drawn")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.drawn")]
     drawn -> PyMoney = money_to_py(s.inner.drawn);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.is_stochastic")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.is_stochastic")]
     is_stochastic -> bool = s.inner.is_stochastic();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.credit_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.credit_curve_id")]
     credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.recovery_rate")]
     recovery_rate -> f64 = s.inner.recovery_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.leq")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.leq")]
     leq -> f64 = s.inner.leq;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.stub")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.calendar_id")]
     calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.payment_lag_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.payment_lag_days")]
     payment_lag_days -> u32 = s.inner.payment_lag_days;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCredit.settlement_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.settlement_days")]
     settlement_days -> u32 = s.inner.settlement_days;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "RevolvingCreditBuilder",
@@ -243,7 +250,7 @@ pub struct PyRevolvingCreditBuilder {
 
 #[pymethods]
 impl PyRevolvingCreditBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(
@@ -254,7 +261,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.commitment")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.commitment")]
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn commitment<'py>(
@@ -271,7 +278,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.drawn")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.drawn")]
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn drawn<'py>(
@@ -288,7 +295,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.issue_date")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.issue_date")]
     #[pyo3(text_signature = "($self, value)")]
     fn issue_date<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -303,7 +310,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -318,7 +325,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -336,7 +343,7 @@ impl PyRevolvingCreditBuilder {
         builder_set!(slf, rate, repr, |b: RevolvingCreditBuilder| b.rate(spec))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -351,7 +358,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -366,7 +373,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.fees")]
     #[pyo3(text_signature = "($self, value)")]
     fn fees<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -382,7 +389,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.commitment_steps")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.commitment_steps")]
     #[pyo3(text_signature = "($self, value)")]
     fn commitment_steps<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -400,7 +407,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.scheduled_fees")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.scheduled_fees")]
     #[pyo3(text_signature = "($self, value)")]
     fn scheduled_fees<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -418,7 +425,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.oid_eir")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.oid_eir")]
     #[pyo3(signature = (value))]
     #[pyo3(text_signature = "($self, value)")]
     fn oid_eir<'py>(
@@ -438,7 +445,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.lc")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.lc")]
     #[pyo3(signature = (value))]
     #[pyo3(text_signature = "($self, value)")]
     fn lc<'py>(
@@ -454,7 +461,7 @@ impl PyRevolvingCreditBuilder {
             .lc_opt(lc))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.margin_steps")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.margin_steps")]
     #[pyo3(text_signature = "($self, value)")]
     fn margin_steps<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -472,7 +479,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.draw_repay_spec")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.draw_repay_spec")]
     #[pyo3(text_signature = "($self, value)")]
     fn draw_repay_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -492,7 +499,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.discount_curve_id")]
     #[pyo3(text_signature = "($self, value)")]
     fn discount_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -506,7 +513,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.credit_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.credit_curve_id")]
     #[pyo3(signature = (value))]
     #[pyo3(text_signature = "($self, value)")]
     fn credit_curve_id<'py>(
@@ -522,7 +529,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.recovery_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.recovery_rate")]
     #[pyo3(text_signature = "($self, value)")]
     fn recovery_rate<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -536,14 +543,14 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.leq")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.leq")]
     #[pyo3(text_signature = "($self, value)")]
     fn leq<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, leq, value.to_string(), |b: RevolvingCreditBuilder| b
             .leq(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.stub")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.stub")]
     #[pyo3(text_signature = "($self, value)")]
     fn stub<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -558,7 +565,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.business_day_convention")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.business_day_convention")]
     #[pyo3(text_signature = "($self, value)")]
     fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -573,7 +580,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.calendar_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.calendar_id")]
     #[pyo3(signature = (value))]
     #[pyo3(text_signature = "($self, value)")]
     fn calendar_id<'py>(
@@ -588,7 +595,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.payment_lag_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.payment_lag_days")]
     #[pyo3(text_signature = "($self, value)")]
     fn payment_lag_days<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -602,7 +609,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.settlement_days")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.settlement_days")]
     #[pyo3(text_signature = "($self, value)")]
     fn settlement_days<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -616,7 +623,7 @@ impl PyRevolvingCreditBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "RevolvingCreditBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

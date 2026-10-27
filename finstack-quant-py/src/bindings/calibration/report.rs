@@ -9,7 +9,7 @@ use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-#[doc = pydoc!("finstack_quant.calibration", "QuoteQuality")]
+#[doc = pydoc!("finstack_quant.calibration._report", "QuoteQuality")]
 #[pyclass(
     name = "QuoteQuality",
     module = "finstack_quant.calibration",
@@ -29,25 +29,25 @@ impl PyQuoteQuality {
 
 #[pymethods]
 impl PyQuoteQuality {
-    #[doc = pydoc!("finstack_quant.calibration", "QuoteQuality.quote_label")]
+    #[doc = pydoc!("finstack_quant.calibration._report", "QuoteQuality.quote_label")]
     #[getter]
     fn quote_label(&self) -> String {
         self.inner.quote_label.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "QuoteQuality.quote_value")]
+    #[doc = pydoc!("finstack_quant.calibration._report", "QuoteQuality.quote_value")]
     #[getter]
     fn quote_value(&self) -> Option<f64> {
         self.inner.quote_value
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "QuoteQuality.residual")]
+    #[doc = pydoc!("finstack_quant.calibration._report", "QuoteQuality.residual")]
     #[getter]
     fn residual(&self) -> f64 {
         self.inner.residual
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "QuoteQuality.sensitivity")]
+    #[doc = pydoc!("finstack_quant.calibration._report", "QuoteQuality.sensitivity")]
     #[getter]
     fn sensitivity(&self) -> f64 {
         self.inner.sensitivity
@@ -62,7 +62,7 @@ wire_methods!(
     PyQuoteQuality,
     QuoteQuality,
     "QuoteQuality",
-    module = "finstack_quant.calibration"
+    module = "finstack_quant.calibration._report"
 );
 
 /// Per-quote fit quality and conditioning diagnostics for one calibration step.
@@ -297,7 +297,7 @@ impl PyCalibrationReport {
         self.inner.convergence_reason.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationReport.metadata")]
+    #[doc = pydoc!("finstack_quant.calibration._report", "CalibrationReport.metadata")]
     #[getter]
     fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
@@ -343,13 +343,13 @@ impl PyCalibrationReport {
         self.inner.success_tolerance
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationReport.solver_method")]
+    #[doc = pydoc!("finstack_quant.calibration._report", "CalibrationReport.solver_method")]
     #[getter]
     fn solver_method(&self) -> Option<&'static str> {
         self.inner.solver_method.map(|method| method.as_str())
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CalibrationReport.residual_units")]
+    #[doc = pydoc!("finstack_quant.calibration._report", "CalibrationReport.residual_units")]
     #[getter]
     fn residual_units(&self) -> Option<&'static str> {
         self.inner.residual_units.map(|units| units.as_str())
@@ -450,7 +450,7 @@ impl PyCalibrationValidationReport {
     }
 
     #[doc = pydoc!(
-        "finstack_quant.calibration",
+        "finstack_quant.calibration._report",
         "CalibrationValidationReport.dependency_graph"
     )]
     #[getter]

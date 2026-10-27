@@ -21,7 +21,7 @@ use super::super::typed_macros::builder_set;
 
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "Tranche",
@@ -36,7 +36,7 @@ pub struct PyTranche {
 
 #[pymethods]
 impl PyTranche {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.builder")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.builder")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn builder() -> PyTrancheBuilder {
@@ -47,7 +47,7 @@ impl PyTranche {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.from_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -56,25 +56,25 @@ impl PyTranche {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.to_json")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.to_json")]
     #[pyo3(text_signature = "($self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.to_dict")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.__reduce__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.rating")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.rating")]
     #[getter]
     fn rating(&self) -> PyResult<Option<String>> {
         self.inner
@@ -84,19 +84,19 @@ impl PyTranche {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.coupon")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.coupon")]
     #[getter]
     fn coupon<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.coupon)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.maturity")]
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.oc_trigger")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.oc_trigger")]
     #[getter]
     fn oc_trigger<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -106,7 +106,7 @@ impl PyTranche {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.ic_trigger")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.ic_trigger")]
     #[getter]
     fn ic_trigger<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -132,51 +132,51 @@ impl PyTranche {
 }
 
 crate::bindings::macros::py_getters!(PyTranche |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.id")]
     id -> String = s.inner.id.to_string();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.attach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.attach_pct")]
     attach_pct -> Option<f64> = s.inner.attach_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.detach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.detach_pct")]
     detach_pct -> Option<f64> = s.inner.detach_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.seniority")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.seniority")]
     seniority -> PyResult<String> = enum_to_py_string(&s.inner.seniority);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.original_balance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.original_balance")]
     original_balance -> PyMoney = money_to_py(s.inner.original_balance);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.current_balance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.current_balance")]
     current_balance -> PyMoney = money_to_py(s.inner.current_balance);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.deferred_interest")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.deferred_interest")]
     deferred_interest -> PyMoney = money_to_py(s.inner.deferred_interest);
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.pik_enabled")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.pik_enabled")]
     pik_enabled -> bool = s.inner.pik_enabled;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.non_deferrable")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.non_deferrable")]
     non_deferrable -> Option<bool> = s.inner.non_deferrable;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.is_non_deferrable")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.is_non_deferrable")]
     is_non_deferrable -> bool = s.inner.is_non_deferrable();
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.payment_priority")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.payment_priority")]
     payment_priority -> u32 = s.inner.payment_priority;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "Tranche.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.attributes")]
     attributes -> crate::bindings::core::types::PyAttributes =
         attributes_to_py(&s.inner.attributes);
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TrancheBuilder",
@@ -190,13 +190,13 @@ pub struct PyTrancheBuilder {
 
 #[pymethods]
 impl PyTrancheBuilder {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, |b: TrancheBuilder| b.id(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.attach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.attach_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn attach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
@@ -205,7 +205,7 @@ impl PyTrancheBuilder {
         Ok(slf)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.detach_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.detach_pct")]
     #[pyo3(text_signature = "($self, value)")]
     fn detach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
@@ -214,14 +214,14 @@ impl PyTrancheBuilder {
         Ok(slf)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.seniority")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.seniority")]
     #[pyo3(text_signature = "($self, value)")]
     fn seniority<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let seniority: TrancheSeniority = enum_from_str(value, "seniority")?;
         builder_set!(slf, |b: TrancheBuilder| b.seniority(seniority))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.original_balance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.original_balance")]
     #[pyo3(text_signature = "($self, value)")]
     fn original_balance<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -230,7 +230,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.balance(value.inner))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.coupon_fixed")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.coupon_fixed")]
     #[pyo3(text_signature = "($self, rate)")]
     fn coupon_fixed<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -240,7 +240,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.coupon(RateSpec::Fixed { rate }))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.coupon_floating")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.coupon_floating")]
     #[pyo3(text_signature = "($self, value)")]
     fn coupon_floating<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -251,7 +251,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.coupon(coupon))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.maturity")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.maturity")]
     #[pyo3(text_signature = "($self, value)")]
     fn maturity<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -261,7 +261,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.maturity(maturity))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.frequency")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.frequency")]
     #[pyo3(text_signature = "($self, value)")]
     fn frequency<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -271,7 +271,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.frequency(frequency))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.day_count")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.day_count")]
     #[pyo3(text_signature = "($self, value)")]
     fn day_count<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -282,7 +282,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.day_count(day_count))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.current_balance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.current_balance")]
     #[pyo3(text_signature = "($self, value)")]
     fn current_balance<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -291,7 +291,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.current_balance(value.inner))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.deferred_interest")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.deferred_interest")]
     #[pyo3(text_signature = "($self, value)")]
     fn deferred_interest<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -300,7 +300,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.deferred_interest(value.inner))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.pik_enabled")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.pik_enabled")]
     #[pyo3(text_signature = "($self, value)")]
     fn pik_enabled<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -309,7 +309,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.pik_enabled(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.non_deferrable")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.non_deferrable")]
     #[pyo3(text_signature = "($self, value)")]
     fn non_deferrable<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -318,14 +318,14 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.non_deferrable(value))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.rating")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.rating")]
     #[pyo3(text_signature = "($self, value)")]
     fn rating<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let rating: CreditRating = value.parse().map_err(core_to_py)?;
         builder_set!(slf, |b: TrancheBuilder| b.rating(rating))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.oc_trigger")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.oc_trigger")]
     #[pyo3(text_signature = "($self, value)")]
     fn oc_trigger<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -337,7 +337,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.oc_trigger(trigger))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.ic_trigger")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.ic_trigger")]
     #[pyo3(text_signature = "($self, value)")]
     fn ic_trigger<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -349,7 +349,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.ic_trigger(trigger))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.attributes")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.attributes")]
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -359,7 +359,7 @@ impl PyTrancheBuilder {
         builder_set!(slf, |b: TrancheBuilder| b.attributes(attributes))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "TrancheBuilder.build")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "TrancheBuilder.build")]
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyTranche> {
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;

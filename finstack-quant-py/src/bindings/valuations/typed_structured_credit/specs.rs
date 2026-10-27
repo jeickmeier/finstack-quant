@@ -19,7 +19,7 @@ fn opt_date(
     value.map(py_to_date).transpose()
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "BalloonSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "BalloonSpec",
@@ -36,13 +36,13 @@ crate::bindings::macros::wire_methods!(
     PyBalloonSpec,
     BalloonSpec,
     "BalloonSpec",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.specs",
     to_dict
 );
 
 #[pymethods]
 impl PyBalloonSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "BalloonSpec.__init__")]
     #[new]
     #[pyo3(signature = (extension_prob, extension_months, *, extension_rate=None, loss_prob=0.0, severity_pct=0.0, workout_months=0))]
     #[pyo3(
@@ -81,26 +81,26 @@ impl PyBalloonSpec {
 }
 
 crate::bindings::macros::py_getters!(PyBalloonSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.extension_prob")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "BalloonSpec.extension_prob")]
     extension_prob -> f64 = s.inner.extension_prob;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.extension_months")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "BalloonSpec.extension_months")]
     extension_months -> u32 = s.inner.extension_months;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.extension_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "BalloonSpec.extension_rate")]
     extension_rate -> Option<f64> = s.inner.extension_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.loss_prob")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "BalloonSpec.loss_prob")]
     loss_prob -> f64 = s.inner.loss_prob;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.severity_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "BalloonSpec.severity_pct")]
     severity_pct -> f64 = s.inner.severity_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "BalloonSpec.workout_months")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "BalloonSpec.workout_months")]
     workout_months -> u32 = s.inner.workout_months;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "PrepaymentPenalty",
@@ -117,7 +117,7 @@ crate::bindings::macros::wire_methods!(
     PyPrepaymentPenalty,
     PrepaymentPenalty,
     "PrepaymentPenalty",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.specs",
     to_dict
 );
 
@@ -130,7 +130,7 @@ impl PyPrepaymentPenalty {
 
 #[pymethods]
 impl PyPrepaymentPenalty {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.lockout")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.lockout")]
     #[staticmethod]
     #[pyo3(signature = (through=None))]
     #[pyo3(text_signature = "(through=None)")]
@@ -140,7 +140,7 @@ impl PyPrepaymentPenalty {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.fixed")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.fixed")]
     #[staticmethod]
     #[pyo3(signature = (pct, through=None))]
     #[pyo3(text_signature = "(pct, through=None)")]
@@ -151,7 +151,7 @@ impl PyPrepaymentPenalty {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.step_down")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.step_down")]
     #[staticmethod]
     #[pyo3(text_signature = "(schedule)")]
     fn step_down(schedule: Vec<(Bound<'_, PyAny>, f64)>) -> PyResult<Self> {
@@ -167,7 +167,7 @@ impl PyPrepaymentPenalty {
         Self::build(PrepaymentPenalty::StepDown { schedule })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.yield_maintenance")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.yield_maintenance")]
     #[staticmethod]
     #[pyo3(signature = (*, reinvestment_rate=None, discount_curve_id=None, floor_pct=None, through=None))]
     #[pyo3(
@@ -187,7 +187,7 @@ impl PyPrepaymentPenalty {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.kind")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.kind")]
     #[getter]
     fn kind(&self) -> &'static str {
         match self.inner {
@@ -198,7 +198,7 @@ impl PyPrepaymentPenalty {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.through")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.through")]
     #[getter]
     fn through<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         let through = match &self.inner {
@@ -210,7 +210,7 @@ impl PyPrepaymentPenalty {
         through.map(|date| date_to_py(py, date)).transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.schedule")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.schedule")]
     #[getter]
     fn schedule<'py>(&self, py: Python<'py>) -> PyResult<Option<PenaltySteps<'py>>> {
         match &self.inner {
@@ -223,7 +223,7 @@ impl PyPrepaymentPenalty {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.reinvestment_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.reinvestment_rate")]
     #[getter]
     fn reinvestment_rate(&self) -> Option<f64> {
         match self.inner {
@@ -234,7 +234,7 @@ impl PyPrepaymentPenalty {
         }
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.discount_curve_id")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.discount_curve_id")]
     #[getter]
     fn discount_curve_id(&self) -> Option<String> {
         match &self.inner {
@@ -252,18 +252,18 @@ impl PyPrepaymentPenalty {
 }
 
 crate::bindings::macros::py_getters!(PyPrepaymentPenalty |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.pct")]
     pct -> Option<f64> =
         match s.inner { PrepaymentPenalty::Fixed { pct, .. } => Some(pct), _ => None };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "PrepaymentPenalty.floor_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "PrepaymentPenalty.floor_pct")]
     floor_pct -> Option<f64> = match s.inner {
         PrepaymentPenalty::YieldMaintenance { floor_pct, .. } => floor_pct,
         _ => None,
     };
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SpecialServicingSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "SpecialServicingSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "SpecialServicingSpec",
@@ -280,13 +280,13 @@ crate::bindings::macros::wire_methods!(
     PySpecialServicingSpec,
     SpecialServicingSpec,
     "SpecialServicingSpec",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.specs",
     to_dict
 );
 
 #[pymethods]
 impl PySpecialServicingSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SpecialServicingSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "SpecialServicingSpec.__init__")]
     #[new]
     #[pyo3(text_signature = "(appraisal_reduction_pct)")]
     fn new(appraisal_reduction_pct: f64) -> PyResult<Self> {
@@ -307,11 +307,11 @@ impl PySpecialServicingSpec {
 }
 
 crate::bindings::macros::py_getters!(PySpecialServicingSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "SpecialServicingSpec.appraisal_reduction_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "SpecialServicingSpec.appraisal_reduction_pct")]
     appraisal_reduction_pct -> f64 = s.inner.appraisal_reduction_pct;
 });
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "LiquidationSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "LiquidationSpec",
@@ -328,13 +328,13 @@ crate::bindings::macros::wire_methods!(
     PyLiquidationSpec,
     LiquidationSpec,
     "LiquidationSpec",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.specs",
     to_dict
 );
 
 #[pymethods]
 impl PyLiquidationSpec {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "LiquidationSpec.__init__")]
     #[new]
     #[pyo3(signature = (months_to_resolution, proceeds_pct, *, carry_cost_pct=0.0, reperformance_prob=0.0, modified_rate=None))]
     #[pyo3(
@@ -368,21 +368,21 @@ impl PyLiquidationSpec {
 }
 
 crate::bindings::macros::py_getters!(PyLiquidationSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.months_to_resolution")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "LiquidationSpec.months_to_resolution")]
     months_to_resolution -> u32 = s.inner.months_to_resolution;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.proceeds_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "LiquidationSpec.proceeds_pct")]
     proceeds_pct -> f64 = s.inner.proceeds_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.carry_cost_pct")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "LiquidationSpec.carry_cost_pct")]
     carry_cost_pct -> f64 = s.inner.carry_cost_pct;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.reperformance_prob")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "LiquidationSpec.reperformance_prob")]
     reperformance_prob -> f64 = s.inner.reperformance_prob;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.modified_rate")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "LiquidationSpec.modified_rate")]
     modified_rate -> Option<f64> = s.inner.modified_rate;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "LiquidationSpec.net_proceeds_fraction")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.specs", "LiquidationSpec.net_proceeds_fraction")]
     net_proceeds_fraction -> f64 = s.inner.net_proceeds_fraction();
 });

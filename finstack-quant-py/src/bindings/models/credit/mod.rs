@@ -36,7 +36,7 @@ fn moodys_warf_factor(rating: &Bound<'_, PyAny>) -> PyResult<f64> {
     rust_moodys_warf_factor(rating).map_err(core_to_py)
 }
 
-#[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable")]
+#[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable")]
 #[pyclass(
     name = "RatingFactorTable",
     module = "finstack_quant.models.credit",
@@ -50,7 +50,7 @@ pub(crate) struct PyRatingFactorTable {
 
 #[pymethods]
 impl PyRatingFactorTable {
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.default_calibration")]
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.default_calibration")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn default_calibration() -> PyResult<Self> {
@@ -59,7 +59,7 @@ impl PyRatingFactorTable {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.from_registry_id")]
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.from_registry_id")]
     #[staticmethod]
     #[pyo3(text_signature = "(id)")]
     fn from_registry_id(id: &str) -> PyResult<Self> {
@@ -68,32 +68,32 @@ impl PyRatingFactorTable {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.get_factor")]
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.get_factor")]
     #[pyo3(text_signature = "($self, rating)")]
     fn get_factor(&self, rating: &Bound<'_, PyAny>) -> PyResult<f64> {
         let rating = extract_credit_rating(rating)?;
         self.inner.get_factor(rating).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.agency")]
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.agency")]
     #[getter]
     fn agency(&self) -> String {
         self.inner.agency().to_string()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.methodology")]
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.methodology")]
     #[getter]
     fn methodology(&self) -> String {
         self.inner.methodology().to_string()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.default_factor")]
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.default_factor")]
     #[getter]
     fn default_factor(&self) -> f64 {
         self.inner.default_factor()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "RatingFactorTable.__repr__")]
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RatingFactorTable", &self.inner)
     }
@@ -103,10 +103,10 @@ wire_methods!(
     PyRatingFactorTable,
     RatingFactorTable,
     "RatingFactorTable",
-    module = "finstack_quant.models.credit._structural"
+    module = "finstack_quant.models.credit"
 );
 
-#[doc = pydoc!("finstack_quant.models.credit._structural", "MertonBarrierType")]
+#[doc = pydoc!("finstack_quant.models.credit", "MertonBarrierType")]
 #[pyclass(
     name = "MertonBarrierType",
     module = "finstack_quant.models.credit",
@@ -127,7 +127,7 @@ impl PyBarrierType {
 
 #[pymethods]
 impl PyBarrierType {
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonBarrierType.terminal")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonBarrierType.terminal")]
     #[staticmethod]
     fn terminal() -> Self {
         Self {
@@ -135,7 +135,7 @@ impl PyBarrierType {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonBarrierType.first_passage")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonBarrierType.first_passage")]
     #[staticmethod]
     fn first_passage(barrier_growth_rate: f64) -> Self {
         Self {
@@ -154,10 +154,10 @@ wire_methods!(
     PyBarrierType,
     MertonBarrierType,
     "MertonBarrierType",
-    module = "finstack_quant.models.credit._structural"
+    module = "finstack_quant.models.credit"
 );
 
-#[doc = pydoc!("finstack_quant.models.credit._structural", "AssetDynamics")]
+#[doc = pydoc!("finstack_quant.models.credit", "AssetDynamics")]
 #[pyclass(
     name = "AssetDynamics",
     module = "finstack_quant.models.credit",
@@ -178,7 +178,7 @@ impl PyAssetDynamics {
 
 #[pymethods]
 impl PyAssetDynamics {
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "AssetDynamics.geometric_brownian")]
+    #[doc = pydoc!("finstack_quant.models.credit", "AssetDynamics.geometric_brownian")]
     #[staticmethod]
     fn geometric_brownian() -> Self {
         Self {
@@ -186,7 +186,7 @@ impl PyAssetDynamics {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "AssetDynamics.jump_diffusion")]
+    #[doc = pydoc!("finstack_quant.models.credit", "AssetDynamics.jump_diffusion")]
     #[staticmethod]
     fn jump_diffusion(jump_intensity: f64, jump_mean: f64, jump_vol: f64) -> Self {
         Self {
@@ -198,7 +198,7 @@ impl PyAssetDynamics {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "AssetDynamics.credit_grades")]
+    #[doc = pydoc!("finstack_quant.models.credit", "AssetDynamics.credit_grades")]
     #[staticmethod]
     fn credit_grades(barrier_uncertainty: f64, mean_recovery: f64) -> Self {
         Self {
@@ -218,10 +218,10 @@ wire_methods!(
     PyAssetDynamics,
     AssetDynamics,
     "AssetDynamics",
-    module = "finstack_quant.models.credit._structural"
+    module = "finstack_quant.models.credit"
 );
 
-#[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel")]
+#[doc = pydoc!("finstack_quant.models.credit", "MertonModel")]
 #[pyclass(
     name = "MertonModel",
     module = "finstack_quant.models.credit",
@@ -236,7 +236,7 @@ pub(crate) struct PyMertonModel {
 
 #[pymethods]
 impl PyMertonModel {
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.__init__")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.__init__")]
     #[new]
     #[pyo3(text_signature = "(asset_value, asset_vol, debt_barrier, risk_free_rate)")]
     fn new(
@@ -251,7 +251,7 @@ impl PyMertonModel {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.from_equity")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.from_equity")]
     #[staticmethod]
     fn from_equity(
         equity_value: f64,
@@ -274,7 +274,7 @@ impl PyMertonModel {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.from_cds_spread")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.from_cds_spread")]
     #[staticmethod]
     fn from_cds_spread(
         cds_spread_bp: f64,
@@ -299,7 +299,7 @@ impl PyMertonModel {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.from_target_pd")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.from_target_pd")]
     #[staticmethod]
     fn from_target_pd(
         asset_value: f64,
@@ -322,13 +322,13 @@ impl PyMertonModel {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.kmv_default_point")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.kmv_default_point")]
     #[staticmethod]
     fn kmv_default_point(short_term_debt: f64, long_term_debt: f64) -> PyResult<f64> {
         MertonModel::kmv_default_point(short_term_debt, long_term_debt).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.new_with_dynamics")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.new_with_dynamics")]
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
     fn new_with_dynamics(
@@ -354,7 +354,7 @@ impl PyMertonModel {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.credit_grades")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.credit_grades")]
     #[staticmethod]
     fn credit_grades(
         equity_value: f64,
@@ -377,71 +377,71 @@ impl PyMertonModel {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.asset_value")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.asset_value")]
     #[getter]
     fn asset_value(&self) -> f64 {
         self.inner.asset_value()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.asset_vol")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.asset_vol")]
     #[getter]
     fn asset_vol(&self) -> f64 {
         self.inner.asset_vol()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.debt_barrier")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.debt_barrier")]
     #[getter]
     fn debt_barrier(&self) -> f64 {
         self.inner.debt_barrier()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.risk_free_rate")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.risk_free_rate")]
     #[getter]
     fn risk_free_rate(&self) -> f64 {
         self.inner.risk_free_rate()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.payout_rate")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.payout_rate")]
     #[getter]
     fn payout_rate(&self) -> f64 {
         self.inner.payout_rate()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.barrier_type")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.barrier_type")]
     #[getter]
     fn barrier_type(&self) -> PyBarrierType {
         PyBarrierType::from_inner(*self.inner.barrier_type())
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.dynamics")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.dynamics")]
     #[getter]
     fn dynamics(&self) -> PyAssetDynamics {
         PyAssetDynamics::from_inner(*self.inner.dynamics())
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.distance_to_default")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.distance_to_default")]
     fn distance_to_default(&self, horizon: f64) -> f64 {
         self.inner.distance_to_default(horizon)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.distance_to_default_with_drift")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.distance_to_default_with_drift")]
     fn distance_to_default_with_drift(&self, asset_drift: f64, horizon: f64) -> PyResult<f64> {
         self.inner
             .distance_to_default_with_drift(asset_drift, horizon)
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.default_probability")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.default_probability")]
     fn default_probability(&self, horizon: f64) -> f64 {
         self.inner.default_probability(horizon)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.default_probabilities")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.default_probabilities")]
     #[pyo3(text_signature = "($self, horizons)")]
     fn default_probabilities<'py>(
         &self,
@@ -453,38 +453,38 @@ impl PyMertonModel {
         values_to_series(py, values, &labels, "default_probability")
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.default_probability_with_drift")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.default_probability_with_drift")]
     fn default_probability_with_drift(&self, asset_drift: f64, horizon: f64) -> PyResult<f64> {
         self.inner
             .default_probability_with_drift(asset_drift, horizon)
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.implied_spread")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.implied_spread")]
     fn implied_spread(&self, horizon: f64, recovery: f64) -> PyResult<f64> {
         self.inner
             .implied_spread(horizon, recovery)
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.debt_spread")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.debt_spread")]
     fn debt_spread(&self, horizon: f64) -> PyResult<f64> {
         self.inner.debt_spread(horizon).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.cds_par_spread")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.cds_par_spread")]
     fn cds_par_spread(&self, maturity: f64, recovery: f64) -> PyResult<f64> {
         self.inner
             .cds_par_spread(maturity, recovery)
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.implied_equity")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.implied_equity")]
     fn implied_equity(&self, horizon: f64) -> PyResult<(f64, f64)> {
         self.inner.implied_equity(horizon).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.to_hazard_curve")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.to_hazard_curve")]
     #[pyo3(text_signature = "($self, id, base_date, tenors, recovery, day_count)")]
     fn to_hazard_curve(
         &self,
@@ -503,7 +503,7 @@ impl PyMertonModel {
         Ok(PyHazardCurve::from_inner(Arc::new(curve)))
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "MertonModel.simulate_paths")]
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.simulate_paths")]
     #[pyo3(text_signature = "($self, num_paths, num_steps, horizon, seed, antithetic)")]
     fn simulate_paths(
         &self,
@@ -529,10 +529,10 @@ wire_methods!(
     PyMertonModel,
     MertonModel,
     "MertonModel",
-    module = "finstack_quant.models.credit._structural"
+    module = "finstack_quant.models.credit"
 );
 
-#[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths")]
+#[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths")]
 #[pyclass(
     name = "SimulatedPaths",
     module = "finstack_quant.models.credit",
@@ -552,37 +552,37 @@ impl PySimulatedPaths {
 
 #[pymethods]
 impl PySimulatedPaths {
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.times")]
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.times")]
     #[getter]
     fn times(&self) -> Vec<f64> {
         self.inner.times.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.asset_values")]
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.asset_values")]
     #[getter]
     fn asset_values(&self) -> Vec<f64> {
         self.inner.asset_values.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.num_paths")]
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.num_paths")]
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.num_steps")]
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.num_steps")]
     #[getter]
     fn num_steps(&self) -> usize {
         self.inner.num_steps
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.values_per_path")]
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.values_per_path")]
     #[getter]
     fn values_per_path(&self) -> usize {
         self.inner.values_per_path()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let per_path = self.inner.values_per_path();
         let n = self.inner.num_paths * per_path;
@@ -601,17 +601,17 @@ impl PySimulatedPaths {
         dict_to_dataframe(py, &columns, None)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.get")]
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.get")]
     fn get(&self, path_idx: usize, time_idx: usize) -> Option<f64> {
         self.inner.get(path_idx, time_idx)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.path")]
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.path")]
     fn path(&self, path_idx: usize) -> Option<Vec<f64>> {
         self.inner.path(path_idx).map(<[f64]>::to_vec)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "SimulatedPaths.to_nested")]
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.to_nested")]
     fn to_nested(&self) -> Vec<Vec<f64>> {
         self.inner.to_nested()
     }
@@ -625,10 +625,10 @@ wire_methods!(
     PySimulatedPaths,
     SimulatedPaths,
     "SimulatedPaths",
-    module = "finstack_quant.models.credit._structural"
+    module = "finstack_quant.models.credit"
 );
 
-#[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec")]
+#[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec")]
 #[pyclass(
     name = "DynamicRecoverySpec",
     module = "finstack_quant.models.credit",
@@ -643,7 +643,7 @@ pub(crate) struct PyDynamicRecoverySpec {
 
 #[pymethods]
 impl PyDynamicRecoverySpec {
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.constant")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.constant")]
     #[staticmethod]
     #[pyo3(text_signature = "(recovery)")]
     fn constant(recovery: f64) -> PyResult<Self> {
@@ -652,7 +652,7 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.inverse_linear")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.inverse_linear")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_recovery, base_notional)")]
     fn inverse_linear(base_recovery: f64, base_notional: f64) -> PyResult<Self> {
@@ -662,7 +662,7 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.inverse_power")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.inverse_power")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_recovery, base_notional, exponent)")]
     fn inverse_power(base_recovery: f64, base_notional: f64, exponent: f64) -> PyResult<Self> {
@@ -672,7 +672,7 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.floored_inverse")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.floored_inverse")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_recovery, base_notional, floor)")]
     fn floored_inverse(base_recovery: f64, base_notional: f64, floor: f64) -> PyResult<Self> {
@@ -682,7 +682,7 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.linear_decline")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.linear_decline")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_recovery, base_notional, sensitivity, floor)")]
     fn linear_decline(
@@ -702,37 +702,37 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.kind")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(self.inner.model()).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.recovery_at_notional")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.recovery_at_notional")]
     #[pyo3(text_signature = "($self, notional)")]
     fn recovery_at_notional(&self, notional: f64) -> f64 {
         self.inner.recovery_at_notional(notional)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.base_recovery")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.base_recovery")]
     #[getter]
     fn base_recovery(&self) -> f64 {
         self.inner.base_recovery()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.base_notional")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.base_notional")]
     #[getter]
     fn base_notional(&self) -> f64 {
         self.inner.base_notional()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.model")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.model")]
     #[getter]
     fn model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, self.inner.model())
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "DynamicRecoverySpec.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
@@ -746,10 +746,10 @@ wire_methods!(
     PyDynamicRecoverySpec,
     DynamicRecoverySpec,
     "DynamicRecoverySpec",
-    module = "finstack_quant.models.credit._structural"
+    module = "finstack_quant.models.credit"
 );
 
-#[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec")]
+#[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec")]
 #[pyclass(
     name = "EndogenousHazardSpec",
     module = "finstack_quant.models.credit",
@@ -764,7 +764,7 @@ pub(crate) struct PyEndogenousHazardSpec {
 
 #[pymethods]
 impl PyEndogenousHazardSpec {
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.power_law")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.power_law")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_hazard, base_leverage, exponent)")]
     fn power_law(base_hazard: f64, base_leverage: f64, exponent: f64) -> PyResult<Self> {
@@ -774,7 +774,7 @@ impl PyEndogenousHazardSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.exponential")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.exponential")]
     #[staticmethod]
     #[pyo3(text_signature = "(base_hazard, base_leverage, sensitivity)")]
     fn exponential(base_hazard: f64, base_leverage: f64, sensitivity: f64) -> PyResult<Self> {
@@ -784,7 +784,7 @@ impl PyEndogenousHazardSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.tabular")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.tabular")]
     #[staticmethod]
     #[pyo3(text_signature = "(leverage_points, hazard_points)")]
     fn tabular(leverage_points: Vec<f64>, hazard_points: Vec<f64>) -> PyResult<Self> {
@@ -794,44 +794,44 @@ impl PyEndogenousHazardSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.kind")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(self.inner.leverage_hazard_map()).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.hazard_at_leverage")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.hazard_at_leverage")]
     #[pyo3(text_signature = "($self, leverage)")]
     fn hazard_at_leverage(&self, leverage: f64) -> f64 {
         self.inner.hazard_at_leverage(leverage)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.hazard_after_pik_accrual")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.hazard_after_pik_accrual")]
     #[pyo3(text_signature = "($self, accreted_notional, asset_value)")]
     fn hazard_after_pik_accrual(&self, accreted_notional: f64, asset_value: f64) -> f64 {
         self.inner
             .hazard_after_pik_accrual(accreted_notional, asset_value)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.base_hazard_rate")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.base_hazard_rate")]
     #[getter]
     fn base_hazard_rate(&self) -> f64 {
         self.inner.base_hazard_rate()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.base_leverage")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.base_leverage")]
     #[getter]
     fn base_leverage(&self) -> f64 {
         self.inner.base_leverage()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.leverage_hazard_map")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.leverage_hazard_map")]
     #[getter]
     fn leverage_hazard_map<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, self.inner.leverage_hazard_map())
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "EndogenousHazardSpec.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
@@ -845,10 +845,10 @@ wire_methods!(
     PyEndogenousHazardSpec,
     EndogenousHazardSpec,
     "EndogenousHazardSpec",
-    module = "finstack_quant.models.credit._structural"
+    module = "finstack_quant.models.credit"
 );
 
-#[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState")]
+#[doc = pydoc!("finstack_quant.models.credit", "CreditState")]
 #[pyclass(
     name = "CreditState",
     module = "finstack_quant.models.credit",
@@ -862,7 +862,7 @@ pub(crate) struct PyCreditState {
 
 #[pymethods]
 impl PyCreditState {
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.__init__")]
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.__init__")]
     #[new]
     #[pyo3(signature = (hazard_rate=0.0, distance_to_default=None, leverage=0.0, accreted_notional=0.0, coupon_due=0.0, asset_value=None))]
     #[pyo3(
@@ -888,43 +888,43 @@ impl PyCreditState {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.hazard_rate")]
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.hazard_rate")]
     #[getter]
     fn hazard_rate(&self) -> f64 {
         self.inner.hazard_rate
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.distance_to_default")]
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.distance_to_default")]
     #[getter]
     fn distance_to_default(&self) -> Option<f64> {
         self.inner.distance_to_default
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.leverage")]
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.leverage")]
     #[getter]
     fn leverage(&self) -> f64 {
         self.inner.leverage
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.accreted_notional")]
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.accreted_notional")]
     #[getter]
     fn accreted_notional(&self) -> f64 {
         self.inner.accreted_notional
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.coupon_due")]
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.coupon_due")]
     #[getter]
     fn coupon_due(&self) -> f64 {
         self.inner.coupon_due
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.asset_value")]
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.asset_value")]
     #[getter]
     fn asset_value(&self) -> Option<f64> {
         self.inner.asset_value
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "CreditState.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
@@ -938,10 +938,10 @@ wire_methods!(
     PyCreditState,
     CreditState,
     "CreditState",
-    module = "finstack_quant.models.credit._structural"
+    module = "finstack_quant.models.credit"
 );
 
-#[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel")]
+#[doc = pydoc!("finstack_quant.models.credit", "ToggleExerciseModel")]
 #[pyclass(
     name = "ToggleExerciseModel",
     module = "finstack_quant.models.credit",
@@ -956,7 +956,7 @@ pub(crate) struct PyToggleExerciseModel {
 
 #[pymethods]
 impl PyToggleExerciseModel {
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.threshold")]
+    #[doc = pydoc!("finstack_quant.models.credit", "ToggleExerciseModel.threshold")]
     #[staticmethod]
     #[pyo3(text_signature = "(variable, threshold, direction)")]
     fn threshold(variable: &str, threshold: f64, direction: &str) -> PyResult<Self> {
@@ -967,7 +967,7 @@ impl PyToggleExerciseModel {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.stochastic")]
+    #[doc = pydoc!("finstack_quant.models.credit", "ToggleExerciseModel.stochastic")]
     #[staticmethod]
     #[pyo3(text_signature = "(variable, intercept, sensitivity)")]
     fn stochastic(variable: &str, intercept: f64, sensitivity: f64) -> PyResult<Self> {
@@ -977,13 +977,13 @@ impl PyToggleExerciseModel {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.should_pik")]
+    #[doc = pydoc!("finstack_quant.models.credit", "ToggleExerciseModel.should_pik")]
     #[pyo3(text_signature = "($self, state, u)")]
     fn should_pik(&self, state: &PyCreditState, u: f64) -> bool {
         self.inner.should_pik(&state.inner, u)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.optimal")]
+    #[doc = pydoc!("finstack_quant.models.credit", "ToggleExerciseModel.optimal")]
     #[staticmethod]
     #[pyo3(text_signature = "(nested_paths, asset_vol, risk_free_rate, horizon)")]
     fn optimal(
@@ -997,13 +997,13 @@ impl PyToggleExerciseModel {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.kind")]
+    #[doc = pydoc!("finstack_quant.models.credit", "ToggleExerciseModel.kind")]
     #[getter]
     fn kind(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit._structural", "ToggleExerciseModel.params")]
+    #[doc = pydoc!("finstack_quant.models.credit", "ToggleExerciseModel.params")]
     #[getter]
     fn params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match &self.inner {
@@ -1022,7 +1022,7 @@ wire_methods!(
     PyToggleExerciseModel,
     ToggleExerciseModel,
     "ToggleExerciseModel",
-    module = "finstack_quant.models.credit._structural"
+    module = "finstack_quant.models.credit"
 );
 
 /// Render an externally-tagged enum as its Python constructor call:

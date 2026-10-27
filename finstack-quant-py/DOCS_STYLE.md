@@ -24,6 +24,36 @@ Do not add a `.py` re-export shim for a compiled module: register it with
 `Exposure::Compiled` and put its module docstring in the stub. Keep a `.py`
 only when it adds pure-Python code.
 
+## Stub layout mirrors the Rust bindings
+
+Each Rust binding file has exactly one stub twin, so a declaration is found
+by the same path on both sides:
+
+- A public module's `__init__.pyi` (or `<name>.pyi` when the module draws on
+  one Rust file) holds the module docstring and example, what the module's own
+  Rust file defines (`mod.rs`, or the single `<name>.rs`), shared aliases and
+  constants, the `X as X` re-exports, and `__all__`.
+- Every other Rust file of the module gets a private fragment with the same
+  name: `bindings/portfolio/brinson.rs` → `portfolio/_brinson.pyi`, and nested
+  folders mirror as private folders:
+  `bindings/portfolio/optimization/enums.rs` →
+  `portfolio/_optimization/enums.pyi` (no `__init__.pyi` in private folders).
+  `bindings/valuations/` hosts `valuations.instruments`, so its files map to
+  `valuations/instruments/_<file>.pyi`.
+- A fragment opens with a one-line docstring naming its Rust twin, imports
+  siblings absolutely (`from finstack_quant.portfolio._results import
+  PortfolioResult`) and shared aliases from the public module, and keeps
+  private typing helpers next to their first user.
+- The `pydoc!` key, and the `module =` argument of doc-keyed macros such as
+  `wire_methods!` and `instrument_pricing_methods!`, name the fragment
+  (`pydoc!("finstack_quant.portfolio._brinson", "BrinsonPeriodResult")`). The
+  `#[pyclass(module = ...)]` attribute stays the public module, which is what
+  `__module__`, `repr` and pickling see.
+
+Adding a Rust binding file means adding its fragment and the re-export in the
+public `__init__.pyi`; tests read a module's declarations through
+`tests/stub_helpers.py` rather than one file.
+
 ## Required content
 
 Every public class, classmethod, free function, and constructor documents:

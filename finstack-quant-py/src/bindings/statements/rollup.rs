@@ -11,7 +11,7 @@ use finstack_quant_statements::evaluator::{RollupMethod, RollupSpec as RustRollu
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 
-#[doc = pydoc!("finstack_quant.statements", "RollupSpec")]
+#[doc = pydoc!("finstack_quant.statements._rollup", "RollupSpec")]
 #[pyclass(
     name = "RollupSpec",
     module = "finstack_quant.statements",
@@ -26,7 +26,7 @@ wire_methods!(
     PyRollupSpec,
     RustRollupSpec,
     "RollupSpec",
-    module = "finstack_quant.statements"
+    module = "finstack_quant.statements._rollup"
 );
 
 #[pymethods]
@@ -49,13 +49,13 @@ impl PyRollupSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "RollupSpec.frequency")]
+    #[doc = pydoc!("finstack_quant.statements._rollup", "RollupSpec.frequency")]
     #[getter]
     fn frequency(&self) -> String {
         self.inner.frequency.to_string()
     }
 
-    #[doc = pydoc!("finstack_quant.statements", "RollupSpec.methods")]
+    #[doc = pydoc!("finstack_quant.statements._rollup", "RollupSpec.methods")]
     #[getter]
     fn methods(&self) -> PyResult<IndexMap<String, String>> {
         self.inner

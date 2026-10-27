@@ -94,13 +94,14 @@ def _lookup(mod: ModuleType, name: str) -> Any:
 
 
 def _import(module: str) -> ModuleType | None:
-    """Import ``module``; a private stub-only module resolves to its parent package."""
+    """Import ``module``; a private stub fragment resolves to the public module above it."""
+    parts = module.split(".")
+    private = next((i for i, part in enumerate(parts) if i and part.startswith("_")), None)
+    if private is not None:
+        return importlib.import_module(".".join(parts[:private]))
     try:
         return importlib.import_module(module)
     except ImportError:
-        parent, _, leaf = module.rpartition(".")
-        if leaf.startswith("_") and parent:
-            return importlib.import_module(parent)
         return None
 
 

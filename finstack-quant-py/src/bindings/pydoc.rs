@@ -10,8 +10,10 @@
 ///
 /// # Arguments
 ///
-/// * `$module` - Public dotted module path of the stub, e.g.
-///   `"finstack_quant.valuations.market"`.
+/// * `$module` - Dotted module path of the stub file holding the docstring:
+///   the public module (`"finstack_quant.valuations.market"`) or the private
+///   fragment mirroring the owner's Rust file
+///   (`"finstack_quant.valuations.instruments._typed_rates"`).
 /// * `$key` - Qualified name inside that stub: `"Class"`, `"Class.member"`,
 ///   `"function"`, or `"__module__"` for the module docstring. Macro-generated
 ///   owners may pass a `concat!(..)` of literals instead of one literal.

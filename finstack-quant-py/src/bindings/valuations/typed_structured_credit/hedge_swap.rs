@@ -11,7 +11,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 
 use super::super::convert::enum_from_str;
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.hedge_swap", "HedgeSwap")]
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "HedgeSwap",
@@ -28,13 +28,13 @@ crate::bindings::macros::wire_methods!(
     PyHedgeSwap,
     HedgeSwap,
     "HedgeSwap",
-    module = "finstack_quant.valuations.instruments",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.hedge_swap",
     to_dict
 );
 
 #[pymethods]
 impl PyHedgeSwap {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap.__init__")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.hedge_swap", "HedgeSwap.__init__")]
     #[new]
     #[pyo3(signature = (swap, notional=None, priority=None))]
     #[pyo3(text_signature = "(swap, notional=None, priority=None)")]
@@ -61,7 +61,7 @@ impl PyHedgeSwap {
         })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap.notional")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.hedge_swap", "HedgeSwap.notional")]
     #[getter]
     fn notional<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.notional)
@@ -79,9 +79,9 @@ impl PyHedgeSwap {
 }
 
 crate::bindings::macros::py_getters!(PyHedgeSwap |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap.swap")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.hedge_swap", "HedgeSwap.swap")]
     swap -> PyInterestRateSwap = PyInterestRateSwap { inner: s.inner.swap.clone() };
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "HedgeSwap.priority")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.hedge_swap", "HedgeSwap.priority")]
     priority -> PyResult<String> = enum_to_py_string(&s.inner.priority);
 });

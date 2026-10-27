@@ -11,7 +11,7 @@ use pyo3::types::PyModule;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::analytics_to_py;
 
-#[doc = pydoc!("finstack_quant.analytics", "constrained_least_squares")]
+#[doc = pydoc!("finstack_quant.analytics._regression", "constrained_least_squares")]
 #[pyfunction]
 #[pyo3(text_signature = "(exposures, n_factors, returns, weights)")]
 fn constrained_least_squares(

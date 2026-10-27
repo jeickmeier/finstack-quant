@@ -294,7 +294,7 @@ impl PyCdsQuote {
 
 #[pymethods]
 impl PyCdsQuote {
-    #[doc = pydoc!("finstack_quant.calibration", "CdsQuote.par_spread")]
+    #[doc = pydoc!("finstack_quant.calibration._quotes", "CdsQuote.par_spread")]
     #[staticmethod]
     #[pyo3(text_signature = "(id, entity, currency, doc_clause, pillar, spread_bp, recovery_rate)")]
     #[allow(clippy::too_many_arguments)]
@@ -321,7 +321,7 @@ impl PyCdsQuote {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.calibration", "CdsQuote.upfront")]
+    #[doc = pydoc!("finstack_quant.calibration._quotes", "CdsQuote.upfront")]
     #[staticmethod]
     #[pyo3(
         text_signature = "(id, entity, currency, doc_clause, pillar, coupon_bp, upfront_pct, recovery_rate)"
@@ -884,7 +884,7 @@ pub struct PyCdsTrancheQuote {
 
 #[pymethods]
 impl PyCdsTrancheQuote {
-    #[doc = pydoc!("finstack_quant.calibration", "CdsTrancheQuote.__init__")]
+    #[doc = pydoc!("finstack_quant.calibration._quotes", "CdsTrancheQuote.__init__")]
     #[new]
     #[pyo3(
         text_signature = "(id, index, series, attachment, detachment, maturity, upfront_pct, coupon_bp, currency, doc_clause)"
