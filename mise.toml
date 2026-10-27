@@ -683,6 +683,17 @@ fi
 node finstack-quant-ui/scripts/run-fixtures.mjs
 '''
 
+[tasks.ui-brand]
+description = "Generate a validated brand stylesheet from a brand token file (finstack-quant-ui/README.md, Branding)"
+usage = '''
+arg "<brand>" help="Brand file with the sections of registry/theme/finstack-theme/tokens.json, listing only the keys it changes"
+arg "<out>" help="Stylesheet to write; the application installs it as styles/finstack/theme.css"
+'''
+# Paths are relative to the directory mise was run from, not the repository root.
+run = '''
+cd "$MISE_ORIGINAL_CWD" && node "$MISE_PROJECT_ROOT/finstack-quant-ui/scripts/gen-theme.mjs" --brand "$usage_brand" --out "$usage_out"
+'''
+
 [tasks.ui-build]
 description = "Build the component-registry distribution"
 run = "npm --prefix finstack-quant-ui run build"

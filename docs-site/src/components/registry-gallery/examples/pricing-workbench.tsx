@@ -114,6 +114,7 @@ export function Example({
     <PricingWorkbench
       key={selectedType}
       defaultInstrumentType={selectedType}
+      brand="finstack"
       defaultRequest={exampleRequests[selectedType]!}
       exampleRequests={exampleRequests}
       exampleResultTabs={exampleResultTabs}

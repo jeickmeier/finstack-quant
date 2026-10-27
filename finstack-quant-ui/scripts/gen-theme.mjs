@@ -4,6 +4,7 @@ import path from "node:path";
 import prettier from "prettier";
 import { isDeepStrictEqual } from "node:util";
 import { withoutMetadata } from "./registry-metadata.mjs";
+import { mergeBrand, validateTokens } from "./check-tokens.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 export function themeOutput(tokens) {
   const declarations = (values) =>
@@ -20,8 +21,10 @@ export function themeOutput(tokens) {
 ${imports}
 @custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 :root { ${declarations(tokens.theme)} ${declarations(tokens.density.compact)} }
-:root, [data-theme="light"] { ${declarations(tokens.light)} }
-:root.dark, [data-theme="dark"] { ${declarations(tokens.dark)} }
+/* The native chart tooltip, crosshair and focus overlays read these hooks; their fallbacks are OS Canvas colours and system-ui. */
+:root { --ts-chart-tooltip-background: var(--popover); --ts-chart-tooltip-color: var(--popover-foreground); --ts-chart-tooltip-border: var(--border-width) solid var(--border); --ts-chart-tooltip-border-radius: calc(var(--radius) - 4px); --ts-chart-tooltip-font: 500 var(--text-xs)/1.3 var(--font-sans); --ts-chart-tooltip-shadow: var(--elevation); --ts-chart-tooltip-active-row-background: var(--accent); --ts-chart-focus-fill: var(--background); --ts-chart-crosshair-marker-fill: var(--background); --ts-chart-crosshair-label-halo: var(--background); }
+:root, [data-theme="light"] { color-scheme: light; ${declarations(tokens.light)} }
+:root.dark, [data-theme="dark"] { color-scheme: dark; ${declarations(tokens.dark)} }
 [data-density="compact"] { ${declarations(tokens.density.compact)} }
 [data-density="comfortable"] { ${declarations(tokens.density.comfortable)} }
 @theme inline { --radius-sm:calc(var(--radius) - 4px); --radius-md:calc(var(--radius) - 2px); --radius-lg:var(--radius); --radius-xl:calc(var(--radius) + 4px); ${Object.keys(
@@ -30,9 +33,7 @@ ${imports}
     .map((key) => `--color-${key}: var(--${key});`)
     .join("\n")} }
 @theme { ${Object.keys(tokens.theme)
-    .filter((key) =>
-      /^(font-(?:sans|mono)|text-|spacing$|radius-|breakpoint-)/.test(key),
-    )
+    .filter((key) => /^(font-(?:sans|mono)|text-|spacing$|radius-)/.test(key))
     .map((key) => `--${key}: ${tokens.theme[key]};`)
     .join("\n")} }
 @utility finstack-numeric { font-variant-numeric: var(--font-numeric-variant); }
@@ -416,7 +417,7 @@ ${imports}
     title: "Finstack theme",
     description:
       "Shared light and dark tokens, compact and comfortable density, IBM Plex fonts and component styles for every finstack item.",
-    docs: "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Tenant styles override the same properties after this stylesheet. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files.",
+    docs: "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Colours, fonts, the type scale and the chart palettes are CSS variables from one token file: rebrand by generating this stylesheet from a brand file with a checkout of the registry (node finstack-quant-ui/scripts/gen-theme.mjs --brand <brand.json> --out <theme.css>) or by redeclaring variables on [data-theme] after it. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files.",
     dependencies: [
       "shadcn@4.21.0",
       "tw-animate-css@1.4.0",
@@ -429,17 +430,36 @@ ${imports}
         target: "styles/finstack/theme.css",
       },
     ],
-    cssVars: { theme: tokens.theme, light: tokens.light, dark: tokens.dark },
+    // No cssVars: the shadcn CLI would append the default tokens to the
+    // application stylesheet after the theme import and override a brand.
   };
   return { css, item };
 }
-export async function generateTheme(check = false) {
-  const tokens = JSON.parse(
+const readTokens = async () =>
+  JSON.parse(
     await readFile(
       path.join(root, "registry/theme/finstack-theme/tokens.json"),
       "utf8",
     ),
   );
+/**
+ * Write a complete brand stylesheet: the brand file is merged over the default
+ * tokens, validated like the default theme, and rendered through the same
+ * template, so Tailwind utilities, component rules, chart palettes, print
+ * output and font imports all follow the brand.
+ */
+export async function generateBrand(brandPath, outputPath) {
+  const brand = JSON.parse(await readFile(brandPath, "utf8"));
+  const tokens = mergeBrand(await readTokens(), brand);
+  validateTokens(tokens);
+  await writeFile(
+    outputPath,
+    await prettier.format(themeOutput(tokens).css, { parser: "css" }),
+  );
+  return { name: brand.name, tokens };
+}
+export async function generateTheme(check = false) {
+  const tokens = await readTokens();
   const { css, item } = themeOutput(tokens);
   const outputs = [
     [
@@ -477,6 +497,30 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  await generateTheme(process.argv.includes("--check"));
-  console.log("Checked theme generation.");
+  const args = process.argv.slice(2);
+  const brand = args.indexOf("--brand"),
+    out = args.indexOf("--out");
+  if (brand >= 0 || out >= 0) {
+    if (brand < 0 || out < 0 || !args[brand + 1] || !args[out + 1])
+      throw new Error(
+        "Usage: gen-theme.mjs --brand <brand.json> --out <theme.css>",
+      );
+    const { name, tokens } = await generateBrand(
+      args[brand + 1],
+      args[out + 1],
+    );
+    const packages = tokens.fonts.map(
+      (font) => `${font.package}@${font.version}`,
+    );
+    console.log(
+      `Generated ${name ?? "brand"} theme at ${args[out + 1]}. Install in the application: ${
+        packages.length
+          ? packages.join(" ")
+          : "no Fontsource packages (the host supplies its fonts)"
+      }.`,
+    );
+  } else {
+    await generateTheme(args.includes("--check"));
+    console.log("Checked theme generation.");
+  }
 }

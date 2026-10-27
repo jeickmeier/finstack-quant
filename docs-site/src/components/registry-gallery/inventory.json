@@ -3,7 +3,7 @@
     {
       "name": "finstack-theme",
       "type": "registry:theme",
-      "docs": "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Tenant styles override the same properties after this stylesheet. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files."
+      "docs": "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Colours, fonts, the type scale and the chart palettes are CSS variables from one token file: rebrand by generating this stylesheet from a brand file with a checkout of the registry (node finstack-quant-ui/scripts/gen-theme.mjs --brand <brand.json> --out <theme.css>) or by redeclaring variables on [data-theme] after it. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files."
     },
     {
       "name": "field-frame",
