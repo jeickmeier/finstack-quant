@@ -4,19 +4,25 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import prettier from "prettier";
 import { loadRegistry } from "shadcn/registry";
+import { checkGraph, visualTypes, workerRoles } from "./check-registry.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url)),
   repo = path.resolve(root, "..");
 const output = path.join(repo, "docs-site/src/components/registry-gallery");
 const registry = await loadRegistry({ cwd: root });
-const visualTypes = new Set([
-  "registry:ui",
-  "registry:component",
-  "registry:block",
-  "registry:theme",
-]);
+// The gallery wraps an item in FinstackQueryProvider exactly when its role is `host`.
+const roles = await workerRoles(
+  root,
+  registry.items,
+  checkGraph(registry.items),
+);
 const visual = registry.items
   .filter((item) => visualTypes.has(item.type))
-  .map((item) => ({ name: item.name, type: item.type, docs: item.docs }));
+  .map((item) => ({
+    name: item.name,
+    type: item.type,
+    docs: item.docs,
+    worker: roles.get(item.name),
+  }));
 const nonvisual = registry.items.filter((item) => !visualTypes.has(item.type));
 const sources = {
   bond: "src/fixtures/results/bond.json",

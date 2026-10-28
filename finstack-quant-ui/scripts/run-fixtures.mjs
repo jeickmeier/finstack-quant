@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { requireWasm } from "./require-wasm.mjs";
 
 // Regenerates (or, with --check, verifies) every native fixture the tests and
 // the gallery pin, in dependency order: results writes src/fixtures/results/
@@ -10,16 +10,7 @@ import { fileURLToPath } from "node:url";
 // do not share memory.
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const checking = process.argv.includes("--check");
-const nodePackage = new URL(
-  "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-  import.meta.url,
-);
-if (!existsSync(nodePackage)) {
-  console.error(
-    "finstack-quant-wasm/pkg-node is not built; run `mise run wasm-build-node` (dev) or `mise run wasm-pkg` (release) first.",
-  );
-  process.exit(1);
-}
+requireWasm(["pkg-node"]);
 const generators = [
   "tests/valuations/results/generate.mjs",
   "tests/valuations/cashflows/generate.mjs",

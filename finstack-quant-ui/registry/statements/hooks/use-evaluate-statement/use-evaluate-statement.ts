@@ -3,19 +3,29 @@ import {
   useWorkerQuery,
   workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
+import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { StatementRequest } from "@/workers/finstack-contract";
-
-/** One immutable model/market/date request in the current worker session. */
+export type { StatementRequest } from "@/workers/finstack-contract";
+/** Snapshot model, market and as-of. Null disables evaluation. */
+export function evaluateStatementOptions(
+  client: FinstackClient | null,
+  session: number,
+  request: StatementRequest | null,
+) {
+  const snapshot = request === null ? null : { ...request };
+  return workerQueryOptions({
+    client,
+    queryKey: ["finstack", session, "evaluateStatement", snapshot] as const,
+    ready: snapshot !== null,
+    missing:
+      "Statement evaluation requires an explicit request and ready worker",
+    queryFn: (ready) => ready.call("evaluateStatement", snapshot!),
+  });
+}
+/** Native StatementResult or structured failure. */
 export function useEvaluateStatement(request: StatementRequest | null) {
-  const snapshot = request === null ? null : Object.freeze({ ...request });
   return useWorkerQuery((worker) => ({
-    ...workerQueryOptions({
-      client: worker.client,
-      queryKey: ["finstack", worker.session, "statement", snapshot] as const,
-      ready: snapshot !== null,
-      missing: "Statement worker is not ready",
-      queryFn: (client) => client.call("evaluateStatement", snapshot!),
-    }),
-    enabled: worker.status === "ready" && snapshot !== null,
+    ...evaluateStatementOptions(worker.client, worker.session, request),
+    enabled: worker.status === "ready" && request !== null,
   }));
 }

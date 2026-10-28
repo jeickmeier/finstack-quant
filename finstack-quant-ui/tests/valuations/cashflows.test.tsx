@@ -249,6 +249,14 @@ it("preserves wide signed tokens, row currencies, zero and absent diagnostics wi
   );
   expect(totalRow.children[3].textContent).toBe("");
 });
+it("keeps the schedule a named keyboard stop inside its scroll container", async () => {
+  suppliedExport(fixture.cases[0].cashflows!);
+  // Wide schedules overflow narrow viewports; focusing the table lets arrow
+  // keys scroll the stock table container around it.
+  const table = await screen.findByRole("table", { name: "Cashflow schedule" });
+  expect(table.tabIndex).toBe(0);
+  expect(table.parentElement!.dataset.slot).toBe("table-container");
+});
 it("omits absent optional columns and retains zero total for an empty native schedule", async () => {
   const envelope = JSON.parse(fixture.cases[0].cashflows!);
   envelope.flows = [];

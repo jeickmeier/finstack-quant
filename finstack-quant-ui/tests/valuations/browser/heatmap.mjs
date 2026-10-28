@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import {
@@ -10,6 +11,10 @@ import {
 } from "../../browser/consumer.mjs";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-heatmap-"));
+const evidence =
+  process.env.REGISTRY_SMOKE_DIR ??
+  (await mkdtemp(path.join(tmpdir(), "registry-heatmap-")));
+await mkdir(evidence, { recursive: true });
 let browser, server, page;
 try {
   const installed = await installBuilt(root, consumer, ["finstack-chart"]);
@@ -18,7 +23,7 @@ try {
     await readFile(new URL("./fixture/heatmap.tsx", import.meta.url)),
   );
 
-  await buildConsumer(consumer, { title: "Publication figures" });
+  await buildConsumer(consumer, { title: "Scenario heatmap" });
   ({ server, browser, page } = await openConsumer(path.join(consumer, "dist"), {
     viewport: { width: 1050, height: 1000 },
   }));
@@ -102,7 +107,7 @@ try {
       );
       assert.equal(geometry.values, which === "small" ? 9 : 0);
       assert.deepEqual(geometry.outside, []);
-      await writeFile(`/tmp/pr027-${which}-${theme}.svg`, svg);
+      await writeFile(path.join(evidence, `${which}-${theme}.svg`), svg);
       exports.push({ theme, which, ...geometry });
     }
   }
@@ -110,7 +115,10 @@ try {
   assert.deepEqual(accessibility.violations, []);
   assert.deepEqual(failures, []);
   assert(!requests.some((url) => url.endsWith(".wasm")));
-  await page.screenshot({ path: "/tmp/pr027-heatmap.png", fullPage: true });
+  await page.screenshot({
+    path: path.join(evidence, "heatmap.png"),
+    fullPage: true,
+  });
   const report = {
     browser: browser.version(),
     installed,
@@ -121,10 +129,11 @@ try {
     verdict: "pass",
   };
   await writeFile(
-    "/tmp/pr027-heatmap.json",
+    path.join(evidence, "heatmap.json"),
     JSON.stringify(report, null, 2) + "\n",
   );
   console.log(JSON.stringify(report, null, 2));
+  console.log(`Evidence: ${evidence}`);
 } finally {
   await closeConsumer({ browser, server }, consumer);
 }

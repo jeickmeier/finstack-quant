@@ -6,7 +6,7 @@ import init, {
   valuations,
 } from "../../../finstack-quant-wasm/index.js";
 import { adaptValuation, exportValuation } from "../../src/host";
-import { valuationCodec } from "../valuations/details/restore";
+import { valuationCodec } from "../valuations/details/result";
 
 await init({
   module_or_path: await readFile(

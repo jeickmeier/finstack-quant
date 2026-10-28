@@ -31,6 +31,12 @@ export const importHarnesses = {
   "finstack-worker": () =>
     Promise.all([
       import("@/workers/finstack-service"),
+      import("@/workers/services/context"),
+      import("@/workers/services/core"),
+      import("@/workers/services/valuations"),
+      import("@/workers/services/calibration"),
+      import("@/workers/services/models"),
+      import("@/workers/services/statements"),
       import("@/workers/finstack-contract"),
     ]).then((modules) => ({
       name: "finstack-worker",
@@ -93,6 +99,62 @@ export const importHarnesses = {
       name: "use-evaluate-statement",
       modules: modules.length,
     })),
+  "use-statement-model-validator": () =>
+    Promise.all([
+      import("@/hooks/statements/use-statement-model-validator/use-statement-model-validator"),
+    ]).then((modules) => ({
+      name: "use-statement-model-validator",
+      modules: modules.length,
+    })),
+  "use-statement-formula-validator": () =>
+    Promise.all([
+      import("@/hooks/statements/use-statement-formula-validator/use-statement-formula-validator"),
+    ]).then((modules) => ({
+      name: "use-statement-formula-validator",
+      modules: modules.length,
+    })),
+  "use-check-suite-validator": () =>
+    Promise.all([
+      import("@/hooks/statements/use-check-suite-validator/use-check-suite-validator"),
+    ]).then((modules) => ({
+      name: "use-check-suite-validator",
+      modules: modules.length,
+    })),
+  "use-rollup-statement": () =>
+    Promise.all([
+      import("@/hooks/statements/use-rollup-statement/use-rollup-statement"),
+    ]).then((modules) => ({
+      name: "use-rollup-statement",
+      modules: modules.length,
+    })),
+  "use-evaluate-statement-scenarios": () =>
+    Promise.all([
+      import("@/hooks/statements/use-evaluate-statement-scenarios/use-evaluate-statement-scenarios"),
+    ]).then((modules) => ({
+      name: "use-evaluate-statement-scenarios",
+      modules: modules.length,
+    })),
+  "use-run-statement-checks": () =>
+    Promise.all([
+      import("@/hooks/statements/use-run-statement-checks/use-run-statement-checks"),
+    ]).then((modules) => ({
+      name: "use-run-statement-checks",
+      modules: modules.length,
+    })),
+  "use-explain-statement": () =>
+    Promise.all([
+      import("@/hooks/statements/use-explain-statement/use-explain-statement"),
+    ]).then((modules) => ({
+      name: "use-explain-statement",
+      modules: modules.length,
+    })),
+  "use-trace-statement": () =>
+    Promise.all([
+      import("@/hooks/statements/use-trace-statement/use-trace-statement"),
+    ]).then((modules) => ({
+      name: "use-trace-statement",
+      modules: modules.length,
+    })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -117,6 +179,7 @@ export const importHarnesses = {
     Promise.all([
       import("@/lib/finstack/format/format"),
       import("@/lib/finstack/format/columns"),
+      import("@/lib/finstack/format/label.mjs"),
     ]).then((modules) => ({
       name: "finstack-format",
       modules: modules.length,
@@ -1008,6 +1071,24 @@ export const importHarnesses = {
       name: "contract-valuation-result",
       modules: modules.length,
     })),
+  "contract-scenario-set": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_set.json"),
+      import("@/lib/finstack/generated/types/scenario_set"),
+      import("@/lib/finstack/generated/meta/scenario_set"),
+    ]).then((modules) => ({
+      name: "contract-scenario-set",
+      modules: modules.length,
+    })),
+  "contract-check-suite-spec": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/check_suite_spec.json"),
+      import("@/lib/finstack/generated/types/check_suite_spec"),
+      import("@/lib/finstack/generated/meta/check_suite_spec"),
+    ]).then((modules) => ({
+      name: "contract-check-suite-spec",
+      modules: modules.length,
+    })),
   "contract-financial-model-spec": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/financial_model_spec.json"),
@@ -1016,6 +1097,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/examples/financial_model_spec.json"),
     ]).then((modules) => ({
       name: "contract-financial-model-spec",
+      modules: modules.length,
+    })),
+  "contract-rollup-spec": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/rollup_spec.json"),
+      import("@/lib/finstack/generated/types/rollup_spec"),
+      import("@/lib/finstack/generated/meta/rollup_spec"),
+    ]).then((modules) => ({
+      name: "contract-rollup-spec",
       modules: modules.length,
     })),
   "contract-statement-result": () =>

@@ -9,7 +9,7 @@ const ui = path.join(repo, "finstack-quant-ui");
 const external = await mkdtemp(path.join(tmpdir(), "finstack-next-installed-"));
 const evidence =
   process.env.REGISTRY_SMOKE_DIR ??
-  (await mkdtemp(path.join(tmpdir(), "pr017-install-")));
+  (await mkdtemp(path.join(tmpdir(), "registry-install-smoke-")));
 console.log(`External consumer: ${external}\nEvidence: ${evidence}`);
 const run = (command, args, cwd, env = {}) =>
   new Promise((resolve, reject) => {
@@ -21,7 +21,7 @@ const run = (command, args, cwd, env = {}) =>
         npm_config_ignore_scripts: "true",
         npm_config_install_links: "true",
         npm_config_save_exact: "true",
-        npm_config_cache: "/tmp/component-registry-npm-cache",
+        npm_config_cache: path.join(tmpdir(), "finstack-npm-cache"),
         ...env,
       },
     });
@@ -127,9 +127,12 @@ await cp(
   path.join(ui, "src/fixtures/results/bond.json"),
   path.join(external, "app/bond.json"),
 );
+// The explicit evaluated-view options match the docs demo
+// (docs-site/src/components/registry-demo.tsx); tests/install/workbench.mjs
+// renders the calibrated surfaces and cubes through them.
 await writeFile(
   path.join(external, "app/page.tsx"),
-  '"use client";\nimport { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";\nimport { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";\nimport fixture from "./bond.json";\nexport default function Page() { return <main className="finstack-surface mx-auto max-w-6xl p-4"><h1>Bond pricing</h1><FinstackQueryProvider><PricingWorkbench defaultRequest={fixture.request} /></FinstackQueryProvider></main>; }\n',
+  '"use client";\nimport { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";\nimport { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";\nimport fixture from "./bond.json";\nexport default function Page() { return <main className="finstack-surface mx-auto max-w-6xl p-4"><h1>Bond pricing</h1><FinstackQueryProvider><PricingWorkbench defaultRequest={fixture.request} surfaceOptions={() => ({ colorDomain: [0, 1] })} cubeOptions={() => ({ initialStrike: 0.05, initialConvention: "normal", colorDomains: { normal: [0, 0.1], black_lognormal: [0, 2] } })} fxOptions={() => ({ coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }], colorDomain: [0, 1] })} /></FinstackQueryProvider></main>; }\n',
 );
 const hash = createHash("sha256")
   .update(
@@ -189,7 +192,7 @@ for (const [consumer, route, build] of [
         : external;
     await run(
       process.execPath,
-      [path.join(import.meta.dirname, "../valuations/browser/workbench.mjs")],
+      [path.join(ui, "tests/install/workbench.mjs")],
       repo,
       {
         REGISTRY_EXPORT_DIR: path.join(app, "out"),

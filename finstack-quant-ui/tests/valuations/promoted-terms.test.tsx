@@ -70,13 +70,10 @@ it("promotes the bond clean price, replaces only conflicting price quotes, and c
   await userEvent.click(
     screen.getByRole("button", { name: "More pricing overrides" }),
   );
-  expect(
-    (
-      document.querySelector(
-        "details[data-pricing-overrides]",
-      ) as HTMLDetailsElement
-    ).open,
-  ).toBe(true);
+  const revealed = document.activeElement as HTMLElement;
+  expect(revealed.tagName).toBe("SUMMARY");
+  expect(revealed.textContent).toMatch(/^Pricing overrides/);
+  expect((revealed.parentElement as HTMLDetailsElement).open).toBe(true);
   fireEvent.change(input, { target: { value: "99.5" } });
   const spec = await canonicalAfter(accepted, (spec) => {
     const quotes = ((

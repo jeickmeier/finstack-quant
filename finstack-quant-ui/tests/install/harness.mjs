@@ -1,114 +1,113 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
+import ts from "typescript";
+import { resolveInstalled } from "../../scripts/check-registry.mjs";
 
-const nativeForms = new Set([
-  "schema-form",
-  "instrument-form",
-  "market-context-form",
-  "calibration-form",
-]);
-const wrappers = new Set([
-  "curve-chart",
-  "calibration-fit-chart",
-  "scenario-heatmap",
-  "vol-surface-chart",
-  "fx-surface-chart",
-  "vol-cube-explorer",
-]);
+const exists = (file) =>
+  access(file).then(
+    () => true,
+    () => false,
+  );
 
-/** Copy one explicit example: unrelated gallery imports never enter its install closure. */
-export async function visualHarness(repo, item) {
-  const fixture = (name) =>
-    readFile(
-      path.join(repo, "finstack-quant-ui/tests/install/fixture", name),
+/**
+ * Copy each `@/` import of `source` whose owner is outside the item's closure into
+ * app/ and point the specifier at the copy. `from` is where `source` lands in app/.
+ * The copy never lands on an installed target, so an item's own imports still fail
+ * when its closure misses a dependency.
+ */
+async function localize(repo, item, graph, source, from) {
+  const closure = graph.closures.get(item.name),
+    extra = {};
+  for (const { fileName: specifier } of ts.preProcessFile(source, true, true)
+    .importedFiles) {
+    if (!specifier.startsWith("@/")) continue;
+    const target = resolveInstalled(graph.owners, from, specifier);
+    if (!target || closure.has(graph.owners.get(target))) continue;
+    const file = graph.byName
+      .get(graph.owners.get(target))
+      .files.find((file) => file.target === target);
+    extra[target] = await readFile(
+      path.join(repo, "finstack-quant-ui", file.path),
       "utf8",
     );
-  const example = (name) =>
-    readFile(
-      path.join(
-        repo,
-        "docs-site/src/components/registry-gallery/examples",
-        name,
-      ),
-      "utf8",
+    let local = path.posix.relative(
+      path.posix.dirname(from),
+      specifier.slice(2),
     );
-  if (
-    item.name === "finstack-chart" ||
-    (item.name === "pricing-workbench" &&
-      process.env.REGISTRY_INSTALL_PUBLISHING === "1")
-  ) {
-    return {
-      source: await fixture(
-        item.name === "finstack-chart" ? "chart.tsx" : "publishing.tsx",
-      ),
-      extra: {
-        "figure-data.ts": await readFile(
-          path.join(
-            repo,
-            "finstack-quant-ui/registry/shared/chart/figure-example/figure-data.ts",
-          ),
-          "utf8",
-        ),
-      },
-    };
+    if (!local.startsWith(".")) local = `./${local}`;
+    source = source.replaceAll(`"${specifier}"`, `"${local}"`);
   }
-  if (nativeForms.has(item.name)) {
-    return {
-      source: await fixture(`${item.name}.tsx`),
-      extra:
-        item.name === "schema-form"
-          ? {
-              "bond.schema.json": await readFile(
-                path.join(
-                  repo,
-                  "finstack-quant-ui/src/generated/schemas/bond.json",
-                ),
-                "utf8",
-              ),
-            }
-          : {},
-    };
-  }
+  return { source, extra };
+}
+
+/**
+ * Build the installed page body for one visual item: its fixture under
+ * tests/install/fixture/<name>.tsx when one exists, otherwise its gallery example.
+ * Unrelated gallery imports never enter its install closure.
+ */
+export async function visualHarness(repo, item, graph) {
+  const fixtures = path.join(repo, "finstack-quant-ui/tests/install/fixture");
+  const fixture =
+    item.name === "pricing-workbench" &&
+    process.env.REGISTRY_INSTALL_PUBLISHING === "1"
+      ? path.join(fixtures, "publishing.tsx")
+      : path.join(fixtures, `${item.name}.tsx`);
+  if (await exists(fixture))
+    return localize(
+      repo,
+      item,
+      graph,
+      await readFile(fixture, "utf8"),
+      "harness.tsx",
+    );
+  const examples = path.join(
+    repo,
+    "docs-site/src/components/registry-gallery/examples",
+  );
+  const from = `examples/${item.name}.tsx`;
+  const example = await localize(
+    repo,
+    item,
+    graph,
+    await readFile(path.join(examples, `${item.name}.tsx`), "utf8"),
+    from,
+  );
   const extra = {
-    [`examples/${item.name}.tsx`]: await example(`${item.name}.tsx`),
-    "examples/props.ts": await example("props.ts"),
-  };
-  if (["valuation-details", "monte-carlo-diagnostics"].includes(item.name)) {
-    // The example restores captured wire fixtures; the display item needs no result codec/schema.
-    extra[`examples/${item.name}.tsx`] = extra[
-      `examples/${item.name}.tsx`
-    ].replace(
-      "@/lib/finstack/generated/schemas/valuation_result.json",
-      "../valuation-result.schema.json",
-    );
-    extra["valuation-result.schema.json"] = await readFile(
-      path.join(
-        repo,
-        "finstack-quant-ui/src/generated/schemas/valuation_result.json",
-      ),
+    ...example.extra,
+    [from]: example.source,
+    "examples/props.ts": await readFile(
+      path.join(examples, "props.ts"),
       "utf8",
-    );
-  }
-  if (!wrappers.has(item.name))
+    ),
+  };
+  // An example that forwards a `presentation` prop wraps a chart: probe it through those public props.
+  if (!/\bpresentation\?:/.test(example.source))
     return {
       source: `"use client";import {Example} from "./examples/${item.name}";export function InstalledItem(){return <Example/>;}`,
       extra,
     };
-  extra["wrapper-probe.tsx"] = await fixture("wrapper-probe.tsx");
-  const refs =
-    item.name === "scenario-heatmap"
-      ? "figureRef: captureFigure"
-      : "figureRefs: captureFigures";
+  const ref = example.source.match(
+    /presentation\?:\s*Pick<[\s\S]*?"(figureRefs?)"/,
+  )?.[1];
+  if (!ref)
+    throw Error(
+      `${item.name} example declares presentation without figureRef or figureRefs`,
+    );
+  extra["wrapper-probe.tsx"] = await readFile(
+    path.join(fixtures, "wrapper-probe.tsx"),
+    "utf8",
+  );
   return {
     source: `"use client";
 import {Example} from "./examples/${item.name}";
 import {captureFigure,captureFigures,recordActivation,TooltipAction} from "./wrapper-probe";
 export function InstalledItem(){return <Example presentation={{
-  ${refs}, title: "Independent wrapper figure",
+  ${ref === "figureRef" ? "figureRef: captureFigure" : "figureRefs: captureFigures"}, title: "Independent wrapper figure",
   subtitle: "Supplied presentation through public wrapper props",
   onSelect: recordActivation,
   renderTooltipBody: ({defaultBody,pinned,dismiss}) => <>{defaultBody}{pinned&&<TooltipAction dismiss={dismiss}/>}</>,
 }}/>;}`,
     extra,
+    wrapper: true,
   };
 }

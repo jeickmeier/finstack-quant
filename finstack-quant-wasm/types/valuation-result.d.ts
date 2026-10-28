@@ -3605,7 +3605,7 @@ export interface StochasticPricingResult {
    * Number of simulated scenario paths (`2 × pricing_mode.num_paths` with
    * antithetic pairing, `pricing_mode.num_paths` without).
    */
-  num_paths: bigint;
+  num_paths: number;
   pricing_mode: StructuredCreditPricingMode;
   /**
    * Two-sided 95% Student-t confidence interval for the mean PV, in the
@@ -4534,7 +4534,7 @@ export interface StructuredCreditPricingMode {
      * Sample standard error and the Student-t interval use this estimator
      * count, with `num_paths - 1` degrees of freedom.
      */
-    num_paths: bigint;
+    num_paths: number;
   };
 }
 /**
@@ -4567,7 +4567,7 @@ export interface TranchePricingResult {
    * Number of simulated paths on which the tranche received any
    * principal (the paths `wal` averages over).
    */
-  paths_with_principal?: bigint;
+  paths_with_principal?: number;
   /**
    * Mean present value as a percent of the tranche's current balance at
    * the valuation date (100 = par); `0.0` for a fully retired tranche.
@@ -5674,7 +5674,7 @@ export interface StructuredCreditPricingMode1 {
      * Sample standard error and the Student-t interval use this estimator
      * count, with `num_paths - 1` degrees of freedom.
      */
-    num_paths: bigint;
+    num_paths: number;
   };
 }
 /**

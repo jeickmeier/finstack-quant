@@ -7,6 +7,6 @@ import data from "../data.json";
 // Captured native check run over the analyst model; this item needs no worker.
 const report = data.statementCheckReport as unknown as CheckReport;
 
-export function Example(_props: ExampleProps) {
-  return <StatementCheckReport report={report} />;
+export function Example({ density = "compact" }: ExampleProps) {
+  return <StatementCheckReport report={report} density={density} />;
 }

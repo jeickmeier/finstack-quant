@@ -1,6 +1,9 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { ForecastEditor } from "./forecast-editor";
 import { MetricEditor } from "./metric-editor";
 import { ScenarioPanel } from "./scenario-panel";
@@ -18,14 +21,19 @@ import { StatementChart } from "@/components/finstack/statements/components/stat
 import { StatementExplanation } from "@/components/finstack/statements/components/statement-diagnostics/statement-explanation";
 import { StatementChecks } from "@/components/finstack/statements/components/statement-diagnostics/statement-checks";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
-import { useEvaluateStatement } from "@/hooks/statements/use-evaluate-statement/use-evaluate-statement";
-import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
+import { SurfaceContext } from "@/components/finstack/shared/primitives/surface/surface";
+import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
 import {
-  useWorkerQuery,
-  workerQueryOptions,
-} from "@/hooks/shared/use-finstack/query";
+  evaluateStatementOptions,
+  useEvaluateStatement,
+} from "@/hooks/statements/use-evaluate-statement/use-evaluate-statement";
+import { useStatementModelValidator } from "@/hooks/statements/use-statement-model-validator/use-statement-model-validator";
+import { useRollupStatement } from "@/hooks/statements/use-rollup-statement/use-rollup-statement";
+import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import { useLinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
+import contracts from "@/lib/finstack/generated/primitive-contracts.json";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import {
   adaptStatementResult,
@@ -38,6 +46,8 @@ import type {
   StatementRollupRequest,
 } from "@/workers/finstack-contract";
 
+/** Rust DecimalWire: the exact decimal text a monetary amount accepts. */
+const decimalPattern = new RegExp(contracts.decimal.schema.pattern);
 type Tab =
   "statements" | "forecast" | "scenarios" | "ratios" | "checks" | "advanced";
 const tabs: { id: Tab; label: string }[] = [
@@ -48,13 +58,64 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "checks", label: "Checks" },
   { id: "advanced", label: "Advanced" },
 ];
-const inputClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm";
-const cardClass = "rounded-lg border border-border bg-card p-4";
+/** Rust EvalWarning, exactly as the native StatementResult reports it in meta.warnings. */
+type EvalWarning = NonNullable<
+  NonNullable<
+    ReturnType<typeof useEvaluateStatement>["data"]
+  >["meta"]["warnings"]
+>[number];
+/** One evaluation warning for display: its line (null when a capital-structure warning names none), period, Rust variant and remaining fields. */
+interface WarningEntry {
+  nodeId: string | null;
+  period: string;
+  kind: string;
+  detail: string;
+}
+/** Flattens one externally tagged EvalWarning; a new Rust variant fails to type-check at capital_structure. */
+function warningEntry(warning: EvalWarning): WarningEntry {
+  if ("division_by_zero" in warning) {
+    const { node_id, period } = warning.division_by_zero;
+    return { nodeId: node_id, period, kind: "division_by_zero", detail: "" };
+  }
+  if ("non_finite_value" in warning) {
+    const { node_id, period, value } = warning.non_finite_value;
+    return {
+      nodeId: node_id,
+      period,
+      kind: "non_finite_value",
+      detail: String(value),
+    };
+  }
+  if ("non_finite_skipped" in warning) {
+    const {
+      node_id,
+      period,
+      count,
+      function: name,
+    } = warning.non_finite_skipped;
+    return {
+      nodeId: node_id,
+      period,
+      kind: "non_finite_skipped",
+      detail: `${count} dropped by ${name}`,
+    };
+  }
+  const { period, warning: cause } = warning.capital_structure;
+  const { kind, node_id, ...fields } = cause;
+  return {
+    nodeId: typeof node_id === "string" ? node_id : null,
+    period,
+    kind,
+    detail: Object.entries(fields)
+      .map(([name, value]) => `${name}: ${String(value)}`)
+      .join(", "),
+  };
+}
 
 /** Review supplied financials, edit explicit values and forecast inputs, and evaluate through native WASM. Wrap in FinstackQueryProvider. */
 export function StatementsWorkbench({
   defaultModelJson,
+  density = "compact",
   marketJson,
   asOf,
   defaultCheckSuiteJson,
@@ -67,6 +128,8 @@ export function StatementsWorkbench({
 }: {
   /** Complete canonical model supplied by the host or a financial-data service. Remount for a different document. */
   defaultModelJson: string;
+  /** Row and text density of the workbench surface; compact by default. Sets SurfaceContext and data-density on the root, while data-theme is inherited from the host. */
+  density?: "compact" | "comfortable";
   /** Both market JSON and ISO as-of must be supplied for market-aware evaluation. */
   marketJson?: string;
   asOf?: string;
@@ -85,7 +148,9 @@ export function StatementsWorkbench({
     nextPeriodId: string,
   ) => Promise<string>;
 }) {
-  const { client, status } = useFinstack();
+  const { client, status, session } = useFinstack();
+  const queryClient = useQueryClient();
+  const validateModel = useStatementModelValidator();
   const link = useLinkedSelection({ selectedKey, onSelectedKeyChange });
   const [document, setDocument] = useState(defaultModelJson);
   const [importText, setImportText] = useState(defaultModelJson);
@@ -125,15 +190,21 @@ export function StatementsWorkbench({
       const token = ++generation.current;
       setActionError(null);
       try {
-        const canonical = await client.call("validateStatementModel", input);
-        const ids = await client.call("statementNodeIds", canonical);
-        await client.call("evaluateStatement", {
+        const canonical = await validateModel(input);
+        const next: StatementRequest = {
           modelJson: canonical,
           marketJson,
           asOf,
-        });
+        };
+        // Rejects a failing edit and caches the result under useEvaluateStatement's key (staleTime Infinity), so the hook does not evaluate again.
+        await queryClient.query(
+          evaluateStatementOptions(client, session, next),
+        );
         if (token !== generation.current)
           return "A newer statement update superseded this one.";
+        const ids = Object.keys(
+          (JSON.parse(canonical) as FinancialModelSpecWire).nodes,
+        );
         const sourceOrder = Object.keys(
           (JSON.parse(input) as FinancialModelSpecWire).nodes ?? {},
         );
@@ -148,7 +219,7 @@ export function StatementsWorkbench({
             ...ids.filter((id) => !order.includes(id)),
           ];
         });
-        setRequest({ modelJson: canonical, marketJson, asOf });
+        setRequest(next);
         setRevision((value) => value + 1);
         onModelAccepted?.(canonical);
         return null;
@@ -158,7 +229,17 @@ export function StatementsWorkbench({
         return message;
       }
     },
-    [client, status, marketPair, marketJson, asOf, onModelAccepted],
+    [
+      client,
+      status,
+      session,
+      queryClient,
+      validateModel,
+      marketPair,
+      marketJson,
+      asOf,
+      onModelAccepted,
+    ],
   );
   useEffect(() => {
     if (initialized.current || status !== "ready" || !client) return;
@@ -167,11 +248,23 @@ export function StatementsWorkbench({
   }, [client, status, commit, defaultModelJson]);
 
   const evaluation = useEvaluateStatement(request);
+  const evaluating =
+    useIsFetching({ queryKey: ["finstack", session, "evaluateStatement"] }) > 0;
   const result = request?.modelJson === document ? evaluation.data : undefined;
   const resultJson = useMemo(
     () => (result ? serializeHost(result) : null),
     [result],
   );
+  const warningCount = result?.meta.warnings?.length ?? 0;
+  /** Native evaluation warnings grouped by line, in the order Rust reported them. */
+  const warningGroups = useMemo(() => {
+    const groups = new Map<string | null, WarningEntry[]>();
+    for (const warning of result?.meta.warnings ?? []) {
+      const entry = warningEntry(warning);
+      groups.set(entry.nodeId, [...(groups.get(entry.nodeId) ?? []), entry]);
+    }
+    return [...groups];
+  }, [result]);
   const [periodView, setPeriodView] = useState<"reported" | "annual">(
     "reported",
   );
@@ -196,21 +289,7 @@ export function StatementsWorkbench({
           specJson: annualRollupSpecJson(methods),
         }
       : null;
-  const rollup = useWorkerQuery((worker) => ({
-    ...workerQueryOptions({
-      client: worker.client,
-      queryKey: [
-        "finstack",
-        worker.session,
-        "statement-rollup",
-        rollupRequest,
-      ] as const,
-      ready: rollupRequest !== null,
-      missing: "Statement worker is not ready",
-      queryFn: (client) => client.call("rollupStatement", rollupRequest!),
-    }),
-    enabled: worker.status === "ready" && rollupRequest !== null,
-  }));
+  const rollup = useRollupStatement(rollupRequest);
   const annual = useMemo(
     () =>
       model && rollup.data
@@ -348,7 +427,7 @@ export function StatementsWorkbench({
     if (value === null) delete values[periodId];
     else if (!value.trim()) return "Enter an exact value.";
     else if (node.value_type?.type === "monetary") {
-      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim()))
+      if (!decimalPattern.test(value.trim()))
         return "Enter a decimal amount in base units.";
       values[periodId] = {
         amount: value.trim(),
@@ -374,488 +453,565 @@ export function StatementsWorkbench({
   };
 
   return (
-    <section
-      aria-label="Statements workbench"
-      className="space-y-5 rounded-xl border border-border bg-background p-4 font-sans text-foreground md:p-6"
-    >
-      <header className="space-y-4 border-b border-border pb-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Credit analysis · financial statements
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold">{entity}</h2>
-            <p className="text-sm text-muted-foreground">
-              {model?.id}
-              {currency ? ` · ${currency}` : ""}
-              {model?.periods.length
-                ? ` · ${model.periods.length} reporting periods`
-                : ""}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className="rounded-full border border-border px-3 py-1 text-xs"
-              role="status"
-            >
-              {evaluation.isFetching
-                ? "Evaluating…"
-                : result
-                  ? "Evaluated"
-                  : status === "ready"
-                    ? "Loading financials…"
-                    : "Starting runtime…"}
-            </span>
-          </div>
-        </div>
-        {model && (
-          <div className="flex flex-wrap gap-2" aria-label="Reporting periods">
-            {model.periods.map((period) => (
-              <button
-                key={period.id}
-                type="button"
-                onClick={() => choosePeriod(period.id)}
-                className={`rounded-md border px-3 py-1.5 text-xs ${activePeriod === period.id ? "border-primary bg-primary/10 font-semibold" : "border-border bg-card"}`}
-                aria-pressed={activePeriod === period.id}
+    <SurfaceContext.Provider value={{ density }}>
+      <section
+        aria-label="Statements workbench"
+        data-density={density}
+        className="space-y-5 rounded-xl border border-border bg-background p-4 font-sans text-foreground md:p-6"
+      >
+        <header className="space-y-4 border-b border-border pb-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Credit analysis · financial statements
+              </p>
+              <h2 className="mt-1 text-2xl font-semibold">{entity}</h2>
+              <p className="text-sm text-muted-foreground">
+                {model?.id}
+                {currency ? ` · ${currency}` : ""}
+                {model?.periods.length
+                  ? ` · ${model.periods.length} reporting periods`
+                  : ""}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className="rounded-full border border-border px-3 py-1 text-xs"
+                role="status"
               >
-                <span className="font-mono">{period.id}</span>{" "}
-                <span className="ml-1 text-muted-foreground">
-                  {period.is_actual ? "Historical" : "Forecast"}
-                </span>
-              </button>
-            ))}
+                {evaluating
+                  ? "Evaluating…"
+                  : result
+                    ? "Evaluated"
+                    : status === "ready"
+                      ? "Loading financials…"
+                      : "Starting runtime…"}
+              </span>
+            </div>
           </div>
-        )}
-      </header>
-      {actionError && (
-        <p
-          role="alert"
-          className="rounded-md border border-error p-3 text-sm text-error"
-        >
-          {actionError}
-        </p>
-      )}
-      {evaluation.error && (
-        <p
-          role="alert"
-          className="rounded-md border border-error p-3 text-sm text-error"
-        >
-          {evaluation.error.message}
-        </p>
-      )}
-      <div
-        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-        aria-label="Headline metrics"
-      >
-        {headline.slice(0, 4).map((row) => (
-          <div className={cardClass} key={row.nodeId}>
-            <p className="text-xs text-muted-foreground">{row.name}</p>
-            <p className="mt-2 text-lg font-semibold tabular-nums">
-              {activePeriod
-                ? displayStatementCell(row.cells[activePeriod], displayMode)
-                : "—"}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {activePeriod ?? ""} ·{" "}
-              {row.valueType.startsWith("Monetary")
-                ? displayMode === "millions"
-                  ? "display in millions"
-                  : "exact native value"
-                : "native ratio"}
-            </p>
-          </div>
-        ))}
-      </div>
-      <div
-        className="flex flex-wrap items-center justify-end gap-2 text-xs"
-        aria-label="Display units"
-      >
-        <span className="text-muted-foreground">Periods</span>
-        <button
-          type="button"
-          className={`rounded-md border px-2 py-1 ${reported ? "border-primary bg-primary/10 font-semibold" : "border-border"}`}
-          aria-pressed={reported}
-          onClick={() => setPeriodView("reported")}
-        >
-          Reported
-        </button>
-        <button
-          type="button"
-          className={`rounded-md border px-2 py-1 ${reported ? "border-border" : "border-primary bg-primary/10 font-semibold"}`}
-          aria-pressed={!reported}
-          onClick={() => setPeriodView("annual")}
-        >
-          Annual
-        </button>
-        <span className="ml-3 text-muted-foreground">Display units</span>
-        <button
-          type="button"
-          className={`rounded-md border px-2 py-1 ${displayMode === "millions" ? "border-primary bg-primary/10 font-semibold" : "border-border"}`}
-          aria-pressed={displayMode === "millions"}
-          onClick={() => setDisplayMode("millions")}
-        >
-          Millions
-        </button>
-        <button
-          type="button"
-          className={`rounded-md border px-2 py-1 ${displayMode === "exact" ? "border-primary bg-primary/10 font-semibold" : "border-border"}`}
-          aria-pressed={displayMode === "exact"}
-          onClick={() => setDisplayMode("exact")}
-        >
-          Exact
-        </button>
-      </div>
-      <nav
-        className="flex flex-wrap gap-1 border-b border-border"
-        aria-label="Statement workspace"
-      >
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`rounded-t-md px-3 py-2 text-sm ${tab === item.id ? "border-b-2 border-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setTab(item.id)}
-            aria-current={tab === item.id ? "page" : undefined}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
-      {!model && <p role="alert">The supplied model is not valid JSON.</p>}
-      {!result && !evaluation.isFetching && !actionError && (
-        <p className={cardClass} role="status">
-          Loading supplied financial statements…
-        </p>
-      )}
-      {model && result && resultJson && tab === "statements" && (
-        <div className="space-y-6">
-          <p className="text-xs text-muted-foreground">
-            {reported
-              ? "Select a period above to review it. Click a reported or forecast value to edit in exact units; calculated lines update from their drivers."
-              : "Annual values are rolled up natively from the reported periods. Switch to Reported to edit values."}
-          </p>
-          {!reported && (
-            <RollupMethodsEditor
-              model={model}
-              nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
-              methods={methods}
-              onChange={setRollupMethods}
-            />
-          )}
-          {!reported && rollup.error && (
-            <p
-              role="alert"
-              className="rounded-md border border-error p-3 text-sm text-error"
+          {model && (
+            <div
+              role="group"
+              aria-label="Reporting periods"
+              className="flex flex-wrap gap-2"
             >
-              {rollup.error.message}
-            </p>
-          )}
-          {!view && !rollup.error && (
-            <p className={cardClass} role="status">
-              Rolling up to annual periods…
-            </p>
-          )}
-          {view && (
-            <div className="min-w-0 space-y-8">
-              {(
-                [
-                  ["Income statement", sections.income],
-                  ["Balance sheet & debt", sections.balance],
-                  ["Cash flow", sections.cash],
-                  ["Other lines", sections.other],
-                ] as const
-              ).map(
-                ([title, ids]) =>
-                  ids.length > 0 && (
-                    <StatementGrid
-                      key={title}
-                      title={title}
-                      model={view.model}
-                      result={view.result}
-                      link={link}
-                      nodeIds={ids}
-                      displayMode={displayMode}
-                      showType={false}
-                      showRaw={false}
-                      activePeriod={reported ? activePeriod : null}
-                      onEditValue={reported ? saveCell : undefined}
-                    />
-                  ),
-              )}
+              {model.periods.map((period) => (
+                <Button
+                  key={period.id}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-pressed={activePeriod === period.id}
+                  onClick={() => choosePeriod(period.id)}
+                >
+                  <span className="font-mono">{period.id}</span>{" "}
+                  <span className="ml-1 text-muted-foreground">
+                    {period.is_actual ? "Historical" : "Forecast"}
+                  </span>
+                </Button>
+              ))}
             </div>
           )}
-          {reported && activeNode && activePeriod && (
-            <details className={cardClass}>
-              <summary className="cursor-pointer font-semibold">
-                Explain selected value
-              </summary>
-              <div className="mt-3">
-                <StatementExplanation
-                  request={{
-                    modelJson: request!.modelJson,
-                    resultsJson: resultJson,
-                    nodeId: activeNode,
-                    period: activePeriod,
-                  }}
-                />
-              </div>
+          {warningCount > 0 && (
+            <details>
+              <summary>Evaluation warnings ({warningCount})</summary>
+              <ul
+                aria-label="Evaluation warnings"
+                className="mt-2 space-y-2 text-sm"
+              >
+                {warningGroups.map(([nodeId, entries]) => {
+                  const label =
+                    nodeId === null
+                      ? "Capital structure"
+                      : (model?.nodes[nodeId]?.name ?? nodeId);
+                  return (
+                    <li key={nodeId ?? ""}>
+                      <span className="font-medium">{label}</span>
+                      {nodeId !== null && (
+                        <span className="ml-2 font-mono text-xs text-muted-foreground">
+                          {nodeId}
+                        </span>
+                      )}
+                      <ul
+                        aria-label={`${label} warnings`}
+                        className="mt-1 space-y-0.5 pl-4 text-xs text-muted-foreground"
+                      >
+                        {entries.map((entry, index) => (
+                          <li key={index}>
+                            <span className="font-mono">{entry.period}</span>
+                            {" · "}
+                            <code>{entry.kind}</code>
+                            {entry.detail && ` · ${entry.detail}`}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  );
+                })}
+              </ul>
             </details>
           )}
-        </div>
-      )}
-      {model && tab === "forecast" && (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold">Forecast assumptions</h3>
-              <p className="text-sm text-muted-foreground">
-                Choose a forecast method and edit its assumptions. Rates are
-                decimals; levels use exact model units. WASM calculates the
-                projected values.
+        </header>
+        {actionError && (
+          <p
+            role="alert"
+            className="rounded-md border border-error p-3 text-sm text-error"
+          >
+            {actionError}
+          </p>
+        )}
+        {evaluation.error && (
+          <p
+            role="alert"
+            className="rounded-md border border-error p-3 text-sm text-error"
+          >
+            {evaluation.error.message}
+          </p>
+        )}
+        <div
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          aria-label="Headline metrics"
+        >
+          {headline.slice(0, 4).map((row) => (
+            <div
+              className="rounded-lg border border-border bg-card p-4"
+              key={row.nodeId}
+            >
+              <p className="text-xs text-muted-foreground">{row.name}</p>
+              <p className="mt-2 text-lg font-semibold tabular-nums">
+                {activePeriod
+                  ? displayStatementCell(row.cells[activePeriod], displayMode)
+                  : "—"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {activePeriod ?? ""} ·{" "}
+                {row.valueType.startsWith("Monetary")
+                  ? displayMode === "millions"
+                    ? "display in millions"
+                    : "exact native value"
+                  : "native ratio"}
               </p>
             </div>
-            {forecastNodes.map(([id, node]) => (
-              <ForecastEditor
-                key={`${revision}:${id}`}
-                model={model}
-                nodeId={id}
-                node={node}
-                onApply={(forecast) => {
-                  const next = structuredClone(model);
-                  next.nodes[id].forecast = forecast;
-                  return commit(JSON.stringify(next), true);
-                }}
-              />
-            ))}
-            {forecastNodes.length === 0 && (
-              <p className={cardClass}>
-                This supplied model has no forecast driver nodes.
-              </p>
-            )}
-            {forecastCandidates.length > 0 && (
-              <div className={cardClass}>
-                <h4 className="font-semibold">Add a forecast driver</h4>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Start with carry forward, then choose the projection method
-                  and assumptions above.
-                </p>
-                <div className="mt-3 flex flex-wrap items-end gap-2">
-                  <label className="min-w-48 flex-1 text-xs">
-                    Line item
-                    <select
-                      className={`${inputClass} mt-1`}
-                      value={newForecastNode}
-                      onChange={(event) =>
-                        setNewForecastNode(event.target.value)
-                      }
-                    >
-                      <option value="">Select a line…</option>
-                      {forecastCandidates.map(([id, node]) => (
-                        <option key={id} value={id}>
-                          {node.name ?? id}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={!newForecastNode}
-                    onClick={() => void addForecast()}
-                  >
-                    Add driver
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-          <aside className={`${cardClass} h-fit space-y-3`}>
-            <h3 className="font-semibold">Roll forward actuals</h3>
-            {nextForecast ? (
-              <>
-                <p className="text-sm">
-                  Next forecast period:{" "}
-                  <strong className="font-mono">{nextForecast.id}</strong>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Bring in the next complete model with reported values and
-                  updated forecast assumptions. The workbench validates it and
-                  refreshes every statement and ratio.
-                </p>
-                {onRollForward && (
-                  <Button
-                    type="button"
-                    disabled={rolling || status !== "ready"}
-                    onClick={() => void rollForward()}
-                  >
-                    {rolling
-                      ? "Loading actuals…"
-                      : `Roll forward to ${nextForecast.id}`}
-                  </Button>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                All supplied periods are actual. Load a model with forecast
-                periods to continue.
-              </p>
-            )}
-            <button
-              type="button"
-              className="text-sm text-primary underline"
-              onClick={() => setTab("advanced")}
-            >
-              Load updated financials
-            </button>
-          </aside>
+          ))}
         </div>
-      )}
-      {model && request && tab === "scenarios" && (
-        <ScenarioPanel
-          model={model}
-          modelJson={request.modelJson}
-          nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
-          marketJson={marketJson}
-          asOf={asOf}
-          activePeriod={activePeriod}
-          displayMode={displayMode}
-          link={link}
-          defaultScenarioSetJson={defaultScenarioSetJson}
-        />
-      )}
-      {model && result && tab === "ratios" && (
-        <div className="space-y-5">
-          <MetricEditor model={model} onApply={(json) => commit(json, true)} />
-          <p className="text-sm text-muted-foreground">
-            Every value below is calculated from the current financials by WASM.
-          </p>
-          {sections.ratios.length > 0 ? (
-            <>
-              {view ? (
-                <StatementGrid
-                  title={
-                    reported
-                      ? "Metrics, margins & covenant ratios"
-                      : "Annual metrics, margins & covenant ratios"
-                  }
-                  model={view.model}
-                  result={view.result}
-                  link={link}
-                  nodeIds={sections.ratios}
-                  displayMode={displayMode}
-                  showType={false}
-                  showRaw={false}
-                  activePeriod={reported ? activePeriod : null}
-                />
-              ) : (
-                <p className={cardClass} role="status">
-                  {rollup.error?.message ?? "Rolling up to annual periods…"}
-                </p>
-              )}
-              <div className={cardClass}>
-                <label className="block text-sm">
-                  Trend
-                  <select
-                    className={`${inputClass} mt-1 max-w-md`}
-                    value={chartId ?? ""}
-                    onChange={(event) => setChartNode(event.target.value)}
-                  >
-                    {sections.ratios.map((id) => (
-                      <option key={id} value={id}>
-                        {model.nodes[id]?.name ?? id}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {chartId && view && (
-                  <StatementChart
-                    model={view.model}
-                    result={view.result}
-                    nodeId={chartId}
-                    link={link}
-                  />
-                )}
-              </div>
-            </>
-          ) : (
-            <p className={cardClass}>
-              No calculated metrics are supplied yet. Add one above.
-            </p>
-          )}
-        </div>
-      )}
-      {model && result && resultJson && tab === "checks" && (
-        <div className="max-w-5xl">
-          <StatementChecks
-            key={revision}
-            modelJson={request!.modelJson}
-            resultsJson={resultJson}
-            defaultConfigJson={defaultCheckSuiteJson}
-            link={link}
-          />
-        </div>
-      )}
-      {model && tab === "advanced" && (
-        <div className="space-y-6">
-          <div className={cardClass}>
-            <h3 className="font-semibold">Load updated financials</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Paste the complete canonical FinancialModelSpec JSON returned by
-              your data provider or parsing service.
-            </p>
-            <label className="mt-3 block text-xs">
-              Model JSON
-              <textarea
-                className={`${inputClass} mt-1 min-h-36 font-mono`}
-                value={importText}
-                onChange={(event) => setImportText(event.target.value)}
-                spellCheck={false}
-              />
-            </label>
+        <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+          <span className="text-muted-foreground">Periods</span>
+          <div role="group" aria-label="Periods" className="flex gap-1">
             <Button
               type="button"
-              className="mt-3"
-              disabled={status !== "ready"}
-              onClick={() => void commit(importText)}
+              variant="ghost"
+              size="sm"
+              aria-pressed={reported}
+              onClick={() => setPeriodView("reported")}
             >
-              Load & evaluate
+              Reported
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-pressed={!reported}
+              onClick={() => setPeriodView("annual")}
+            >
+              Annual
             </Button>
           </div>
-          <details className={cardClass}>
-            <summary className="cursor-pointer font-semibold">
-              Model structure and formulas
-            </summary>
-            <div className="mt-4">
-              <FinancialModelEditor
-                key={revision}
-                defaultJson={document}
-                onSubmit={async (json) => {
-                  await commit(json, true);
-                }}
-              />
-            </div>
-          </details>
-          <details className={cardClass}>
-            <summary className="cursor-pointer font-semibold">
-              Canonical model and native result
-            </summary>
-            <div className="mt-3 space-y-4">
-              <JsonViewer
-                label="Canonical model JSON"
-                text={document}
-                downloadName="financial-model.json"
-              />
-              {resultJson && (
-                <JsonViewer
-                  label="Native statement result"
-                  text={resultJson}
-                  downloadName="statement-result.json"
-                />
-              )}
-            </div>
-          </details>
+          <span className="ml-3 text-muted-foreground">Display units</span>
+          <div role="group" aria-label="Display units" className="flex gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-pressed={displayMode === "millions"}
+              onClick={() => setDisplayMode("millions")}
+            >
+              Millions
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-pressed={displayMode === "exact"}
+              onClick={() => setDisplayMode("exact")}
+            >
+              Exact
+            </Button>
+          </div>
         </div>
-      )}
-    </section>
+        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+          <TabsList
+            variant="line"
+            aria-label="Statement workspace"
+            className="finstack-workbench__tabs"
+          >
+            {tabs.map((item) => (
+              <TabsTrigger key={item.id} value={item.id}>
+                {item.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {!model && <p role="alert">The supplied model is not valid JSON.</p>}
+          {!result && !evaluating && !actionError && (
+            <p className="text-sm text-muted-foreground" role="status">
+              Loading supplied financial statements…
+            </p>
+          )}
+          <TabsContent value="statements">
+            {model && result && resultJson && (
+              <div className="space-y-6">
+                <p className="text-xs text-muted-foreground">
+                  {reported
+                    ? "Select a period above to review it. Click a reported or forecast value to edit in exact units; calculated lines update from their drivers."
+                    : "Annual values are rolled up natively from the reported periods. Switch to Reported to edit values."}
+                </p>
+                {!reported && (
+                  <RollupMethodsEditor
+                    model={model}
+                    nodeIds={
+                      nodeIds.length ? nodeIds : Object.keys(model.nodes)
+                    }
+                    methods={methods}
+                    onChange={setRollupMethods}
+                  />
+                )}
+                {!reported && rollup.error && (
+                  <p
+                    role="alert"
+                    className="rounded-md border border-error p-3 text-sm text-error"
+                  >
+                    {rollup.error.message}
+                  </p>
+                )}
+                {!view && !rollup.error && (
+                  <p className="text-sm text-muted-foreground" role="status">
+                    Rolling up to annual periods…
+                  </p>
+                )}
+                {view && (
+                  <div className="min-w-0 space-y-8">
+                    {(
+                      [
+                        ["Income statement", sections.income],
+                        ["Balance sheet & debt", sections.balance],
+                        ["Cash flow", sections.cash],
+                        ["Other lines", sections.other],
+                      ] as const
+                    ).map(
+                      ([title, ids]) =>
+                        ids.length > 0 && (
+                          <StatementGrid
+                            key={title}
+                            title={title}
+                            model={view.model}
+                            result={view.result}
+                            link={link}
+                            nodeIds={ids}
+                            displayMode={displayMode}
+                            showType={false}
+                            showRaw={false}
+                            activePeriod={reported ? activePeriod : null}
+                            onEditValue={reported ? saveCell : undefined}
+                            density={density}
+                          />
+                        ),
+                    )}
+                  </div>
+                )}
+                {reported && activeNode && activePeriod && (
+                  <details>
+                    <summary>Explain selected value</summary>
+                    <div className="mt-3">
+                      <StatementExplanation
+                        request={{
+                          modelJson: request!.modelJson,
+                          resultsJson: resultJson,
+                          nodeId: activeNode,
+                          period: activePeriod,
+                        }}
+                        density={density}
+                      />
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent value="forecast">
+            {model && (
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">
+                      Forecast assumptions
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choose a forecast method and edit its assumptions. Rates
+                      are decimals; levels use exact model units. WASM
+                      calculates the projected values.
+                    </p>
+                  </div>
+                  {forecastNodes.map(([id, node]) => (
+                    <ForecastEditor
+                      key={`${revision}:${id}`}
+                      model={model}
+                      nodeId={id}
+                      node={node}
+                      onApply={(forecast) => {
+                        const next = structuredClone(model);
+                        next.nodes[id].forecast = forecast;
+                        return commit(JSON.stringify(next), true);
+                      }}
+                    />
+                  ))}
+                  {forecastNodes.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      This supplied model has no forecast driver nodes.
+                    </p>
+                  )}
+                  {forecastCandidates.length > 0 && (
+                    <div className="rounded-lg border border-border bg-card p-4">
+                      <h4 className="font-semibold">Add a forecast driver</h4>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Start with carry forward, then choose the projection
+                        method and assumptions above.
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-end gap-2">
+                        <div className="min-w-48 flex-1">
+                          <EnumField
+                            label="Line item"
+                            layout="select"
+                            value={newForecastNode}
+                            onValueChange={setNewForecastNode}
+                            options={forecastCandidates.map(([id, node]) => ({
+                              value: id,
+                              label: node.name ?? id,
+                            }))}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!newForecastNode}
+                          onClick={() => void addForecast()}
+                        >
+                          Add driver
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <aside className="h-fit space-y-3 rounded-lg border border-border bg-card p-4">
+                  <h3 className="font-semibold">Roll forward actuals</h3>
+                  {nextForecast ? (
+                    <>
+                      <p className="text-sm">
+                        Next forecast period:{" "}
+                        <strong className="font-mono">{nextForecast.id}</strong>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Bring in the next complete model with reported values
+                        and updated forecast assumptions. The workbench
+                        validates it and refreshes every statement and ratio.
+                      </p>
+                      {onRollForward && (
+                        <Button
+                          type="button"
+                          disabled={rolling || status !== "ready"}
+                          onClick={() => void rollForward()}
+                        >
+                          {rolling
+                            ? "Loading actuals…"
+                            : `Roll forward to ${nextForecast.id}`}
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      All supplied periods are actual. Load a model with
+                      forecast periods to continue.
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={() => setTab("advanced")}
+                  >
+                    Load updated financials
+                  </Button>
+                </aside>
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent value="scenarios">
+            {model && request && (
+              <ScenarioPanel
+                model={model}
+                modelJson={request.modelJson}
+                nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
+                marketJson={marketJson}
+                asOf={asOf}
+                activePeriod={activePeriod}
+                displayMode={displayMode}
+                link={link}
+                defaultScenarioSetJson={defaultScenarioSetJson}
+                density={density}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="ratios">
+            {model && result && (
+              <div className="space-y-5">
+                <MetricEditor
+                  model={model}
+                  onApply={(json) => commit(json, true)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Every value below is calculated from the current financials by
+                  WASM.
+                </p>
+                {sections.ratios.length > 0 ? (
+                  <>
+                    {view ? (
+                      <StatementGrid
+                        title={
+                          reported
+                            ? "Metrics, margins & covenant ratios"
+                            : "Annual metrics, margins & covenant ratios"
+                        }
+                        model={view.model}
+                        result={view.result}
+                        link={link}
+                        nodeIds={sections.ratios}
+                        displayMode={displayMode}
+                        showType={false}
+                        showRaw={false}
+                        activePeriod={reported ? activePeriod : null}
+                        density={density}
+                      />
+                    ) : (
+                      <p
+                        className="text-sm text-muted-foreground"
+                        role="status"
+                      >
+                        {rollup.error?.message ??
+                          "Rolling up to annual periods…"}
+                      </p>
+                    )}
+                    <div className="rounded-lg border border-border bg-card p-4">
+                      <div className="max-w-md">
+                        <EnumField
+                          label="Trend"
+                          layout="select"
+                          value={chartId ?? ""}
+                          onValueChange={setChartNode}
+                          options={sections.ratios.map((id) => ({
+                            value: id,
+                            label: model.nodes[id]?.name ?? id,
+                          }))}
+                        />
+                      </div>
+                      {chartId && view && (
+                        <StatementChart
+                          model={view.model}
+                          result={view.result}
+                          nodeId={chartId}
+                          link={link}
+                        />
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No calculated metrics are supplied yet. Add one above.
+                  </p>
+                )}
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent value="checks">
+            {model && result && resultJson && (
+              <div className="max-w-5xl">
+                <StatementChecks
+                  key={revision}
+                  modelJson={request!.modelJson}
+                  resultsJson={resultJson}
+                  defaultConfigJson={defaultCheckSuiteJson}
+                  link={link}
+                  density={density}
+                />
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent value="advanced">
+            {model && (
+              <div className="space-y-6">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <h3 className="font-semibold">Load updated financials</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Paste the complete canonical FinancialModelSpec JSON
+                    returned by your data provider or parsing service.
+                  </p>
+                  <div className="mt-3">
+                    <FieldFrame label="Model JSON">
+                      {(control) => (
+                        <Textarea
+                          {...control}
+                          className="min-h-36 font-mono"
+                          value={importText}
+                          onChange={(event) =>
+                            setImportText(event.target.value)
+                          }
+                          spellCheck={false}
+                        />
+                      )}
+                    </FieldFrame>
+                  </div>
+                  <Button
+                    type="button"
+                    className="mt-3"
+                    disabled={status !== "ready"}
+                    onClick={() => void commit(importText)}
+                  >
+                    Load & evaluate
+                  </Button>
+                </div>
+                <details>
+                  <summary>Model structure and formulas</summary>
+                  <div className="mt-4">
+                    <FinancialModelEditor
+                      key={revision}
+                      defaultJson={document}
+                      onSubmit={async (json) => {
+                        await commit(json, true);
+                      }}
+                    />
+                  </div>
+                </details>
+                <details>
+                  <summary>Canonical model and native result</summary>
+                  <div className="mt-3 space-y-4">
+                    <JsonViewer
+                      label="Canonical model JSON"
+                      text={document}
+                      downloadName="financial-model.json"
+                      density={density}
+                    />
+                    {resultJson && (
+                      <JsonViewer
+                        label="Native statement result"
+                        text={resultJson}
+                        downloadName="statement-result.json"
+                        density={density}
+                      />
+                    )}
+                  </div>
+                </details>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </section>
+    </SurfaceContext.Provider>
   );
 }

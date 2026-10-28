@@ -3,277 +3,332 @@
     {
       "name": "finstack-theme",
       "type": "registry:theme",
-      "docs": "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Colours, fonts, the type scale and the chart palettes are CSS variables from one token file: rebrand by generating this stylesheet from a brand file with a checkout of the registry (node finstack-quant-ui/scripts/gen-theme.mjs --brand <brand.json> --out <theme.css>) or by redeclaring variables on [data-theme] after it. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files."
+      "docs": "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Colours, fonts, the type scale and the chart palettes are CSS variables from one token file: rebrand by generating this stylesheet from a brand file with a checkout of the registry (node finstack-quant-ui/scripts/gen-theme.mjs --brand <brand.json> --out <theme.css>) or by redeclaring variables on [data-theme] after it. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files.",
+      "worker": "none"
     },
     {
       "name": "field-frame",
       "type": "registry:ui",
-      "docs": "Controlled field-frame primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled field-frame primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "finstack-table",
       "type": "registry:ui",
-      "docs": "Controlled finstack-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled finstack-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. A column whose meta sets rowHeader renders its body cells as row headers (th scope=row) with plain-cell styling and selection. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "enum-field",
       "type": "registry:ui",
-      "docs": "Controlled enum-field primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled enum-field primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "json-viewer",
       "type": "registry:ui",
-      "docs": "Read-only JSON with lossless formatted presentation and an Original toggle. Numeric tokens remain exact. Invalid JSON, including duplicate keys, stays in Original view with a formatting notice. Copy and download always preserve the supplied bytes. Import the installed finstack theme; no worker or workbench is required."
+      "docs": "Read-only JSON with lossless formatted presentation and an Original toggle. Numeric tokens remain exact. Invalid JSON, including duplicate keys, stays in Original view with a formatting notice. Copy and download always preserve the supplied bytes. Import the installed finstack theme; no worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "id-combobox",
       "type": "registry:ui",
-      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred."
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred.",
+      "worker": "none"
     },
     {
       "name": "finstack-chart",
       "type": "registry:ui",
-      "docs": "Standalone native SVG publication figure with complete titles, captions, sources and exports. Supply native chart definitions for scale/axis/unit conventions and annotation marks. Import the theme; no WASM, forms, tables or worker runtime is required. Export needs a same-origin font stylesheet and explicit dimensions."
+      "docs": "Standalone native SVG publication figure with complete titles, captions, sources and exports. Supply native chart definitions for scale/axis/unit conventions and annotation marks. Import the theme; no WASM, forms, tables or worker runtime is required. Export needs a same-origin font stylesheet and explicit dimensions.",
+      "worker": "none"
     },
     {
       "name": "figure-example",
       "type": "registry:component",
-      "docs": "Standalone supplied-data publication example. Uses the same figure props on screen and in explicit 900x600 vector / 1800x1200 pixel exports (6x4 inches at 300 PPI). The theme includes licensed fonts; install IBM Plex Sans in a desktop editor if it cannot use embedded webfonts."
+      "docs": "Standalone supplied-data publication example. Uses the same figure props on screen and in explicit 900x600 vector / 1800x1200 pixel exports (6x4 inches at 300 PPI). The theme includes licensed fonts; install IBM Plex Sans in a desktop editor if it cannot use embedded webfonts.",
+      "worker": "none"
     },
     {
       "name": "finstack-form",
       "type": "registry:ui",
-      "docs": "Shared TanStack Form contexts bound to registry fields, array controls, error summary and submit/reset controls. Values remain working edits; canonical validation is a separate boundary."
+      "docs": "Shared TanStack Form contexts bound to registry fields, array controls, error summary and submit/reset controls. Values remain working edits; canonical validation is a separate boundary.",
+      "worker": "none"
     },
     {
       "name": "decimal-input",
       "type": "registry:ui",
-      "docs": "Controlled decimal-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled decimal-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "money-input",
       "type": "registry:ui",
-      "docs": "Controlled money-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled money-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "rate-input",
       "type": "registry:ui",
-      "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "tenor-input",
       "type": "registry:ui",
-      "docs": "Controlled tenor-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled tenor-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "day-count-select",
       "type": "registry:ui",
-      "docs": "Controlled day-count-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled day-count-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "bdc-select",
       "type": "registry:ui",
-      "docs": "Controlled bdc-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled bdc-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "knot-table",
       "type": "registry:ui",
-      "docs": "Controlled knot-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled knot-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "money-value",
       "type": "registry:ui",
-      "docs": "Controlled money-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled money-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "date-input",
       "type": "registry:ui",
-      "docs": "Controlled date-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled date-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "domain-field",
       "type": "registry:ui",
-      "docs": "Date and decimal fields bound to the shared form context. Supply labels and constraints; canonical validation stays outside these controls."
+      "docs": "Date and decimal fields bound to the shared form context. Supply labels and constraints; canonical validation stays outside these controls.",
+      "worker": "none"
     },
     {
       "name": "curve-chart",
       "type": "registry:component",
-      "docs": "Displays validated CurveState entries with point-only stored coordinates. Variants are faceted, same-variant curves overlay. Base-correlation arrays and parametric fields retain their generated schema view. Native figure axes, annotations, typed callbacks, tooltip and per-variant exports are supported; linking requires a caller key mapping. No sampling or pricing engine."
+      "docs": "Displays validated CurveState entries with point-only stored coordinates. Variants are faceted, same-variant curves overlay. Base-correlation arrays and parametric fields retain their generated schema view. Native figure axes, annotations, typed callbacks, tooltip and per-variant exports are supported; linking requires a caller key mapping. No sampling or pricing engine.",
+      "worker": "none"
     },
     {
       "name": "market-context-form",
       "type": "registry:component",
-      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit."
+      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
+      "worker": "none"
     },
     {
       "name": "vol-surface-chart",
       "type": "registry:component",
-      "docs": "Canonical stored volatility heatmap, node table and exact row/column slices. Supply validated surface metadata and an explicit raw-unit color extent. Optional shared selection links caller controls; no interpolation or worker dependency. Import the shared theme. FX quote arrays remain separate from stored grids."
+      "docs": "Canonical stored volatility heatmap, node table and exact row/column slices. Supply validated surface metadata and an explicit raw-unit color extent. Optional shared selection links caller controls; no interpolation or worker dependency. Import the shared theme. FX quote arrays remain separate from stored grids.",
+      "worker": "none"
     },
     {
       "name": "fx-delta-quotes",
       "type": "registry:component",
-      "docs": "Raw canonical FX ATM delta-neutral straddle, RR and BF quote arrays. Missing optional arrays remain missing. No forward, interpolation, strike grid or conversion is inferred."
+      "docs": "Raw canonical FX ATM delta-neutral straddle, RR and BF quote arrays. Missing optional arrays remain missing. No forward, interpolation, strike grid or conversion is inferred.",
+      "worker": "none"
     },
     {
       "name": "fx-matrix-grid",
       "type": "registry:component",
-      "docs": "Exact directed stored FX matrices separated by pair-global, provider and date/policy-pinned sources. Missing cells remain unavailable, undated tuples stay undated, and complete config/state exports remain unchanged. No priority resolution, inverse rates or triangulation."
+      "docs": "Exact directed stored FX matrices separated by pair-global, provider and date/policy-pinned sources. Missing cells remain unavailable, undated tuples stay undated, and complete config/state exports remain unchanged. No priority resolution, inverse rates or triangulation.",
+      "worker": "none"
     },
     {
       "name": "market-context-browser",
       "type": "registry:component",
-      "docs": "Searchable disclosure tree over every actual market value and generated root fields. Inspect exact leaf JSON and matching stored curve/FX views. Optional surfaceOptions supplies explicit color extents; without them surface data remains raw. A host renderObject slot can supply evaluated views with explicit strike/forward/convention inputs. No worker is required for stored browsing. Parent accepts canonical market edits through market-context-form/use-market-validator."
+      "docs": "Searchable disclosure tree over every actual market value and generated root fields. Inspect exact leaf JSON and matching stored curve/FX views. Optional surfaceOptions supplies explicit color extents; without them surface data remains raw. A host renderObject slot can supply evaluated views with explicit strike/forward/convention inputs. No worker is required for stored browsing. Parent accepts canonical market edits through market-context-form/use-market-validator.",
+      "worker": "none"
     },
     {
       "name": "schema-form",
       "type": "registry:component",
-      "docs": "Generated schema form for the complete 78-tag instrument inventory. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic mode hides defaulted fields. Edited pricing coverage and catalogue activation are separate gates."
+      "docs": "Generated schema form for any generated contract module. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic layout collapses defaulted or empty values under Less common terms. Composing editors inject disclosure, sheet and promotedField to group domain terms, choose the term-sheet root and promote one input.",
+      "worker": "none"
     },
     {
       "name": "curve-link-example",
       "type": "registry:component",
-      "docs": "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations."
+      "docs": "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations.",
+      "worker": "none"
     },
     {
       "name": "metric-picker",
       "type": "registry:ui",
-      "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "measure-value",
       "type": "registry:ui",
-      "docs": "Controlled measure-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled measure-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "stamp-badge",
       "type": "registry:ui",
-      "docs": "Controlled stamp-badge primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Controlled stamp-badge primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
     },
     {
       "name": "valuation-summary",
       "type": "registry:component",
-      "docs": "Displays supplied valuation context and raw measures. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available."
+      "docs": "Displays supplied valuation context and raw measures. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available.",
+      "worker": "none"
     },
     {
       "name": "measures-grid",
       "type": "registry:component",
-      "docs": "Displays supplied valuation context and measures. Native metric metadata provides readable labels and grouped, maturity-sorted bucket tenors; Exact keys reveals fully qualified keys. Values default to six significant digits, with Exact values and value titles retaining supplied precision. The nonzero view hides zero rows only when both sides are supplied and zero in a comparison; Show all reveals every row, and missing values remain distinct. Comparisons retain independent currencies, dates and stamps; no local differences, aggregates or FX conversion. Pass native metric metadata and explicit source-backed units when available."
+      "docs": "Displays supplied valuation context and measures. Labels are the native metric id in sentence case with recognised acronyms upper-cased; native metric metadata groups bucket tenors in maturity order; Exact keys reveals fully qualified keys. Values default to six significant digits, with Exact values and value titles retaining supplied precision. The nonzero view hides zero rows only when both sides are supplied and zero in a comparison; Show all reveals every row, and missing values remain distinct. Comparisons retain independent currencies, dates and stamps; no local differences, aggregates or FX conversion. Pass native metric metadata and explicit source-backed units when available.",
+      "worker": "none"
     },
     {
       "name": "dimensional-measures",
       "type": "registry:component",
-      "docs": "Displays native per-coordinate valuation measures as bucket lists, two-axis matrices, and selectable three-axis slices. Uses Rust-supplied metric metadata for coordinates and units; exact values and canonical keys remain available."
+      "docs": "Displays native per-coordinate valuation measures as bucket lists, two-axis matrices, and selectable three-axis slices. Uses Rust-supplied metric metadata for coordinates and units; exact values and canonical keys remain available.",
+      "worker": "none"
     },
     {
       "name": "instrument-form",
       "type": "registry:component",
-      "docs": "Standalone all-instrument generated form with grouped search, explicit examples and guarded recent selections. Lazy schema modules are reused by native module caching. Native validation is supplied by the consumer."
+      "docs": "Standalone all-instrument generated form with grouped search, explicit examples and guarded recent selections. Lazy schema modules are reused by native module caching. Native validation is supplied by the consumer.",
+      "worker": "none"
     },
     {
       "name": "pricing-params-form",
       "type": "registry:component",
-      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation."
+      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
+      "worker": "none"
     },
     {
       "name": "cashflow-viewer",
       "type": "registry:component",
-      "docs": "Supplied native cashflow JSON table with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download. Accepts text, loading and error props; no worker or query provider required."
+      "docs": "Supplied native cashflow JSON table with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download. Accepts text, loading and error props; no worker or query provider required.",
+      "worker": "none"
     },
     {
       "name": "explanation-trace",
       "type": "registry:component",
-      "docs": "Optional original valuation explanation rendered losslessly; no steps or severity are inferred."
+      "docs": "Optional original valuation explanation rendered losslessly; no steps or severity are inferred.",
+      "worker": "none"
     },
     {
       "name": "valuation-details",
       "type": "registry:component",
-      "docs": "Lazy native result detail routing. Only Monte Carlo has a complete published host shape; composite, credit, FX and structured-credit payloads stay raw. Unknown tags show a warning; full result metadata and nullable fields remain available."
+      "docs": "Lazy native result detail routing. Only Monte Carlo has a complete published host shape; composite, credit, FX and structured-credit payloads stay raw. Unknown tags show a warning; full result metadata and nullable fields remain available.",
+      "worker": "none"
     },
     {
       "name": "scenario-heatmap",
       "type": "registry:component",
-      "docs": "Display returned ScenarioTable prices at original CPR/CDR coordinates, with an explicitly controlled severity and priceDomain straddling the canonical par reference 100. Prices are clean settlement percentages of current tranche balance per Rust ScenarioCell.price. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation, rebasing or WAL/writedown overlay."
+      "docs": "Display returned ScenarioTable prices at original CPR/CDR coordinates, with an explicitly controlled severity and priceDomain straddling the canonical par reference 100. Prices are clean settlement percentages of current tranche balance per Rust ScenarioCell.price. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation, rebasing or WAL/writedown overlay.",
+      "worker": "none"
     },
     {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit scenarios. Host owns routes and domain inputs."
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit scenarios. Host owns routes and domain inputs.",
+      "worker": "host"
     },
     {
       "name": "pricing-forms-example",
       "type": "registry:component",
-      "docs": "Standalone instrument and pricing forms with caller state and real shared worker hooks. Example installs at the consumer source directory under examples/ and receives the consumer-owned components alias. Fixture request derives from manifest-listed native instrument/market fixtures. No workbench block is imported."
+      "docs": "Standalone instrument and pricing forms with caller state and real shared worker hooks. Example installs at the consumer source directory under examples/ and receives the consumer-owned components alias. Fixture request derives from manifest-listed native instrument/market fixtures. No workbench block is imported.",
+      "worker": "self"
     },
     {
       "name": "calibration-form",
       "type": "registry:component",
-      "docs": "Editable canonical calibration envelope from the generated root, step and MarketQuote contracts. Requires explicit defaultJson and native validate callback; onSubmit receives canonical JSON only. Remount for a new document. No solver or business defaults are inferred."
+      "docs": "Editable canonical calibration envelope from the generated root, step and MarketQuote contracts. Requires explicit defaultJson and native validate callback; onSubmit receives canonical JSON only. Remount for a new document. No solver or business defaults are inferred.",
+      "worker": "none"
     },
     {
       "name": "calibration-report",
       "type": "registry:component",
-      "docs": "Present native report metrics, residual identities, diagnostics and structured failures without unit conversion. Accepts the published CalibrationReport; complete raw report metadata remains visible. Optional caller-owned linking uses [stepId, quoteId] keys."
+      "docs": "Present native report metrics, residual identities, diagnostics and structured failures without unit conversion. Accepts the published CalibrationReport; complete raw report metadata remains visible. Optional caller-owned linking uses [stepId, quoteId] keys.",
+      "worker": "none"
     },
     {
       "name": "calibration-fit-chart",
       "type": "registry:component",
-      "docs": "Plot signed returned residuals against zero in separate step and canonical quote-kind panels. Unmatched quote identities are isolated; missing quote-unit conventions are labeled solver units. Supports shared publication/export props, callbacks, tooltip slots and optional accepted selection."
+      "docs": "Plot signed returned residuals against zero in separate step and canonical quote-kind panels. Unmatched quote identities are isolated; missing quote-unit conventions are labeled solver units. Supports shared publication/export props, callbacks, tooltip slots and optional accepted selection.",
+      "worker": "none"
     },
     {
       "name": "covenant-report",
       "type": "registry:component",
-      "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred."
+      "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred.",
+      "worker": "none"
     },
     {
       "name": "monte-carlo-diagnostics",
       "type": "registry:component",
-      "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat."
+      "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat.",
+      "worker": "none"
     },
     {
       "name": "fx-surface-chart",
       "type": "registry:component",
-      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator."
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "worker": "host"
     },
     {
       "name": "vol-cube-explorer",
       "type": "registry:component",
-      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation."
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "worker": "host"
     },
     {
       "name": "financial-model-editor",
       "type": "registry:component",
-      "docs": "Edit explicit FinancialModelSpec fields from the generated Rust schema. Native WASM validates and canonicalizes the model; formula fields show the opaque native parse preview. Requires FinstackQueryProvider and remounting for a new document."
+      "docs": "Edit explicit FinancialModelSpec fields from the generated Rust schema. Native WASM validates and canonicalizes the model; formula fields show the opaque native parse preview. Requires FinstackQueryProvider and remounting for a new document.",
+      "worker": "host"
     },
     {
       "name": "statement-grid",
       "type": "registry:component",
-      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation."
+      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
+      "worker": "none"
     },
     {
       "name": "statement-chart",
       "type": "registry:component",
-      "docs": "Plot finite native values for one supplied statement node in explicit period order. Missing and nonfinite values are omitted from marks and remain visible in the grid; Money stays exact there. Selection links by node and period."
+      "docs": "Plot finite native values for one supplied statement node in explicit period order. Missing and nonfinite values are omitted from marks and remain visible in the grid; Money stays exact there. Selection links by node and period.",
+      "worker": "none"
     },
     {
       "name": "statement-explanation",
       "type": "registry:component",
-      "docs": "Call native explanation, text explanation and dependency trace for a matching model/result/node/period request. Render structured returned components and opaque native text without parsing formulas in JavaScript."
+      "docs": "Call native explanation and dependency trace for a matching model/result/node/period request. Render the structured value, source, forecast, formula breakdown and dependency tree without parsing formulas in JavaScript.",
+      "worker": "host"
     },
     {
       "name": "statement-check-report",
       "type": "registry:component",
-      "docs": "Display native check summary, statuses, severity, findings and materiality without local pass/fail calculations. Supplied cell selection is a notification only; the full report remains exportable."
+      "docs": "Display native check summary, statuses, severity, findings and materiality without local pass/fail calculations. Supplied cell selection is a notification only; the full report remains exportable.",
+      "worker": "none"
     },
     {
       "name": "statement-checks",
       "type": "registry:component",
-      "docs": "Run native check suites or raw three-statement and credit mappings against the supplied matching result. Native suite validation and execution own all check semantics; the editable JSON is never inferred from examples."
+      "docs": "Edit the check suite through the form generated from the Rust CheckSuiteSpec, validated natively before running; three-statement and credit mappings stay canonical JSON because Rust publishes no root for them. Native execution owns all check semantics and nothing is inferred from examples.",
+      "worker": "host"
     },
     {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. Host owns data ingestion and persistence. Requires FinstackQueryProvider."
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "worker": "host"
     }
   ],
   "nonvisual": [
@@ -331,6 +386,38 @@
     },
     {
       "name": "use-evaluate-statement",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-statement-model-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-statement-formula-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-check-suite-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-rollup-statement",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-statement-scenarios",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-run-statement-checks",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-explain-statement",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-trace-statement",
       "type": "registry:hook"
     },
     {
@@ -682,7 +769,19 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-scenario-set",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-check-suite-spec",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-financial-model-spec",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-rollup-spec",
       "type": "registry:lib"
     },
     {
@@ -733,7 +832,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "ff8975acf49cabdd31f71fe8d1eb0cb8543ed8b2ea5621f2a834f0b46f64ae90"
+      "sha256": "59f8dbca57a419bc8d97b2f449bd6817d02b9eca0df10aa8c6639fced065eefe"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",

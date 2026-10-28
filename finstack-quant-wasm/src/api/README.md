@@ -220,8 +220,9 @@ export that is not in it is invisible to TypeScript users, and
   under the frozen fitted exercise policy and excludes regression approximation,
   time-grid discretization, and model error. Structured valuation results follow
   this rule for Monte Carlo `seed`: every payload that embeds a `ValuationResult`
-  is serialized with `utils::to_js_value_with_bigints`, and non-valuation counts
-  next to it use `finstack_quant_core::wire::count` so they stay plain numbers.
+  is serialized with `utils::to_js_value_with_bigints`, and the path counts
+  inside the result and the counts next to it use
+  `finstack_quant_core::wire::count` so they stay plain numbers.
   `valuationResultToJson` turns such a result back into canonical JSON.
 
 - **Doc comments before the attribute.** Every JS-facing callable documents each

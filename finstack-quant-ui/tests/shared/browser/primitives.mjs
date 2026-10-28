@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -15,6 +16,10 @@ import {
 } from "../../browser/consumer.mjs";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-primitives-"));
+const evidence =
+  process.env.REGISTRY_SMOKE_DIR ??
+  (await mkdtemp(path.join(tmpdir(), "registry-primitives-")));
+await mkdir(evidence, { recursive: true });
 let browser, server;
 try {
   const registry = await loadRegistry({ cwd: root });
@@ -200,10 +205,8 @@ try {
     !server.requests.some((url) => url.endsWith(".wasm")),
     "Primitives must not initialize WASM",
   );
-  const output =
-    process.env.REGISTRY_PRIMITIVES_REPORT ?? "/tmp/pr008-primitives.json";
   await page.screenshot({
-    path: output.replace(/\.json$/, ".png"),
+    path: path.join(evidence, "primitives.png"),
     fullPage: true,
   });
   const report = {
@@ -215,8 +218,12 @@ try {
     failures,
     verdict: "pass",
   };
-  await writeFile(output, JSON.stringify(report, null, 2) + "\n");
+  await writeFile(
+    path.join(evidence, "primitives.json"),
+    JSON.stringify(report, null, 2) + "\n",
+  );
   console.log(JSON.stringify(report, null, 2));
+  console.log(`Evidence: ${evidence}`);
 } finally {
   await closeConsumer({ browser, server }, consumer);
 }

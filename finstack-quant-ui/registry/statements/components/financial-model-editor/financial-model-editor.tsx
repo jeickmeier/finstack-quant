@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
-import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
+import { useStatementModelValidator } from "@/hooks/statements/use-statement-model-validator/use-statement-model-validator";
 import { financialModelModule } from "./model";
 import { FormulaPreview } from "./formula-preview";
 
@@ -18,7 +18,7 @@ export function FinancialModelEditor({
   onValidated?: (json: string | null) => void;
   onInputJson?: (json: string | null) => void;
 }) {
-  const { client, status } = useFinstack();
+  const validate = useStatementModelValidator();
   const [initial] = useState(() => {
     try {
       const value = financialModelModule.codec.parse(defaultJson);
@@ -29,16 +29,6 @@ export function FinancialModelEditor({
       return { error: error instanceof Error ? error.message : String(error) };
     }
   });
-  const validate = useCallback(
-    async (json: string, signal?: AbortSignal) => {
-      if (!client || status !== "ready")
-        throw new Error("Statement worker is not ready");
-      const canonical = await client.call("validateStatementModel", json);
-      if (signal?.aborted) throw new DOMException("Superseded", "AbortError");
-      return canonical;
-    },
-    [client, status],
-  );
   if ("error" in initial) return <p role="alert">{initial.error}</p>;
   return (
     <SchemaForm

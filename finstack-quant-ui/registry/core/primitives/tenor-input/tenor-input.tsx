@@ -22,6 +22,7 @@ export function TenorInput({
   })),
   label,
   error,
+  describedBy,
   disabled,
 }: FieldInfo & {
   value: TenorEdit;
@@ -41,6 +42,7 @@ export function TenorInput({
         pattern={integerText.source}
         min={contracts.tenor.schema.properties.count.minimum}
         error={error}
+        describedBy={describedBy}
         disabled={disabled}
       />
       <EnumField
@@ -49,6 +51,7 @@ export function TenorInput({
         onValueChange={(unit) => onValueChange({ ...value, unit })}
         options={units}
         layout="select"
+        describedBy={describedBy}
         disabled={disabled}
       />
     </fieldset>

@@ -9,6 +9,6 @@ import data from "../data.json";
 const model = data.statementModel as FinancialModelSpecWire;
 const result = data.statementResult as unknown as StatementResult;
 
-export function Example(_props: ExampleProps) {
-  return <StatementGrid model={model} result={result} />;
+export function Example({ density = "compact" }: ExampleProps) {
+  return <StatementGrid model={model} result={result} density={density} />;
 }

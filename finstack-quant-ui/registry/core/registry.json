@@ -523,8 +523,8 @@
       "name": "schema-form",
       "type": "registry:component",
       "title": "Schema form",
-      "description": "Form generated from an instrument's JSON Schema that emits canonical JSON after native validation.",
-      "docs": "Generated schema form for the complete 78-tag instrument inventory. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic mode hides defaulted fields. Edited pricing coverage and catalogue activation are separate gates.",
+      "description": "Form generated from a contract's JSON Schema that emits canonical JSON after native validation.",
+      "docs": "Generated schema form for any generated contract module. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic layout collapses defaulted or empty values under Less common terms. Composing editors inject disclosure, sheet and promotedField to group domain terms, choose the term-sheet root and promote one input.",
       "files": [
         {
           "path": "components/schema-form/schema-form.tsx",
@@ -581,6 +581,7 @@
         "@finstack/finstack-form",
         "@finstack/domain-field",
         "@finstack/finstack-codec",
+        "@finstack/finstack-format",
         "@finstack/enum-field",
         "button",
         "popover"
