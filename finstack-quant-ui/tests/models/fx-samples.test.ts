@@ -11,13 +11,14 @@ import { fxDeltaOptions } from "@/hooks/models/use-fx-delta-samples/use-fx-delta
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import { serializeHost } from "../../src/codec.mjs";
 import { fxQuotes } from "../core/surfaces/fixtures";
+import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
 let worker: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   worker = await startWorker();
-}, 30000);
+}, budget(30000));
 afterAll(async () => worker?.close());
 const request: FxDeltaSampleRequest = {
   surface: fxQuotes,

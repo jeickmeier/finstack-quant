@@ -10,6 +10,7 @@ import {
   statementRows,
 } from "@/components/finstack/statements/components/statement-grid/projection";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
+import { budget } from "../shared/budget";
 
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -36,7 +37,7 @@ const market = readFileSync(
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, 30000);
+}, budget(30000));
 afterAll(async () => harness?.close());
 
 it("validates and evaluates the canonical model through the real worker", async () => {

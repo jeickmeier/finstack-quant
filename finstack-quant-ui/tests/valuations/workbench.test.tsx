@@ -27,6 +27,7 @@ import {
   errorValue,
 } from "@/workers/finstack-contract";
 import { formatMoney, formatRawMoney } from "../../src/format/format";
+import { budget } from "../shared/budget";
 const bondDisplay = formatRawMoney(fixture.result.value);
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
@@ -153,145 +154,160 @@ function mount(request: PriceRequest = fixture.request) {
     </div>,
   );
 }
-it("embeds the existing components, debounces complete requests and retains edits/results across tabs", async () => {
-  const view = mount();
-  await waitFor(() => expect(prices()).toHaveLength(1), { timeout: 3000 });
-  expect(prices()[0]).toEqual({
-    ...fixture.request,
-    marketJson: canonicalMarket(fixture.request.marketJson),
-    instrumentJson: native.validateInstrumentJson(
-      fixture.request.instrumentJson,
-    ),
-  });
-  const results = screen.getByRole("region", { name: "Results" });
-  expect(
-    (await within(results).findByTitle(fixture.result.value.amount))
-      .textContent,
-  ).toBe(bondDisplay);
-  const amount = screen.getByRole("textbox", { name: "Amount" });
-  fireEvent.change(amount, { target: { value: "1000000.123456789" } });
-  await userEvent.click(screen.getByRole("button", { name: "Settings" }));
-  const history = '{"base_date":"2025-01-01","window_days":2,"scenarios":[]}';
-  await userEvent.click(
-    screen.getByRole("button", { name: "Add theta period" }),
-  );
-  fireEvent.change(
-    within(screen.getByText("Pricing overrides").parentElement!).getByRole(
-      "textbox",
-      { name: "Count" },
-    ),
-    {
-      target: { value: "1" },
-    },
-  );
-  await userEvent.click(
-    within(screen.getByText("Pricing overrides").parentElement!).getByRole(
-      "combobox",
-      { name: "Unit" },
-    ),
-  );
-  await userEvent.click(await screen.findByRole("option", { name: "weeks" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "Market history" }), {
-    target: { value: history },
-  });
-  await waitFor(
-    () => {
-      const latest = prices().at(-1);
-      expect(latest?.metricPricingOverrides).toBe(
-        '{"theta_period":{"count":1,"unit":"weeks"}}',
-      );
-      expect(latest?.marketHistory).toBe(history);
-      expect(latest?.instrumentJson).toContain('"amount":"1000000.123456789"');
-    },
-    { timeout: 5000 },
-  );
-  await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
-  await userEvent.click(screen.getByRole("tab", { name: "Snapshot JSON" }));
-  showOriginal(screen.getByRole("region", { name: "Market snapshot" }));
-  const snapshot = screen.getByRole("region", { name: "Market snapshot" });
-  expect(snapshot.querySelector("pre")!.textContent).toBe(
-    canonicalMarket(fixture.request.marketJson),
-  );
-  expect(snapshot.querySelector("[data-json-print-source]")!.textContent).toBe(
-    canonicalMarket(fixture.request.marketJson),
-  );
-  expect(screen.getByRole("region", { name: "Results" })).toBe(results);
-  await userEvent.click(screen.getByRole("tab", { name: "1 Instrument" }));
-  expect(
-    (screen.getByRole("textbox", { name: "Amount" }) as HTMLInputElement).value,
-  ).toBe("1000000.123456789");
-  expect(mock.createClient).toHaveBeenCalledTimes(1);
-  view.unmount();
-  expect(close).toHaveBeenCalledTimes(1);
-}, 15000);
-it("retains the completed context during invalid edits, native pricing failure and catalogue selection", async () => {
-  mount();
-  expect(
-    (
-      await screen.findByTitle(
-        fixture.result.value.amount,
-        {},
-        { timeout: 3000 },
-      )
-    ).textContent,
-  ).toBe(bondDisplay);
-  const amount = screen.getByRole("textbox", { name: "Amount" });
-  fireEvent.change(amount, { target: { value: "abc" } });
-  const issue = await screen.findByRole("button", {
-    name: "instrument.spec.notional.amount",
-  });
-  await userEvent.click(issue);
-  expect(document.activeElement).toBe(amount);
-  expect(prices()).toHaveLength(1);
-  expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-    bondDisplay,
-  );
-  fireEvent.change(amount, { target: { value: "1000000" } });
-  await userEvent.click(screen.getByRole("button", { name: "Settings" }));
-  await userEvent.click(
-    screen.getByRole("button", { name: "Add theta period" }),
-  );
-  fireEvent.change(
-    within(screen.getByText("Pricing overrides").parentElement!).getByRole(
-      "textbox",
-      { name: "Count" },
-    ),
-    {
-      target: { value: "0" },
-    },
-  );
-  await userEvent.click(
-    within(screen.getByText("Pricing overrides").parentElement!).getByRole(
-      "combobox",
-      { name: "Unit" },
-    ),
-  );
-  await userEvent.click(await screen.findByRole("option", { name: "weeks" }));
-  await waitFor(
-    () =>
-      expect(
-        screen
-          .getAllByRole("alert")
-          .some((node) => node.textContent?.includes("Invalid tenor")),
-      ).toBe(true),
-    { timeout: 3000 },
-  );
-  expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-    bondDisplay,
-  );
-  await userEvent.click(
-    screen.getByRole("combobox", { name: "Instrument type" }),
-  );
-  await userEvent.click(screen.getByRole("option", { name: "equity" }));
-  expect(
-    await screen.findByRole("button", { name: "Load example" }),
-  ).toBeTruthy();
-  await waitFor(() => expect(prices()).toHaveLength(3), { timeout: 3000 });
-  expect(prices()[2].model).toBe(prices()[0].model);
-  expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-    bondDisplay,
-  );
-}, 15000);
+it(
+  "embeds the existing components, debounces complete requests and retains edits/results across tabs",
+  async () => {
+    const view = mount();
+    await waitFor(() => expect(prices()).toHaveLength(1), {
+      timeout: budget(3000),
+    });
+    expect(prices()[0]).toEqual({
+      ...fixture.request,
+      marketJson: canonicalMarket(fixture.request.marketJson),
+      instrumentJson: native.validateInstrumentJson(
+        fixture.request.instrumentJson,
+      ),
+    });
+    const results = screen.getByRole("region", { name: "Results" });
+    expect(
+      (await within(results).findByTitle(fixture.result.value.amount))
+        .textContent,
+    ).toBe(bondDisplay);
+    const amount = screen.getByRole("textbox", { name: "Amount" });
+    fireEvent.change(amount, { target: { value: "1000000.123456789" } });
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const history = '{"base_date":"2025-01-01","window_days":2,"scenarios":[]}';
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add theta period" }),
+    );
+    fireEvent.change(
+      within(screen.getByText("Pricing overrides").parentElement!).getByRole(
+        "textbox",
+        { name: "Count" },
+      ),
+      {
+        target: { value: "1" },
+      },
+    );
+    await userEvent.click(
+      within(screen.getByText("Pricing overrides").parentElement!).getByRole(
+        "combobox",
+        { name: "Unit" },
+      ),
+    );
+    await userEvent.click(await screen.findByRole("option", { name: "weeks" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Market history" }), {
+      target: { value: history },
+    });
+    await waitFor(
+      () => {
+        const latest = prices().at(-1);
+        expect(latest?.metricPricingOverrides).toBe(
+          '{"theta_period":{"count":1,"unit":"weeks"}}',
+        );
+        expect(latest?.marketHistory).toBe(history);
+        expect(latest?.instrumentJson).toContain(
+          '"amount":"1000000.123456789"',
+        );
+      },
+      { timeout: budget(5000) },
+    );
+    await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Snapshot JSON" }));
+    showOriginal(screen.getByRole("region", { name: "Market snapshot" }));
+    const snapshot = screen.getByRole("region", { name: "Market snapshot" });
+    expect(snapshot.querySelector("pre")!.textContent).toBe(
+      canonicalMarket(fixture.request.marketJson),
+    );
+    expect(
+      snapshot.querySelector("[data-json-print-source]")!.textContent,
+    ).toBe(canonicalMarket(fixture.request.marketJson));
+    expect(screen.getByRole("region", { name: "Results" })).toBe(results);
+    await userEvent.click(screen.getByRole("tab", { name: "1 Instrument" }));
+    expect(
+      (screen.getByRole("textbox", { name: "Amount" }) as HTMLInputElement)
+        .value,
+    ).toBe("1000000.123456789");
+    expect(mock.createClient).toHaveBeenCalledTimes(1);
+    view.unmount();
+    expect(close).toHaveBeenCalledTimes(1);
+  },
+  budget(15000),
+);
+it(
+  "retains the completed context during invalid edits, native pricing failure and catalogue selection",
+  async () => {
+    mount();
+    expect(
+      (
+        await screen.findByTitle(
+          fixture.result.value.amount,
+          {},
+          { timeout: budget(3000) },
+        )
+      ).textContent,
+    ).toBe(bondDisplay);
+    const amount = screen.getByRole("textbox", { name: "Amount" });
+    fireEvent.change(amount, { target: { value: "abc" } });
+    const issue = await screen.findByRole("button", {
+      name: "instrument.spec.notional.amount",
+    });
+    await userEvent.click(issue);
+    expect(document.activeElement).toBe(amount);
+    expect(prices()).toHaveLength(1);
+    expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
+      bondDisplay,
+    );
+    fireEvent.change(amount, { target: { value: "1000000" } });
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add theta period" }),
+    );
+    fireEvent.change(
+      within(screen.getByText("Pricing overrides").parentElement!).getByRole(
+        "textbox",
+        { name: "Count" },
+      ),
+      {
+        target: { value: "0" },
+      },
+    );
+    await userEvent.click(
+      within(screen.getByText("Pricing overrides").parentElement!).getByRole(
+        "combobox",
+        { name: "Unit" },
+      ),
+    );
+    await userEvent.click(await screen.findByRole("option", { name: "weeks" }));
+    await waitFor(
+      () =>
+        expect(
+          screen
+            .getAllByRole("alert")
+            .some((node) => node.textContent?.includes("Invalid tenor")),
+        ).toBe(true),
+      { timeout: budget(3000) },
+    );
+    expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
+      bondDisplay,
+    );
+    await userEvent.click(
+      screen.getByRole("combobox", { name: "Instrument type" }),
+    );
+    await userEvent.click(screen.getByRole("option", { name: "equity" }));
+    expect(
+      await screen.findByRole("button", { name: "Load example" }),
+    ).toBeTruthy();
+    await waitFor(() => expect(prices()).toHaveLength(3), {
+      timeout: budget(3000),
+    });
+    expect(prices()[2].model).toBe(prices()[0].model);
+    expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
+      bondDisplay,
+    );
+  },
+  budget(15000),
+);
 it("rejects a calibration envelope as a market snapshot before issuing a price request", async () => {
   mount({
     ...fixture.request,
@@ -313,64 +329,70 @@ it("rejects a calibration envelope as a market snapshot before issuing a price r
   expect(prices()).toEqual([]);
 });
 
-it("feeds the complete native-validated market edit to pricing and shares stored-node selection", async () => {
-  mount();
-  expect(
-    (
-      await screen.findByTitle(
-        fixture.result.value.amount,
-        {},
-        { timeout: 3000 },
-      )
-    ).textContent,
-  ).toBe(bondDisplay);
-  await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
-  await userEvent.click(screen.getByRole("tab", { name: "Edit market" }));
-  fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {
-    target: { value: "0.985" },
-  });
-  await waitFor(() => expect(prices()).toHaveLength(2), { timeout: 4000 });
-  const request = prices()[1];
-  const expected = JSON.parse(fixture.request.marketJson);
-  expected.curves[0].knot_points[1][1] = 0.985;
-  expect(request.marketJson).toBe(canonicalMarket(JSON.stringify(expected)));
-  expect({ ...request, marketJson: prices()[0].marketJson }).toEqual(
-    prices()[0],
-  );
-  await userEvent.click(screen.getByRole("tab", { name: "View market" }));
-  const curveIndex = JSON.parse(request.marketJson).curves.findIndex(
-    (curve: any) => curve.id === expected.curves[0].id,
-  );
-  fireEvent.change(screen.getByLabelText("Search market data"), {
-    target: { value: `/curves/${curveIndex}` },
-  });
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: `Inspect ${expected.curves[0].id}, /curves/${curveIndex}`,
-    }),
-  );
-  const cell = screen.getByRole("cell", { name: "0.985" });
-  await userEvent.click(cell);
-  expect(cell.getAttribute("aria-selected")).toBe("true");
-  await userEvent.click(screen.getByRole("tab", { name: "4 Diagnostics" }));
-  const direct = native.priceInstrument(
-    request.instrumentJson,
-    request.marketJson,
-    request.asOf,
-    request.model,
-    request.metrics,
-  );
-  await waitFor(() =>
+it(
+  "feeds the complete native-validated market edit to pricing and shares stored-node selection",
+  async () => {
+    mount();
     expect(
-      screen
-        .getByRole("region", {
-          name: "Complete valuation result JSON",
-          hidden: true,
-        })
-        .querySelector("pre")!.textContent,
-    ).toContain(direct.value.amount),
-  );
-}, 15000);
+      (
+        await screen.findByTitle(
+          fixture.result.value.amount,
+          {},
+          { timeout: budget(3000) },
+        )
+      ).textContent,
+    ).toBe(bondDisplay);
+    await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Edit market" }));
+    fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {
+      target: { value: "0.985" },
+    });
+    await waitFor(() => expect(prices()).toHaveLength(2), {
+      timeout: budget(4000),
+    });
+    const request = prices()[1];
+    const expected = JSON.parse(fixture.request.marketJson);
+    expected.curves[0].knot_points[1][1] = 0.985;
+    expect(request.marketJson).toBe(canonicalMarket(JSON.stringify(expected)));
+    expect({ ...request, marketJson: prices()[0].marketJson }).toEqual(
+      prices()[0],
+    );
+    await userEvent.click(screen.getByRole("tab", { name: "View market" }));
+    const curveIndex = JSON.parse(request.marketJson).curves.findIndex(
+      (curve: any) => curve.id === expected.curves[0].id,
+    );
+    fireEvent.change(screen.getByLabelText("Search market data"), {
+      target: { value: `/curves/${curveIndex}` },
+    });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Inspect ${expected.curves[0].id}, /curves/${curveIndex}`,
+      }),
+    );
+    const cell = screen.getByRole("cell", { name: "0.985" });
+    await userEvent.click(cell);
+    expect(cell.getAttribute("aria-selected")).toBe("true");
+    await userEvent.click(screen.getByRole("tab", { name: "4 Diagnostics" }));
+    const direct = native.priceInstrument(
+      request.instrumentJson,
+      request.marketJson,
+      request.asOf,
+      request.model,
+      request.metrics,
+    );
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("region", {
+            name: "Complete valuation result JSON",
+            hidden: true,
+          })
+          .querySelector("pre")!.textContent,
+      ).toContain(direct.value.amount),
+    );
+  },
+  budget(15000),
+);
 
 it.each(detailFixtures.cases)(
   "composes actual $type pricing with its returned $detailType route",
@@ -380,7 +402,7 @@ it.each(detailFixtures.cases)(
     const raw = await screen.findByRole(
       "region",
       { name: "Complete valuation result JSON", hidden: true },
-      { timeout: 10000 },
+      { timeout: budget(10000) },
     );
     showOriginal(raw);
     const result = JSON.parse(raw.querySelector("pre")!.textContent!);
@@ -426,7 +448,7 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
     const result = await results.findByRole(
       "region",
       { name: "Complete valuation result JSON", hidden: true },
-      { timeout: 10000 },
+      { timeout: budget(10000) },
     );
     expect(JSON.parse(result.querySelector("pre")!.textContent!).value).toEqual(
       entry.pricedValue,
@@ -471,50 +493,63 @@ it("lets the host deep link select another canonical example while preserving ex
       />
     </FinstackQueryProvider>,
   );
-  await waitFor(() => expect(prices()).toHaveLength(1), { timeout: 5000 });
+  await waitFor(() => expect(prices()).toHaveLength(1), {
+    timeout: budget(5000),
+  });
   const request = prices()[0];
   expect(JSON.parse(request.instrumentJson).instrument.type).toBe("equity");
   expect(request.marketJson).toBe(canonicalMarket(fixture.request.marketJson));
   expect(request.model).toBe(fixture.request.model);
 });
 
-it("loads the complete host request when a prepared instrument is selected", async () => {
-  const option = cashflowFixtures.cases.find(
-    (entry) => entry.type === "equity_option",
-  )!.request;
-  render(
-    <FinstackQueryProvider>
-      <PricingWorkbench
-        defaultRequest={fixture.request}
-        exampleRequests={{ bond: fixture.request, equity_option: option }}
-      />
-    </FinstackQueryProvider>,
-  );
-  await waitFor(() => expect(prices()).toHaveLength(1), { timeout: 5000 });
-  expect(screen.queryByRole("button", { name: "Load example" })).toBeNull();
-  await userEvent.click(
-    screen.getByRole("combobox", { name: "Instrument type" }),
-  );
-  expect(screen.queryByRole("option", { name: "equity" })).toBeNull();
-  await userEvent.click(screen.getByRole("option", { name: "equity_option" }));
-  await waitFor(() => expect(prices()).toHaveLength(2), { timeout: 5000 });
-  const selected = prices()[1];
-  expect(JSON.parse(selected.instrumentJson).instrument.type).toBe(
-    "equity_option",
-  );
-  expect(selected.marketJson).toBe(canonicalMarket(option.marketJson));
-  expect(selected.asOf).toBe(option.asOf);
-  expect(selected.model).toBe(option.model);
-  expect(selected.metrics).toEqual(option.metrics);
-  expect(
-    (
-      await screen.findByTitle(
-        cashflowFixtures.cases.find((entry) => entry.type === "equity_option")!
-          .pricedValue.amount,
-      )
-    ).textContent,
-  ).toContain("25,748");
-}, 15000);
+it(
+  "loads the complete host request when a prepared instrument is selected",
+  async () => {
+    const option = cashflowFixtures.cases.find(
+      (entry) => entry.type === "equity_option",
+    )!.request;
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={fixture.request}
+          exampleRequests={{ bond: fixture.request, equity_option: option }}
+        />
+      </FinstackQueryProvider>,
+    );
+    await waitFor(() => expect(prices()).toHaveLength(1), {
+      timeout: budget(5000),
+    });
+    expect(screen.queryByRole("button", { name: "Load example" })).toBeNull();
+    await userEvent.click(
+      screen.getByRole("combobox", { name: "Instrument type" }),
+    );
+    expect(screen.queryByRole("option", { name: "equity" })).toBeNull();
+    await userEvent.click(
+      screen.getByRole("option", { name: "equity_option" }),
+    );
+    await waitFor(() => expect(prices()).toHaveLength(2), {
+      timeout: budget(5000),
+    });
+    const selected = prices()[1];
+    expect(JSON.parse(selected.instrumentJson).instrument.type).toBe(
+      "equity_option",
+    );
+    expect(selected.marketJson).toBe(canonicalMarket(option.marketJson));
+    expect(selected.asOf).toBe(option.asOf);
+    expect(selected.model).toBe(option.model);
+    expect(selected.metrics).toEqual(option.metrics);
+    expect(
+      (
+        await screen.findByTitle(
+          cashflowFixtures.cases.find(
+            (entry) => entry.type === "equity_option",
+          )!.pricedValue.amount,
+        )
+      ).textContent,
+    ).toContain("25,748");
+  },
+  budget(15000),
+);
 
 it("offers configured scenario prices only while structured credit is selected", async () => {
   render(
@@ -529,148 +564,164 @@ it("offers configured scenario prices only while structured credit is selected",
       />
     </FinstackQueryProvider>,
   );
-  await waitFor(() => expect(prices()).toHaveLength(1), { timeout: 10000 });
+  await waitFor(() => expect(prices()).toHaveLength(1), {
+    timeout: budget(10000),
+  });
   expect(screen.queryByRole("tab", { name: "Scenarios" })).toBeNull();
 });
-it("loads configured scenario prices only on demand from the completed structured-credit context", async () => {
-  const request = {
-    instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),
-    marketJson: JSON.stringify(pricingMarket),
-    asOf: scenarioCases.asOf,
-    model: "discounting",
-    metrics: [],
-  };
-  const scenario = {
-    trancheId: scenarioCases.trancheId,
-    gridJson: JSON.stringify(scenarioCases.grid),
-    priceDomain: [80, 140] as const,
-  };
-  render(
-    <FinstackQueryProvider>
-      <PricingWorkbench defaultRequest={request} scenario={scenario} />
-    </FinstackQueryProvider>,
-  );
-  await waitFor(() => expect(prices()).toHaveLength(1), { timeout: 10000 });
-  expect(call.mock.calls.some(([method]) => method === "scenarioTable")).toBe(
-    false,
-  );
-  await userEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
-  const toggle = await screen.findByText(
-    "Scenario prices",
-    { selector: "summary" },
-    { timeout: 5000 },
-  );
-  fireEvent.click(toggle);
-  await waitFor(
-    () =>
-      expect(
-        call.mock.calls.some(([method]) => method === "scenarioTable"),
-      ).toBe(true),
-    { timeout: 5000 },
-  );
-  const invocation = call.mock.calls.find(
-    ([method]) => method === "scenarioTable",
-  )![1];
-  expect(invocation).toEqual({
-    instrumentJson: prices()[0].instrumentJson,
-    marketJson: prices()[0].marketJson,
-    asOf: prices()[0].asOf,
-    trancheId: scenario.trancheId,
-    gridJson: scenario.gridJson,
-  });
-  await waitFor(
-    () =>
-      expect(
-        document.querySelector('[aria-label="CLONOTES-A scenario prices"]'),
-      ).toBeTruthy(),
-    { timeout: 5000 },
-  );
-  expect(prices()).toHaveLength(1);
-}, 30000);
-
-it("prepares one completed cashflow snapshot before printing and restores the input tab", async () => {
-  const invoke = call.getMockImplementation()! as (
-    method: string,
-    request: any,
-  ) => Promise<any>;
-  let release!: () => void;
-  const pending = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  call.mockImplementation(async (method, request) => {
-    if (method === "cashflows") await pending;
-    return invoke(method, request);
-  });
-  const print = vi.fn();
-  vi.stubGlobal("print", print);
-  vi.stubGlobal("requestAnimationFrame", (callback: () => void) =>
-    setTimeout(callback, 0),
-  );
-  Object.defineProperty(document, "fonts", {
-    configurable: true,
-    value: { ready: Promise.resolve() },
-  });
-  try {
-    mount();
-    const button = await screen.findByRole("button", { name: "Print report" });
-    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false), {
-      timeout: 10000,
-    });
-    const request = prices()[0]!;
-    fireEvent.click(button);
-    const workbench = screen.getByRole("region", { name: "Pricing workbench" });
-    await waitFor(() =>
-      expect(workbench.getAttribute("data-printing")).toBe("preparing"),
-    );
-    expect(print).not.toHaveBeenCalled();
-    expect(
-      screen
-        .getByRole("tab", { name: "2 Market" })
-        .getAttribute("aria-selected"),
-    ).toBe("true");
-    release();
-    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
-    const cashflowCalls = call.mock.calls.filter(
-      ([method]) => method === "cashflows",
-    );
-    expect(cashflowCalls).toHaveLength(1);
-    expect(cashflowCalls[0]![1]).toEqual({
-      instrumentJson: request.instrumentJson,
-      marketJson: request.marketJson,
-      asOf: request.asOf,
+it(
+  "loads configured scenario prices only on demand from the completed structured-credit context",
+  async () => {
+    const request = {
+      instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),
+      marketJson: JSON.stringify(pricingMarket),
+      asOf: scenarioCases.asOf,
       model: "discounting",
+      metrics: [],
+    };
+    const scenario = {
+      trancheId: scenarioCases.trancheId,
+      gridJson: JSON.stringify(scenarioCases.grid),
+      priceDomain: [80, 140] as const,
+    };
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench defaultRequest={request} scenario={scenario} />
+      </FinstackQueryProvider>,
+    );
+    await waitFor(() => expect(prices()).toHaveLength(1), {
+      timeout: budget(10000),
     });
-    showOriginal(
-      workbench.querySelector('[aria-label="Priced instrument JSON"]')!,
+    expect(call.mock.calls.some(([method]) => method === "scenarioTable")).toBe(
+      false,
     );
-    showOriginal(workbench.querySelector('[aria-label="Market snapshot"]')!);
-    expect(
-      workbench.querySelector('[aria-label="Priced instrument JSON"] pre')
-        ?.textContent,
-    ).toBe(request.instrumentJson);
-    expect(
-      workbench.querySelector('[aria-label="Market snapshot"] pre')
-        ?.textContent,
-    ).toBe(request.marketJson);
-    fireEvent(window, new Event("afterprint"));
-    await waitFor(() =>
-      expect(workbench.hasAttribute("data-printing")).toBe(false),
+    await userEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
+    const toggle = await screen.findByText(
+      "Scenario prices",
+      { selector: "summary" },
+      { timeout: budget(5000) },
     );
-    expect(
-      screen
-        .getByRole("tab", { name: "1 Instrument" })
-        .getAttribute("aria-selected"),
-    ).toBe("true");
-    expect(
-      screen
-        .getByRole("tab", { name: "3 Cashflows" })
-        .getAttribute("aria-selected"),
-    ).toBe("true");
-  } finally {
-    Reflect.deleteProperty(document, "fonts");
-    release();
-  }
-}, 30000);
+    fireEvent.click(toggle);
+    await waitFor(
+      () =>
+        expect(
+          call.mock.calls.some(([method]) => method === "scenarioTable"),
+        ).toBe(true),
+      { timeout: budget(5000) },
+    );
+    const invocation = call.mock.calls.find(
+      ([method]) => method === "scenarioTable",
+    )![1];
+    expect(invocation).toEqual({
+      instrumentJson: prices()[0].instrumentJson,
+      marketJson: prices()[0].marketJson,
+      asOf: prices()[0].asOf,
+      trancheId: scenario.trancheId,
+      gridJson: scenario.gridJson,
+    });
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector('[aria-label="CLONOTES-A scenario prices"]'),
+        ).toBeTruthy(),
+      { timeout: budget(5000) },
+    );
+    expect(prices()).toHaveLength(1);
+  },
+  budget(30000),
+);
+
+it(
+  "prepares one completed cashflow snapshot before printing and restores the input tab",
+  async () => {
+    const invoke = call.getMockImplementation()! as (
+      method: string,
+      request: any,
+    ) => Promise<any>;
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    call.mockImplementation(async (method, request) => {
+      if (method === "cashflows") await pending;
+      return invoke(method, request);
+    });
+    const print = vi.fn();
+    vi.stubGlobal("print", print);
+    vi.stubGlobal("requestAnimationFrame", (callback: () => void) =>
+      setTimeout(callback, 0),
+    );
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: { ready: Promise.resolve() },
+    });
+    try {
+      mount();
+      const button = await screen.findByRole("button", {
+        name: "Print report",
+      });
+      await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false), {
+        timeout: budget(10000),
+      });
+      const request = prices()[0]!;
+      fireEvent.click(button);
+      const workbench = screen.getByRole("region", {
+        name: "Pricing workbench",
+      });
+      await waitFor(() =>
+        expect(workbench.getAttribute("data-printing")).toBe("preparing"),
+      );
+      expect(print).not.toHaveBeenCalled();
+      expect(
+        screen
+          .getByRole("tab", { name: "2 Market" })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+      release();
+      await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+      const cashflowCalls = call.mock.calls.filter(
+        ([method]) => method === "cashflows",
+      );
+      expect(cashflowCalls).toHaveLength(1);
+      expect(cashflowCalls[0]![1]).toEqual({
+        instrumentJson: request.instrumentJson,
+        marketJson: request.marketJson,
+        asOf: request.asOf,
+        model: "discounting",
+      });
+      showOriginal(
+        workbench.querySelector('[aria-label="Priced instrument JSON"]')!,
+      );
+      showOriginal(workbench.querySelector('[aria-label="Market snapshot"]')!);
+      expect(
+        workbench.querySelector('[aria-label="Priced instrument JSON"] pre')
+          ?.textContent,
+      ).toBe(request.instrumentJson);
+      expect(
+        workbench.querySelector('[aria-label="Market snapshot"] pre')
+          ?.textContent,
+      ).toBe(request.marketJson);
+      fireEvent(window, new Event("afterprint"));
+      await waitFor(() =>
+        expect(workbench.hasAttribute("data-printing")).toBe(false),
+      );
+      expect(
+        screen
+          .getByRole("tab", { name: "1 Instrument" })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+      expect(
+        screen
+          .getByRole("tab", { name: "3 Cashflows" })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+    } finally {
+      Reflect.deleteProperty(document, "fonts");
+      release();
+    }
+  },
+  budget(30000),
+);
 
 it("keeps shortcuts within the focused workbench and leaves field typing intact", () => {
   const first = mount(),

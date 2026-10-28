@@ -18,6 +18,7 @@ import { serializeHost } from "../../src/codec.mjs";
 import failure from "../calibration/failure.json";
 import cases from "../calibration/cases.json";
 import inventory from "../../src/generated/fixtures.json";
+import { budget } from "../shared/budget";
 afterEach(cleanup);
 const reports = cases as unknown as {
   source: string;
@@ -113,49 +114,58 @@ it("separates deposit/swap and unlike steps and isolates missing input identitie
     "Duplicate",
   );
 });
-it("renders exact plan and step reports, unavailable diagnostics and native zero-target representation", () => {
-  for (const fixture of reports)
-    for (const [stepId, report] of [
-      ["Plan", fixture.result.result.report],
-      ...Object.entries(fixture.result.result.step_reports),
-    ] as const) {
-      const mounted = render(
-        <CalibrationReport stepId={stepId} report={report} />,
-      );
-      for (const button of screen.getAllByRole("button", { name: "Original" }))
-        fireEvent.click(button);
-      expect(
-        screen
-          .getByRole("region", { name: `${stepId} complete report` })
-          .querySelector("pre")!.textContent,
-      ).toBe(serializeHost(report));
-      if (report.diagnostics) {
-        const rows = Array.from(
-          screen
-            .getByRole("table", {
-              name: `${stepId} native per-quote diagnostics`,
-            })
-            .querySelectorAll("tbody tr"),
-          (row) =>
-            Array.from(row.querySelectorAll("td"), (cell) => cell.textContent),
+it(
+  "renders exact plan and step reports, unavailable diagnostics and native zero-target representation",
+  () => {
+    for (const fixture of reports)
+      for (const [stepId, report] of [
+        ["Plan", fixture.result.result.report],
+        ...Object.entries(fixture.result.result.step_reports),
+      ] as const) {
+        const mounted = render(
+          <CalibrationReport stepId={stepId} report={report} />,
         );
-        expect(rows).toEqual(
-          report.diagnostics.per_quote.map((q) =>
-            [q.quote_label, q.quote_value, q.residual, q.sensitivity].map(
-              String,
-            ),
-          ),
-        );
-        // Each row carries the market quote it was calibrated to.
+        for (const button of screen.getAllByRole("button", {
+          name: "Original",
+        }))
+          fireEvent.click(button);
         expect(
-          report.diagnostics.per_quote.every((q) =>
-            Number.isFinite(q.quote_value),
-          ),
-        ).toBe(true);
-      } else expect(screen.getByText("Diagnostics unavailable")).toBeTruthy();
-      mounted.unmount();
-    }
-}, 15000);
+          screen
+            .getByRole("region", { name: `${stepId} complete report` })
+            .querySelector("pre")!.textContent,
+        ).toBe(serializeHost(report));
+        if (report.diagnostics) {
+          const rows = Array.from(
+            screen
+              .getByRole("table", {
+                name: `${stepId} native per-quote diagnostics`,
+              })
+              .querySelectorAll("tbody tr"),
+            (row) =>
+              Array.from(
+                row.querySelectorAll("td"),
+                (cell) => cell.textContent,
+              ),
+          );
+          expect(rows).toEqual(
+            report.diagnostics.per_quote.map((q) =>
+              [q.quote_label, q.quote_value, q.residual, q.sensitivity].map(
+                String,
+              ),
+            ),
+          );
+          // Each row carries the market quote it was calibrated to.
+          expect(
+            report.diagnostics.per_quote.every((q) =>
+              Number.isFinite(q.quote_value),
+            ),
+          ).toBe(true);
+        } else expect(screen.getByText("Diagnostics unavailable")).toBeTruthy();
+        mounted.unmount();
+      }
+  },
+  budget(15000),
+);
 
 it("preserves actual native structured failures with available and unavailable solver diagnostics", () => {
   const { rerender } = render(

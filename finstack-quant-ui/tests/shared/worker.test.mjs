@@ -7,6 +7,7 @@ import { exportValuation } from "../../src/host";
 import { formatMoney, formatRawMoney } from "../../src/format/format";
 import { priceOptions } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
 import { errorValue, unwrap } from "@/workers/finstack-contract";
+import { budget } from "./budget.ts";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -70,7 +71,7 @@ function same(actual, expected) {
 beforeAll(async () => {
   harness = await startWorker();
   proxy = harness.proxy;
-}, 30000);
+}, budget(30000));
 afterAll(async () => harness?.close());
 it("compares real worker results and errors with the direct native facade", async () => {
   for (const request of Object.values(requests))

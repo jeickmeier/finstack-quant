@@ -11,6 +11,7 @@ import {
   structuralValidator,
   workingValue,
 } from "@/components/finstack/core/components/schema-form/schema-walk";
+import { budget } from "../../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 ) as { validateInstrumentJson(json: string): string };
@@ -74,7 +75,7 @@ it.each(instruments)(
             ) as HTMLButtonElement
           ).disabled,
         ).toBe(false),
-      { timeout: 10000 },
+      { timeout: budget(10000) },
     );
     fireEvent.submit(container.querySelector("form")!);
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));

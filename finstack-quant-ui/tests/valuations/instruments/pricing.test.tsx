@@ -17,6 +17,7 @@ import {
 } from "@/workers/finstack-contract";
 import { startWorker } from "../../shared/worker/harness.mjs";
 import manifest from "./pricing-cases.json";
+import { budget } from "../../shared/budget";
 
 type Case = (typeof manifest.cases)[number];
 const repository = resolve(
@@ -34,7 +35,7 @@ beforeAll(async () => {
     ),
   });
   worker = await startWorker();
-}, 30000);
+}, budget(30000));
 afterAll(async () => worker?.close());
 afterEach(cleanup);
 
@@ -185,7 +186,7 @@ it.each(manifest.cases)(
             ) as HTMLButtonElement
           ).disabled,
         ).toBe(false),
-      { timeout: 10000 },
+      { timeout: budget(10000) },
     );
     fireEvent.submit(container.querySelector("form")!);
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));

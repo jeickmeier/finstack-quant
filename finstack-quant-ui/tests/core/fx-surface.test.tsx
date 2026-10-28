@@ -6,6 +6,7 @@ import { FxSurfaceChart } from "@/components/finstack/models/components/fx-surfa
 import { startWorker } from "../shared/worker/harness.mjs";
 import { unwrap } from "@/workers/finstack-contract";
 import { fxQuotes } from "./surfaces/fixtures";
+import { budget } from "../shared/budget";
 const transport = vi.hoisted(() => ({ call: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/use-finstack", () => ({
   useFinstack: () => ({
@@ -30,7 +31,7 @@ beforeAll(async () => {
   transport.call.mockImplementation(async (method, arg) =>
     unwrap(await worker.proxy[method as "sampleFxDelta"](arg)),
   );
-}, 30000);
+}, budget(30000));
 afterAll(async () => worker?.close());
 afterEach(() => {
   cleanup();

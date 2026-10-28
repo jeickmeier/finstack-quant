@@ -15,6 +15,7 @@ import { CalibrationForm } from "@/components/finstack/calibration/components/ca
 import { calibrationModule } from "@/components/finstack/calibration/components/calibration-form/calibration";
 import { startWorker } from "../shared/worker/harness.mjs";
 import { unwrap } from "@/workers/finstack-contract";
+import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -32,87 +33,99 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../.."),
 let worker: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   worker = await startWorker();
-}, 30000);
+}, budget(30000));
 afterAll(async () => worker?.close());
 afterEach(cleanup);
 const validate = async (json: string) =>
   unwrap(await worker.proxy.validateCalibration(json));
-it("edits generated quotes, prior markets and settings and submits the exact native canonical envelope", async () => {
-  const initial = load("01_usd_discount");
-  initial.prior_market = load("05_cdx_base_correlation").prior_market;
-  initial.plan.settings.compute_diagnostics = false;
-  const onSubmit = vi.fn();
-  render(
-    <CalibrationForm
-      defaultJson={JSON.stringify(initial)}
-      validate={validate}
-      onSubmit={onSubmit}
-    />,
-  );
-  const submit = screen.getByRole("button", {
-    name: "Calibrate",
-  }) as HTMLButtonElement;
-  const field = (path: string) =>
-    document.querySelector(
-      `[data-field-path="${path}"] input`,
+it(
+  "edits generated quotes, prior markets and settings and submits the exact native canonical envelope",
+  async () => {
+    const initial = load("01_usd_discount");
+    initial.prior_market = load("05_cdx_base_correlation").prior_market;
+    initial.plan.settings.compute_diagnostics = false;
+    const onSubmit = vi.fn();
+    render(
+      <CalibrationForm
+        defaultJson={JSON.stringify(initial)}
+        validate={validate}
+        onSubmit={onSubmit}
+      />,
+    );
+    const submit = screen.getByRole("button", {
+      name: "Calibrate",
+    }) as HTMLButtonElement;
+    const field = (path: string) =>
+      document.querySelector(
+        `[data-field-path="${path}"] input`,
+      ) as HTMLInputElement;
+    expect(field("market_data[0].rate")).toBeTruthy();
+    fireEvent.change(field("market_data[0].rate"), {
+      target: { value: "0.0527" },
+    });
+    fireEvent.change(field("prior_market[0].knot_points[1][1]"), {
+      target: { value: "0.0013" },
+    });
+    const checkbox = document.querySelector(
+      '[data-field-path="plan.settings.compute_diagnostics"] input[type="checkbox"]',
     ) as HTMLInputElement;
-  expect(field("market_data[0].rate")).toBeTruthy();
-  fireEvent.change(field("market_data[0].rate"), {
-    target: { value: "0.0527" },
-  });
-  fireEvent.change(field("prior_market[0].knot_points[1][1]"), {
-    target: { value: "0.0013" },
-  });
-  const checkbox = document.querySelector(
-    '[data-field-path="plan.settings.compute_diagnostics"] input[type="checkbox"]',
-  ) as HTMLInputElement;
-  expect(checkbox).toBeTruthy();
-  fireEvent.click(checkbox);
-  await waitFor(() => expect(submit.disabled).toBe(false), { timeout: 5000 });
-  fireEvent.click(submit);
-  await waitFor(() => expect(onSubmit).toHaveBeenCalled(), { timeout: 5000 });
-  initial.market_data[0].rate = 0.0527;
-  initial.prior_market[0].knot_points[1][1] = 0.0013;
-  initial.plan.settings.compute_diagnostics = true;
-  expect(onSubmit.mock.calls.at(-1)![0]).toBe(
-    JSON.stringify(native.validateCalibration(JSON.stringify(initial))),
-  );
-  expect(
-    calibrationModule.codec.stringify(
-      calibrationModule.codec.parse(onSubmit.mock.calls[0]![0]),
-    ),
-  ).toBeTruthy();
-}, 15000);
-it("keeps native semantic failures in the summary and prevents calibration acceptance", async () => {
-  const initial = load("01_usd_discount");
-  initial.plan.steps[0].quote_set = "missing_quotes";
-  const onSubmit = vi.fn();
-  render(
-    <CalibrationForm
-      defaultJson={JSON.stringify(initial)}
-      validate={validate}
-      onSubmit={onSubmit}
-    />,
-  );
-  let message;
-  try {
-    native.validateCalibration(JSON.stringify(initial));
-  } catch (error) {
-    message = (error as Error).message;
-  }
-  await waitFor(() =>
+    expect(checkbox).toBeTruthy();
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(submit.disabled).toBe(false), {
+      timeout: budget(5000),
+    });
+    fireEvent.click(submit);
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled(), {
+      timeout: budget(5000),
+    });
+    initial.market_data[0].rate = 0.0527;
+    initial.prior_market[0].knot_points[1][1] = 0.0013;
+    initial.plan.settings.compute_diagnostics = true;
+    expect(onSubmit.mock.calls.at(-1)![0]).toBe(
+      JSON.stringify(native.validateCalibration(JSON.stringify(initial))),
+    );
     expect(
-      screen
-        .getAllByRole("alert")
-        .some((node) => node.textContent?.includes(message!)),
-    ).toBe(true),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Calibrate" }));
-  await waitFor(() =>
-    expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
-  );
-  expect(onSubmit).not.toHaveBeenCalled();
-}, 15000);
+      calibrationModule.codec.stringify(
+        calibrationModule.codec.parse(onSubmit.mock.calls[0]![0]),
+      ),
+    ).toBeTruthy();
+  },
+  budget(15000),
+);
+it(
+  "keeps native semantic failures in the summary and prevents calibration acceptance",
+  async () => {
+    const initial = load("01_usd_discount");
+    initial.plan.steps[0].quote_set = "missing_quotes";
+    const onSubmit = vi.fn();
+    render(
+      <CalibrationForm
+        defaultJson={JSON.stringify(initial)}
+        validate={validate}
+        onSubmit={onSubmit}
+      />,
+    );
+    let message;
+    try {
+      native.validateCalibration(JSON.stringify(initial));
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole("alert")
+          .some((node) => node.textContent?.includes(message!)),
+      ).toBe(true),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Calibrate" }));
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  },
+  budget(15000),
+);
 
 it.each(["null", "[]", "42", '"text"', "{ malformed"])(
   "rejects invalid initial root %s instead of loading an example",
@@ -150,7 +163,7 @@ it("exposes structurally valid JSON for diagnostics while native rejection preve
       expect(input.mock.calls.some(([json]) => typeof json === "string")).toBe(
         true,
       ),
-    { timeout: 5000 },
+    { timeout: budget(5000) },
   );
   expect(accepted.mock.calls.every(([json]) => json === null)).toBe(true);
   input.mockClear();
