@@ -1,7 +1,7 @@
 import { createChartRuntime, type ChartValue } from "@tanstack/charts";
 import { serializeChartSvg, renderChartImage } from "@tanstack/charts/export";
 import { composeFigure, type FigureSpec } from "./figure";
-import { readPresentation } from "./presentation";
+import { figureLayout, readPresentation } from "./presentation";
 export interface FigureExportOptions {
   width: number;
   height: number;
@@ -108,6 +108,10 @@ export async function exportFigure<
   try {
     const presentation = readPresentation(host);
     if (options.background) presentation.theme.background = options.background;
+    if (!figureLayout(props, options.width, options.height, presentation))
+      throw new Error(
+        "Figure dimensions cannot fit the supplied headings and notes; increase the width or height",
+      );
     const figure = composeFigure(props, presentation);
     const scene = runtime.render(
       figure.definition,

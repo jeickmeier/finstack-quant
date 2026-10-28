@@ -246,6 +246,36 @@ try {
     lightFromDark.includes(`fill="${tokens.light.background}"`),
     "A light export must be independent of the dark application theme",
   );
+  // An export too small for its prose rejects; a live container that small
+  // (a panel animating open) draws the plot alone instead of throwing.
+  assert.match(
+    await page.evaluate(() =>
+      window.figureProbe
+        .export("numeric", "svg", { width: 16, height: 640 })
+        .then(
+          () => "exported",
+          (error) => error.message,
+        ),
+    ),
+    /cannot fit the supplied headings and notes/,
+  );
+  for (const width of ["1px", "8px", "120px"]) {
+    await page.evaluate((width) => {
+      for (const figure of document.querySelectorAll("[data-finstack-figure]"))
+        figure.style.width = width;
+    }, width);
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    await page.waitForTimeout(100);
+  }
+  await page.evaluate(() => {
+    for (const figure of document.querySelectorAll("[data-finstack-figure]"))
+      figure.style.width = "";
+  });
   assert.deepEqual(failures, []);
   assert(!requests.some((url) => url.endsWith(".wasm")));
   await page.screenshot({

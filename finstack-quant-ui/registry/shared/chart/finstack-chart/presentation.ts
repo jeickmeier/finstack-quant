@@ -107,7 +107,14 @@ export function readPresentation(element: HTMLElement): FigurePresentation {
     measureText,
   };
 }
-/** Only publication prose wraps here; native chart guides own axis measurement and tick policies. */
+/**
+ * Wrap the publication prose (title, subtitle, caption, sources and figure notes)
+ * for one figure size; native chart guides own axis measurement and tick policies.
+ * @returns The prose bands and their lines, or `null` when the size leaves no room
+ * for the prose and a 96px plot. Callers decide: exports reject, the live chart draws
+ * the plot without prose.
+ * @throws Error when a figure annotation fraction lies outside 0..1.
+ */
 export function figureLayout(
   text: FigureText,
   width: number,
@@ -117,10 +124,7 @@ export function figureLayout(
   const { spacing, measureText, fontFamily } = presentation;
   const inset = spacing * 2;
   const available = width - inset * 2;
-  if (!(available > 0) || !Number.isFinite(height) || height <= 0)
-    throw new Error(
-      "Figure dimensions must be positive and leave room for text",
-    );
+  if (!(available > 0) || !Number.isFinite(height) || height <= 0) return null;
   const lines: SceneLabel[] = [];
   function block(
     value: string | undefined,
@@ -229,9 +233,6 @@ export function figureLayout(
       style: { fill: presentation.theme.foreground },
     });
   }
-  if (height - top - bottom < 96)
-    throw new Error(
-      "Figure dimensions cannot fit the supplied headings and notes; increase the height",
-    );
+  if (height - top - bottom < 96) return null;
   return { top, bottom, lines };
 }

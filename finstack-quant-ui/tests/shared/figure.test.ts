@@ -72,7 +72,7 @@ it.each([340, 900])(
     expect(svg).toContain("<path");
     expect(svg).not.toContain("foreignObject");
     expect(svg).not.toContain("<image");
-    const layout = figureLayout(figureExample, width, 600, presentation);
+    const layout = figureLayout(figureExample, width, 600, presentation)!;
     const labels = (nodes: readonly SceneNode[]): SceneNode[] =>
       nodes.flatMap((node) =>
         node.kind === "group" ? labels(node.children) : [node],
@@ -97,17 +97,51 @@ it("omits empty bands and preserves all long text without ellipsis", () => {
     lines: [],
   });
   const title = "A heading with explicit\nparagraphs andaverylongsingleword";
-  const layout = figureLayout({ title }, 180, 600, presentation);
+  const layout = figureLayout({ title }, 180, 600, presentation)!;
   expect(
     layout.lines
       .map((line) => line.text)
       .join("")
       .replaceAll(/\s/g, ""),
   ).toBe(title.replaceAll(/\s/g, ""));
-  expect(() => figureLayout({ title }, 120, 120, presentation)).toThrow(
-    /cannot fit/,
-  );
 });
+it("has no layout when the size cannot fit the prose and a 96px plot", () => {
+  const title = "A heading with explicit\nparagraphs andaverylongsingleword";
+  // spacing 4 insets the prose 8px on each side, so 16px leaves no width.
+  expect(figureLayout({ title }, 16, 600, presentation)).toBeNull();
+  expect(figureLayout({}, 17, 600, presentation)).toEqual({
+    top: 0,
+    bottom: 0,
+    lines: [],
+  });
+  expect(figureLayout({ title }, 120, 120, presentation)).toBeNull();
+  expect(figureLayout({ title }, 300, 0, presentation)).toBeNull();
+});
+it.each([
+  [1, 600],
+  [16, 600],
+  [120, 120],
+])(
+  "draws the live plot without prose at %i x %i instead of throwing",
+  (width, height) => {
+    const figure = composeFigure(figureExample, presentation);
+    const runtime = createChartRuntime<
+      ChartSpecDatum<typeof figureExample.definition>,
+      number,
+      number
+    >();
+    const scene = runtime.render(
+      figure.definition,
+      { width, height },
+      { measureText: presentation.measureText },
+    );
+    const svg = figure.renderSvg(scene, { ariaLabel: figureExample.ariaLabel });
+    expect(svg).toContain("<svg");
+    expect(svg).not.toContain(figureExample.title);
+    expect(svg).not.toContain("Registry illustration");
+    runtime.destroy();
+  },
+);
 it("places figure-relative notes without touching native data values and escapes markup", () => {
   const props = {
     ...figureExample,
@@ -125,7 +159,7 @@ it("places figure-relative notes without touching native data values and escapes
   expect(svg).not.toContain("<script>");
   expect(svg).toContain("&lt;script&gt;");
   expect(
-    figureLayout(props, 900, 600, presentation).lines.at(-1),
+    figureLayout(props, 900, 600, presentation)!.lines.at(-1),
   ).toMatchObject({ text: "Figure note", x: 458, y: 64 });
   runtime.destroy();
 });

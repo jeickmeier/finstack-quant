@@ -32,9 +32,7 @@ try {
     ),
   );
   ({ server, browser, page } = await openConsumer(path.join(consumer, "dist"), {
-    // Tall enough for both parents, so the evidence screenshot needs no
-    // beyond-viewport capture (see the screenshot below).
-    viewport: { width: 1000, height: 1700 },
+    viewport: { width: 1000, height: 1000 },
   }));
   const failures = [],
     requests = [];
@@ -154,9 +152,11 @@ try {
   assert.match(await status.textContent(), /Accepted: none/);
   assert.match(await events.textContent(), /Activations: 3; proposals: 5/);
   // A full-page capture beyond the viewport briefly lays the charts out 1px
-  // wide, which FinstackChart rejects with a page error; the viewport already
-  // holds the whole fixture, so capture just the viewport.
-  await page.screenshot({ path: path.join(evidence, "interactions.png") });
+  // wide; asserting failures afterwards checks FinstackChart draws through it.
+  await page.screenshot({
+    path: path.join(evidence, "interactions.png"),
+    fullPage: true,
+  });
   assert.deepEqual(failures, []);
   assert(!requests.some((url) => url.endsWith(".wasm")));
   const report = {
