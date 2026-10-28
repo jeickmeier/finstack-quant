@@ -450,7 +450,9 @@ thinning and explicit label rotation. No units or financial values are inferred.
 A `FigureHandle` ref exposes `exportSvg` and `exportPng` with explicit width/height,
 optional raster scale, theme and background. Exports use the same composition at
 that size after fonts load. Dimensions too small for the supplied prose reject
-instead of silently dropping text. Same-origin font stylesheets allow the export
+instead of silently dropping text. On screen, a container too small for the prose
+(a panel animating open, for example) draws the plot without it instead of
+throwing. Same-origin font stylesheets allow the export
 to embed loaded webfonts; desktop editors may require the font installed locally.
 PNG scale changes pixel density, not data/layout coordinates. For example, a
 900×600 layout at scale 2 gives 1800×1200 pixels, suitable for 6×4 inches at 300 PPI.
