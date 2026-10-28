@@ -635,7 +635,7 @@ fn pricing_entry_points_declare_structured_valuation_results() {
     }
     assert!(contains_ignoring_ws(
         interface_block(&host, "StochasticPricingResult"),
-        "num_paths: bigint;"
+        "num_paths: number;"
     ));
     assert!(contains_ignoring_ws(
         interface_block(&host, "FxValuationDetails"),

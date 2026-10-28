@@ -23,7 +23,17 @@ export function resolve(
     if (!target || typeof target !== "object")
       throw new Error(`Missing schema reference: ${ref}`);
     const { $ref: _, ...siblings } = schema;
-    schema = { ...(target as Schema), ...siblings };
+    const merged: Schema = { ...(target as Schema), ...siblings };
+    // A tagged struct variant is `{$ref: struct, properties: {tag}, required: [tag]}`:
+    // its sibling fields extend the struct's, as allOf would, instead of replacing them.
+    const { properties, required } = target as Schema;
+    if (properties && siblings.properties) {
+      merged.properties = { ...properties, ...siblings.properties };
+      merged.required = [
+        ...new Set([...(required ?? []), ...(siblings.required ?? [])]),
+      ];
+    }
+    schema = merged;
     pointer = ref;
   }
   return { schema, pointer };
@@ -58,56 +68,6 @@ export const objectValue = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-const ACRONYMS = new Set([
-  "mc",
-  "fx",
-  "ois",
-  "cds",
-  "cms",
-  "fra",
-  "irs",
-  "tba",
-  "cmo",
-  "mbs",
-  "abs",
-  "clo",
-  "oas",
-  "dv01",
-  "cs01",
-  "pv",
-  "npv",
-  "ytm",
-  "atm",
-  "rr",
-  "bf",
-  "hw1f",
-  "cpr",
-  "cdr",
-  "wal",
-  "isda",
-  "imm",
-  "sofr",
-  "libor",
-  "ndf",
-  "trs",
-  "yoy",
-  "xccy",
-  "vol",
-  "sabr",
-  "pde",
-]);
-/** Sentence-case labels from wire names; market acronyms stay upright. */
-export const labelFor = (name: string) =>
-  name
-    .split("_")
-    .map((word, index) =>
-      ACRONYMS.has(word)
-        ? word.toUpperCase()
-        : index === 0
-          ? word.replace(/^./, (letter) => letter.toUpperCase())
-          : word,
-    )
-    .join(" ");
 
 /** Create an editable branch from declared defaults; missing required inputs stay visibly incomplete. */
 export function initialValue(

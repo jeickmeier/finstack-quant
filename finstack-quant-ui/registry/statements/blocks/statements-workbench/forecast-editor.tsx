@@ -1,6 +1,10 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
+import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/id-combobox";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 
 type Node = FinancialModelSpecWire["nodes"][string];
@@ -333,119 +337,132 @@ export function ForecastEditor({
         ? []
         : [typeof value === "number" ? String(value) : value.amount];
     });
+  const set = (key: string, value: string) =>
+    setDraft({ ...draft, [key]: value });
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <section
+      aria-label={`${node.name ?? nodeId} forecast`}
+      className="rounded-lg border border-border bg-card p-4"
+    >
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_15rem]">
         <div>
           <h4 className="font-semibold">{node.name ?? nodeId}</h4>
           <p className="text-xs text-muted-foreground">{selected.help}</p>
         </div>
-        <label className="text-xs font-medium">
-          Forecast method
-          <select
-            aria-label={`${node.name ?? nodeId} forecast method`}
-            className="mt-1 w-full rounded border border-border bg-background px-2 py-2 text-sm"
-            value={method}
-            onChange={(event) => changeMethod(event.target.value as Method)}
-          >
-            {methods.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <EnumField
+          label={`${node.name ?? nodeId} forecast method`}
+          layout="select"
+          value={method}
+          onValueChange={(next) => changeMethod(next as Method)}
+          options={methods.map((item) => ({
+            value: item.id,
+            label: item.label,
+            description: item.help,
+          }))}
+        />
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {method === "curve_pct" &&
           periods.map((id) => (
-            <label key={id} className="text-xs">
-              {id} growth rate
-              <input
-                aria-label={`${node.name ?? nodeId} ${id} growth rate`}
-                className="mt-1 w-full rounded border border-border bg-background px-2 py-2 font-mono text-sm"
-                inputMode="decimal"
-                value={draft[id] ?? ""}
-                onChange={(event) =>
-                  setDraft({ ...draft, [id]: event.target.value })
-                }
-              />
-            </label>
+            <FieldFrame key={id} label={`${id} growth rate`}>
+              {(control) => (
+                <Input
+                  {...control}
+                  inputMode="decimal"
+                  className="font-mono"
+                  value={draft[id] ?? ""}
+                  onChange={(event) => set(id, event.target.value)}
+                />
+              )}
+            </FieldFrame>
           ))}
         {method === "override" &&
           periods.map((id) => (
-            <label key={id} className="text-xs">
-              {id} scheduled value
-              <input
-                aria-label={`${node.name ?? nodeId} ${id} scheduled value`}
-                className="mt-1 w-full rounded border border-border bg-background px-2 py-2 font-mono text-sm"
-                inputMode="decimal"
-                placeholder="Carry forward"
-                value={draft[id] ?? ""}
-                onChange={(event) =>
-                  setDraft({ ...draft, [id]: event.target.value })
-                }
-              />
-            </label>
+            <FieldFrame key={id} label={`${id} scheduled value`}>
+              {(control) => (
+                <Input
+                  {...control}
+                  inputMode="decimal"
+                  className="font-mono"
+                  placeholder="Carry forward"
+                  value={draft[id] ?? ""}
+                  onChange={(event) => set(id, event.target.value)}
+                />
+              )}
+            </FieldFrame>
           ))}
-        {fieldList.map((item) => (
-          <label key={item.key} className="text-xs">
-            {item.label}
-            {item.kind === "select" ? (
-              <select
-                className="mt-1 w-full rounded border border-border bg-background px-2 py-2 text-sm"
-                value={draft[item.key] ?? ""}
-                onChange={(event) =>
-                  setDraft({ ...draft, [item.key]: event.target.value })
-                }
-              >
-                <option value="">Choose…</option>
-                {item.options?.map((value) => (
-                  <option key={value} value={value}>
-                    {value.replaceAll("_", " ")}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                className="mt-1 w-full rounded border border-border bg-background px-2 py-2 font-mono text-sm"
-                inputMode={item.key === "correlation_with" ? "text" : "decimal"}
-                value={draft[item.key] ?? ""}
-                onChange={(event) =>
-                  setDraft({ ...draft, [item.key]: event.target.value })
-                }
+        {fieldList.map((item) => {
+          const value = draft[item.key] ?? "";
+          if (item.kind === "select")
+            return (
+              <EnumField
+                key={item.key}
+                label={item.label}
+                value={value}
+                onValueChange={(next) => set(item.key, next)}
+                options={(item.options ?? []).map((option) => ({
+                  value: option,
+                  label: option.replaceAll("_", " "),
+                }))}
+              />
+            );
+          if (item.key === "correlation_with")
+            return (
+              <IdCombobox
+                key={item.key}
+                label={item.label}
+                value={value}
+                onValueChange={(next) => set(item.key, next)}
+                options={Object.keys(model.nodes).filter((id) => id !== nodeId)}
+              />
+            );
+          return (
+            <div key={item.key} className="space-y-1">
+              <FieldFrame label={item.label} help={item.hint}>
+                {(control) => (
+                  <Input
+                    {...control}
+                    inputMode={
+                      item.kind === "array"
+                        ? undefined
+                        : item.kind === "integer"
+                          ? "numeric"
+                          : "decimal"
+                    }
+                    className="font-mono"
+                    value={value}
+                    onChange={(event) => set(item.key, event.target.value)}
+                  />
+                )}
+              </FieldFrame>
+              {item.key === "historical" && history.length > 0 && (
+                <Button
+                  type="button"
+                  variant="link"
+                  size="xs"
+                  onClick={() => set("historical", history.join(", "))}
+                >
+                  Use reported history
+                </Button>
+              )}
+            </div>
+          );
+        })}
+        {(["min", "max"] as const).map((key) => (
+          <FieldFrame
+            key={key}
+            label={`${key === "min" ? "Minimum" : "Maximum"} (optional)`}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                inputMode="decimal"
+                className="font-mono"
+                value={draft[key] ?? ""}
+                onChange={(event) => set(key, event.target.value)}
               />
             )}
-            {item.hint && (
-              <span className="block pt-1 text-[11px] text-muted-foreground">
-                {item.hint}
-              </span>
-            )}
-            {item.key === "historical" && history.length > 0 && (
-              <button
-                type="button"
-                className="mt-1 text-primary underline"
-                onClick={() =>
-                  setDraft({ ...draft, historical: history.join(", ") })
-                }
-              >
-                Use reported history
-              </button>
-            )}
-          </label>
-        ))}
-        {(["min", "max"] as const).map((key) => (
-          <label key={key} className="text-xs">
-            {key === "min" ? "Minimum" : "Maximum"} (optional)
-            <input
-              className="mt-1 w-full rounded border border-border bg-background px-2 py-2 font-mono text-sm"
-              inputMode="decimal"
-              value={draft[key] ?? ""}
-              onChange={(event) =>
-                setDraft({ ...draft, [key]: event.target.value })
-              }
-            />
-          </label>
+          </FieldFrame>
         ))}
       </div>
       {error && (
@@ -462,6 +479,6 @@ export function ForecastEditor({
       >
         {saving ? "Evaluating…" : applyLabel}
       </Button>
-    </div>
+    </section>
   );
 }

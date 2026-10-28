@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
+import type { MoneyValue as Money } from "finstack-quant-wasm";
 import { DecimalInput } from "./components/finstack/core/primitives/decimal-input/decimal-input";
 import { MoneyInput } from "./components/finstack/core/primitives/money-input/money-input";
 import { RateInput } from "./components/finstack/core/primitives/rate-input/rate-input";
@@ -21,7 +22,7 @@ const options = Array.from(
 );
 function App() {
   const [decimal, setDecimal] = useState("12345678901234567890.1234"),
-    [money, setMoney] = useState(data.notional),
+    [money, setMoney] = useState<Money>(data.notional as Money),
     [rate, setRate] = useState<string | number>("0.025"),
     [date, setDate] = useState("2024-02-29"),
     [id, setId] = useState(""),

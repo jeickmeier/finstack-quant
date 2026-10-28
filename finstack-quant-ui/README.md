@@ -33,6 +33,89 @@ caches the module and its validator. The catalogue has no static imports of Zod,
 schemas, metadata or examples. Individual wire types are exported by the loaded
 module, and live under `src/generated/types/` for type-only imports.
 
+## Layout and extension
+
+| Path                                                 | Holds                                                                                                                                                                                                                           |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
+| `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                     |
+| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                           |
+| `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                       |
+| `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                    |
+| `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                              |
+| `tests/e2e/`, `tests/install/`, `tests/publishing/`  | The `ui-e2e`, `ui-install` and `ui-publish-check` gates.                                                                                                                                                                        |
+| `tests/browser/`                                     | Worker smoke, footprint gate, the harness runner and shared consumer helpers.                                                                                                                                                   |
+
+Sources import through the paths an installed consumer uses. `tsconfig.json`
+maps them back here; `vitest.config.mts` copies that table into prefix aliases
+in order, so a specific key must precede its prefix.
+
+| Import                    | Source                                                                                                                             |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                 |
+| `@/lib/finstack/*`        | `src/*`                                                                                                                            |
+| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `models` and `statements`; a new crate adds its line |
+| `@/workers/*`             | `registry/shared/file/*`                                                                                                           |
+| `@/components/finstack/*` | `registry/*`                                                                                                                       |
+| `@/components/ui/*`       | `components/ui/*`                                                                                                                  |
+
+A new crate category also adds its directory name to the `include` list in
+`scripts/gen-registry.mjs`, then runs
+`npm --prefix finstack-quant-ui run generate`; without it, the build,
+`check-registry`, the gallery and the install matrix never see the crate's items.
+
+To add an item (the gate that catches each omission is in brackets):
+
+1. Write it under `registry/<category>/`, composing stock controls from
+   `@/components/ui/*` (never `@base-ui/*`), with colours and fonts from theme
+   tokens only [`ui-check`: `check-registry`, `check-tokens`].
+2. Declare it in `registry/<category>/registry.json` so every import resolves
+   inside its `registryDependencies` closure; visual items must reach
+   `finstack-theme`, and a closure that reaches a stock shadcn component must
+   contain `finstack-base` [`ui-check`: `check-registry`].
+3. Run `npm --prefix finstack-quant-ui run generate` [`ui-check`: generator
+   drift].
+4. For a visual item, add
+   `docs-site/src/components/registry-gallery/examples/<item>.tsx` and its key
+   in `primitives.tsx` or `components.tsx` there [`ui-check`: `gen-gallery`].
+5. Cover its behaviour in Vitest under `tests/<crate>/` [review only].
+6. Record its four screenshots with
+   `mise run ui-e2e -- --update-snapshots -g "<item>"` and inspect them [local
+   `ui-e2e`].
+7. Check it installs in isolation with
+   `mise run ui-build && REGISTRY_INSTALL_ITEMS=<item> node finstack-quant-ui/scripts/install-matrix.mjs`
+   while iterating; `mise run ui-install` is the full local gate. Its worker
+   role comes from the registry, and an install that needs extra files uses
+   `tests/install/fixture/<item>.tsx` [local `ui-install`].
+
+CI runs only `ui-check` (the Test UI job); the other gates are local.
+
+`npm run generate` runs `scripts/run-generators.mjs`: `gen`, `gen-registry`,
+`gen-theme`, `encoding-report`, `catalogue-docs`, `gen-metadata`,
+`gen-gallery`. `gen-registry` and `gen-theme` rewrite `registry.json` and
+`registry/theme/registry.json` without `categories` and `meta`, which only
+`gen-metadata` restores; running either alone leaves metadata drift that
+`ui-check` rejects. Native fixtures follow [Native fixtures](#native-fixtures).
+
+| Gate                             | Needs                                                  | Measured                                                               |
+| -------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------- |
+| `ui-test`, `ui-check`            | `finstack-quant-wasm/pkg` and `pkg-node`               | `ui-check` 143 s, of which Vitest 76 s                                 |
+| Test UI (CI)                     | Builds both dev packages, then runs `ui-check`         | 1094 s: packages 448 s, `ui-check` 583 s                               |
+| `wasm-pkg`                       | Rust toolchain and `wasm-pack`                         | 278 s                                                                  |
+| `ui-e2e`                         | The export from `mise run ui-docs-build`               |                                                                        |
+| `ui-install`, `ui-publish-check` | A fresh `mise run wasm-pkg`                            | `ui-install` 2995 s (173-item matrix, docs install, composition smoke) |
+| `ui-harness`                     | Nothing prebuilt; each harness builds its own registry | 16 s (five harnesses)                                                  |
+
+Local times are wall clock on an Apple M5 Max (18 cores, 128 GB, macOS),
+measured one gate at a time on 2026-10-28. Test UI is CI run 40609354672
+(2026-10-28) on the hosted `ubuntu-24.04` runner.
+
+`mise run wasm-build` and `wasm-build-node` build the development packages and
+`wasm-pkg` the release ones. Each `ui-*` task that needs a WASM package checks
+for it before any WASM-dependent work and names the missing build;
+`ui-docs-install`, `ui-docs-build`, `ui-install` and `ui-publish-check` run the
+`ui-build` registry build, which needs no WASM, before that check.
+
 ## Ownership and generation
 
 `scripts/gen.mjs` reads the canonical crate schema indexes by URI. Ref Parser
@@ -85,6 +168,11 @@ the reason in the commit message.
 These validators establish JSON structure, not financial validity. Rust/WASM
 still owns schedules, market lookups, cross-field rules, pricing and calibration.
 No financial rules, unit tables or arithmetic are implemented here.
+Schema field, metric and registry names render through `labelFor`; components
+add no curated label maps for those names. A composing editor presents the
+choices its own controls offer: instrument-form's desk-quote and term-sheet
+tables, the statements workbench's forecast and rollup method lists and the
+valuation-details raw-detail labels.
 
 Generated interfaces describe wire shapes and cannot express every runtime
 constraint (bounds, patterns or exclusive unions). They are not WASM host types.
@@ -98,8 +186,9 @@ integers and non-JSON host objects fail instead of silently losing information.
 actual structured results, and `exportValuation(result,
 valuations.valuationResultToJson)` emits integer tokens validated by Rust.
 All five detail variants use Rust-derived WASM host declarations and validation
-metadata. Monte Carlo has a dedicated view; the other four retain raw views,
-including structured-credit bigint counts. Cashflow structure comes from the
+metadata. Monte Carlo has a dedicated view; the other four retain raw views.
+Path counts are plain numbers (Rust `wire::count`); only schema `int64`/`uint64`
+fields, such as seeds, arrive as bigint. Cashflow structure comes from the
 published Rust `instrument_cashflow` schema. Its presentation adapter preserves
 numeric tokens and the original JSON, including mixed-currency FX-swap rows.
 
@@ -248,7 +337,8 @@ so colours stay the light tokens.
 
 ## Display formatting
 
-`finstack-format` installs `lib/finstack/format/{format,columns}.ts`.
+`finstack-format` installs `lib/finstack/format/{format,columns}.ts` and
+`label.mjs` with its `label.d.mts` declaration.
 Scalar formatting is independent of WASM initialization.
 
 `formatMoney` preserves the amount and applies returned per-currency rounding
@@ -262,6 +352,14 @@ source strings remain the caller's state. Grouping currently uses en-US.
 `isoToEpoch` and `epochToIso` call the native core date functions in an initialized
 host (inside the worker for browser consumers). Column presets target Table
 9.2.4 and add formatting/alignment only.
+
+`labelFor` (`label.mjs`, also used by `gen-registry` for item titles) turns a
+Rust wire or metric name into a sentence-case label with one set of upright
+market acronyms; it is typography only and adds no financial names.
+`compareTenorLabels` puts whole-label `Nm`/`Ny` tenors first in maturity order on
+Rust's year basis (a month is 1/12 year). Other labels compare run by run:
+numbers by value, an embedded tenor run such as vega's `SURF::0.25y` in years,
+and text by en-US collation; ties fall back to the full label.
 
 ## Controlled primitives
 
@@ -287,7 +385,7 @@ using pinned `lossless-json`, preserving number tokens without converting them
 to JavaScript numbers. Its Original toggle shows the supplied bytes; Copy and
 Download always use those original bytes. Print uses the compact original text
 with wrapping, independently of the screen toggle. Invalid JSON, including duplicate keys,
-stays in Original view with a formatting notice. `node finstack-quant-ui/tests/shared/browser/primitives.mjs` builds an isolated
+stays in Original view with a formatting notice. `mise run ui-harness` (`tests/shared/browser/primitives.mjs`) builds an isolated
 consumer from actual registry JSON, checks keyboard/focus/clipboard behavior and
 10,000-option virtualization, and runs axe in both themes and densities.
 
@@ -299,6 +397,20 @@ They include `use-finstack` and the worker closure. Hooks install at
 the consumer's source directory (`src/` when the application has one).
 The worker uses the consumer's standard `@/lib/finstack` alias for the installed
 codec. The shared registry index owns these worker files.
+The contract (`workers/finstack-contract.ts`) groups the API by crate
+(`CoreApi`, `ValuationsApi`, `CalibrationApi`, `ModelsApi`, `StatementsApi`), and
+each method's comment names the facade call it wraps. The service
+(`workers/finstack-service.ts`) is a composer over `workers/services/<crate>.ts`,
+which share `workers/services/context.ts`. A new crate adds its interface to the
+contract and to the `WorkerApi` intersection there, one slice in
+`workers/services/<crate>.ts`, its `<Crate>Native` in the `createService`
+parameter type and one spread in `finstack-service.ts`, the import and pass of
+its facade namespace in `workers/finstack.worker.ts`, and a `files` entry in
+the `finstack-worker` item of `registry/shared/registry.json`. The method-set
+test in `tests/shared/worker.test.mjs` lists every method exactly, so the new
+methods join it there; it is the tripwire that fails when a spread is missing.
+The Node test worker (`tests/shared/worker/node.mjs`) passes the whole facade
+and needs no edit.
 
 Use `FinstackQueryProvider` around a standalone feature, or `FinstackProvider`
 inside the application's existing `QueryClientProvider`. `useFinstack` exposes
@@ -338,14 +450,16 @@ thinning and explicit label rotation. No units or financial values are inferred.
 A `FigureHandle` ref exposes `exportSvg` and `exportPng` with explicit width/height,
 optional raster scale, theme and background. Exports use the same composition at
 that size after fonts load. Dimensions too small for the supplied prose reject
-instead of silently dropping text. Same-origin font stylesheets allow the export
+instead of silently dropping text. On screen, a container too small for the prose
+(a panel animating open, for example) draws the plot without it instead of
+throwing. Same-origin font stylesheets allow the export
 to embed loaded webfonts; desktop editors may require the font installed locally.
 PNG scale changes pixel density, not data/layout coordinates. For example, a
 900×600 layout at scale 2 gives 1800×1200 pixels, suitable for 6×4 inches at 300 PPI.
 The original inputs are unchanged. SVG includes all persistent prose, sources,
 axes, legends and marks, without HTML overlays or rasterized marks.
 
-`node finstack-quant-ui/tests/shared/browser/figures.mjs` builds the installed example, exports narrow/wide
+`mise run ui-harness` (`tests/shared/browser/figures.mjs`) builds the installed example, exports narrow/wide
 numeric/date/category fixtures, checks text clipping/overlap, vector elements,
 font/style portability, exact raster dimensions, accessibility and no WASM loads.
 Pages 14.5 places the complete SVG at 15.24 × 10.16 cm with IBM Plex Sans
@@ -373,6 +487,11 @@ accepted state again there would duplicate the native selection proposal. Shared
 cursors use a parent-owned native `createChartCursor`, with explicitly compatible
 coordinates. See the installable `LinkedFigureExample`.
 The hook imports only React; chart-only consumers load neither tables nor WASM.
+`mise run ui-harness` (`tests/shared/browser/interactions.mjs`) builds the
+installed `figure-example` with two `LinkedFigureExample` parents and checks
+controlled accept, reject and clear, focus preservation, the shared cursor,
+keyboard-pinned tooltip actions and that figure export omits the transient
+tooltip, with no TanStack Table or WASM module bundled and no `.wasm` request.
 
 ## Bond schema form
 
@@ -386,7 +505,12 @@ instruments so active edits are never replaced by new defaults.
 Structural validation runs on changes; native validation is debounced and ignores
 superseded responses. Numeric edit text is converted at validation/output boundaries;
 exact decimal text and full-width integers retain their canonical representations.
-`layout="basic"` hides defaulted fields under More; `layout="full"` exposes them.
+`layout="basic"` collapses defaulted or empty values under Less common terms;
+`layout="full"` exposes them. `disclosure`, `sheet` and `promotedField` let a
+composing editor group domain terms, choose the term-sheet root and promote one
+input; `instrument-form` supplies the instrument term sheet (convention groups
+and the desk quote). A bare `SchemaForm` can pass
+`sheet={{ path: "instrument.spec", label: "Instrument terms" }}`.
 `fields={{ allow, deny }}` uses canonical paths such as
 `instrument.spec.notional.amount` and preserves hidden values. Schema errors appear
 under fields where mapped, with remaining native errors in the summary.
@@ -402,10 +526,13 @@ presentation; `compareTo` retains an independent result with its own currency,
 date and metadata. `density` accepts the shared compact/comfortable modes. Missing
 metadata does not create rounding or FX defaults.
 
-`MeasuresGrid` composes that context with the unlinked table. Native metric
-metadata supplies readable labels and groups qualified buckets by identifier with
-tenors in maturity order; unrecognized keys remain opaque. The Exact keys control
-reveals fully qualified keys. Values display six significant digits by default;
+`MeasuresGrid` composes that context with the unlinked table. Labels are the
+native metric id in sentence case with recognised acronyms upper-cased (`ytm`
+reads YTM); prose
+names would need a Rust metadata field. Native metric metadata groups qualified
+buckets by identifier with tenors in maturity order; keys without metadata remain
+opaque. The Exact keys control reveals fully qualified keys. Values display six
+significant digits by default;
 Exact values and the value title retain the supplied precision. The nonzero view
 hides zero rows (both sides must be supplied and zero in a comparison); Show all
 reveals every row. Missing values remain distinct from zero. Units appear only when native
@@ -488,9 +615,10 @@ visual categories are Primitive Components, Individual Components and Blocks.
 existing schema/provenance inventory, and `ui-check` rejects drift.
 
 CI runs `mise run ui-check` in the `Test UI` job on every pull request. The
-gallery export, screenshot suite, installation matrix and publishing check are
-local gates: `mise run ui-docs-build`, `mise run ui-e2e`, `mise run ui-install`
-and `mise run ui-publish-check`. No workflow deploys the public namespace URL in
+gallery export, screenshot suite, installation matrix, publishing check and
+standalone harnesses are local gates: `mise run ui-docs-build`,
+`mise run ui-e2e`, `mise run ui-install`, `mise run ui-publish-check` and
+`mise run ui-harness`. No workflow deploys the public namespace URL in
 `components.json` today; `scripts/verify-public.mjs <base-url>` is the local
 check of a served registry, and local-host success does not close the
 public-site gate.
@@ -499,6 +627,13 @@ public-site gate.
 exports `/registry-gallery/` with the production Next build. The generated
 inventory and import harness follow the registry catalogue; `mise run ui-check`
 rejects stale copies. Fixtures preserve their source-file hashes.
+The gallery wraps an item in `FinstackQueryProvider` exactly when `workerRoles`
+in `scripts/check-registry.mjs` classifies it `host`: its dependency closure
+contains `use-finstack` and none of its own files renders a
+`FinstackQueryProvider` or `FinstackProvider` element imported, under any local
+name, from `use-finstack` (`self`, as `pricing-forms-example` does). The generated `inventory.json` carries that
+role. The schema-form examples add validator hooks outside those items'
+closures, so `native-forms.tsx` mounts its own provider.
 
 For interactive review, run `mise run ui-docs-install`, then
 `npm --prefix docs-site run dev` to start the docs-site Next.js server. Open
@@ -562,6 +697,24 @@ subset and cannot satisfy `ui-install`. The faster workbench check,
 `node finstack-quant-ui/tests/browser/install-smoke.mjs` after
 `mise run ui-docs-install`, remains available. `mise run ui-install` is a local
 gate run on demand against fresh native packages, not a CI job.
+
+The matrix reads the same roles: it mounts `FinstackQueryProvider` only for
+`host` items and fails any item that is neither `host` nor `self` and still
+loads WASM. An item with `tests/install/fixture/<name>.tsx` installs that
+fixture (the four schema forms use a caller `validate` stub); any other visual
+item installs its gallery example, and an example declaring a `presentation`
+prop also gets the wrapper probe. An `@/` import in a fixture or example that
+resolves outside the item's closure is copied under `app/` at its installed
+target; the copy's own imports are not followed. Every registry-declared package
+a consumer loads at runtime must be declared inside the item's closure, apart
+from the scaffold packages (`next`, `react`, `react-dom`, `@base-ui/react`).
+`check-registry` requires `finstack-base`, which declares the stock controls'
+packages (`cn`, `class-variance-authority`, `lucide-react`), in every closure
+that reaches a stock shadcn component. For an item whose closure reaches
+`instrument-catalogue`, the page's first static load (the chunks the exported
+HTML names; for a non-visual item, everything it loads) must not contain the
+instrument, schema or example module of a type the closure reaches only through
+the catalogue.
 
 ## Printing completed valuations
 

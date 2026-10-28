@@ -17,7 +17,7 @@ import { ValuationDetails } from "@/components/finstack/valuations/components/va
 import { adaptValuation, exportValuation } from "../../src/host";
 import { serializeHost } from "../../src/codec.mjs";
 import type { ValuationResult } from "finstack-quant-wasm";
-import { restore, valuationCodec } from "./details/restore";
+import { decode, valuationCodec } from "./details/result";
 import fixture from "./details/cases.json";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -48,7 +48,7 @@ function withoutClock(value: unknown): unknown {
     );
   return value;
 }
-it("pins fixture sources and restores exact current host transport for all five required variants", () => {
+it("pins fixture sources and decodes exact current host transport for all five required variants", () => {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
   for (const source of fixture.sources)
     expect(
@@ -73,12 +73,12 @@ it("pins fixture sources and restores exact current host transport for all five 
       r.model,
       r.metrics,
     );
-    const restored = restore(entry);
+    const decoded = decode(entry);
     expect(current.details.type).toBe(entry.detailType);
-    expect(withoutClock(restored)).toEqual(withoutClock(current));
-    expect(adaptValuation(restored)).toEqual(restored);
-    expect(structuredClone(restored)).toEqual(restored);
-    expect(exportValuation(restored, native.valuationResultToJson)).toBe(
+    expect(withoutClock(decoded)).toEqual(withoutClock(current));
+    expect(adaptValuation(decoded)).toEqual(decoded);
+    expect(structuredClone(decoded)).toEqual(decoded);
+    expect(exportValuation(decoded, native.valuationResultToJson)).toBe(
       entry.resultJson,
     );
   }
@@ -86,7 +86,7 @@ it("pins fixture sources and restores exact current host transport for all five 
 it.each(fixture.cases)(
   "renders actual $type details without dropping nullable fields or stamps",
   async (entry) => {
-    const result = restore(entry);
+    const result = decode(entry);
     const tree = (density: "compact" | "comfortable") => (
       <ValuationDetails result={result} density={density} />
     );
@@ -128,7 +128,7 @@ it.each(fixture.cases)(
   },
 );
 it("retains full-width seed digits through display, clone, copy and native canonical export", async () => {
-  const result = restore(fixture.cases.find((c) => c.type === "bond")!);
+  const result = decode(fixture.cases.find((c) => c.type === "bond")!);
   if (result.details?.type !== "monte_carlo")
     throw new Error("Missing native diagnostics");
   expect(result.details.data.seed).toBeGreaterThan(
@@ -159,7 +159,7 @@ it.each(["future_variant", "__proto__", "constructor"])(
   "warns and preserves unknown discriminator %s",
   async (type) => {
     const result = {
-      ...restore(fixture.cases[0]),
+      ...decode(fixture.cases[0]),
       details: {
         type,
         data: {
@@ -181,7 +181,7 @@ it.each(["future_variant", "__proto__", "constructor"])(
   },
 );
 it("shows absence distinctly", () => {
-  const absent = restore(fixture.cases[0]);
+  const absent = decode(fixture.cases[0]);
   delete absent.details;
   delete absent.explanation;
   absent.covenants = null;
@@ -214,7 +214,7 @@ it("preserves optional canonical trace and covenant sections as raw transport", 
     fixture.covenantRequest.asOf,
   );
   const result = {
-    ...restore(fixture.cases[0]),
+    ...decode(fixture.cases[0]),
     explanation,
     covenants: reports,
   };
@@ -240,29 +240,29 @@ it("preserves optional canonical trace and covenant sections as raw transport", 
   );
 });
 
-it("validates formerly opaque FX fields and structured-credit bigint counts", () => {
-  const fx = restore(fixture.cases.find((entry) => entry.detailType === "fx")!);
+it("validates formerly opaque FX fields and plain-number structured-credit counts", () => {
+  const fx = decode(fixture.cases.find((entry) => entry.detailType === "fx")!);
   expect(() =>
     adaptValuation({
       ...fx,
       details: { type: "fx", data: { fx_triangulated: "yes" } },
     } as unknown as ValuationResult),
   ).toThrow();
-  const credit = restore(
+  const credit = decode(
     fixture.cases.find(
       (entry) => entry.detailType === "structured_credit_stochastic",
     )!,
   );
   if (credit.details?.type !== "structured_credit_stochastic")
     throw new Error("Wrong fixture");
-  expect(typeof credit.details.data.num_paths).toBe("bigint");
+  expect(typeof credit.details.data.num_paths).toBe("number");
   const invalid = {
     ...credit,
     details: {
       ...credit.details,
       data: {
         ...credit.details.data,
-        num_paths: Number(credit.details.data.num_paths),
+        num_paths: BigInt(credit.details.data.num_paths),
       },
     },
   } as unknown as ValuationResult;

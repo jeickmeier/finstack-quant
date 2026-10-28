@@ -3,7 +3,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect } from "playwright/test";
 
-export async function verifyItem(page, item, evidence, repo) {
+/** Item acceptance checks; `harness` is the visual harness result (undefined for nonvisual items). */
+export async function verifyItem(page, item, evidence, repo, harness) {
   const checks = [];
   if (item.name === "cashflow-viewer") {
     const data = JSON.parse(
@@ -133,16 +134,7 @@ export async function verifyItem(page, item, evidence, repo) {
       "native selection and cursor composition, custom tooltip action, callbacks, complete editable SVG and 1800x1200 PNG",
     );
   }
-  if (
-    [
-      "curve-chart",
-      "calibration-fit-chart",
-      "scenario-heatmap",
-      "vol-surface-chart",
-      "fx-surface-chart",
-      "vol-cube-explorer",
-    ].includes(item.name)
-  ) {
+  if (harness?.wrapper) {
     const chart = page.locator("svg.ts-chart").first();
     await chart.focus();
     await page.keyboard.press("Home");

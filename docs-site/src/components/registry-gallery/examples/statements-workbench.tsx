@@ -12,19 +12,21 @@ const updates: Record<string, unknown> = {
   "2025Q4": data.statementRollForward2025Q4,
 };
 
-export function Example(_props: ExampleProps) {
+export function Example({ density = "compact" }: ExampleProps) {
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">
-        Fictional issuer and illustrative financials. Roll-forward responses
-        use native forecast output as sample reported values.
+        Fictional issuer and illustrative financials. Roll-forward responses use
+        native forecast output as sample reported values.
       </p>
       <StatementsWorkbench
         defaultModelJson={modelJson}
         defaultCheckSuiteJson={suiteJson}
+        density={density}
         onRollForward={async (_current, periodId) => {
           const update = updates[periodId];
-          if (!update) throw new Error(`No illustrative actuals for ${periodId}`);
+          if (!update)
+            throw new Error(`No illustrative actuals for ${periodId}`);
           return JSON.stringify(update);
         }}
       />

@@ -41,9 +41,7 @@ it("shows every native bond bucket and its exact value in a compact tenor ladder
 
   expect(screen.getByRole("heading", { name: "Bucketed DV01" })).toBeTruthy();
   expect(screen.getByText("Exact Bucketed DV01 keys and values")).toBeTruthy();
-  expect(
-    screen.queryByRole("heading", { name: "Yield To Maturity" }),
-  ).toBeNull();
+  expect(screen.queryByRole("heading", { name: "YTM" })).toBeNull();
   const ladder = screen.getByRole("table", {
     name: "Returned bucket values for USD-OIS",
   });
@@ -89,7 +87,7 @@ it("renders a native two-axis matrix without mistaking metric names for metadata
   const matrix = screen.getByRole("table", {
     name: "Returned two-coordinate measure matrix",
   });
-  expect(screen.getByRole("heading", { name: "Bucketed Vega" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Bucketed vega" })).toBeTruthy();
   expect(
     within(matrix)
       .getAllByRole("columnheader")
@@ -101,6 +99,38 @@ it("renders a native two-axis matrix without mistaking metric names for metadata
   expect(volA.textContent).toContain("+2");
   expect(volA.textContent).toContain("-3");
   expect(matrix.querySelector('span[title="0"]')).toBeTruthy();
+});
+
+it("orders vega expiry rows and decimal strike columns by value", () => {
+  // Rust emits each bucketed-vega row as one `{surface}::{expiry}y` coordinate.
+  const rows = ["S::0.5y", "S::10y", "S::0.25y", "S::2y"];
+  const strikes = ["1.2", "1.05", "0.95", "1.1"];
+  const metadata = rows.flatMap((row) =>
+    strikes.map((strike) =>
+      descriptor(`bucketed_vega::${row}::${strike}`, "bucketed_vega", [
+        row,
+        strike,
+      ]),
+    ),
+  );
+  const measures = Object.fromEntries(
+    metadata.map((entry, index) => [entry.key, index + 1]),
+  );
+  render(<DimensionalMeasures result={{ measures }} metadata={metadata} />);
+
+  const matrix = screen.getByRole("table", {
+    name: "Returned two-coordinate measure matrix",
+  });
+  expect(
+    within(matrix)
+      .getAllByRole("columnheader")
+      .map((cell) => cell.textContent),
+  ).toEqual(["Coordinate 1 / Coordinate 2", "0.95", "1.05", "1.1", "1.2"]);
+  expect(
+    within(matrix)
+      .getAllByRole("rowheader")
+      .map((cell) => cell.textContent),
+  ).toEqual(["S::0.25y", "S::0.5y", "S::2y", "S::10y"]);
 });
 
 it("uses a flat coordinate table for sparse shapes and leaves missing comparisons blank", () => {
@@ -154,7 +184,7 @@ it("selects a native three-axis slice and retains one-axis qualified measures", 
   render(<DimensionalMeasures result={{ measures }} metadata={metadata} />);
   expect(dimensionalMeasureCount({ result: { measures }, metadata })).toBe(5);
   expect(
-    screen.getByRole("heading", { name: "Constituent Delta" }),
+    screen.getByRole("heading", { name: "Constituent delta" }),
   ).toBeTruthy();
   const slice = screen.getByRole("combobox", {
     name: "First returned coordinate",

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import {
@@ -10,6 +11,10 @@ import {
 } from "../../browser/consumer.mjs";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-figures-"));
+const evidence =
+  process.env.REGISTRY_SMOKE_DIR ??
+  (await mkdtemp(path.join(tmpdir(), "registry-figures-")));
+await mkdir(evidence, { recursive: true });
 let browser, server, page;
 try {
   const installed = await installBuilt(root, consumer, ["figure-example"]);
@@ -61,12 +66,19 @@ try {
       }
     }),
   }));
+  const tokens = JSON.parse(
+    await readFile(
+      path.join(root, "registry/theme/finstack-theme/tokens.json"),
+      "utf8",
+    ),
+  );
+  const px = (name) => Number.parseFloat(tokens.theme[name]);
   assert.deepEqual(presentation.standard, {
-    title: 18,
-    body: 16,
-    note: 14,
-    cell: 12,
-    spacing: 4,
+    title: px("text-lg"),
+    body: px("text-base"),
+    note: px("text-sm"),
+    cell: px("text-xs"),
+    spacing: px("spacing"),
   });
   assert.deepEqual(presentation.mixed, {
     title: 24,
@@ -108,7 +120,7 @@ try {
         svg.includes(`width="${width}"`) &&
           svg.includes(`height="${options.height}"`),
       );
-      await writeFile(`/tmp/pr010-${name}-${width}.svg`, svg);
+      await writeFile(path.join(evidence, `${name}-${width}.svg`), svg);
       // Inspect all exported text geometry in the same loaded browser font environment.
       const geometry = await page.evaluate(
         async ({ svg, width, height }) => {
@@ -186,7 +198,7 @@ try {
       );
       assert.equal(png.readUInt32BE(16), width * 2);
       assert.equal(png.readUInt32BE(20), options.height * 2);
-      await writeFile(`/tmp/pr010-${name}-${width}.png`, png);
+      await writeFile(path.join(evidence, `${name}-${width}.png`), png);
       exports.push({
         name,
         width,
@@ -230,19 +242,46 @@ try {
       theme: "light",
     }),
   );
-  const tokens = JSON.parse(
-    await readFile(
-      path.join(root, "registry/theme/finstack-theme/tokens.json"),
-      "utf8",
-    ),
-  );
   assert(
     lightFromDark.includes(`fill="${tokens.light.background}"`),
     "A light export must be independent of the dark application theme",
   );
+  // An export too small for its prose rejects; a live container that small
+  // (a panel animating open) draws the plot alone instead of throwing.
+  assert.match(
+    await page.evaluate(() =>
+      window.figureProbe
+        .export("numeric", "svg", { width: 16, height: 640 })
+        .then(
+          () => "exported",
+          (error) => error.message,
+        ),
+    ),
+    /cannot fit the supplied headings and notes/,
+  );
+  for (const width of ["1px", "8px", "120px"]) {
+    await page.evaluate((width) => {
+      for (const figure of document.querySelectorAll("[data-finstack-figure]"))
+        figure.style.width = width;
+    }, width);
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    await page.waitForTimeout(100);
+  }
+  await page.evaluate(() => {
+    for (const figure of document.querySelectorAll("[data-finstack-figure]"))
+      figure.style.width = "";
+  });
   assert.deepEqual(failures, []);
   assert(!requests.some((url) => url.endsWith(".wasm")));
-  await page.screenshot({ path: "/tmp/pr010-figures.png", fullPage: true });
+  await page.screenshot({
+    path: path.join(evidence, "figures.png"),
+    fullPage: true,
+  });
   const report = {
     browser: browser.version(),
     installed,
@@ -254,10 +293,11 @@ try {
     verdict: "pass",
   };
   await writeFile(
-    "/tmp/pr010-figures.json",
+    path.join(evidence, "figures.json"),
     JSON.stringify(report, null, 2) + "\n",
   );
   console.log(JSON.stringify(report, null, 2));
+  console.log(`Evidence: ${evidence}`);
 } finally {
   await closeConsumer({ browser, server }, consumer);
 }

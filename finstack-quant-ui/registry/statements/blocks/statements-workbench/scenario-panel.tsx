@@ -1,13 +1,23 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { StatementGrid } from "@/components/finstack/statements/components/statement-grid/statement-grid";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
-import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
+import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
+import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
+import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import {
+  useEvaluateStatementScenarios,
+  type StatementScenarioRequest,
+} from "@/hooks/statements/use-evaluate-statement-scenarios/use-evaluate-statement-scenarios";
 import type { LinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
+import schema from "@/lib/finstack/generated/schemas/scenario_set.json";
+import type { ScenarioSetWire } from "@/lib/finstack/generated/types/scenario_set";
+import { createWireCodec } from "@/lib/finstack/codec.mjs";
 import { formatRawMoney } from "@/lib/finstack/format/format";
-import type { StatementScenarioResults } from "@/workers/finstack-contract";
 import {
   adaptStatementResult,
   reportStatementCell,
@@ -16,9 +26,9 @@ import {
 } from "../../components/statement-grid/projection";
 import { ForecastEditor, type ForecastSpecWire } from "./forecast-editor";
 
-type Value = NonNullable<
-  FinancialModelSpecWire["nodes"][string]["values"]
->[string];
+const scenarioSetCodec = createWireCodec(schema);
+type ScenarioDefinition = ScenarioSetWire["scenarios"][string];
+type Value = NonNullable<ScenarioDefinition["overrides"]>[string];
 interface ScenarioDraft {
   name: string;
   parent: string;
@@ -27,34 +37,53 @@ interface ScenarioDraft {
   /** Whole native forecast spec per node. */
   forecasts: Record<string, ForecastSpecWire>;
   /** Host-supplied per-period overrides, passed through unchanged. */
-  periodOverrides?: unknown;
+  periodOverrides?: ScenarioDefinition["period_overrides"];
 }
-interface ScenarioSetWire {
-  scenarios: Record<
-    string,
-    {
-      parent?: string;
-      overrides?: Record<string, Value>;
-      period_overrides?: unknown;
-      forecast_overrides?: Record<string, ForecastSpecWire>;
-    }
-  >;
+/** One compared line: its name and the active-period cell of each scenario, in result order. */
+interface ComparisonLine {
+  id: string;
+  name: string;
+  cells: (StatementCell | undefined)[];
 }
-const inputClass =
-  "w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm";
-const cardClass = "rounded-lg border border-border bg-card p-4";
 
+/** First failing wire path and its reason from a codec ZodError issue or wire TypeError. */
+function codecFailure(error: unknown): {
+  path: PropertyKey[];
+  message: string;
+} {
+  const issue = (
+    error as {
+      issues?: { path: PropertyKey[]; message: string; code?: string }[];
+    }
+  ).issues?.[0];
+  if (!issue)
+    return {
+      path: (error as { path?: PropertyKey[] }).path ?? [],
+      // A wire TypeError message already starts with its path.
+      message: error instanceof Error ? error.message : String(error),
+    };
+  return {
+    path: issue.path,
+    // A custom issue carries the wire TypeError text, path included.
+    message:
+      issue.code === "custom"
+        ? issue.message
+        : `/${issue.path.join("/")}: ${issue.message}`,
+  };
+}
+
+/** Drafts from native ScenarioSet JSON; the codec validates it and keeps wide integers exact. */
 function draftsFrom(json: string | undefined): ScenarioDraft[] {
   if (json === undefined)
     return [{ name: "base", parent: "", overrides: {}, forecasts: {} }];
-  const set = JSON.parse(json) as ScenarioSetWire;
+  const set = scenarioSetCodec.parse(json) as ScenarioSetWire;
   return Object.entries(set.scenarios).map(([name, definition]) => ({
     name,
     parent: definition.parent ?? "",
     overrides: Object.fromEntries(
       Object.entries(definition.overrides ?? {}).map(([id, value]) => [
         id,
-        typeof value === "number" ? String(value) : value.amount,
+        typeof value === "object" ? value.amount : String(value),
       ]),
     ),
     forecasts: { ...definition.forecast_overrides },
@@ -62,7 +91,11 @@ function draftsFrom(json: string | undefined): ScenarioDraft[] {
   }));
 }
 
-/** Native ScenarioSet JSON; exact value text keeps the line's unit and currency. */
+/**
+ * Native ScenarioSet JSON; exact value text keeps the line's unit and currency.
+ * The generated codec enforces the Rust contract, including the decimal pattern
+ * of monetary overrides, and names the failing line.
+ */
 function scenarioSetJson(
   model: FinancialModelSpecWire,
   drafts: ScenarioDraft[],
@@ -78,8 +111,6 @@ function scenarioSetJson(
       const label = model.nodes[id]?.name ?? id;
       const type = model.nodes[id]?.value_type;
       if (type?.type === "monetary") {
-        if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text.trim()))
-          throw new Error(`${label}: enter a decimal amount in base units.`);
         overrides[id] = { amount: text.trim(), currency: type.currency };
       } else {
         const number = Number(text);
@@ -99,7 +130,25 @@ function scenarioSetJson(
         : {}),
     };
   }
-  return JSON.stringify({ scenarios });
+  try {
+    return scenarioSetCodec.stringify({ scenarios });
+  } catch (cause) {
+    const { path, message } = codecFailure(cause);
+    const [root, , field, id] = path;
+    if (
+      root === "scenarios" &&
+      field === "overrides" &&
+      typeof id === "string"
+    ) {
+      const label = model.nodes[id]?.name ?? id;
+      throw new Error(
+        model.nodes[id]?.value_type?.type === "monetary"
+          ? `${label}: enter a decimal amount in base units.`
+          : `${label}: enter a finite number.`,
+      );
+    }
+    throw new Error(message);
+  }
 }
 
 function moneyCell(
@@ -122,6 +171,7 @@ export function ScenarioPanel({
   displayMode,
   link,
   defaultScenarioSetJson,
+  density,
 }: {
   model: FinancialModelSpecWire;
   /** Canonical model the scenarios override. */
@@ -134,21 +184,32 @@ export function ScenarioPanel({
   link?: LinkedSelection;
   /** Optional host-supplied native ScenarioSet JSON. */
   defaultScenarioSetJson?: string;
+  /** Density of the comparison table, statement grid and JSON viewer; undefined inherits the surrounding surface. */
+  density?: "compact" | "comfortable";
 }) {
-  const { client, status } = useFinstack();
-  const [drafts, setDrafts] = useState<ScenarioDraft[]>(() =>
-    draftsFrom(defaultScenarioSetJson),
+  const cardId = useId();
+  // Invalid host JSON starts from the base draft and shows why, instead of failing the panel.
+  const [initial] = useState(() => {
+    try {
+      return { drafts: draftsFrom(defaultScenarioSetJson), error: null };
+    } catch (cause) {
+      return {
+        drafts: draftsFrom(undefined),
+        error: codecFailure(cause).message,
+      };
+    }
+  });
+  const [drafts, setDrafts] = useState<ScenarioDraft[]>(initial.drafts);
+  const [error, setError] = useState<string | null>(initial.error);
+  const [submitted, setSubmitted] = useState<StatementScenarioRequest | null>(
+    null,
   );
-  const [error, setError] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
-  const [run, setRun] = useState<{
-    modelJson: string;
-    setJson: string;
-    results: StatementScenarioResults;
-  } | null>(null);
+  const request = submitted?.modelJson === modelJson ? submitted : null;
+  const scenarios = useEvaluateStatementScenarios(request);
+  const results = scenarios.data ?? null;
+  const failure = error ?? scenarios.error?.message;
   const [shown, setShown] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
-  const results = run?.modelJson === modelJson ? run.results : null;
   const names = useMemo(() => (results ? Object.keys(results) : []), [results]);
   const shownName = shown && names.includes(shown) ? shown : names[0];
   const valueNodes = nodeIds.filter(
@@ -158,7 +219,7 @@ export function ScenarioPanel({
     setDrafts(
       drafts.map((draft, i) => (i === index ? { ...draft, ...change } : draft)),
     );
-  const comparison = useMemo(() => {
+  const comparison = useMemo((): ComparisonLine[] | null => {
     if (!results || !activePeriod) return null;
     const rows = Object.fromEntries(
       names.map((name) => [name, adaptStatementResult(results[name])]),
@@ -196,29 +257,17 @@ export function ScenarioPanel({
     return [...lines, ...capital];
   }, [results, names, activePeriod, nodeIds, model]);
 
-  const runScenarios = async () => {
-    if (!client || status !== "ready") return;
+  const runScenarios = () => {
     setError(null);
-    let setJson: string;
     try {
-      setJson = scenarioSetJson(model, drafts);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-      return;
-    }
-    setRunning(true);
-    try {
-      const value = await client.call("evaluateStatementScenarios", {
+      setSubmitted({
         modelJson,
-        scenarioSetJson: setJson,
+        scenarioSetJson: scenarioSetJson(model, drafts),
         marketJson,
         asOf,
       });
-      setRun({ modelJson, setJson, results: value });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setRunning(false);
     }
   };
 
@@ -240,40 +289,42 @@ export function ScenarioPanel({
         const others = drafts.filter((_, i) => i !== index);
         const unusedValue = valueNodes.filter((id) => !(id in draft.overrides));
         const unusedForecast = nodeIds.filter((id) => !(id in draft.forecasts));
+        // Repeated override controls name their scenario in the accessible description only.
+        const scenarioId = `${cardId}-${index}`;
         return (
           <section
             key={index}
             aria-label={`Scenario ${draft.name || index + 1}`}
-            className={`${cardClass} space-y-4`}
+            className="space-y-4 rounded-lg border border-border bg-card p-4"
           >
+            <span id={scenarioId} className="sr-only">
+              Scenario {draft.name || index + 1}
+            </span>
             <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-              <label className="text-xs">
-                Scenario name
-                <input
-                  className={`${inputClass} mt-1`}
-                  value={draft.name}
-                  onChange={(event) =>
-                    update(index, { name: event.target.value })
-                  }
-                />
-              </label>
-              <label className="text-xs">
-                Inherits from
-                <select
-                  className={`${inputClass} mt-1`}
-                  value={draft.parent}
-                  onChange={(event) =>
-                    update(index, { parent: event.target.value })
-                  }
-                >
-                  <option value="">No parent</option>
-                  {others.map((other) => (
-                    <option key={other.name} value={other.name}>
-                      {other.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <FieldFrame label="Scenario name">
+                {(control) => (
+                  <Input
+                    {...control}
+                    value={draft.name}
+                    onChange={(event) =>
+                      update(index, { name: event.target.value })
+                    }
+                  />
+                )}
+              </FieldFrame>
+              {/* Radio, not select: a select maps the empty "No parent" value to its placeholder. */}
+              <EnumField
+                label="Inherits from"
+                layout="radio"
+                value={draft.parent}
+                onValueChange={(parent) => update(index, { parent })}
+                options={[
+                  { value: "", label: "No parent" },
+                  ...others
+                    .filter((other) => other.name)
+                    .map((other) => ({ value: other.name, label: other.name })),
+                ]}
+              />
               <Button
                 type="button"
                 variant="outline"
@@ -290,59 +341,67 @@ export function ScenarioPanel({
                 Applied to every forecast period, in the line&apos;s exact base
                 units.
               </p>
-              {Object.entries(draft.overrides).map(([id, text]) => (
-                <div key={id} className="flex flex-wrap items-end gap-2">
-                  <label className="min-w-48 flex-1 text-xs">
-                    {model.nodes[id]?.name ?? id}
-                    <input
-                      aria-label={`${draft.name} ${model.nodes[id]?.name ?? id} override`}
-                      className={`${inputClass} mt-1 font-mono`}
-                      inputMode="decimal"
-                      value={text}
-                      onChange={(event) =>
-                        update(index, {
-                          overrides: {
-                            ...draft.overrides,
-                            [id]: event.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const { [id]: _, ...rest } = draft.overrides;
-                      update(index, { overrides: rest });
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
+              {Object.entries(draft.overrides).map(([id, text]) => {
+                const label = model.nodes[id]?.name ?? id;
+                const setText = (value: string) =>
+                  update(index, {
+                    overrides: { ...draft.overrides, [id]: value },
+                  });
+                return (
+                  <div key={id} className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-48 flex-1">
+                      {model.nodes[id]?.value_type?.type === "monetary" ? (
+                        <DecimalInput
+                          label={label}
+                          describedBy={scenarioId}
+                          value={text}
+                          onValueChange={setText}
+                        />
+                      ) : (
+                        <FieldFrame label={label} describedBy={scenarioId}>
+                          {(control) => (
+                            <Input
+                              {...control}
+                              inputMode="decimal"
+                              value={text}
+                              onChange={(event) => setText(event.target.value)}
+                            />
+                          )}
+                        </FieldFrame>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const { [id]: _, ...rest } = draft.overrides;
+                        update(index, { overrides: rest });
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                );
+              })}
               {unusedValue.length > 0 && (
-                <select
-                  aria-label={`${draft.name} add value override`}
-                  className={`${inputClass} max-w-xs`}
-                  value=""
-                  onChange={(event) =>
-                    update(index, {
-                      overrides: {
-                        ...draft.overrides,
-                        [event.target.value]: "",
-                      },
-                    })
-                  }
-                >
-                  <option value="">Add a value override…</option>
-                  {unusedValue.map((id) => (
-                    <option key={id} value={id}>
-                      {model.nodes[id]?.name ?? id}
-                    </option>
-                  ))}
-                </select>
+                <div className="max-w-xs">
+                  <EnumField
+                    label="Add value override"
+                    describedBy={scenarioId}
+                    layout="select"
+                    value=""
+                    onValueChange={(id) =>
+                      update(index, {
+                        overrides: { ...draft.overrides, [id]: "" },
+                      })
+                    }
+                    options={unusedValue.map((id) => ({
+                      value: id,
+                      label: model.nodes[id]?.name ?? id,
+                    }))}
+                  />
+                </div>
               )}
             </div>
             <div className="space-y-2">
@@ -376,31 +435,30 @@ export function ScenarioPanel({
                 </div>
               ))}
               {unusedForecast.length > 0 && (
-                <select
-                  aria-label={`${draft.name} add forecast override`}
-                  className={`${inputClass} max-w-xs`}
-                  value=""
-                  onChange={(event) => {
-                    const id = event.target.value;
-                    setRevision((value) => value + 1);
-                    update(index, {
-                      forecasts: {
-                        ...draft.forecasts,
-                        [id]: model.nodes[id]?.forecast ?? {
-                          method: "forward_fill",
-                          params: {},
+                <div className="max-w-xs">
+                  <EnumField
+                    label="Add forecast override"
+                    describedBy={scenarioId}
+                    layout="select"
+                    value=""
+                    onValueChange={(id) => {
+                      setRevision((value) => value + 1);
+                      update(index, {
+                        forecasts: {
+                          ...draft.forecasts,
+                          [id]: model.nodes[id]?.forecast ?? {
+                            method: "forward_fill",
+                            params: {},
+                          },
                         },
-                      },
-                    });
-                  }}
-                >
-                  <option value="">Add a forecast override…</option>
-                  {unusedForecast.map((id) => (
-                    <option key={id} value={id}>
-                      {model.nodes[id]?.name ?? id}
-                    </option>
-                  ))}
-                </select>
+                      });
+                    }}
+                    options={unusedForecast.map((id) => ({
+                      value: id,
+                      label: model.nodes[id]?.name ?? id,
+                    }))}
+                  />
+                </div>
               )}
             </div>
           </section>
@@ -426,18 +484,18 @@ export function ScenarioPanel({
         </Button>
         <Button
           type="button"
-          disabled={running || status !== "ready"}
-          onClick={() => void runScenarios()}
+          disabled={scenarios.isFetching || scenarios.workerStatus !== "ready"}
+          onClick={runScenarios}
         >
-          {running ? "Evaluating scenarios…" : "Run scenarios"}
+          {scenarios.isFetching ? "Evaluating scenarios…" : "Run scenarios"}
         </Button>
       </div>
-      {error && (
+      {failure && (
         <p
           role="alert"
           className="rounded-md border border-error p-3 text-sm text-error"
         >
-          {error}
+          {failure}
         </p>
       )}
       {results && comparison && activePeriod && (
@@ -445,70 +503,50 @@ export function ScenarioPanel({
           <h3 className="text-base font-semibold">
             Scenario comparison · {activePeriod}
           </h3>
-          <div className="overflow-x-auto border-y border-foreground/70 bg-card">
-            <table className="w-full min-w-max border-collapse text-sm tabular-nums">
-              <caption className="sr-only">
-                Scenario values for {activePeriod}
-              </caption>
-              <thead>
-                <tr className="border-b border-foreground/50 text-xs">
-                  <th
-                    scope="col"
-                    className="sticky left-0 bg-card px-3 py-2 text-left"
-                  >
-                    Line item
-                  </th>
-                  {names.map((name) => (
-                    <th
-                      key={name}
-                      scope="col"
-                      className="min-w-28 px-3 py-2 text-right"
-                    >
-                      {name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {comparison.map((line) => (
-                  <tr key={line.id} className="border-b border-border/60">
-                    <th
-                      scope="row"
-                      className="sticky left-0 bg-card px-3 py-2 text-left font-normal"
-                    >
-                      {line.name}
-                    </th>
-                    {line.cells.map((cell, i) => (
-                      <td
-                        key={names[i]}
-                        className="px-3 py-2 text-right font-mono text-xs"
-                      >
-                        {reportStatementCell(cell, displayMode)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <FinstackTable
+            caption={`Scenario values for ${activePeriod}`}
+            captionVisibility="sr-only"
+            data={comparison}
+            getRowId={(line) => line.id}
+            columns={[
+              {
+                id: "line",
+                header: "Line item",
+                accessorFn: (line: ComparisonLine) => line.name,
+                // Row headers announce each scenario value with its line item.
+                meta: { className: "", rowHeader: true },
+              },
+              // Index-based ids keep a scenario named "line" distinct from the line column.
+              ...names.map((name, i) => ({
+                id: `scenario-${i}`,
+                header: name,
+                accessorFn: (line: ComparisonLine) =>
+                  reportStatementCell(line.cells[i], displayMode),
+                meta: { className: "text-right font-mono text-xs" },
+              })),
+            ]}
+            density={density}
+          />
         </section>
       )}
       {results && shownName && (
         <div className="space-y-3">
           <div
-            className="flex flex-wrap gap-2"
+            role="group"
             aria-label="Scenario statements"
+            className="flex flex-wrap gap-2"
           >
             {names.map((name) => (
-              <button
+              <Button
                 key={name}
                 type="button"
-                className={`rounded-md border px-3 py-1.5 text-xs ${shownName === name ? "border-primary bg-primary/10 font-semibold" : "border-border bg-card"}`}
+                variant="ghost"
+                size="sm"
                 aria-pressed={shownName === name}
                 onClick={() => setShown(name)}
               >
                 {name}
-              </button>
+              </Button>
             ))}
           </div>
           <StatementGrid
@@ -521,19 +559,19 @@ export function ScenarioPanel({
             showType={false}
             showRaw={false}
             activePeriod={activePeriod}
+            density={density}
           />
         </div>
       )}
-      {run && (
-        <details className={cardClass}>
-          <summary className="cursor-pointer font-semibold">
-            Scenario set JSON
-          </summary>
+      {request && (
+        <details>
+          <summary>Scenario set JSON</summary>
           <div className="mt-3">
             <JsonViewer
               label="Native scenario set"
-              text={run.setJson}
+              text={request.scenarioSetJson}
               downloadName="scenario-set.json"
+              density={density}
             />
           </div>
         </details>

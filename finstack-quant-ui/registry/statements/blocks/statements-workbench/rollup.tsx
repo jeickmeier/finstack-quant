@@ -1,9 +1,11 @@
 "use client";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
+import type { RollupSpecWire } from "@/lib/finstack/generated/types/rollup_spec";
 import type { StatementPeriod } from "../../components/statement-grid/projection";
+import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 
 /** Native RollupMethod: flows sum, balances take the period end, ratios re-run their formula. */
-export type RollupMethod = "sum" | "period_end" | "formula";
+export type RollupMethod = NonNullable<RollupSpecWire["methods"]>[string];
 const methodLabels: Record<RollupMethod, string> = {
   sum: "Sum (flow)",
   period_end: "Period end (balance)",
@@ -20,9 +22,7 @@ export function initialRollupMethods(
   defaultSpecJson?: string,
 ): Record<string, RollupMethod> {
   if (defaultSpecJson !== undefined) {
-    const spec = JSON.parse(defaultSpecJson) as {
-      methods?: Record<string, RollupMethod>;
-    };
+    const spec = JSON.parse(defaultSpecJson) as RollupSpecWire;
     return { ...spec.methods };
   }
   const methods: Record<string, RollupMethod> = {};
@@ -45,7 +45,8 @@ export function annualRollupSpecJson(
   const listed = Object.fromEntries(
     Object.entries(methods).filter(([, method]) => method !== "sum"),
   );
-  return JSON.stringify({ frequency: "annual", methods: listed });
+  const spec: RollupSpecWire = { frequency: "annual", methods: listed };
+  return JSON.stringify(spec);
 }
 
 /**
@@ -88,10 +89,8 @@ export function RollupMethodsEditor({
   onChange: (methods: Record<string, RollupMethod>) => void;
 }) {
   return (
-    <details className="rounded-lg border border-border bg-card p-4">
-      <summary className="cursor-pointer font-semibold">
-        Annual roll-up methods
-      </summary>
+    <details>
+      <summary>Annual roll-up methods</summary>
       <p className="mt-2 text-xs text-muted-foreground">
         Flows sum across the year, balances and trailing metrics take the
         year-end value, and ratios are recalculated from the annual figures.
@@ -101,30 +100,21 @@ export function RollupMethodsEditor({
         {nodeIds.map((id) => {
           const node = model.nodes[id];
           return (
-            <label key={id} className="text-xs">
-              {node?.name ?? id}
-              <select
-                aria-label={`${node?.name ?? id} roll-up method`}
-                className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
-                value={methods[id] ?? "sum"}
-                onChange={(event) =>
-                  onChange({
-                    ...methods,
-                    [id]: event.target.value as RollupMethod,
-                  })
-                }
-              >
-                {(Object.keys(methodLabels) as RollupMethod[])
-                  .filter(
-                    (method) => method !== "formula" || node?.formula_text,
-                  )
-                  .map((method) => (
-                    <option key={method} value={method}>
-                      {methodLabels[method]}
-                    </option>
-                  ))}
-              </select>
-            </label>
+            <EnumField
+              key={id}
+              label={`${node?.name ?? id} roll-up method`}
+              layout="select"
+              value={methods[id] ?? "sum"}
+              onValueChange={(next) =>
+                onChange({ ...methods, [id]: next as RollupMethod })
+              }
+              options={(Object.keys(methodLabels) as RollupMethod[])
+                .filter((method) => method !== "formula" || node?.formula_text)
+                .map((method) => ({
+                  value: method,
+                  label: methodLabels[method],
+                }))}
+            />
           );
         })}
       </div>

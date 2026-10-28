@@ -8,6 +8,8 @@ import {
 } from "../valuation-summary/valuation-summary";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { MetricMetadata } from "finstack-quant-wasm";
+import { compareTenorLabels } from "@/lib/finstack/format/format";
+import { labelFor } from "@/lib/finstack/format/label.mjs";
 export interface MeasuresGridProps extends ValuationSummaryProps {
   /** Choose a compact valuation summary, detailed measures, or both. */
   content?: "all" | "summary" | "measures";
@@ -34,23 +36,6 @@ type MeasureSection = {
   rows: MeasureRow[];
   bucketed: boolean;
 };
-const metricLabels: Readonly<Record<string, string>> = {
-  ytm: "Yield to maturity",
-  duration_mod: "Modified duration",
-  dv01: "DV01",
-  bucketed_dv01: "Bucketed DV01",
-  bucketed_cs01: "Bucketed CS01",
-  fx01: "FX01",
-  delta: "Delta",
-  gamma: "Gamma",
-  vega: "Vega",
-  theta: "Theta",
-  par_spread: "Par spread",
-  risky_pv01: "Risky PV01",
-  jump_to_default: "Jump to default",
-  expected_loss: "Expected loss",
-  wal: "Weighted average life",
-};
 function descriptorFor(key: string, props: MeasuresGridProps) {
   return (
     props.metadata?.find((entry) => entry.key === key) ??
@@ -62,31 +47,19 @@ function measureLabel(key: string, props: MeasuresGridProps) {
   if (!descriptor) return key;
   if (descriptor.bucketed && descriptor.components.length === 2)
     return descriptor.components[1];
-  const metric = metricLabels[descriptor.metric];
-  if (!metric) return key;
+  const metric = labelFor(descriptor.metric);
   if (descriptor.components.length === 0) return metric;
   if (descriptor.components.length === 1)
     return `${metric} · ${descriptor.components[0]}`;
   return key;
 }
-function tenorYears(label: string) {
-  const match = /^(\d+(?:\.\d+)?)([dwmy])$/.exec(label);
-  if (!match) return undefined;
-  const factors = { d: 1 / 365, w: 7 / 365, m: 1 / 12, y: 1 };
-  return Number(match[1]) * factors[match[2] as keyof typeof factors];
-}
 function sortedBucketRows(rows: MeasureRow[], props: MeasuresGridProps) {
-  return [...rows].sort((left, right) => {
-    const leftLabel = measureLabel(left.key, props);
-    const rightLabel = measureLabel(right.key, props);
-    const leftTenor = tenorYears(leftLabel);
-    const rightTenor = tenorYears(rightLabel);
-    if (leftTenor !== undefined && rightTenor !== undefined)
-      return leftTenor - rightTenor;
-    if (leftTenor !== undefined) return -1;
-    if (rightTenor !== undefined) return 1;
-    return leftLabel.localeCompare(rightLabel, undefined, { numeric: true });
-  });
+  return [...rows].sort((left, right) =>
+    compareTenorLabels(
+      measureLabel(left.key, props),
+      measureLabel(right.key, props),
+    ),
+  );
 }
 function displaySections(rows: MeasureRow[], props: MeasuresGridProps) {
   const sections = new Map<string, MeasureSection>();
@@ -100,7 +73,7 @@ function displaySections(rows: MeasureRow[], props: MeasuresGridProps) {
     const id = JSON.stringify([descriptor.metric, descriptor.components[0]]);
     const section = sections.get(id) ?? {
       id,
-      title: `${metricLabels[descriptor.metric] ?? descriptor.metric} · ${descriptor.components[0]}`,
+      title: `${labelFor(descriptor.metric)} · ${descriptor.components[0]}`,
       rows: [],
       bucketed: true,
     };

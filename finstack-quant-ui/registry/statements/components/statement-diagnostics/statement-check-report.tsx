@@ -11,9 +11,12 @@ import type { LinkedSelection } from "@/hooks/shared/use-linked-selection/use-li
 export function StatementCheckReport({
   report,
   link,
+  density,
 }: {
   report: CheckReport;
   link?: LinkedSelection;
+  /** Density of the checks table and JSON viewer; undefined inherits the surrounding surface. */
+  density?: "compact" | "comfortable";
 }) {
   const { summary } = report;
   return (
@@ -49,6 +52,7 @@ export function StatementCheckReport({
           },
         ]}
         emptyState="No checks returned"
+        density={density}
       />
       {report.results.flatMap((check) =>
         check.findings.map((finding, index) => (
@@ -98,6 +102,7 @@ export function StatementCheckReport({
           label="Check report JSON"
           text={serializeHost(report)}
           downloadName="statement-checks.json"
+          density={density}
         />
       </details>
     </section>

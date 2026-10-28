@@ -27,6 +27,8 @@
       "registryDependencies": [
         "@finstack/schema-form",
         "@finstack/use-finstack",
+        "@finstack/use-statement-model-validator",
+        "@finstack/use-statement-formula-validator",
         "@finstack/contract-financial-model-spec",
         "@finstack/finstack-codec"
       ],
@@ -66,7 +68,10 @@
         "@finstack/finstack-format",
         "@finstack/contract-statement-result",
         "@finstack/contract-financial-model-spec",
-        "@finstack/use-linked-selection"
+        "@finstack/use-linked-selection",
+        "table",
+        "input",
+        "button"
       ],
       "dependencies": [
         "react@19.2.8",
@@ -124,7 +129,7 @@
       "type": "registry:component",
       "title": "Statement explanation",
       "description": "Native explanation and dependency trace for one statement node and period.",
-      "docs": "Call native explanation, text explanation and dependency trace for a matching model/result/node/period request. Render structured returned components and opaque native text without parsing formulas in JavaScript.",
+      "docs": "Call native explanation and dependency trace for a matching model/result/node/period request. Render the structured value, source, forecast, formula breakdown and dependency tree without parsing formulas in JavaScript.",
       "files": [
         {
           "path": "components/statement-diagnostics/statement-explanation.tsx",
@@ -133,12 +138,13 @@
         }
       ],
       "registryDependencies": [
-        "@finstack/use-finstack",
+        "@finstack/use-explain-statement",
+        "@finstack/use-trace-statement",
         "@finstack/finstack-table",
         "@finstack/json-viewer",
         "@finstack/finstack-codec"
       ],
-      "dependencies": ["react@19.2.8"],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.11.0"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
@@ -187,19 +193,31 @@
       "type": "registry:component",
       "title": "Statement checks",
       "description": "Runs native check suites against an evaluated statement result and shows the report.",
-      "docs": "Run native check suites or raw three-statement and credit mappings against the supplied matching result. Native suite validation and execution own all check semantics; the editable JSON is never inferred from examples.",
+      "docs": "Edit the check suite through the form generated from the Rust CheckSuiteSpec, validated natively before running; three-statement and credit mappings stay canonical JSON because Rust publishes no root for them. Native execution owns all check semantics and nothing is inferred from examples.",
       "files": [
         {
           "path": "components/statement-diagnostics/statement-checks.tsx",
           "type": "registry:component",
           "target": "components/finstack/statements/components/statement-diagnostics/statement-checks.tsx"
+        },
+        {
+          "path": "components/statement-diagnostics/check-suite.ts",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-diagnostics/check-suite.ts"
         }
       ],
       "registryDependencies": [
         "@finstack/statement-check-report",
-        "@finstack/use-finstack",
+        "@finstack/use-run-statement-checks",
+        "@finstack/use-check-suite-validator",
         "@finstack/use-linked-selection",
-        "button"
+        "@finstack/schema-form",
+        "@finstack/contract-check-suite-spec",
+        "@finstack/finstack-codec",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "button",
+        "textarea"
       ],
       "dependencies": ["react@19.2.8"],
       "categories": ["Individual Components"],
@@ -209,6 +227,7 @@
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json"
         ]
@@ -219,7 +238,7 @@
       "type": "registry:hook",
       "title": "useEvaluateStatement",
       "description": "Evaluates a financial statement model through the WASM worker.",
-      "docs": "Query native statement evaluation with exact canonical model, optional market and as-of identity in the current worker session. Null disables evaluation and no model or market defaults are inferred.",
+      "docs": "Query native statement evaluation keyed by the exact canonical model, optional market and as-of in the current worker session. evaluateStatementOptions lets a host seed the same cache entry through queryClient.query. Null disables evaluation and no model or market defaults are inferred.",
       "files": [
         {
           "path": "hooks/use-evaluate-statement/use-evaluate-statement.ts",
@@ -240,11 +259,211 @@
       }
     },
     {
+      "name": "use-statement-model-validator",
+      "type": "registry:hook",
+      "title": "useStatementModelValidator",
+      "description": "Validates and canonicalizes financial model JSON through the WASM worker, for schema-form.",
+      "docs": "Native SchemaForm validation of FinancialModelSpec JSON using the existing FinstackProvider worker. Returns canonical JSON and rejects superseded revisions; does not write canonical output into active edits.",
+      "files": [
+        {
+          "path": "hooks/use-statement-model-validator/use-statement-model-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-statement-model-validator/use-statement-model-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-statement-formula-validator",
+      "type": "registry:hook",
+      "title": "useStatementFormulaValidator",
+      "description": "Validates one statement formula through the WASM worker and returns the native parse preview.",
+      "docs": "Native parse-and-compile check of one formula string using the existing FinstackProvider worker. Resolves to the native canonical formula text and rejects invalid formulas. A call rejects as superseded only when the caller passes an aborted AbortSignal; callers own debouncing and staleness.",
+      "files": [
+        {
+          "path": "hooks/use-statement-formula-validator/use-statement-formula-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-statement-formula-validator/use-statement-formula-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-check-suite-validator",
+      "type": "registry:hook",
+      "title": "useCheckSuiteValidator",
+      "description": "Validates and canonicalizes statement check-suite JSON through the WASM worker, for schema-form.",
+      "docs": "Native CheckSuiteSpec validation (rejects negative or non-finite thresholds) using the existing FinstackProvider worker. Returns canonical JSON and rejects superseded revisions.",
+      "files": [
+        {
+          "path": "hooks/use-check-suite-validator/use-check-suite-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-check-suite-validator/use-check-suite-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-rollup-statement",
+      "type": "registry:hook",
+      "title": "useRollupStatement",
+      "description": "Rolls an evaluated statement result up to a coarser frequency through the WASM worker.",
+      "docs": "Native StatementResult rollup for the supplied model, matching result and RollupSpec JSON, keyed by the complete immutable request and worker session. Null disables the query; no rollup methods or periods are inferred.",
+      "files": [
+        {
+          "path": "hooks/use-rollup-statement/use-rollup-statement.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-rollup-statement/use-rollup-statement.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-evaluate-statement-scenarios",
+      "type": "registry:hook",
+      "title": "useEvaluateStatementScenarios",
+      "description": "Evaluates a statement scenario set against one model through the WASM worker.",
+      "docs": "Native ScenarioSet evaluation keyed by the complete immutable model, scenario set, market and as-of request in the current worker session; market and as-of are supplied together. Null disables evaluation. Returns scenario name to native StatementResult.",
+      "files": [
+        {
+          "path": "hooks/use-evaluate-statement-scenarios/use-evaluate-statement-scenarios.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-evaluate-statement-scenarios/use-evaluate-statement-scenarios.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-run-statement-checks",
+      "type": "registry:hook",
+      "title": "useRunStatementChecks",
+      "description": "Runs a statement check suite or mapping against an evaluated result through the WASM worker.",
+      "docs": "Native CheckReport for the supplied model, matching result, runner kind and canonical configuration JSON, keyed by the complete immutable request and worker session. Null disables the run; no suite or mapping is synthesized.",
+      "files": [
+        {
+          "path": "hooks/use-run-statement-checks/use-run-statement-checks.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-run-statement-checks/use-run-statement-checks.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-explain-statement",
+      "type": "registry:hook",
+      "title": "useExplainStatement",
+      "description": "Explains one statement node and period through the WASM worker.",
+      "docs": "Native structured Explanation (value, source, forecast, formula and breakdown) for a matching model/result/node/period request in the current worker session. Null disables the query.",
+      "files": [
+        {
+          "path": "hooks/use-explain-statement/use-explain-statement.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-explain-statement/use-explain-statement.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-trace-statement",
+      "type": "registry:hook",
+      "title": "useTraceStatement",
+      "description": "Traces one statement node's dependency tree through the WASM worker.",
+      "docs": "Native DependencyTree (node, formula, children) for a model and root node, keyed by the immutable request and worker session. A dependency already on the path appears once more as a <id> (cycle) leaf. Null disables the query.",
+      "files": [
+        {
+          "path": "hooks/use-trace-statement/use-trace-statement.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-trace-statement/use-trace-statement.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -279,13 +498,29 @@
         "@finstack/statement-explanation",
         "@finstack/statement-checks",
         "@finstack/use-evaluate-statement",
+        "@finstack/use-statement-model-validator",
+        "@finstack/use-statement-formula-validator",
+        "@finstack/use-rollup-statement",
+        "@finstack/use-evaluate-statement-scenarios",
         "@finstack/use-linked-selection",
         "@finstack/use-finstack",
         "@finstack/json-viewer",
         "@finstack/finstack-codec",
-        "button"
+        "@finstack/contract-rollup-spec",
+        "@finstack/contract-scenario-set",
+        "@finstack/primitive-contracts",
+        "@finstack/finstack-surface",
+        "@finstack/field-frame",
+        "@finstack/enum-field",
+        "@finstack/id-combobox",
+        "@finstack/decimal-input",
+        "@finstack/finstack-table",
+        "button",
+        "input",
+        "tabs",
+        "textarea"
       ],
-      "dependencies": ["react@19.2.8"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
       "categories": ["Blocks"],
       "meta": {
         "version": "0.2.0",
@@ -293,8 +528,11 @@
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-          "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json"
+          "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json"
         ]
       }
     }

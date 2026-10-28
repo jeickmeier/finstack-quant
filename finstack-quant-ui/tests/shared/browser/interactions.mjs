@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import {
@@ -10,6 +11,10 @@ import {
 } from "../../browser/consumer.mjs";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-interactions-"));
+const evidence =
+  process.env.REGISTRY_SMOKE_DIR ??
+  (await mkdtemp(path.join(tmpdir(), "registry-interactions-")));
+await mkdir(evidence, { recursive: true });
 let browser, server, page;
 try {
   const installed = await installBuilt(root, consumer, ["figure-example"]);
@@ -146,8 +151,10 @@ try {
   await chart.click({ position: { x: 1, y: 1 } });
   assert.match(await status.textContent(), /Accepted: none/);
   assert.match(await events.textContent(), /Activations: 3; proposals: 5/);
+  // A full-page capture beyond the viewport briefly lays the charts out 1px
+  // wide; asserting failures afterwards checks FinstackChart draws through it.
   await page.screenshot({
-    path: "/tmp/pr011-interactions.png",
+    path: path.join(evidence, "interactions.png"),
     fullPage: true,
   });
   assert.deepEqual(failures, []);
@@ -173,10 +180,11 @@ try {
     verdict: "pass",
   };
   await writeFile(
-    "/tmp/pr011-interactions.json",
+    path.join(evidence, "interactions.json"),
     JSON.stringify(report, null, 2) + "\n",
   );
   console.log(JSON.stringify(report, null, 2));
+  console.log(`Evidence: ${evidence}`);
 } finally {
   await closeConsumer({ browser, server }, consumer);
 }

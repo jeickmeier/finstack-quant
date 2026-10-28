@@ -5,6 +5,17 @@ import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/fina
 import type { LinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   adaptStatementResult,
   reportStatementCell,
@@ -26,6 +37,7 @@ export function StatementGrid({
   showType = true,
   activePeriod,
   onEditValue,
+  density,
 }: {
   model: FinancialModelSpecWire;
   result: StatementResult;
@@ -44,6 +56,8 @@ export function StatementGrid({
     periodId: string,
     value: string | null,
   ) => Promise<string | null>;
+  /** Density of the raw JSON viewers; undefined inherits the surrounding surface. */
+  density?: "compact" | "comfortable";
 }) {
   const [edit, setEdit] = useState<Edit | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -111,206 +125,210 @@ export function StatementGrid({
           {unitLabel}
         </span>
       </div>
-      <div className="overflow-x-auto border-y border-foreground/70 bg-card">
-        <table className="w-full min-w-max border-collapse text-sm tabular-nums">
-          <caption className="sr-only">{title} by reporting period</caption>
-          <thead>
-            <tr className="border-b border-border text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              <th
+      <Table className="min-w-max border-collapse border-y border-foreground/70 bg-card tabular-nums">
+        <TableCaption className="sr-only">
+          {title} by reporting period
+        </TableCaption>
+        <TableHeader>
+          <TableRow className="border-b border-border text-[10px] uppercase tracking-[0.12em] hover:bg-transparent">
+            <TableHead
+              rowSpan={2}
+              scope="col"
+              className="sticky left-0 z-20 min-w-48 bg-card px-3 py-2 text-left font-semibold text-muted-foreground"
+            >
+              Line item
+            </TableHead>
+            {showType && (
+              <TableHead
                 rowSpan={2}
                 scope="col"
-                className="sticky left-0 z-20 min-w-48 bg-card px-3 py-2 text-left font-semibold"
+                className="px-3 py-2 text-left font-semibold text-muted-foreground"
               >
-                Line item
-              </th>
-              {showType && (
-                <th rowSpan={2} scope="col" className="px-3 py-2 text-left">
-                  Type
-                </th>
-              )}
-              {groups.map((group, index) => (
-                <th
-                  key={`${group.label}-${index}`}
-                  colSpan={group.count}
-                  scope="colgroup"
-                  className={`border-l px-3 py-2 text-center ${group.label === "Forecast" ? "bg-primary/5" : ""}`}
+                Type
+              </TableHead>
+            )}
+            {groups.map((group, index) => (
+              <TableHead
+                key={`${group.label}-${index}`}
+                colSpan={group.count}
+                scope="colgroup"
+                className={`border-l px-3 py-2 text-center font-semibold text-muted-foreground ${group.label === "Forecast" ? "bg-primary/5" : ""}`}
+              >
+                {group.label}
+              </TableHead>
+            ))}
+          </TableRow>
+          <TableRow className="border-b border-foreground/50 text-xs hover:bg-transparent">
+            {model.periods.map((period) => (
+              <TableHead
+                key={period.id}
+                scope="col"
+                aria-label={`${period.id} ${period.is_actual ? "Historical" : "Forecast"}`}
+                className={`min-w-28 px-3 py-2 text-right font-semibold ${period.is_actual ? "" : "bg-primary/5"} ${activePeriod === period.id ? "text-primary underline underline-offset-4" : ""}`}
+              >
+                {period.id}
+                <span className="sr-only">
+                  {" "}
+                  {period.is_actual ? "Historical" : "Forecast"}
+                </span>
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => {
+            const node = model.nodes[row.nodeId];
+            const emphasized = node?.tags?.some(
+              (tag) => tag === "headline" || tag === "covenant",
+            );
+            return (
+              <TableRow
+                key={row.nodeId}
+                className={`border-b border-border/60 hover:bg-transparent ${emphasized ? "border-t border-t-foreground/50 font-semibold" : ""}`}
+              >
+                <TableHead
+                  scope="row"
+                  className={`sticky left-0 z-10 bg-card px-3 py-2 text-left font-sans ${emphasized ? "font-semibold" : "font-normal"}`}
                 >
-                  {group.label}
-                </th>
-              ))}
-            </tr>
-            <tr className="border-b border-foreground/50 text-xs">
-              {model.periods.map((period) => (
-                <th
-                  key={period.id}
-                  scope="col"
-                  aria-label={`${period.id} ${period.is_actual ? "Historical" : "Forecast"}`}
-                  className={`min-w-28 px-3 py-2 text-right font-semibold ${period.is_actual ? "" : "bg-primary/5"} ${activePeriod === period.id ? "text-primary underline underline-offset-4" : ""}`}
-                >
-                  {period.id}
-                  <span className="sr-only">
-                    {" "}
-                    {period.is_actual ? "Historical" : "Forecast"}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const node = model.nodes[row.nodeId];
-              const emphasized = node?.tags?.some(
-                (tag) => tag === "headline" || tag === "covenant",
-              );
-              return (
-                <tr
-                  key={row.nodeId}
-                  className={`border-b border-border/60 last:border-b-0 ${emphasized ? "border-t border-t-foreground/50 font-semibold" : ""}`}
-                >
-                  <th
-                    scope="row"
-                    className={`sticky left-0 z-10 bg-card px-3 py-2 text-left font-sans ${emphasized ? "font-semibold" : "font-normal"}`}
-                  >
-                    {row.name}
-                  </th>
-                  {showType && (
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {row.valueType}
-                    </td>
-                  )}
-                  {model.periods.map((period) => {
-                    const cell = row.cells[period.id];
-                    const key = statementCellKey(row.nodeId, period.id);
-                    const selected = link?.selectedKey === key;
-                    const editing =
-                      edit?.nodeId === row.nodeId &&
-                      edit.periodId === period.id;
-                    const editable = Boolean(
-                      onEditValue && node && node.node_type !== "calculated",
-                    );
-                    const explicit = node?.values?.[period.id];
-                    const unit =
-                      node?.value_type?.type === "monetary"
-                        ? node.value_type.currency
-                        : null;
-                    return (
-                      <td
-                        key={period.id}
-                        className={`h-10 border-l border-border/30 px-3 text-right font-mono text-xs ${period.is_actual ? "" : "bg-primary/[0.035]"} ${activePeriod === period.id ? "bg-primary/[0.075]" : ""} ${selected ? "outline outline-1 outline-inset outline-primary" : ""}`}
-                      >
-                        {editing ? (
-                          <div className="min-w-40 py-1 text-left">
-                            <div className="flex items-center gap-1">
-                              <input
-                                ref={editInput}
-                                aria-label={`${row.name} ${period.id} exact value`}
-                                className="w-32 rounded border border-primary bg-background px-2 py-1 text-right font-mono text-xs"
-                                inputMode="decimal"
-                                value={edit.draft}
-                                onChange={(event) =>
-                                  setEdit({
-                                    ...edit,
-                                    draft: event.target.value,
-                                  })
-                                }
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter")
-                                    void save(edit.draft);
-                                  if (event.key === "Escape") {
-                                    setEdit(null);
-                                    setEditError(null);
-                                  }
-                                }}
-                                disabled={saving}
-                              />
-                              <button
-                                type="button"
-                                className="rounded px-1 text-primary"
-                                aria-label={`Save ${row.name} ${period.id}`}
-                                onClick={() => void save(edit.draft)}
-                                disabled={saving}
-                              >
-                                ✓
-                              </button>
-                              <button
-                                type="button"
-                                className="rounded px-1 text-muted-foreground"
-                                aria-label={`Cancel ${row.name} ${period.id}`}
-                                onClick={() => {
+                  {row.name}
+                </TableHead>
+                {showType && (
+                  <TableCell className="px-3 py-2 text-xs text-muted-foreground">
+                    {row.valueType}
+                  </TableCell>
+                )}
+                {model.periods.map((period) => {
+                  const cell = row.cells[period.id];
+                  const key = statementCellKey(row.nodeId, period.id);
+                  const selected = link?.selectedKey === key;
+                  const editing =
+                    edit?.nodeId === row.nodeId && edit.periodId === period.id;
+                  const editable = Boolean(
+                    onEditValue && node && node.node_type !== "calculated",
+                  );
+                  const explicit = node?.values?.[period.id];
+                  const unit =
+                    node?.value_type?.type === "monetary"
+                      ? node.value_type.currency
+                      : null;
+                  return (
+                    <TableCell
+                      key={period.id}
+                      className={`h-10 border-l border-border/30 px-1 py-0 text-right font-mono text-xs ${period.is_actual ? "" : "bg-primary/[0.035]"} ${activePeriod === period.id ? "bg-primary/[0.075]" : ""} ${selected ? "outline outline-1 outline-inset outline-primary" : ""}`}
+                    >
+                      {editing ? (
+                        <div className="min-w-40 px-2 py-1 text-left">
+                          <div className="flex items-center gap-1">
+                            <Input
+                              ref={editInput}
+                              aria-label={`${row.name} ${period.id} exact value`}
+                              className="h-7 w-32 text-right font-mono text-xs md:text-xs"
+                              inputMode="decimal"
+                              value={edit.draft}
+                              onChange={(event) =>
+                                setEdit({ ...edit, draft: event.target.value })
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter")
+                                  void save(edit.draft);
+                                if (event.key === "Escape") {
                                   setEdit(null);
                                   setEditError(null);
-                                }}
-                              >
-                                ×
-                              </button>
-                            </div>
-                            <span className="text-[10px] text-muted-foreground">
-                              Exact {unit ?? "scalar"} value
-                            </span>
-                            {explicit !== undefined &&
-                              node?.node_type === "mixed" && (
-                                <button
-                                  type="button"
-                                  className="ml-2 text-[10px] text-primary underline"
-                                  onClick={() => void save(null)}
-                                >
-                                  Use forecast
-                                </button>
-                              )}
-                            {editError && (
-                              <p
-                                role="alert"
-                                className="text-[10px] text-error"
-                              >
-                                {editError}
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            aria-label={`${row.name} ${period.id}${editable ? ", edit value" : ", inspect value"}`}
-                            title={
-                              editable
-                                ? `${cell?.text ?? "—"} · click to edit exact ${unit ?? "scalar"} value`
-                                : cell?.text
-                            }
-                            className={`w-full py-2 text-right ${editable ? "cursor-text hover:text-primary hover:underline" : "cursor-default"}`}
-                            onClick={() => {
-                              link?.select(key);
-                              if (editable) {
+                                }
+                              }}
+                              disabled={saving}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label={`Save ${row.name} ${period.id}`}
+                              onClick={() => void save(edit.draft)}
+                              disabled={saving}
+                            >
+                              ✓
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label={`Cancel ${row.name} ${period.id}`}
+                              onClick={() => {
+                                setEdit(null);
                                 setEditError(null);
-                                setEdit({
-                                  nodeId: row.nodeId,
-                                  periodId: period.id,
-                                  draft:
-                                    explicit === undefined
-                                      ? ""
-                                      : typeof explicit === "number"
-                                        ? String(explicit)
-                                        : explicit.amount,
-                                });
-                              }
-                            }}
-                          >
-                            {reportStatementCell(cell, displayMode)}
-                          </button>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                              }}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">
+                            Exact {unit ?? "scalar"} value
+                          </span>
+                          {explicit !== undefined &&
+                            node?.node_type === "mixed" && (
+                              <Button
+                                type="button"
+                                variant="link"
+                                size="xs"
+                                className="ml-1"
+                                onClick={() => void save(null)}
+                              >
+                                Use forecast
+                              </Button>
+                            )}
+                          {editError && (
+                            <p role="alert" className="text-[10px] text-error">
+                              {editError}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`${row.name} ${period.id}${editable ? ", edit value" : ", inspect value"}`}
+                          title={
+                            editable
+                              ? `${cell?.text ?? "—"} · click to edit exact ${unit ?? "scalar"} value`
+                              : cell?.text
+                          }
+                          className={`w-full justify-end font-mono text-xs ${emphasized ? "font-semibold" : "font-normal"}`}
+                          onClick={() => {
+                            link?.select(key);
+                            if (editable) {
+                              setEditError(null);
+                              setEdit({
+                                nodeId: row.nodeId,
+                                periodId: period.id,
+                                draft:
+                                  explicit === undefined
+                                    ? ""
+                                    : typeof explicit === "number"
+                                      ? String(explicit)
+                                      : explicit.amount,
+                              });
+                            }
+                          }}
+                        >
+                          {reportStatementCell(cell, displayMode)}
+                        </Button>
+                      )}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
       {showRaw && (
         <details>
           <summary>Evaluation metadata</summary>
           <JsonViewer
             label="Evaluation metadata"
             text={serializeHost(checked.meta)}
+            density={density}
           />
         </details>
       )}
@@ -321,6 +339,7 @@ export function StatementGrid({
             label="Statement result JSON"
             text={serializeHost(checked)}
             downloadName="statement-result.json"
+            density={density}
           />
         </details>
       )}

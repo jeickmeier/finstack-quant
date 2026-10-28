@@ -2,6 +2,8 @@
 
 import { useId, useState } from "react";
 import type { MetricMetadata, ValuationResult } from "finstack-quant-wasm";
+import { compareTenorLabels } from "@/lib/finstack/format/format";
+import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { MeasureValue } from "../../primitives/measure-value/measure-value";
 
 type MeasureResult = Pick<ValuationResult, "measures">;
@@ -85,17 +87,6 @@ export function dimensionalMeasureCount(
   return dimensionalEntries(props).length;
 }
 
-function metricLabel(metric: string): string {
-  return metric
-    .split("_")
-    .map((part) =>
-      /^(dv01|cs01|fx01|pv01|var|oas)$/i.test(part)
-        ? part.toUpperCase()
-        : `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`,
-    )
-    .join(" ");
-}
-
 function shortValue(value: number | undefined): string | undefined {
   return value === undefined || !Number.isFinite(value)
     ? undefined
@@ -130,20 +121,6 @@ function axisLabel(index: number, bucketed: boolean): string {
   if (bucketed && index === 0) return "Identifier";
   if (bucketed && index === 1) return "Bucket";
   return `Coordinate ${index + 1}`;
-}
-
-function coordinateOrder(left: string, right: string): number {
-  const tenor = /^(\d+(?:\.\d+)?)([dwmy])$/;
-  const a = tenor.exec(left);
-  const b = tenor.exec(right);
-  if (a && b) {
-    const days = { d: 1, w: 7, m: 30, y: 365 };
-    const difference =
-      Number(a[1]) * days[a[2] as keyof typeof days] -
-      Number(b[1]) * days[b[2] as keyof typeof days];
-    if (difference) return difference;
-  }
-  return left.localeCompare(right, undefined, { numeric: true });
 }
 
 function Values({
@@ -280,10 +257,10 @@ function CoordinateView({
 
   const rows = [
     ...new Set(entries.map((entry) => entry.coordinates[axisOffset])),
-  ].sort(coordinateOrder);
+  ].sort(compareTenorLabels);
   const columns = [
     ...new Set(entries.map((entry) => entry.coordinates[axisOffset + 1])),
-  ].sort(coordinateOrder);
+  ].sort(compareTenorLabels);
   const cells = new Map<string, MeasureEntry>();
   let regular = rows.every(Boolean) && columns.every(Boolean);
   for (const entry of entries) {
@@ -420,7 +397,7 @@ function MetricSection({
   const threeDimensional = first.coordinates.length === 3;
   const slices = threeDimensional
     ? [...new Set(entries.map((entry) => entry.coordinates[0]))].sort(
-        coordinateOrder,
+        compareTenorLabels,
       )
     : [];
   const activeSlice = slice && slices.includes(slice) ? slice : slices[0];
@@ -440,7 +417,7 @@ function MetricSection({
             {first.group ?? "Other measures"}
           </p>
           <h3 className="text-sm font-semibold leading-5 text-foreground">
-            {metricLabel(first.metric)}
+            {labelFor(first.metric)}
           </h3>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -502,7 +479,7 @@ function MetricSection({
 
       <details className="mt-2 text-xs text-muted-foreground">
         <summary className="w-fit cursor-pointer rounded-sm py-1 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-          Exact {metricLabel(first.metric)} keys and values
+          Exact {labelFor(first.metric)} keys and values
         </summary>
         <div className="max-h-52 overflow-auto rounded-md border border-border bg-muted/20">
           <table className="w-full border-collapse text-left text-xs">

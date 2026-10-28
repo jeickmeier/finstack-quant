@@ -21,6 +21,8 @@ export interface FieldInfo {
   /** Canonical form path independent of DOM IDs. */ path?: string;
   /** Supplied edit state; renders the changed-term marker without owning form state. */
   dirty?: boolean;
+  /** Ids of elements that describe the control, merged ahead of the error id in `aria-describedby`. */
+  describedBy?: string;
 }
 export interface FieldControlProps {
   id: string;
@@ -37,6 +39,7 @@ export function FieldFrame({
   path,
   orientation,
   dirty,
+  describedBy,
   children,
 }: FieldInfo & { children: (control: FieldControlProps) => ReactNode }) {
   const generated = useId(),
@@ -59,7 +62,10 @@ export function FieldFrame({
         {children({
           id: fieldId,
           "aria-labelledby": `${fieldId}-label`,
-          "aria-describedby": error ? `${fieldId}-error` : undefined,
+          "aria-describedby":
+            [describedBy, error ? `${fieldId}-error` : undefined]
+              .filter(Boolean)
+              .join(" ") || undefined,
           "aria-invalid": Boolean(error),
         })}
       </div>

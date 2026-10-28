@@ -1,68 +1,45 @@
 "use client";
-import type { StatementExplanationRequest } from "@/workers/finstack-contract";
+import type { DependencyTree } from "finstack-quant-wasm";
 import {
-  useWorkerQuery,
-  workerQueryOptions,
-} from "@/hooks/shared/use-finstack/query";
+  useExplainStatement,
+  type StatementExplanationRequest,
+} from "@/hooks/statements/use-explain-statement/use-explain-statement";
+import { useTraceStatement } from "@/hooks/statements/use-trace-statement/use-trace-statement";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 
-/** Native structured formula breakdown plus opaque text and dependency trace. */
+/** One dependency tree node at its pre-order position and nesting depth. */
+interface TraceRow {
+  index: number;
+  depth: number;
+  node: DependencyTree;
+}
+/** Flatten the native tree pre-order; a recurring dependency keeps one row per occurrence. */
+function traceRows(root: DependencyTree): TraceRow[] {
+  const rows: TraceRow[] = [];
+  const visit = (node: DependencyTree, depth: number) => {
+    rows.push({ index: rows.length, depth, node });
+    for (const child of node.children) visit(child, depth + 1);
+  };
+  visit(root, 0);
+  return rows;
+}
+
+/** Native structured formula breakdown plus dependency trace. */
 export function StatementExplanation({
   request,
+  density,
 }: {
   request: StatementExplanationRequest | null;
+  /** Density of the breakdown and trace tables and the JSON viewer; undefined inherits the surrounding surface. */
+  density?: "compact" | "comfortable";
 }) {
-  const snapshot = request === null ? null : Object.freeze({ ...request });
-  const explanation = useWorkerQuery((worker) => ({
-    ...workerQueryOptions({
-      client: worker.client,
-      queryKey: [
-        "finstack",
-        worker.session,
-        "statement-explanation",
-        snapshot,
-      ] as const,
-      ready: snapshot !== null,
-      missing: "Statement worker is not ready",
-      queryFn: (client) => client.call("explainStatement", snapshot!),
-    }),
-    enabled: worker.status === "ready" && snapshot !== null,
-  }));
-  const text = useWorkerQuery((worker) => ({
-    ...workerQueryOptions({
-      client: worker.client,
-      queryKey: [
-        "finstack",
-        worker.session,
-        "statement-explanation-text",
-        snapshot,
-      ] as const,
-      ready: snapshot !== null,
-      missing: "Statement worker is not ready",
-      queryFn: (client) => client.call("explainStatementText", snapshot!),
-    }),
-    enabled: worker.status === "ready" && snapshot !== null,
-  }));
-  const trace = useWorkerQuery((worker) => ({
-    ...workerQueryOptions({
-      client: worker.client,
-      queryKey: [
-        "finstack",
-        worker.session,
-        "statement-trace",
-        snapshot?.modelJson,
-        snapshot?.nodeId,
-      ] as const,
-      ready: snapshot !== null,
-      missing: "Statement worker is not ready",
-      queryFn: (client) =>
-        client.call("traceStatement", snapshot!.modelJson, snapshot!.nodeId),
-    }),
-    enabled: worker.status === "ready" && snapshot !== null,
-  }));
-  if (!snapshot)
+  const explanation = useExplainStatement(request);
+  const trace = useTraceStatement(
+    request && { modelJson: request.modelJson, nodeId: request.nodeId },
+  );
+  if (!request)
     return <p role="status">Select a statement cell to inspect its formula.</p>;
   const data = explanation.data;
   return (
@@ -71,7 +48,7 @@ export function StatementExplanation({
       className="space-y-3 font-sans text-sm text-foreground"
     >
       <h3 className="font-semibold">
-        {snapshot.nodeId} · {snapshot.period}
+        {request.nodeId} · {request.period}
       </h3>
       {explanation.isPending && <p role="status">Explaining selected value…</p>}
       {explanation.error && <p role="alert">{explanation.error.message}</p>}
@@ -81,10 +58,16 @@ export function StatementExplanation({
             Returned value:{" "}
             <span className="font-mono">{String(data.final_value)}</span> ·{" "}
             {data.node_type}
+            {data.source ? ` · ${data.source}` : ""}
           </p>
           {data.formula_text && (
             <p>
               Formula: <code>{data.formula_text}</code>
+            </p>
+          )}
+          {data.forecast && (
+            <p>
+              Forecast method: <code>{data.forecast.method}</code>
             </p>
           )}
           <FinstackTable
@@ -109,12 +92,14 @@ export function StatementExplanation({
               },
             ]}
             emptyState="No formula components returned"
+            density={density}
           />
           <details>
             <summary>Complete explanation</summary>
             <JsonViewer
               label="Formula explanation JSON"
               text={serializeHost(data)}
+              density={density}
             />
           </details>
         </>
@@ -125,18 +110,33 @@ export function StatementExplanation({
       {trace.data && (
         <details>
           <summary>Dependency trace</summary>
-          <pre className="overflow-auto whitespace-pre-wrap font-mono text-xs">
-            {trace.data}
-          </pre>
-        </details>
-      )}
-      {text.error && <p role="alert">Text explanation: {text.error.message}</p>}
-      {text.data && (
-        <details>
-          <summary>Native text explanation</summary>
-          <pre className="overflow-auto whitespace-pre-wrap font-mono text-xs">
-            {text.data}
-          </pre>
+          <FinstackTable
+            caption="Native dependency tree"
+            data={traceRows(trace.data)}
+            getRowId={(row) => String(row.index)}
+            columns={[
+              {
+                id: "node",
+                header: "Node",
+                accessorFn: (row) => row.node.node_id,
+                cell: ({ row }: { row: { original: TraceRow } }) => (
+                  <span
+                    className="font-mono"
+                    style={{ paddingInlineStart: `${row.original.depth}rem` }}
+                  >
+                    {row.original.node.node_id}
+                  </span>
+                ),
+              },
+              {
+                id: "formula",
+                header: "Formula",
+                accessorFn: (row) => row.node.formula ?? "—",
+              },
+            ]}
+            emptyState="No dependencies returned"
+            density={density}
+          />
         </details>
       )}
     </section>

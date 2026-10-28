@@ -48,7 +48,7 @@
       "type": "registry:ui",
       "title": "Finstack table",
       "description": "TanStack Table wrapper for supplied rows and totals with caller-owned row IDs and optional linked row or cell selection.",
-      "docs": "Controlled finstack-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "docs": "Controlled finstack-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. A column whose meta sets rowHeader renders its body cells as row headers (th scope=row) with plain-cell styling and selection. No worker or workbench is required.",
       "files": [
         {
           "path": "table/finstack-table/finstack-table.tsx",
@@ -340,6 +340,36 @@
           "path": "file/finstack-service.ts",
           "type": "registry:file",
           "target": "workers/finstack-service.ts"
+        },
+        {
+          "path": "file/services/context.ts",
+          "type": "registry:file",
+          "target": "workers/services/context.ts"
+        },
+        {
+          "path": "file/services/core.ts",
+          "type": "registry:file",
+          "target": "workers/services/core.ts"
+        },
+        {
+          "path": "file/services/valuations.ts",
+          "type": "registry:file",
+          "target": "workers/services/valuations.ts"
+        },
+        {
+          "path": "file/services/calibration.ts",
+          "type": "registry:file",
+          "target": "workers/services/calibration.ts"
+        },
+        {
+          "path": "file/services/models.ts",
+          "type": "registry:file",
+          "target": "workers/services/models.ts"
+        },
+        {
+          "path": "file/services/statements.ts",
+          "type": "registry:file",
+          "target": "workers/services/statements.ts"
         },
         {
           "path": "file/finstack-contract.ts",

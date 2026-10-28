@@ -43,9 +43,6 @@ afterAll(async () => harness?.close());
 it("validates and evaluates the canonical model through the real worker", async () => {
   const canonical = unwrap(await harness.proxy.validateStatementModel(fixture));
   expect(canonical).toBe(native.validateFinancialModelJson(fixture));
-  expect(unwrap(await harness.proxy.statementNodeIds(canonical))).toEqual(
-    native.modelNodeIds(canonical),
-  );
   const result = unwrap(
     await harness.proxy.evaluateStatement({ modelJson: canonical }),
   );
@@ -140,14 +137,27 @@ it("routes formula, explanation and check semantics to WASM", async () => {
   expect(unwrap(await harness.proxy.explainStatement(explanation))).toEqual(
     native.explainFormula(modelJson, resultsJson, "margin", "2025Q1"),
   );
-  expect(unwrap(await harness.proxy.traceStatement(modelJson, "margin"))).toBe(
-    new native.DependencyTracer(modelJson).dependencyTreeText("margin"),
-  );
+  expect(
+    unwrap(await harness.proxy.traceStatement({ modelJson, nodeId: "margin" })),
+  ).toEqual(new native.DependencyTracer(modelJson).dependencyTree("margin"));
   const configJson = JSON.stringify({
     name: "empty",
     builtin_checks: [],
     formula_checks: [],
   });
+  expect(unwrap(await harness.proxy.validateCheckSuiteSpec(configJson))).toBe(
+    native.validateCheckSuiteSpecJson(configJson),
+  );
+  const negative = await harness.proxy.validateCheckSuiteSpec(
+    JSON.stringify({
+      name: "negative",
+      builtin_checks: [],
+      formula_checks: [],
+      config: { default_tolerance: -1 },
+    }),
+  );
+  expect(negative.ok).toBe(false);
+  if (!negative.ok) expect(negative.error.message).toMatch(/default_tolerance/);
   const report = unwrap(
     await harness.proxy.runStatementChecks({
       modelJson,

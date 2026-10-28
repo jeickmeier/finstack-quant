@@ -94,6 +94,9 @@ export async function generate(repo = repoRoot) {
           "instrument_cashflow",
           "financial_model_spec",
           "statement_result",
+          "check_suite_spec",
+          "rollup_spec",
+          "scenario_set",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));

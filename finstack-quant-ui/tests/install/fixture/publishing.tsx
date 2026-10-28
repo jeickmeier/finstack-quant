@@ -6,7 +6,7 @@ import {
   type FigureHandle,
 } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import data from "./data.json";
-import { figureExample } from "./figure-data";
+import { figureExample } from "@/components/finstack/shared/chart/figure-example/figure-data";
 export function InstalledItem() {
   const [kind, setKind] = useState("bond");
   const figure = useRef<FigureHandle>(null);

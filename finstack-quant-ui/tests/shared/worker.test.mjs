@@ -73,6 +73,42 @@ beforeAll(async () => {
   proxy = harness.proxy;
 }, budget(30000));
 afterAll(async () => harness?.close());
+it("exposes exactly initialize plus every crate slice's methods", async () => {
+  const expected = [
+    "initialize",
+    // CoreApi
+    "formatMoney",
+    "validateMarket",
+    "calendars",
+    // ValuationsApi
+    "price",
+    "validate",
+    "cashflows",
+    "scenarioTable",
+    "models",
+    "metrics",
+    "metricMetadata",
+    "exportResult",
+    // CalibrationApi
+    "validateCalibration",
+    "dryRun",
+    "calibrate",
+    // ModelsApi
+    "sampleCube",
+    "sampleFxDelta",
+    // StatementsApi
+    "validateStatementModel",
+    "validateStatementFormula",
+    "validateCheckSuiteSpec",
+    "evaluateStatement",
+    "explainStatement",
+    "traceStatement",
+    "runStatementChecks",
+    "evaluateStatementScenarios",
+    "rollupStatement",
+  ];
+  expect((await proxy.methods()).sort()).toEqual(expected.sort());
+});
 it("compares real worker results and errors with the direct native facade", async () => {
   for (const request of Object.values(requests))
     same(await proxy.price(request), direct(request));

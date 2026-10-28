@@ -24,6 +24,9 @@ export interface FigureSpec<
   ariaLabel: string;
   ariaDescription?: string;
 }
+// A live container too small for the prose (a panel animating open, a beyond-viewport
+// capture) draws the plot alone; exports check the size first and reject instead.
+const noProse = { top: 0, bottom: 0, lines: [] };
 /** One figure composition used by the native React host and all export sizes. */
 export function composeFigure<T, X extends ChartValue, Y extends ChartValue>(
   props: FigureSpec<T, X, Y>,
@@ -49,12 +52,9 @@ export function composeFigure<T, X extends ChartValue, Y extends ChartValue>(
   const definition: DomChartDefinition<T, X, Y> = {
     ...options,
     chart(context) {
-      const layout = figureLayout(
-        props,
-        context.width,
-        context.height,
-        presentation,
-      );
+      const layout =
+        figureLayout(props, context.width, context.height, presentation) ??
+        noProse;
       const size = {
         width: context.width,
         height: context.height - layout.top - layout.bottom,
@@ -151,7 +151,8 @@ export function figureRenderer<T, X extends ChartValue, Y extends ChartValue>(
   presentation: FigurePresentation,
 ): ChartSvgRenderer<T, X, Y> {
   return (scene, options) => {
-    const layout = figureLayout(props, scene.width, scene.height, presentation);
+    const layout =
+      figureLayout(props, scene.width, scene.height, presentation) ?? noProse;
     return renderChartSvg(
       { ...scene, nodes: [...scene.nodes, ...layout.lines] },
       options,

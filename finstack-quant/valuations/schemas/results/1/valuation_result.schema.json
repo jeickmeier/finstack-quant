@@ -963,7 +963,7 @@
         },
         "num_paths": {
           "description": "Number of simulated scenario paths (`2 × pricing_mode.num_paths` with\nantithetic pairing, `pricing_mode.num_paths` without).",
-          "format": "uint",
+          "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
@@ -1041,7 +1041,7 @@
             },
             "num_paths": {
               "description": "Number of independent estimators; must be at least two to estimate\nsampling uncertainty. With `antithetic` each estimator averages a\n`(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.\nSample standard error and the Student-t interval use this estimator\ncount, with `num_paths - 1` degrees of freedom.",
-              "format": "uint",
+              "format": "uint32",
               "minimum": 2,
               "type": "integer"
             }
@@ -1199,7 +1199,7 @@
         "paths_with_principal": {
           "default": 0,
           "description": "Number of simulated paths on which the tranche received any\nprincipal (the paths `wal` averages over).",
-          "format": "uint",
+          "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },

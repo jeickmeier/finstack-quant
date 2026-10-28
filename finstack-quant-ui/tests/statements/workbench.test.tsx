@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { createRequire } from "node:module";
 import model from "../../src/fixtures/statements/analyst-model.json";
 import rolledQ2 from "../../src/fixtures/statements/roll-forward-2025Q2.json";
@@ -38,8 +39,6 @@ beforeEach(() => {
         return { state: "ready", worker: true };
       case "validateStatementModel":
         return native.validateFinancialModelJson(arg);
-      case "statementNodeIds":
-        return native.modelNodeIds(arg);
       case "evaluateStatement":
         return new native.Evaluator().evaluate(arg.modelJson);
       case "validateStatementFormula":
@@ -118,9 +117,10 @@ it("opens complete statements, applies an explicit edit, and rolls forward from 
     screen.getByRole("button", { name: "Revenue 2024Q1, edit value" })
       .textContent,
   ).toBe("190.0");
-  fireEvent.click(
-    screen.getByRole("button", { name: "Forecast & roll forward" }),
-  );
+  expect(
+    call.mock.calls.filter(([method]) => method === "evaluateStatement"),
+  ).toHaveLength(accepted.mock.calls.length);
+  fireEvent.click(screen.getByRole("tab", { name: "Forecast & roll forward" }));
   await screen.findByRole("button", { name: "Roll forward to 2025Q2" });
   fireEvent.click(
     screen.getByRole("button", { name: "Roll forward to 2025Q2" }),
@@ -143,16 +143,16 @@ it("changes a native forecast method and calculates a newly added metric", async
     </FinstackQueryProvider>,
   );
   await screen.findByRole("region", { name: "Income statement" });
-  fireEvent.click(
-    screen.getByRole("button", { name: "Forecast & roll forward" }),
-  );
-  fireEvent.change(
+  fireEvent.click(screen.getByRole("tab", { name: "Forecast & roll forward" }));
+  await userEvent.click(
     screen.getByRole("combobox", { name: "Revenue forecast method" }),
-    { target: { value: "growth_pct" } },
   );
-  const revenueEditor = screen
-    .getByRole("combobox", { name: "Revenue forecast method" })
-    .closest("div.rounded-lg") as HTMLElement;
+  await userEvent.click(
+    await screen.findByRole("option", { name: "Fixed growth" }),
+  );
+  const revenueEditor = screen.getByRole("region", {
+    name: "Revenue forecast",
+  });
   fireEvent.change(
     within(revenueEditor).getByRole("textbox", { name: /Growth per period/ }),
     { target: { value: "0.1" } },
@@ -166,7 +166,7 @@ it("changes a native forecast method and calculates a newly added metric", async
     method: "growth_pct",
     params: { rate: 0.1 },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Metrics & ratios" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Metrics & ratios" }));
   fireEvent.click(screen.getByRole("button", { name: "Add metric" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Metric name" }), {
     target: { value: "Revenue to debt" },
@@ -205,7 +205,7 @@ it("changes a native forecast method and calculates a newly added metric", async
       name: "Revenue to debt 2024Q1, inspect value",
     }).textContent,
   ).toBe("0.445");
-  fireEvent.click(screen.getByRole("button", { name: "Statements & editing" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Statements & editing" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Revenue 2024Q1, edit value" }),
   );
@@ -215,7 +215,7 @@ it("changes a native forecast method and calculates a newly added metric", async
   );
   fireEvent.click(screen.getByRole("button", { name: "Save Revenue 2024Q1" }));
   await waitFor(() => expect(accepted).toHaveBeenCalledTimes(4));
-  fireEvent.click(screen.getByRole("button", { name: "Metrics & ratios" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Metrics & ratios" }));
   const refreshedRatios = await screen.findByRole("region", {
     name: "Metrics, margins & covenant ratios",
   });
@@ -230,6 +230,12 @@ it("changes a native forecast method and calculates a newly added metric", async
 
 const canonicalModel = () =>
   native.validateFinancialModelJson(JSON.stringify(model));
+/** Text of the elements a control's aria-describedby references. */
+const description = (element: HTMLElement) =>
+  (element.getAttribute("aria-describedby") ?? "")
+    .split(" ")
+    .map((id) => document.getElementById(id)?.textContent)
+    .join(" ");
 const lastCall = (method: string) =>
   call.mock.calls.findLast(([name]) => name === method)?.[1];
 
@@ -283,11 +289,13 @@ it("rolls reported quarters up to native annual values with editable methods", a
     within(income).queryByRole("button", { name: "Revenue 2024, edit value" }),
   ).toBeNull();
 
-  fireEvent.change(
+  await userEvent.click(
     screen.getByRole("combobox", {
       name: "Debt, opening balance roll-up method",
     }),
-    { target: { value: "formula" } },
+  );
+  await userEvent.click(
+    await screen.findByRole("option", { name: "Recalculate formula (ratio)" }),
   );
   await waitFor(() =>
     expect(
@@ -308,18 +316,43 @@ it("runs scenarios with forecast overrides and compares them natively", async ()
   );
   await screen.findByRole("region", { name: "Income statement" });
   fireEvent.click(screen.getByRole("button", { name: "2025Q3 Forecast" }));
-  fireEvent.click(screen.getByRole("button", { name: "Scenarios" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
   fireEvent.click(screen.getByRole("button", { name: "Add scenario" }));
   const card = screen.getByRole("region", { name: "Scenario scenario_2" });
-  fireEvent.change(
-    within(card).getByRole("combobox", {
-      name: "scenario_2 add forecast override",
-    }),
-    { target: { value: "revenue" } },
+  // The empty parent is a real radio choice, and a new scenario inherits the first.
+  expect(
+    within(screen.getByRole("region", { name: "Scenario base" }))
+      .getByRole("radio", { name: "No parent" })
+      .getAttribute("aria-checked"),
+  ).toBe("true");
+  expect(
+    within(card)
+      .getByRole("radio", { name: "base" })
+      .getAttribute("aria-checked"),
+  ).toBe("true");
+  // Repeated override pickers keep their visible label and name their scenario in the description.
+  expect(
+    description(
+      within(screen.getByRole("region", { name: "Scenario base" })).getByRole(
+        "combobox",
+        { name: "Add value override" },
+      ),
+    ),
+  ).toBe("Scenario base");
+  expect(
+    description(
+      within(card).getByRole("combobox", { name: "Add forecast override" }),
+    ),
+  ).toBe("Scenario scenario_2");
+  await userEvent.click(
+    within(card).getByRole("combobox", { name: "Add forecast override" }),
   );
-  fireEvent.change(
+  await userEvent.click(await screen.findByRole("option", { name: "Revenue" }));
+  await userEvent.click(
     within(card).getByRole("combobox", { name: "Revenue forecast method" }),
-    { target: { value: "growth_pct" } },
+  );
+  await userEvent.click(
+    await screen.findByRole("option", { name: "Fixed growth" }),
   );
   fireEvent.change(
     within(card).getByRole("textbox", { name: /Growth per period/ }),
@@ -346,12 +379,20 @@ it("runs scenarios with forecast overrides and compares them natively", async ()
     },
   });
   const results = native.evaluateScenarioSet(canonicalModel(), setJson);
+  // Line names are row headers, so each scenario value is announced with its line.
+  const lineHeaders = within(comparison).getAllByRole("rowheader");
+  // One row header per body row; the first row holds the column headers.
+  expect(lineHeaders).toHaveLength(
+    within(comparison).getAllByRole("row").length - 1,
+  );
   const revenueRow = within(comparison)
     .getAllByRole("row")
-    .find((row) => row.querySelector("th")?.textContent === "Revenue")!;
-  const cells = [...revenueRow.querySelectorAll("td")].map(
-    (cell) => cell.textContent,
-  );
+    .find(
+      (row) => within(row).queryByRole("rowheader")?.textContent === "Revenue",
+    )!;
+  const cells = within(revenueRow)
+    .getAllByRole("cell")
+    .map((cell) => cell.textContent);
   expect(cells).toEqual(
     ["base", "scenario_2"].map((name) =>
       reportStatementCell(
@@ -371,4 +412,213 @@ it("runs scenarios with forecast overrides and compares them natively", async ()
   expect(
     await screen.findByRole("region", { name: "scenario_2 statements" }),
   ).toBeTruthy();
+});
+
+it("rejects scenario amounts outside the Rust decimal contract before the worker", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  fireEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
+  const card = screen.getByRole("region", { name: "Scenario base" });
+  await userEvent.click(
+    within(card).getByRole("combobox", { name: "Add value override" }),
+  );
+  await userEvent.click(await screen.findByRole("option", { name: "Revenue" }));
+  const amount = within(card).getByRole("textbox", { name: "Revenue" });
+  expect(description(amount)).toBe("Scenario base");
+  fireEvent.change(amount, { target: { value: "1." } });
+  fireEvent.click(screen.getByRole("button", { name: "Run scenarios" }));
+  expect(
+    (
+      await screen.findByText("Revenue: enter a decimal amount in base units.")
+    ).getAttribute("role"),
+  ).toBe("alert");
+  expect(
+    call.mock.calls.filter(
+      ([method]) => method === "evaluateStatementScenarios",
+    ),
+  ).toHaveLength(0);
+
+  fireEvent.change(amount, { target: { value: "1e3" } });
+  fireEvent.click(screen.getByRole("button", { name: "Run scenarios" }));
+  await waitFor(() =>
+    expect(lastCall("evaluateStatementScenarios")).toBeDefined(),
+  );
+  expect(
+    JSON.parse(lastCall("evaluateStatementScenarios").scenarioSetJson),
+  ).toEqual({
+    scenarios: {
+      base: { overrides: { revenue: { amount: "1e3", currency: "USD" } } },
+    },
+  });
+  expect(
+    screen.queryByText("Revenue: enter a decimal amount in base units."),
+  ).toBeNull();
+});
+
+it("rejects grid amounts outside the Rust decimal contract before validation", async () => {
+  const accepted = vi.fn();
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench
+        defaultModelJson={JSON.stringify(model)}
+        onModelAccepted={accepted}
+      />
+    </FinstackQueryProvider>,
+  );
+  const income = await screen.findByRole("region", {
+    name: "Income statement",
+  });
+  await waitFor(() => expect(accepted).toHaveBeenCalledTimes(1));
+  const validations = () =>
+    call.mock.calls.filter(([method]) => method === "validateStatementModel")
+      .length;
+  const before = validations();
+  fireEvent.click(
+    within(income).getByRole("button", { name: "Revenue 2024Q1, edit value" }),
+  );
+  const exactValue = screen.getByRole("textbox", {
+    name: "Revenue 2024Q1 exact value",
+  });
+  fireEvent.change(exactValue, { target: { value: "+5" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save Revenue 2024Q1" }));
+  expect(
+    (
+      await screen.findByText("Enter a decimal amount in base units.")
+    ).getAttribute("role"),
+  ).toBe("alert");
+  expect(validations()).toBe(before);
+
+  fireEvent.change(exactValue, { target: { value: "1e3" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save Revenue 2024Q1" }));
+  await waitFor(() => expect(accepted).toHaveBeenCalledTimes(2));
+  expect(
+    JSON.parse(lastCall("validateStatementModel")).nodes.revenue.values[
+      "2024Q1"
+    ].amount,
+  ).toBe("1e3");
+  expect(
+    JSON.parse(accepted.mock.lastCall![0]).nodes.revenue.values["2024Q1"]
+      .amount,
+  ).toBe("1000");
+});
+
+it("starts from the base scenario and names the failing path when the host scenario set is invalid", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench
+        defaultModelJson={JSON.stringify(model)}
+        defaultScenarioSetJson={JSON.stringify({
+          scenarios: {
+            downside: {
+              overrides: { revenue: { amount: "1.", currency: "USD" } },
+            },
+          },
+        })}
+      />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  fireEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
+  expect(screen.getByRole("region", { name: "Scenario base" })).toBeTruthy();
+  expect(
+    screen.queryByRole("region", { name: "Scenario downside" }),
+  ).toBeNull();
+  expect(
+    (
+      await screen.findByText(/\/scenarios\/downside\/overrides\/revenue: /)
+    ).getAttribute("role"),
+  ).toBe("alert");
+});
+
+/** Replaces meta.warnings on every native evaluation the mocked worker returns. */
+function evaluateWithWarnings(warnings: unknown[]) {
+  const evaluate = call.getMockImplementation()! as (
+    method: string,
+    arg: any,
+  ) => Promise<any>;
+  call.mockImplementation(async (method: string, arg: any) => {
+    const value = await evaluate(method, arg);
+    if (method === "evaluateStatement") value.meta.warnings = warnings;
+    return value;
+  });
+}
+
+it("lists native evaluation warnings by line in a collapsed disclosure", async () => {
+  evaluateWithWarnings([
+    {
+      non_finite_value: {
+        node_id: "ltm_ebitda",
+        period: "2024Q1",
+        value: "nan",
+      },
+    },
+    {
+      non_finite_value: {
+        node_id: "ltm_ebitda",
+        period: "2024Q2",
+        value: "inf",
+      },
+    },
+    {
+      capital_structure: {
+        period: "2025Q1",
+        warning: {
+          kind: "interest_shortfall",
+          amount: 125000,
+          instrument_id: "TL-A",
+        },
+      },
+    },
+  ]);
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  const summary = screen.getByText("Evaluation warnings (3)");
+  const disclosure = summary.closest("details")!;
+  expect(disclosure.open).toBe(false);
+  fireEvent.click(summary);
+  expect(disclosure.open).toBe(true);
+  const ltm = within(disclosure).getByRole("list", {
+    name: "LTM EBITDA warnings",
+  });
+  expect(
+    within(ltm)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual([
+    "2024Q1 · non_finite_value · nan",
+    "2024Q2 · non_finite_value · inf",
+  ]);
+  const capital = within(disclosure).getByRole("list", {
+    name: "Capital structure warnings",
+  });
+  expect(
+    within(capital)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual([
+    "2025Q1 · interest_shortfall · amount: 125000, instrument_id: TL-A",
+  ]);
+});
+
+it("renders no warning disclosure when native evaluation reports none", async () => {
+  evaluateWithWarnings([]);
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  expect(screen.getByRole("status").textContent).toBe("Evaluated");
+  expect(screen.queryByText(/Evaluation warnings/)).toBeNull();
+  expect(
+    screen.queryByRole("list", { name: "Evaluation warnings" }),
+  ).toBeNull();
 });

@@ -1,25 +1,11 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useIsFetching } from "@tanstack/react-query";
-import {
-  FinstackQueryProvider,
-  useFinstack,
-} from "@/hooks/shared/use-finstack/use-finstack";
 import { PrimitiveDemo } from "./primitives";
-import { ComponentDemo, nativeItems } from "./components";
+import { ComponentDemo } from "./components";
+import { WorkerPreview } from "./worker-preview";
 import { importHarnesses } from "./imports";
 import inventory from "./inventory.json";
-function Ready({ children }: { children: ReactNode }) {
-  const worker = useFinstack(),
-    fetching = useIsFetching();
-  return (
-    <div data-worker-state={worker.status} data-fetching={fetching}>
-      {worker.error && <p role="alert">{worker.error.message}</p>}
-      {children}
-    </div>
-  );
-}
 function Imports() {
   const [results, setResults] = useState<{ name: string; modules: number }[]>(
       [],
@@ -213,10 +199,8 @@ export function RegistryGallery() {
                 role="region"
                 aria-label={`${name} preview`}
               >
-                {nativeItems.has(name) ? (
-                  <FinstackQueryProvider>
-                    <Ready>{content}</Ready>
-                  </FinstackQueryProvider>
+                {item.worker === "host" ? (
+                  <WorkerPreview>{content}</WorkerPreview>
                 ) : (
                   content
                 )}
