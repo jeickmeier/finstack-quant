@@ -13,6 +13,7 @@ import {
   formatSigned,
   isoToEpoch,
   epochToIso,
+  compareTenorLabels,
   type RoundingStamp,
 } from "../../src/format/format";
 import {
@@ -219,4 +220,57 @@ it("preserves canonical scientific decimal values in display conversion", () => 
     unit: "bp",
   });
   expect(rateToWire("0.00123", presentation)).toBe("0.000000123");
+});
+
+it("orders tenor labels by Rust's year basis before other labels", () => {
+  const sorted = (labels: string[]) => [...labels].sort(compareTenorLabels);
+  expect(sorted(["10y", "3m", "1y", "6m"])).toEqual(["3m", "6m", "1y", "10y"]);
+  expect(sorted(["1y", "12m"])).toEqual(["1y", "12m"]);
+  expect(sorted(["12m", "1y"])).toEqual(["1y", "12m"]);
+  expect(sorted(["USD-OIS", "2y"])).toEqual(["2y", "USD-OIS"]);
+  expect(sorted(["100", "95", "102.5"])).toEqual(["95", "100", "102.5"]);
+  expect(sorted(["9m", "0.75y"])).toEqual(["0.75y", "9m"]);
+  expect(sorted(["0.75y", "9m"])).toEqual(["0.75y", "9m"]);
+});
+
+it("orders vega expiry rows and decimal strikes by value, not by digit runs", () => {
+  const sorted = (labels: string[]) => [...labels].sort(compareTenorLabels);
+  // Bucketed-vega rows arrive as one `{surface}::{expiry}y` coordinate (vega.rs).
+  expect(
+    sorted(["S::0.5y", "S::0.25y", "S::0.75y", "S::1y", "S::2y", "S::10y"]),
+  ).toEqual(["S::0.25y", "S::0.5y", "S::0.75y", "S::1y", "S::2y", "S::10y"]);
+  // Case in a text run never outranks the numeric order of a later run.
+  expect(sorted(["Usd::2y", "USD::1y"])).toEqual(["USD::1y", "Usd::2y"]);
+  expect(sorted(["S::1y", "S::6m", "R::3m"])).toEqual([
+    "R::3m",
+    "S::6m",
+    "S::1y",
+  ]);
+  expect(sorted(["0.95", "1", "1.1", "1.2", "1.05"])).toEqual([
+    "0.95",
+    "1",
+    "1.05",
+    "1.1",
+    "1.2",
+  ]);
+  // USD-SOFR-HW-VOL strikes, which numeric collation ties.
+  expect(sorted(["0.04", "0.08", "0.004"])).toEqual(["0.004", "0.04", "0.08"]);
+  expect(sorted(["0.004", "0.04", "0.08"])).toEqual(["0.004", "0.04", "0.08"]);
+  // JPYUSD-VOL strikes from tests/valuations/instruments/pricing-market.json.
+  expect(sorted(["0.007", "0.014", "0.0007000000000000001"])).toEqual([
+    "0.0007000000000000001",
+    "0.007",
+    "0.014",
+  ]);
+  expect(sorted(["0.25", "-0.5", "USD-OIS", "3m"])).toEqual([
+    "3m",
+    "-0.5",
+    "0.25",
+    "USD-OIS",
+  ]);
+  expect(sorted(["USD-SOFR", "EUR-ESTR", "USD-OIS"])).toEqual([
+    "EUR-ESTR",
+    "USD-OIS",
+    "USD-SOFR",
+  ]);
 });

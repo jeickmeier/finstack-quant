@@ -1,8 +1,12 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
+import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
-import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
+import { useStatementFormulaValidator } from "@/hooks/statements/use-statement-formula-validator/use-statement-formula-validator";
 import { FormulaPreview } from "@/components/finstack/statements/components/financial-model-editor/formula-preview";
 
 /** Add a formula-backed metric to the canonical model for native validation and evaluation. */
@@ -13,7 +17,7 @@ export function MetricEditor({
   model: FinancialModelSpecWire;
   onApply: (json: string) => Promise<string | null>;
 }) {
-  const { client, status } = useFinstack();
+  const validateFormula = useStatementFormulaValidator();
   const [open, setOpen] = useState(false);
   const [id, setId] = useState("");
   const [name, setName] = useState("");
@@ -38,11 +42,9 @@ export function MetricEditor({
       return setError("Enter a name and formula.");
     if (kind === "monetary" && !/^[A-Z]{3}$/.test(currency.trim()))
       return setError("Enter a three-letter currency code.");
-    if (!client || status !== "ready")
-      return setError("Statement runtime is not ready.");
     setSaving(true);
     try {
-      await client.call("validateStatementFormula", formula.trim());
+      await validateFormula(formula.trim());
       const next = structuredClone(model);
       next.nodes[metricId] = {
         node_id: metricId,
@@ -91,65 +93,69 @@ export function MetricEditor({
       </div>
       {open && (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="text-xs">
-            Metric name
-            <input
-              className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Net debt / EBITDA"
-            />
-          </label>
-          <label className="text-xs">
-            Metric ID
-            <input
-              className="mt-1 w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm"
-              value={id}
-              onChange={(event) => setId(event.target.value)}
-              placeholder="net_debt_leverage"
-            />
-          </label>
-          <label className="text-xs">
-            Result type
-            <select
-              className="mt-1 w-full rounded border border-border bg-background px-3 py-2 text-sm"
-              value={kind}
-              onChange={(event) =>
-                setKind(event.target.value as "scalar" | "monetary")
-              }
-            >
-              <option value="scalar">Scalar / ratio</option>
-              <option value="monetary">Monetary amount</option>
-            </select>
-          </label>
-          {kind === "monetary" && (
-            <label className="text-xs">
-              Currency
-              <input
-                className="mt-1 w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm"
-                value={currency}
-                onChange={(event) =>
-                  setCurrency(event.target.value.toUpperCase())
-                }
-                maxLength={3}
+          <FieldFrame label="Metric name">
+            {(control) => (
+              <Input
+                {...control}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Net debt / EBITDA"
               />
-            </label>
+            )}
+          </FieldFrame>
+          <FieldFrame label="Metric ID">
+            {(control) => (
+              <Input
+                {...control}
+                className="font-mono"
+                value={id}
+                onChange={(event) => setId(event.target.value)}
+                placeholder="net_debt_leverage"
+              />
+            )}
+          </FieldFrame>
+          <EnumField
+            label="Result type"
+            value={kind}
+            onValueChange={(next) => setKind(next as "scalar" | "monetary")}
+            options={[
+              { value: "scalar", label: "Scalar / ratio" },
+              { value: "monetary", label: "Monetary amount" },
+            ]}
+          />
+          {kind === "monetary" && (
+            <FieldFrame label="Currency">
+              {(control) => (
+                <Input
+                  {...control}
+                  className="font-mono"
+                  value={currency}
+                  onChange={(event) =>
+                    setCurrency(event.target.value.toUpperCase())
+                  }
+                  maxLength={3}
+                />
+              )}
+            </FieldFrame>
           )}
-          <label className="text-xs sm:col-span-2">
-            Formula
-            <textarea
-              aria-label="Formula"
-              className="mt-1 w-full rounded border border-border bg-background px-3 py-2 font-mono text-sm"
-              rows={2}
-              value={formula}
-              onChange={(event) => setFormula(event.target.value)}
-              placeholder="debt_closing / ltm_ebitda"
-            />
-            <span className="block pt-1 text-muted-foreground">
+          <div className="space-y-1 sm:col-span-2">
+            <FieldFrame label="Formula">
+              {(control) => (
+                <Textarea
+                  {...control}
+                  rows={2}
+                  className="font-mono"
+                  value={formula}
+                  onChange={(event) => setFormula(event.target.value)}
+                  placeholder="debt_closing / ltm_ebitda"
+                />
+              )}
+            </FieldFrame>
+            <p className="text-xs text-muted-foreground">
               Available lines: {Object.keys(model.nodes).join(", ")}
-            </span>
+            </p>
             <FormulaPreview formula={formula || null} />
-          </label>
+          </div>
           {error && (
             <p role="alert" className="text-xs text-error sm:col-span-2">
               {error}

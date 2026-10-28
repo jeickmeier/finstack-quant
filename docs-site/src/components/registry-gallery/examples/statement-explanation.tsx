@@ -10,6 +10,6 @@ const request = {
   period: "2025Q2",
 };
 
-export function Example(_props: ExampleProps) {
-  return <StatementExplanation request={request} />;
+export function Example({ density = "compact" }: ExampleProps) {
+  return <StatementExplanation request={request} density={density} />;
 }

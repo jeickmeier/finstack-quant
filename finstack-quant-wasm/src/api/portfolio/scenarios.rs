@@ -14,9 +14,9 @@ use wasm_bindgen::prelude::*;
 /// @param scenario_json - Scenario specification JSON.
 /// @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
 ///
-/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
-/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
-/// them; serialize one with `valuations.valuationResultToJson`.
+/// Each position's `valuation_result` matches what `priceInstrument` returns:
+/// the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain
+/// numbers, so serialize one with `valuations.valuationResultToJson`.
 /// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
 /// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
 /// order before other keys, not in the Rust (and Python) insertion order; take

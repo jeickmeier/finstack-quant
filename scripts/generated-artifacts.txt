@@ -183,6 +183,7 @@ finstack-quant-ui/src/generated/meta/cap_floor.ts
 finstack-quant-ui/src/generated/meta/cds_index.ts
 finstack-quant-ui/src/generated/meta/cds_option.ts
 finstack-quant-ui/src/generated/meta/cds_tranche.ts
+finstack-quant-ui/src/generated/meta/check_suite_spec.ts
 finstack-quant-ui/src/generated/meta/cliquet_option.ts
 finstack-quant-ui/src/generated/meta/cms_option.ts
 finstack-quant-ui/src/generated/meta/cms_spread_option.ts
@@ -235,6 +236,8 @@ finstack-quant-ui/src/generated/meta/range_accrual.ts
 finstack-quant-ui/src/generated/meta/real_estate_asset.ts
 finstack-quant-ui/src/generated/meta/repo.ts
 finstack-quant-ui/src/generated/meta/revolving_credit.ts
+finstack-quant-ui/src/generated/meta/rollup_spec.ts
+finstack-quant-ui/src/generated/meta/scenario_set.ts
 finstack-quant-ui/src/generated/meta/shared.ts
 finstack-quant-ui/src/generated/meta/snowball.ts
 finstack-quant-ui/src/generated/meta/statement_result.ts
@@ -270,6 +273,7 @@ finstack-quant-ui/src/generated/schemas/cap_floor.json
 finstack-quant-ui/src/generated/schemas/cds_index.json
 finstack-quant-ui/src/generated/schemas/cds_option.json
 finstack-quant-ui/src/generated/schemas/cds_tranche.json
+finstack-quant-ui/src/generated/schemas/check_suite_spec.json
 finstack-quant-ui/src/generated/schemas/cliquet_option.json
 finstack-quant-ui/src/generated/schemas/cms_option.json
 finstack-quant-ui/src/generated/schemas/cms_spread_option.json
@@ -322,6 +326,8 @@ finstack-quant-ui/src/generated/schemas/range_accrual.json
 finstack-quant-ui/src/generated/schemas/real_estate_asset.json
 finstack-quant-ui/src/generated/schemas/repo.json
 finstack-quant-ui/src/generated/schemas/revolving_credit.json
+finstack-quant-ui/src/generated/schemas/rollup_spec.json
+finstack-quant-ui/src/generated/schemas/scenario_set.json
 finstack-quant-ui/src/generated/schemas/snowball.json
 finstack-quant-ui/src/generated/schemas/statement_result.json
 finstack-quant-ui/src/generated/schemas/structured_credit.json
@@ -354,6 +360,7 @@ finstack-quant-ui/src/generated/types/cap_floor.ts
 finstack-quant-ui/src/generated/types/cds_index.ts
 finstack-quant-ui/src/generated/types/cds_option.ts
 finstack-quant-ui/src/generated/types/cds_tranche.ts
+finstack-quant-ui/src/generated/types/check_suite_spec.ts
 finstack-quant-ui/src/generated/types/cliquet_option.ts
 finstack-quant-ui/src/generated/types/cms_option.ts
 finstack-quant-ui/src/generated/types/cms_spread_option.ts
@@ -406,6 +413,8 @@ finstack-quant-ui/src/generated/types/range_accrual.ts
 finstack-quant-ui/src/generated/types/real_estate_asset.ts
 finstack-quant-ui/src/generated/types/repo.ts
 finstack-quant-ui/src/generated/types/revolving_credit.ts
+finstack-quant-ui/src/generated/types/rollup_spec.ts
+finstack-quant-ui/src/generated/types/scenario_set.ts
 finstack-quant-ui/src/generated/types/shared.ts
 finstack-quant-ui/src/generated/types/snowball.ts
 finstack-quant-ui/src/generated/types/statement_result.ts

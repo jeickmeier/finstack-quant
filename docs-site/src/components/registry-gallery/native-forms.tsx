@@ -10,7 +10,17 @@ import { useMarketValidator } from "@/hooks/core/use-market-validator/use-market
 import { useCalibrationValidator } from "@/hooks/calibration/use-calibrate/use-calibrate";
 import * as bond from "@/lib/finstack/generated/instrument/bond";
 import data from "./data.json";
+import { WorkerPreview } from "./worker-preview";
+// These validator hooks sit outside the four items' install closures, so the example mounts
+// its own provider; the install matrix runs each item with a caller `validate` stub instead.
 export function NativeForms({ name }: { name: string }) {
+  return (
+    <WorkerPreview>
+      <Forms name={name} />
+    </WorkerPreview>
+  );
+}
+function Forms({ name }: { name: string }) {
   const [type, setType] = useState("bond"),
     [submissions, setSubmissions] = useState(0);
   const [marketDocument, setMarketDocument] = useState({

@@ -2,6 +2,7 @@
 import { createRequire } from "node:module";
 import { it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {
   surfaceNodes,
   surfaceSlices,
@@ -12,7 +13,8 @@ import { FxDeltaQuotes } from "@/components/finstack/core/components/fx-delta-qu
 import { useLinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import { storedSurface, tenorSurface, fxQuotes } from "./surfaces/fixtures";
 import bond from "../../src/fixtures/results/bond.json";
-// Native marks/export/keyboard are exercised by the installed browser fixture.
+// Native marks, export and keyboard are exercised in a real browser only for
+// the heatmap, by the install-matrix wrapper probe (tests/install/browser.mjs).
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
   async (importOriginal) => ({
@@ -120,6 +122,35 @@ it("shares table/control/external selection and clears removed coordinates witho
   expect(
     screen.queryByRole("img", { name: "Supplied surface row slice" }),
   ).toBeNull();
+});
+it("selects a stored node through the coordinate combobox option", async () => {
+  const user = userEvent.setup();
+  function App() {
+    const link = useLinkedSelection();
+    return (
+      <>
+        <output aria-label="key">{link.selectedKey}</output>
+        <VolSurfaceChart
+          surface={storedSurface}
+          link={link}
+          colorDomain={[0, 0.3]}
+        />
+      </>
+    );
+  }
+  render(<App />);
+  const labels = surfaceLabels(storedSurface);
+  const name = `${labels.expiry} 2 · ${labels.secondary} 120`;
+  const combobox = screen.getByRole("combobox", { name: "Stored coordinate" });
+  combobox.focus();
+  await user.keyboard("{ArrowDown}");
+  await user.click(await screen.findByRole("option", { name }));
+  expect(screen.getByLabelText("key").textContent).toBe(
+    JSON.stringify([storedSurface.id, 2, 120]),
+  );
+  expect(combobox.querySelector("[data-slot=select-value]")!.textContent).toBe(
+    name,
+  );
 });
 it("preserves complete raw FX quote arrays without inventing missing wings", () => {
   render(<FxDeltaQuotes surface={fxQuotes} />);

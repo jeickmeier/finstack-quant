@@ -99,12 +99,9 @@ try {
       (request) => window.registryProbe.proxy.price(request),
       request,
     );
-    const reference = structuredClone(expected[name]);
     if (actual.ok) {
-      // Each real pricing call supplies its own wall-clock stamp. Compare the
-      // remaining result exactly, then round-trip this call's timestamp below.
-      assert.equal(typeof actual.value.meta.timestamp, "string");
-      reference.value.meta.timestamp = actual.value.meta.timestamp;
+      // Results carry no wall-clock stamp, so the worker result must equal
+      // the native result exactly.
       const exported = await page.evaluate(
         (value) => window.registryProbe.proxy.exportResult(value),
         actual.value,
@@ -114,7 +111,7 @@ try {
         value: valuations.valuationResultToJson(serializeHost(actual.value)),
       });
     }
-    assert.deepEqual(actual, reference, name);
+    assert.deepEqual(actual, expected[name], name);
     if (name === "stochastic") {
       const exported = await page.evaluate(async (request) => {
         const result = await window.registryProbe.proxy.price(request);

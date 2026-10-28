@@ -4,7 +4,13 @@ import { useFinstack } from "./use-finstack";
 import type { WorkerApi } from "@/workers/finstack-contract";
 /** Shared transport policy; SchemaForm owns scheduling and cancellation of stale results. */
 export function useNativeValidator<
-  K extends "validate" | "validateMarket" | "validateCalibration",
+  K extends
+    | "validate"
+    | "validateMarket"
+    | "validateCalibration"
+    | "validateStatementModel"
+    | "validateStatementFormula"
+    | "validateCheckSuiteSpec",
 >(operation: K, label: string) {
   const worker = useFinstack();
   return useCallback(

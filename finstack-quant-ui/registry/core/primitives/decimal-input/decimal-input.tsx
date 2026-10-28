@@ -32,7 +32,7 @@ export function DecimalInput({
   ...props
 }: DecimalInputProps) {
   const [focused, setFocused] = useState(false);
-  const { label, help, error, id, path, dirty, ...input } = props;
+  const { label, help, error, id, path, dirty, describedBy, ...input } = props;
   const invalid =
     value !== "" &&
     (!new RegExp(pattern).test(value) ||
@@ -46,7 +46,7 @@ export function DecimalInput({
     }
   return (
     <FieldFrame
-      {...{ label, help, id, path, dirty }}
+      {...{ label, help, id, path, dirty, describedBy }}
       error={
         error ??
         (invalid

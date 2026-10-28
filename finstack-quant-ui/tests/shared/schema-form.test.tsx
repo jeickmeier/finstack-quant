@@ -10,10 +10,9 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRequire } from "node:module";
-import { termDisclosure } from "@/components/finstack/core/components/schema-form/disclosure";
+import { LESS_COMMON_TERMS } from "@/components/finstack/core/components/schema-form/disclosure";
 import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import * as bond from "../../src/generated/instrument/bond";
-import * as equityOption from "../../src/generated/instrument/equity_option";
 import { createWireCodec } from "../../src/codec.mjs";
 import { discriminator } from "@/components/finstack/core/components/schema-form/discriminator";
 import type { Schema } from "@/components/finstack/core/components/schema-form/schema";
@@ -24,6 +23,8 @@ import {
   workingValue,
 } from "@/components/finstack/core/components/schema-form/schema-walk";
 import calibrationSchema from "../../src/generated/schemas/calibration.json";
+import checkSuiteSchema from "../../src/generated/schemas/check_suite_spec.json";
+import checkSuiteMetadata from "../../src/generated/meta/check_suite_spec";
 afterEach(cleanup);
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -34,195 +35,80 @@ function summaries(name: RegExp) {
     name.test(node.textContent ?? ""),
   );
 }
-it("keeps common bond terms on the sheet and conventions in collapsed disclosures", () => {
-  expect(termDisclosure("day_count", { atSpec: true, siblingKeys: [] })).toBe(
-    "Schedule conventions",
-  );
-  expect(
-    termDisclosure("discount_curve_id", { atSpec: true, siblingKeys: [] }),
-  ).toBe("Market links");
-  expect(
-    termDisclosure("spot_id", {
-      atSpec: true,
-      siblingKeys: ["underlying_ticker"],
-    }),
-  ).toBe("Market links");
-  expect(
-    termDisclosure("spot_id", { atSpec: true, siblingKeys: [] }),
-  ).toBeNull();
-  expect(
-    termDisclosure("pool", {
-      atSpec: true,
-      instrumentType: "structured_credit",
-      siblingKeys: [],
-    }),
-  ).toBe("Deal structure");
-  expect(
-    termDisclosure("fees", {
-      atSpec: true,
-      instrumentType: "revolving_credit",
-      siblingKeys: [],
-    }),
-  ).toBe("Facility terms");
-  expect(termDisclosure("rate", { atSpec: true, siblingKeys: [] })).toBeNull();
-  expect(
-    termDisclosure("id", {
-      atSpec: true,
-      instrumentType: "cds_option",
-      siblingKeys: [],
-    }),
-  ).toBeNull();
-});
-it("edits generated bond controls, shows decimal errors and emits native canonical JSON without replacing edits", async () => {
-  const submit = vi.fn();
-  render(<SchemaForm module={bond} validate={validate} onSubmit={submit} />);
-  const addCredit = screen.getByRole("button", { name: "Add credit curve id" });
-  expect(addCredit.closest("details")?.open).toBe(false);
-  expect(
-    addCredit.closest("details")?.querySelector("summary")?.textContent,
-  ).toMatch(/^Market links/);
-  expect(screen.getByRole("textbox", { name: "Rate" })).toBeTruthy();
-  expect(summaries(/^More /)).toEqual([]);
-  const settlement = screen.getByRole("textbox", {
-    name: "Settlement days",
-  }) as HTMLInputElement;
-  expect(settlement.closest("details")?.open).toBe(false);
-  expect(settlement.value).toBe("1");
-  const amount = within(
-    screen.getByRole("group", { name: "Notional" }),
-  ).getByRole("textbox", { name: "Amount" });
-  fireEvent.focus(amount);
-  fireEvent.change(amount, { target: { value: "abc" } });
-  await waitFor(() => expect(amount.getAttribute("aria-invalid")).toBe("true"));
-  expect(
-    screen
-      .getAllByRole("alert")
-      .map((node) => node.textContent)
-      .join(" "),
-  ).toMatch(/pattern|decimal/i);
-  fireEvent.change(amount, { target: { value: "1234567.1234567890" } });
-  await waitFor(() =>
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Apply instrument",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(false),
-  );
-  fireEvent.submit(amount.closest("form")!);
-  await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
-  const canonical = submit.mock.calls[0][0];
-  expect(native.validateInstrumentJson(canonical)).toBe(canonical);
-  expect(JSON.parse(canonical).instrument.spec.notional.amount).toBe(
-    "1234567.1234567890",
-  );
-  expect(JSON.parse(canonical).instrument.spec.settlement_days).toBe(1);
-  expect(
-    JSON.parse(canonical).instrument.spec.cashflow_spec.fixed.day_count,
-  ).toBe("act_act_isma");
-  expect((amount as HTMLInputElement).value).toBe("1234567.1234567890");
-});
-it("keeps a defaulted exercise style on the equity option sheet", () => {
+it("groups, roots and promotes fields through injected disclosure, sheet and promotedField", async () => {
+  const schema: Schema = {
+    type: "object",
+    properties: {
+      doc: {
+        type: "object",
+        properties: {
+          terms: {
+            type: "object",
+            properties: {
+              a: { type: "string" },
+              b: { type: "string" },
+              c: { type: "string" },
+              note: { type: "string", default: "" },
+            },
+          },
+        },
+      },
+    },
+  };
+  const module = {
+    schema,
+    metadata: [],
+    codec: createWireCodec({ ...schema }),
+    example: {
+      doc: { terms: { a: "first", b: "second", c: "third", note: "" } },
+    },
+  };
   render(
     <SchemaForm
-      module={equityOption}
-      validate={validate}
+      module={module}
+      validate={async (json) => json}
       onSubmit={() => {}}
+      sheet={{ path: "doc", label: "Doc terms" }}
+      disclosure={{
+        order: ["B group", "C group", "A group"],
+        group: ({ key, secondary }) =>
+          key === "a"
+            ? "A group"
+            : key === "b"
+              ? "B group"
+              : key === "c"
+                ? "C group"
+                : secondary
+                  ? LESS_COMMON_TERMS
+                  : null,
+      }}
+      promotedField={({ reveal }) => ({
+        path: "doc.terms.b",
+        node: (
+          <button type="button" onClick={() => reveal("doc.terms", "A group")}>
+            Show A group
+          </button>
+        ),
+      })}
     />,
   );
-  const style = screen.getByRole("combobox", { name: "Exercise style" });
-  expect(style.closest("details")).toBeNull();
-});
-it("opens a collapsed disclosure when its field is invalid", async () => {
-  render(<SchemaForm module={bond} validate={validate} onSubmit={() => {}} />);
-  const settlement = screen.getByRole("textbox", {
-    name: "Settlement days",
-  }) as HTMLInputElement;
-  const details = settlement.closest("details");
-  expect(details?.open).toBe(false);
-  fireEvent.change(settlement, { target: { value: "nope" } });
-  await waitFor(() =>
-    expect(settlement.getAttribute("aria-invalid")).toBe("true"),
-  );
-  expect(details?.open).toBe(true);
-  expect(document.activeElement).toBe(settlement);
-  details!.open = false;
-  details!.dispatchEvent(new Event("toggle", { bubbles: true }));
-  expect(details?.open).toBe(true);
-  expect(settlement.value).toBe("nope");
-});
-it("switches canonical external coupon branches, and exposes defaulted fields only on request", async () => {
-  const user = userEvent.setup();
-  render(<SchemaForm module={bond} validate={validate} onSubmit={() => {}} />);
-  const dayCount = screen.getByRole("combobox", { name: "Day count" });
-  expect(dayCount.closest("details")?.open).toBe(false);
-  for (const summary of summaries(/^Schedule conventions/))
-    await user.click(summary);
-  expect(
-    screen.getByRole("textbox", { name: "Settlement days" }).closest("details")
-      ?.open,
-  ).toBe(true);
-  expect(dayCount.closest("details")?.open).toBe(true);
-  const types = screen.getByRole("radiogroup", { name: "Cashflow spec type" });
-  await user.click(within(types).getByRole("radio", { name: "Floating" }));
-  expect(
-    within(types)
-      .getByRole("radio", { name: "Floating" })
-      .getAttribute("aria-checked"),
-  ).toBe("true");
-  expect(screen.queryByRole("group", { name: "Fixed" })).toBeNull();
-  await user.click(within(types).getByRole("radio", { name: "Fixed" }));
-  expect(
-    within(types)
-      .getByRole("radio", { name: "Fixed" })
-      .getAttribute("aria-checked"),
-  ).toBe("true");
-});
-it("supports nullable references without inventing IDs and ignores stale native validation errors", async () => {
-  const pending: {
-    json: string;
-    resolve(value: string): void;
-    reject(error: Error): void;
-  }[] = [];
-  render(
-    <SchemaForm
-      module={bond}
-      validate={(json) =>
-        new Promise((resolve, reject) =>
-          pending.push({ json, resolve, reject }),
-        )
-      }
-      onSubmit={() => {}}
-    />,
-  );
-  fireEvent.click(summaries(/^Market links/)[0]!);
-  fireEvent.click(screen.getByRole("button", { name: "Add credit curve id" }));
-  const credit = screen.getByRole("textbox", { name: "Credit curve id" });
-  expect((credit as HTMLInputElement).value).toBe("");
-  fireEvent.change(credit, { target: { value: "OLD" } });
-  await waitFor(() => expect(pending.length).toBeGreaterThan(0));
-  fireEvent.change(credit, { target: { value: "NEW" } });
-  await waitFor(() => expect(pending.length).toBe(2));
-  pending[1].resolve(native.validateInstrumentJson(pending[1].json));
-  pending[0].reject(new Error("Obsolete native error"));
-  await waitFor(() =>
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Apply instrument",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(false),
-  );
-  expect(screen.queryByText("Obsolete native error")).toBeNull();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Credit curve id options" }),
-  );
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Clear credit curve id" }),
-  );
-  expect(screen.queryByRole("textbox", { name: "Credit curve id" })).toBeNull();
+  // Listed groups follow `order` (C before A, against property order); the unlisted
+  // generic group follows them. B's only member is the promoted, denied field, so
+  // B is not rendered and no count includes it.
+  expect(summaries(/./).map((node) => node.textContent)).toEqual([
+    "C group (1)",
+    "A group (1)",
+    `${LESS_COMMON_TERMS} (1)`,
+  ]);
+  const root = screen.getByRole("group", { name: "Doc terms" });
+  expect(root.classList.contains("finstack-schema-root")).toBe(true);
+  expect(screen.queryByRole("group", { name: "Doc" })).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "B" })).toBeNull();
+  const a = summaries(/^A group/)[0]!;
+  expect((a.parentElement as HTMLDetailsElement).open).toBe(false);
+  await userEvent.click(screen.getByRole("button", { name: "Show A group" }));
+  expect(document.activeElement).toBe(a);
+  expect((a.parentElement as HTMLDetailsElement).open).toBe(true);
 });
 it("preserves real bond wide-integer fields until the generated codec checks their range", async () => {
   const edited = structuredClone(bond.example) as unknown as Record<
@@ -475,32 +361,6 @@ it.each(["", "loaded"])(
   },
 );
 
-it("normalizes each immutable edit once across errors, native validation and submission", async () => {
-  const codec = createWireCodec(bond.schema);
-  const normalize = vi.spyOn(codec.validator, "parse");
-  const stringify = vi.spyOn(codec, "stringify");
-  const module = { ...bond, codec };
-  const nativeValidate = vi.fn(validate);
-  const submit = vi.fn();
-  render(
-    <SchemaForm module={module} validate={nativeValidate} onSubmit={submit} />,
-  );
-  await waitFor(() => expect(nativeValidate).toHaveBeenCalledTimes(1));
-  expect(normalize).toHaveBeenCalledTimes(1);
-  const input = screen.getByRole("textbox", {
-    name: "Settlement days",
-    hidden: true,
-  });
-  fireEvent.click(input.closest("details")!.querySelector("summary")!);
-  fireEvent.change(input, { target: { value: "2" } });
-  await waitFor(() => expect(nativeValidate).toHaveBeenCalledTimes(2));
-  expect(normalize).toHaveBeenCalledTimes(2);
-  fireEvent.submit(input.closest("form")!);
-  await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
-  expect(normalize).toHaveBeenCalledTimes(2);
-  expect(nativeValidate).toHaveBeenCalledTimes(2);
-  expect(stringify).not.toHaveBeenCalled();
-});
 it("keeps undeclared boolean defaults unanswered while preserving declared defaults", () => {
   const schema: Schema = {
     type: "object",
@@ -627,6 +487,85 @@ it("resolves escaped local references without mutating the input schema", () => 
     resolve(root, { schema: { $ref: "#/$defs/C" }, pointer: "#" }),
   ).toThrow("Unsupported schema reference");
   expect(JSON.stringify(root)).toBe(before);
+});
+
+it("merges a tagged struct variant's sibling tag into the referenced struct fields", () => {
+  const root: Schema = {
+    $defs: {
+      S: {
+        type: "object",
+        properties: { nodes: { type: "array" }, tolerance: { type: "number" } },
+        required: ["nodes"],
+      },
+    },
+  };
+  const before = JSON.stringify(root);
+  const { schema, pointer } = resolve(root, {
+    schema: {
+      $ref: "#/$defs/S",
+      properties: { type: { const: "a" } },
+      required: ["type"],
+    },
+    pointer: "#",
+  });
+  expect(pointer).toBe("#/$defs/S");
+  expect(Object.keys(schema.properties ?? {})).toEqual([
+    "nodes",
+    "tolerance",
+    "type",
+  ]);
+  expect(schema.properties?.type?.const).toBe("a");
+  expect(schema.required).toEqual(["nodes", "type"]);
+  expect(JSON.stringify(root)).toBe(before);
+});
+
+it("edits a builtin check's struct fields through its generated tagged variant", async () => {
+  const user = userEvent.setup();
+  const module = {
+    schema: checkSuiteSchema as Schema,
+    metadata: checkSuiteMetadata,
+    codec: createWireCodec(checkSuiteSchema),
+    example: checkSuiteSchema.examples[0],
+  };
+  const input = vi.fn();
+  render(
+    <SchemaForm
+      module={module}
+      validate={async (json) => json}
+      onSubmit={() => {}}
+      onInputJson={input}
+      layout="full"
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Add Builtin checks" }));
+  await user.click(
+    screen.getByRole("combobox", { name: "Builtin checks 2 type" }),
+  );
+  await user.click(
+    await screen.findByRole("option", { name: "Balance sheet articulation" }),
+  );
+  const check = screen.getByRole("group", { name: "Builtin checks 2" });
+  for (const name of ["Assets nodes", "Liabilities nodes", "Equity nodes"])
+    expect(within(check).getByRole("group", { name })).toBeTruthy();
+  await user.click(
+    within(check).getByRole("button", { name: "Add tolerance" }),
+  );
+  await user.type(
+    within(check).getByRole("textbox", { name: "Tolerance" }),
+    "0.5",
+  );
+  await waitFor(() => {
+    const json = input.mock.calls.at(-1)?.[0] as string | null | undefined;
+    expect(json).toBeTruthy();
+    expect(JSON.parse(json!).builtin_checks[1]).toEqual({
+      type: "balance_sheet_articulation",
+      assets_nodes: [],
+      liabilities_nodes: [],
+      equity_nodes: [],
+      tolerance: 0.5,
+    });
+  });
+  expect(input.mock.calls.at(-1)?.[0]).toContain('"tolerance":0.5');
 });
 
 it("workingValue keeps wide integer tokens and incomplete edit text exact", () => {

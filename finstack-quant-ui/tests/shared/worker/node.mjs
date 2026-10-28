@@ -1,13 +1,17 @@
 import { parentPort, workerData } from "node:worker_threads";
-import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { expose } from "comlink";
 import nodeEndpoint from "comlink/dist/esm/node-adapter.mjs";
 import { createService } from "@/workers/finstack-service";
-const wasm = createRequire(import.meta.url)(workerData.packagePath);
+// The published facade, imported at run time so the build never bundles it.
+const { default: init, ...facade } = await import(
+  pathToFileURL(workerData.facadePath).href
+);
 let constructed = 0,
   freed = 0,
   calls = 0;
-class MarketContext extends wasm.MarketContext {
+class MarketContext extends facade.core.MarketContext {
   static fromJson(json) {
     const handle = super.fromJson(json);
     constructed++;
@@ -28,7 +32,7 @@ class MarketContext extends wasm.MarketContext {
 let cubeConstructed = 0,
   cubeFreed = 0,
   cubeJson = "";
-class VolCube extends wasm.VolCube {
+class VolCube extends facade.core.VolCube {
   static fromJson(json) {
     const handle = super.fromJson(json);
     cubeConstructed++;
@@ -43,7 +47,7 @@ class VolCube extends wasm.VolCube {
 }
 let fxConstructed = 0,
   fxFreed = 0;
-class FxDeltaVolSurface extends wasm.FxDeltaVolSurface {
+class FxDeltaVolSurface extends facade.core.FxDeltaVolSurface {
   static fromJson(json) {
     const handle = super.fromJson(json);
     fxConstructed++;
@@ -57,7 +61,7 @@ class FxDeltaVolSurface extends wasm.FxDeltaVolSurface {
 }
 let moneyConstructed = 0,
   moneyFreed = 0;
-class Money extends wasm.Money {
+class Money extends facade.core.Money {
   static fromDecimalStr(amount, currency) {
     const handle = super.fromDecimalStr(amount, currency);
     moneyConstructed++;
@@ -77,29 +81,17 @@ const service = createService({
         report: { wasm: "missing" },
         cause: new Error("fixture cause"),
       });
+    await init({ module_or_path: readFileSync(workerData.wasmPath) });
   },
-  core: { ...wasm, FxDeltaVolSurface, MarketContext, Money, VolCube },
-  models: {
-    volatility: {
-      getCubeVol: wasm.getCubeVol,
-      getCubeNormalVol: wasm.getCubeNormalVol,
-      getFxDeltaVol: wasm.getFxDeltaVol,
-    },
-  },
-  calibration: {
-    calibrate: wasm.calibrate,
-    dryRun: wasm.dryRun,
-    validateCalibration: wasm.validateCalibration,
-  },
-  statements: wasm,
-  statements_analytics: wasm,
+  ...facade,
+  core: { ...facade.core, FxDeltaVolSurface, MarketContext, Money, VolCube },
   valuations: {
-    valuationResultToJson: wasm.valuationResultToJson,
+    ...facade.valuations,
     instruments: {
-      ...wasm,
+      ...facade.valuations.instruments,
       priceInstrumentWithMarket(...args) {
         calls++;
-        return wasm.priceInstrumentWithMarket(...args);
+        return facade.valuations.instruments.priceInstrumentWithMarket(...args);
       },
     },
   },
@@ -107,6 +99,7 @@ const service = createService({
 expose(
   {
     ...service,
+    methods: () => Object.keys(service),
     resources: () => ({
       constructed,
       freed,

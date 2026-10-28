@@ -15,7 +15,13 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { loadRegistry } from "shadcn/registry";
 import { chromium } from "playwright";
-import { checkGraph } from "./check-registry.mjs";
+import {
+  checkGraph,
+  dependencyName,
+  lazyCatalogueTargets,
+  visualTypes,
+  workerRoles,
+} from "./check-registry.mjs";
 import { serveLocalRegistry } from "./local-registry.mjs";
 import { serveExport } from "../tests/browser/static-server.mjs";
 import { verifyItem } from "../tests/install/browser.mjs";
@@ -24,6 +30,20 @@ const root = fileURLToPath(new URL("../", import.meta.url)),
   repo = path.resolve(root, "..");
 const registry = await loadRegistry({ cwd: root }),
   graph = checkGraph(registry.items);
+const roles = await workerRoles(root, registry.items, graph);
+// Packages any registry item declares; a consumer may load one only when its closure declares it.
+const registryPackages = new Set(
+  registry.items.flatMap((item) =>
+    (item.dependencies ?? []).map(dependencyName),
+  ),
+);
+// The fresh consumer's own runtime packages, beside the closure's declared ones.
+const scaffold = {
+  next: "16.3.4",
+  react: "19.2.8",
+  "react-dom": "19.2.8",
+  "@base-ui/react": "1.8.0",
+};
 const requested = process.env.REGISTRY_INSTALL_ITEMS?.split(",");
 if (requested && process.env.REGISTRY_INSTALL_COMPLETE === "1")
   throw Error("The complete ui-install gate cannot use a subset");
@@ -44,21 +64,6 @@ const npmCache = await mkdtemp(path.join(tmpdir(), "finstack-npm-cache-"));
 const transport = await serveLocalRegistry(root),
   browser = await chromium.launch({ headless: true }),
   results = [];
-const visualTypes = new Set([
-  "registry:ui",
-  "registry:component",
-  "registry:block",
-  "registry:theme",
-]);
-const workerVisuals = new Set([
-  "fx-surface-chart",
-  "vol-cube-explorer",
-  "pricing-workbench",
-  "financial-model-editor",
-  "statement-explanation",
-  "statement-checks",
-  "statements-workbench",
-]);
 const run = (args, cwd, log) =>
   new Promise((resolve, reject) => {
     const output = createWriteStream(log, { flags: "a" });
@@ -102,7 +107,7 @@ async function installItem(index, item) {
   const needsWasm = closure
     .flatMap((name) => graph.byName.get(name).dependencies ?? [])
     .some((name) => name.startsWith("finstack-quant-wasm@"));
-  let server, context;
+  let server, context, harness;
   console.log(
     `[${index + 1}/${items.length}] ${item.name}: fresh scaffold and one-item CLI install`,
   );
@@ -113,10 +118,7 @@ async function installItem(index, item) {
       private: true,
       type: "module",
       dependencies: {
-        next: "16.3.4",
-        react: "19.2.8",
-        "react-dom": "19.2.8",
-        "@base-ui/react": "1.8.0",
+        ...scaffold,
         ...(needsWasm
           ? { "finstack-quant-wasm": `file:${transport.wasm}` }
           : {}),
@@ -239,9 +241,8 @@ async function installItem(index, item) {
     await writeFile(path.join(consumer, "app/layout.tsx"), layout);
     const visual = visualTypes.has(item.type);
     if (visual) {
-      const harness = await visualHarness(repo, item),
-        source = harness.source;
-      await writeFile(path.join(consumer, "app/harness.tsx"), source);
+      harness = await visualHarness(repo, item, graph);
+      await writeFile(path.join(consumer, "app/harness.tsx"), harness.source);
       for (const [name, text] of Object.entries(harness.extra)) {
         await mkdir(path.dirname(path.join(consumer, "app", name)), {
           recursive: true,
@@ -252,7 +253,7 @@ async function installItem(index, item) {
         path.join(repo, "docs-site/src/components/registry-gallery/data.json"),
         path.join(consumer, "app/data.json"),
       );
-      const native = workerVisuals.has(item.name);
+      const native = roles.get(item.name) === "host";
       await writeFile(
         path.join(consumer, "app/page.tsx"),
         `"use client";import {InstalledItem} from "./harness";${native ? 'import {FinstackQueryProvider} from "@/hooks/shared/use-finstack/use-finstack";' : ""}export default function Page(){return <main className="finstack-surface" style={{padding:24,width:960}} data-installed-item=${JSON.stringify(item.name)}><h1>${item.name}</h1>${native ? "<FinstackQueryProvider>" : ""}<InstalledItem/>${native ? "</FinstackQueryProvider>" : ""}</main>}`,
@@ -325,7 +326,7 @@ async function installItem(index, item) {
         fullPage: true,
       });
     }
-    const checks = await verifyItem(page, item, evidence, repo);
+    const checks = await verifyItem(page, item, evidence, repo, harness);
     if (
       item.name === "pricing-workbench" &&
       process.env.REGISTRY_INSTALL_PUBLISHING === "1"
@@ -341,13 +342,21 @@ async function installItem(index, item) {
     if (alerts.length)
       throw Error(`Installed harness displayed an error: ${alerts.join("; ")}`);
     const wasmRequests = requests.filter((url) => url.endsWith(".wasm"));
-    if (
-      !workerVisuals.has(item.name) &&
-      item.name !== "pricing-forms-example" &&
-      wasmRequests.length
-    )
+    if (!["host", "self"].includes(roles.get(item.name)) && wasmRequests.length)
       throw Error("Data/presentation-only item initialized WASM");
-    const sources = new Set();
+    // A visual page's first static load is every chunk its exported HTML names, in
+    // script tags or in the RSC payload; a lazy chunk is named only inside other
+    // chunks. A non-visual page imports only the item's own modules and never calls
+    // their loaders, so everything it loads is the item's static load.
+    const named = new Set(
+      [
+        ...(
+          await readFile(path.join(consumer, "out/index.html"), "utf8")
+        ).matchAll(/\/_next\/static\/[^"'\\\s<>]+\.js\b/g),
+      ].map(([src]) => new URL(src, server.url).href),
+    );
+    const sources = new Set(),
+      initial = new Set();
     for (const url of requests.filter((url) =>
       new URL(url).pathname.endsWith(".js"),
     )) {
@@ -368,37 +377,51 @@ async function installItem(index, item) {
             "utf8",
           ),
         );
-        for (const source of map.sources ?? []) sources.add(source);
+        for (const source of map.sources ?? []) {
+          sources.add(source);
+          if (!visual || named.has(url)) initial.add(source);
+        }
       } catch (error) {
         if (error.code !== "ENOENT") throw error;
       }
     }
-    if (
-      item.name === "instrument-catalogue" &&
-      [...sources].some((source) => source.includes("generated/schemas/"))
-    )
-      throw Error("Lazy instrument catalogue eagerly loaded schema payloads");
     if (!sources.size)
       throw Error("No production source maps available for runtime inspection");
-    if (
-      item.name === "finstack-table" &&
-      [...sources].some((source) => source.includes("@tanstack/charts"))
-    )
-      throw Error("Table-only consumer imported charts");
-    if (
-      item.name === "finstack-chart" &&
-      [...sources].some((source) =>
-        /\/@tanstack\/(?:react-)?table/.test(source),
-      )
-    )
-      throw Error("Chart-only consumer imported tables");
-    if (
-      item.name === "use-linked-selection" &&
-      [...sources].some((source) =>
-        /\/@tanstack\/(?:react-)?(?:table|charts)/.test(source),
-      )
-    )
-      throw Error("Selection helper imported a visual runtime");
+    const lazy = lazyCatalogueTargets(graph, item.name);
+    if (lazy.length && !initial.size)
+      throw Error("No source maps for the page's first static load");
+    const eager = [...initial].filter((source) =>
+      lazy.some((target) => source.includes(target)),
+    );
+    if (eager.length)
+      throw Error(
+        `${item.name} eagerly loaded lazy catalogue modules: ${eager.join(", ")}`,
+      );
+    const declared = new Set([
+      ...closure.flatMap((name) =>
+        (graph.byName.get(name).dependencies ?? []).map(dependencyName),
+      ),
+      ...Object.keys(scaffold),
+    ]);
+    const packages = new Set();
+    for (const source of sources) {
+      const at = source.lastIndexOf("node_modules/");
+      if (at < 0) continue;
+      const [scope, name] = source
+        .slice(at + "node_modules/".length)
+        .split("/");
+      const pkg = scope.startsWith("@") ? `${scope}/${name}` : scope;
+      if (!registryPackages.has(pkg)) continue;
+      if (!declared.has(pkg))
+        throw Error(`${item.name} loaded undeclared package ${pkg}`);
+      packages.add(pkg);
+    }
+    const generatedModules = (set) =>
+      [...set]
+        .filter((source) =>
+          /\/generated\/(?:instrument|schemas|examples)\//.test(source),
+        )
+        .sort();
     results.push({
       name: item.name,
       verdict: "pass",
@@ -407,6 +430,14 @@ async function installItem(index, item) {
       targets,
       wasmRequests: wasmRequests.length,
       loadedSourceCount: sources.size,
+      initialSourceCount: initial.size,
+      // Evidence for the eager-load check: generated instrument, schema and
+      // example modules in the first static load and in everything loaded.
+      generatedModules: {
+        initial: generatedModules(initial),
+        loaded: generatedModules(sources),
+      },
+      loadedPackages: [...packages].sort(),
       checks,
     });
     await context.close();

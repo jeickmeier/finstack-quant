@@ -1,20 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
+import { useStatementFormulaValidator } from "@/hooks/statements/use-statement-formula-validator/use-statement-formula-validator";
 
 /** Native formula validation and opaque AST preview for a supplied text field. */
 export function FormulaPreview({ formula }: { formula: string | null }) {
-  const { client, status } = useFinstack();
+  const { status } = useFinstack();
+  const validate = useStatementFormulaValidator();
   const [preview, setPreview] = useState<{
     formula: string;
     text?: string;
     error?: string;
   } | null>(null);
   useEffect(() => {
-    if (!formula || !client || status !== "ready") return;
+    if (!formula || status !== "ready") return;
     let current = true;
     const timer = setTimeout(() => {
-      void client.call("validateStatementFormula", formula).then(
+      void validate(formula).then(
         (text) => {
           if (current) setPreview({ formula, text });
         },
@@ -31,7 +33,7 @@ export function FormulaPreview({ formula }: { formula: string | null }) {
       current = false;
       clearTimeout(timer);
     };
-  }, [formula, client, status]);
+  }, [formula, status, validate]);
   if (!formula) return null;
   return (
     <div className="mt-1 text-xs text-muted-foreground" aria-live="polite">

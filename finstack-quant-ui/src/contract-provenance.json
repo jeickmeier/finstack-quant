@@ -1283,8 +1283,8 @@
     {
       "name": "ValuationResult",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Valuation envelope returned by the `priceInstrument*` entry points (Rust `ValuationResult`).\n *\n * Generated from the host valuation-result schema: 64-bit integers (Monte Carlo\n * seeds, path counts) are lossless `bigint`s, so serialize stochastic results\n * with `valuations.valuationResultToJson` rather than `JSON.stringify`. The\n * emitted-field presence is stricter than the schema's input view: `covenants`\n * is always present (`null` when the instrument has none), while `details`,\n * `explanation` and `provenance` are omitted rather than `null` when absent.\n * `provenance` is stamped on every priced result.\n */\nexport type ValuationResult = Omit<\n  HostValuationResult,\n  'covenants' | 'details' | 'explanation' | 'provenance'\n> & {\n  covenants: NonNullable<HostValuationResult['covenants']> | null;\n  details?: NonNullable<HostValuationResult['details']>;\n  explanation?: NonNullable<HostValuationResult['explanation']>;\n  provenance?: NonNullable<HostValuationResult['provenance']>;\n};",
-      "sha256": "400dbc25d0ccada08d4e9fe93db5af5b1b588a5645edc5a66bb78a55377afa5f"
+      "declaration": "/**\n * Valuation envelope returned by the `priceInstrument*` entry points (Rust `ValuationResult`).\n *\n * Generated from the host valuation-result schema: the 64-bit Monte Carlo\n * `seed` is a lossless `bigint` and path counts are plain numbers, so serialize\n * stochastic results with `valuations.valuationResultToJson` rather than\n * `JSON.stringify`. The emitted-field presence is stricter than the schema's\n * input view: `covenants` is always present (`null` when the instrument has\n * none), while `details`, `explanation` and `provenance` are omitted rather\n * than `null` when absent.\n * `provenance` is stamped on every priced result.\n */\nexport type ValuationResult = Omit<\n  HostValuationResult,\n  'covenants' | 'details' | 'explanation' | 'provenance'\n> & {\n  covenants: NonNullable<HostValuationResult['covenants']> | null;\n  details?: NonNullable<HostValuationResult['details']>;\n  explanation?: NonNullable<HostValuationResult['explanation']>;\n  provenance?: NonNullable<HostValuationResult['provenance']>;\n};",
+      "sha256": "ad2d394b3967d5c41d7409886c3bfb241b34d70fc3c40d1163a89ec8e712ef7a"
     },
     {
       "name": "ValuationDetails",
@@ -1319,7 +1319,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "e138e4b4d04dc4c16648528c00e848bb3c4046aa14650be1d5c545de3a3842ab"
+    "sha256": "cd638313cac4de879ee787612e50fc3ba675275258a0f0a79392966eaa96c186"
   },
   "details": [
     {

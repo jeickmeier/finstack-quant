@@ -65,6 +65,8 @@ pub struct StochasticPricingResult {
 
     /// Number of simulated scenario paths (`2 × pricing_mode.num_paths` with
     /// antithetic pairing, `pricing_mode.num_paths` without).
+    #[serde(serialize_with = "finstack_quant_core::wire::count::serialize")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub num_paths: usize,
 
     /// Pricing mode used.
@@ -186,7 +188,11 @@ pub struct TranchePricingResult {
 
     /// Number of simulated paths on which the tranche received any
     /// principal (the paths `wal` averages over).
-    #[serde(default)]
+    #[serde(
+        default,
+        serialize_with = "finstack_quant_core::wire::count::serialize"
+    )]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub paths_with_principal: usize,
 
     /// Credit duration (price sensitivity to credit spread)
@@ -318,7 +324,8 @@ pub enum StructuredCreditPricingMode {
         /// `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
         /// Sample standard error and the Student-t interval use this estimator
         /// count, with `num_paths - 1` degrees of freedom.
-        #[cfg_attr(feature = "json-schema", schemars(range(min = 2)))]
+        #[serde(serialize_with = "finstack_quant_core::wire::count::serialize")]
+        #[cfg_attr(feature = "json-schema", schemars(with = "u32", range(min = 2)))]
         num_paths: usize,
         /// Pair each estimator's path with its sign-flipped mirror.
         antithetic: bool,

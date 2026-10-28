@@ -11,6 +11,11 @@ import {
 export interface ColumnPresentation {
   className: string;
   unit?: string;
+  /**
+   * Render the column's body cells as row headers (`th scope="row"`), so each value in the row is
+   * announced with this label. Selection, activation and cell styling stay those of a plain cell.
+   */
+  rowHeader?: boolean;
 }
 /** Core-only Table v9 column with explicit presentation metadata. */
 export type FormattedColumn<

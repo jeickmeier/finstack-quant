@@ -663,10 +663,14 @@ description = "Type-check the UI package with tsc"
 run = "npm --prefix finstack-quant-ui run typecheck"
 
 [tasks.ui-test]
+# Needs finstack-quant-wasm/pkg and pkg-node (wasm-build + wasm-build-node, or
+# wasm-pkg); the preflight names a missing one.
 description = "Run the UI Vitest tests"
 run = "npm --prefix finstack-quant-ui run test --"
 
 [tasks.ui-check]
+# Needs finstack-quant-wasm/pkg and pkg-node (wasm-build + wasm-build-node, or
+# wasm-pkg); the preflight names a missing one.
 description = "Check registry generation drift, native fixtures, types and focused tests"
 run = "npm --prefix finstack-quant-ui run check"
 
@@ -705,7 +709,11 @@ run = "npm --prefix finstack-quant-ui run e2e --"
 [tasks.ui-docs-install]
 description = "Install the built registry into docs-site"
 depends = ["ui-build"]
-run = ["node finstack-quant-ui/scripts/gen-gallery.mjs", "node finstack-quant-ui/scripts/install-local.mjs docs-site"]
+run = [
+  "node finstack-quant-ui/scripts/require-wasm.mjs pkg",
+  "node finstack-quant-ui/scripts/gen-gallery.mjs",
+  "node finstack-quant-ui/scripts/install-local.mjs docs-site",
+]
 
 [tasks.ui-docs-build]
 description = "Export the registry docs routes (no notebook execution)"
@@ -716,6 +724,7 @@ run = "node finstack-quant-ui/scripts/build-docs.mjs"
 description = "Install every registry item in isolation, then verify composed consumers"
 depends = ["ui-build"]
 run = [
+  "node finstack-quant-ui/scripts/require-wasm.mjs pkg pkg-node",
   "REGISTRY_INSTALL_COMPLETE=1 node finstack-quant-ui/scripts/install-matrix.mjs",
   "mise run ui-docs-install",
   "REGISTRY_INSTALL_COMPOSITION=1 node finstack-quant-ui/tests/browser/install-smoke.mjs",
@@ -726,10 +735,15 @@ description = "Verify installed workbench PDF reports and offline figure exports
 depends = ["ui-build"]
 run = """
 export REGISTRY_INSTALL_EVIDENCE="${REGISTRY_INSTALL_EVIDENCE:-$PWD/finstack-quant-ui/test-results/publishing}"
+node finstack-quant-ui/scripts/require-wasm.mjs pkg pkg-node
 REGISTRY_INSTALL_ITEMS=pricing-workbench REGISTRY_INSTALL_PUBLISHING=1 node finstack-quant-ui/scripts/install-matrix.mjs
 node finstack-quant-ui/tests/publishing/offline.mjs "$REGISTRY_INSTALL_EVIDENCE"
 uv run --no-project --with pdfplumber==0.11.9 python finstack-quant-ui/tests/publishing/pdf-check.py "$REGISTRY_INSTALL_EVIDENCE"
 """
+
+[tasks.ui-harness]
+description = "Run the standalone browser harnesses (figure exports, primitives, chart interactions, heatmap text bounds, measures layout) in fresh isolated consumers"
+run = "node finstack-quant-ui/tests/browser/harnesses.mjs"
 
 # ─────────────────────────────────────────────────────────────────
 # Analyst documentation site (docs-site)

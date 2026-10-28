@@ -8,6 +8,7 @@ import { wasmVersion, withoutMetadata } from "./registry-metadata.mjs";
 import ts from "typescript";
 import { shadcnItems } from "./shadcn.mjs";
 import { byCodeUnit } from "./order.mjs";
+import { labelFor } from "../src/format/label.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = (path) => readFile(`${root}${path}`, "utf8").then(JSON.parse);
@@ -19,21 +20,6 @@ const file = (path) => ({
   type: "registry:file",
   target: `lib/finstack/${path}`,
 });
-const acronyms = new Set(
-  "cds cmo cms fx mbs ndf tarn tba trs xccy yoy".split(" "),
-);
-/** Sentence-case label from a kebab or snake name; financial acronyms stay upper case. */
-const label = (name) =>
-  name
-    .split(/[-_]/)
-    .map((word, index) =>
-      acronyms.has(word)
-        ? word.toUpperCase()
-        : index === 0
-          ? word[0].toUpperCase() + word.slice(1)
-          : word,
-    )
-    .join(" ");
 const item = (
   name,
   description,
@@ -43,7 +29,7 @@ const item = (
 ) => ({
   name,
   type: "registry:lib",
-  title: label(name),
+  title: labelFor(name),
   description,
   files: files.map(file),
   registryDependencies: registryDependencies.map((name) => `@finstack/${name}`),
@@ -78,7 +64,7 @@ for (const { schema } of roots) {
       files,
       dependencies,
     ),
-    title: `${label(name)} contract`,
+    title: `${labelFor(name)} contract`,
   });
 }
 const items = [
@@ -105,8 +91,13 @@ const items = [
   ),
   item(
     "finstack-format",
-    "Exact decimal, money, rate and date display formatting plus TanStack Table column presets.",
-    ["format/format.ts", "format/columns.ts"],
+    "Exact decimal, money, rate and date display formatting, field labels, tenor ordering and TanStack Table column presets.",
+    [
+      "format/format.ts",
+      "format/columns.ts",
+      "format/label.mjs",
+      "format/label.d.mts",
+    ],
     ["contract-valuation-result"],
     [
       "big.js@7.0.1",

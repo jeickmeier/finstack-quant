@@ -5,7 +5,13 @@ import { z } from "zod";
 import { instruments } from "../../src/generated/instruments";
 import fixtures from "../../src/generated/fixtures.json";
 import roots from "../../src/generated/roots.json";
-import { converterSchema } from "../../src/schema.mjs";
+import checkSuiteSchema from "../../src/generated/schemas/check_suite_spec.json";
+import { createWireCodec } from "../../src/codec.mjs";
+import {
+  converterSchema,
+  linkSchema,
+  sharedDefsId,
+} from "../../src/schema.mjs";
 
 const repo = resolve(import.meta.dirname, "../../..");
 
@@ -81,5 +87,43 @@ describe("discovered canonical fixtures", () => {
       }
       expect(validators.get(fixture.schema).parse(value)).toEqual(value);
     }
+  });
+  it("accepts every embedded Rust example of each non-instrument root unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const shared = JSON.parse(
+      await readFile(resolve(generated, "defs/shared.json"), "utf8"),
+    );
+    const withoutExamples: string[] = [];
+    for (const root of roots.filter(
+      (root) => !root.uri.includes("/instrument/"),
+    )) {
+      const text = await readFile(resolve(generated, root.schema), "utf8");
+      const bundle = JSON.parse(text);
+      const schema = text.includes(sharedDefsId)
+        ? linkSchema(bundle, shared)
+        : bundle;
+      if (!schema.examples?.length) {
+        withoutExamples.push(root.schema);
+        continue;
+      }
+      const validator = z.fromJSONSchema(converterSchema(schema));
+      for (const example of schema.examples)
+        expect(validator.parse(example)).toEqual(example);
+    }
+    // Rust publishes no example for ScenarioSet; every other root carries one.
+    expect(withoutExamples).toEqual(["schemas/scenario_set.json"]);
+  });
+  it("round-trips the analyst check suite through the generated CheckSuiteSpec codec", async () => {
+    const text = await readFile(
+      resolve(
+        repo,
+        "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
+      ),
+      "utf8",
+    );
+    const codec = createWireCodec(checkSuiteSchema);
+    expect(JSON.parse(codec.stringify(codec.parse(text)))).toEqual(
+      JSON.parse(text),
+    );
   });
 });

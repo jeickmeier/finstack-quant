@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
 import { beforeAll, afterAll, afterEach, it, expect, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+  within,
+  fireEvent,
+} from "@testing-library/react";
 import { FxSurfaceChart } from "@/components/finstack/models/components/fx-surface-chart/fx-surface-chart";
+import { useLinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import { startWorker } from "../shared/worker/harness.mjs";
 import { unwrap } from "@/workers/finstack-contract";
 import { fxQuotes } from "./surfaces/fixtures";
@@ -75,5 +83,45 @@ it("makes no request without every forward, samples only explicit coordinates, a
   mounted.rerender(view());
   expect(screen.queryByRole("alert")).toBeNull();
   expect(transport.call).toHaveBeenCalledTimes(2);
+  cache.clear();
+});
+it("selects an evaluated sample by its FX surface, expiry and strike key", async () => {
+  const cache = new QueryClient();
+  const coordinates = [
+    { expiry: 0.5, strike: 1.1, forward: 1.12 },
+    { expiry: 1, strike: 1.15, forward: 1.13 },
+  ];
+  function App() {
+    const link = useLinkedSelection();
+    return (
+      <QueryClientProvider client={cache}>
+        <output aria-label="key">{link.selectedKey}</output>
+        <FxSurfaceChart
+          surface={fxQuotes}
+          coordinates={coordinates}
+          link={link}
+          colorDomain={[0, 0.3]}
+        />
+      </QueryClientProvider>
+    );
+  }
+  render(<App />);
+  const surface = await screen.findByRole("region", {
+    name: "EURUSD evaluated surface",
+  });
+  const sample = within(surface)
+    .getAllByRole("row")
+    .map((row) => [...row.querySelectorAll("td")])
+    .find(
+      (cells) =>
+        cells.length === 3 &&
+        cells[0]!.textContent === "1" &&
+        cells[1]!.textContent === "1.15",
+    )!;
+  expect(screen.getByLabelText("key").textContent).toBe("");
+  fireEvent.click(sample[2]!);
+  expect(screen.getByLabelText("key").textContent).toBe(
+    JSON.stringify([fxQuotes.id, 1, 1.15]),
+  );
   cache.clear();
 });

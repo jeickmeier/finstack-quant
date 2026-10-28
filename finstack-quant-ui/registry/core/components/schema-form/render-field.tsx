@@ -1,41 +1,51 @@
 "use client";
 import { useContext, useEffect, useState, useRef, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { useStore } from "@tanstack/react-form";
 import { Fieldset } from "@/lib/finstack/form";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { ScalarField } from "./field-kind";
-import { DISCLOSURE_ORDER, pinnedTerm, termDisclosure } from "./disclosure";
+import { SheetContext, revealKey } from "./disclosure";
 import { FieldRendererContext } from "./field-renderer";
 import { discriminator } from "./discriminator";
 import type { InstrumentModule, SchemaLocation } from "./schema";
 import { propertiesOf } from "./schema";
-import {
-  initialValue,
-  labelFor,
-  nullable,
-  objectValue,
-  resolve,
-} from "./schema-walk";
+import { labelFor } from "@/lib/finstack/format/label.mjs";
+import { initialValue, nullable, objectValue, resolve } from "./schema-walk";
 import type { SchemaFormApi, FieldFilter } from "./schema-form";
 import { nullableFieldChrome, optionalFieldChrome } from "./field-chrome";
 
 function TermDisclosure({
+  path,
   label,
   count,
   forceOpen,
-  pricingOverrides,
   children,
 }: {
+  /** Canonical path of the object that owns the grouped properties. */
+  path: string;
   label: string;
   count: number;
   forceOpen: boolean;
-  pricingOverrides?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  const summaryRef = useRef<HTMLElement>(null);
   const focusedError = useRef(false);
+  const { revealers } = useContext(SheetContext);
+  useEffect(() => {
+    const key = revealKey(path, label);
+    revealers.set(key, () => {
+      const details = detailsRef.current;
+      if (!details) return;
+      details.open = true;
+      summaryRef.current?.focus();
+      details.scrollIntoView?.({ block: "nearest" });
+    });
+    return () => {
+      revealers.delete(key);
+    };
+  }, [path, label, revealers]);
   useEffect(() => {
     if (!forceOpen) {
       focusedError.current = false;
@@ -51,7 +61,6 @@ function TermDisclosure({
     <details
       ref={detailsRef}
       className="finstack-term-disclosure"
-      data-pricing-overrides={pricingOverrides || undefined}
       open={open || forceOpen}
       onBeforeToggle={(event) => {
         if (forceOpen && event.newState === "closed") event.preventDefault();
@@ -65,7 +74,7 @@ function TermDisclosure({
         setOpen((current) => (current === next ? current : next));
       }}
     >
-      <summary>{`${label} (${count})`}</summary>
+      <summary ref={summaryRef}>{`${label} (${count})`}</summary>
       {children}
     </details>
   );
@@ -99,17 +108,15 @@ export function RenderField({
 }) {
   const placement = useRef(new Map<string, Map<string, string | null>>());
   const fieldMeta = useStore(form.store, (state) => state.fieldMeta);
-  const instrumentType = useStore(form.store, (state) => {
-    const instrument = (state.values as { instrument?: { type?: unknown } })
-      .instrument;
-    return typeof instrument?.type === "string" ? instrument.type : undefined;
-  });
+  const sheet = useContext(SheetContext);
   const render = useContext(FieldRendererContext);
   const within = (child: string, parent: string) =>
     child === parent ||
     child.startsWith(`${parent}.`) ||
     child.startsWith(`${parent}[`);
-  if (fields?.deny?.some((key) => within(path, key))) return null;
+  const denied = (fieldPath: string) =>
+    fields?.deny?.some((key) => within(fieldPath, key)) ?? false;
+  if (denied(path)) return null;
   if (
     fields?.allow &&
     path &&
@@ -327,8 +334,6 @@ export function RenderField({
         (current != null && typeof current === "object")
       );
     };
-    const atInstrument =
-      path === "instrument.spec" || path.startsWith("instrument.spec.");
     const siblingKeys = properties.map(([key]) => key);
     let placed = placement.current.get(pointer);
     if (!placed) {
@@ -336,24 +341,18 @@ export function RenderField({
       placement.current.set(pointer, placed);
     }
     for (const entry of properties) {
-      if (placed.has(entry[0])) continue;
-      const named =
-        layout === "basic" && atInstrument
-          ? termDisclosure(entry[0], {
-              atSpec: path === "instrument.spec",
-              instrumentType,
-              siblingKeys,
-            })
-          : null;
-      const pinned = layout === "basic" && atInstrument && pinnedTerm(entry[0]);
+      const key = entry[0];
+      if (placed.has(key)) continue;
       placed.set(
-        entry[0],
-        pinned
-          ? null
-          : (named ??
-              (layout === "basic" && valueIsSecondary(entry)
-                ? "Less common terms"
-                : null)),
+        key,
+        layout === "basic"
+          ? sheet.disclosure.group({
+              path,
+              key,
+              siblingKeys,
+              secondary: valueIsSecondary(entry),
+            })
+          : null,
       );
     }
     const fieldHasError = (key: string) => {
@@ -363,37 +362,42 @@ export function RenderField({
           within(name, fieldPath) && Boolean(meta?.errors.length),
       );
     };
-    const render = ([key, node]: (typeof properties)[number]) => (
-      <RenderField
-        key={key}
-        sectionless={sectionless && properties.length === 1}
-        {...{ module, form, layout, fields }}
-        location={{ schema: node, pointer: `${pointer}/properties/${key}` }}
-        path={path ? `${path}.${key}` : key}
-        label={
-          path === "instrument" && key === "spec"
-            ? "Instrument terms"
-            : labelFor(key)
-        }
-        value={objectValue(value)[key]}
-        required={schema.required?.includes(key) ?? false}
-      />
-    );
-    if (!path || (path === "instrument" && schema.properties?.spec))
+    const render = ([key, node]: (typeof properties)[number]) => {
+      const childPath = path ? `${path}.${key}` : key;
+      return (
+        <RenderField
+          key={key}
+          sectionless={sectionless && properties.length === 1}
+          {...{ module, form, layout, fields }}
+          location={{ schema: node, pointer: `${pointer}/properties/${key}` }}
+          path={childPath}
+          label={
+            childPath === sheet.root?.path ? sheet.root.label : labelFor(key)
+          }
+          value={objectValue(value)[key]}
+          required={schema.required?.includes(key) ?? false}
+        />
+      );
+    };
+    if (!path || sheet.root?.path.startsWith(`${path}.`))
       return <div className="min-w-0">{properties.map(render)}</div>;
-    const primary = properties.filter(([key]) => placed.get(key) == null);
+    // Denied fields render nothing, so they neither count in a group nor keep it alive.
+    const shown = properties.filter(
+      ([key]) => !denied(path ? `${path}.${key}` : key),
+    );
+    const primary = shown.filter(([key]) => placed.get(key) == null);
     const buckets = new Map<string, (typeof properties)[number][]>();
-    for (const entry of properties) {
+    for (const entry of shown) {
       const group = placed.get(entry[0]);
       if (!group) continue;
       const list = buckets.get(group) ?? [];
       list.push(entry);
       buckets.set(group, list);
     }
-    const known = new Set<string>(DISCLOSURE_ORDER);
+    const groupOrder = sheet.disclosure.order;
     const groupNames = [
-      ...DISCLOSURE_ORDER.filter((name) => buckets.has(name)),
-      ...[...buckets.keys()].filter((name) => !known.has(name)),
+      ...groupOrder.filter((name) => buckets.has(name)),
+      ...[...buckets.keys()].filter((name) => !groupOrder.includes(name)),
     ];
     const contents = (
       <>
@@ -403,12 +407,10 @@ export function RenderField({
           return (
             <TermDisclosure
               key={name}
+              path={path}
               label={name}
               count={entries.length}
               forceOpen={entries.some(([key]) => fieldHasError(key))}
-              pricingOverrides={
-                path === "instrument.spec" && name === "Pricing overrides"
-              }
             >
               <div className="finstack-term-fields">{entries.map(render)}</div>
             </TermDisclosure>
@@ -421,7 +423,7 @@ export function RenderField({
       <Fieldset
         {...info}
         className={
-          path === "instrument.spec" ? "finstack-schema-root" : undefined
+          path === sheet.root?.path ? "finstack-schema-root" : undefined
         }
       >
         {contents}
