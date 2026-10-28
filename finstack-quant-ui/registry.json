@@ -89,7 +89,7 @@
       "name": "finstack-format",
       "type": "registry:lib",
       "title": "Finstack format",
-      "description": "Exact decimal, money, rate and date display formatting plus TanStack Table column presets.",
+      "description": "Exact decimal, money, rate and date display formatting, field labels, tenor ordering and TanStack Table column presets.",
       "files": [
         {
           "path": "src/format/format.ts",
@@ -100,6 +100,16 @@
           "path": "src/format/columns.ts",
           "type": "registry:file",
           "target": "lib/finstack/format/columns.ts"
+        },
+        {
+          "path": "src/format/label.mjs",
+          "type": "registry:file",
+          "target": "lib/finstack/format/label.mjs"
+        },
+        {
+          "path": "src/format/label.d.mts",
+          "type": "registry:file",
+          "target": "lib/finstack/format/label.d.mts"
         }
       ],
       "registryDependencies": ["@finstack/contract-valuation-result"],
@@ -3649,6 +3659,72 @@
       }
     },
     {
+      "name": "contract-scenario-set",
+      "type": "registry:lib",
+      "title": "Scenario set contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_set contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_set.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_set.json"
+        },
+        {
+          "path": "src/generated/types/scenario_set.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_set.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_set.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_set.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-check-suite-spec",
+      "type": "registry:lib",
+      "title": "Check suite spec contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust check_suite_spec contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/check_suite_spec.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/check_suite_spec.json"
+        },
+        {
+          "path": "src/generated/types/check_suite_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/check_suite_spec.ts"
+        },
+        {
+          "path": "src/generated/meta/check_suite_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/check_suite_spec.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-financial-model-spec",
       "type": "registry:lib",
       "title": "Financial model spec contract",
@@ -3683,6 +3759,39 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-rollup-spec",
+      "type": "registry:lib",
+      "title": "Rollup spec contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust rollup_spec contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/rollup_spec.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/rollup_spec.json"
+        },
+        {
+          "path": "src/generated/types/rollup_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/rollup_spec.ts"
+        },
+        {
+          "path": "src/generated/meta/rollup_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/rollup_spec.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json"
         ]
       }
     },

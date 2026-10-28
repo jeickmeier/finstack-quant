@@ -7,12 +7,13 @@ const modelJson = JSON.stringify(data.statementModel);
 const resultsJson = JSON.stringify(data.statementResult);
 const suiteJson = JSON.stringify(data.statementChecks);
 
-export function Example(_props: ExampleProps) {
+export function Example({ density = "compact" }: ExampleProps) {
   return (
     <StatementChecks
       modelJson={modelJson}
       resultsJson={resultsJson}
       defaultConfigJson={suiteJson}
+      density={density}
     />
   );
 }

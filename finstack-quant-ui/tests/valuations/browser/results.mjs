@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import {
@@ -10,6 +11,10 @@ import {
 } from "../../browser/consumer.mjs";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-results-"));
+const evidence =
+  process.env.REGISTRY_SMOKE_DIR ??
+  (await mkdtemp(path.join(tmpdir(), "registry-results-")));
+await mkdir(evidence, { recursive: true });
 const bond = JSON.parse(
   await readFile(path.join(root, "src/fixtures/results/bond.json"), "utf8"),
 );
@@ -157,12 +162,9 @@ try {
       "Different currencies and valuation dates",
     ),
   );
+  assert.equal(await page.getByText("YTM", { exact: true }).count(), 1);
   assert.equal(
-    await page.getByText("Yield to maturity", { exact: true }).count(),
-    1,
-  );
-  assert.equal(
-    await page.getByText("Modified duration", { exact: true }).count(),
+    await page.getByText("Duration mod", { exact: true }).count(),
     1,
   );
   assert.equal(
@@ -296,7 +298,10 @@ try {
       getComputedStyle(document.querySelector("tbody td")).color ===
       getComputedStyle(document.body).color,
   );
-  await page.screenshot({ path: "/tmp/pr013-results.png", fullPage: true });
+  await page.screenshot({
+    path: path.join(evidence, "results.png"),
+    fullPage: true,
+  });
   const printSectionId = await dv01Toggle.getAttribute("aria-controls");
   await page.emulateMedia({ media: "print" });
   const printSection = page.locator(`#${printSectionId}`);
@@ -338,7 +343,7 @@ try {
   const mobileAxe = await page.evaluate(() => window.axe.run(document));
   assert.deepEqual(mobileAxe.violations, []);
   await page.screenshot({
-    path: "/tmp/pr013-results-mobile.png",
+    path: path.join(evidence, "results-mobile.png"),
     fullPage: true,
   });
   assert(
@@ -370,10 +375,11 @@ try {
     verdict: "pass",
   };
   await writeFile(
-    "/tmp/pr013-results.json",
+    path.join(evidence, "results.json"),
     JSON.stringify(report, null, 2) + "\n",
   );
   console.log(JSON.stringify(report, null, 2));
+  console.log(`Evidence: ${evidence}`);
 } finally {
   await closeConsumer({ browser, server }, consumer);
 }

@@ -80,7 +80,10 @@ function columnIds<TData extends RowData>(
     return [column.id];
   });
 }
-/** Shared core table with optional native, single-target row/cell selection. */
+/**
+ * Shared core table with optional native, single-target row/cell selection. A
+ * column whose meta sets `rowHeader` renders its body cells as row headers.
+ */
 export function FinstackTable<TData extends RowData, TValue = unknown>(
   props: FinstackTableProps<TData, TValue>,
 ) {
@@ -199,54 +202,45 @@ function TableContent<TData extends RowData, TValue>({
                 })
               }
             >
-              {row.getAllCells().map((cell) => (
-                <TableCell
-                  key={cell.id}
-                  className={`h-[var(--row-height)] px-2 py-0 data-[linked=true]:bg-accent data-[linked=true]:outline data-[linked=true]:outline-1 data-[linked=true]:outline-primary focus-visible:outline-2 focus-visible:outline-ring ${(cell.column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
-                  data-linked={
+              {row.getAllCells().map((cell) => {
+                const presentation = cell.column.columnDef.meta as
+                  ColumnPresentation | undefined;
+                const cellKey = getCellKey?.(row.original, cell.column.id);
+                const activate = () => {
+                  if (link) table.setFocusedCell(row.id, cell.column.id);
+                  onCellActivate?.({
+                    row: row.original,
+                    rowId: row.id,
+                    columnId: cell.column.id,
+                    value: cell.getValue() as TValue,
+                  });
+                };
+                const cellProps = {
+                  // font-normal undoes the header weight so a row header looks like a plain cell.
+                  className: `h-[var(--row-height)] px-2 py-0 ${presentation?.rowHeader ? "font-normal " : ""}data-[linked=true]:bg-accent data-[linked=true]:outline data-[linked=true]:outline-1 data-[linked=true]:outline-primary focus-visible:outline-2 focus-visible:outline-ring ${presentation?.className ?? ""}`,
+                  "data-linked":
                     link &&
                     link.selectedKey !== null &&
-                    getCellKey?.(row.original, cell.column.id) ===
-                      link.selectedKey
-                  }
-                  aria-selected={link ? cell.getIsSelected() : undefined}
-                  tabIndex={
-                    getCellKey?.(row.original, cell.column.id) != null
-                      ? 0
-                      : undefined
-                  }
-                  onClick={(event) => {
-                    if (
-                      nestedControl(event) ||
-                      getCellKey?.(row.original, cell.column.id) == null
-                    )
-                      return;
+                    cellKey === link.selectedKey,
+                  "aria-selected": link ? cell.getIsSelected() : undefined,
+                  tabIndex: cellKey != null ? 0 : undefined,
+                  onClick: (event: MouseEvent) => {
+                    if (nestedControl(event) || cellKey == null) return;
                     event.stopPropagation();
-                    if (link) table.setFocusedCell(row.id, cell.column.id);
-                    onCellActivate?.({
-                      row: row.original,
-                      rowId: row.id,
-                      columnId: cell.column.id,
-                      value: cell.getValue() as TValue,
-                    });
-                  }}
-                  onKeyDown={(event) => {
-                    if (getCellKey?.(row.original, cell.column.id) == null)
-                      return;
-                    keyActivation(event, () => {
-                      if (link) table.setFocusedCell(row.id, cell.column.id);
-                      onCellActivate?.({
-                        row: row.original,
-                        rowId: row.id,
-                        columnId: cell.column.id,
-                        value: cell.getValue() as TValue,
-                      });
-                    });
-                  }}
-                >
-                  <table.FlexRender cell={cell} />
-                </TableCell>
-              ))}
+                    activate();
+                  },
+                  onKeyDown: (event: KeyboardEvent) => {
+                    if (cellKey == null) return;
+                    keyActivation(event, activate);
+                  },
+                  children: <table.FlexRender cell={cell} />,
+                };
+                return presentation?.rowHeader ? (
+                  <TableHead key={cell.id} scope="row" {...cellProps} />
+                ) : (
+                  <TableCell key={cell.id} {...cellProps} />
+                );
+              })}
             </TableRow>
           ))}
         </TableBody>

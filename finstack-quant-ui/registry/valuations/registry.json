@@ -116,7 +116,7 @@
       "type": "registry:component",
       "title": "Measures grid",
       "description": "Table of a valuation result's measures with native labels, grouped bucket tenors and exact values, with optional comparison.",
-      "docs": "Displays supplied valuation context and measures. Native metric metadata provides readable labels and grouped, maturity-sorted bucket tenors; Exact keys reveals fully qualified keys. Values default to six significant digits, with Exact values and value titles retaining supplied precision. The nonzero view hides zero rows only when both sides are supplied and zero in a comparison; Show all reveals every row, and missing values remain distinct. Comparisons retain independent currencies, dates and stamps; no local differences, aggregates or FX conversion. Pass native metric metadata and explicit source-backed units when available.",
+      "docs": "Displays supplied valuation context and measures. Labels are the native metric id in sentence case with recognised acronyms upper-cased; native metric metadata groups bucket tenors in maturity order; Exact keys reveals fully qualified keys. Values default to six significant digits, with Exact values and value titles retaining supplied precision. The nonzero view hides zero rows only when both sides are supplied and zero in a comparison; Show all reveals every row, and missing values remain distinct. Comparisons retain independent currencies, dates and stamps; no local differences, aggregates or FX conversion. Pass native metric metadata and explicit source-backed units when available.",
       "files": [
         {
           "path": "components/measures-grid/measures-grid.tsx",
@@ -153,7 +153,10 @@
           "target": "components/finstack/valuations/components/dimensional-measures/dimensional-measures.tsx"
         }
       ],
-      "registryDependencies": ["@finstack/measure-value"],
+      "registryDependencies": [
+        "@finstack/measure-value",
+        "@finstack/finstack-format"
+      ],
       "dependencies": ["finstack-quant-wasm@0.11.0"],
       "categories": ["Individual Components"],
       "meta": {
@@ -180,14 +183,27 @@
           "path": "components/instrument-form/instrument-selector.tsx",
           "type": "registry:component",
           "target": "components/finstack/valuations/components/instrument-form/instrument-selector.tsx"
+        },
+        {
+          "path": "components/instrument-form/instrument-sheet.ts",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/instrument-form/instrument-sheet.ts"
+        },
+        {
+          "path": "components/instrument-form/promoted-term.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/instrument-form/promoted-term.tsx"
         }
       ],
       "registryDependencies": [
         "@finstack/schema-form",
         "@finstack/instrument-catalogue",
         "@finstack/json-viewer",
+        "@finstack/finstack-form",
+        "@finstack/finstack-format",
         "button",
         "combobox",
+        "input",
         "input-group",
         "label"
       ],

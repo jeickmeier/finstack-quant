@@ -34,20 +34,6 @@ import { Example as Example30 } from "./examples/statement-explanation";
 import { Example as Example31 } from "./examples/statement-checks";
 import { Example as Example32 } from "./examples/statement-check-report";
 import { Example as Example33 } from "./examples/statements-workbench";
-export const nativeItems = new Set([
-  "schema-form",
-  "instrument-form",
-  "market-context-form",
-  "calibration-form",
-  "cashflow-viewer",
-  "fx-surface-chart",
-  "vol-cube-explorer",
-  "pricing-workbench",
-  "financial-model-editor",
-  "statement-explanation",
-  "statement-checks",
-  "statements-workbench",
-]);
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,

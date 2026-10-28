@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import {
@@ -10,6 +11,10 @@ import {
 } from "../../browser/consumer.mjs";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-interactions-"));
+const evidence =
+  process.env.REGISTRY_SMOKE_DIR ??
+  (await mkdtemp(path.join(tmpdir(), "registry-interactions-")));
+await mkdir(evidence, { recursive: true });
 let browser, server, page;
 try {
   const installed = await installBuilt(root, consumer, ["figure-example"]);
@@ -27,7 +32,9 @@ try {
     ),
   );
   ({ server, browser, page } = await openConsumer(path.join(consumer, "dist"), {
-    viewport: { width: 1000, height: 1000 },
+    // Tall enough for both parents, so the evidence screenshot needs no
+    // beyond-viewport capture (see the screenshot below).
+    viewport: { width: 1000, height: 1700 },
   }));
   const failures = [],
     requests = [];
@@ -146,10 +153,10 @@ try {
   await chart.click({ position: { x: 1, y: 1 } });
   assert.match(await status.textContent(), /Accepted: none/);
   assert.match(await events.textContent(), /Activations: 3; proposals: 5/);
-  await page.screenshot({
-    path: "/tmp/pr011-interactions.png",
-    fullPage: true,
-  });
+  // A full-page capture beyond the viewport briefly lays the charts out 1px
+  // wide, which FinstackChart rejects with a page error; the viewport already
+  // holds the whole fixture, so capture just the viewport.
+  await page.screenshot({ path: path.join(evidence, "interactions.png") });
   assert.deepEqual(failures, []);
   assert(!requests.some((url) => url.endsWith(".wasm")));
   const report = {
@@ -173,10 +180,11 @@ try {
     verdict: "pass",
   };
   await writeFile(
-    "/tmp/pr011-interactions.json",
+    path.join(evidence, "interactions.json"),
     JSON.stringify(report, null, 2) + "\n",
   );
   console.log(JSON.stringify(report, null, 2));
+  console.log(`Evidence: ${evidence}`);
 } finally {
   await closeConsumer({ browser, server }, consumer);
 }

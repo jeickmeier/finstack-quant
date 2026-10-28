@@ -33,13 +33,6 @@ function patch(value, patches) {
   }
   return value;
 }
-function bigintPaths(value, path = []) {
-  if (typeof value === "bigint") return [path];
-  if (!value || typeof value !== "object") return [];
-  return Object.entries(value).flatMap(([key, child]) =>
-    bigintPaths(child, [...path, Array.isArray(value) ? Number(key) : key]),
-  );
-}
 const cases = [];
 for (const type of [
   "commodity_spot_option",
@@ -107,7 +100,6 @@ for (const type of [
     type,
     request,
     detailType: expected,
-    hostBigIntPaths: bigintPaths(result),
     resultJson: native.valuationResultToJson(serializeHost(result)),
   });
 }
@@ -129,7 +121,7 @@ const reports = native.evaluateEngine(
 );
 const output = {
   description:
-    "Actual native results. hostBigIntPaths record transport kinds emitted by the binding serializer, not domain types inferred from examples. Reconstruct through the canonical wire codec then restore these exact integer leaves; tests compare with a fresh native call.",
+    "Actual native results. Decode resultJson through the canonical wire codec, which yields the facade transport (bigint for schema int64/uint64 fields); tests compare with a fresh native call.",
   sources: await Promise.all(
     [...sources].map(async (path) => ({
       path,

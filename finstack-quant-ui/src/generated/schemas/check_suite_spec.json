@@ -1,0 +1,549 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Serializable check suite: built-in checks, formula checks and filtering configuration.",
+  "examples": [
+    {
+      "builtin_checks": [
+        {
+          "assets_nodes": [
+            "total_assets"
+          ],
+          "equity_nodes": [
+            "total_equity"
+          ],
+          "liabilities_nodes": [
+            "total_liabilities"
+          ],
+          "type": "balance_sheet_articulation"
+        }
+      ],
+      "config": {
+        "default_relative_tolerance": 1e-9,
+        "default_tolerance": 0.01,
+        "materiality_threshold": 0,
+        "min_severity": "info"
+      },
+      "description": "Balance sheet articulation and a leverage sanity bound.",
+      "formula_checks": [
+        {
+          "category": "credit_reasonableness",
+          "formula": "net_debt / ebitda < 8",
+          "id": "leverage_bound",
+          "message_template": "Net leverage exceeds 8x",
+          "name": "Net leverage below 8x",
+          "severity": "warning"
+        }
+      ],
+      "name": "three_statement_integrity"
+    }
+  ],
+  "properties": {
+    "builtin_checks": {
+      "default": [],
+      "description": "Built-in checks to include.",
+      "items": {
+        "$ref": "#/$defs/d_ac9b456dde5354f033fc"
+      },
+      "type": "array"
+    },
+    "config": {
+      "$ref": "#/$defs/d_5de9f28b928c01e49782",
+      "default": {
+        "default_relative_tolerance": 1e-9,
+        "default_tolerance": 0.01,
+        "materiality_threshold": 0,
+        "min_severity": "info"
+      },
+      "description": "Suite configuration."
+    },
+    "description": {
+      "description": "Suite description.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "formula_checks": {
+      "default": [],
+      "description": "User-defined formula checks.",
+      "items": {
+        "$ref": "#/$defs/d_270bee76f784bc446378"
+      },
+      "type": "array"
+    },
+    "name": {
+      "description": "Suite name.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "CheckSuiteSpec",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
+  "$defs": {
+    "d_06907e07480e89ff7314": {
+      "description": "Severity level for a check finding, ordered from least to most severe.",
+      "oneOf": [
+        {
+          "const": "info",
+          "description": "Informational finding — no action required.",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "Warning — review recommended.",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "Error — indicates a likely problem that should be addressed.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_16c0d07694c2c99e93aa": {
+      "description": "Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally\nTotalCF = CFO + CFI + CFF.\n\nEvery configured operand must have the same scalar/monetary units and\ncurrency. Execution rejects incompatible units or non-finite/negative\ntolerances; it performs no FX conversion.",
+      "properties": {
+        "cash_balance_node": {
+          "$ref": "#/$defs/d_695249af9946117b99a3",
+          "description": "Node for cash balance."
+        },
+        "cff_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_695249af9946117b99a3"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional node for cash from financing."
+        },
+        "cfi_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_695249af9946117b99a3"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional node for cash from investing."
+        },
+        "cfo_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_695249af9946117b99a3"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional node for cash from operations."
+        },
+        "tolerance": {
+          "description": "Tolerance override; falls back to\n[`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_cash_flow_node": {
+          "$ref": "#/$defs/d_695249af9946117b99a3",
+          "description": "Node for total cash flow."
+        }
+      },
+      "required": [
+        "cash_balance_node",
+        "total_cash_flow_node"
+      ],
+      "type": "object"
+    },
+    "d_270bee76f784bc446378": {
+      "additionalProperties": false,
+      "description": "Serializable, runnable user-defined formula-check specification.\n\nFull suite definitions (built-in + formula) can be stored as a single JSON\ndocument and resolved directly with [`CheckSuiteSpec::resolve`].\n\nEach period ends in one of three verdicts: pass, fail (a finding with the\nconfigured `severity`), or insufficient data. A period has insufficient\ndata when a same-period input is missing or non-finite, or when the\nformula consumes a non-finite value, such as a lag or rolling window that\nreaches before the first period. It is reported as a `warning` finding\nnaming the inputs, records no comparison, and never fails the check. A\ndivision by zero over finite inputs is not missing data and still fails.",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/d_545b6f75d3fd6017c27d",
+          "description": "Category grouping."
+        },
+        "formula": {
+          "description": "Statements DSL expression to evaluate (e.g. `\"revenue > 0\"`).\n\nFormula checks use the same evaluator as calculated statement nodes,\nincluding time-series functions and `cs.*` capital-structure references.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Unique identifier for this check instance.",
+          "type": "string"
+        },
+        "message_template": {
+          "description": "Template for the finding message (`{period}` is replaced at runtime).",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name shown in reports.",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/d_06907e07480e89ff7314",
+          "description": "Severity assigned to findings when the formula fails."
+        },
+        "tolerance": {
+          "description": "Finite, nonnegative absolute residual bound in the formula's result units.\nWhen present, the formula passes when its absolute result is at most\nthis bound. When absent, the formula is a predicate and any finite\nnonzero result passes.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "category",
+        "severity",
+        "formula",
+        "message_template"
+      ],
+      "type": "object"
+    },
+    "d_2bc9b0f4efb33830f0a7": {
+      "description": "Detects NaN or infinite values in node results.\n\n**Gating**: findings are `Severity::Error`, so any non-finite cell sets\n`CheckResult::passed` to `false` and fails a pipeline gate. Non-finite\nvalues poison every downstream calculation, so they are never advisory.",
+      "properties": {
+        "nodes": {
+          "default": [],
+          "description": "Specific nodes to check; if empty, all nodes in results are inspected.",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "d_32be215bf9263ac78fcf": {
+      "description": "Scope that determines which periods a check applies to.",
+      "oneOf": [
+        {
+          "const": "all_periods",
+          "description": "Run the check on every period.",
+          "type": "string"
+        },
+        {
+          "const": "actuals_only",
+          "description": "Run only on actual (historical) periods.",
+          "type": "string"
+        },
+        {
+          "const": "forecast_only",
+          "description": "Run only on forecast periods.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_545b6f75d3fd6017c27d": {
+      "description": "Category that groups related checks together.",
+      "oneOf": [
+        {
+          "const": "accounting_identity",
+          "description": "Balance sheet balances, retained earnings flow-through, cash ties",
+          "type": "string"
+        },
+        {
+          "const": "cross_statement_reconciliation",
+          "description": "Depreciation ties to PP&E, interest ties to debt schedule, etc.",
+          "type": "string"
+        },
+        {
+          "const": "internal_consistency",
+          "description": "Growth rate plausibility, effective tax rate range, WC consistency",
+          "type": "string"
+        },
+        {
+          "const": "credit_reasonableness",
+          "description": "Leverage ranges, coverage floors, FCF sign, liquidity runway",
+          "type": "string"
+        },
+        {
+          "const": "data_quality",
+          "description": "Missing values, NaN/Inf, sign conventions",
+          "type": "string"
+        }
+      ]
+    },
+    "d_596da27a7e87322af664": {
+      "description": "Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).\n\n**Advisory-only**: every finding is `Severity::Warning`, so this check's\n`CheckResult::passed` is always `true` and it never fails a pipeline gate.\nTreat its findings as review prompts, not assertions.",
+      "properties": {
+        "negative_nodes": {
+          "default": [],
+          "description": "Nodes expected to carry negative values.",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        },
+        "positive_nodes": {
+          "default": [],
+          "description": "Nodes expected to carry positive values.",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "d_5de9f28b928c01e49782": {
+      "additionalProperties": false,
+      "description": "Configuration parameters that govern check execution.\n\nIdentity checks trigger a finding when\n`|diff| > max(default_tolerance, default_relative_tolerance * |reference|)`,\nso an analyst can set an absolute floor (currency units) that catches\nmicro-errors on small balances plus a relative ceiling that scales with\nlarger balance sheets. A per-check tolerance override bypasses both\ndefaults and is applied verbatim.\n\nAll four fields are part of the public configuration surface and are\nintended to be tuned per-deployment via JSON / serde overrides — e.g.,\nraising `default_relative_tolerance` to `1e-4` (1 bp) when a downstream\nprocess is known to round to the nearest hundred. The defaults\n(`default_tolerance = 0.01`, `default_relative_tolerance = 1e-9`,\n`materiality_threshold = 0.0`, `min_severity = Info`) are conservative:\nthe absolute cent floor catches micro-errors on small balances while the\nrelative component absorbs f64 accumulation noise on large ones.",
+      "properties": {
+        "default_relative_tolerance": {
+          "default": 1e-9,
+          "description": "Default **relative** tolerance as a fraction of the reference\ndenominator (e.g. 1e-6 ≈ \"one basis point of a basis point\"). Zero\ndisables relative tolerance.",
+          "format": "double",
+          "type": "number"
+        },
+        "default_tolerance": {
+          "default": 0.01,
+          "description": "Default **absolute** tolerance for equality comparisons, expressed in\nthe same currency units as the node values being compared (e.g. 0.01\nmeans one cent when nodes are in whole dollars).",
+          "format": "double",
+          "type": "number"
+        },
+        "materiality_threshold": {
+          "default": 0,
+          "description": "Findings below this absolute materiality threshold are excluded from\nreports. Error-severity findings are exempt: materiality filters\nadvisory noise, it never changes a check's pass/fail verdict.",
+          "format": "double",
+          "type": "number"
+        },
+        "min_severity": {
+          "$ref": "#/$defs/d_06907e07480e89ff7314",
+          "default": "info",
+          "description": "Minimum severity a finding must have to appear in the report."
+        }
+      },
+      "type": "object"
+    },
+    "d_671f6d76f67f4fafb7f3": {
+      "description": "Checks that retained earnings flow correctly across periods:\nRE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).\n\nEvery configured balance, flow, and adjustment must use the same\nscalar/monetary units and currency. Execution rejects incompatible units or\ninvalid numeric tolerances; it performs no FX conversion.\n\n# Sign convention\n\n* `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]\n  convention — positive values increase RE (profit), negative values\n  decrease it (loss). No validation is emitted for NI since both signs\n  are meaningful.\n* `dividends_node` carries the [`SignConventionPolicy::MagnitudePositive`]\n  convention by default — the formula subtracts dividends explicitly.\n* `other_adjustments` carry\n  [`SignConventionPolicy::InflowPositive`] — they are signed amounts\n  added directly.",
+      "properties": {
+        "dividends_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_695249af9946117b99a3"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional node for dividends paid."
+        },
+        "dividends_sign_convention": {
+          "$ref": "#/$defs/d_96026cdfba85af9b3310",
+          "default": "magnitude_positive",
+          "description": "Sign convention applied to the `dividends_node` input. Defaults\nto [`SignConventionPolicy::MagnitudePositive`].\n`net_income_node` and `other_adjustments` always use\n`InflowPositive` by construction."
+        },
+        "net_income_node": {
+          "$ref": "#/$defs/d_695249af9946117b99a3",
+          "description": "Node for net income."
+        },
+        "other_adjustments": {
+          "default": [],
+          "description": "Additional adjustment nodes (buybacks, AOCI, etc.).",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        },
+        "retained_earnings_node": {
+          "$ref": "#/$defs/d_695249af9946117b99a3",
+          "description": "Node for retained earnings balance."
+        },
+        "tolerance": {
+          "description": "Tolerance override; falls back to\n[`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "retained_earnings_node",
+        "net_income_node"
+      ],
+      "type": "object"
+    },
+    "d_695249af9946117b99a3": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
+    "d_96026cdfba85af9b3310": {
+      "description": "Declared sign convention for a flow / magnitude input to a reconciliation\ncheck.\n\nEach reconciliation declares its input expectation so callers can\nvalidate data at construction time rather than at P&L\nreconciliation. Previously each reconciliation embedded its sign\nassumptions implicitly (e.g. `CapexReconciliation` expected\n`capex_cf` to be a positive magnitude while INVARIANTS.md §3\ndocumented the CFS convention as negative), which produced silent\ncross-check failures on any model that used the other convention.\n\n# Variants\n\n* [`Self::MagnitudePositive`] — the value is a non-negative magnitude;\n  direction (inflow vs outflow) is encoded in the reconciliation's\n  formula via `+` / `-` operators. Used by capex, depreciation,\n  dividends, and disposal magnitudes across the cross-statement\n  reconciliations.\n* [`Self::InflowPositive`] — the value is a signed flow where positive\n  means \"inflow\" / \"addition\" and negative means \"outflow\" /\n  \"reduction\". Used by `total_cash_flow` in `CashReconciliation` and\n  `net_income` in `RetainedEarningsReconciliation`.",
+      "oneOf": [
+        {
+          "const": "magnitude_positive",
+          "description": "The value must be a non-negative magnitude (the reconciliation's\nformula adds or subtracts it explicitly). This is the default for\nhistorical reasons — every reconciliation in the current code\nassumes magnitudes are positive.",
+          "type": "string"
+        },
+        {
+          "const": "inflow_positive",
+          "description": "The value is signed: positive = inflow / addition, negative =\noutflow / reduction.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_ac9b456dde5354f033fc": {
+      "description": "Tagged enum describing any built-in check in a serializable form.\n\nEach variant wraps its check struct, so the struct is the single schema;\nthe JSON shape is the struct's fields plus a `type` tag. Convert into a\nboxed [`Check`] via [`BuiltinCheckSpec::to_check`].",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/d_c7d556ba6ae95916518c",
+          "description": "Balance sheet articulation: Assets = Liabilities + Equity.",
+          "properties": {
+            "type": {
+              "const": "balance_sheet_articulation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/d_671f6d76f67f4fafb7f3",
+          "description": "Retained earnings reconciliation across periods.",
+          "properties": {
+            "type": {
+              "const": "retained_earnings_reconciliation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/d_16c0d07694c2c99e93aa",
+          "description": "Cash balance reconciliation: Cash(t) = Cash(t-1) + TotalCF(t).",
+          "properties": {
+            "type": {
+              "const": "cash_reconciliation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/d_b45cf940e78a8e787a32",
+          "description": "Flags required nodes that lack values in applicable periods.",
+          "properties": {
+            "type": {
+              "const": "missing_value",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/d_596da27a7e87322af664",
+          "description": "Flags values with unexpected signs.",
+          "properties": {
+            "type": {
+              "const": "sign_convention",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/d_2bc9b0f4efb33830f0a7",
+          "description": "Detects NaN or infinite values.",
+          "properties": {
+            "type": {
+              "const": "non_finite",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_b45cf940e78a8e787a32": {
+      "description": "Flags required nodes that lack values in applicable periods.\n\nMissing actual observations produce `Severity::Error` and fail the check.\nMissing forecast observations produce advisory `Severity::Warning` findings.",
+      "properties": {
+        "required_nodes": {
+          "description": "Nodes that must have values in every in-scope period.",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        },
+        "scope": {
+          "$ref": "#/$defs/d_32be215bf9263ac78fcf",
+          "description": "Which periods to inspect."
+        }
+      },
+      "required": [
+        "required_nodes",
+        "scope"
+      ],
+      "type": "object"
+    },
+    "d_c7d556ba6ae95916518c": {
+      "description": "Verifies that Assets = Liabilities + Equity for every period.\n\nAll configured operands must have compatible scalar/monetary units and one\ncurrency. Execution rejects incompatible units or invalid numeric tolerances;\nit performs no FX conversion.",
+      "properties": {
+        "assets_nodes": {
+          "description": "Node IDs whose values represent total assets.",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        },
+        "equity_nodes": {
+          "description": "Node IDs whose values represent total equity.",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        },
+        "liabilities_nodes": {
+          "description": "Node IDs whose values represent total liabilities.",
+          "items": {
+            "$ref": "#/$defs/d_695249af9946117b99a3"
+          },
+          "type": "array"
+        },
+        "tolerance": {
+          "description": "Tolerance override; falls back to\n[`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "assets_nodes",
+        "liabilities_nodes",
+        "equity_nodes"
+      ],
+      "type": "object"
+    }
+  }
+}

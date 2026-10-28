@@ -596,12 +596,13 @@ type HostValuationResult = import('./types/valuation-result.js').ValuationResult
 /**
  * Valuation envelope returned by the `priceInstrument*` entry points (Rust `ValuationResult`).
  *
- * Generated from the host valuation-result schema: 64-bit integers (Monte Carlo
- * seeds, path counts) are lossless `bigint`s, so serialize stochastic results
- * with `valuations.valuationResultToJson` rather than `JSON.stringify`. The
- * emitted-field presence is stricter than the schema's input view: `covenants`
- * is always present (`null` when the instrument has none), while `details`,
- * `explanation` and `provenance` are omitted rather than `null` when absent.
+ * Generated from the host valuation-result schema: the 64-bit Monte Carlo
+ * `seed` is a lossless `bigint` and path counts are plain numbers, so serialize
+ * stochastic results with `valuations.valuationResultToJson` rather than
+ * `JSON.stringify`. The emitted-field presence is stricter than the schema's
+ * input view: `covenants` is always present (`null` when the instrument has
+ * none), while `details`, `explanation` and `provenance` are omitted rather
+ * than `null` when absent.
  * `provenance` is stamped on every priced result.
  */
 export type ValuationResult = Omit<
@@ -33959,7 +33960,7 @@ export interface PortfolioNamespace {
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
    * @param strictRisk - Optional; when omitted or `undefined`, uses the Rust `PortfolioValuationOptions` default, `true` (fail closed when a requested risk metric fails to compute). Pass `false` only for an intentional PV-preserving fallback.
-   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
+   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` matches what `priceInstrument` returns: the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain numbers, so serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
    * @throws Error - Throws a JavaScript exception if a requested metric name is unknown, portfolio valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
    */
   valuePortfolio(
@@ -34020,7 +34021,7 @@ export interface PortfolioNamespace {
    * @returns Revalued result object and scenario application report.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Scenario specification JSON.
-   * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
+   * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data. Each position's `valuation_result` matches what `priceInstrument` returns: the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain numbers, so serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
    * @throws Error - Throws a JavaScript exception if the scenario JSON is malformed or invalid, scenario application or portfolio revaluation fails, or the structured result cannot be converted to a JavaScript value.
    */
   applyScenarioAndRevalue(
@@ -34080,7 +34081,7 @@ export interface PortfolioNamespace {
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param portfolio - Built `Portfolio` handle (from `Portfolio.fromSpec` or `Portfolio.builder`) to revalue at every snapshot.
    * @param snapshotsJson - Market-snapshot JSON array.
-   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from the portfolio's positions when it matters.
+   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` matches what `priceInstrument` returns: the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain numbers, so serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from the portfolio's positions when it matters.
    * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the replay configuration or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
    */
   replayPortfolio(

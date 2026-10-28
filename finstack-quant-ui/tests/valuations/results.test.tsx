@@ -87,11 +87,11 @@ it("renders Rust-supplied units and groups from native metric metadata", () => {
       metadata={fixture.metadata as MetricMetadata[]}
     />,
   );
-  const ytm = screen.getByText("Yield to maturity").closest("tr")!;
+  const ytm = screen.getByText("YTM").closest("tr")!;
   expect(ytm.textContent).toContain("decimal");
   const dv01 = screen.getByText("DV01").closest("tr")!;
   expect(dv01.textContent).toContain("currency");
-  expect(screen.getByText("Modified duration")).toBeTruthy();
+  expect(screen.getByText("Duration mod")).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Pricing" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Sensitivity" })).toBeTruthy();
   expect(
@@ -151,7 +151,7 @@ it("keeps comparison currencies, dates and stamps independent and never calculat
     "supplied-version",
   ])
     expect(comparison.textContent).toContain(value);
-  const row = screen.getByText("Yield to maturity").closest("tr")!;
+  const row = screen.getByText("YTM").closest("tr")!;
   expect(row.textContent).toContain("0.043");
   expect(row.textContent).not.toContain("4.3%");
   const missing = screen.getByText("other").closest("tr")!;
@@ -202,7 +202,7 @@ it("uses only explicit per-result units and keeps ungrouped metrics in the unava
   expect(
     screen.getByRole("table", { name: "Group unavailable measures" }),
   ).toBeTruthy();
-  const row = screen.getByText("Yield to maturity").closest("tr")!;
+  const row = screen.getByText("YTM").closest("tr")!;
   expect(row.textContent).toContain("0.043decimal rate");
   expect(row.textContent).toContain("0.043Unit unavailable");
 });
@@ -261,7 +261,7 @@ it("shortens measure values to six significant digits while retaining exact retu
       metadata={metadataFor(measures)}
     />,
   );
-  const ytm = screen.getByText("Yield to maturity").closest("tr")!;
+  const ytm = screen.getByText("YTM").closest("tr")!;
   const value = within(ytm).getByTitle("0.123456789");
   expect(value.querySelector(".print\\:hidden")?.textContent).toBe("0.123457");
   expect(value.getAttribute("aria-label")).toContain("exact value 0.123456789");
@@ -329,7 +329,7 @@ it("sorts metadata-backed bucket tenors, collapses long groups and reveals exact
   expect(exactKeys.getAttribute("aria-pressed")).toBe("true");
   expect(within(table).getByText("bucketed_dv01::USD-OIS::3m")).toBeTruthy();
   expect(screen.getByText("ytm")).toBeTruthy();
-  expect(screen.queryByText("Yield to maturity")).toBeNull();
+  expect(screen.queryByText("YTM")).toBeNull();
   expect(document.querySelector("[data-bucket-bar]")).toBeNull();
 
   fireEvent.click(bucket);
@@ -356,19 +356,19 @@ it("filters only supplied zero pairs and preserves rows with a missing compariso
   const nonzero = screen.getByRole("button", { name: "Nonzero only" });
   expect(showAll.getAttribute("aria-pressed")).toBe("true");
   expect(nonzero.getAttribute("aria-pressed")).toBe("false");
-  expect(screen.getByText("Yield to maturity")).toBeTruthy();
+  expect(screen.getByText("YTM")).toBeTruthy();
 
   fireEvent.click(nonzero);
   expect(nonzero.getAttribute("aria-pressed")).toBe("true");
   expect(showAll.getAttribute("aria-pressed")).toBe("false");
-  expect(screen.queryByText("Yield to maturity")).toBeNull();
+  expect(screen.queryByText("YTM")).toBeNull();
   const dv01 = screen.getByText("DV01").closest("tr")!;
   expect(within(dv01).getAllByRole("cell")[2].textContent).toBe("—");
-  const other = screen.getByText("other").closest("tr")!;
+  const other = screen.getByText("Other").closest("tr")!;
   expect(within(other).getAllByRole("cell")[1].textContent).toBe("—");
   expect(other.textContent).toContain("0");
 
   fireEvent.click(showAll);
   expect(showAll.getAttribute("aria-pressed")).toBe("true");
-  expect(screen.getByText("Yield to maturity")).toBeTruthy();
+  expect(screen.getByText("YTM")).toBeTruthy();
 });

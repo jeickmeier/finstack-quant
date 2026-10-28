@@ -11,6 +11,7 @@ import type {
   ScenarioResults,
   StatementResult,
   Explanation,
+  DependencyTree,
   CheckReport,
 } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
@@ -54,6 +55,11 @@ export interface StatementExplanationRequest {
   readonly resultsJson: string;
   readonly nodeId: string;
   readonly period: string;
+}
+/** Root node whose dependency tree is traced in modelJson. */
+export interface StatementTraceRequest {
+  readonly modelJson: string;
+  readonly nodeId: string;
 }
 export interface StatementChecksRequest {
   readonly modelJson: string;
@@ -107,60 +113,96 @@ export interface ErrorValue {
 }
 export type Envelope<T> =
   { ok: true; value: T } | { ok: false; error: ErrorValue };
-export interface WorkerApi {
-  initialize(
-    wasmUrl?: string,
-  ): Promise<Envelope<{ state: "ready"; worker: boolean }>>;
-  price(request: PriceRequest): Promise<Envelope<ValuationResult>>;
-  /** Native display text for an exact amount under its returned rounding stamp. */
+/** core: money display, market canonicalization and calendars. */
+export interface CoreApi {
+  /** core.Currency + core.Money.fromDecimalStr(...).formatWith: native display text for an exact amount under its returned rounding stamp; raw text keeping every supplied digit when the stamp has no scale for the currency. */
   formatMoney(request: MoneyFormatRequest): Promise<Envelope<string>>;
-  /** Validate and canonicalize instrument JSON through the native facade. */
-  validate(instrumentJson: string): Promise<Envelope<string>>;
-  /** Canonicalize the complete market through its native constructor. */
+  /** core.MarketContext.fromJson + toJson: canonicalize the complete market and cache its handle. */
   validateMarket(marketJson: string): Promise<Envelope<string>>;
-  /** Full envelope includes prior_market, quote sets, data and every plan setting. */
+  /** core.availableCalendars. */
+  calendars(): Promise<Envelope<string[]>>;
+}
+/** valuations: instrument validation, pricing, cashflows, scenarios, registries and export. */
+export interface ValuationsApi {
+  /** valuations.instruments.validateInstrumentJson + priceInstrumentWithMarket over the cached market handle. */
+  price(request: PriceRequest): Promise<Envelope<ValuationResult>>;
+  /** valuations.instruments.validateInstrumentJson: validate and canonicalize instrument JSON. */
+  validate(instrumentJson: string): Promise<Envelope<string>>;
+  /** valuations.instruments.validateInstrumentJson + instrumentCashflowsWithMarket over the cached market handle, returned as JSON text. */
+  cashflows(request: CashflowRequest): Promise<Envelope<string>>;
+  /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
+  scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
+  /** valuations.instruments.listModelsGrouped. */
+  models(): Promise<Envelope<Record<string, string[]>>>;
+  /** valuations.instruments.listStandardMetricsGrouped. */
+  metrics(): Promise<Envelope<Record<string, string[]>>>;
+  /** valuations.instruments.metricMetadata: native per-key interpretation (units, decoded coordinates, groups) for metric keys. */
+  metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;
+  /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */
+  exportResult(value: ValuationResult): Promise<Envelope<string>>;
+}
+/** calibration: envelope validation, static diagnostics and calibration runs. */
+export interface CalibrationApi {
+  /** calibration.validateCalibration: full envelope includes prior_market, quote sets, data and every plan setting. */
   validateCalibration(
     envelopeJson: string,
   ): Promise<Envelope<CalibrationEnvelope>>;
+  /** calibration.dryRun: structured static diagnostics. */
+  dryRun(envelopeJson: string): Promise<Envelope<CalibrationValidationReport>>;
+  /** calibration.calibrate. */
+  calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
+}
+/** models: volatility sampling over core surface handles. */
+export interface ModelsApi {
+  /** core.VolCube.fromJson + models.volatility.getCubeNormalVol or getCubeVol, per coordinate. */
+  sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
+  /** core.FxDeltaVolSurface.fromJson + models.volatility.getFxDeltaVol, per coordinate. */
+  sampleFxDelta(request: FxDeltaSampleRequest): Promise<Envelope<number[]>>;
+}
+/** statements and statements_analytics: model validation, evaluation and diagnostics. */
+export interface StatementsApi {
+  /** statements.validateFinancialModelJson. */
   validateStatementModel(modelJson: string): Promise<Envelope<string>>;
-  statementNodeIds(modelJson: string): Promise<Envelope<string[]>>;
+  /** statements.parseAndCompile + parseFormula. */
   validateStatementFormula(formula: string): Promise<Envelope<string>>;
+  /** statements.validateCheckSuiteSpecJson: validate and canonicalize CheckSuiteSpec JSON. */
+  validateCheckSuiteSpec(json: string): Promise<Envelope<string>>;
+  /** statements.Evaluator evaluate, or evaluateWithMarket when market and date are supplied. */
   evaluateStatement(
     request: StatementRequest,
   ): Promise<Envelope<StatementResult>>;
+  /** statements_analytics.explainFormula. */
   explainStatement(
     request: StatementExplanationRequest,
   ): Promise<Envelope<Explanation>>;
-  explainStatementText(
-    request: StatementExplanationRequest,
-  ): Promise<Envelope<string>>;
-  traceStatement(modelJson: string, nodeId: string): Promise<Envelope<string>>;
+  /** statements_analytics.DependencyTracer.dependencyTree. */
+  traceStatement(
+    request: StatementTraceRequest,
+  ): Promise<Envelope<DependencyTree>>;
+  /** statements_analytics.runChecks, runThreeStatementChecks or runCreditUnderwritingChecks, by request kind. */
   runStatementChecks(
     request: StatementChecksRequest,
   ): Promise<Envelope<CheckReport>>;
-  renderStatementChecks(reportJson: string): Promise<Envelope<string>>;
-  /** Evaluate every scenario natively, with the capital structure priced from the market when supplied. */
+  /** statements_analytics.evaluateScenarioSet, or evaluateScenarioSetWithMarket to price the capital structure from the market. */
   evaluateStatementScenarios(
     request: StatementScenarioRequest,
   ): Promise<Envelope<StatementScenarioResults>>;
-  /** Native rollup of an evaluated result to a coarser frequency. */
+  /** statements.statementResultRollup: an evaluated result at a coarser frequency. */
   rollupStatement(
     request: StatementRollupRequest,
   ): Promise<Envelope<StatementResult>>;
-  /** Structured static diagnostics returned by native `dryRun`. */
-  dryRun(envelopeJson: string): Promise<Envelope<CalibrationValidationReport>>;
-  calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
-  sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
-  sampleFxDelta(request: FxDeltaSampleRequest): Promise<Envelope<number[]>>;
-  scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
-  cashflows(request: CashflowRequest): Promise<Envelope<string>>;
-  models(): Promise<Envelope<Record<string, string[]>>>;
-  metrics(): Promise<Envelope<Record<string, string[]>>>;
-  /** Native per-key interpretation (units, decoded coordinates, groups) for metric keys. */
-  metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;
-  calendars(): Promise<Envelope<string[]>>;
-  exportResult(value: ValuationResult): Promise<Envelope<string>>;
 }
+/** Every worker method, grouped by the crate whose facade namespace it calls. */
+export type WorkerApi = {
+  /** Facade default init (module_or_path = wasmUrl), started once; resolves when ready. */
+  initialize(
+    wasmUrl?: string,
+  ): Promise<Envelope<{ state: "ready"; worker: boolean }>>;
+} & CoreApi &
+  ValuationsApi &
+  CalibrationApi &
+  ModelsApi &
+  StatementsApi;
 /** Preserve native exception fields and recursively preserve Error causes. */
 export function errorValue(error: unknown): ErrorValue {
   const object =

@@ -7,96 +7,11 @@ import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/
 import {
   SchemaForm,
   type InstrumentModule,
-  type PromotedTerm,
   type SchemaFormProps,
 } from "@/components/finstack/core/components/schema-form/schema-form";
+import { INSTRUMENT_SHEET, instrumentDisclosure } from "./instrument-sheet";
+import { promotedField } from "./promoted-term";
 
-const marketQuotePath =
-  "instrument.spec.instrument_pricing_overrides.market_quotes";
-
-/** Only inputs consumed by the corresponding native pricer are promoted. */
-const promotedTerms: Record<string, PromotedTerm> = {
-  bond: {
-    path: `${marketQuotePath}.quoted_clean_price_pct`,
-    label: "Bond clean price",
-    unit: "% of par",
-    hint: "99.5 = 99.5% of par; overrides model PV.",
-    emptySource: "Model price",
-    kind: "market-quote",
-    exclusiveWith: [
-      "quoted_dirty_price_currency",
-      "quoted_ytm",
-      "quoted_ytw",
-      "quoted_z_spread",
-      "quoted_oas",
-      "quoted_discount_margin",
-      "quoted_i_spread",
-      "quoted_asw_market",
-      "quoted_japanese_simple_yield",
-    ],
-  },
-  equity_option: {
-    path: `${marketQuotePath}.implied_volatility`,
-    label: "Implied volatility",
-    unit: "decimal σ",
-    hint: "0.20 = 20%; flat volatility replaces the surface.",
-    emptySource: "Volatility surface",
-    kind: "market-quote",
-  },
-  commodity_spot_option: {
-    path: `${marketQuotePath}.implied_volatility`,
-    label: "Implied volatility",
-    unit: "decimal σ",
-    hint: "0.20 = 20%; flat volatility replaces the surface.",
-    emptySource: "Volatility surface",
-    kind: "market-quote",
-  },
-  fx_option: {
-    path: `${marketQuotePath}.implied_volatility`,
-    label: "Implied volatility",
-    unit: "decimal σ",
-    hint: "0.20 = 20%; flat volatility replaces the surface.",
-    emptySource: "Volatility surface",
-    kind: "market-quote",
-  },
-  credit_default_swap: {
-    path: "instrument.spec.premium_leg.coupon_bp",
-    label: "Running coupon",
-    unit: "bp",
-    hint: "Contract premium; par spread appears in Results.",
-    kind: "contract-term",
-  },
-  interest_rate_swap: {
-    path: "instrument.spec.fixed_leg.rate",
-    label: "Fixed coupon",
-    unit: "decimal rate",
-    hint: "0.04 = 4%; par rate appears in Results.",
-    kind: "contract-term",
-  },
-  fx_swap: {
-    path: "instrument.spec.far_rate",
-    label: "Far FX rate",
-    unit: "quote / base",
-    hint: "Far-leg outright rate, quote per base.",
-    emptySource: "Forward curves",
-    kind: "nullable-term",
-  },
-  xccy_swap: {
-    path: "instrument.spec.leg2.leg.spread_bp",
-    label: "Leg 2 spread",
-    unit: "bp",
-    hint: "Contract spread on the second leg.",
-    kind: "contract-term",
-  },
-  structured_credit: {
-    path: "instrument.spec.tranches.tranches[0].coupon.fixed.rate",
-    label: "Tranche coupon",
-    unit: "decimal rate",
-    hint: "0.06 = 6%; fixed coupon for this tranche.",
-    kind: "single-fixed-tranche",
-    morePricingOverrides: false,
-  },
-};
 /** Independently installed all-instrument editor; generated modules convert only when selected. */
 export function InstrumentForm(props: {
   type: string;
@@ -205,7 +120,9 @@ export function InstrumentForm(props: {
                   onValidated={props.onValidated}
                   layout={props.layout}
                   submitVariant={props.submitVariant}
-                  promotedTerm={promotedTerms[props.type]}
+                  sheet={INSTRUMENT_SHEET}
+                  disclosure={instrumentDisclosure(props.type)}
+                  promotedField={promotedField(props.type)}
                 />
               )}
               {props.showGeneratedExample !== false && (

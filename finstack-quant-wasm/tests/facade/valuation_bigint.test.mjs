@@ -1,7 +1,7 @@
 /**
- * Every payload that embeds a `ValuationResult` keeps its 64-bit fields (the
- * Monte Carlo `seed` and path counts) as `bigint`, exactly as `priceInstrument`
- * returns them, while the counts around it stay plain numbers.
+ * Every payload that embeds a `ValuationResult` keeps the 64-bit Monte Carlo
+ * `seed` as a `bigint`, exactly as `priceInstrument` returns it, while path
+ * counts and the counts around the result stay plain numbers.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

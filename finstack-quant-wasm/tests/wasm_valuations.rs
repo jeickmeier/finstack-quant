@@ -355,11 +355,11 @@ fn price_instrument_structured_credit_stochastic_returns_details() {
 fn assert_deterministic_structured_credit_details(parsed: &serde_json::Value) {
     assert_eq!(parsed["details"]["type"], "structured_credit_stochastic");
     let details = &parsed["details"]["data"];
-    // usize counts cross the pricing boundary as BigInt; valuation_object
-    // preserves them as decimal strings when round-tripping through JSON.
-    assert_eq!(details["pricing_mode"]["monte_carlo"]["num_paths"], "2");
+    // Path counts use the wire::count adapter, so they cross the pricing
+    // boundary as plain numbers next to the BigInt-serialized result.
+    assert_eq!(details["pricing_mode"]["monte_carlo"]["num_paths"], 2);
     assert_eq!(details["pricing_mode"]["monte_carlo"]["antithetic"], true);
-    assert_eq!(details["num_paths"], "4", "two antithetic estimator pairs");
+    assert_eq!(details["num_paths"], 4, "two antithetic estimator pairs");
     assert_eq!(
         details["pv_std_error"].as_f64(),
         Some(0.0),

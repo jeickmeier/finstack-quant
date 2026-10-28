@@ -2,7 +2,7 @@
 import { afterEach, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { render, screen, cleanup } from "@testing-library/react";
-import { createChartRuntime, type SceneNode } from "@tanstack/charts";
+import { createChartRuntime, text, type SceneNode } from "@tanstack/charts";
 import { createWireCodec } from "../../src/codec.mjs";
 import schema from "../../src/generated/schemas/market_context_state.json";
 import fixture from "../../registry/core/components/curve-link-example/market.json";
@@ -15,6 +15,8 @@ import {
 } from "@/components/finstack/core/components/curve-chart/curve-chart";
 import { getCurveView } from "../../src/views";
 const curves = fixture.curves as CurveState[];
+const flat = (nodes: readonly SceneNode[]): SceneNode[] =>
+  nodes.flatMap((n) => (n.kind === "group" ? flat(n.children) : [n]));
 afterEach(cleanup);
 it("validates all eight variants against the generated contract and native Market round trip", () => {
   expect(createWireCodec(schema).validator.safeParse(fixture).success).toBe(
@@ -35,8 +37,6 @@ it("plots every stored tuple unchanged, overlays only compatible variants and re
   const panels = curvePanels(curves);
   expect(panels).toHaveLength(8);
   expect(panels.find((p) => p.type === "discount")!.states).toHaveLength(2);
-  const flat = (nodes: readonly SceneNode[]): SceneNode[] =>
-    nodes.flatMap((n) => (n.kind === "group" ? flat(n.children) : [n]));
   for (const panel of panels) {
     if (panel.route.route !== "stored-knots") {
       expect(panel.points).toEqual([]);
@@ -64,6 +64,38 @@ it("plots every stored tuple unchanged, overlays only compatible variants and re
       expect(
         flat(scene.nodes).filter((n) => n.kind === "dot").length,
       ).toBeGreaterThanOrEqual(stored.length);
+    } finally {
+      runtime.destroy();
+    }
+  }
+});
+it("adds supplied annotation marks only to the panel of their curve type", () => {
+  const panels = curvePanels(curves).filter(
+    (panel) => panel.route.route === "stored-knots",
+  );
+  const discount = panels.find((panel) => panel.type === "discount")!;
+  const annotations = {
+    discount: [
+      text<CurvePoint>([discount.points[0]], {
+        x: (p) => p.knot[0],
+        y: (p) => p.knot[1],
+        text: () => "Supplied knot note",
+        id: "knot-note",
+      }),
+    ],
+  };
+  expect(panels.length).toBeGreaterThan(1);
+  for (const panel of panels) {
+    const runtime = createChartRuntime<CurvePoint, number, number>();
+    try {
+      const scene = runtime.render(
+        curveDefinition(panel.points, panel.type, { annotations }),
+        { width: 800, height: 420 },
+      );
+      const notes = flat(scene.nodes).filter(
+        (n) => n.kind === "label" && n.text === "Supplied knot note",
+      );
+      expect(notes).toHaveLength(panel.type === "discount" ? 1 : 0);
     } finally {
       runtime.destroy();
     }

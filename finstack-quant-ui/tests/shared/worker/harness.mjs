@@ -6,7 +6,7 @@ import { build } from "vite";
 import { wrap, releaseProxy } from "comlink";
 import nodeEndpoint from "comlink/dist/esm/node-adapter.mjs";
 
-/** Production Comlink service in a real worker, using the native Node package. */
+/** Production Comlink service in a real worker, over the published facade initialized from the web WASM bytes. */
 export async function startWorker({
   fail = false,
   failMarketSerialization = false,
@@ -46,9 +46,10 @@ export async function startWorker({
       workerData: {
         fail,
         failMarketSerialization,
-        packagePath: path.resolve(
+        facadePath: path.resolve(root, "../finstack-quant-wasm/index.js"),
+        wasmPath: path.resolve(
           root,
-          "../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
+          "../finstack-quant-wasm/pkg/finstack_quant_wasm_bg.wasm",
         ),
       },
     });
