@@ -59,9 +59,16 @@ for (const theme of ["light", "dark"])
       await expect(floating).toHaveAttribute("aria-checked", "true");
       await expect(fixed).toHaveAttribute("aria-checked", "false");
       await expectOpaque(floating);
+      // The group label carries a schema-derived field count; address the
+      // disclosure by the field it holds instead.
       await workbench
+        .locator("details.finstack-term-disclosure", {
+          has: page.locator(
+            '[data-field-path^="instrument.spec.cashflow_spec"][data-field-path$=".day_count"]',
+          ),
+        })
+        .last()
         .locator("summary")
-        .filter({ hasText: "Schedule conventions (6)" })
         .click();
       await expect(
         workbench.getByRole("combobox", { name: "Day count", exact: true }),

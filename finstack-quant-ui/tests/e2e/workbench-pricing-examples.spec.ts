@@ -1,4 +1,5 @@
 import { test, expect } from "playwright/test";
+import scenarios from "../valuations/scenario-table/cases.json" with { type: "json" };
 
 const examples = [
   { type: "bond", id: "US912828XG33", model: "discounting", featured: 3 },
@@ -249,7 +250,11 @@ test("structured-credit scenario prices use the completed native request", async
   const scenario = results.getByRole("region", {
     name: "CLONOTES-A scenario prices",
   });
-  await expect(scenario.getByRole("grid")).toContainText("126.336");
+  // The grid shows the live native prices; the committed fixture holds the same
+  // native table and `mise run ui-fixtures --check` keeps it fresh.
+  await expect(scenario.getByRole("grid")).toContainText(
+    String(scenarios.cases[0]!.table.cells[0]!.price),
+  );
   await expect(scenario).toContainText("trancheScenarioTable");
   expect(errors).toEqual([]);
 });
