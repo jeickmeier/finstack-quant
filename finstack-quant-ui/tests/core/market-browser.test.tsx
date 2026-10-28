@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
@@ -23,6 +22,7 @@ import type { MarketContextStateWire } from "../../src/generated/types/market_co
 import { serializeHost } from "../../src/codec.mjs";
 import fixture from "./market-browser/cases.json";
 import schema from "../../src/generated/schemas/market_context_state.json";
+import { budget } from "../shared/budget";
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
   async (importOriginal) => ({
@@ -34,9 +34,6 @@ vi.mock(
 );
 afterEach(cleanup);
 const market = fixture.supplemental as unknown as MarketContextStateWire;
-const native = createRequire(import.meta.url)(
-  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 function showOriginal(viewer: HTMLElement) {
   const button = within(viewer).queryByRole("button", {
     name: "Original",
@@ -44,7 +41,9 @@ function showOriginal(viewer: HTMLElement) {
   });
   if (button) fireEvent.click(button);
 }
-it("retains the realistic CDX calibration and native canonical supplemental fixture", () => {
+// The CDX calibration and the canonical supplemental market are regenerated and
+// compared by `mise run ui-fixtures --check` (tests/core/market-browser/generate.mjs).
+it("records the CDX calibration source its fixture was generated from", () => {
   const source = readFileSync(
     resolve(
       dirname(fileURLToPath(import.meta.url)),
@@ -57,59 +56,53 @@ it("retains the realistic CDX calibration and native canonical supplemental fixt
     createHash("sha256").update(source).digest("hex"),
     `${fixture.source} changed since tests/core/market-browser/generate.mjs ran; rerun mise run ui-fixtures`,
   ).toBe(fixture.sha256);
-  expect(native.calibrate(source).result.final_market).toEqual(
-    fixture.calibrated,
-  );
-  const handle = native.MarketContext.fromJson(JSON.stringify(market));
-  try {
-    expect(JSON.parse(handle.toJson())).toEqual(market);
-  } finally {
-    handle.free();
-  }
-  // One native CDX base-correlation solve takes ~20 s under the dev WASM build.
-}, 60000);
-it("navigates every supplied leaf with exact displayed and copied values", async () => {
-  const copy = vi.fn().mockResolvedValue(undefined);
-  Object.defineProperty(navigator, "clipboard", {
-    configurable: true,
-    value: { writeText: copy },
-  });
-  const select = vi.fn(),
-    rendered = render(<MarketContextBrowser state={market} />);
-  for (const state of [
-    fixture.calibrated as unknown as MarketContextStateWire,
-    market,
-  ]) {
-    const entries = flattenMarket(marketTree(state));
-    expect(new Set(entries.map((e) => e.key)).size).toBe(entries.length);
-    expect(marketTree(state).map((e) => e.label)).toEqual(
-      Object.keys(schema.properties),
-    );
-    for (const entry of entries.filter((e) => !e.children.length)) {
-      const original = entry.path.reduce<unknown>(
-        (value, key) => (value as Record<string | number, unknown>)[key],
-        state,
+});
+it(
+  "navigates every supplied leaf with exact displayed and copied values",
+  async () => {
+    const copy = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: copy },
+    });
+    const select = vi.fn(),
+      rendered = render(<MarketContextBrowser state={market} />);
+    for (const state of [
+      fixture.calibrated as unknown as MarketContextStateWire,
+      market,
+    ]) {
+      const entries = flattenMarket(marketTree(state));
+      expect(new Set(entries.map((e) => e.key)).size).toBe(entries.length);
+      expect(marketTree(state).map((e) => e.label)).toEqual(
+        Object.keys(schema.properties),
       );
-      expect(entry.value).toBe(original);
-      rendered.rerender(
-        <MarketContextBrowser
-          state={state}
-          link={{ selectedKey: entry.key, select, clear: vi.fn() }}
-          renderObject={() => null}
-        />,
-      );
-      const view = screen.getByRole("region", {
-        name: "Selected stored value",
-      });
-      showOriginal(view);
-      expect(view.querySelector("pre")!.textContent).toBe(
-        serializeHost(original),
-      );
-      fireEvent.click(within(view).getByRole("button", { name: "Copy" }));
-      expect(copy).toHaveBeenLastCalledWith(serializeHost(original));
+      for (const entry of entries.filter((e) => !e.children.length)) {
+        const original = entry.path.reduce<unknown>(
+          (value, key) => (value as Record<string | number, unknown>)[key],
+          state,
+        );
+        expect(entry.value).toBe(original);
+        rendered.rerender(
+          <MarketContextBrowser
+            state={state}
+            link={{ selectedKey: entry.key, select, clear: vi.fn() }}
+            renderObject={() => null}
+          />,
+        );
+        const view = screen.getByRole("region", {
+          name: "Selected stored value",
+        });
+        showOriginal(view);
+        expect(view.querySelector("pre")!.textContent).toBe(
+          serializeHost(original),
+        );
+        fireEvent.click(within(view).getByRole("button", { name: "Copy" }));
+        expect(copy).toHaveBeenLastCalledWith(serializeHost(original));
+      }
     }
-  }
-}, 20000);
+  },
+  budget(20000),
+);
 it("searches literal paths and preserves identified selection across reorder, then reports removal", () => {
   const curve = market.curves.find((c) => c.id === "NEG-RATES")!;
   const entry = flattenMarket(marketTree(market)).find(

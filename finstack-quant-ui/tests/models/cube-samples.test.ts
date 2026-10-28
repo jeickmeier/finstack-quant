@@ -14,13 +14,14 @@ import { cubeOptions } from "@/hooks/models/use-cube-samples/use-cube-samples";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import { serializeHost } from "../../src/codec.mjs";
 import fixture from "../core/cubes/cases.json";
+import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
 let worker: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   worker = await startWorker();
-}, 30000);
+}, budget(30000));
 afterAll(async () => worker?.close());
 const cubes = fixture.market.vol_cubes as CubeSampleRequest["cube"][];
 const request = (
@@ -62,7 +63,9 @@ const resources = () =>
       }>;
     }
   ).resources();
-it("uses the fresh native 07 calibration output, with missing shifts preserved in canonical data", () => {
+// The 07 calibration output is regenerated and compared by
+// `mise run ui-fixtures --check` (tests/core/cubes/generate.mjs).
+it("records the 07 calibration source its cube fixture was generated from", () => {
   const source = readFileSync(
     fileURLToPath(new URL(`../../../${fixture.source}`, import.meta.url)),
     "utf8",
@@ -71,8 +74,6 @@ it("uses the fresh native 07 calibration output, with missing shifts preserved i
     createHash("sha256").update(source).digest("hex"),
     `${fixture.source} changed since tests/core/cubes/generate.mjs ran; rerun mise run ui-fixtures`,
   ).toBe(fixture.sha256);
-  const actual = native.calibrate(source).result.final_market.vol_cubes[0];
-  expect(cubes.find((c) => c.id === actual.id)).toEqual(actual);
 });
 it("matches both checked evaluators for absent/present shifts and complete state/coordinate changes", async () => {
   const before = await resources();

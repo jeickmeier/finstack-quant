@@ -1,8 +1,5 @@
 // @vitest-environment jsdom
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import {
   cleanup,
@@ -32,13 +29,15 @@ import { startWorker } from "../shared/worker/harness.mjs";
 import bond from "../../src/fixtures/results/bond.json";
 import marketFixture from "../valuations/instruments/pricing-market.json";
 import curves from "../../registry/core/components/curve-link-example/market.json";
+import calibrations from "../calibration/cases.json";
+import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, 30000);
+}, budget(30000));
 afterAll(async () => harness?.close());
 afterEach(cleanup);
 const validate = async (json: string) =>
@@ -62,7 +61,7 @@ async function submit(onSubmit: ReturnType<typeof vi.fn>) {
           }) as HTMLButtonElement
         ).disabled,
       ).toBe(false),
-    { timeout: 3000 },
+    { timeout: budget(3000) },
   );
   fireEvent.click(screen.getByRole("button", { name: "Apply market" }));
   await waitFor(() => expect(onSubmit).toHaveBeenCalled());
@@ -160,16 +159,10 @@ it("edits no-knot parametric and base-correlation shapes and preserves every oth
   ).toBe(true);
 });
 it("imports an actual native calibration envelope and canonical fixture, leaving other fields read-only", async () => {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-  const envelope = native.calibrate(
-    readFileSync(
-      resolve(
-        root,
-        "finstack-quant/calibration/examples/market_bootstrap/01_usd_discount.json",
-      ),
-      "utf8",
-    ),
-  );
+  // The recorded native envelope; `mise run ui-fixtures --check` regenerates it.
+  const envelope = calibrations.find(
+    (c) => c.source.endsWith("01_usd_discount.json") && !("variant" in c),
+  )!.result;
   const imported = importMarket(serializeHost(envelope));
   expect(imported).toEqual(
     marketModule.codec.parse(
@@ -344,109 +337,117 @@ it("edits stored FX entries and scalar prices while preserving populated unopene
   }
 });
 
-it("edits stored surfaces and raw FX quotes through generated fields and native validation", async () => {
-  const { storedSurface, fxQuotes } = await import("./surfaces/fixtures");
-  const input = {
-    ...JSON.parse(bond.request.marketJson),
-    surfaces: [storedSurface],
-    fx_delta_vol_surfaces: [fxQuotes],
-  };
-  const onSubmit = vi.fn();
-  render(
-    <MarketContextForm
-      defaultJson={JSON.stringify(input)}
-      validate={validate}
-      onSubmit={onSubmit}
-    />,
-  );
-  const field = (path: string) =>
-    document.querySelector(
-      `[data-field-path="${path}"] input`,
-    ) as HTMLInputElement;
-  fireEvent.click(
-    screen.getByRole("button", { name: /Edit .*Supplied surface/ }),
-  );
-  fireEvent.click(screen.getByRole("button", { name: /Edit .*EURUSD/ }));
-  fireEvent.change(field("surfaces[0].vols_row_major[4]"), {
-    target: { value: "0.241" },
-  });
-  fireEvent.change(field("fx_delta_vol_surfaces[0].atm_vols[1]"), {
-    target: { value: "0.095" },
-  });
-  const json = await submit(onSubmit);
-  const expected = structuredClone(input);
-  expected.surfaces[0].vols_row_major[4] = 0.241;
-  expected.fx_delta_vol_surfaces[0].atm_vols[1] = 0.095;
-  expect(JSON.parse(json)).toEqual(
-    JSON.parse(canonical(JSON.stringify(expected))),
-  );
-  const { surfaceNodes } =
-    await import("@/components/finstack/core/components/vol-surface-chart/stored");
-  expect(surfaceNodes(JSON.parse(json).surfaces[0])[4]!.value).toBe(0.241);
-  fireEvent.change(field("surfaces[0].vols_row_major[4]"), {
-    target: { value: "-1" },
-  });
-  await waitFor(() =>
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Apply market",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true),
-  );
-  await waitFor(() =>
-    expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
-  );
-}, 15000);
+it(
+  "edits stored surfaces and raw FX quotes through generated fields and native validation",
+  async () => {
+    const { storedSurface, fxQuotes } = await import("./surfaces/fixtures");
+    const input = {
+      ...JSON.parse(bond.request.marketJson),
+      surfaces: [storedSurface],
+      fx_delta_vol_surfaces: [fxQuotes],
+    };
+    const onSubmit = vi.fn();
+    render(
+      <MarketContextForm
+        defaultJson={JSON.stringify(input)}
+        validate={validate}
+        onSubmit={onSubmit}
+      />,
+    );
+    const field = (path: string) =>
+      document.querySelector(
+        `[data-field-path="${path}"] input`,
+      ) as HTMLInputElement;
+    fireEvent.click(
+      screen.getByRole("button", { name: /Edit .*Supplied surface/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Edit .*EURUSD/ }));
+    fireEvent.change(field("surfaces[0].vols_row_major[4]"), {
+      target: { value: "0.241" },
+    });
+    fireEvent.change(field("fx_delta_vol_surfaces[0].atm_vols[1]"), {
+      target: { value: "0.095" },
+    });
+    const json = await submit(onSubmit);
+    const expected = structuredClone(input);
+    expected.surfaces[0].vols_row_major[4] = 0.241;
+    expected.fx_delta_vol_surfaces[0].atm_vols[1] = 0.095;
+    expect(JSON.parse(json)).toEqual(
+      JSON.parse(canonical(JSON.stringify(expected))),
+    );
+    const { surfaceNodes } =
+      await import("@/components/finstack/core/components/vol-surface-chart/stored");
+    expect(surfaceNodes(JSON.parse(json).surfaces[0])[4]!.value).toBe(0.241);
+    fireEvent.change(field("surfaces[0].vols_row_major[4]"), {
+      target: { value: "-1" },
+    });
+    await waitFor(() =>
+      expect(
+        (
+          screen.getByRole("button", {
+            name: "Apply market",
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(true),
+    );
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
+    );
+  },
+  budget(15000),
+);
 
-it("edits canonical cube parameters and forwards without altering shifts or interpolation", async () => {
-  const fixture = await import("./cubes/cases.json");
-  const cube = fixture.default.market.vol_cubes.find(
-    (c) => c.id !== "SHIFTED-BLACK",
-  )!;
-  const input = { ...JSON.parse(bond.request.marketJson), vol_cubes: [cube] };
-  const onSubmit = vi.fn();
-  render(
-    <MarketContextForm
-      defaultJson={JSON.stringify(input)}
-      validate={validate}
-      onSubmit={onSubmit}
-    />,
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: new RegExp(`Edit .*${cube.id}`) }),
-  );
-  const field = (path: string) =>
-    document.querySelector(
-      `[data-field-path="${path}"] input`,
-    ) as HTMLInputElement;
-  fireEvent.change(field("vol_cubes[0].params[0].alpha"), {
-    target: { value: "0.008" },
-  });
-  fireEvent.change(field("vol_cubes[0].forwards[0]"), {
-    target: { value: "0.051" },
-  });
-  const json = await submit(onSubmit),
-    expected = structuredClone(input);
-  expected.vol_cubes[0].params[0].alpha = 0.008;
-  expected.vol_cubes[0].forwards[0] = 0.051;
-  expect(JSON.parse(json)).toEqual(
-    JSON.parse(canonical(JSON.stringify(expected))),
-  );
-  fireEvent.change(field("vol_cubes[0].params[0].alpha"), {
-    target: { value: "-1" },
-  });
-  await waitFor(() =>
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Apply market",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true),
-  );
-  await waitFor(() =>
-    expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
-  );
-}, 15000);
+it(
+  "edits canonical cube parameters and forwards without altering shifts or interpolation",
+  async () => {
+    const fixture = await import("./cubes/cases.json");
+    const cube = fixture.default.market.vol_cubes.find(
+      (c) => c.id !== "SHIFTED-BLACK",
+    )!;
+    const input = { ...JSON.parse(bond.request.marketJson), vol_cubes: [cube] };
+    const onSubmit = vi.fn();
+    render(
+      <MarketContextForm
+        defaultJson={JSON.stringify(input)}
+        validate={validate}
+        onSubmit={onSubmit}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: new RegExp(`Edit .*${cube.id}`) }),
+    );
+    const field = (path: string) =>
+      document.querySelector(
+        `[data-field-path="${path}"] input`,
+      ) as HTMLInputElement;
+    fireEvent.change(field("vol_cubes[0].params[0].alpha"), {
+      target: { value: "0.008" },
+    });
+    fireEvent.change(field("vol_cubes[0].forwards[0]"), {
+      target: { value: "0.051" },
+    });
+    const json = await submit(onSubmit),
+      expected = structuredClone(input);
+    expected.vol_cubes[0].params[0].alpha = 0.008;
+    expected.vol_cubes[0].forwards[0] = 0.051;
+    expect(JSON.parse(json)).toEqual(
+      JSON.parse(canonical(JSON.stringify(expected))),
+    );
+    fireEvent.change(field("vol_cubes[0].params[0].alpha"), {
+      target: { value: "-1" },
+    });
+    await waitFor(() =>
+      expect(
+        (
+          screen.getByRole("button", {
+            name: "Apply market",
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(true),
+    );
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
+    );
+  },
+  budget(15000),
+);

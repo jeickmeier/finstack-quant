@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
@@ -32,13 +31,11 @@ import { CashflowViewer } from "@/components/finstack/valuations/components/cash
 import { unwrap, type CashflowRequest } from "@/workers/finstack-contract";
 import { startWorker } from "../shared/worker/harness.mjs";
 import fixture from "./cashflows/cases.json";
+import { budget } from "../shared/budget";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
   createClient: mock.createClient,
 }));
-const native = createRequire(import.meta.url)(
-  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 let harness: Awaited<ReturnType<typeof startWorker>>;
 let call: ReturnType<typeof vi.fn>;
 const exportRequest = (request: CashflowRequest): CashflowRequest => ({
@@ -49,7 +46,7 @@ const exportRequest = (request: CashflowRequest): CashflowRequest => ({
 });
 beforeAll(async () => {
   harness = await startWorker();
-}, 30000);
+}, budget(30000));
 afterAll(async () => harness?.close());
 async function invoke(
   method: "initialize" | "cashflows",
@@ -72,7 +69,9 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-it("pins authoritative fixture sources and exact current native exports", () => {
+// Prices and cashflow exports are regenerated and compared by
+// `mise run ui-fixtures --check` (tests/valuations/cashflows/generate.mjs).
+it("pins the JSON inputs the cashflow fixture was built from", () => {
   const repository = resolve(
     dirname(fileURLToPath(import.meta.url)),
     "../../..",
@@ -84,42 +83,6 @@ it("pins authoritative fixture sources and exact current native exports", () => 
         .digest("hex"),
       `${source.path} changed since tests/valuations/cashflows/generate.mjs ran; rerun mise run ui-fixtures`,
     ).toBe(source.sha256);
-  for (const entry of fixture.cases) {
-    const r = entry.request;
-    expect(
-      native.priceInstrument(
-        r.instrumentJson,
-        r.marketJson,
-        r.asOf,
-        r.model,
-        r.metrics,
-        r.metricPricingOverrides,
-        r.marketHistory,
-      ).value,
-    ).toEqual(entry.pricedValue);
-    if (entry.cashflows !== null)
-      expect(
-        JSON.stringify(
-          native.instrumentCashflows(
-            r.instrumentJson,
-            r.marketJson,
-            r.asOf,
-            r.model,
-          ),
-        ),
-      ).toBe(entry.cashflows);
-    else
-      expect(() =>
-        JSON.stringify(
-          native.instrumentCashflows(
-            r.instrumentJson,
-            r.marketJson,
-            r.asOf,
-            r.model,
-          ),
-        ),
-      ).toThrow(entry.error!);
-  }
 });
 it.each(fixture.cases.filter((c) => c.cashflows !== null))(
   "tables and copies exact native $type cashflows at both densities",
