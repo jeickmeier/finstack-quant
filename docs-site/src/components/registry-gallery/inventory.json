@@ -529,6 +529,14 @@
       "type": "registry:hook"
     },
     {
+      "name": "use-attribute-pnl-many",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-default-waterfall-order",
+      "type": "registry:hook"
+    },
+    {
       "name": "use-performance-report",
       "type": "registry:hook"
     },
@@ -1144,7 +1152,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",
-      "sha256": "97f0920fcf37c1d07633557c56da625599a5e1dbc1d7b39b038456eef35014ad"
+      "sha256": "cd14d6dc977a1e5c28800c02924e9718af87ae38dcfec5291ceb2eb3fad2c905"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",

@@ -398,6 +398,11 @@
           "target": "workers/services/scenarios.ts"
         },
         {
+          "path": "file/services/attribution.ts",
+          "type": "registry:file",
+          "target": "workers/services/attribution.ts"
+        },
+        {
           "path": "file/services/analytics.ts",
           "type": "registry:file",
           "target": "workers/services/analytics.ts"

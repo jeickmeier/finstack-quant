@@ -39,6 +39,56 @@
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
+    },
+    {
+      "name": "use-attribute-pnl-many",
+      "type": "registry:hook",
+      "title": "useAttributePnlMany",
+      "description": "Attributes the T0 to T1 P&L of priced instruments through the WASM worker.",
+      "docs": "attribution.attributePnlMany with one AttributionInputs (the two MarketContext texts canonicalized through the worker's market cache and spliced, never parsed; the dates; the AttributionMethod wire value, which Rust requires) over the instrument envelopes in order, then per result attribution.pnlAttributionExplainText, pnlAttributionResidualWithinTolerance against the run's own tolerances and pnlAttributionPctOfTotal per factor bucket. Returns one {attribution, explain, residualWithinTolerance, pctOfTotal} per instrument for PnlAttributionReport. Every other AttributionInputs option stays unset; a failing instrument fails the call with the native error (metrics_based, for example, needs a calibration recipe for every hazard curve). Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-attribute-pnl-many/use-attribute-pnl-many.ts",
+          "type": "registry:hook",
+          "target": "hooks/attribution/use-attribute-pnl-many/use-attribute-pnl-many.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-default-waterfall-order",
+      "type": "registry:hook",
+      "title": "useDefaultWaterfallOrder",
+      "description": "Reads Rust's default waterfall attribution factor order through the WASM worker.",
+      "docs": "attribution.defaultWaterfallOrder: the canonical snake_case factor names a waterfall AttributionMethod applies in order ({waterfall: order}). Immutable within one worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-default-waterfall-order/use-default-waterfall-order.ts",
+          "type": "registry:hook",
+          "target": "hooks/attribution/use-default-waterfall-order/use-default-waterfall-order.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     }
   ]
 }

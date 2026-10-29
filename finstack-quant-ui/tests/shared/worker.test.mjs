@@ -99,6 +99,9 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "buildMarketScenario",
     "applyMarketScenario",
     "horizonReturn",
+    // AttributionApi
+    "attributePnlMany",
+    "defaultWaterfallOrder",
     // AnalyticsApi
     "performanceReport",
     "benchmarkReport",

@@ -82,6 +82,17 @@ text and the factor attribution. The attribution method and the roll calendar
 are optional; blank leaves both to Rust. `metrics_based` fails on a hazard
 curve without a calibration recipe, and the native error is shown.
 
+## P&L explain
+
+The P&L explain result tab runs the native `attributePnlMany` on the last priced
+instrument. **Pin as T0** keeps the last priced request's market and valuation
+date; T1 is the last priced request (reprice on an edited or calibrated market)
+or the applied market scenario's shocked market and returned date. Choose a
+method: Rust requires one, and the waterfall runs in Rust's default factor
+order. The tab shows Rust's attribution with its explain text, residual verdict
+and share of total per factor; no P&L is computed in the browser. Pinning keeps
+only the market and date, so a changed instrument is repriced at T0 too.
+
 ## Print and publication output
 
 After **Priced**, choose **Print report**. The workbench captures its completed

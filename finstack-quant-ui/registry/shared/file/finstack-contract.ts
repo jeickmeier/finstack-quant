@@ -19,6 +19,7 @@ import type {
   ArbitrageValidationResult,
   ApplicationReport,
   HorizonReport,
+  PnlAttribution,
   BetaResult,
   DatedSeries,
   DrawdownEpisode,
@@ -229,6 +230,32 @@ export interface HorizonReturn {
   readonly report: HorizonReport;
   /** scenarios.horizonResultExplainText of the report. */
   readonly explain: string;
+}
+/** One attribution configuration over T0 -> T1 for an ordered list of instruments. */
+export interface AttributePnlManyRequest {
+  /** Canonical instrument envelope JSON texts, attributed in this order. */
+  readonly instrumentJsons: readonly string[];
+  /** MarketContext JSON at T0; canonicalized through the market cache and spliced, never parsed. */
+  readonly marketT0Json: string;
+  /** MarketContext JSON at T1; canonicalized through the market cache and spliced, never parsed. */
+  readonly marketT1Json: string;
+  /** ISO valuation date at T0. */
+  readonly asOfT0: string;
+  /** ISO valuation date at T1. */
+  readonly asOfT1: string;
+  /** AttributionMethod wire value (required by AttributionInputs; Rust has no default here). */
+  readonly method: attributionWire.AttributionMethod;
+}
+/** One native attribution with the Rust helpers a report shows beside it. */
+export interface AttributedPnl {
+  /** attribution.attributePnlMany's entry for the instrument, as returned. */
+  readonly attribution: PnlAttribution;
+  /** attribution.pnlAttributionExplainText (zero factors hidden, Rust's default). */
+  readonly explain: string;
+  /** attribution.pnlAttributionResidualWithinTolerance against the run's own tolerances. */
+  readonly residualWithinTolerance: boolean;
+  /** attribution.pnlAttributionPctOfTotal per factor bucket, in percent; null where Rust returns none. */
+  readonly pctOfTotal: Readonly<Record<string, number | null>>;
 }
 /** A ticker-major panel for analytics.Performance; every omitted option is left to Rust. */
 export interface PerformanceReportRequest {
@@ -738,6 +765,15 @@ export interface ScenariosApi {
     request: HorizonReturnRequest,
   ): Promise<Envelope<HorizonReturn>>;
 }
+/** attribution: single-instrument T0 -> T1 P&L attribution and its Rust helpers. */
+export interface AttributionApi {
+  /** attribution.attributePnlMany over canonical market texts, then pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotal per factor; one entry per instrument in input order. */
+  attributePnlMany(
+    request: AttributePnlManyRequest,
+  ): Promise<Envelope<AttributedPnl[]>>;
+  /** attribution.defaultWaterfallOrder: Rust's waterfall factor order. */
+  defaultWaterfallOrder(): Promise<Envelope<string[]>>;
+}
 /** analytics: performance reports over a host-supplied panel. */
 export interface AnalyticsApi {
   /** analytics.Performance (fromReturns or the price constructor) + summary, series, drawdowns, rolling, periodic, lookback (core.FiscalConfig when a fiscal start is set) and correlation; every handle is freed. */
@@ -876,6 +912,7 @@ export type WorkerApi = {
   ValuationsApi &
   CashflowsApi &
   ScenariosApi &
+  AttributionApi &
   AnalyticsApi &
   PortfolioApi &
   MarginApi &

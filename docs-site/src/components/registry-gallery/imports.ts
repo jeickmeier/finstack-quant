@@ -36,6 +36,7 @@ export const importHarnesses = {
       import("@/workers/services/valuations"),
       import("@/workers/services/cashflows"),
       import("@/workers/services/scenarios"),
+      import("@/workers/services/attribution"),
       import("@/workers/services/analytics"),
       import("@/workers/services/portfolio"),
       import("@/workers/services/margin"),
@@ -116,6 +117,20 @@ export const importHarnesses = {
       import("@/hooks/scenarios/use-horizon-return/use-horizon-return"),
     ]).then((modules) => ({
       name: "use-horizon-return",
+      modules: modules.length,
+    })),
+  "use-attribute-pnl-many": () =>
+    Promise.all([
+      import("@/hooks/attribution/use-attribute-pnl-many/use-attribute-pnl-many"),
+    ]).then((modules) => ({
+      name: "use-attribute-pnl-many",
+      modules: modules.length,
+    })),
+  "use-default-waterfall-order": () =>
+    Promise.all([
+      import("@/hooks/attribution/use-default-waterfall-order/use-default-waterfall-order"),
+    ]).then((modules) => ({
+      name: "use-default-waterfall-order",
       modules: modules.length,
     })),
   "use-performance-report": () =>

@@ -4,8 +4,9 @@ import { requireWasm } from "./require-wasm.mjs";
 
 // Regenerates (or, with --check, verifies) every native fixture the tests and
 // the gallery pin, in dependency order: results writes src/fixtures/results/
-// bond.json, which the scenario application, horizon return, cashflows and
-// details embed; curves writes the curve-link market that market-browser
+// bond.json, which the scenario application, horizon return, attribution,
+// cashflows and details embed (attribution also reads the scenario
+// application cases); curves writes the curve-link market that market-browser
 // extends; covenants reads the analyst result that statements writes;
 // gen-gallery copies the fixtures into docs-site last. Each generator runs in its own process so the
 // WASM instances do not share memory.

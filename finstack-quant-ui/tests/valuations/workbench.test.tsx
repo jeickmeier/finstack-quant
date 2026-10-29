@@ -31,6 +31,7 @@ import { formatMoney, formatRawMoney } from "../../src/format/format";
 import { budget } from "../shared/budget";
 import { createContext } from "@/workers/services/context";
 import { createScenariosService } from "@/workers/services/scenarios";
+import { createAttributionService } from "@/workers/services/attribution";
 import type { MarketScenarioDraft } from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
 import marketScenarios from "../scenarios/application/cases.json";
 const bondDisplay = formatRawMoney(fixture.result.value);
@@ -57,6 +58,15 @@ let call: ReturnType<typeof vi.fn>, close: ReturnType<typeof vi.fn>;
 // The production ScenariosApi over the Node facade; its envelopes unwrap as the client does.
 const scenarioService = createScenariosService(
   { scenarios: native },
+  createContext({
+    initialize: async () => undefined,
+    core: { MarketContext: native.MarketContext },
+    portfolio: { Portfolio: native.Portfolio },
+  }),
+);
+// The production AttributionApi over the Node facade.
+const attributionService = createAttributionService(
+  { attribution: native },
   createContext({
     initialize: async () => undefined,
     core: { MarketContext: native.MarketContext },
@@ -111,6 +121,10 @@ beforeEach(() => {
         return unwrap(await scenarioService.applyMarketScenario(request));
       case "horizonReturn":
         return unwrap(await scenarioService.horizonReturn(request));
+      case "attributePnlMany":
+        return unwrap(await attributionService.attributePnlMany(request));
+      case "defaultWaterfallOrder":
+        return native.defaultWaterfallOrder();
       case "calendars":
         return native.availableCalendars();
       case "formatMoney":
@@ -940,6 +954,92 @@ it(
       expect(within(results).queryByText("Comparison valuation")).toBeNull(),
     );
     expect(prices()).toHaveLength(2);
+  },
+  budget(20000),
+);
+
+it(
+  "explains the P&L from a pinned T0 market to an edited, repriced market with Rust's attribution only",
+  async () => {
+    mount();
+    const results = screen.getByRole("region", { name: "Results" });
+    await within(results).findByTitle(
+      fixture.result.value.amount,
+      {},
+      { timeout: budget(3000) },
+    );
+    await userEvent.click(
+      within(screen.getByRole("tablist", { name: "Result views" })).getByRole(
+        "tab",
+        { name: "P&L explain" },
+      ),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Pin as T0" }));
+    expect(within(results).getByText(/T0 pinned at/).textContent).toBe(
+      `T0 pinned at ${fixture.request.asOf}`,
+    );
+    // Rust requires a method; none is preselected and nothing is requested.
+    expect(
+      within(results).getByText("Choose an attribution method."),
+    ).toBeTruthy();
+    await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Edit market" }));
+    fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {
+      target: { value: "0.985" },
+    });
+    await waitFor(() => expect(prices()).toHaveLength(2), {
+      timeout: budget(4000),
+    });
+    const [t0, t1] = prices();
+    await userEvent.click(
+      within(results).getByRole("radio", { name: "parallel" }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          call.mock.calls.filter(([method]) => method === "attributePnlMany"),
+        ).toHaveLength(1),
+      { timeout: budget(4000) },
+    );
+    // The pinned market and date, and the last priced instrument, market and date.
+    expect(
+      call.mock.calls.filter(([method]) => method === "attributePnlMany"),
+    ).toEqual([
+      [
+        "attributePnlMany",
+        {
+          instrumentJsons: [t1!.instrumentJson],
+          marketT0Json: t0!.marketJson,
+          marketT1Json: t1!.marketJson,
+          asOfT0: t0!.asOf,
+          asOfT1: t1!.asOf,
+          method: "parallel",
+        },
+      ],
+    ]);
+    const [expected] = native.attributePnlMany(
+      `{"as_of_t0":"${t0!.asOf}","as_of_t1":"${t1!.asOf}","market_t0":${t0!.marketJson},"market_t1":${t1!.marketJson},"method":"parallel"}`,
+      [t1!.instrumentJson],
+    );
+    const report = within(results).getByRole("region", {
+      name: "P&L attribution",
+    });
+    expect(
+      await within(report).findAllByTitle(
+        expected.total_pnl.amount,
+        {},
+        { timeout: budget(4000) },
+      ),
+    ).not.toHaveLength(0);
+    expect(
+      within(report).getAllByTitle(expected.rates_curves_pnl.amount),
+    ).not.toHaveLength(0);
+    // The scenario source stays unavailable until a scenario is applied.
+    expect(
+      within(results)
+        .getByRole("radio", { name: "Applied market scenario" })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
   },
   budget(20000),
 );

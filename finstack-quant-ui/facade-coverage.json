@@ -1,6 +1,11 @@
 {
   "covered": [
     "analytics.Performance",
+    "attribution.attributePnlMany",
+    "attribution.defaultWaterfallOrder",
+    "attribution.pnlAttributionExplainText",
+    "attribution.pnlAttributionPctOfTotal",
+    "attribution.pnlAttributionResidualWithinTolerance",
     "calibration.calibrate",
     "calibration.dryRun",
     "calibration.validateCalibration",
@@ -81,11 +86,6 @@
     "valuations.valuationResultToJson"
   ],
   "planned": {
-    "attribution.attributePnlMany": "ATR-1",
-    "attribution.defaultWaterfallOrder": "ATR-1",
-    "attribution.pnlAttributionExplainText": "ATR-1",
-    "attribution.pnlAttributionPctOfTotal": "ATR-1",
-    "attribution.pnlAttributionResidualWithinTolerance": "ATR-1",
     "core.VolSurface": "vd-surface-arbitrage-badge",
     "covenants.covLite": "sd-covenant-engine-editor",
     "covenants.lboStandard": "sd-covenant-engine-editor",

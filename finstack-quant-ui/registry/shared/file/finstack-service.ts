@@ -14,6 +14,10 @@ import {
   type ScenariosNative,
 } from "./services/scenarios";
 import {
+  createAttributionService,
+  type AttributionNative,
+} from "./services/attribution";
+import {
   createAnalyticsService,
   type AnalyticsNative,
 } from "./services/analytics";
@@ -38,6 +42,7 @@ export function createService(
     ValuationsNative &
     CashflowsNative &
     ScenariosNative &
+    AttributionNative &
     AnalyticsNative &
     PortfolioNative &
     MarginNative &
@@ -58,6 +63,7 @@ export function createService(
     ...createValuationsService(native, context),
     ...createCashflowsService(native, context),
     ...createScenariosService(native, context),
+    ...createAttributionService(native, context),
     ...createAnalyticsService(native, context),
     ...createPortfolioService(native, context),
     ...createMarginService(native, context),
