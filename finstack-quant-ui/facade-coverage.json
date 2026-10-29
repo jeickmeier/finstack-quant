@@ -18,6 +18,12 @@
     "core.VolCube",
     "core.VolSurface",
     "core.availableCalendars",
+    "covenants.CovenantEngine",
+    "covenants.covLite",
+    "covenants.lboStandard",
+    "covenants.projectFinance",
+    "covenants.realEstate",
+    "covenants.validateCovenantEngineJson",
     "margin.SimmCalculator",
     "margin.SimmSensitivities",
     "margin.VmCalculator",
@@ -87,6 +93,7 @@
     "statements_analytics.backtestForecast",
     "statements_analytics.creditAssessment",
     "statements_analytics.dcfSensitivity",
+    "statements_analytics.evaluateCovenants",
     "statements_analytics.evaluateDcf",
     "statements_analytics.evaluateLbo",
     "statements_analytics.evaluateScenarioSet",
@@ -119,12 +126,6 @@
     "valuations.valuationResultToJson"
   ],
   "planned": {
-    "covenants.covLite": "sd-covenant-engine-editor",
-    "covenants.lboStandard": "sd-covenant-engine-editor",
-    "covenants.projectFinance": "sd-covenant-engine-editor",
-    "covenants.realEstate": "sd-covenant-engine-editor",
-    "covenants.validateCovenantEngineJson": "sd-covenant-engine-editor",
-    "statements_analytics.evaluateCovenants": "sd-covenant-engine-editor",
     "statements_analytics.forecastBreaches": "sd-covenant-breach-forecast"
   },
   "excluded": {

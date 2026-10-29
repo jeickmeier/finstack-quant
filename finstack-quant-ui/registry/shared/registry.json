@@ -393,6 +393,11 @@
           "target": "workers/services/cashflows.ts"
         },
         {
+          "path": "file/services/covenants.ts",
+          "type": "registry:file",
+          "target": "workers/services/covenants.ts"
+        },
+        {
           "path": "file/services/scenarios.ts",
           "type": "registry:file",
           "target": "workers/services/scenarios.ts"

@@ -61,6 +61,7 @@ import type {
 import type {
   attribution as attributionWire,
   core as wire,
+  covenants as covenantsWire,
   models as modelsWire,
   scenarios as scenarioWire,
 } from "finstack-quant-wasm/types";
@@ -304,6 +305,51 @@ export interface MonteCarloBreachRequest {
   readonly metric: string;
   /** Breach level in the metric's own units. */
   readonly threshold: number;
+}
+/** Native CovenantSpec wire object (a template's specs, ready to wrap as `{ specs }`). */
+export type CovenantSpec = covenantsWire.CovenantSpec;
+/** Native DatedCovenantReports row: the reports of the covenants applicable on one test date. */
+export type DatedCovenantReports = covenantsWire.DatedCovenantReports;
+/**
+ * A Rust covenant package template and its thresholds, named after the facade
+ * function and its parameters. Ratios are in turns (`3.5` means 3.5x), yields
+ * and loan-to-value as decimals, amounts in the reporting currency; a cleared
+ * field is NaN, which Rust rejects.
+ */
+export type CovenantTemplateRequest =
+  | {
+      readonly kind: "covLite";
+      readonly maxLeverage: number;
+      readonly maxSeniorLeverage: number;
+    }
+  | {
+      readonly kind: "lboStandard";
+      readonly initialLeverage: number;
+      readonly interestCoverage: number;
+      readonly fixedChargeCoverage: number;
+      readonly maxCapex: number;
+    }
+  | {
+      readonly kind: "realEstate";
+      readonly minDscr: number;
+      readonly minDebtYield: number;
+      readonly maxLtv: number;
+    }
+  | {
+      readonly kind: "projectFinance";
+      readonly minDscr: number;
+      readonly distributionLockupDscr: number;
+      readonly minLiquidity: number;
+      readonly maxNetLeverage: number;
+    };
+/** Covenant compliance of an evaluated statement result under a CovenantEngine. */
+export interface EvaluateCovenantsRequest {
+  /** CovenantEngine JSON; covenant metric ids are statement node ids. */
+  readonly engineJson: string;
+  /** FinancialModelSpec JSON whose period calendar gives each test date. */
+  readonly modelJson: string;
+  /** Host-serialized StatementResult of that model. */
+  readonly resultsJson: string;
 }
 /** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
 export interface StatementRollupRequest {
@@ -1033,6 +1079,19 @@ export interface CashflowsApi {
     cashflows: CashflowEnvelope,
   ): Promise<Envelope<CurrencyLadder[]>>;
 }
+/** covenants: package templates, engine validation and statement covenant compliance. */
+export interface CovenantsApi {
+  /** covenants.covLite, lboStandard, realEstate or projectFinance, by request kind: the Rust package's CovenantSpec objects. */
+  covenantTemplate(
+    request: CovenantTemplateRequest,
+  ): Promise<Envelope<CovenantSpec[]>>;
+  /** covenants.validateCovenantEngineJson: canonical CovenantEngine text. */
+  validateCovenantEngine(json: string): Promise<Envelope<string>>;
+  /** covenants.CovenantEngine.fromJson + statements_analytics.evaluateCovenants: one row per result period, tested on its last day with the applicable covenants; the handle is freed. */
+  evaluateCovenants(
+    request: EvaluateCovenantsRequest,
+  ): Promise<Envelope<DatedCovenantReports[]>>;
+}
 /** scenarios: market scenario construction, application and horizon total return. */
 export interface ScenariosApi {
   /** scenarios.operationSpecTimeRollForward + parallelBpMany per shift + parseScenarioSpec: canonical ScenarioSpec text. */
@@ -1270,6 +1329,7 @@ export type WorkerApi = {
 } & CoreApi &
   ValuationsApi &
   CashflowsApi &
+  CovenantsApi &
   ScenariosApi &
   AttributionApi &
   AnalyticsApi &

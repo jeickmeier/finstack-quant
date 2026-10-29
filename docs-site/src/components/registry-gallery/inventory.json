@@ -277,6 +277,12 @@
       "worker": "none"
     },
     {
+      "name": "covenant-engine-editor",
+      "type": "registry:component",
+      "docs": "Composes schema-form over the generated covenant_engine contract (started from defaultJson; Rust publishes no example, so it otherwise starts empty). When loadTemplate is supplied, a template bar loads the specs of a Rust package (covenants.covLite, lboStandard, realEstate or projectFinance) for thresholds typed into decimal inputs that start empty; a blank threshold is sent as NaN and a rejected template shows the native error. Every metric_id and denominator_metric_id (top-level and windowed specs) is an id-combobox: free text with metricIds as suggestions. A Covenant metrics table lists each spec's metric id and whether metricIds contains it, before any evaluation; an unset metric id is listed as read by Rust's conventional metric for the covenant type and is not checked. Validation, templates and every term are native: connect validate to useCovenantEngineValidator, loadTemplate to useCovenantTemplate and onSubmit to the useEvaluateCovenants request. Accepts defaultJson, validate, onSubmit, loadTemplate, metricIds, disabled and density props.",
+      "worker": "none"
+    },
+    {
       "name": "covenant-compliance",
       "type": "registry:component",
       "docs": "Present native DatedCovenantReports rows (statements_analytics.evaluateCovenants over statement results, or CovenantEngine#evaluateSeries over dated rows) as a grid: one column per test date in the order supplied, one row per covenant instance key in first-appearance order, each cell the returned verdict as Passed or Failed, or a dash when Rust returned no report for that covenant on that date. A date header button selects the date (the latest initially) and its reports render below through covenant-report. Nothing is computed, sorted or inferred. No worker is required.",
@@ -543,7 +549,7 @@
     {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -598,6 +604,18 @@
     },
     {
       "name": "use-calibrate",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-covenant-engine-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-covenant-template",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-covenants",
       "type": "registry:hook"
     },
     {
@@ -874,6 +892,10 @@
     },
     {
       "name": "contract-scenario-grid",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-covenant-engine",
       "type": "registry:lib"
     },
     {
@@ -1565,6 +1587,10 @@
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",
       "sha256": "935031d6a641f06aeb4aab35c03a00f02db3506dd0310192ef51dd9fa0c4b298"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenants.json",
+      "sha256": "3d7aa1a9f985846d4e9b921ffc2590f61a14df31051968ed3df42006da1d1bb9"
     }
   ]
 }

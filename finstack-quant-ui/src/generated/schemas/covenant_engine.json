@@ -1,0 +1,893 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Covenant engine for evaluation and consequence application.",
+  "properties": {
+    "breach_history": {
+      "default": [],
+      "description": "Historical breaches",
+      "items": {
+        "$ref": "#/$defs/d_213f3b72cada138d8e2c"
+      },
+      "type": "array"
+    },
+    "specs": {
+      "description": "Active covenant specifications",
+      "items": {
+        "$ref": "#/$defs/d_f9a859b047bead1188ce"
+      },
+      "type": "array"
+    },
+    "waivers": {
+      "default": [],
+      "description": "Active waivers and amendments",
+      "items": {
+        "$ref": "#/$defs/d_716a3fc5837303815e4b"
+      },
+      "type": "array"
+    },
+    "windows": {
+      "default": [],
+      "description": "Covenant testing windows",
+      "items": {
+        "$ref": "#/$defs/d_469936ac596d48a38888"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "specs"
+  ],
+  "title": "CovenantEngine",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
+  "$defs": {
+    "d_105cd3ccbff15da6bdf7": {
+      "description": "Type of financial or operational covenant",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Maximum debt-to-EBITDA ratio",
+          "properties": {
+            "max_debt_to_ebitda": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed ratio",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_debt_to_ebitda"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum interest coverage ratio (EBIT/Interest)",
+          "properties": {
+            "min_interest_coverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required ratio",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_interest_coverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum fixed charge coverage ratio",
+          "properties": {
+            "min_fixed_charge_coverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required coverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_fixed_charge_coverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximum total leverage ratio",
+          "properties": {
+            "max_total_leverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed leverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_total_leverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximum senior leverage ratio",
+          "properties": {
+            "max_senior_leverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed senior leverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_senior_leverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum asset coverage ratio",
+          "properties": {
+            "min_asset_coverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required coverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_asset_coverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Negative covenant (prohibition)",
+          "properties": {
+            "negative": {
+              "additionalProperties": false,
+              "properties": {
+                "restriction": {
+                  "description": "Description of restriction",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "restriction"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "negative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Affirmative covenant (requirement)",
+          "properties": {
+            "affirmative": {
+              "additionalProperties": false,
+              "properties": {
+                "requirement": {
+                  "description": "Description of requirement",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "requirement"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "affirmative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Custom covenant with metric and threshold test",
+          "properties": {
+            "custom": {
+              "additionalProperties": false,
+              "properties": {
+                "metric": {
+                  "description": "Name of metric to test",
+                  "type": "string"
+                },
+                "test": {
+                  "$ref": "#/$defs/d_88381bbea720043b178a",
+                  "description": "Threshold test (min or max)"
+                }
+              },
+              "required": [
+                "metric",
+                "test"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Basket tracking covenant (e.g., available debt baskets)",
+          "properties": {
+            "basket": {
+              "additionalProperties": false,
+              "properties": {
+                "limit": {
+                  "description": "Maximum allowed utilization of the basket",
+                  "format": "double",
+                  "type": "number"
+                },
+                "name": {
+                  "description": "Basket identifier/metric name",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "limit"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "basket"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum debt service coverage ratio (EBITDA / Debt Service)",
+          "properties": {
+            "min_dscr": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required coverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_dscr"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximum net debt to EBITDA ratio (net of cash)",
+          "properties": {
+            "max_net_debt_to_ebitda": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed ratio",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_net_debt_to_ebitda"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximum capital expenditure",
+          "properties": {
+            "max_capex": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed capex amount",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_capex"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum liquidity (cash + available revolver)",
+          "properties": {
+            "min_liquidity": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required liquidity",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_liquidity"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_1fdf0b9bb33d72d96c05": {
+      "description": "Piecewise-constant threshold schedule for covenants.\n\nEntries are stored sorted by date ascending. The effective threshold for a\ntest date is the last entry with date <= test_date. If no entry applies,\n[`ThresholdSchedule::threshold_for`] returns `None`.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "$ref": "#/$defs/d_9ad028eee46397180b42"
+          },
+          {
+            "format": "double",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "d_213f3b72cada138d8e2c": {
+      "additionalProperties": false,
+      "description": "Covenant breach tracking.",
+      "properties": {
+        "actual_value": {
+          "description": "Actual value that caused the breach",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "applied_consequences": {
+          "description": "Successfully applied prefix of `consequences`; retries resume after it.",
+          "items": {
+            "$ref": "#/$defs/d_916628d26f1bb84896b6"
+          },
+          "type": "array"
+        },
+        "breach_date": {
+          "$ref": "#/$defs/d_9ad028eee46397180b42",
+          "description": "Date of the breach"
+        },
+        "consequences": {
+          "description": "Consequences captured from the effective specification at the breach date.\nThis immutable execution order survives later amendments and window changes.",
+          "items": {
+            "$ref": "#/$defs/d_916628d26f1bb84896b6"
+          },
+          "type": "array"
+        },
+        "covenant_id": {
+          "default": "",
+          "description": "Stable identifier matching [`Covenant::instance_key`].",
+          "type": "string"
+        },
+        "covenant_type": {
+          "description": "Human-readable description (from `Display`).",
+          "type": "string"
+        },
+        "cure_deadline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9ad028eee46397180b42"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cure period end date (if applicable)"
+        },
+        "is_cured": {
+          "description": "Whether the breach has been cured",
+          "type": "boolean"
+        },
+        "threshold": {
+          "description": "Required threshold",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "covenant_type",
+        "breach_date",
+        "is_cured",
+        "consequences",
+        "applied_consequences"
+      ],
+      "type": "object"
+    },
+    "d_2b108e66e5a95c3be10e": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
+    "d_469936ac596d48a38888": {
+      "additionalProperties": false,
+      "description": "Covenant window for scheduled testing.",
+      "properties": {
+        "covenants": {
+          "description": "Covenants active during this window",
+          "items": {
+            "$ref": "#/$defs/d_f9a859b047bead1188ce"
+          },
+          "type": "array"
+        },
+        "end": {
+          "$ref": "#/$defs/d_9ad028eee46397180b42",
+          "description": "End date of the window"
+        },
+        "start": {
+          "$ref": "#/$defs/d_9ad028eee46397180b42",
+          "description": "Start date of the window"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "covenants"
+      ],
+      "type": "object"
+    },
+    "d_49d38ea265511d4c2f14": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
+    },
+    "d_716a3fc5837303815e4b": {
+      "additionalProperties": false,
+      "description": "A covenant waiver or amendment granted by lenders.",
+      "properties": {
+        "amended_threshold": {
+          "description": "Amended threshold (if this is an amendment rather than a full waiver).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "covenant_id": {
+          "description": "Stable instance identifier of the waived covenant\n(from [`Covenant::instance_key`]).",
+          "type": "string"
+        },
+        "description": {
+          "description": "Free-text description of the waiver terms.",
+          "type": "string"
+        },
+        "effective_date": {
+          "$ref": "#/$defs/d_9ad028eee46397180b42",
+          "description": "Start date of the waiver period."
+        },
+        "expiry_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9ad028eee46397180b42"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "End date of the waiver period (None = permanent amendment)."
+        }
+      },
+      "required": [
+        "covenant_id",
+        "effective_date",
+        "description"
+      ],
+      "type": "object"
+    },
+    "d_73e2a3d0b082dde59923": {
+      "additionalProperties": false,
+      "description": "Financial covenant specification with test frequency and consequences.",
+      "properties": {
+        "consequences": {
+          "description": "Actions taken if covenant is breached",
+          "items": {
+            "$ref": "#/$defs/d_916628d26f1bb84896b6"
+          },
+          "type": "array"
+        },
+        "covenant_type": {
+          "$ref": "#/$defs/d_105cd3ccbff15da6bdf7",
+          "description": "Type of covenant (leverage, coverage, etc.)"
+        },
+        "cure_period_days": {
+          "description": "Optional cure period in days before default",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "is_active": {
+          "description": "Whether the covenant is currently active",
+          "type": "boolean"
+        },
+        "label": {
+          "description": "Optional instance label disambiguating covenants of the same type.\n\n[`CovenantType::covenant_id`] is discriminant-only, so two covenants of\nthe same type (e.g. a senior and a total leverage test, or two baskets)\nwould collide in compliance reports and breach tracking without a\ndistinct label. Waivers and breaches key off it.",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/d_8db385584c6797088eb1",
+          "description": "Whether the covenant is maintenance or incurrence."
+        },
+        "springing_condition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_a9069f9359594ad82f56"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional activation condition for springing covenants."
+        },
+        "test_frequency": {
+          "$ref": "#/$defs/d_afd0c826962e4f0c27cd",
+          "description": "How frequently the covenant is tested.\n\nDescriptive metadata only: the engine does **not** enforce this\nschedule. Callers control test dates by choosing when to invoke\n[`super::CovenantEngine::evaluate`]."
+        }
+      },
+      "required": [
+        "covenant_type",
+        "test_frequency",
+        "consequences",
+        "is_active",
+        "scope",
+        "label"
+      ],
+      "type": "object"
+    },
+    "d_88381bbea720043b178a": {
+      "description": "Threshold test type (maximum or minimum bound)",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Maximum allowed value",
+          "properties": {
+            "maximum": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "maximum"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum required value",
+          "properties": {
+            "minimum": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "minimum"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_8db385584c6797088eb1": {
+      "description": "Whether a covenant is tested periodically or only upon an action.",
+      "oneOf": [
+        {
+          "const": "maintenance",
+          "description": "Tested on a schedule (e.g., quarterly leverage tests).",
+          "type": "string"
+        },
+        {
+          "const": "incurrence",
+          "description": "Tested only upon specific actions (e.g., incurrence of debt).",
+          "type": "string"
+        }
+      ]
+    },
+    "d_916628d26f1bb84896b6": {
+      "description": "Consequence of covenant breach",
+      "oneOf": [
+        {
+          "const": "default",
+          "description": "Event of default",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Interest rate margin increase",
+          "properties": {
+            "rate_increase": {
+              "additionalProperties": false,
+              "properties": {
+                "bp_increase": {
+                  "description": "Increase in basis points",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "bp_increase"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "rate_increase"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Mandatory cash sweep of excess cash flow",
+          "properties": {
+            "cash_sweep": {
+              "additionalProperties": false,
+              "properties": {
+                "sweep_percentage": {
+                  "description": "Percentage of cash flow to sweep",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sweep_percentage"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "cash_sweep"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "block_distributions",
+          "description": "Block distributions to equity holders",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Require additional collateral",
+          "properties": {
+            "require_collateral": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "description": "Description of collateral requirement",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "description"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "require_collateral"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Accelerate loan maturity date",
+          "properties": {
+            "accelerate_maturity": {
+              "additionalProperties": false,
+              "properties": {
+                "new_maturity": {
+                  "$ref": "#/$defs/d_9ad028eee46397180b42",
+                  "description": "New accelerated maturity date"
+                }
+              },
+              "required": [
+                "new_maturity"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "accelerate_maturity"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_9ad028eee46397180b42": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "d_a9069f9359594ad82f56": {
+      "additionalProperties": false,
+      "description": "Optional activation condition for springing covenants.",
+      "properties": {
+        "metric_id": {
+          "$ref": "#/$defs/d_2b108e66e5a95c3be10e",
+          "description": "Metric that controls activation (e.g., revolver utilization), named by\nits statements node ID."
+        },
+        "test": {
+          "$ref": "#/$defs/d_88381bbea720043b178a",
+          "description": "Threshold test applied to the metric."
+        }
+      },
+      "required": [
+        "metric_id",
+        "test"
+      ],
+      "type": "object"
+    },
+    "d_afd0c826962e4f0c27cd": {
+      "additionalProperties": false,
+      "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
+      "properties": {
+        "count": {
+          "description": "Number of `unit` periods in the tenor. Must be at least 1; `0` is\nrejected because a zero-length period makes schedule generation loop.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unit": {
+          "$ref": "#/$defs/d_49d38ea265511d4c2f14",
+          "description": "Calendar unit the count is expressed in, such as days, weeks, months,\nor years."
+        }
+      },
+      "required": [
+        "count",
+        "unit"
+      ],
+      "type": "object"
+    },
+    "d_f9a859b047bead1188ce": {
+      "additionalProperties": false,
+      "description": "Covenant evaluation specification.",
+      "properties": {
+        "covenant": {
+          "$ref": "#/$defs/d_73e2a3d0b082dde59923",
+          "description": "The covenant to evaluate"
+        },
+        "denominator_metric_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_2b108e66e5a95c3be10e"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Earnings denominator used to validate a leverage ratio. Required for net\ndebt/EBITDA, where a negative ratio can mean net cash or negative earnings.\nValues must be finite and in the same reporting-period convention as the\nratio. A non-positive denominator makes the test a breach with no headroom."
+        },
+        "metric_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_2b108e66e5a95c3be10e"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Metric ID to use for evaluation (for financial covenants), conventionally\na statements node ID such as `debt_to_ebitda`, `ebitda`,\n`interest_coverage`, or `dscr`."
+        },
+        "threshold_schedule": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_1fdf0b9bb33d72d96c05"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Time-varying threshold schedule that overrides the static threshold in\n[`CovenantType`] when present. Enables leverage step-down schedules."
+        }
+      },
+      "required": [
+        "covenant"
+      ],
+      "type": "object"
+    }
+  }
+}

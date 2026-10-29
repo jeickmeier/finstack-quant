@@ -61147,6 +61147,72 @@
       }
     }
   ],
+  "covenantEngine": {
+    "specs": [
+      {
+        "covenant": {
+          "covenant_type": {
+            "min_interest_coverage": {
+              "threshold": 3
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "consequences": [],
+          "is_active": true,
+          "scope": "maintenance",
+          "label": "min_interest_coverage"
+        },
+        "metric_id": "interest_coverage"
+      }
+    ],
+    "windows": [
+      {
+        "start": "2024-10-01",
+        "end": "2025-12-31",
+        "covenants": [
+          {
+            "covenant": {
+              "covenant_type": {
+                "max_debt_to_ebitda": {
+                  "threshold": 3.5
+                }
+              },
+              "test_frequency": {
+                "count": 3,
+                "unit": "months"
+              },
+              "consequences": [],
+              "is_active": true,
+              "scope": "maintenance",
+              "label": "max_debt_to_ebitda"
+            },
+            "metric_id": "leverage"
+          },
+          {
+            "covenant": {
+              "covenant_type": {
+                "min_interest_coverage": {
+                  "threshold": 3
+                }
+              },
+              "test_frequency": {
+                "count": 3,
+                "unit": "months"
+              },
+              "consequences": [],
+              "is_active": true,
+              "scope": "maintenance",
+              "label": "min_interest_coverage"
+            },
+            "metric_id": "interest_coverage"
+          }
+        ]
+      }
+    ]
+  },
   "pricingExamples": {
     "agency_cmo": {
       "instrument": {

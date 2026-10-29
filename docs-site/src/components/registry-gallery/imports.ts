@@ -35,6 +35,7 @@ export const importHarnesses = {
       import("@/workers/services/core"),
       import("@/workers/services/valuations"),
       import("@/workers/services/cashflows"),
+      import("@/workers/services/covenants"),
       import("@/workers/services/scenarios"),
       import("@/workers/services/attribution"),
       import("@/workers/services/analytics"),
@@ -98,6 +99,27 @@ export const importHarnesses = {
     Promise.all([
       import("@/hooks/calibration/use-calibrate/use-calibrate"),
     ]).then((modules) => ({ name: "use-calibrate", modules: modules.length })),
+  "use-covenant-engine-validator": () =>
+    Promise.all([
+      import("@/hooks/covenants/use-covenant-engine-validator/use-covenant-engine-validator"),
+    ]).then((modules) => ({
+      name: "use-covenant-engine-validator",
+      modules: modules.length,
+    })),
+  "use-covenant-template": () =>
+    Promise.all([
+      import("@/hooks/covenants/use-covenant-template/use-covenant-template"),
+    ]).then((modules) => ({
+      name: "use-covenant-template",
+      modules: modules.length,
+    })),
+  "use-evaluate-covenants": () =>
+    Promise.all([
+      import("@/hooks/covenants/use-evaluate-covenants/use-evaluate-covenants"),
+    ]).then((modules) => ({
+      name: "use-evaluate-covenants",
+      modules: modules.length,
+    })),
   "use-market-scenario": () =>
     Promise.all([
       import("@/hooks/scenarios/use-market-scenario/use-market-scenario"),
@@ -567,6 +589,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/scenario_grid"),
     ]).then((modules) => ({
       name: "contract-scenario-grid",
+      modules: modules.length,
+    })),
+  "contract-covenant-engine": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/covenant_engine.json"),
+      import("@/lib/finstack/generated/types/covenant_engine"),
+      import("@/lib/finstack/generated/meta/covenant_engine"),
+    ]).then((modules) => ({
+      name: "contract-covenant-engine",
       modules: modules.length,
     })),
   "contract-covenant-report": () =>
