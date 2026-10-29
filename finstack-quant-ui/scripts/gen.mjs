@@ -97,6 +97,7 @@ export async function generate(repo = repoRoot) {
           "check_suite_spec",
           "rollup_spec",
           "scenario_set",
+          "scenario_diff",
           "table_envelope",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )

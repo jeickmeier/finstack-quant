@@ -40,3 +40,25 @@ await write(
     ),
   ),
 );
+// Native scenarioDiff over the analyst scenario set (base → downside → severe):
+// each scenario against its parent, over the P&L lines for the 2025 quarters.
+const scenarioSetJson = await read("analyst-scenarios.json");
+const scenarioResults = native.evaluateScenarioSet(modelJson, scenarioSetJson);
+await write(
+  "analyst-scenario-diff.json",
+  serializeHost(
+    [
+      ["base", "downside"],
+      ["downside", "severe"],
+    ].map(([baseline, comparison]) =>
+      native.scenarioDiff(
+        scenarioSetJson,
+        scenarioResults,
+        baseline,
+        comparison,
+        ["revenue", "cogs", "gross_profit", "opex", "ebitda", "net_income"],
+        ["2025Q1", "2025Q2", "2025Q3", "2025Q4"],
+      ),
+    ),
+  ),
+);

@@ -331,9 +331,15 @@
       "worker": "host"
     },
     {
+      "name": "variance-table",
+      "type": "registry:component",
+      "docs": "Present a native VarianceReport (for example ScenarioDiff.variance) as is: rows in native order, baseline and comparison columns under their native labels, abs_var as the variance and pct_var as a percent of the fraction Rust returns, with an unset pct_var (baseline effectively zero) shown as n/m. Metric labels default to labelFor; a host may inject metricLabel and formatValue. It sorts, totals and computes nothing. No worker is required.",
+      "worker": "none"
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -428,6 +434,14 @@
     },
     {
       "name": "use-trace-statement",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-diff-statement-scenarios",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-trace-statement-scenario",
       "type": "registry:hook"
     },
     {
@@ -779,6 +793,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-scenario-diff",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-scenario-set",
       "type": "registry:lib"
     },
@@ -875,6 +893,14 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-pl-summary.json",
       "sha256": "ae0b624dc30e44539a907b91c25f18a8503ef58bd1e60c8d95e2ee28b2ed0b62"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",
+      "sha256": "d41ea1aba2c86012f561aeb72f7bdaf35f6496b7a8f695710eede96f8c8ec982"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenario-diff.json",
+      "sha256": "b0944c409c3d2275d23f6c9b7bccb9ba6fabf33f2b6846a93ca231177d0b3588"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",

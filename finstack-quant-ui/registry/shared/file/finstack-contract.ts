@@ -14,6 +14,7 @@ import type {
   DependencyTree,
   CheckReport,
   CalendarYearLadderRow,
+  statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
@@ -76,6 +77,30 @@ export interface StatementScenarioRequest {
   readonly marketJson?: string;
   readonly asOf?: string;
 }
+/** One baseline/comparison pair of scenario names, both keyed in the scenario set. */
+export interface StatementScenarioPair {
+  readonly baseline: string;
+  readonly comparison: string;
+}
+/** Native ScenarioSet JSON, its evaluated results and the pairs, metrics and periods to diff. */
+export interface StatementScenarioDiffRequest {
+  readonly scenarioSetJson: string;
+  /** Host-serialized scenario name to StatementResult map from evaluateStatementScenarios. */
+  readonly resultsJson: string;
+  readonly pairs: readonly StatementScenarioPair[];
+  /** Node ids in row order; every one must have a value at every period in both scenarios. */
+  readonly metrics: readonly string[];
+  readonly periods: readonly string[];
+}
+/** One scenario of native ScenarioSet JSON whose inheritance lineage is traced. */
+export interface StatementScenarioTraceRequest {
+  readonly scenarioSetJson: string;
+  readonly scenario: string;
+}
+/** Native variance-style diff of one scenario pair (not a top-level package export). */
+export type StatementScenarioDiff = ReturnType<
+  typeof statements_analytics.scenarioDiff
+>;
 /** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
 export interface StatementRollupRequest {
   readonly modelJson: string;
@@ -205,6 +230,14 @@ export interface StatementsApi {
   evaluateStatementScenarios(
     request: StatementScenarioRequest,
   ): Promise<Envelope<StatementScenarioResults>>;
+  /** statements_analytics.scenarioDiff once per pair, in pair order. */
+  diffStatementScenarios(
+    request: StatementScenarioDiffRequest,
+  ): Promise<Envelope<StatementScenarioDiff[]>>;
+  /** statements_analytics.scenarioSetTrace: scenario names from the root ancestor down to the scenario. */
+  traceStatementScenario(
+    request: StatementScenarioTraceRequest,
+  ): Promise<Envelope<string[]>>;
   /** statements.statementResultRollup: an evaluated result at a coarser frequency. */
   rollupStatement(
     request: StatementRollupRequest,

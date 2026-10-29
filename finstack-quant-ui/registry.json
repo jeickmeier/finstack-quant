@@ -3659,6 +3659,39 @@
       }
     },
     {
+      "name": "contract-scenario-diff",
+      "type": "registry:lib",
+      "title": "Scenario diff contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_diff contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_diff.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_diff.json"
+        },
+        {
+          "path": "src/generated/types/scenario_diff.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_diff.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_diff.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_diff.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-scenario-set",
       "type": "registry:lib",
       "title": "Scenario set contract",

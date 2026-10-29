@@ -163,6 +163,20 @@ export const importHarnesses = {
       name: "use-trace-statement",
       modules: modules.length,
     })),
+  "use-diff-statement-scenarios": () =>
+    Promise.all([
+      import("@/hooks/statements/use-diff-statement-scenarios/use-diff-statement-scenarios"),
+    ]).then((modules) => ({
+      name: "use-diff-statement-scenarios",
+      modules: modules.length,
+    })),
+  "use-trace-statement-scenario": () =>
+    Promise.all([
+      import("@/hooks/statements/use-trace-statement-scenario/use-trace-statement-scenario"),
+    ]).then((modules) => ({
+      name: "use-trace-statement-scenario",
+      modules: modules.length,
+    })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -1077,6 +1091,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/valuation_result"),
     ]).then((modules) => ({
       name: "contract-valuation-result",
+      modules: modules.length,
+    })),
+  "contract-scenario-diff": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_diff.json"),
+      import("@/lib/finstack/generated/types/scenario_diff"),
+      import("@/lib/finstack/generated/meta/scenario_diff"),
+    ]).then((modules) => ({
+      name: "contract-scenario-diff",
       modules: modules.length,
     })),
   "contract-scenario-set": () =>

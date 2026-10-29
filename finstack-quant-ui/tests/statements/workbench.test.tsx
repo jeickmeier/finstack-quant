@@ -52,6 +52,19 @@ beforeEach(() => {
         );
       case "evaluateStatementScenarios":
         return native.evaluateScenarioSet(arg.modelJson, arg.scenarioSetJson);
+      case "traceStatementScenario":
+        return native.scenarioSetTrace(arg.scenarioSetJson, arg.scenario);
+      case "diffStatementScenarios":
+        return arg.pairs.map((pair: { baseline: string; comparison: string }) =>
+          native.scenarioDiff(
+            arg.scenarioSetJson,
+            arg.resultsJson,
+            pair.baseline,
+            pair.comparison,
+            arg.metrics,
+            arg.periods,
+          ),
+        );
       default:
         throw new Error(`Unexpected worker call: ${method}`);
     }
@@ -396,6 +409,18 @@ it("runs scenarios with forecast overrides and compares them natively", async ()
   expect(lineHeaders).toHaveLength(
     within(comparison).getAllByRole("row").length - 1,
   );
+  // scenario_2's default baseline is its parent, read from the native lineage.
+  await within(comparison).findByRole("columnheader", {
+    name: "Δ scenario_2 vs base",
+  });
+  const [delta] = native.scenarioDiff(
+    setJson,
+    results,
+    "base",
+    "scenario_2",
+    ["revenue"],
+    ["2025Q3"],
+  ).variance.rows;
   const revenueRow = within(comparison)
     .getAllByRole("row")
     .find(
@@ -404,8 +429,8 @@ it("runs scenarios with forecast overrides and compares them natively", async ()
   const cells = within(revenueRow)
     .getAllByRole("cell")
     .map((cell) => cell.textContent);
-  expect(cells).toEqual(
-    ["base", "scenario_2"].map((name) =>
+  expect(cells).toEqual([
+    ...["base", "scenario_2"].map((name) =>
       reportStatementCell(
         {
           periodId: "2025Q3",
@@ -416,8 +441,20 @@ it("runs scenarios with forecast overrides and compares them natively", async ()
         "millions",
       ),
     ),
-  );
+    reportStatementCell(
+      {
+        periodId: "2025Q3",
+        present: true,
+        text: "",
+        value: { amount: String(delta.abs_var), currency: "USD" },
+      },
+      "millions",
+    ),
+  ]);
   expect(cells[0]).not.toBe(cells[1]);
+  expect(screen.getByLabelText("Lineage of scenario_2").textContent).toBe(
+    "base › scenario_2",
+  );
   expect(screen.getByRole("region", { name: "base statements" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "scenario_2" }));
   expect(

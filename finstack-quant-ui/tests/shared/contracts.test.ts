@@ -110,8 +110,29 @@ describe("discovered canonical fixtures", () => {
       for (const example of schema.examples)
         expect(validator.parse(example)).toEqual(example);
     }
-    // Rust publishes no example for ScenarioSet; every other root carries one.
-    expect(withoutExamples).toEqual(["schemas/scenario_set.json"]);
+    // Rust publishes no example for ScenarioSet or ScenarioDiff; every other root carries one.
+    expect(withoutExamples).toEqual([
+      "schemas/scenario_diff.json",
+      "schemas/scenario_set.json",
+    ]);
+  });
+  it("accepts the captured native scenario diffs under the generated ScenarioDiff schema unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const schema = JSON.parse(
+      await readFile(resolve(generated, "schemas/scenario_diff.json"), "utf8"),
+    );
+    const diffs = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/src/fixtures/statements/analyst-scenario-diff.json",
+        ),
+        "utf8",
+      ),
+    );
+    const validator = z.fromJSONSchema(converterSchema(schema));
+    expect(diffs).toHaveLength(2);
+    for (const diff of diffs) expect(validator.parse(diff)).toEqual(diff);
   });
   it("round-trips the analyst check suite through the generated CheckSuiteSpec codec", async () => {
     const text = await readFile(

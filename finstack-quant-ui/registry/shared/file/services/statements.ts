@@ -21,6 +21,8 @@ export type StatementsNative = {
     | "runCreditUnderwritingChecks"
     | "evaluateScenarioSet"
     | "evaluateScenarioSetWithMarket"
+    | "scenarioDiff"
+    | "scenarioSetTrace"
   >;
 };
 /** StatementsApi over the statements and statements_analytics facade namespaces. */
@@ -132,6 +134,28 @@ export function createStatementsService(
           asOf,
         );
       });
+    },
+    diffStatementScenarios(request) {
+      return context.result(() =>
+        request.pairs.map((pair) =>
+          native.statements_analytics.scenarioDiff(
+            request.scenarioSetJson,
+            request.resultsJson,
+            pair.baseline,
+            pair.comparison,
+            [...request.metrics],
+            [...request.periods],
+          ),
+        ),
+      );
+    },
+    traceStatementScenario(request) {
+      return context.result(() =>
+        native.statements_analytics.scenarioSetTrace(
+          request.scenarioSetJson,
+          request.scenario,
+        ),
+      );
     },
     rollupStatement(request) {
       return context.result(() =>
