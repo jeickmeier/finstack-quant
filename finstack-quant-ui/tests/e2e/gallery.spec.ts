@@ -256,6 +256,37 @@ test("csa-editor loads a Rust preset and its initial margin terms", async ({
   await expect(im).toBeVisible();
   await expect(im).toHaveScreenshot("csa-editor-im-params.png");
 });
+test("portfolio-risk-report risk budget", async ({ page }) => {
+  const item = await open(
+    page,
+    "portfolio-risk-report",
+    "light",
+    "comfortable",
+  );
+  // The four item baselines stop above the budget table.
+  const budget = item.getByRole("region", { name: "Risk budget", exact: true });
+  await expect(budget.getByRole("table")).toBeVisible();
+  await expect(budget).toHaveScreenshot("portfolio-risk-report-budget.png");
+});
+test("portfolio-risk-report historical stress attribution", async ({
+  page,
+}) => {
+  const item = await open(
+    page,
+    "portfolio-risk-report",
+    "light",
+    "comfortable",
+    {
+      variant: "historical",
+    },
+  );
+  const stress = item.getByRole("region", {
+    name: "Stress attribution",
+    exact: true,
+  });
+  await expect(stress.getByRole("table").first()).toBeVisible();
+  await expect(stress).toHaveScreenshot("portfolio-risk-report-stress.png");
+});
 test("transition-matrix-heatmap cumulative default probability", async ({
   page,
 }) => {

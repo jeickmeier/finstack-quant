@@ -57,6 +57,7 @@ import { Example as Example53 } from "./examples/csa-editor";
 import { Example as Example54 } from "./examples/margin-call-table";
 import { Example as Example55 } from "./examples/portfolio-margin-report";
 import { Example as Example56 } from "./examples/credit-scorecard";
+import { Example as Example57 } from "./examples/portfolio-risk-report";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -115,6 +116,7 @@ const examples = {
   "margin-call-table": Example54,
   "portfolio-margin-report": Example55,
   "credit-scorecard": Example56,
+  "portfolio-risk-report": Example57,
 };
 export function ComponentDemo({
   name,

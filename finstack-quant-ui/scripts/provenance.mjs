@@ -412,6 +412,19 @@ const displays = [
       "Returned models.credit.scoring ScoringResult of one model (Altman Z, Z', Z'' or EM, Ohlson O, Zmijewski) over ratios entered in the fields of its generated input contract and passed in the facade's positional order: score, zone and implied PD as returned (probabilities as fractions), and models.credit.pd.MasterScale.defaultCalibration().mapScore of the result, or Rust's error when the result has no implied PD (the Altman models). No zone, threshold or grade is derived here.",
   },
   {
+    id: "portfolio-risk-report",
+    schema: `${base}models/1/position_risk_decomposition.schema.json`,
+    pointer: "#",
+    api: [
+      "models.factor.risk.parametricVarDecomposition",
+      "FactorRiskNamespace",
+      "parametricVarDecomposition",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned models.factor.risk PositionRiskDecomposition (parametric or historical): portfolio VaR and ES, confidence, method and the Euler residual (null for historical) as returned, component VaR charted and tabulated in returned order with relative, marginal and incremental VaR and the ES contributions; evaluateRiskBudget over positionComponentVar of each position against the supplied target shares (has_breach, total_overbudget, utilization and excess as returned, an omitted threshold left to Rust); buildStressAttribution of a historical source's P&L in Rust's largest-driver-first order with the tail scenarios worst first. Losses negative, in the units of the supplied weights or P&L; nothing summed, flagged or re-sorted.",
+  },
+  {
     id: "transition-matrix-heatmap",
     api: [
       "models.credit.migration.TransitionMatrix#toRows",
