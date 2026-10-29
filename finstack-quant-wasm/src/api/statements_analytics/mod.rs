@@ -7,12 +7,15 @@
 //! `CreditScorecardExtension`.
 
 mod comps;
+mod covenants;
 mod ecl;
 mod handles;
 mod members;
 mod templates;
 
 pub use handles::{JsCorkscrewExtension, JsCreditScorecardExtension, JsDependencyTracer};
+
+pub use covenants::{evaluate_covenants, forecast_breaches};
 
 pub use comps::{
     compute_multiple, peer_stats, percentile_rank, regression_fair_value, score_relative_value,

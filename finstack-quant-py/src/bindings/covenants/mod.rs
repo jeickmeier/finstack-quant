@@ -10,7 +10,7 @@ mod forecast;
 mod report;
 mod spec;
 
-pub(crate) use engine::{PyCovenantBreach, PyCovenantEngine};
+pub(crate) use engine::{dated_reports_frame, PyCovenantBreach, PyCovenantEngine};
 pub(crate) use forecast::{PyCovenantForecast, PyCovenantForecastConfig, PyFutureBreach};
 pub(crate) use report::PyCovenantReport;
 pub(crate) use spec::{
