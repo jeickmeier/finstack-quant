@@ -17,6 +17,7 @@ export const instruments = {
   listStandardMetrics: wasm.listStandardMetrics,
   listStandardMetricsGrouped: wasm.listStandardMetricsGrouped,
   metricMetadata: wasm.metricMetadata,
+  metricsForInstrument: wasm.metricsForInstrument,
   trancheDiscountMargin: wasm.trancheDiscountMargin,
   trancheBreakevenCdr: wasm.trancheBreakevenCdr,
   trancheOas: wasm.trancheOas,

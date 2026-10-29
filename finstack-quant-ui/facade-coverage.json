@@ -122,7 +122,8 @@
     "statements_analytics.plSummaryReport": "sd-credit-assessment",
     "statements_analytics.runSensitivity": "sd-sensitivity-goal-seek",
     "statements_analytics.runVariance": "sd-roll-forward-variance",
-    "statements_analytics.varianceBridge": "sd-roll-forward-variance"
+    "statements_analytics.varianceBridge": "sd-roll-forward-variance",
+    "valuations.instruments.metricsForInstrument": "vd-metric-picker-per-instrument"
   },
   "excluded": {
     "calibration.calibrationStepBaseCorrelation": "schema-form",

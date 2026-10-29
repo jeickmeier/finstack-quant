@@ -54,6 +54,20 @@ test('listStandardMetricsGrouped returns a plain object of string arrays', () =>
   }
 });
 
+test('metricsForInstrument returns the grouped metrics registered for one type', () => {
+  const offersWal = (type) => {
+    const grouped = wasm.metricsForInstrument(type);
+    assertPlainObject(grouped, `metricsForInstrument(${type}) result`);
+    return Object.values(grouped).some((ids) => ids.includes('wal'));
+  };
+  assert.equal(offersWal('fx_option'), false);
+  assert.equal(offersWal('structured_credit'), true);
+  assert.throws(
+    () => wasm.metricsForInstrument('not_an_instrument'),
+    (error) => error.name === 'FinstackError' && error.kind === 'validation'
+  );
+});
+
 test('FxOption price and greeks return plain objects', () => {
   // Reuse the canonical FX-option golden fixture (instrument + calibration
   // envelope) so the market shape cannot drift from the pricing pipeline.

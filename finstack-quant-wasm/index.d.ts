@@ -23174,6 +23174,22 @@ export interface ValuationInstrumentsNamespace {
    */
   metricMetadata(keys: string[]): MetricMetadata[];
   /**
+   * List the standard metrics registered for one instrument type, grouped by
+   * display category.
+   * @example
+   * ```typescript
+   * import init, { valuations } from "finstack-quant-wasm";
+   * await init();
+   * const grouped = valuations.instruments.metricsForInstrument('structured_credit');
+   * const offersWal = Object.values(grouped).some((ids) => ids.includes('wal'));
+   * console.log(offersWal); // true
+   * ```
+   * @param instrumentType - Canonical instrument-type tag, matched exactly in snake case (for example `"bond"`, `"fx_option"` or `"structured_credit"`); the same tag an instrument envelope carries in its `type` field.
+   * @returns Applicable metric identifiers keyed by human-readable group name, each array sorted ascending.
+   * @throws Error - Throws a validation error when `instrumentType` is not a known instrument type, or a `TypeError` when it is not a string.
+   */
+  metricsForInstrument(instrumentType: string): Record<string, string[]>;
+  /**
    * Z-spread-equivalent discount margin for a floating-rate tranche, returned in
    * decimal units (`0.015` = 150 bp).
    *

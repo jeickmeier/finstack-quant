@@ -266,6 +266,46 @@ def list_standard_metrics_grouped() -> dict[str, list[str]]:
     """
     ...
 
+def metrics_for_instrument(instrument_type: str) -> dict[str, list[str]]:
+    """
+    Return the standard metric IDs registered for one instrument type, by group.
+
+    The per-instrument counterpart to :func:`list_standard_metrics_grouped`:
+    each display group keeps only the metrics the standard registry applies
+    to ``instrument_type``, and groups left empty are omitted. A listed
+    metric is registered for the type; whether it computes under a given
+    pricing model still depends on that model. Metrics outside every display
+    group are not listed.
+
+    Parameters
+    ----------
+    instrument_type : str
+        Canonical instrument-type tag, matched exactly in snake case (for
+        example ``"bond"``, ``"fx_option"`` or ``"structured_credit"``); the
+        same tag an instrument envelope carries in its ``type`` field.
+
+    Returns
+    -------
+    dict[str, list[str]]
+        Mapping from group label to that group's sorted applicable metric
+        IDs, in ascending group-label order.
+
+    Raises
+    ------
+    ValueError
+        If ``instrument_type`` is not a known instrument type.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import metrics_for_instrument
+    >>> def offers_wal(instrument_type):
+    ...     grouped = metrics_for_instrument(instrument_type)
+    ...     return any("wal" in ids for ids in grouped.values())
+    >>> (offers_wal("fx_option"), offers_wal("structured_credit"))
+    (False, True)
+    """
+    ...
+
 def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     """
     Describe canonical metric keys using Rust-owned units and coordinates.
