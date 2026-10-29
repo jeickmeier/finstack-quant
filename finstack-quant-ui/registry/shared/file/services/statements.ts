@@ -11,6 +11,7 @@ export type StatementsNative = {
     | "parseFormula"
     | "Evaluator"
     | "statementResultRollup"
+    | "monteCarloBreachProbability"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
@@ -295,6 +296,30 @@ export function createStatementsService(
           [...request.actual],
           [...request.forecast],
         ),
+      );
+    },
+    evaluateMonteCarlo(request) {
+      return context.result(() => {
+        const evaluator = new native.statements.Evaluator();
+        try {
+          return evaluator.evaluateMonteCarlo(
+            request.modelJson,
+            request.configJson,
+          );
+        } finally {
+          evaluator.free();
+        }
+      });
+    },
+    monteCarloBreachProbability(request) {
+      // Rust's None (no path data for the metric) crosses as undefined; the envelope carries null.
+      return context.result(
+        () =>
+          native.statements.monteCarloBreachProbability(
+            request.resultsJson,
+            request.metric,
+            request.threshold,
+          ) ?? null,
       );
     },
     rollupStatement(request) {

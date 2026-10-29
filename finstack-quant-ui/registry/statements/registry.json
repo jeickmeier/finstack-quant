@@ -610,6 +610,55 @@
       }
     },
     {
+      "name": "statement-monte-carlo",
+      "type": "registry:component",
+      "title": "Statement Monte Carlo",
+      "description": "Edits a Rust MonteCarloConfig and presents native Monte Carlo statement results: a percentile fan, the percentile table, a breach probability and the warnings.",
+      "docs": "Edit a MonteCarloConfig with the schema form over the generated monte_carlo_config contract (path count, the uint64 seed kept as an exact integer, percentiles and include path data; the form starts empty, Rust's example is not preloaded); Simulate passes the structurally valid JSON to the caller (usually the useEvaluateMonteCarlo request), and Rust validates it. The native MonteCarloResults (statements.Evaluator.evaluateMonteCarlo) are shown as returned: for the chosen metric (the first returned by default), a fan of bands between the returned percentiles paired from the outside in, with the unpaired middle percentile as a line, over the forecast periods, the percentile table (percentiles shown as percents of Rust's fractions), the breach probability Rust reports for a threshold (statements.monteCarloBreachProbability; null when the results carry no path data) and the simulation warnings in a collapsed list. Nothing is simulated, interpolated or summed. Accepts defaultConfig, onSubmit, results, loading, error, defaultBreach, onBreach, breachProbability, breachLoading, breachError, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/statement-monte-carlo/statement-monte-carlo.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-monte-carlo/statement-monte-carlo.tsx"
+        },
+        {
+          "path": "components/statement-monte-carlo/monte-carlo-config.ts",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-monte-carlo/monte-carlo-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/schema-form",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/contract-monte-carlo-config",
+        "@finstack/contract-monte-carlo-results",
+        "@finstack/finstack-codec",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-evaluate-statement",
       "type": "registry:hook",
       "title": "useEvaluateStatement",
@@ -1135,11 +1184,61 @@
       }
     },
     {
+      "name": "use-evaluate-monte-carlo",
+      "type": "registry:hook",
+      "title": "useEvaluateMonteCarlo",
+      "description": "Simulates a statement model's stochastic forecasts natively through the WASM worker.",
+      "docs": "Native statements.Evaluator.evaluateMonteCarlo of the model under a Rust MonteCarloConfig JSON (path count, the uint64 seed as an exact integer token, optional percentiles and include_path_data). Returns MonteCarloResults: percentile summaries per metric over the forecast periods, warnings and, when requested, the path table. Keyed by the complete request and worker session; null disables the query. Native errors (zero paths, a capital structure, a failing path) are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-evaluate-monte-carlo/use-evaluate-monte-carlo.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-evaluate-monte-carlo/use-evaluate-monte-carlo.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-monte-carlo-breach-probability",
+      "type": "registry:hook",
+      "title": "useMonteCarloBreachProbability",
+      "description": "Tests a breach threshold on native Monte Carlo statement paths through the WASM worker.",
+      "docs": "Native statements.monteCarloBreachProbability of host-serialized MonteCarloResults, a metric and a threshold in the metric's own units: the fraction of paths above the threshold in any forecast period, or null when Rust returns none (no path data for the metric, no forecast periods). Keyed by the complete request (a non-finite threshold kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-monte-carlo-breach-probability/use-monte-carlo-breach-probability.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-monte-carlo-breach-probability/use-monte-carlo-breach-probability.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -1180,6 +1279,11 @@
           "path": "blocks/statements-workbench/roll-forward-review.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/roll-forward-review.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/monte-carlo-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/monte-carlo-panel.tsx"
         }
       ],
       "registryDependencies": [
@@ -1197,6 +1301,7 @@
         "@finstack/goal-seek-form",
         "@finstack/variance-bridge-chart",
         "@finstack/forecast-backtest",
+        "@finstack/statement-monte-carlo",
         "@finstack/use-evaluate-statement",
         "@finstack/use-statement-model-validator",
         "@finstack/use-statement-formula-validator",
@@ -1214,6 +1319,8 @@
         "@finstack/use-run-variance",
         "@finstack/use-variance-bridge",
         "@finstack/use-backtest-forecast",
+        "@finstack/use-evaluate-monte-carlo",
+        "@finstack/use-monte-carlo-breach-probability",
         "@finstack/use-linked-selection",
         "@finstack/use-finstack",
         "@finstack/json-viewer",
@@ -1242,6 +1349,8 @@
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",

@@ -529,6 +529,17 @@ one signed bar from zero per driver contribution in Rust's order, Rust's
 unexplained residual and the comparison; no cumulative positioning, since the
 contributions are raw driver deltas) and `ForecastBacktest` for the pre-roll
 forecast against the reported values.
+`useEvaluateMonteCarlo` (`use-evaluate-monte-carlo`) passes the model and
+`MonteCarloConfig` JSON to `statements.Evaluator#evaluateMonteCarlo` (the
+schema form keeps the `uint64` seed an exact integer token, so a seed above
+2^53 reaches Rust unchanged), and `useMonteCarloBreachProbability`
+(`use-monte-carlo-breach-probability`) passes host-serialized results, a
+metric and a threshold to `statements.monteCarloBreachProbability`, returning
+null when Rust reports none (results without path data). The workbench's
+Monte Carlo tab composes `StatementMonteCarlo`: the config form (starting
+empty), a fan of bands between the returned percentiles paired from the
+outside in (the unpaired middle one a line), the percentile table, the breach
+readout and the warnings, all as returned.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useMetrics(instrumentType)` returns the standard metrics Rust registers for
 that type (`metricsForInstrument`), grouped by native category; `null` disables

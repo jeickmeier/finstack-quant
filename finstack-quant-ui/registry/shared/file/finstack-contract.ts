@@ -24,6 +24,7 @@ import type {
   GoalSeekResult,
   VarianceReport,
   ForecastMetrics,
+  MonteCarloResults,
   ArbitrageValidationResult,
   ApplicationReport,
   HorizonReport,
@@ -287,6 +288,20 @@ export type BridgeChart = ReturnType<
 export interface BacktestForecastRequest {
   readonly actual: readonly number[];
   readonly forecast: readonly number[];
+}
+/** A Monte Carlo evaluation of a model's stochastic forecasts under Rust MonteCarloConfig JSON. */
+export interface EvaluateMonteCarloRequest {
+  readonly modelJson: string;
+  /** Rust MonteCarloConfig JSON; the uint64 seed stays an exact integer token. */
+  readonly configJson: string;
+}
+/** Breach test of one metric over host-serialized MonteCarloResults. */
+export interface MonteCarloBreachRequest {
+  /** Host-serialized MonteCarloResults; only results run with path data carry a probability. */
+  readonly resultsJson: string;
+  readonly metric: string;
+  /** Breach level in the metric's own units. */
+  readonly threshold: number;
 }
 /** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
 export interface StatementRollupRequest {
@@ -1200,6 +1215,14 @@ export interface StatementsApi {
   backtestForecast(
     request: BacktestForecastRequest,
   ): Promise<Envelope<ForecastMetrics>>;
+  /** statements.Evaluator.evaluateMonteCarlo: percentile summaries per metric and, when requested, the path table. */
+  evaluateMonteCarlo(
+    request: EvaluateMonteCarloRequest,
+  ): Promise<Envelope<MonteCarloResults>>;
+  /** statements.monteCarloBreachProbability: fraction of paths above the threshold in any forecast period, or null when Rust returns none. */
+  monteCarloBreachProbability(
+    request: MonteCarloBreachRequest,
+  ): Promise<Envelope<number | null>>;
 }
 /** Every worker method, grouped by the crate whose facade namespace it calls. */
 export type WorkerApi = {

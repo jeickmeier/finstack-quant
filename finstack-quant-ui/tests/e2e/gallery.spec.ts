@@ -302,6 +302,28 @@ test("lbo-report returns and checks", async ({ page }) => {
   await expect(checks).toBeVisible();
   await expect(checks).toHaveScreenshot("lbo-report-checks.png");
 });
+test("statement-monte-carlo results", async ({ page }) => {
+  const item = await open(
+    page,
+    "statement-monte-carlo",
+    "light",
+    "comfortable",
+  );
+  // The four item baselines stop inside the fan, above the percentile table,
+  // the breach readout and the warnings.
+  const results = item.getByRole("group", {
+    name: "Returned Monte Carlo results",
+  });
+  await expect(
+    results.getByRole("table", {
+      name: "Leverage percentiles by forecast period",
+    }),
+  ).toBeVisible();
+  await expect(
+    results.getByRole("region", { name: "Breach probability" }),
+  ).toContainText("16.5%");
+  await expect(results).toHaveScreenshot("statement-monte-carlo-results.png");
+});
 test("portfolio-risk-report risk budget", async ({ page }) => {
   const item = await open(
     page,

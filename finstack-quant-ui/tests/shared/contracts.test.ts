@@ -253,6 +253,30 @@ describe("discovered canonical fixtures", () => {
       expect(validator.parse(fixture)).toEqual(fixture);
     }
   });
+  it("accepts the Monte Carlo config input and the captured native results under their generated schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    for (const [schemaName, fixtureName] of [
+      ["schemas/monte_carlo_config.json", "analyst-monte-carlo-config.json"],
+      ["schemas/monte_carlo_results.json", "analyst-monte-carlo.json"],
+    ]) {
+      const validator = z.fromJSONSchema(
+        converterSchema(
+          JSON.parse(await readFile(resolve(generated, schemaName), "utf8")),
+        ),
+      );
+      const fixture = JSON.parse(
+        await readFile(
+          resolve(
+            repo,
+            "finstack-quant-ui/src/fixtures/statements",
+            fixtureName,
+          ),
+          "utf8",
+        ),
+      );
+      expect(validator.parse(fixture)).toEqual(fixture);
+    }
+  });
   it("accepts the captured native covenant series under the generated DatedCovenantReports and CovenantReport schemas unchanged", async () => {
     const generated = resolve(repo, "finstack-quant-ui/src/generated");
     const read = async (name: string) =>

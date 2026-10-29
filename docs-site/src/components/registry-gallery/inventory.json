@@ -529,9 +529,15 @@
       "worker": "none"
     },
     {
+      "name": "statement-monte-carlo",
+      "type": "registry:component",
+      "docs": "Edit a MonteCarloConfig with the schema form over the generated monte_carlo_config contract (path count, the uint64 seed kept as an exact integer, percentiles and include path data; the form starts empty, Rust's example is not preloaded); Simulate passes the structurally valid JSON to the caller (usually the useEvaluateMonteCarlo request), and Rust validates it. The native MonteCarloResults (statements.Evaluator.evaluateMonteCarlo) are shown as returned: for the chosen metric (the first returned by default), a fan of bands between the returned percentiles paired from the outside in, with the unpaired middle percentile as a line, over the forecast periods, the percentile table (percentiles shown as percents of Rust's fractions), the breach probability Rust reports for a threshold (statements.monteCarloBreachProbability; null when the results carry no path data) and the simulation warnings in a collapsed list. Nothing is simulated, interpolated or summed. Accepts defaultConfig, onSubmit, results, loading, error, defaultBreach, onBreach, breachProbability, breachLoading, breachError, formatValue and density props.",
+      "worker": "none"
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -798,6 +804,14 @@
     },
     {
       "name": "use-backtest-forecast",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-monte-carlo",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-monte-carlo-breach-probability",
       "type": "registry:hook"
     },
     {
@@ -1273,6 +1287,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-monte-carlo-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-monte-carlo-results",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-rollup-spec",
       "type": "registry:lib"
     },
@@ -1465,6 +1487,18 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-backtest.json",
       "sha256": "6d5fae1ccb18362f231df2dbaf6ad4b29a8488f5b779777c6260df5ab784ea21"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-config.json",
+      "sha256": "1d6a3005e1cde3f95aafba6b5407bd3c1dc0b1b0639ce3f1878bdacc08588793"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
+      "sha256": "c53139c82b0c9759b5eb8529ea5ed0fd5f5c1e33e18e01c8e9f63577f72ea376"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-breach.json",
+      "sha256": "dec0fb4c2eb53c935fe5b8a247c4f8e0b84baa8f923828d1c4ebb048b9c6abb5"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",

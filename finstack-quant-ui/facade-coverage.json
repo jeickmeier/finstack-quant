@@ -71,6 +71,7 @@
     "scenarios.scenarioSpecMutatesInstruments",
     "scenarios.scenarioSpecRequiresInstruments",
     "statements.Evaluator",
+    "statements.monteCarloBreachProbability",
     "statements.parseAndCompile",
     "statements.parseFormula",
     "statements.statementResultRollup",
@@ -121,8 +122,7 @@
     "scenarios.buildFromTemplate": "SCN-3",
     "scenarios.buildTemplateComponent": "SCN-3",
     "scenarios.composeScenarios": "SCN-3",
-    "scenarios.listBuiltinTemplateMetadata": "SCN-3",
-    "statements.monteCarloBreachProbability": "sd-monte-carlo"
+    "scenarios.listBuiltinTemplateMetadata": "SCN-3"
   },
   "excluded": {
     "calibration.calibrationStepBaseCorrelation": "schema-form",
