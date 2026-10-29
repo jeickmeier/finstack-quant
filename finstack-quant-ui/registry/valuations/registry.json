@@ -334,8 +334,8 @@
       "name": "cashflow-viewer",
       "type": "registry:component",
       "title": "Cashflow viewer",
-      "description": "Table of a supplied native cashflow envelope with row-currency amounts, reporting-currency PV and a JSON export.",
-      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, loading and error props; no worker or query provider required.",
+      "description": "Table of a supplied native cashflow envelope with row-currency amounts, reporting-currency PV, an optional native annual ladder per row currency and a JSON export.",
+      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. An optional ladder prop (the native cashflows.calendarYearLadder rows per row currency, as useCashflowLadder returns them) adds a Schedule / Annual ladder toggle with one table per currency in native PV. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, ladder, loading and error props; no worker or query provider required.",
       "files": [
         {
           "path": "components/cashflow-viewer/cashflow-viewer.tsx",
@@ -354,9 +354,15 @@
         "table",
         "badge",
         "@finstack/contract-instrument-cashflow",
-        "@finstack/finstack-codec"
+        "@finstack/finstack-codec",
+        "@finstack/finstack-table",
+        "@finstack/enum-field"
       ],
-      "dependencies": ["react@19.2.8"],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
@@ -527,6 +533,7 @@
         "tabs",
         "textarea",
         "@finstack/use-cashflows",
+        "@finstack/use-cashflow-ladder",
         "@finstack/finstack-worker"
       ],
       "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.11.0"],
@@ -681,6 +688,31 @@
           "path": "hooks/use-cashflows/use-cashflows.ts",
           "type": "registry:hook",
           "target": "hooks/valuations/use-cashflows/use-cashflows.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-cashflow-ladder",
+      "type": "registry:hook",
+      "title": "useCashflowLadder",
+      "description": "Fetches the native calendar-year cashflow ladder of a supplied cashflow envelope, one per row currency, through the WASM worker.",
+      "docs": "Native cashflows.calendarYearLadder rows for each row currency of the supplied envelope, in first-appearance order, over each flow's native PV (row currency, before FX conversion and any scenario price shock). Keyed on the complete envelope and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider. No sums or FX conversion are computed locally.",
+      "files": [
+        {
+          "path": "hooks/use-cashflow-ladder/use-cashflow-ladder.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-cashflow-ladder/use-cashflow-ladder.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

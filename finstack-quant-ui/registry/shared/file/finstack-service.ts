@@ -6,6 +6,10 @@ import {
   type ValuationsNative,
 } from "./services/valuations";
 import {
+  createCashflowsService,
+  type CashflowsNative,
+} from "./services/cashflows";
+import {
   createCalibrationService,
   type CalibrationNative,
 } from "./services/calibration";
@@ -18,6 +22,7 @@ import {
 export function createService(
   native: { initialize(wasmUrl?: string): Promise<unknown> } & CoreNative &
     ValuationsNative &
+    CashflowsNative &
     CalibrationNative &
     ModelsNative &
     StatementsNative,
@@ -33,6 +38,7 @@ export function createService(
     },
     ...createCoreService(native, context),
     ...createValuationsService(native, context),
+    ...createCashflowsService(native, context),
     ...createCalibrationService(native, context),
     ...createModelsService(native, context),
     ...createStatementsService(native, context),

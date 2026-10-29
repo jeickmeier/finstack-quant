@@ -27,10 +27,18 @@ import {
   cashflowOptions,
   useCashflows,
 } from "@/hooks/valuations/use-cashflows/use-cashflows";
+import {
+  cashflowLadderOptions,
+  useCashflowLadder,
+} from "@/hooks/valuations/use-cashflow-ladder/use-cashflow-ladder";
 import { CashflowViewer } from "@/components/finstack/valuations/components/cashflow-viewer/cashflow-viewer";
 import type { InstrumentCashflowWire } from "@/lib/finstack/generated/types/instrument_cashflow";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
-import { unwrap, type CashflowRequest } from "@/workers/finstack-contract";
+import {
+  unwrap,
+  type CashflowEnvelope,
+  type CashflowRequest,
+} from "@/workers/finstack-contract";
 import { startWorker } from "../shared/worker/harness.mjs";
 import fixture from "./cashflows/cases.json";
 const envelope = (value: unknown) => value as InstrumentCashflowWire;
@@ -52,12 +60,15 @@ beforeAll(async () => {
 }, budget(30000));
 afterAll(async () => harness?.close());
 async function invoke(
-  method: "initialize" | "cashflows",
-  request: CashflowRequest,
+  method: "initialize" | "cashflows" | "cashflowLadder",
+  request: unknown,
 ) {
-  return method === "initialize"
-    ? unwrap(await harness.proxy.initialize())
-    : unwrap(await harness.proxy.cashflows(request));
+  if (method === "initialize") return unwrap(await harness.proxy.initialize());
+  if (method === "cashflowLadder")
+    return unwrap(
+      await harness.proxy.cashflowLadder(request as CashflowEnvelope),
+    );
+  return unwrap(await harness.proxy.cashflows(request as CashflowRequest));
 }
 beforeEach(() => {
   vi.stubGlobal("Worker", class {});
@@ -324,3 +335,131 @@ it.each([
     );
   },
 );
+
+const withFlows = fixture.cases.filter((c) => c.cashflows !== null);
+it.each(withFlows)(
+  "returns the native $type ladder per row currency in first-appearance order",
+  async (entry) => {
+    const cashflows = entry.cashflows as unknown as CashflowEnvelope;
+    const ladder = unwrap(await harness.proxy.cashflowLadder(cashflows));
+    expect(ladder).toEqual(entry.ladder);
+    expect(ladder.map((currency) => currency.currency)).toEqual([
+      ...new Set(cashflows.flows.map((flow) => flow.currency)),
+    ]);
+  },
+);
+it("ladders the two-currency cross-currency swap per currency, never across them", () => {
+  const entry = fixture.cases.find((c) => c.type === "xccy_swap")!;
+  expect(
+    entry.ladder!.map(({ currency, rows }) => [currency, rows.length]),
+  ).toEqual([
+    ["USD", 6],
+    ["EUR", 6],
+  ]);
+});
+it("returns the native validation error for a flow kind Rust does not know", async () => {
+  const cashflows = withFlows[0].cashflows as unknown as CashflowEnvelope;
+  const result = await harness.proxy.cashflowLadder({
+    ...cashflows,
+    flows: cashflows.flows.map((flow, index) =>
+      index === 0 ? { ...flow, kind: "not_a_kind" as never } : flow,
+    ),
+  });
+  expect(result.ok).toBe(false);
+  if (result.ok) return;
+  expect(result.error.kind).toBe("validation");
+  expect(result.error.message).toContain("unknown cashflow kind 'not_a_kind'");
+});
+it("keys the ladder on the worker session and the complete envelope", () => {
+  const client = { call, close() {} } as FinstackClient;
+  const cashflows = withFlows[0].cashflows as unknown as CashflowEnvelope;
+  const options = cashflowLadderOptions(client, 3, cashflows);
+  expect(options.queryKey).toEqual([
+    "finstack",
+    3,
+    "cashflowLadder",
+    cashflows,
+  ]);
+  expect(cashflowLadderOptions(client, 4, cashflows).queryKey).not.toEqual(
+    options.queryKey,
+  );
+  expect(cashflowLadderOptions(client, 3, null).enabled).toBe(false);
+});
+it("offers the annual ladder only when one is supplied and tables each currency in native PV", async () => {
+  const entry = fixture.cases.find((c) => c.type === "xccy_swap")!;
+  const cashflows = envelope(entry.cashflows);
+  const { rerender } = render(<CashflowViewer cashflows={cashflows} />);
+  await screen.findByRole("table", { name: "Cashflow schedule" });
+  expect(screen.queryByRole("radio", { name: "Annual ladder" })).toBeNull();
+  rerender(
+    <CashflowViewer cashflows={cashflows} ladder={entry.ladder as never} />,
+  );
+  expect(
+    (
+      screen.getByRole("radio", { name: "Schedule" }) as HTMLElement
+    ).getAttribute("aria-checked"),
+  ).toBe("true");
+  fireEvent.click(screen.getByRole("radio", { name: "Annual ladder" }));
+  const group = await screen.findByRole("group", { name: "Annual ladder" });
+  expect(screen.queryByRole("table", { name: "Cashflow schedule" })).toBeNull();
+  for (const { currency, rows } of entry.ladder!) {
+    const table = within(group).getByRole("table", {
+      name: `Annual ladder · ${currency}`,
+    });
+    expect(within(table).getByRole("columnheader", { name: "Native PV" }));
+    const body = table.querySelectorAll("tbody tr");
+    expect(body).toHaveLength(rows.length);
+    for (const [i, row] of rows.entries()) {
+      expect(body[i].children[0].textContent).toBe(String(row.year));
+      expect(
+        body[i].children[3].querySelector("[title]")?.getAttribute("title"),
+      ).toBe(String(row.pv));
+      expect(body[i].children[3].textContent).toContain(`${currency} `);
+    }
+  }
+});
+it("shows the pending and native-error ladder states", async () => {
+  const cashflows = envelope(withFlows[0].cashflows);
+  const { rerender } = render(
+    <CashflowViewer cashflows={cashflows} ladder={null} />,
+  );
+  fireEvent.click(await screen.findByRole("radio", { name: "Annual ladder" }));
+  expect(screen.getByText("Loading annual ladder…")).toBeTruthy();
+  rerender(
+    <CashflowViewer
+      cashflows={cashflows}
+      ladder={null}
+      ladderError="bad kind"
+    />,
+  );
+  expect(screen.getByRole("alert").textContent).toBe(
+    "Annual ladder unavailable: bad kind",
+  );
+});
+function ConnectedLadder({ request }: { request: CashflowRequest }) {
+  const cashflows = useCashflows(request);
+  const ladder = useCashflowLadder(cashflows.data);
+  return (
+    <CashflowViewer
+      cashflows={cashflows.data}
+      ladder={ladder.data ?? null}
+      ladderError={ladder.error?.message}
+    />
+  );
+}
+it("chains the worker ladder onto the worker envelope through the hooks", async () => {
+  const entry = fixture.cases.find((c) => c.type === "xccy_swap")!;
+  render(
+    <FinstackQueryProvider>
+      <ConnectedLadder request={exportRequest(entry.request)} />
+    </FinstackQueryProvider>,
+  );
+  fireEvent.click(await screen.findByRole("radio", { name: "Annual ladder" }));
+  await screen.findByRole("table", { name: "Annual ladder · EUR" });
+  expect(
+    screen.getByRole("table", { name: "Annual ladder · USD" }),
+  ).toBeTruthy();
+  expect(
+    call.mock.calls.filter(([method]) => method === "cashflowLadder"),
+  ).toEqual([["cashflowLadder", entry.cashflows]]);
+});

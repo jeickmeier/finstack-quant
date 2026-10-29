@@ -1,5 +1,5 @@
 {
-  "description": "Native cashflow envelope objects; no inferred row schema or financial reconciliation.",
+  "description": "Native cashflow envelope objects and their native calendar-year ladders per row currency; no inferred row schema or financial reconciliation.",
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
@@ -105,6 +105,25 @@
         "total_pv": 1000438.9643912486,
         "reconciles_with_base_value": true
       },
+      "ladder": [
+        {
+          "currency": "USD",
+          "rows": [
+            {
+              "year": 2025,
+              "non_principal": 21250,
+              "principal": -1000000,
+              "pv": 20806.7925372131
+            },
+            {
+              "year": 2026,
+              "non_principal": 21250,
+              "principal": 1000000,
+              "pv": 979632.1718540351
+            }
+          ]
+        }
+      ],
       "error": null
     },
     {
@@ -183,6 +202,30 @@
         "total_pv": 19685.391170221614,
         "reconciles_with_base_value": true
       },
+      "ladder": [
+        {
+          "currency": "USD",
+          "rows": [
+            {
+              "year": 2024,
+              "non_principal": 0,
+              "principal": 20000,
+              "pv": 3116.0194332099054
+            }
+          ]
+        },
+        {
+          "currency": "EUR",
+          "rows": [
+            {
+              "year": 2024,
+              "non_principal": 0,
+              "principal": 0,
+              "pv": 15063.065215464798
+            }
+          ]
+        }
+      ],
       "error": null
     },
     {
@@ -845,6 +888,90 @@
         "total_pv": 415230.5361451007,
         "reconciles_with_base_value": true
       },
+      "ladder": [
+        {
+          "currency": "USD",
+          "rows": [
+            {
+              "year": 2024,
+              "non_principal": 300276.5683587728,
+              "principal": -10000000,
+              "pv": -9699402.640025804
+            },
+            {
+              "year": 2025,
+              "non_principal": 400000.1665527165,
+              "principal": 0,
+              "pv": 383462.45953396044
+            },
+            {
+              "year": 2026,
+              "non_principal": 400000.1665527165,
+              "principal": 0,
+              "pv": 372064.9797722306
+            },
+            {
+              "year": 2027,
+              "non_principal": 400000.1665527165,
+              "principal": 0,
+              "pv": 361021.75773099123
+            },
+            {
+              "year": 2028,
+              "non_principal": 401106.1068574984,
+              "principal": 0,
+              "pv": 351314.35225719353
+            },
+            {
+              "year": 2029,
+              "non_principal": 100829.4779490271,
+              "principal": 10000000,
+              "pv": 8681015.03839343
+            }
+          ]
+        },
+        {
+          "currency": "EUR",
+          "rows": [
+            {
+              "year": 2024,
+              "non_principal": -214192.60679698212,
+              "principal": 9200000,
+              "pv": 8984543.954197
+            },
+            {
+              "year": 2025,
+              "non_principal": -285327.8637854834,
+              "principal": 0,
+              "pv": -273531.20446687395
+            },
+            {
+              "year": 2026,
+              "non_principal": -285327.8637854855,
+              "principal": 0,
+              "pv": -265401.16171189037
+            },
+            {
+              "year": 2027,
+              "non_principal": -285327.8637854855,
+              "principal": 0,
+              "pv": -257523.81671325178
+            },
+            {
+              "year": 2028,
+              "non_principal": -286114.7856150329,
+              "principal": 0,
+              "pv": -250597.60704348222
+            },
+            {
+              "year": 2029,
+              "non_principal": -71922.1475483031,
+              "principal": -9200000,
+              "pv": -7968622.35654961
+            }
+          ]
+        }
+      ],
       "error": null
     },
     {
@@ -863,6 +990,7 @@
         "currency": "USD"
       },
       "cashflows": null,
+      "ladder": null,
       "error": "Validation error: model 'black76' not supported for instrument_cashflows; supported: 'discounting', 'hazard_rate'"
     }
   ]
