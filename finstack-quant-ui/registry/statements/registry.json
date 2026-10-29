@@ -542,6 +542,74 @@
       }
     },
     {
+      "name": "variance-bridge-chart",
+      "type": "registry:component",
+      "title": "Variance bridge chart",
+      "description": "Draws a native statements_analytics BridgeChart as returned: baseline, one signed bar per driver contribution in Rust's order, the unexplained residual and the comparison value.",
+      "docs": "Present a native BridgeChart (statements_analytics.varianceBridge) as returned: a bar from zero to the baseline value, one signed bar from zero per driver contribution in Rust's order, a bar for Rust's unexplained residual and one for the comparison value, coloured by kind, with the same values in a table. Nothing is accumulated or positioned cumulatively: Rust's contributions are raw deltas in driver units, which need not sum to the target's variance, so this is not a waterfall. Non-finite values are left out of the chart and shown in the table. Node labels default to labelFor; a host may inject metricLabel and formatValue. Accepts bridge, metricLabel, formatValue and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/variance-bridge-chart/variance-bridge-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/variance-bridge-chart/variance-bridge-chart.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-worker",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/contract-bridge-chart"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "forecast-backtest",
+      "type": "registry:component",
+      "title": "Forecast backtest",
+      "description": "Presents native statements_analytics forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE and counts) as returned.",
+      "docs": "Show a native ForecastMetrics (statements_analytics.backtestForecast) as returned: one tile per field in the generated forecast_metrics contract's order, labelled through labelFor with the first paragraph of Rust's description (MAPE and sMAPE are percentages in Rust). A null or non-finite metric, such as MAPE when every actual is zero, shows as n/m. Nothing is calculated. Accepts metrics, caption, loading, error and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/forecast-backtest/forecast-backtest.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/forecast-backtest/forecast-backtest.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/contract-forecast-metrics"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-evaluate-statement",
       "type": "registry:hook",
       "title": "useEvaluateStatement",
@@ -992,11 +1060,86 @@
       }
     },
     {
+      "name": "use-run-variance",
+      "type": "registry:hook",
+      "title": "useRunVariance",
+      "description": "Compares two evaluated statement results natively through the WASM worker.",
+      "docs": "Native statements_analytics.runVariance of a baseline and a comparison StatementResult (host-serialized) under a Rust VarianceConfig JSON: labels, metrics and periods. Returns the VarianceReport rows in Rust's order. Keyed by the complete request and worker session; null disables the query. Native errors (an empty metric list, mismatched metric types or a missing value) are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-run-variance/use-run-variance.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-run-variance/use-run-variance.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-variance-bridge",
+      "type": "registry:hook",
+      "title": "useVarianceBridge",
+      "description": "Explains one metric's variance between two evaluated statement results across driver nodes through the WASM worker.",
+      "docs": "Native statements_analytics.varianceBridge of a baseline and a comparison StatementResult with the target metric, period, driver node ids and the two display labels passed positionally. Returns the BridgeChart: both values, driver contributions in driver order and the unexplained residual. Keyed by the complete request and worker session; null disables the query. Native errors (a driver of another type or currency, a missing node) are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-variance-bridge/use-variance-bridge.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-variance-bridge/use-variance-bridge.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-backtest-forecast",
+      "type": "registry:hook",
+      "title": "useBacktestForecast",
+      "description": "Measures a forecast's accuracy against realized values through the WASM worker.",
+      "docs": "Native statements_analytics.backtestForecast of an actual and a forecast series aligned one-for-one in the same units. Returns ForecastMetrics (MAE, MAPE, sMAPE, RMSE and counts; a non-finite metric stays a number). Keyed by the complete request (non-finite values kept distinct) and worker session; null disables the query. Native errors (empty or unequal series, a non-finite value) are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-backtest-forecast/use-backtest-forecast.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-backtest-forecast/use-backtest-forecast.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -1032,6 +1175,11 @@
           "path": "blocks/statements-workbench/sensitivity-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/sensitivity-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/roll-forward-review.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/roll-forward-review.tsx"
         }
       ],
       "registryDependencies": [
@@ -1047,6 +1195,8 @@
         "@finstack/lbo-report",
         "@finstack/statement-sensitivity",
         "@finstack/goal-seek-form",
+        "@finstack/variance-bridge-chart",
+        "@finstack/forecast-backtest",
         "@finstack/use-evaluate-statement",
         "@finstack/use-statement-model-validator",
         "@finstack/use-statement-formula-validator",
@@ -1061,6 +1211,9 @@
         "@finstack/use-evaluate-lbo",
         "@finstack/use-run-sensitivity",
         "@finstack/use-goal-seek",
+        "@finstack/use-run-variance",
+        "@finstack/use-variance-bridge",
+        "@finstack/use-backtest-forecast",
         "@finstack/use-linked-selection",
         "@finstack/use-finstack",
         "@finstack/json-viewer",
@@ -1091,9 +1244,11 @@
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",

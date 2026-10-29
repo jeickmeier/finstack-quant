@@ -517,9 +517,21 @@
       "worker": "none"
     },
     {
+      "name": "variance-bridge-chart",
+      "type": "registry:component",
+      "docs": "Present a native BridgeChart (statements_analytics.varianceBridge) as returned: a bar from zero to the baseline value, one signed bar from zero per driver contribution in Rust's order, a bar for Rust's unexplained residual and one for the comparison value, coloured by kind, with the same values in a table. Nothing is accumulated or positioned cumulatively: Rust's contributions are raw deltas in driver units, which need not sum to the target's variance, so this is not a waterfall. Non-finite values are left out of the chart and shown in the table. Node labels default to labelFor; a host may inject metricLabel and formatValue. Accepts bridge, metricLabel, formatValue and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "forecast-backtest",
+      "type": "registry:component",
+      "docs": "Show a native ForecastMetrics (statements_analytics.backtestForecast) as returned: one tile per field in the generated forecast_metrics contract's order, labelled through labelFor with the first paragraph of Rust's description (MAPE and sMAPE are percentages in Rust). A null or non-finite metric, such as MAPE when every actual is zero, shows as n/m. Nothing is calculated. Accepts metrics, caption, loading, error and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -774,6 +786,18 @@
     },
     {
       "name": "use-goal-seek",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-run-variance",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-variance-bridge",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-backtest-forecast",
       "type": "registry:hook"
     },
     {
@@ -1197,6 +1221,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-bridge-chart",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-credit-assessment",
       "type": "registry:lib"
     },
@@ -1206,6 +1234,10 @@
     },
     {
       "name": "contract-dcf-sensitivity-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-forecast-metrics",
       "type": "registry:lib"
     },
     {
@@ -1226,6 +1258,10 @@
     },
     {
       "name": "contract-sensitivity-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-variance-config",
       "type": "registry:lib"
     },
     {
@@ -1421,6 +1457,14 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek.json",
       "sha256": "79cc93c5b3e7f5c891f92108ca343d7ba67cc22ccaeb23e57b60f7c3f5845361"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-bridge.json",
+      "sha256": "4235f93e6d83edea9dd48c24640b4a203531659ed2b67022ed096166111fd86f"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-backtest.json",
+      "sha256": "6d5fae1ccb18362f231df2dbaf6ad4b29a8488f5b779777c6260df5ab784ea21"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",

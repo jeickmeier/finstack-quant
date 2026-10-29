@@ -77,6 +77,7 @@
     "statements.validateCheckSuiteSpecJson",
     "statements.validateFinancialModelJson",
     "statements_analytics.DependencyTracer",
+    "statements_analytics.backtestForecast",
     "statements_analytics.creditAssessment",
     "statements_analytics.dcfSensitivity",
     "statements_analytics.evaluateDcf",
@@ -92,8 +93,10 @@
     "statements_analytics.runCreditUnderwritingChecks",
     "statements_analytics.runSensitivity",
     "statements_analytics.runThreeStatementChecks",
+    "statements_analytics.runVariance",
     "statements_analytics.scenarioDiff",
     "statements_analytics.scenarioSetTrace",
+    "statements_analytics.varianceBridge",
     "valuations.instruments.StructuredCredit",
     "valuations.instruments.instrumentCashflowsWithMarket",
     "valuations.instruments.listModelsGrouped",
@@ -119,10 +122,7 @@
     "scenarios.buildTemplateComponent": "SCN-3",
     "scenarios.composeScenarios": "SCN-3",
     "scenarios.listBuiltinTemplateMetadata": "SCN-3",
-    "statements.monteCarloBreachProbability": "sd-monte-carlo",
-    "statements_analytics.backtestForecast": "sd-roll-forward-variance",
-    "statements_analytics.runVariance": "sd-roll-forward-variance",
-    "statements_analytics.varianceBridge": "sd-roll-forward-variance"
+    "statements.monteCarloBreachProbability": "sd-monte-carlo"
   },
   "excluded": {
     "calibration.calibrationStepBaseCorrelation": "schema-form",

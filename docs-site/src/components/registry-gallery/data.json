@@ -47730,6 +47730,37 @@
     "evaluations": 7,
     "converged": true
   },
+  "statementBridge": {
+    "target_metric": "ebitda",
+    "period": "2025Q2",
+    "baseline_label": "Before roll forward",
+    "comparison_label": "After roll forward",
+    "baseline_value": 54144512.5,
+    "comparison_value": 55457500,
+    "steps": [
+      {
+        "driver": "revenue",
+        "contribution": 3651000
+      },
+      {
+        "driver": "cogs",
+        "contribution": 1232212.5
+      },
+      {
+        "driver": "opex",
+        "contribution": 1105800
+      }
+    ],
+    "unexplained": -4676025
+  },
+  "statementBacktest": {
+    "mae": 2864625.0099999807,
+    "mape": 1.2927065631167498,
+    "mape_effective_n": 3,
+    "smape": 1.2933821298938597,
+    "rmse": 2918113.400292748,
+    "n": 3
+  },
   "statementScenarios": {
     "scenarios": {
       "base": {},

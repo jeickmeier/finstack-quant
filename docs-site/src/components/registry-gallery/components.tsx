@@ -65,6 +65,8 @@ import { Example as Example61 } from "./examples/dcf-assumptions-form";
 import { Example as Example62 } from "./examples/lbo-report";
 import { Example as Example63 } from "./examples/statement-sensitivity";
 import { Example as Example64 } from "./examples/goal-seek-form";
+import { Example as Example65 } from "./examples/variance-bridge-chart";
+import { Example as Example66 } from "./examples/forecast-backtest";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -131,6 +133,8 @@ const examples = {
   "lbo-report": Example62,
   "statement-sensitivity": Example63,
   "goal-seek-form": Example64,
+  "variance-bridge-chart": Example65,
+  "forecast-backtest": Example66,
 };
 export function ComponentDemo({
   name,

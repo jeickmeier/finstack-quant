@@ -12,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { createRequire } from "node:module";
 import model from "../../src/fixtures/statements/analyst-model.json";
 import rolledQ2 from "../../src/fixtures/statements/roll-forward-2025Q2.json";
+import reportedQ4 from "../../src/fixtures/statements/analyst-reported-2025Q4.json";
 import { StatementsWorkbench } from "@/components/finstack/statements/blocks/statements-workbench/statements-workbench";
 import { reportStatementCell } from "@/components/finstack/statements/components/statement-grid/projection";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
@@ -132,6 +133,24 @@ beforeEach(() => {
           ),
         };
       }
+      case "runVariance":
+        return native.runVariance(
+          arg.baseJson,
+          arg.comparisonJson,
+          arg.configJson,
+        );
+      case "varianceBridge":
+        return native.varianceBridge(
+          arg.baseJson,
+          arg.comparisonJson,
+          arg.targetMetric,
+          arg.period,
+          arg.drivers,
+          arg.baselineLabel,
+          arg.comparisonLabel,
+        );
+      case "backtestForecast":
+        return native.backtestForecast(arg.actual, arg.forecast);
       case "goalSeek":
         return native.goalSeek(
           arg.modelJson,
@@ -611,6 +630,94 @@ it("runs a native sensitivity and applies a goal-seek solution only on explicit 
     call.mock.calls.filter(([method]) => method === "goalSeek"),
   ).toHaveLength(1);
   await within(sensitivity).findByText("No sensitivity run available.");
+});
+
+it("reviews the variance, bridge and forecast backtest since the last roll forward against the pre-roll model", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench
+        defaultModelJson={JSON.stringify(model)}
+        onRollForward={async () => JSON.stringify(reportedQ4)}
+      />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  fireEvent.click(screen.getByRole("tab", { name: "Forecast & roll forward" }));
+  // Nothing to review before a roll forward.
+  expect(
+    screen.queryByRole("region", { name: "Since last roll forward" }),
+  ).toBeNull();
+  const before = lastCall("evaluateStatement").modelJson;
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Roll forward to 2025Q2" }),
+  );
+  const review = await screen.findByRole("region", {
+    name: "Since last roll forward",
+  });
+  expect(review.textContent).toContain("2025Q2, 2025Q3, 2025Q4");
+  const after = lastCall("evaluateStatement").modelJson;
+  const baseJson = new native.Evaluator().evaluate(before);
+  const comparison = new native.Evaluator().evaluate(after);
+  // Only nodes present in both results are offered.
+  const metrics = within(review).getByRole("group", {
+    name: "Variance metrics",
+  });
+  expect(
+    within(metrics)
+      .getAllByRole("button")
+      .map((button) => button.textContent),
+  ).toEqual(
+    Object.keys(reportedQ4.nodes).filter(
+      (id) => id in baseJson.nodes && id in comparison.nodes,
+    ),
+  );
+  expect(lastCall("runVariance")).toBeUndefined();
+  fireEvent.click(within(metrics).getByRole("button", { name: "revenue" }));
+  await waitFor(() => expect(lastCall("runVariance")).toBeDefined());
+  const variance = lastCall("runVariance");
+  expect(JSON.parse(variance.baseJson)).toEqual(
+    JSON.parse(JSON.stringify(baseJson)),
+  );
+  expect(JSON.parse(variance.configJson)).toEqual({
+    baseline_label: "Before roll forward",
+    comparison_label: "After roll forward",
+    metrics: ["revenue"],
+    periods: ["2025Q2", "2025Q3", "2025Q4"],
+  });
+  expect(
+    await within(review).findByRole("table", {
+      name: "Variance since last roll forward",
+    }),
+  ).toBeTruthy();
+  // The backtest compares the pre-roll forecast with the reported values.
+  await userEvent.click(
+    within(review).getByRole("combobox", { name: "Backtested metric" }),
+  );
+  await userEvent.click(await screen.findByRole("option", { name: "revenue" }));
+  await waitFor(() => expect(lastCall("backtestForecast")).toBeDefined());
+  expect(lastCall("backtestForecast")).toEqual({
+    actual: [218200000, 219600000, 228900000],
+    forecast: ["2025Q2", "2025Q3", "2025Q4"].map(
+      (period) => baseJson.nodes.revenue[period],
+    ),
+  });
+  // The bridge runs once its metric and period are chosen.
+  await userEvent.click(
+    within(review).getByRole("combobox", { name: "Bridge metric" }),
+  );
+  await userEvent.click(await screen.findByRole("option", { name: "ebitda" }));
+  await userEvent.click(
+    within(review).getByRole("combobox", { name: "Bridge period" }),
+  );
+  await userEvent.click(await screen.findByRole("option", { name: "2025Q2" }));
+  const drivers = within(review).getByRole("group", { name: "Bridge drivers" });
+  fireEvent.click(within(drivers).getByRole("button", { name: "revenue" }));
+  await waitFor(() =>
+    expect(lastCall("varianceBridge")?.drivers).toEqual(["revenue"]),
+  );
+  expect(
+    await within(review).findByRole("table", { name: "Ebitda bridge, 2025Q2" }),
+  ).toBeTruthy();
 });
 
 it("rolls reported quarters up to native annual values with editable methods", async () => {

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for variance analysis between two `StatementResult`.",
+  "properties": {
+    "baseline_label": {
+      "description": "Human-readable name for the baseline (e.g. `\"management_case\"`).",
+      "type": "string"
+    },
+    "comparison_label": {
+      "description": "Human-readable name for the comparison (e.g. `\"bank_case\"`).",
+      "type": "string"
+    },
+    "metrics": {
+      "description": "Node identifiers to compare (e.g. `[\"revenue\", \"ebitda\"]`).",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "periods": {
+      "description": "Periods to include in the variance report.",
+      "items": {
+        "$ref": "#/$defs/d_6c88b9c68ca9d8f87b4e"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "baseline_label",
+    "comparison_label",
+    "metrics",
+    "periods"
+  ],
+  "title": "VarianceConfig",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/variance_config.schema.json",
+  "$defs": {
+    "d_6c88b9c68ca9d8f87b4e": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    }
+  }
+}

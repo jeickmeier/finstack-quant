@@ -9,6 +9,7 @@ import { MetricEditor } from "./metric-editor";
 import { ScenarioPanel } from "./scenario-panel";
 import { ValuationPanel } from "./valuation-panel";
 import { SensitivityPanel } from "./sensitivity-panel";
+import { RollForwardReview, type EvaluatedModel } from "./roll-forward-review";
 import {
   annualRollupSpecJson,
   initialRollupMethods,
@@ -177,6 +178,8 @@ export function StatementsWorkbench({
   const [actionError, setActionError] = useState<string | null>(null);
   const [rolling, setRolling] = useState(false);
   const [newForecastNode, setNewForecastNode] = useState("");
+  // The model and result held before the last accepted roll forward.
+  const [previousRoll, setPreviousRoll] = useState<EvaluatedModel | null>(null);
   const [revision, setRevision] = useState(0);
   const generation = useRef(0);
   const initialized = useRef(false);
@@ -410,6 +413,8 @@ export function StatementsWorkbench({
   const nextForecast = model?.periods.find((period) => !period.is_actual);
   const rollForward = async () => {
     if (!onRollForward || !request || !nextForecast) return;
+    const before =
+      resultJson === null ? null : { modelJson: request.modelJson, resultJson };
     const token = ++generation.current;
     setRolling(true);
     setActionError(null);
@@ -426,7 +431,8 @@ export function StatementsWorkbench({
         throw new Error(
           `Updated financials must mark ${nextForecast.id} actual.`,
         );
-      if (token === generation.current) await commit(updated);
+      if (token === generation.current && (await commit(updated)) === null)
+        setPreviousRoll(before);
     } catch (error) {
       if (token === generation.current)
         setActionError(error instanceof Error ? error.message : String(error));
@@ -865,6 +871,15 @@ export function StatementsWorkbench({
                     Load updated financials
                   </Button>
                 </aside>
+                {previousRoll && request && resultJson && (
+                  <div className="lg:col-span-2">
+                    <RollForwardReview
+                      previous={previousRoll}
+                      current={{ modelJson: request.modelJson, resultJson }}
+                      density={density}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>

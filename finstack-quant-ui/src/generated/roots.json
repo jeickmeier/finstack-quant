@@ -500,6 +500,11 @@
     "schema": "schemas/valuation_result.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/bridge_chart.schema.json",
+    "schema": "schemas/bridge_chart.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/credit_assessment.schema.json",
     "schema": "schemas/credit_assessment.json"
@@ -513,6 +518,11 @@
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
     "schema": "schemas/dcf_sensitivity_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/forecast_metrics.schema.json",
+    "schema": "schemas/forecast_metrics.json"
   },
   {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
@@ -538,6 +548,11 @@
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/sensitivity_result.schema.json",
     "schema": "schemas/sensitivity_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/variance_config.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/variance_config.schema.json",
+    "schema": "schemas/variance_config.json"
   },
   {
     "uri": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",

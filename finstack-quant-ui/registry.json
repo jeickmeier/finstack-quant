@@ -4258,6 +4258,39 @@
       }
     },
     {
+      "name": "contract-bridge-chart",
+      "type": "registry:lib",
+      "title": "Bridge chart contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust bridge_chart contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/bridge_chart.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/bridge_chart.json"
+        },
+        {
+          "path": "src/generated/types/bridge_chart.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/bridge_chart.ts"
+        },
+        {
+          "path": "src/generated/meta/bridge_chart.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/bridge_chart.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-credit-assessment",
       "type": "registry:lib",
       "title": "Credit assessment contract",
@@ -4353,6 +4386,39 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-forecast-metrics",
+      "type": "registry:lib",
+      "title": "Forecast metrics contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust forecast_metrics contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/forecast_metrics.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/forecast_metrics.json"
+        },
+        {
+          "path": "src/generated/types/forecast_metrics.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/forecast_metrics.ts"
+        },
+        {
+          "path": "src/generated/meta/forecast_metrics.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/forecast_metrics.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json"
         ]
       }
     },
@@ -4518,6 +4584,39 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-variance-config",
+      "type": "registry:lib",
+      "title": "Variance config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust variance_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/variance_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/variance_config.json"
+        },
+        {
+          "path": "src/generated/types/variance_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/variance_config.ts"
+        },
+        {
+          "path": "src/generated/meta/variance_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/variance_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/variance_config.schema.json"
         ]
       }
     },
