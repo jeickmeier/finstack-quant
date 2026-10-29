@@ -74,10 +74,16 @@ To add an item (the gate that catches each omission is in brackets):
    `finstack-theme`, and a closure that reaches a stock shadcn component must
    contain `finstack-base` [`ui-check`: `check-registry`].
 3. Run `npm --prefix finstack-quant-ui run generate` [`ui-check`: generator
-   drift].
+   drift]. When that adds or removes a file under `src/generated/`, rewrite
+   the repository manifest from the repository root with
+   `uv run --no-sync python scripts/generation_digest.py --write-manifest`
+   [CI `gen-check` (`--check-manifest`); `ui-check` does not catch it].
 4. For a visual item, add
    `docs-site/src/components/registry-gallery/examples/<item>.tsx` and its key
    in `primitives.tsx` or `components.tsx` there [`ui-check`: `gen-gallery`].
+   An example that reads a native fixture names it in the hand-maintained
+   `sources` map of `scripts/gen-gallery.mjs`, which writes the gallery
+   `data.json` [local `ui-e2e`].
 5. Cover its behaviour in Vitest under `tests/<crate>/` [review only].
 6. Record its four screenshots with
    `mise run ui-e2e -- --update-snapshots -g "<item>"` and inspect them [local
@@ -87,6 +93,18 @@ To add an item (the gate that catches each omission is in brackets):
    while iterating; `mise run ui-install` is the full local gate. Its worker
    role comes from the registry, and an install that needs extra files uses
    `tests/install/fixture/<item>.tsx` [local `ui-install`].
+8. When the item changes what an entry in the `displays` array or the
+   `deferred` map of `scripts/provenance.mjs` asserts (route, convention,
+   deferral), update that entry and rerun `generate`, which rewrites
+   `src/contract-provenance.json` [review only; `ui-check` catches an
+   unregenerated file].
+9. When a worker slice calls a new facade function or class, pick it as a
+   leaf in its `<Crate>Native` (never a whole sub-namespace) and run
+   `npm --prefix finstack-quant-ui run coverage`, which moves the key from
+   `planned` to `covered` in `facade-coverage.json`. That file also lists
+   each excluded key with its reason (`data-constructor` or `schema-form`);
+   `schema.*` keys, `*Json` wire twins and builders are excluded by rule, and
+   a dropped slice deletes its `planned` keys [`ui-check`: `coverage --check`].
 
 CI runs only `ui-check` (the Test UI job); the other gates are local.
 
@@ -411,6 +429,10 @@ test in `tests/shared/worker.test.mjs` lists every method exactly, so the new
 methods join it there; it is the tripwire that fails when a spread is missing.
 The Node test worker (`tests/shared/worker/node.mjs`) passes the whole facade
 and needs no edit.
+Only `finstack.worker.ts` imports the facade as a value; every facade member a
+service calls is a leaf of its `<Crate>Native` Pick, which
+`scripts/coverage.mjs --check` holds equal to `covered` in
+`facade-coverage.json`.
 
 Use `FinstackQueryProvider` around a standalone feature, or `FinstackProvider`
 inside the application's existing `QueryClientProvider`. `useFinstack` exposes
