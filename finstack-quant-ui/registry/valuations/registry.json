@@ -620,7 +620,9 @@
         "@finstack/enum-field",
         "@finstack/pnl-attribution-report",
         "@finstack/use-attribute-pnl-many",
-        "@finstack/use-default-waterfall-order"
+        "@finstack/use-default-waterfall-order",
+        "@finstack/vol-surface-chart",
+        "@finstack/surface-arbitrage-badge"
       ],
       "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.11.0"],
       "categories": ["Blocks"],
@@ -711,6 +713,7 @@
           "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json",
           "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
           "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json"

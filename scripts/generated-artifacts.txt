@@ -171,6 +171,7 @@ finstack-quant-ui/src/generated/meta/agency_tba.ts
 finstack-quant-ui/src/generated/meta/altman_z_double_prime_input.ts
 finstack-quant-ui/src/generated/meta/altman_z_prime_input.ts
 finstack-quant-ui/src/generated/meta/altman_z_score_input.ts
+finstack-quant-ui/src/generated/meta/arbitrage_report.ts
 finstack-quant-ui/src/generated/meta/asian_option.ts
 finstack-quant-ui/src/generated/meta/asset_backed_facility.ts
 finstack-quant-ui/src/generated/meta/autocallable.ts
@@ -293,6 +294,7 @@ finstack-quant-ui/src/generated/schemas/agency_tba.json
 finstack-quant-ui/src/generated/schemas/altman_z_double_prime_input.json
 finstack-quant-ui/src/generated/schemas/altman_z_prime_input.json
 finstack-quant-ui/src/generated/schemas/altman_z_score_input.json
+finstack-quant-ui/src/generated/schemas/arbitrage_report.json
 finstack-quant-ui/src/generated/schemas/asian_option.json
 finstack-quant-ui/src/generated/schemas/asset_backed_facility.json
 finstack-quant-ui/src/generated/schemas/autocallable.json
@@ -412,6 +414,7 @@ finstack-quant-ui/src/generated/types/agency_tba.ts
 finstack-quant-ui/src/generated/types/altman_z_double_prime_input.ts
 finstack-quant-ui/src/generated/types/altman_z_prime_input.ts
 finstack-quant-ui/src/generated/types/altman_z_score_input.ts
+finstack-quant-ui/src/generated/types/arbitrage_report.ts
 finstack-quant-ui/src/generated/types/asian_option.ts
 finstack-quant-ui/src/generated/types/asset_backed_facility.ts
 finstack-quant-ui/src/generated/types/autocallable.ts

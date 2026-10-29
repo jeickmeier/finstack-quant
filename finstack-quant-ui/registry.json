@@ -3961,6 +3961,39 @@
       }
     },
     {
+      "name": "contract-arbitrage-report",
+      "type": "registry:lib",
+      "title": "Arbitrage report contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust arbitrage_report contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/arbitrage_report.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/arbitrage_report.json"
+        },
+        {
+          "path": "src/generated/types/arbitrage_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/arbitrage_report.ts"
+        },
+        {
+          "path": "src/generated/meta/arbitrage_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/arbitrage_report.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-merton-model",
       "type": "registry:lib",
       "title": "Merton model contract",

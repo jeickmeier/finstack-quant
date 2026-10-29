@@ -32,6 +32,8 @@ import { budget } from "../shared/budget";
 import { createContext } from "@/workers/services/context";
 import { createScenariosService } from "@/workers/services/scenarios";
 import { createAttributionService } from "@/workers/services/attribution";
+import { createModelsService } from "@/workers/services/models";
+import calibrationCases from "../calibration/cases.json";
 import marketScenarios from "../scenarios/application/cases.json";
 const bondDisplay = formatRawMoney(fixture.result.value);
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
@@ -66,6 +68,21 @@ const scenarioService = createScenariosService(
 // The production AttributionApi over the Node facade.
 const attributionService = createAttributionService(
   { attribution: native },
+  createContext({
+    initialize: async () => undefined,
+    core: { MarketContext: native.MarketContext },
+    portfolio: { Portfolio: native.Portfolio },
+  }),
+);
+// The production checkSurface over the Node facade's VolSurface and checkSurface.
+const modelsService = createModelsService(
+  {
+    core: { VolSurface: native.VolSurface },
+    models: {
+      volatility: { checkSurface: native.checkSurface },
+      credit: { migration: {} },
+    },
+  } as unknown as Parameters<typeof createModelsService>[0],
   createContext({
     initialize: async () => undefined,
     core: { MarketContext: native.MarketContext },
@@ -126,6 +143,8 @@ beforeEach(() => {
         return unwrap(await scenarioService.listBuiltinTemplateMetadata());
       case "attributePnlMany":
         return unwrap(await attributionService.attributePnlMany(request));
+      case "checkSurface":
+        return unwrap(await modelsService.checkSurface(request));
       case "defaultWaterfallOrder":
         return native.defaultWaterfallOrder();
       case "calendars":
@@ -427,6 +446,63 @@ it(
           .querySelector("pre")!.textContent,
       ).toContain(direct.value.amount),
     );
+  },
+  budget(15000),
+);
+
+it(
+  "adds the native static-arbitrage badge to a stored surface only when the host supplies forwards",
+  async () => {
+    const surface = calibrationCases.find((c) =>
+      c.source.includes("08_equity"),
+    )!.result.result.final_market.surfaces[0]!;
+    const market = JSON.parse(fixture.request.marketJson);
+    market.surfaces = [surface];
+    const surfaceOptions = vi.fn((stored: { id: string }) =>
+      stored.id === "AAPL-EQUITY-VOL"
+        ? { colorDomain: [0, 1] as const, forwards: [175] }
+        : undefined,
+    );
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={{
+            ...fixture.request,
+            marketJson: JSON.stringify(market),
+          }}
+          surfaceOptions={surfaceOptions}
+        />
+      </FinstackQueryProvider>,
+    );
+    await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
+    await userEvent.click(screen.getByRole("tab", { name: "View market" }));
+    fireEvent.change(
+      await screen.findByLabelText(
+        "Search market data",
+        {},
+        { timeout: budget(5000) },
+      ),
+      { target: { value: "AAPL-EQUITY-VOL" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Inspect AAPL-EQUITY-VOL/ }),
+    );
+    const details = await screen.findByRole("button", {
+      name: "Arbitrage details",
+    });
+    await waitFor(
+      () => expect(details.parentElement!.textContent).toContain("Passed"),
+      { timeout: budget(5000) },
+    );
+    expect(
+      call.mock.calls
+        .filter(([method]) => method === "checkSurface")
+        .map(([, request]) => request),
+    ).toEqual([{ surface, forwards: [175] }]);
+    // The stored chart stays beside the badge.
+    expect(
+      screen.getAllByRole("img", { name: /AAPL-EQUITY-VOL/ }).length,
+    ).toBeGreaterThan(0);
   },
   budget(15000),
 );

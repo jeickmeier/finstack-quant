@@ -68,6 +68,7 @@ import { Example as Example64 } from "./examples/goal-seek-form";
 import { Example as Example65 } from "./examples/variance-bridge-chart";
 import { Example as Example66 } from "./examples/forecast-backtest";
 import { Example as Example67 } from "./examples/statement-monte-carlo";
+import { Example as Example68 } from "./examples/surface-arbitrage-badge";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -137,6 +138,7 @@ const examples = {
   "variance-bridge-chart": Example65,
   "forecast-backtest": Example66,
   "statement-monte-carlo": Example67,
+  "surface-arbitrage-badge": Example68,
 };
 export function ComponentDemo({
   name,

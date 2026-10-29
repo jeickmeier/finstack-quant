@@ -15,6 +15,8 @@ import {
   VolCubeExplorer,
   type VolCubeExplorerProps,
 } from "@/components/finstack/models/components/vol-cube-explorer/vol-cube-explorer";
+import { VolSurfaceChart } from "@/components/finstack/core/components/vol-surface-chart/vol-surface-chart";
+import { SurfaceArbitrageBadge } from "@/components/finstack/models/components/surface-arbitrage-badge/surface-arbitrage-badge";
 import {
   FxSurfaceChart,
   type FxSurfaceChartProps,
@@ -85,7 +87,15 @@ export function PricingWorkbench({
   };
   /** Initial ScenarioSpec JSON for the "Market scenario" tab; it is applied only on request. Defaults to an empty scenario. */
   marketScenario?: string;
-  surfaceOptions?: MarketContextBrowserProps["surfaceOptions"];
+  /** Stored-surface view options. A returned `forwards` key adds the native static-arbitrage badge (null or empty: forwards not supplied); forwards are host-supplied, never inferred. */
+  surfaceOptions?(surface: MarketContextStateWire["surfaces"][number]):
+    | (NonNullable<
+        ReturnType<NonNullable<MarketContextBrowserProps["surfaceOptions"]>>
+      > & {
+        /** Forward prices in the surface's strike units: one to broadcast or one per expiry. */
+        forwards?: readonly number[] | null;
+      })
+    | undefined;
   cubeOptions?(
     cube: MarketContextStateWire["vol_cubes"][number],
   ): Omit<VolCubeExplorerProps, "cube"> | undefined;
@@ -403,6 +413,25 @@ export function PricingWorkbench({
                                 cube={cube}
                               />
                             ) : undefined;
+                          }
+                          if (field === "surfaces") {
+                            const surface = (printMarket ?? market.state)
+                                .surfaces[index]!,
+                              options = surfaceOptions?.(surface);
+                            if (!options || !("forwards" in options))
+                              return undefined;
+                            const { forwards, ...chart } = options;
+                            return (
+                              <div className="space-y-2">
+                                <SurfaceArbitrageBadge
+                                  key={surface.id}
+                                  surface={surface}
+                                  forwards={forwards}
+                                  density={currentDensity}
+                                />
+                                <VolSurfaceChart surface={surface} {...chart} />
+                              </div>
+                            );
                           }
                           if (field === "fx_delta_vol_surfaces") {
                             const surface = (printMarket ?? market.state)

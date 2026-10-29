@@ -893,6 +893,22 @@ over `[0, 1]`; the generator's colour domain is the extent of its intensities,
 centred on zero, because its diagonal is negative. The native fixture (an
 illustrative eight-state one-year matrix) lives in `tests/models/credit/`.
 
+## Surface static arbitrage
+
+`useCheckSurface` (`@finstack/use-check-surface`) runs
+`core.VolSurface.fromJson` and `models.volatility.checkSurface` on a canonical
+stored surface with every check enabled (butterfly, calendar spread, local-vol
+density) and host-supplied forwards in the surface's strike units, one to
+broadcast or one per expiry; a tolerance is sent only when supplied, so Rust's
+default applies otherwise. The handle is freed. `SurfaceArbitrageBadge` shows
+the result as Passed, the violation count, Not checked (the native error; Rust
+checks only unshifted Black lognormal quotes on a strike axis) or Forwards not
+supplied (no request is made), with the returned counts by type and severity
+and every violation in a popover. Forwards are never inferred: `PricingWorkbench`
+mounts the badge beside a stored surface's chart only when `surfaceOptions`
+returns a `forwards` key, for example
+`surfaceOptions={() => ({ colorDomain: [0, 1], forwards: [175] })}`.
+
 ## Merton structural credit
 
 `useMertonModelValidator` (`@finstack/use-merton-model-validator`) returns

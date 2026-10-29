@@ -136,6 +136,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "materializeFxSurface",
     "cubeSlice",
     "cubeSmile",
+    "checkSurface",
     "migrationMatrix",
     "migrationProjection",
     "validateMertonModel",

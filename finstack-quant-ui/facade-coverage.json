@@ -16,6 +16,7 @@
     "core.MarketContext",
     "core.Money",
     "core.VolCube",
+    "core.VolSurface",
     "core.availableCalendars",
     "margin.SimmCalculator",
     "margin.SimmSensitivities",
@@ -45,6 +46,7 @@
     "models.factor.risk.positionComponentVar",
     "models.volatility.SabrParameters",
     "models.volatility.SabrSmile",
+    "models.volatility.checkSurface",
     "models.volatility.getCubeNormalVol",
     "models.volatility.getCubeVol",
     "models.volatility.getFxDeltaVol",
@@ -117,13 +119,11 @@
     "valuations.valuationResultToJson"
   ],
   "planned": {
-    "core.VolSurface": "vd-surface-arbitrage-badge",
     "covenants.covLite": "sd-covenant-engine-editor",
     "covenants.lboStandard": "sd-covenant-engine-editor",
     "covenants.projectFinance": "sd-covenant-engine-editor",
     "covenants.realEstate": "sd-covenant-engine-editor",
-    "covenants.validateCovenantEngineJson": "sd-covenant-engine-editor",
-    "models.volatility.checkSurface": "vd-surface-arbitrage-badge"
+    "covenants.validateCovenantEngineJson": "sd-covenant-engine-editor"
   },
   "excluded": {
     "calibration.calibrationStepBaseCorrelation": "schema-form",

@@ -1,6 +1,7 @@
 import type { core, models } from "finstack-quant-wasm";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import type {
+  ArbitrageReport,
   CreditScoreRequest,
   CubeSlice,
   FxStrikeSurface,
@@ -12,9 +13,9 @@ import type {
   ScoringResult,
 } from "../finstack-contract";
 import { attempt, type ServiceContext } from "./context";
-/** models.volatility evaluators, the core surface handles they sample, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale and the models.factor.risk position decompositions. */
+/** models.volatility evaluators and the surface arbitrage check, the core surface handles they read, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale and the models.factor.risk position decompositions. */
 export type ModelsNative = {
-  core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube">;
+  core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube" | "VolSurface">;
   models: {
     volatility: Pick<
       typeof models.volatility,
@@ -28,6 +29,7 @@ export type ModelsNative = {
       | "materializeCubeExpirySliceNormal"
       | "SabrParameters"
       | "SabrSmile"
+      | "checkSurface"
     >;
     credit: Pick<typeof models.credit, "MertonModel"> & {
       migration: Pick<
@@ -305,6 +307,24 @@ export function createModelsService(
           }
         } finally {
           cube.free();
+        }
+      });
+    },
+    checkSurface(request) {
+      return context.result((): ArbitrageReport => {
+        const surface = native.core.VolSurface.fromJson(
+          serializeHost(request.surface),
+        );
+        try {
+          // An omitted tolerance stays unset so Rust applies its default.
+          return native.models.volatility.checkSurface(surface, {
+            forward_prices: [...request.forwards],
+            ...(request.tolerance == null
+              ? {}
+              : { tolerance: request.tolerance }),
+          });
+        } finally {
+          surface.free();
         }
       });
     },
