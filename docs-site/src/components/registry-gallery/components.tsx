@@ -69,6 +69,7 @@ import { Example as Example65 } from "./examples/variance-bridge-chart";
 import { Example as Example66 } from "./examples/forecast-backtest";
 import { Example as Example67 } from "./examples/statement-monte-carlo";
 import { Example as Example68 } from "./examples/surface-arbitrage-badge";
+import { Example as Example69 } from "./examples/covenant-engine-editor";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -139,6 +140,7 @@ const examples = {
   "forecast-backtest": Example66,
   "statement-monte-carlo": Example67,
   "surface-arbitrage-badge": Example68,
+  "covenant-engine-editor": Example69,
 };
 export function ComponentDemo({
   name,

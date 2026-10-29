@@ -104,6 +104,7 @@ export async function generate(repo = repoRoot) {
           "table_envelope",
           "covenant_report",
           "dated_covenant_reports",
+          "covenant_engine",
           "portfolio_result",
           "scenario_pnl_batch_item",
           "scenario_revalue_view",

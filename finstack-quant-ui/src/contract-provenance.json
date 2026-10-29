@@ -980,6 +980,20 @@
       ]
     },
     {
+      "id": "covenant-engine-editor",
+      "route": "schema",
+      "convention": "Generated covenant_engine form (the caller's engine; Rust publishes no example), optionally replaced by the specs of a Rust package template (covenants.covLite, lboStandard, realEstate or projectFinance over typed thresholds that start empty, a blank one sent as NaN); metric ids are free text with the model's node ids as suggestions, and each spec's metric id is listed with whether the model has that node, without inferring an unset one; validated natively by validateCovenantEngineJson.",
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/covenants/schemas/covenants/1/covenant_engine.schema.json",
+          "sha256": "d231fcc6eea1d787197269c77956b94d1a6d6e3c31c6ec09e17b1bc256a45343",
+          "description": "Covenant engine for evaluation and consequence application."
+        }
+      ]
+    },
+    {
       "id": "cashflow-viewer",
       "route": "native-envelope-table",
       "convention": "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Its JSON view is a host serialization, not native text. The optional annual ladder is cashflows.calendarYearLadder per row currency (worker partition, first-appearance order) over each flow's native_pv: row-currency PV before FX conversion and any scenario price shock.",

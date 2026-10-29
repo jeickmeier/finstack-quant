@@ -265,6 +265,39 @@
       }
     },
     {
+      "name": "contract-covenant-engine",
+      "type": "registry:lib",
+      "title": "Covenant engine contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust covenant_engine contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/covenant_engine.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/covenant_engine.json"
+        },
+        {
+          "path": "src/generated/types/covenant_engine.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/covenant_engine.ts"
+        },
+        {
+          "path": "src/generated/meta/covenant_engine.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/covenant_engine.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-covenant-report",
       "type": "registry:lib",
       "title": "Covenant report contract",

@@ -107,6 +107,14 @@ const displays = [
       "Returned DatedCovenantReports rows in input order and their verdicts; a covenant without a report on a date shows a dash. Rust evaluates every statement result period at its end date with the covenants applicable on that date, reading a metric only where an applicable covenant needs it, so covenant windows decide which metrics a date requires; the component builds no rows.",
   },
   {
+    id: "covenant-engine-editor",
+    schema: `${base}covenants/1/covenant_engine.schema.json`,
+    pointer: "#",
+    route: "schema",
+    convention:
+      "Generated covenant_engine form (the caller's engine; Rust publishes no example), optionally replaced by the specs of a Rust package template (covenants.covLite, lboStandard, realEstate or projectFinance over typed thresholds that start empty, a blank one sent as NaN); metric ids are free text with the model's node ids as suggestions, and each spec's metric id is listed with whether the model has that node, without inferring an unset one; validated natively by validateCovenantEngineJson.",
+  },
+  {
     id: "cashflow-viewer",
     schema: `${base}results/1/instrument_cashflow.schema.json`,
     pointer: "#",

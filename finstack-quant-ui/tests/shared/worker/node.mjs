@@ -310,6 +310,20 @@ class VmCalculator extends facade.margin.VmCalculator {
     };
   }
 }
+let covenantEngineConstructed = 0,
+  covenantEngineFreed = 0;
+class CovenantEngine extends facade.covenants.CovenantEngine {
+  static fromJson(json) {
+    const handle = super.fromJson(json);
+    covenantEngineConstructed++;
+    const free = handle.free.bind(handle);
+    handle.free = () => {
+      free();
+      covenantEngineFreed++;
+    };
+    return handle;
+  }
+}
 const service = createService({
   initialize: async () => {
     if (workerData.fail)
@@ -331,6 +345,7 @@ const service = createService({
     VolSurface,
   },
   analytics: { ...facade.analytics, Performance },
+  covenants: { ...facade.covenants, CovenantEngine },
   portfolio: { ...facade.portfolio, Portfolio },
   margin: { ...facade.margin, SimmSensitivities, SimmCalculator, VmCalculator },
   models: {
@@ -393,6 +408,8 @@ expose(
       portfolioFreed,
       ...migrationCounts,
       ...mertonCounts,
+      covenantEngineConstructed,
+      covenantEngineFreed,
       simmSensitivitiesConstructed,
       simmSensitivitiesFreed,
       simmCalculatorConstructed,

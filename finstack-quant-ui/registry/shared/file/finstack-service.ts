@@ -10,6 +10,10 @@ import {
   type CashflowsNative,
 } from "./services/cashflows";
 import {
+  createCovenantsService,
+  type CovenantsNative,
+} from "./services/covenants";
+import {
   createScenariosService,
   type ScenariosNative,
 } from "./services/scenarios";
@@ -41,6 +45,7 @@ export function createService(
     CoreNative &
     ValuationsNative &
     CashflowsNative &
+    CovenantsNative &
     ScenariosNative &
     AttributionNative &
     AnalyticsNative &
@@ -62,6 +67,7 @@ export function createService(
     ...createCoreService(native, context),
     ...createValuationsService(native, context),
     ...createCashflowsService(native, context),
+    ...createCovenantsService(native, context),
     ...createScenariosService(native, context),
     ...createAttributionService(native, context),
     ...createAnalyticsService(native, context),

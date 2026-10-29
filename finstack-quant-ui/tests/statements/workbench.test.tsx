@@ -13,6 +13,8 @@ import { createRequire } from "node:module";
 import model from "../../src/fixtures/statements/analyst-model.json";
 import rolledQ2 from "../../src/fixtures/statements/roll-forward-2025Q2.json";
 import reportedQ4 from "../../src/fixtures/statements/analyst-reported-2025Q4.json";
+import covenantEngine from "../../src/fixtures/covenants/analyst-covenants.json";
+import covenantSeries from "../../src/fixtures/covenants/analyst-covenant-series.json";
 import { StatementsWorkbench } from "@/components/finstack/statements/blocks/statements-workbench/statements-workbench";
 import { reportStatementCell } from "@/components/finstack/statements/components/statement-grid/projection";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
@@ -164,6 +166,22 @@ beforeEach(() => {
             arg.threshold,
           ) ?? null
         );
+      case "covenantTemplate":
+        return native.covLite(arg.maxLeverage, arg.maxSeniorLeverage);
+      case "validateCovenantEngine":
+        return native.validateCovenantEngineJson(arg);
+      case "evaluateCovenants": {
+        const engine = native.CovenantEngine.fromJson(arg.engineJson);
+        try {
+          return native.evaluateCovenants(
+            arg.resultsJson,
+            engine,
+            arg.modelJson,
+          );
+        } finally {
+          engine.free();
+        }
+      }
       case "goalSeek":
         return native.goalSeek(
           arg.modelJson,
@@ -788,6 +806,55 @@ it("simulates the current model in the Monte Carlo tab only once a config is sub
   ).toBeTruthy();
 });
 
+it("tests the host covenant engine on open in the Covenants tab and returns Rust's not_found for a template the model lacks", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench
+        defaultModelJson={JSON.stringify(model)}
+        defaultCovenantEngineJson={JSON.stringify(covenantEngine)}
+      />
+    </FinstackQueryProvider>,
+  );
+  fireEvent.click(await screen.findByRole("tab", { name: "Covenants" }));
+  const grid = await screen.findByRole("region", {
+    name: "Covenant compliance",
+  });
+  const header = within(grid).getAllByRole("row")[0]!;
+  expect(
+    [...header.querySelectorAll("th")].slice(1).map((cell) => cell.textContent),
+  ).toEqual(covenantSeries.map((row) => row.as_of));
+  // The engine is tested against the workbench's own canonical model and result.
+  const evaluated = lastCall("evaluateCovenants");
+  expect(JSON.parse(evaluated.engineJson)).toEqual(covenantEngine);
+  expect(Object.keys(JSON.parse(evaluated.resultsJson).nodes)).toContain(
+    "leverage",
+  );
+  const templates = within(
+    screen.getByRole("form", { name: "Covenant package templates" }),
+  );
+  await userEvent.type(templates.getByLabelText("Max leverage"), "5");
+  await userEvent.type(templates.getByLabelText("Max senior leverage"), "3");
+  await userEvent.click(
+    templates.getByRole("button", { name: "Load template" }),
+  );
+  await waitFor(() =>
+    expect(
+      within(
+        screen.getByRole("region", { name: "Covenant metrics" }),
+      ).getAllByText("Missing"),
+    ).toHaveLength(3),
+  );
+  const use = screen.getByRole("button", { name: "Use covenants" });
+  await waitFor(async () => {
+    await userEvent.click(use);
+    expect(
+      JSON.parse(lastCall("evaluateCovenants").engineJson).specs[0].metric_id,
+    ).toBe("total_leverage");
+  });
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "metric 'total_leverage' in period 2024Q1",
+  );
+});
 it("rolls reported quarters up to native annual values with editable methods", async () => {
   render(
     <FinstackQueryProvider>

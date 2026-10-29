@@ -10,6 +10,7 @@ import { ScenarioPanel } from "./scenario-panel";
 import { ValuationPanel } from "./valuation-panel";
 import { SensitivityPanel } from "./sensitivity-panel";
 import { MonteCarloPanel } from "./monte-carlo-panel";
+import { CovenantsPanel } from "./covenants-panel";
 import { RollForwardReview, type EvaluatedModel } from "./roll-forward-review";
 import {
   annualRollupSpecJson,
@@ -62,6 +63,7 @@ type Tab =
   | "ratios"
   | "valuation"
   | "monte-carlo"
+  | "covenants"
   | "checks"
   | "advanced";
 const tabs: { id: Tab; label: string }[] = [
@@ -71,6 +73,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "ratios", label: "Metrics & ratios" },
   { id: "valuation", label: "Valuation" },
   { id: "monte-carlo", label: "Monte Carlo" },
+  { id: "covenants", label: "Covenants" },
   { id: "checks", label: "Checks" },
   { id: "advanced", label: "Advanced" },
 ];
@@ -137,6 +140,7 @@ export function StatementsWorkbench({
   defaultCheckSuiteJson,
   defaultScenarioSetJson,
   defaultRollupSpecJson,
+  defaultCovenantEngineJson,
   selectedKey,
   onSelectedKeyChange,
   onModelAccepted,
@@ -155,6 +159,8 @@ export function StatementsWorkbench({
   defaultScenarioSetJson?: string;
   /** Optional native RollupSpec JSON whose methods seed the annual view; otherwise methods follow line tags. */
   defaultRollupSpecJson?: string;
+  /** Optional native CovenantEngine JSON that seeds the Covenants tab and is tested on open. */
+  defaultCovenantEngineJson?: string;
   selectedKey?: string | null;
   onSelectedKeyChange?: (key: string | null) => void;
   onModelAccepted?: (canonicalJson: string) => void;
@@ -1015,6 +1021,17 @@ export function StatementsWorkbench({
             {model && request && (
               <MonteCarloPanel
                 modelJson={request.modelJson}
+                density={density}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="covenants">
+            {model && result && resultJson && (
+              <CovenantsPanel
+                modelJson={request!.modelJson}
+                resultsJson={resultJson}
+                nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
+                defaultEngineJson={defaultCovenantEngineJson}
                 density={density}
               />
             )}

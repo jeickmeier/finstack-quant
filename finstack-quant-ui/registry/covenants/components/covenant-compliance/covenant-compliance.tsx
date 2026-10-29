@@ -24,7 +24,8 @@ export interface CovenantComplianceProps {
  * pass/fail verdicts Rust returned. Covenants are listed in the order they
  * first appear; a covenant with no report on a date (not applicable there)
  * shows a dash. Selecting a test date shows that date's complete reports
- * below; the latest date is selected initially. Nothing is computed.
+ * below; the latest date is selected initially. A series wider than its
+ * container scrolls horizontally inside the table. Nothing is computed.
  */
 export function CovenantCompliance({
   series,
@@ -52,7 +53,8 @@ export function CovenantCompliance({
         <Button
           type="button"
           variant={column === index ? "secondary" : "ghost"}
-          size="sm"
+          size="xs"
+          className="px-1 tabular-nums"
           aria-pressed={column === index}
           onClick={() => setSelected(column)}
         >
@@ -63,6 +65,7 @@ export function CovenantCompliance({
         const report = dated.reports[row.key];
         return report == null ? "—" : report.passed ? "Passed" : "Failed";
       },
+      meta: { className: "whitespace-nowrap" },
       cell: ({ getValue }) =>
         getValue() === "Failed" ? (
           <span className="font-medium text-negative">Failed</span>
@@ -74,7 +77,7 @@ export function CovenantCompliance({
   return (
     <section
       aria-label={caption}
-      className="space-y-3 font-sans text-sm text-foreground"
+      className="min-w-0 max-w-full space-y-3 font-sans text-sm text-foreground"
     >
       <FinstackTable
         data={rows}

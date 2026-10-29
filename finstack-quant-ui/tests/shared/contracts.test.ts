@@ -110,12 +110,13 @@ describe("discovered canonical fixtures", () => {
       for (const example of schema.examples)
         expect(validator.parse(example)).toEqual(example);
     }
-    // Rust publishes no example for CovenantReport, DatedCovenantReports,
+    // Rust publishes no example for CovenantEngine, CovenantReport, DatedCovenantReports,
     // the five credit-scoring inputs, ArbitrageReport, MertonModel, CreditAssessment,
     // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet,
     // ScenarioDiff, SensitivityResult, BridgeChart, ForecastMetrics or
     // VarianceConfig; every other root carries one.
     expect(withoutExamples).toEqual([
+      "schemas/covenant_engine.json",
       "schemas/covenant_report.json",
       "schemas/dated_covenant_reports.json",
       "schemas/altman_z_double_prime_input.json",

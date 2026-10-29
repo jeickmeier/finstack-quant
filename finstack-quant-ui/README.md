@@ -50,14 +50,14 @@ Sources import through the paths an installed consumer uses. `tsconfig.json`
 maps them back here; `vitest.config.mts` copies that table into prefix aliases
 in order, so a specific key must precede its prefix.
 
-| Import                    | Source                                                                                                                                                                                             |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                                                                                 |
-| `@/lib/finstack/*`        | `src/*`                                                                                                                                                                                            |
-| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `scenarios`, `attribution`, `analytics`, `portfolio`, `margin`, `models` and `statements`; a new crate adds its line |
-| `@/workers/*`             | `registry/shared/file/*`                                                                                                                                                                           |
-| `@/components/finstack/*` | `registry/*`                                                                                                                                                                                       |
-| `@/components/ui/*`       | `components/ui/*`                                                                                                                                                                                  |
+| Import                    | Source                                                                                                                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                                                                                              |
+| `@/lib/finstack/*`        | `src/*`                                                                                                                                                                                                         |
+| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `attribution`, `analytics`, `portfolio`, `margin`, `models` and `statements`; a new crate adds its line |
+| `@/workers/*`             | `registry/shared/file/*`                                                                                                                                                                                        |
+| `@/components/finstack/*` | `registry/*`                                                                                                                                                                                                    |
+| `@/components/ui/*`       | `components/ui/*`                                                                                                                                                                                               |
 
 A new crate category also adds its directory name to the `include` list in
 `scripts/gen-registry.mjs`, then runs
@@ -422,8 +422,8 @@ the consumer's source directory (`src/` when the application has one).
 The worker uses the consumer's standard `@/lib/finstack` alias for the installed
 codec. The shared registry index owns these worker files.
 The contract (`workers/finstack-contract.ts`) groups the API by crate
-(`CoreApi`, `ValuationsApi`, `CashflowsApi`, `CalibrationApi`, `ModelsApi`,
-`StatementsApi`), and
+(`CoreApi`, `ValuationsApi`, `CashflowsApi`, `CovenantsApi`, `CalibrationApi`,
+`ModelsApi`, `StatementsApi`), and
 each method's comment names the facade call it wraps. The service
 (`workers/finstack-service.ts`) is a composer over `workers/services/<crate>.ts`,
 which share `workers/services/context.ts`. A new crate adds its interface to the
@@ -1016,6 +1016,26 @@ the display-only `MarginCallTable` presents the returned result, decision, net
 margin, schedule and call dates. No threshold, MTA, rounding or call decision
 is computed in TypeScript. The native fixture (USD regulatory CSA on
 2024-06-17) is `src/fixtures/margin/vm.json`.
+
+## Covenant engine and compliance
+
+`useCovenantTemplate` (`@finstack/use-covenant-template`) returns a loader of
+the Rust covenant packages (`covenants.covLite`, `lboStandard`, `realEstate`,
+`projectFinance`) for typed thresholds, and `useCovenantEngineValidator`
+returns canonical `CovenantEngine` text (`covenants.validateCovenantEngineJson`).
+`useEvaluateCovenants` builds a `covenants.CovenantEngine` per call and runs
+`statements_analytics.evaluateCovenants` over an evaluated statement result:
+Rust tests every result period on its last day with the covenants applicable
+on that date (a window replaces the top-level specs on its dates), so the UI
+builds no rows; a metric an applicable covenant reads that the results lack is
+Rust's `not_found` error, a non-finite one its `validation` error. The engine
+is freed per call. `CovenantEngineEditor` composes `SchemaForm` over the
+generated `covenant_engine` contract (Rust publishes no example) with a
+template bar whose thresholds start empty (a blank one is sent as `NaN`),
+`IdCombobox` metric ids over the model's node ids through `renderField`, and a
+table of each spec's metric id with whether the model has that node. The
+statements workbench's Covenants tab (`covenants-panel.tsx`) composes the
+editor with `CovenantCompliance` and tests `defaultCovenantEngineJson` on open.
 
 ## Served gallery checks
 

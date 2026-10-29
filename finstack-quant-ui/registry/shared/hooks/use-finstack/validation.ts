@@ -15,7 +15,8 @@ export function useNativeValidator<
     | "validateSimmSensitivities"
     | "validateCsa"
     | "validateMertonModel"
-    | "validateScenarioSpec",
+    | "validateScenarioSpec"
+    | "validateCovenantEngine",
 >(operation: K, label: string) {
   const worker = useFinstack();
   return useCallback(
