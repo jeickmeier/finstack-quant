@@ -19,6 +19,14 @@ export interface ServiceContext {
   /** Canonical portfolio spec JSON (Portfolio#toJson) and its live native handle, from a four-entry LRU that frees evictions. */
   portfolio(specJson: string): CachedHandle<Portfolio>;
 }
+/** A native call's value, or its error when that one call is rejected (kept beside the rest of a report). */
+export function attempt<T>(call: () => T): Envelope<T> {
+  try {
+    return { ok: true, value: call() };
+  } catch (error) {
+    return { ok: false, error: errorValue(error) };
+  }
+}
 /** Facade members the shared context reads. */
 export type ContextNative = {
   initialize(wasmUrl?: string): Promise<unknown>;

@@ -3796,6 +3796,39 @@
       }
     },
     {
+      "name": "contract-merton-model",
+      "type": "registry:lib",
+      "title": "Merton model contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust merton_model contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/merton_model.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/merton_model.json"
+        },
+        {
+          "path": "src/generated/types/merton_model.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/merton_model.ts"
+        },
+        {
+          "path": "src/generated/meta/merton_model.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/merton_model.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-portfolio-result",
       "type": "registry:lib",
       "title": "Portfolio result contract",

@@ -221,6 +221,20 @@ export const importHarnesses = {
       name: "use-migration-projection",
       modules: modules.length,
     })),
+  "use-merton-report": () =>
+    Promise.all([
+      import("@/hooks/models/use-merton-report/use-merton-report"),
+    ]).then((modules) => ({
+      name: "use-merton-report",
+      modules: modules.length,
+    })),
+  "use-merton-model-validator": () =>
+    Promise.all([
+      import("@/hooks/models/use-merton-model-validator/use-merton-model-validator"),
+    ]).then((modules) => ({
+      name: "use-merton-model-validator",
+      modules: modules.length,
+    })),
   "use-evaluate-statement": () =>
     Promise.all([
       import("@/hooks/statements/use-evaluate-statement/use-evaluate-statement"),
@@ -1248,6 +1262,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/market_context_state"),
     ]).then((modules) => ({
       name: "contract-market-context-state",
+      modules: modules.length,
+    })),
+  "contract-merton-model": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/merton_model.json"),
+      import("@/lib/finstack/generated/types/merton_model"),
+      import("@/lib/finstack/generated/meta/merton_model"),
+    ]).then((modules) => ({
+      name: "contract-merton-model",
       modules: modules.length,
     })),
   "contract-portfolio-result": () =>

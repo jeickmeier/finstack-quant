@@ -232,6 +232,7 @@ finstack-quant-ui/src/generated/meta/interest_rate_swap.ts
 finstack-quant-ui/src/generated/meta/levered_real_estate_equity.ts
 finstack-quant-ui/src/generated/meta/lookback_option.ts
 finstack-quant-ui/src/generated/meta/market_context_state.ts
+finstack-quant-ui/src/generated/meta/merton_model.ts
 finstack-quant-ui/src/generated/meta/ndf.ts
 finstack-quant-ui/src/generated/meta/oas_config.ts
 finstack-quant-ui/src/generated/meta/portfolio_result.ts
@@ -333,6 +334,7 @@ finstack-quant-ui/src/generated/schemas/interest_rate_swap.json
 finstack-quant-ui/src/generated/schemas/levered_real_estate_equity.json
 finstack-quant-ui/src/generated/schemas/lookback_option.json
 finstack-quant-ui/src/generated/schemas/market_context_state.json
+finstack-quant-ui/src/generated/schemas/merton_model.json
 finstack-quant-ui/src/generated/schemas/ndf.json
 finstack-quant-ui/src/generated/schemas/oas_config.json
 finstack-quant-ui/src/generated/schemas/portfolio_result.json
@@ -431,6 +433,7 @@ finstack-quant-ui/src/generated/types/interest_rate_swap.ts
 finstack-quant-ui/src/generated/types/levered_real_estate_equity.ts
 finstack-quant-ui/src/generated/types/lookback_option.ts
 finstack-quant-ui/src/generated/types/market_context_state.ts
+finstack-quant-ui/src/generated/types/merton_model.ts
 finstack-quant-ui/src/generated/types/ndf.ts
 finstack-quant-ui/src/generated/types/oas_config.ts
 finstack-quant-ui/src/generated/types/portfolio_result.ts
