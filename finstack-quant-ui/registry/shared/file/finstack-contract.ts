@@ -22,6 +22,8 @@ import type {
   SensitivityResult,
   TornadoEntry,
   GoalSeekResult,
+  VarianceReport,
+  ForecastMetrics,
   ArbitrageValidationResult,
   ApplicationReport,
   HorizonReport,
@@ -255,6 +257,36 @@ export interface GoalSeekRequest {
   readonly updateModel: boolean;
   /** `[lower, upper]` search bracket in the driver node's units. */
   readonly bounds?: readonly [number, number];
+}
+/** Two evaluated StatementResults compared under a Rust VarianceConfig. */
+export interface RunVarianceRequest {
+  /** Host-serialized baseline StatementResult. */
+  readonly baseJson: string;
+  /** Host-serialized comparison StatementResult. */
+  readonly comparisonJson: string;
+  /** Rust VarianceConfig JSON: labels, metrics and periods. */
+  readonly configJson: string;
+}
+/** One target metric's variance between two evaluated results, explained by driver nodes. */
+export interface VarianceBridgeRequest {
+  readonly baseJson: string;
+  readonly comparisonJson: string;
+  readonly targetMetric: string;
+  /** Period identifier, such as `2025Q4`. */
+  readonly period: string;
+  /** Driver node ids, in the order Rust reports their contributions. */
+  readonly drivers: readonly string[];
+  readonly baselineLabel: string;
+  readonly comparisonLabel: string;
+}
+/** Native BridgeChart (not a top-level package export). */
+export type BridgeChart = ReturnType<
+  typeof statements_analytics.varianceBridge
+>;
+/** Realized and forecast values aligned one-for-one, in the same units. */
+export interface BacktestForecastRequest {
+  readonly actual: readonly number[];
+  readonly forecast: readonly number[];
 }
 /** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
 export interface StatementRollupRequest {
@@ -1158,6 +1190,16 @@ export interface StatementsApi {
   ): Promise<Envelope<StatementSensitivity>>;
   /** statements_analytics.goalSeek: the driver value that brings the target node to the target value, and optionally the updated model. */
   goalSeek(request: GoalSeekRequest): Promise<Envelope<GoalSeekResult>>;
+  /** statements_analytics.runVariance: metric-by-period variance of two evaluated results. */
+  runVariance(request: RunVarianceRequest): Promise<Envelope<VarianceReport>>;
+  /** statements_analytics.varianceBridge: baseline and comparison values of a target metric, driver contributions in driver order and the unexplained residual. */
+  varianceBridge(
+    request: VarianceBridgeRequest,
+  ): Promise<Envelope<BridgeChart>>;
+  /** statements_analytics.backtestForecast: MAE, MAPE, sMAPE and RMSE of a forecast against realized values. */
+  backtestForecast(
+    request: BacktestForecastRequest,
+  ): Promise<Envelope<ForecastMetrics>>;
 }
 /** Every worker method, grouped by the crate whose facade namespace it calls. */
 export type WorkerApi = {

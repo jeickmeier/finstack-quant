@@ -180,6 +180,7 @@ finstack-quant-ui/src/generated/meta/basket.ts
 finstack-quant-ui/src/generated/meta/bermudan_swaption.ts
 finstack-quant-ui/src/generated/meta/bond.ts
 finstack-quant-ui/src/generated/meta/bond_future.ts
+finstack-quant-ui/src/generated/meta/bridge_chart.ts
 finstack-quant-ui/src/generated/meta/calibration.ts
 finstack-quant-ui/src/generated/meta/callable_range_accrual.ts
 finstack-quant-ui/src/generated/meta/cap_floor.ts
@@ -217,6 +218,7 @@ finstack-quant-ui/src/generated/meta/equity_future_option.ts
 finstack-quant-ui/src/generated/meta/equity_option.ts
 finstack-quant-ui/src/generated/meta/equity_total_return_future.ts
 finstack-quant-ui/src/generated/meta/financial_model_spec.ts
+finstack-quant-ui/src/generated/meta/forecast_metrics.ts
 finstack-quant-ui/src/generated/meta/forward_rate_agreement.ts
 finstack-quant-ui/src/generated/meta/fx_barrier_option.ts
 finstack-quant-ui/src/generated/meta/fx_digital_option.ts
@@ -272,6 +274,7 @@ finstack-quant-ui/src/generated/meta/term_loan.ts
 finstack-quant-ui/src/generated/meta/trs_equity.ts
 finstack-quant-ui/src/generated/meta/trs_fixed_income_index.ts
 finstack-quant-ui/src/generated/meta/valuation_result.ts
+finstack-quant-ui/src/generated/meta/variance_config.ts
 finstack-quant-ui/src/generated/meta/variance_swap.ts
 finstack-quant-ui/src/generated/meta/vm_result.ts
 finstack-quant-ui/src/generated/meta/volatility_index_future.ts
@@ -296,6 +299,7 @@ finstack-quant-ui/src/generated/schemas/basket.json
 finstack-quant-ui/src/generated/schemas/bermudan_swaption.json
 finstack-quant-ui/src/generated/schemas/bond.json
 finstack-quant-ui/src/generated/schemas/bond_future.json
+finstack-quant-ui/src/generated/schemas/bridge_chart.json
 finstack-quant-ui/src/generated/schemas/calibration.json
 finstack-quant-ui/src/generated/schemas/callable_range_accrual.json
 finstack-quant-ui/src/generated/schemas/cap_floor.json
@@ -333,6 +337,7 @@ finstack-quant-ui/src/generated/schemas/equity_future_option.json
 finstack-quant-ui/src/generated/schemas/equity_option.json
 finstack-quant-ui/src/generated/schemas/equity_total_return_future.json
 finstack-quant-ui/src/generated/schemas/financial_model_spec.json
+finstack-quant-ui/src/generated/schemas/forecast_metrics.json
 finstack-quant-ui/src/generated/schemas/forward_rate_agreement.json
 finstack-quant-ui/src/generated/schemas/fx_barrier_option.json
 finstack-quant-ui/src/generated/schemas/fx_digital_option.json
@@ -387,6 +392,7 @@ finstack-quant-ui/src/generated/schemas/term_loan.json
 finstack-quant-ui/src/generated/schemas/trs_equity.json
 finstack-quant-ui/src/generated/schemas/trs_fixed_income_index.json
 finstack-quant-ui/src/generated/schemas/valuation_result.json
+finstack-quant-ui/src/generated/schemas/variance_config.json
 finstack-quant-ui/src/generated/schemas/variance_swap.json
 finstack-quant-ui/src/generated/schemas/vm_result.json
 finstack-quant-ui/src/generated/schemas/volatility_index_future.json
@@ -409,6 +415,7 @@ finstack-quant-ui/src/generated/types/basket.ts
 finstack-quant-ui/src/generated/types/bermudan_swaption.ts
 finstack-quant-ui/src/generated/types/bond.ts
 finstack-quant-ui/src/generated/types/bond_future.ts
+finstack-quant-ui/src/generated/types/bridge_chart.ts
 finstack-quant-ui/src/generated/types/calibration.ts
 finstack-quant-ui/src/generated/types/callable_range_accrual.ts
 finstack-quant-ui/src/generated/types/cap_floor.ts
@@ -446,6 +453,7 @@ finstack-quant-ui/src/generated/types/equity_future_option.ts
 finstack-quant-ui/src/generated/types/equity_option.ts
 finstack-quant-ui/src/generated/types/equity_total_return_future.ts
 finstack-quant-ui/src/generated/types/financial_model_spec.ts
+finstack-quant-ui/src/generated/types/forecast_metrics.ts
 finstack-quant-ui/src/generated/types/forward_rate_agreement.ts
 finstack-quant-ui/src/generated/types/fx_barrier_option.ts
 finstack-quant-ui/src/generated/types/fx_digital_option.ts
@@ -501,6 +509,7 @@ finstack-quant-ui/src/generated/types/term_loan.ts
 finstack-quant-ui/src/generated/types/trs_equity.ts
 finstack-quant-ui/src/generated/types/trs_fixed_income_index.ts
 finstack-quant-ui/src/generated/types/valuation_result.ts
+finstack-quant-ui/src/generated/types/variance_config.ts
 finstack-quant-ui/src/generated/types/variance_swap.ts
 finstack-quant-ui/src/generated/types/vm_result.ts
 finstack-quant-ui/src/generated/types/volatility_index_future.ts

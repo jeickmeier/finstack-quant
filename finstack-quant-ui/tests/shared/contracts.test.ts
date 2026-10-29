@@ -113,7 +113,8 @@ describe("discovered canonical fixtures", () => {
     // Rust publishes no example for CovenantReport, DatedCovenantReports,
     // the five credit-scoring inputs, MertonModel, CreditAssessment,
     // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet,
-    // ScenarioDiff or SensitivityResult; every other root carries one.
+    // ScenarioDiff, SensitivityResult, BridgeChart, ForecastMetrics or
+    // VarianceConfig; every other root carries one.
     expect(withoutExamples).toEqual([
       "schemas/covenant_report.json",
       "schemas/dated_covenant_reports.json",
@@ -123,14 +124,17 @@ describe("discovered canonical fixtures", () => {
       "schemas/merton_model.json",
       "schemas/ohlson_o_score_input.json",
       "schemas/zmijewski_input.json",
+      "schemas/bridge_chart.json",
       "schemas/credit_assessment.json",
       "schemas/dcf_options.json",
       "schemas/dcf_sensitivity_result.json",
+      "schemas/forecast_metrics.json",
       "schemas/lbo_config.json",
       "schemas/lbo_result.json",
       "schemas/scenario_diff.json",
       "schemas/scenario_set.json",
       "schemas/sensitivity_result.json",
+      "schemas/variance_config.json",
     ]);
   });
   it("accepts the captured native credit assessment under the generated CreditAssessment schema unchanged", async () => {
@@ -224,6 +228,30 @@ describe("discovered canonical fixtures", () => {
     );
     expect(result.scenarios).toHaveLength(4);
     expect(validator.parse(result)).toEqual(result);
+  });
+  it("accepts the captured native bridge and backtest under their generated schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    for (const [schemaName, fixtureName] of [
+      ["schemas/bridge_chart.json", "analyst-bridge.json"],
+      ["schemas/forecast_metrics.json", "analyst-backtest.json"],
+    ]) {
+      const validator = z.fromJSONSchema(
+        converterSchema(
+          JSON.parse(await readFile(resolve(generated, schemaName), "utf8")),
+        ),
+      );
+      const fixture = JSON.parse(
+        await readFile(
+          resolve(
+            repo,
+            "finstack-quant-ui/src/fixtures/statements",
+            fixtureName,
+          ),
+          "utf8",
+        ),
+      );
+      expect(validator.parse(fixture)).toEqual(fixture);
+    }
   });
   it("accepts the captured native covenant series under the generated DatedCovenantReports and CovenantReport schemas unchanged", async () => {
     const generated = resolve(repo, "finstack-quant-ui/src/generated");

@@ -32,6 +32,9 @@ export type StatementsNative = {
     | "runSensitivity"
     | "generateTornadoEntries"
     | "goalSeek"
+    | "runVariance"
+    | "varianceBridge"
+    | "backtestForecast"
   >;
 };
 /** StatementsApi over the statements and statements_analytics facade namespaces. */
@@ -261,6 +264,36 @@ export function createStatementsService(
           request.bounds === undefined
             ? undefined
             : [request.bounds[0], request.bounds[1]],
+        ),
+      );
+    },
+    runVariance(request) {
+      return context.result(() =>
+        native.statements_analytics.runVariance(
+          request.baseJson,
+          request.comparisonJson,
+          request.configJson,
+        ),
+      );
+    },
+    varianceBridge(request) {
+      return context.result(() =>
+        native.statements_analytics.varianceBridge(
+          request.baseJson,
+          request.comparisonJson,
+          request.targetMetric,
+          request.period,
+          [...request.drivers],
+          request.baselineLabel,
+          request.comparisonLabel,
+        ),
+      );
+    },
+    backtestForecast(request) {
+      return context.result(() =>
+        native.statements_analytics.backtestForecast(
+          [...request.actual],
+          [...request.forecast],
         ),
       );
     },

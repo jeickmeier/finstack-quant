@@ -1,0 +1,102 @@
+{
+  "baseline_label": "Before roll forward",
+  "comparison_label": "After roll forward",
+  "rows": [
+    {
+      "period": "2025Q2",
+      "metric": "revenue",
+      "baseline": 214549000,
+      "comparison": 218200000,
+      "abs_var": 3651000,
+      "pct_var": 0.01701709166670551
+    },
+    {
+      "period": "2025Q3",
+      "metric": "revenue",
+      "baseline": 222058214.99999997,
+      "comparison": 219600000,
+      "abs_var": -2458214.99999997,
+      "pct_var": -0.011070137621343892
+    },
+    {
+      "period": "2025Q4",
+      "metric": "revenue",
+      "baseline": 231384660.02999997,
+      "comparison": 228900000,
+      "abs_var": -2484660.0299999714,
+      "pct_var": -0.01073822279176945
+    },
+    {
+      "period": "2025Q2",
+      "metric": "opex",
+      "baseline": 87994200,
+      "comparison": 89100000,
+      "abs_var": 1105800,
+      "pct_var": 0.01256673735314373
+    },
+    {
+      "period": "2025Q3",
+      "metric": "opex",
+      "baseline": 89930072.4,
+      "comparison": 91400000,
+      "abs_var": 1469927.599999994,
+      "pct_var": 0.016345228695712626
+    },
+    {
+      "period": "2025Q4",
+      "metric": "opex",
+      "baseline": 91908533.99280001,
+      "comparison": 92600000,
+      "abs_var": 691466.0071999878,
+      "pct_var": 0.007523414607550549
+    },
+    {
+      "period": "2025Q2",
+      "metric": "ebitda",
+      "baseline": 54144512.5,
+      "comparison": 55457500,
+      "abs_var": 1312987.5,
+      "pct_var": 0.024249687352896565
+    },
+    {
+      "period": "2025Q3",
+      "metric": "ebitda",
+      "baseline": 57183495.037499964,
+      "comparison": 54085000,
+      "abs_var": -3098495.0374999642,
+      "pct_var": -0.05418512868910905
+    },
+    {
+      "period": "2025Q4",
+      "metric": "ebitda",
+      "baseline": 61383803.27707498,
+      "comparison": 59046250,
+      "abs_var": -2337553.2770749778,
+      "pct_var": -0.038080945661247166
+    },
+    {
+      "period": "2025Q2",
+      "metric": "leverage",
+      "baseline": 2.0224928898239174,
+      "comparison": 2.009785742484239,
+      "abs_var": -0.012707147339678482,
+      "pct_var": -0.006282913232285723
+    },
+    {
+      "period": "2025Q3",
+      "metric": "leverage",
+      "baseline": 1.888721960602909,
+      "comparison": 1.9043858936098563,
+      "abs_var": 0.01566393300694724,
+      "pct_var": 0.00829340333499753
+    },
+    {
+      "period": "2025Q4",
+      "metric": "leverage",
+      "baseline": 1.9188563760404616,
+      "comparison": 1.9548231282852677,
+      "abs_var": 0.035966752244806166,
+      "pct_var": 0.01874384799920417
+    }
+  ]
+}

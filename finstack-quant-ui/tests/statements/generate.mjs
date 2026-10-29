@@ -126,6 +126,60 @@ await write(
     ),
   ),
 );
+// Since the last roll forward: the analyst model (actuals to 2025Q1) against
+// analyst-reported-2025Q4.json, an illustrative host update reporting
+// 2025Q2-2025Q4 with revenue, opex and D&A away from the forecast. The
+// compared periods are the three it reported, as the workbench chooses them.
+const reportedEvaluator = new native.Evaluator();
+const reportedJson = serializeHost(
+  reportedEvaluator.evaluate(
+    native.validateFinancialModelJson(
+      await read("analyst-reported-2025Q4.json"),
+    ),
+  ),
+);
+reportedEvaluator.free();
+const rolled = ["2025Q2", "2025Q3", "2025Q4"];
+const rollLabels = ["Before roll forward", "After roll forward"];
+await write(
+  "analyst-variance.json",
+  serializeHost(
+    native.runVariance(
+      resultJson,
+      reportedJson,
+      JSON.stringify({
+        baseline_label: rollLabels[0],
+        comparison_label: rollLabels[1],
+        metrics: ["revenue", "opex", "ebitda", "leverage"],
+        periods: rolled,
+      }),
+    ),
+  ),
+);
+await write(
+  "analyst-bridge.json",
+  serializeHost(
+    native.varianceBridge(
+      resultJson,
+      reportedJson,
+      "ebitda",
+      "2025Q2",
+      ["revenue", "cogs", "opex"],
+      ...rollLabels,
+    ),
+  ),
+);
+const before = JSON.parse(resultJson).nodes.revenue;
+const after = JSON.parse(reportedJson).nodes.revenue;
+await write(
+  "analyst-backtest.json",
+  serializeHost(
+    native.backtestForecast(
+      rolled.map((period) => after[period]),
+      rolled.map((period) => before[period]),
+    ),
+  ),
+);
 // Native scenarioDiff over the analyst scenario set (base → downside → severe):
 // each scenario against its parent, over the P&L lines for the 2025 quarters.
 const scenarioSetJson = await read("analyst-scenarios.json");

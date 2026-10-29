@@ -69,6 +69,8 @@ const sources = {
   statementSensitivity: "src/fixtures/statements/analyst-sensitivity.json",
   statementGoalSeekRun: "src/fixtures/statements/analyst-goal-seek-run.json",
   statementGoalSeek: "src/fixtures/statements/analyst-goal-seek.json",
+  statementBridge: "src/fixtures/statements/analyst-bridge.json",
+  statementBacktest: "src/fixtures/statements/analyst-backtest.json",
   statementScenarios: "src/fixtures/statements/analyst-scenarios.json",
   statementScenarioDiff: "src/fixtures/statements/analyst-scenario-diff.json",
   statementRollForward2025Q2:

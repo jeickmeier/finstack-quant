@@ -431,6 +431,27 @@ export const importHarnesses = {
     Promise.all([
       import("@/hooks/statements/use-goal-seek/use-goal-seek"),
     ]).then((modules) => ({ name: "use-goal-seek", modules: modules.length })),
+  "use-run-variance": () =>
+    Promise.all([
+      import("@/hooks/statements/use-run-variance/use-run-variance"),
+    ]).then((modules) => ({
+      name: "use-run-variance",
+      modules: modules.length,
+    })),
+  "use-variance-bridge": () =>
+    Promise.all([
+      import("@/hooks/statements/use-variance-bridge/use-variance-bridge"),
+    ]).then((modules) => ({
+      name: "use-variance-bridge",
+      modules: modules.length,
+    })),
+  "use-backtest-forecast": () =>
+    Promise.all([
+      import("@/hooks/statements/use-backtest-forecast/use-backtest-forecast"),
+    ]).then((modules) => ({
+      name: "use-backtest-forecast",
+      modules: modules.length,
+    })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -1509,6 +1530,15 @@ export const importHarnesses = {
       name: "contract-valuation-result",
       modules: modules.length,
     })),
+  "contract-bridge-chart": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/bridge_chart.json"),
+      import("@/lib/finstack/generated/types/bridge_chart"),
+      import("@/lib/finstack/generated/meta/bridge_chart"),
+    ]).then((modules) => ({
+      name: "contract-bridge-chart",
+      modules: modules.length,
+    })),
   "contract-credit-assessment": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/credit_assessment.json"),
@@ -1534,6 +1564,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/dcf_sensitivity_result"),
     ]).then((modules) => ({
       name: "contract-dcf-sensitivity-result",
+      modules: modules.length,
+    })),
+  "contract-forecast-metrics": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/forecast_metrics.json"),
+      import("@/lib/finstack/generated/types/forecast_metrics"),
+      import("@/lib/finstack/generated/meta/forecast_metrics"),
+    ]).then((modules) => ({
+      name: "contract-forecast-metrics",
       modules: modules.length,
     })),
   "contract-lbo-config": () =>
@@ -1579,6 +1618,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/sensitivity_result"),
     ]).then((modules) => ({
       name: "contract-sensitivity-result",
+      modules: modules.length,
+    })),
+  "contract-variance-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/variance_config.json"),
+      import("@/lib/finstack/generated/types/variance_config"),
+      import("@/lib/finstack/generated/meta/variance_config"),
+    ]).then((modules) => ({
+      name: "contract-variance-config",
       modules: modules.length,
     })),
   "contract-check-suite-spec": () =>

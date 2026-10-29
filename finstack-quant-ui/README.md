@@ -516,6 +516,19 @@ and the target metric in every returned scenario, and `GoalSeekForm` solves
 only on Solve; Apply to model is a second, explicit action that commits the
 returned model through the workbench (no undo), blocked once the model has
 changed since the solve.
+`useRunVariance` (`use-run-variance`), `useVarianceBridge`
+(`use-variance-bridge`) and `useBacktestForecast` (`use-backtest-forecast`)
+pass two host-serialized results to `statements_analytics.runVariance` (with
+a `VarianceConfig`) and `varianceBridge` (target, period, drivers, labels),
+and two aligned series to `backtestForecast`. When a roll forward is accepted
+the workbench keeps the pre-roll model and result; the Forecast tab's "Since
+last roll forward" section then compares them over the periods the roll
+reported (forecast before, actual after), offering only nodes present in both
+results: `VarianceTable` for the variance, `VarianceBridgeChart` (baseline,
+one signed bar from zero per driver contribution in Rust's order, Rust's
+unexplained residual and the comparison; no cumulative positioning, since the
+contributions are raw driver deltas) and `ForecastBacktest` for the pre-roll
+forecast against the reported values.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useMetrics(instrumentType)` returns the standard metrics Rust registers for
 that type (`metricsForInstrument`), grouped by native category; `null` disables
