@@ -337,6 +337,12 @@
       "worker": "none"
     },
     {
+      "name": "scenario-pnl-table",
+      "type": "registry:component",
+      "docs": "Display-only view of the batch returned by useScenarioPnlBatch (portfolio.scenarioPnlBatch): rows in Portfolio#positionIds (spec) order, never the by_position key order, plus any position a scenario added in returned key order; one column per scenario in batch order with the exact returned by_position money; a total row from each scenario's returned pnl.total (base currency); a bar chart of those totals; and each scenario's ApplicationReport through market-scenario-report in a disclosure. Nothing is summed or differenced. Accepts report ({positionIds, items}), loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "simm-sensitivity-table",
       "type": "registry:component",
       "docs": "Display-only view of a SimmSensitivitiesJson document (for example the canonical text useSimmSensitivitiesValidator returns, parsed). Sections follow the SIMM risk classes (interest rate, credit qualifying, credit non-qualifying, equity, commodity, FX); each holds the class's delta and vega tuples in input order, with columns named after the Rust tuple positions, and the curvature entries whose risk_class is that class. Empty fields are omitted. Nothing is summed, netted, regrouped or converted; amounts are in the set's base currency, which is shown. Accepts sensitivities, formatValue and density props; no worker or query provider required.",
@@ -512,6 +518,14 @@
     },
     {
       "name": "use-portfolio-spec-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-scenario-pnl-batch",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-apply-scenario-and-revalue",
       "type": "registry:hook"
     },
     {
@@ -963,6 +977,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-scenario-pnl-batch-item",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-scenario-revalue-view",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-instrument-cashflow",
       "type": "registry:lib"
     },
@@ -1071,6 +1093,10 @@
     {
       "path": "finstack-quant-ui/tests/portfolio/gallery.json",
       "sha256": "3243821ebef6307028c226ffd0f47c7e5a65dc66279b4842c534aa53de0f1e12"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/scenario-pnl.json",
+      "sha256": "d803505d3192eb99918c7ce6b7b6949f76e99c7059f6b107e1cf0054ecaf6137"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",

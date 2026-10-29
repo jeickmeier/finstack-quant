@@ -3829,6 +3829,72 @@
       }
     },
     {
+      "name": "contract-scenario-pnl-batch-item",
+      "type": "registry:lib",
+      "title": "Scenario pnl batch item contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_pnl_batch_item contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_pnl_batch_item.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_pnl_batch_item.json"
+        },
+        {
+          "path": "src/generated/types/scenario_pnl_batch_item.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_pnl_batch_item.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_pnl_batch_item.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_pnl_batch_item.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-scenario-revalue-view",
+      "type": "registry:lib",
+      "title": "Scenario revalue view contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_revalue_view contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_revalue_view.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_revalue_view.json"
+        },
+        {
+          "path": "src/generated/types/scenario_revalue_view.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_revalue_view.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_revalue_view.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_revalue_view.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-instrument-cashflow",
       "type": "registry:lib",
       "title": "Instrument cashflow contract",

@@ -107,6 +107,43 @@
       }
     },
     {
+      "name": "scenario-pnl-table",
+      "type": "registry:component",
+      "title": "Portfolio scenario P&L",
+      "description": "Display of native portfolio scenario P&L: positions by scenarios as returned, a total row from each scenario's returned total, a bar chart of the totals and each scenario's report.",
+      "docs": "Display-only view of the batch returned by useScenarioPnlBatch (portfolio.scenarioPnlBatch): rows in Portfolio#positionIds (spec) order, never the by_position key order, plus any position a scenario added in returned key order; one column per scenario in batch order with the exact returned by_position money; a total row from each scenario's returned pnl.total (base currency); a bar chart of those totals; and each scenario's ApplicationReport through market-scenario-report in a disclosure. Nothing is summed or differenced. Accepts report ({positionIds, items}), loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/scenario-pnl-table/scenario-pnl-table.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/portfolio/components/scenario-pnl-table/scenario-pnl-table.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/market-scenario-report"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-value-portfolio",
       "type": "registry:hook",
       "title": "useValuePortfolio",
@@ -171,6 +208,56 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-scenario-pnl-batch",
+      "type": "registry:hook",
+      "title": "useScenarioPnlBatch",
+      "description": "Values a host-supplied portfolio under an ordered batch of scenarios through the WASM worker and returns each scenario's native P&L.",
+      "docs": "portfolio.scenarioPnlBatch over the shared cached Portfolio (Portfolio.fromSpec, keyed on canonical Portfolio#toJson) and MarketContext handles; the ScenarioSpec texts are joined into one JSON array and never parsed. Rust values the unshocked base once, then each scenario; it returns one ScenarioPnlBatchItem (scenario_id, pnl with the base-currency total and by_position, report) per scenario in input order, with the book's position ids (Portfolio#positionIds) because integer-like by_position keys enumerate numerically in JavaScript. The batch fails whole with the earliest failing scenario's native error. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-scenario-pnl-batch/use-scenario-pnl-batch.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-scenario-pnl-batch/use-scenario-pnl-batch.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-apply-scenario-and-revalue",
+      "type": "registry:hook",
+      "title": "useApplyScenarioAndRevalue",
+      "description": "Applies one scenario to a host-supplied portfolio's market through the WASM worker and returns the native stressed valuation and report.",
+      "docs": "portfolio.applyScenarioAndRevalue over the shared cached Portfolio and MarketContext handles. Returns {positionIds, entityIds, view}: the book's id orders and the native ScenarioRevalueView (the stressed PortfolioValuation, whose valuation_result fields keep 64-bit values as bigint, and the ApplicationReport); present it with portfolio-summary and positions-table. No P&L is computed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-apply-scenario-and-revalue/use-apply-scenario-and-revalue.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-apply-scenario-and-revalue/use-apply-scenario-and-revalue.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
       "categories": [],
       "meta": {
         "version": "0.2.0",

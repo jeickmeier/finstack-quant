@@ -104,6 +104,8 @@ export async function generate(repo = repoRoot) {
           "covenant_report",
           "dated_covenant_reports",
           "portfolio_result",
+          "scenario_pnl_batch_item",
+          "scenario_revalue_view",
           "simm_sensitivities_json",
           "im_result",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),

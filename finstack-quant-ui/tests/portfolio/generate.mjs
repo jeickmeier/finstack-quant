@@ -121,8 +121,49 @@ const cases = [
     },
   },
 ];
+// Scenario P&L: the host-parity book at t0 under its two parity scenarios
+// (portfolio.scenarioPnlBatch, scenario texts joined into one JSON array as
+// the worker does), and the first scenario through applyScenarioAndRevalue.
+function scenarioPnl(specJson, marketJson, scenarioJsons) {
+  const book = native.Portfolio.fromSpec(specJson);
+  const market = native.MarketContext.fromJson(marketJson);
+  try {
+    return {
+      request: { scenarioJsons },
+      batch: {
+        positionIds: book.positionIds,
+        items: native.scenarioPnlBatch(
+          book,
+          `[${scenarioJsons.join(",")}]`,
+          market,
+        ),
+      },
+      revalue: {
+        scenarioJson: scenarioJsons[0],
+        positionIds: book.positionIds,
+        entityIds: book.entityIds,
+        view: native.applyScenarioAndRevalue(book, scenarioJsons[0], market),
+      },
+    };
+  } finally {
+    book.free();
+    market.free();
+  }
+}
+cases.push({
+  file: "scenario-pnl.json",
+  value: {
+    ...scenarioPnl(
+      JSON.stringify(inputs.portfolio_spec),
+      JSON.stringify(inputs.market_t0),
+      inputs.scenarios.map((scenario) => JSON.stringify(scenario)),
+    ),
+    // The batch pinned by the Py/WASM host-parity tests.
+    expected: { scenario_pnl_batch: expected.scenario_pnl_batch },
+  },
+});
 for (const { file, value } of cases)
   await emit(new URL(file, import.meta.url), serializeHost(value));
 console.log(
-  `${checking ? "Checked" : "Generated"} ${cases.length} native portfolio valuations.`,
+  `${checking ? "Checked" : "Generated"} ${cases.length} native portfolio fixtures.`,
 );

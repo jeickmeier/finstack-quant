@@ -356,6 +356,19 @@ const displays = [
       "Returned PortfolioMetrics: aggregated totals with by-entity values, raw by-position metrics with their native currency, unaggregated_metrics, skipped_metrics and degraded_positions as returned. The portfolioMetricsSeries chart keeps Rust's (lexical) entry order, grouped by the first key component; no tenor sort while tenor ordering is an owner decision.",
   },
   {
+    id: "scenario-pnl-table",
+    schema: `${base}portfolio/1/scenario_pnl_batch_item.schema.json`,
+    pointer: "#",
+    api: [
+      "portfolio.scenarioPnlBatch",
+      "PortfolioNamespace",
+      "scenarioPnlBatch",
+    ],
+    route: "returned-pnl",
+    convention:
+      "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",
+  },
+  {
     id: "transition-matrix-heatmap",
     api: [
       "models.credit.migration.TransitionMatrix#toRows",

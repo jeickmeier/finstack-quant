@@ -244,6 +244,8 @@ finstack-quant-ui/src/generated/meta/revolving_credit.ts
 finstack-quant-ui/src/generated/meta/rollup_spec.ts
 finstack-quant-ui/src/generated/meta/scenario_diff.ts
 finstack-quant-ui/src/generated/meta/scenario_grid.ts
+finstack-quant-ui/src/generated/meta/scenario_pnl_batch_item.ts
+finstack-quant-ui/src/generated/meta/scenario_revalue_view.ts
 finstack-quant-ui/src/generated/meta/scenario_set.ts
 finstack-quant-ui/src/generated/meta/shared.ts
 finstack-quant-ui/src/generated/meta/simm_sensitivities_json.ts
@@ -343,6 +345,8 @@ finstack-quant-ui/src/generated/schemas/revolving_credit.json
 finstack-quant-ui/src/generated/schemas/rollup_spec.json
 finstack-quant-ui/src/generated/schemas/scenario_diff.json
 finstack-quant-ui/src/generated/schemas/scenario_grid.json
+finstack-quant-ui/src/generated/schemas/scenario_pnl_batch_item.json
+finstack-quant-ui/src/generated/schemas/scenario_revalue_view.json
 finstack-quant-ui/src/generated/schemas/scenario_set.json
 finstack-quant-ui/src/generated/schemas/simm_sensitivities_json.json
 finstack-quant-ui/src/generated/schemas/snowball.json
@@ -439,6 +443,8 @@ finstack-quant-ui/src/generated/types/revolving_credit.ts
 finstack-quant-ui/src/generated/types/rollup_spec.ts
 finstack-quant-ui/src/generated/types/scenario_diff.ts
 finstack-quant-ui/src/generated/types/scenario_grid.ts
+finstack-quant-ui/src/generated/types/scenario_pnl_batch_item.ts
+finstack-quant-ui/src/generated/types/scenario_revalue_view.ts
 finstack-quant-ui/src/generated/types/scenario_set.ts
 finstack-quant-ui/src/generated/types/shared.ts
 finstack-quant-ui/src/generated/types/simm_sensitivities_json.ts

@@ -27,6 +27,8 @@ import type {
   PortfolioMetrics,
   PortfolioMetricSeriesEntry,
   PortfolioValuation,
+  ScenarioPnlBatchItem,
+  ScenarioRevalueView,
   ImResult,
   statements_analytics,
   valuations,
@@ -318,6 +320,40 @@ export interface PortfolioMetricsSeriesRequest {
   /** Canonical base metric id, for example "bucketed_dv01". */
   readonly base: string;
 }
+/** A host-supplied book and market under an ordered batch of canonical scenarios. */
+export interface ScenarioPnlBatchRequest {
+  /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
+  readonly specJson: string;
+  /** Canonical MarketContext JSON of the unshocked market. */
+  readonly marketJson: string;
+  /** ScenarioSpec JSON texts in batch order; passed to Rust as one JSON array, never parsed here. */
+  readonly scenarioJsons: readonly string[];
+}
+/** The native batch and the book's position order. */
+export interface ScenarioPnlBatch {
+  /** Position ids in spec order (Portfolio#positionIds); `pnl.by_position` keys do not keep it. */
+  readonly positionIds: string[];
+  /** portfolio.scenarioPnlBatch: one item per scenario, in input order. */
+  readonly items: ScenarioPnlBatchItem[];
+}
+/** A host-supplied book and market under one canonical scenario. */
+export interface ScenarioRevalueRequest {
+  /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
+  readonly specJson: string;
+  /** Canonical MarketContext JSON of the unshocked market. */
+  readonly marketJson: string;
+  /** Canonical ScenarioSpec JSON. */
+  readonly scenarioJson: string;
+}
+/** The native stressed valuation and the book's id orders. */
+export interface ScenarioRevalue {
+  /** Position ids in spec order (Portfolio#positionIds). */
+  readonly positionIds: string[];
+  /** Entity ids in registration order (Portfolio#entityIds). */
+  readonly entityIds: string[];
+  /** portfolio.applyScenarioAndRevalue; each `valuation_result` keeps 64-bit fields as bigint. */
+  readonly view: ScenarioRevalueView;
+}
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -527,7 +563,7 @@ export interface AnalyticsApi {
     request: PerformanceReportRequest,
   ): Promise<Envelope<PerformanceReport>>;
 }
-/** portfolio: valuation, metric aggregation and spec validation of a host-supplied book. */
+/** portfolio: valuation, metric aggregation, spec validation and scenario P&L of a host-supplied book. */
 export interface PortfolioApi {
   /** portfolio.valuePortfolio over the cached Portfolio and MarketContext handles, then aggregateMetrics over the same market. */
   valuePortfolio(
@@ -539,6 +575,14 @@ export interface PortfolioApi {
   ): Promise<Envelope<PortfolioMetricSeriesEntry[]>>;
   /** portfolio.parsePortfolioSpecJson, then Portfolio.fromSpec through the handle cache: canonical PortfolioSpec JSON of a book that builds. */
   validatePortfolio(specJson: string): Promise<Envelope<string>>;
+  /** portfolio.scenarioPnlBatch over the cached Portfolio and MarketContext handles; the whole batch fails on the earliest failing scenario. */
+  scenarioPnlBatch(
+    request: ScenarioPnlBatchRequest,
+  ): Promise<Envelope<ScenarioPnlBatch>>;
+  /** portfolio.applyScenarioAndRevalue over the cached Portfolio and MarketContext handles. */
+  applyScenarioAndRevalue(
+    request: ScenarioRevalueRequest,
+  ): Promise<Envelope<ScenarioRevalue>>;
 }
 /** margin: SIMM sensitivity validation and indicative initial margin. */
 export interface MarginApi {
