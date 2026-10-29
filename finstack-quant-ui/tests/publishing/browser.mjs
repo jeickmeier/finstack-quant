@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { expect } from "playwright/test";
+import { serializeHost } from "../../src/codec.mjs";
 export async function verifyPublishing(page, evidence, repo) {
   const native = createRequire(import.meta.url)(
     path.join(repo, "finstack-quant-wasm/pkg-node/finstack_quant_wasm.js"),
@@ -154,14 +155,14 @@ export async function verifyPublishing(page, evidence, repo) {
       assert.equal(JSON.parse(instrument).instrument.type, kind);
       assert.equal(instrument, request.instrumentJson);
       assert.equal(market, request.marketJson);
-      const expected = JSON.stringify(
-        native.instrumentCashflows(
-          instrument,
-          market,
-          request.asOf,
-          request.model ?? "default",
-        ),
+      const envelope = native.instrumentCashflows(
+        instrument,
+        market,
+        request.asOf,
+        request.model ?? "default",
       );
+      // The disclosure shows the host serialization of the native envelope object.
+      const expected = serializeHost(envelope);
       const cashflows = workbench.getByRole("region", {
         name: "Cashflows",
         exact: true,
@@ -172,10 +173,10 @@ export async function verifyPublishing(page, evidence, repo) {
       });
       await expect(schedule).toBeVisible();
       await expect(schedule.locator("tbody tr")).toHaveCount(
-        JSON.parse(expected).flows.length,
+        envelope.flows.length,
       );
       await expect(cashflows.locator("pre")).toBeHidden();
-      await cashflows.getByText("Original JSON", { exact: true }).click();
+      await cashflows.getByText("Envelope JSON", { exact: true }).click();
       await cashflows
         .getByRole("button", { name: "Original", exact: true })
         .click();
@@ -231,7 +232,7 @@ export async function verifyPublishing(page, evidence, repo) {
         false,
         "Printed table must fit its paper width",
       );
-      assert.equal(geometry.rows, JSON.parse(expected).flows.length);
+      assert.equal(geometry.rows, envelope.flows.length);
       const printedFigures = await page.evaluate(() =>
         window.readPrintFigureGeometry(),
       );
@@ -285,7 +286,7 @@ export async function verifyPublishing(page, evidence, repo) {
       await expect(workbench).not.toHaveAttribute("data-printing");
       // Printing restores the disclosure state; close the source before the
       // next format so its default table check starts from the same UI state.
-      await cashflows.getByText("Original JSON", { exact: true }).click();
+      await cashflows.getByText("Envelope JSON", { exact: true }).click();
       await expect(cashflows.locator("pre")).toBeHidden();
       await expect(
         workbench.getByRole("tab", { name: "2 Market", exact: true }),
@@ -294,8 +295,8 @@ export async function verifyPublishing(page, evidence, repo) {
         kind,
         format,
         filename,
-        exactNativeText: true,
-        exactDownload: true,
+        envelopeJson: true,
+        envelopeDownload: true,
         controlsHidden: true,
         printGeometry: geometry,
         preparedFigures,
@@ -323,6 +324,6 @@ export async function verifyPublishing(page, evidence, repo) {
     ) + "\n",
   );
   return [
-    "A4/Letter bond and mixed-currency reports print complete cashflow tables; exact native downloads; standalone publication SVG/PNG",
+    "A4/Letter bond and mixed-currency reports print complete cashflow tables; envelope JSON view and download equal the host serialization; standalone publication SVG/PNG",
   ];
 }

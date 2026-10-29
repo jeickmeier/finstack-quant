@@ -12,7 +12,7 @@ The embedded workbench stacks its panels on narrower screens.
 
 The workbench installs into the host application. One shared browser worker validates
 and prices the request. Amounts remain decimal strings while editing; results retain
-the last completed request until a new valuation succeeds. The catalogue supports every discovered instrument. Open a [canonical example](/docs/registry/instruments), select its model and supply its complete market. Market Edit mode validates complete snapshots natively before repricing; View links the stored-node table and chart. Cashflows retain original native text, including mixed currencies; unsupported exports leave successful pricing intact. Detail views preserve metadata and bigint seeds, with raw JSON for incompletely declared payloads.
+the last completed request until a new valuation succeeds. The catalogue supports every discovered instrument. Open a [canonical example](/docs/registry/instruments), select its model and supply its complete market. Market Edit mode validates complete snapshots natively before repricing; View links the stored-node table and chart. Cashflows show the native envelope object, including mixed currencies; unsupported exports leave successful pricing intact. Detail views preserve metadata and bigint seeds, with raw JSON for incompletely declared payloads.
 
 ## Install locally
 
@@ -58,8 +58,9 @@ After **Priced**, choose **Print report**. The workbench captures its completed
 request, waits for raw cashflows and fonts, and prints the existing instrument,
 market, valuation and measures with controls hidden. Select A4 or Letter in the
 browser dialog; the shared theme supplies 12 mm margins and a light presentation.
-Closing the dialog restores your tabs and disclosures. Cashflow text wraps on
-paper; its **Download** action retains the native JSON bytes and currency labels.
+Closing the dialog restores your tabs and disclosures. Envelope JSON wraps on
+paper; its **Download** action saves the host serialization of the returned
+cashflow envelope, with its currency labels.
 
 Chart wrappers expose the shared `FigureHandle` through `figureRef`. A 900 × 600
 layout with `scale: 2` produces a PNG of 1800 × 1200 pixels: place it at 6 × 4 inches

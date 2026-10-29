@@ -85,7 +85,9 @@ To add an item (the gate that catches each omission is in brackets):
    `sources` map of `scripts/gen-gallery.mjs`, which writes the gallery
    `data.json` [local `ui-e2e`].
 5. Cover its behaviour in Vitest under `tests/<crate>/` [review only].
-6. Record its four screenshots with
+6. Rebuild the gallery export with `mise run ui-docs-build` (`ui-e2e` serves
+   that static export, so `ui-docs-install` alone tests a stale gallery), then
+   record its four screenshots with
    `mise run ui-e2e -- --update-snapshots -g "<item>"` and inspect them [local
    `ui-e2e`].
 7. Check it installs in isolation with
@@ -206,9 +208,10 @@ valuations.valuationResultToJson)` emits integer tokens validated by Rust.
 All five detail variants use Rust-derived WASM host declarations and validation
 metadata. Monte Carlo has a dedicated view; the other four retain raw views.
 Path counts are plain numbers (Rust `wire::count`); only schema `int64`/`uint64`
-fields, such as seeds, arrive as bigint. Cashflow structure comes from the
-published Rust `instrument_cashflow` schema. Its presentation adapter preserves
-numeric tokens and the original JSON, including mixed-currency FX-swap rows.
+fields, such as seeds, arrive as bigint. Cashflows arrive as the facade's
+envelope object, validated against the published Rust `instrument_cashflow`
+schema, including mixed-currency FX-swap rows. Its JSON view is `serializeHost`
+text of that object; the facade returns no cashflow text.
 
 `src/contract-provenance.json` records canonical schema pointers, exact facade
 signatures and inputs, conventions, raw routes and deferred gaps. It includes
@@ -222,8 +225,8 @@ manifest and `gen-check`; `ui-check` verifies their drift and manifest coverage.
 
 The scoped tests price all five result-detail variants using the actual facade,
 transport an actual derived seed above 2^53, validate a u64::MAX transport-boundary
-mutation through Rust (not a claim of pricing with that seed), compare original
-cashflow text byte for byte, and preserve the published Float64Array return.
+mutation through Rust (not a claim of pricing with that seed), structured-clone
+the cashflow envelope object, and preserve the published Float64Array return.
 These are Node structured-clone tests. PR-003 owns the production browser-worker
 proof; static export and installation remain later gates. Full `gen-check` and
 Rust schema gates are separate library-wide validation and are not implied by a
@@ -446,8 +449,8 @@ reset or changing that URL creates a fresh worker and query session.
 `marketJson`, `asOf`, `model`, `metrics`, `metricPricingOverrides`, `marketHistory`). JSON
 strings remain unchanged, including wide integer tokens. Results are structured
 clone values; export through the worker's `exportResult` method for native
-canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns original native JSON
-text. `CashflowViewer` accepts that text plus optional loading/error props and needs no provider. It presents native rows in a table, with exact JSON copy/download in a secondary disclosure;
+canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns the native cashflow
+envelope object. `CashflowViewer` accepts that object as `cashflows` plus optional loading/error props and needs no provider. It presents native rows in a table, with `serializeHost` JSON copy/download in a secondary **Envelope JSON** disclosure;
 unsupported export preserves caller pricing/model state and shows the native error. The workbench owns one cashflow query for both display and its print snapshot.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useInstrumentValidator` accepts canonical text and an optional abort signal;
@@ -704,10 +707,11 @@ are copied from an absolute local path before registry resolution.
 Only after all independent installs pass does the gate run a separate composed
 workbench and table/chart selection consumer at root and deployment base paths.
 It exercises the real worker, edited inputs, wide integers, structured failures,
-font/worker/WASM assets, native-result agreement and exact cashflow output.
+font/worker/WASM assets, native-result agreement and native cashflow envelopes.
 Standalone chart and financial-wrapper checks use their public callbacks, tooltip
-props and shared SVG/PNG handles. `CashflowViewer` offers an exact-text JSON
-download; its presentation adapter parses numeric tokens losslessly, without reserializing exports or computing financial values.
+props and shared SVG/PNG handles. `CashflowViewer` validates the supplied envelope
+object against the Rust schema and offers its `serializeHost` JSON for copy and
+download, without computing financial values.
 
 Set `REGISTRY_INSTALL_EVIDENCE` and `REGISTRY_SMOKE_DIR` to retain matrix and
 composition reports, logs, screenshots and exports. Failed applications are kept
@@ -748,11 +752,12 @@ market, valuation, measures and the cashflow table reuse the existing components
 Closing the dialog restores the prior tabs and disclosure state. Unsupported
 cashflow requests retain the native error. The cashflow table preserves row-currency
 amounts separately from reporting-currency PV and shows the supplied total without
-recalculating it. Original JSON remains available in a collapsed disclosure for
-exact copy/download; printed reports show the table instead of the raw export.
+recalculating it. Envelope JSON (the host serialization of the returned object)
+remains available in a collapsed disclosure for copy/download; printed reports
+show the table instead of the raw export.
 
 `mise run ui-publish-check` builds a fresh installed workbench consumer, generates
-four PDFs, verifies native download identity, checks offline SVG/PNG reopening
+four PDFs, verifies the envelope JSON view and download, checks offline SVG/PNG reopening
 and inspects PDF text/fonts/vectors/bounds with pinned pdfplumber. Evidence is
 written under `finstack-quant-ui/test-results/publishing` by default; set
 `REGISTRY_INSTALL_EVIDENCE` to retain it elsewhere. Visual page and desktop-editor

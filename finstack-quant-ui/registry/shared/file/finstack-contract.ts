@@ -13,6 +13,7 @@ import type {
   Explanation,
   DependencyTree,
   CheckReport,
+  valuations,
 } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
 export interface PriceRequest {
@@ -128,8 +129,14 @@ export interface ValuationsApi {
   price(request: PriceRequest): Promise<Envelope<ValuationResult>>;
   /** valuations.instruments.validateInstrumentJson: validate and canonicalize instrument JSON. */
   validate(instrumentJson: string): Promise<Envelope<string>>;
-  /** valuations.instruments.validateInstrumentJson + instrumentCashflowsWithMarket over the cached market handle, returned as JSON text. */
-  cashflows(request: CashflowRequest): Promise<Envelope<string>>;
+  /** valuations.instruments.validateInstrumentJson + instrumentCashflowsWithMarket over the cached market handle; the native envelope object. */
+  cashflows(
+    request: CashflowRequest,
+  ): Promise<
+    Envelope<
+      ReturnType<typeof valuations.instruments.instrumentCashflowsWithMarket>
+    >
+  >;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
   scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
   /** valuations.instruments.listModelsGrouped. */

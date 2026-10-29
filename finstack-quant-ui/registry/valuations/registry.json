@@ -334,8 +334,8 @@
       "name": "cashflow-viewer",
       "type": "registry:component",
       "title": "Cashflow viewer",
-      "description": "Table of supplied native cashflow JSON with row-currency amounts, reporting-currency PV and exact JSON export.",
-      "docs": "Supplied native cashflow JSON table with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download. Accepts text, loading and error props; no worker or query provider required.",
+      "description": "Table of a supplied native cashflow envelope with row-currency amounts, reporting-currency PV and a JSON export.",
+      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, loading and error props; no worker or query provider required.",
       "files": [
         {
           "path": "components/cashflow-viewer/cashflow-viewer.tsx",
@@ -356,7 +356,7 @@
         "@finstack/contract-instrument-cashflow",
         "@finstack/finstack-codec"
       ],
-      "dependencies": ["react@19.2.8", "lossless-json@4.3.1"],
+      "dependencies": ["react@19.2.8"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
@@ -674,8 +674,8 @@
       "name": "use-cashflows",
       "type": "registry:hook",
       "title": "useCashflows",
-      "description": "Fetches native cashflow JSON for a pricing request through the WASM worker.",
-      "docs": "Original native cashflow JSON with complete immutable request/session keys and native errors. Requires the shared Finstack/Query provider. No cashflow rows or financial logic are inferred.",
+      "description": "Fetches the native cashflow envelope for a pricing request through the WASM worker.",
+      "docs": "Native cashflow envelope object with complete immutable request/session keys and native errors. Requires the shared Finstack/Query provider. No cashflow rows or financial logic are inferred.",
       "files": [
         {
           "path": "hooks/use-cashflows/use-cashflows.ts",
