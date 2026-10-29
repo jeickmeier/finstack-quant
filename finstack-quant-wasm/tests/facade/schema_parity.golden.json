@@ -2689,11 +2689,25 @@
             "bytes": 20481
           },
           {
+            "path": "schemas/common/1/oas_config.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+            "type_name": "OasConfig",
+            "kind": "input",
+            "bytes": 2370
+          },
+          {
             "path": "schemas/common/1/rate_index_conventions.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
             "type_name": "RateIndexConventions",
             "kind": "component",
             "bytes": 10046
+          },
+          {
+            "path": "schemas/common/1/scenario_grid.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+            "type_name": "ScenarioGrid",
+            "kind": "input",
+            "bytes": 1521
           },
           {
             "path": "schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -4708,11 +4722,27 @@
           },
           {
             "domain": "valuations",
+            "path": "schemas/common/1/oas_config.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+            "type_name": "OasConfig",
+            "kind": "input",
+            "bytes": 2370
+          },
+          {
+            "domain": "valuations",
             "path": "schemas/common/1/rate_index_conventions.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
             "type_name": "RateIndexConventions",
             "kind": "component",
             "bytes": 10046
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/scenario_grid.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+            "type_name": "ScenarioGrid",
+            "kind": "input",
+            "bytes": 1521
           },
           {
             "domain": "valuations",
