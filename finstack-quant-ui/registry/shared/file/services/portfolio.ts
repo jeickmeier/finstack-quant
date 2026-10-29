@@ -36,7 +36,7 @@ export function createPortfolioService(
         };
       });
     },
-    portfolioMetricSeries(request) {
+    portfolioMetricsSeries(request) {
       return context.result(() =>
         native.portfolio.portfolioMetricsSeries(request.metrics, request.base),
       );

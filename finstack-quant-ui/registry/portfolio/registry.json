@@ -75,7 +75,7 @@
       "type": "registry:component",
       "title": "Portfolio metrics",
       "description": "Display of native aggregated portfolio metrics: a bucketed series chart in Rust order, aggregated totals by entity, raw metrics by position and the unaggregated, skipped and degraded lists.",
-      "docs": "Display-only view of the metrics returned by useValuePortfolio (portfolio.aggregateMetrics) and a series from usePortfolioMetricSeries (portfolio.portfolioMetricsSeries). The series is charted per first key component (the curve) with buckets in the order Rust returned them, which is lexical (10y, 15y, 1y, ...); no tenor sort is applied while tenor ordering is an open owner decision. Aggregated rows show each total with by-entity columns in entity registration order; the position table shows that position's raw metrics with its native currency. unaggregated_metrics, skipped_metrics and degraded_positions are listed as returned. Accepts report ({positionIds, entityIds, metrics}), series, metadata, initialPosition, formatValue, loading, error and density props; no worker or query provider required.",
+      "docs": "Display-only view of the metrics returned by useValuePortfolio (portfolio.aggregateMetrics) and a series from usePortfolioMetricsSeries (portfolio.portfolioMetricsSeries). The series is charted per first key component (the curve) with buckets in the order Rust returned them, which is lexical (10y, 15y, 1y, ...); no tenor sort is applied while tenor ordering is an open owner decision. Aggregated rows show each total with by-entity columns in entity registration order; the position table shows that position's raw metrics with its native currency. unaggregated_metrics, skipped_metrics and degraded_positions are listed as returned. Accepts report ({positionIds, entityIds, metrics}), series, metadata, initialPosition, formatValue, loading, error and density props; no worker or query provider required.",
       "files": [
         {
           "path": "components/portfolio-metrics/portfolio-metrics.tsx",
@@ -132,16 +132,16 @@
       }
     },
     {
-      "name": "use-portfolio-metric-series",
+      "name": "use-portfolio-metrics-series",
       "type": "registry:hook",
-      "title": "usePortfolioMetricSeries",
+      "title": "usePortfolioMetricsSeries",
       "description": "Decodes one base metric's series from returned portfolio metrics through the WASM worker.",
       "docs": "portfolio.portfolioMetricsSeries over PortfolioMetrics returned by useValuePortfolio and a canonical base metric id such as bucketed_dv01. Entries ({components, total, by_entity}) arrive in the order Rust returns them, which is lexical by key; no tenor sort is applied. The metrics are plain numbers, so the snapshotted request carries no bigint into the query key. Native errors are returned unchanged. Requires the shared Finstack/Query provider.",
       "files": [
         {
-          "path": "hooks/use-portfolio-metric-series/use-portfolio-metric-series.ts",
+          "path": "hooks/use-portfolio-metrics-series/use-portfolio-metrics-series.ts",
           "type": "registry:hook",
-          "target": "hooks/portfolio/use-portfolio-metric-series/use-portfolio-metric-series.ts"
+          "target": "hooks/portfolio/use-portfolio-metrics-series/use-portfolio-metrics-series.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

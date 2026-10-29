@@ -713,7 +713,7 @@ canonical JSON), then `aggregateMetrics` over the same market. It returns
 Omitted `metrics` and `strictRisk` are left to Rust (PV plus `dv01`; fail
 closed). A metric on the menu that an instrument cannot compute is listed on
 that position's `inapplicable_metrics` instead of thrown, unlike
-`priceInstrument`. `usePortfolioMetricSeries` decodes one base metric with
+`priceInstrument`. `usePortfolioMetricsSeries` decodes one base metric with
 `portfolioMetricsSeries`, and `usePortfolioSpecValidator` validates spec text
 (`parsePortfolioSpecJson`, then `Portfolio.fromSpec` through the cache).
 
