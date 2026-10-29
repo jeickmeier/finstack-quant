@@ -59,6 +59,18 @@ class FxDeltaVolSurface extends facade.core.FxDeltaVolSurface {
     return handle;
   }
 }
+let gridConstructed = 0,
+  gridFreed = 0;
+function materializeFxDeltaSurface(...args) {
+  const handle = facade.models.volatility.materializeFxDeltaSurface(...args);
+  gridConstructed++;
+  const free = handle.free.bind(handle);
+  handle.free = () => {
+    free();
+    gridFreed++;
+  };
+  return handle;
+}
 let moneyConstructed = 0,
   moneyFreed = 0;
 class Money extends facade.core.Money {
@@ -85,6 +97,10 @@ const service = createService({
   },
   ...facade,
   core: { ...facade.core, FxDeltaVolSurface, MarketContext, Money, VolCube },
+  models: {
+    ...facade.models,
+    volatility: { ...facade.models.volatility, materializeFxDeltaSurface },
+  },
   valuations: {
     ...facade.valuations,
     instruments: {
@@ -106,6 +122,8 @@ expose(
       calls,
       fxConstructed,
       fxFreed,
+      gridConstructed,
+      gridFreed,
       cubeConstructed,
       cubeFreed,
       cubeJson,

@@ -153,7 +153,18 @@ const displays = [
     ],
     route: "typed",
     convention:
-      "Annualized Black volatility as decimal; forward is explicit caller input.",
+      "Annualized Black volatility as decimal; forward is explicit caller input for evaluated samples. The strike grid is Rust-materialized (fx-strike-grid).",
+  },
+  {
+    id: "fx-strike-grid",
+    api: [
+      "models.volatility.materializeFxDeltaSurface",
+      "VolatilityNamespace",
+      "materializeFxDeltaSurface",
+    ],
+    route: "returned-surface",
+    convention:
+      "Returned VolSurface JSON (expiry by strike, Rust quote type and interpolation metadata); spot domestic per unit of foreign and continuously compounded decimal rates are explicit caller input, never defaulted or looked up.",
   },
   {
     id: "fx-delta-pillars",
@@ -356,7 +367,8 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
           "Generic values stay raw; do not infer units from names or decimal refs.",
         "full-state-curve-evaluation":
           "Use stored nodes and parameters; no constructor-based curve recreation.",
-        "off-grid-surface-evaluation": "Stored nodes only.",
+        "off-grid-surface-evaluation":
+          "Stored nodes only; off-grid values come only from native evaluators or a Rust-materialized grid (fx-strike-grid).",
         "quote-space-calibration-fits":
           "Returned residuals only until quote repricing is published.",
         "missing-financial-aggregates":

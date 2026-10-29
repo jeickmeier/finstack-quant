@@ -31,6 +31,9 @@ function WorkbenchRoute() {
           })}
           fxOptions={() => ({
             coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }],
+            initialSpot: 1.1,
+            initialDomesticRate: 0.04,
+            initialForeignRate: 0.03,
             colorDomain: [0, 1],
           })}
           defaultInstrumentType={type}

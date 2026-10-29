@@ -291,7 +291,7 @@
     {
       "name": "fx-surface-chart",
       "type": "registry:component",
-      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. The strike grid materializes the quotes natively (models.volatility.materializeFxDeltaSurface) from an editable spot (domestic per unit of foreign) and continuously compounded domestic and foreign decimal rates, seeded only from initialSpot, initialDomesticRate and initialForeignRate. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
       "worker": "host"
     },
     {
@@ -404,6 +404,10 @@
     },
     {
       "name": "use-fx-delta-samples",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-fx-strike-surface",
       "type": "registry:hook"
     },
     {

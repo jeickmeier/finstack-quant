@@ -107,6 +107,18 @@ test("shifted cube", async ({ page }) => {
   });
   await expect(item).toHaveScreenshot("shifted-cube.png");
 });
+test("fx strike grid", async ({ page }) => {
+  const item = await open(page, "fx-surface-chart", "light", "comfortable");
+  // The four item baselines stop at the preview's scroll height, above the grid.
+  const grid = item.getByRole("region", {
+    name: "EURUSD strike grid",
+    exact: true,
+  });
+  await expect(
+    grid.getByRole("region", { name: "EURUSD strike grid evaluated surface" }),
+  ).toBeVisible();
+  await expect(grid).toHaveScreenshot("fx-strike-grid.png");
+});
 test("every nonvisual item imports without initializing WASM", async ({
   page,
 }) => {

@@ -44,8 +44,9 @@ again before its result can replace the market. Native solver failures remain vi
 with their structured fields and any available diagnostics.
 
 This demo explicitly supplies illustrative view inputs: surface extent 0–1, cube
-absolute strike 0.05 with normal extent 0–0.1 and lognormal extent 0–2, and one FX
-coordinate (expiry 1 year, strike 1.1, forward 1.12). These are demo inputs, not
+absolute strike 0.05 with normal extent 0–0.1 and lognormal extent 0–2, one FX
+coordinate (expiry 1 year, strike 1.1, forward 1.12), and an FX strike-grid spot of
+1.1 with continuously compounded domestic and foreign rates of 0.04 and 0.03. These are demo inputs, not
 recommended market parameters. Applications supply their own `surfaceOptions`,
 `cubeOptions` and `fxOptions`; omitting them keeps stored data available. Optional
 `scenario` inputs specify the native tranche ID, grid JSON and price extent for

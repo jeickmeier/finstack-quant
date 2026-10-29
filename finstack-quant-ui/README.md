@@ -656,6 +656,9 @@ Evaluated market views take explicit domain inputs through public options:
   })}
   fxOptions={() => ({
     coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }],
+    initialSpot: 1.1,
+    initialDomesticRate: 0.04,
+    initialForeignRate: 0.03,
     colorDomain: [0, 1],
   })}
   scenario={{ trancheId, gridJson, priceDomain: [80, 140] }}
@@ -663,7 +666,11 @@ Evaluated market views take explicit domain inputs through public options:
 ```
 
 Those numbers are illustrative caller inputs, not financial defaults. Use extents,
-strike, forward and coordinates appropriate to the supplied objects. Without
+strike, forward and coordinates appropriate to the supplied objects. The FX
+strike grid (`models.volatility.materializeFxDeltaSurface`) takes a spot in
+domestic per unit of foreign and continuously compounded decimal rates; the FX
+delta state carries no currency pair, so the workbench cannot look either up and
+leaves the fields empty unless `fxOptions` seeds them. Without
 options, the market browser retains exact stored data. Scenario prices are fetched
 only when the detail panel is opened for a completed structured-credit request.
 `calibrationChartOptions` forwards existing figure annotations, export refs and

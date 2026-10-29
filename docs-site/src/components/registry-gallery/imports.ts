@@ -100,6 +100,13 @@ export const importHarnesses = {
       name: "use-fx-delta-samples",
       modules: modules.length,
     })),
+  "use-fx-strike-surface": () =>
+    Promise.all([
+      import("@/hooks/models/use-fx-strike-surface/use-fx-strike-surface"),
+    ]).then((modules) => ({
+      name: "use-fx-strike-surface",
+      modules: modules.length,
+    })),
   "use-cube-samples": () =>
     Promise.all([
       import("@/hooks/models/use-cube-samples/use-cube-samples"),

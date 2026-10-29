@@ -151,6 +151,18 @@ export interface FxDeltaSampleRequest {
     forward: number;
   }[];
 }
+/** Explicit spot and continuously compounded decimal rates for models.volatility.materializeFxDeltaSurface. */
+export interface FxStrikeSurfaceRequest {
+  readonly surface: MarketContextStateWire["fx_delta_vol_surfaces"][number];
+  /** FX spot, domestic per unit of foreign; Rust rejects non-positive values. */
+  readonly spot: number;
+  /** Continuously compounded domestic rate, as a decimal. */
+  readonly domesticRate: number;
+  /** Continuously compounded foreign rate, as a decimal. */
+  readonly foreignRate: number;
+}
+/** Canonical stored-surface JSON of a native VolSurface (`toJson`). */
+export type FxStrikeSurface = MarketContextStateWire["surfaces"][number];
 export interface CubeSampleRequest {
   readonly cube: MarketContextStateWire["vol_cubes"][number];
   readonly coordinates: readonly {
@@ -233,6 +245,10 @@ export interface ModelsApi {
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
   /** core.FxDeltaVolSurface.fromJson + models.volatility.getFxDeltaVol, per coordinate. */
   sampleFxDelta(request: FxDeltaSampleRequest): Promise<Envelope<number[]>>;
+  /** core.FxDeltaVolSurface.fromJson + models.volatility.materializeFxDeltaSurface, as the returned surface's JSON. */
+  materializeFxSurface(
+    request: FxStrikeSurfaceRequest,
+  ): Promise<Envelope<FxStrikeSurface>>;
 }
 /** statements and statements_analytics: model validation, evaluation and diagnostics. */
 export interface StatementsApi {
