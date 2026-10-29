@@ -57,6 +57,11 @@ const sources = {
   statementPlSummary: "src/fixtures/statements/analyst-pl-summary.json",
   statementCreditAssessment:
     "src/fixtures/statements/analyst-credit-assessment.json",
+  statementDcfAssumptions:
+    "src/fixtures/statements/analyst-dcf-assumptions.json",
+  statementDcf: "src/fixtures/statements/analyst-dcf.json",
+  statementDcfSensitivity:
+    "src/fixtures/statements/analyst-dcf-sensitivity.json",
   statementScenarios: "src/fixtures/statements/analyst-scenarios.json",
   statementScenarioDiff: "src/fixtures/statements/analyst-scenario-diff.json",
   statementRollForward2025Q2:

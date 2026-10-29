@@ -481,9 +481,27 @@
       "worker": "none"
     },
     {
+      "name": "tornado-chart",
+      "type": "registry:component",
+      "docs": "Present native TornadoEntry rows (for example DcfSensitivityResult.entries or generateTornadoEntries output) as returned: one band per parameter in Rust's order, a bar from zero to each returned downside and upside delta, and a table of the same values. Deltas Rust returns as non-finite are left out of the chart and shown in the table. Parameter labels default to labelFor; a host may inject parameterLabel and formatValue. It sorts, sums and computes nothing. Accepts entries, valueLabel, caption, parameterLabel, formatValue and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "dcf-report",
+      "type": "registry:component",
+      "docs": "Present a native CorporateValuationResult (statements_analytics.evaluateDcf) as returned: enterprise value, equity value and per-share value tiles; the enterprise-to-equity bridge fields (net debt, valuation discount, diluted shares) and the equity bridge inputs Rust used, in Rust's order; the explicit forecast periods with their free cash flow, discount years, discount factor and present value, and the explicit present value; the undiscounted terminal value, its discount years and present value, and the WACC. A supplied DcfSensitivityResult (statements_analytics.dcfSensitivity) adds the baseline enterprise value, the effective WACC and terminal-growth shocks with their clamp flags, and a tornado-chart of the returned deltas. Monetary amounts keep Rust's exact decimal text; nothing is summed, discounted or rearranged. Accepts result, sensitivity, loading, error, sensitivityLoading, sensitivityError, sensitivityNote, formatValue and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "dcf-assumptions-form",
+      "type": "registry:component",
+      "docs": "Edit the evaluateDcf assumptions: WACC as a decimal, the TerminalValueSpec variant (Gordon growth, exit multiple or H-model, the one hand-written Rust wire union) and its fields, the UFCF node and the exit-multiple metric node as id-comboboxes over the supplied model node ids, an optional net-debt override, and the remaining DcfOptions in the schema form over the generated contract. A cleared required number is sent as NaN, never 0; an empty optional value and empty options stay unset so Rust applies its defaults. The facade has no standalone DcfOptions parse, so the options are checked structurally here and validated by Rust (unknown keys included) when the model is valued. Calculate passes the submission to the caller (usually the useEvaluateDcf and useDcfSensitivity requests). Accepts defaultAssumptions, nodeIds, onSubmit, submitLabel, disabled and density props.",
+      "worker": "none"
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -718,6 +736,14 @@
     },
     {
       "name": "use-pl-summary-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-dcf",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-dcf-sensitivity",
       "type": "registry:hook"
     },
     {
@@ -1145,6 +1171,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-dcf-options",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-dcf-sensitivity-result",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-scenario-diff",
       "type": "registry:lib"
     },
@@ -1309,6 +1343,18 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-credit-assessment.json",
       "sha256": "f54fb7eec15ae6e5a843366bdc5b49f5ca95635adc0d04fbe714a297916732ed"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf-assumptions.json",
+      "sha256": "83de4737b547e30539d43d16e5570c6ce38bde43348cf50f18716f492ebba580"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf.json",
+      "sha256": "a20a4c17e60379df312e0267eaf1f7543a674570f46a89bfc7226703eacf4cfb"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf-sensitivity.json",
+      "sha256": "089dfac66922bb8abb11bcab8e4fa88a67436ae100733ae09828cb9cad8cbf89"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",

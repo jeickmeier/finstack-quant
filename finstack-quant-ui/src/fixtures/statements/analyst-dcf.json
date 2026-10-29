@@ -1,0 +1,67 @@
+{
+  "equity_value": {
+    "amount": "1384420565.351604",
+    "currency": "USD"
+  },
+  "enterprise_value": {
+    "amount": "1700820565.351604",
+    "currency": "USD"
+  },
+  "net_debt": {
+    "amount": "316400000",
+    "currency": "USD"
+  },
+  "valuation_discount": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "terminal_value_pv": {
+    "amount": "1601517332.953818",
+    "currency": "USD"
+  },
+  "equity_value_per_share": 27.68841130703208,
+  "diluted_shares": 50000000,
+  "wacc": 0.1,
+  "periods": [
+    {
+      "period_id": "2025Q2",
+      "date": "2025-06-30",
+      "free_cash_flow": 32515040.0625,
+      "discount_years": 0.2464065708418891,
+      "discount_factor": 0.9767885730831344,
+      "present_value": 31760319.586390324
+    },
+    {
+      "period_id": "2025Q3",
+      "date": "2025-09-30",
+      "free_cash_flow": 34478959.17268747,
+      "discount_years": 0.49828884325804246,
+      "discount_factor": 0.9536181027665147,
+      "present_value": 32879759.631622344
+    },
+    {
+      "period_id": "2025Q4",
+      "date": "2025-12-31",
+      "free_cash_flow": 37232282.67060437,
+      "discount_years": 0.7501711156741958,
+      "discount_factor": 0.9309972608029365,
+      "present_value": 34663153.179773316
+    }
+  ],
+  "pv_explicit": {
+    "amount": "99303232.397786",
+    "currency": "USD"
+  },
+  "terminal_value": {
+    "amount": "1720217019.298846",
+    "currency": "USD"
+  },
+  "terminal_discount_years": 0.7501711156741958,
+  "equity_bridge": {
+    "total_debt": 430000000,
+    "cash": 113600000,
+    "preferred_equity": 0,
+    "minority_interest": 0,
+    "non_operating_assets": 0
+  }
+}

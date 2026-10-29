@@ -59,6 +59,9 @@ import { Example as Example55 } from "./examples/portfolio-margin-report";
 import { Example as Example56 } from "./examples/credit-scorecard";
 import { Example as Example57 } from "./examples/portfolio-risk-report";
 import { Example as Example58 } from "./examples/credit-assessment-report";
+import { Example as Example59 } from "./examples/tornado-chart";
+import { Example as Example60 } from "./examples/dcf-report";
+import { Example as Example61 } from "./examples/dcf-assumptions-form";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -119,6 +122,9 @@ const examples = {
   "credit-scorecard": Example56,
   "portfolio-risk-report": Example57,
   "credit-assessment-report": Example58,
+  "tornado-chart": Example59,
+  "dcf-report": Example60,
+  "dcf-assumptions-form": Example61,
 };
 export function ComponentDemo({
   name,

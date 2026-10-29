@@ -484,6 +484,19 @@ reported period, and shows both in `CreditAssessmentReport`: the returned
 values, the two ratios charted over Rust's series with the periods Rust leaves
 without a value listed instead of plotted, and the summary through
 `TableEnvelope`.
+`useEvaluateDcf` (`use-evaluate-dcf`) and `useDcfSensitivity`
+(`use-dcf-sensitivity`) pass the model, WACC, `TerminalValueSpec` and the
+optional UFCF node, net-debt override and `DcfOptions` JSON to
+`statements_analytics.evaluateDcf` (plus the market and as-of date, which
+Rust requires together) and `dcfSensitivity` (which takes no market)
+positionally, leaving every unset optional argument unset. The workbench's
+Valuation tab composes `DcfAssumptionsForm` (the terminal-value union is the
+one hand-written wire shape; the options are a schema form over the generated
+`dcf_options` contract, checked structurally and validated by Rust when the
+model is valued, because the facade has no standalone `DcfOptions` parse) and
+`DcfReport`, which shows the valuation, bridge fields, per-period present
+values, terminal value and the native tornado through `TornadoChart` as
+returned.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useMetrics(instrumentType)` returns the standard metrics Rust registers for
 that type (`metricsForInstrument`), grouped by native category; `null` disables

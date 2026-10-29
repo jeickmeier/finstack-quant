@@ -15,6 +15,7 @@ import rolledQ2 from "../../src/fixtures/statements/roll-forward-2025Q2.json";
 import { StatementsWorkbench } from "@/components/finstack/statements/blocks/statements-workbench/statements-workbench";
 import { reportStatementCell } from "@/components/finstack/statements/components/statement-grid/projection";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
+import { formatRawMoney } from "../../src/format/format";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
   createClient: mock.createClient,
@@ -83,6 +84,26 @@ beforeEach(() => {
           arg.resultsJson,
           arg.lineItems,
           arg.periods,
+        );
+      case "evaluateDcf":
+        return native.evaluateDcf(
+          arg.modelJson,
+          arg.wacc,
+          arg.terminalValue,
+          arg.ufcfNode,
+          arg.netDebtOverride,
+          arg.optionsJson,
+          arg.marketJson,
+          arg.asOf,
+        );
+      case "dcfSensitivity":
+        return native.dcfSensitivity(
+          arg.modelJson,
+          arg.wacc,
+          arg.terminalValue,
+          arg.ufcfNode,
+          arg.netDebtOverride,
+          arg.optionsJson,
         );
       default:
         throw new Error(`Unexpected worker call: ${method}`);
@@ -342,6 +363,61 @@ it("assesses the active period's credit and summarises the income lines natively
       period: "2025Q3",
     }),
   );
+});
+
+it("values the current model with a native DCF and tornado in Valuation", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  fireEvent.click(await screen.findByRole("tab", { name: "Valuation" }));
+  const form = await screen.findByRole("region", { name: "DCF assumptions" });
+  // Assumptions start empty: Rust supplies no WACC or growth default.
+  expect(
+    (within(form).getByRole("textbox", { name: "WACC" }) as HTMLInputElement)
+      .value,
+  ).toBe("");
+  fireEvent.change(within(form).getByRole("textbox", { name: "WACC" }), {
+    target: { value: "0.1" },
+  });
+  fireEvent.change(
+    within(form).getByRole("textbox", { name: "Stable growth rate" }),
+    { target: { value: "0.02" } },
+  );
+  const value = within(form).getByRole("button", { name: "Value" });
+  await waitFor(() => {
+    fireEvent.click(value);
+    expect(lastCall("evaluateDcf")).toBeDefined();
+  });
+  const modelJson = lastCall("evaluateDcf").modelJson;
+  const terminalValue = { type: "gordon_growth", stable_growth_rate: 0.02 };
+  expect(lastCall("evaluateDcf")).toEqual({
+    modelJson,
+    wacc: 0.1,
+    terminalValue,
+    marketJson: undefined,
+    asOf: undefined,
+  });
+  expect(lastCall("dcfSensitivity")).toEqual({
+    modelJson,
+    wacc: 0.1,
+    terminalValue,
+  });
+  const report = await screen.findByRole("region", { name: "DCF valuation" });
+  const expected = native.evaluateDcf(modelJson, 0.1, terminalValue);
+  await waitFor(() =>
+    expect(
+      within(report)
+        .getByRole("region", { name: "Enterprise value" })
+        .querySelector("p")!.textContent,
+    ).toBe(formatRawMoney(expected.enterprise_value)),
+  );
+  expect(
+    await within(report).findByRole("table", {
+      name: "Enterprise value change by assumption",
+    }),
+  ).toBeTruthy();
 });
 
 it("rolls reported quarters up to native annual values with editable methods", async () => {
