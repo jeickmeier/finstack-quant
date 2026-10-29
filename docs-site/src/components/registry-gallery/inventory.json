@@ -321,7 +321,7 @@
     {
       "name": "portfolio-metrics",
       "type": "registry:component",
-      "docs": "Display-only view of the metrics returned by useValuePortfolio (portfolio.aggregateMetrics) and a series from usePortfolioMetricSeries (portfolio.portfolioMetricsSeries). The series is charted per first key component (the curve) with buckets in the order Rust returned them, which is lexical (10y, 15y, 1y, ...); no tenor sort is applied while tenor ordering is an open owner decision. Aggregated rows show each total with by-entity columns in entity registration order; the position table shows that position's raw metrics with its native currency. unaggregated_metrics, skipped_metrics and degraded_positions are listed as returned. Accepts report ({positionIds, entityIds, metrics}), series, metadata, initialPosition, formatValue, loading, error and density props; no worker or query provider required.",
+      "docs": "Display-only view of the metrics returned by useValuePortfolio (portfolio.aggregateMetrics) and a series from usePortfolioMetricsSeries (portfolio.portfolioMetricsSeries). The series is charted per first key component (the curve) with buckets in the order Rust returned them, which is lexical (10y, 15y, 1y, ...); no tenor sort is applied while tenor ordering is an open owner decision. Aggregated rows show each total with by-entity columns in entity registration order; the position table shows that position's raw metrics with its native currency. unaggregated_metrics, skipped_metrics and degraded_positions are listed as returned. Accepts report ({positionIds, entityIds, metrics}), series, metadata, initialPosition, formatValue, loading, error and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -467,7 +467,7 @@
       "type": "registry:hook"
     },
     {
-      "name": "use-portfolio-metric-series",
+      "name": "use-portfolio-metrics-series",
       "type": "registry:hook"
     },
     {

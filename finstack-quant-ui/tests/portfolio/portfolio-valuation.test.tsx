@@ -28,9 +28,9 @@ import {
   type PortfolioValuationRequest,
 } from "@/hooks/portfolio/use-value-portfolio/use-value-portfolio";
 import {
-  portfolioMetricSeriesOptions,
-  usePortfolioMetricSeries,
-} from "@/hooks/portfolio/use-portfolio-metric-series/use-portfolio-metric-series";
+  portfolioMetricsSeriesOptions,
+  usePortfolioMetricsSeries,
+} from "@/hooks/portfolio/use-portfolio-metrics-series/use-portfolio-metrics-series";
 import { usePortfolioSpecValidator } from "@/hooks/portfolio/use-portfolio-spec-validator/use-portfolio-spec-validator";
 import { PortfolioSummary } from "@/components/finstack/portfolio/components/portfolio-summary/portfolio-summary";
 import { PositionsTable } from "@/components/finstack/portfolio/components/positions-table/positions-table";
@@ -119,7 +119,7 @@ it(
     const report = unwrap(await proxy().valuePortfolio(galleryRequest));
     expect(serializeHost(report)).toBe(serializeHost(gallery.report));
     const series = unwrap(
-      await proxy().portfolioMetricSeries({
+      await proxy().portfolioMetricsSeries({
         metrics: report.metrics,
         base: gallerySeries.base,
       }),
@@ -203,7 +203,7 @@ it("returns native errors for an unknown metric, a bad market and a bad series b
     marketJson: "{",
   });
   expect(market.ok).toBe(false);
-  const series = await proxy().portfolioMetricSeries({
+  const series = await proxy().portfolioMetricsSeries({
     metrics: hostParity.report.metrics as never,
     base: "bucketed_dv01::",
   });
@@ -224,10 +224,10 @@ it("keys both queries on the worker session and the complete snapshotted request
     metrics: galleryReport.metrics,
     base: "bucketed_dv01",
   };
-  const series = portfolioMetricSeriesOptions(null, 3, seriesRequest);
+  const series = portfolioMetricsSeriesOptions(null, 3, seriesRequest);
   // Metrics are plain numbers, so the key serializes.
   expect(() => JSON.stringify(series.queryKey)).not.toThrow();
-  expect(series.queryKey[2]).toBe("portfolioMetricSeries");
+  expect(series.queryKey[2]).toBe("portfolioMetricsSeries");
 });
 it("summarizes the total, the stamped FX policy and entities in registration order", () => {
   const reversed = { ...galleryReport, entityIds: ["RATES", "CREDIT"] };
@@ -355,7 +355,7 @@ it("charts the series per curve in Rust order and lists aggregated, position and
 });
 function Connected({ request }: { request: PortfolioValuationRequest }) {
   const report = useValuePortfolio(request);
-  const series = usePortfolioMetricSeries(
+  const series = usePortfolioMetricsSeries(
     report.data
       ? { metrics: report.data.metrics, base: "bucketed_dv01" }
       : null,

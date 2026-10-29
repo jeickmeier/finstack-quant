@@ -124,11 +124,11 @@ export const importHarnesses = {
       name: "use-value-portfolio",
       modules: modules.length,
     })),
-  "use-portfolio-metric-series": () =>
+  "use-portfolio-metrics-series": () =>
     Promise.all([
-      import("@/hooks/portfolio/use-portfolio-metric-series/use-portfolio-metric-series"),
+      import("@/hooks/portfolio/use-portfolio-metrics-series/use-portfolio-metrics-series"),
     ]).then((modules) => ({
-      name: "use-portfolio-metric-series",
+      name: "use-portfolio-metrics-series",
       modules: modules.length,
     })),
   "use-portfolio-spec-validator": () =>

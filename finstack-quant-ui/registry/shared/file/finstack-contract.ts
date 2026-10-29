@@ -287,7 +287,7 @@ export interface PortfolioValuationReport {
   metrics: PortfolioMetrics;
 }
 /** One base metric's series request over returned aggregated metrics. */
-export interface PortfolioMetricSeriesRequest {
+export interface PortfolioMetricsSeriesRequest {
   /** PortfolioMetrics returned by valuePortfolio (plain numbers; no bigint crosses the query key). */
   readonly metrics: PortfolioMetrics;
   /** Canonical base metric id, for example "bucketed_dv01". */
@@ -452,8 +452,8 @@ export interface PortfolioApi {
     request: PortfolioValuationRequest,
   ): Promise<Envelope<PortfolioValuationReport>>;
   /** portfolio.portfolioMetricsSeries: decoded entries of one base metric, in the order Rust returns them. */
-  portfolioMetricSeries(
-    request: PortfolioMetricSeriesRequest,
+  portfolioMetricsSeries(
+    request: PortfolioMetricsSeriesRequest,
   ): Promise<Envelope<PortfolioMetricSeriesEntry[]>>;
   /** portfolio.parsePortfolioSpecJson, then Portfolio.fromSpec through the handle cache: canonical PortfolioSpec JSON of a book that builds. */
   validatePortfolio(specJson: string): Promise<Envelope<string>>;
