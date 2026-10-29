@@ -1,0 +1,13 @@
+{
+  "entry_multiple": 8.5,
+  "entry_metric_node": "ebitda",
+  "transaction_fees": 12000000,
+  "sources": [
+    { "name": "Term loan B", "amount": 180000000 },
+    { "name": "Senior notes", "amount": 60000000 }
+  ],
+  "exit_multiple": 9,
+  "exit_metric_node": "ebitda",
+  "exit_net_debt_node": "total_debt",
+  "exit_period": "2025Q4"
+}

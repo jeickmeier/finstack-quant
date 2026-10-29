@@ -105,6 +105,8 @@ beforeEach(() => {
           arg.netDebtOverride,
           arg.optionsJson,
         );
+      case "evaluateLbo":
+        return native.evaluateLbo(arg.modelJson, arg.configJson);
       default:
         throw new Error(`Unexpected worker call: ${method}`);
     }
@@ -365,7 +367,7 @@ it("assesses the active period's credit and summarises the income lines natively
   );
 });
 
-it("values the current model with a native DCF and tornado in Valuation", async () => {
+it("values the current model with a native DCF, tornado and LBO in Valuation", async () => {
   render(
     <FinstackQueryProvider>
       <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
@@ -418,6 +420,17 @@ it("values the current model with a native DCF and tornado in Valuation", async 
       name: "Enterprise value change by assumption",
     }),
   ).toBeTruthy();
+  // The LBO config starts empty and nothing is evaluated until it is submitted.
+  const lbo = screen.getByRole("region", { name: "Leveraged buyout" });
+  expect(
+    (
+      within(lbo).getByRole("combobox", {
+        name: "Entry metric node",
+      }) as HTMLInputElement
+    ).value,
+  ).toBe("");
+  expect(within(lbo).getByText("No LBO evaluation available.")).toBeTruthy();
+  expect(lastCall("evaluateLbo")).toBeUndefined();
 });
 
 it("rolls reported quarters up to native annual values with editable methods", async () => {

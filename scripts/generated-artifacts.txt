@@ -236,6 +236,8 @@ finstack-quant-ui/src/generated/meta/instrument_cashflow.ts
 finstack-quant-ui/src/generated/meta/interest_rate_future.ts
 finstack-quant-ui/src/generated/meta/interest_rate_future_option.ts
 finstack-quant-ui/src/generated/meta/interest_rate_swap.ts
+finstack-quant-ui/src/generated/meta/lbo_config.ts
+finstack-quant-ui/src/generated/meta/lbo_result.ts
 finstack-quant-ui/src/generated/meta/levered_real_estate_equity.ts
 finstack-quant-ui/src/generated/meta/lookback_option.ts
 finstack-quant-ui/src/generated/meta/market_context_state.ts
@@ -349,6 +351,8 @@ finstack-quant-ui/src/generated/schemas/instrument_cashflow.json
 finstack-quant-ui/src/generated/schemas/interest_rate_future.json
 finstack-quant-ui/src/generated/schemas/interest_rate_future_option.json
 finstack-quant-ui/src/generated/schemas/interest_rate_swap.json
+finstack-quant-ui/src/generated/schemas/lbo_config.json
+finstack-quant-ui/src/generated/schemas/lbo_result.json
 finstack-quant-ui/src/generated/schemas/levered_real_estate_equity.json
 finstack-quant-ui/src/generated/schemas/lookback_option.json
 finstack-quant-ui/src/generated/schemas/market_context_state.json
@@ -459,6 +463,8 @@ finstack-quant-ui/src/generated/types/instrument_cashflow.ts
 finstack-quant-ui/src/generated/types/interest_rate_future.ts
 finstack-quant-ui/src/generated/types/interest_rate_future_option.ts
 finstack-quant-ui/src/generated/types/interest_rate_swap.ts
+finstack-quant-ui/src/generated/types/lbo_config.ts
+finstack-quant-ui/src/generated/types/lbo_result.ts
 finstack-quant-ui/src/generated/types/levered_real_estate_equity.ts
 finstack-quant-ui/src/generated/types/lookback_option.ts
 finstack-quant-ui/src/generated/types/market_context_state.ts

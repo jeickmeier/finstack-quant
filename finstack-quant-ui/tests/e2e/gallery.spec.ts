@@ -289,6 +289,19 @@ test("dcf-assumptions-form options", async ({ page }) => {
   ).toBeVisible();
   await expect(options).toHaveScreenshot("dcf-assumptions-form-options.png");
 });
+test("lbo-report returns and checks", async ({ page }) => {
+  const item = await open(page, "lbo-report", "light", "comfortable");
+  // The four item baselines stop inside the entry and exit list, above the checks.
+  const returns = item.getByRole("region", {
+    name: "Entry and exit",
+    exact: true,
+  });
+  await expect(returns.getByText("MOIC")).toBeVisible();
+  await expect(returns).toHaveScreenshot("lbo-report-entry-exit.png");
+  const checks = item.getByRole("region", { name: "LBO checks", exact: true });
+  await expect(checks).toBeVisible();
+  await expect(checks).toHaveScreenshot("lbo-report-checks.png");
+});
 test("portfolio-risk-report risk budget", async ({ page }) => {
   const item = await open(
     page,

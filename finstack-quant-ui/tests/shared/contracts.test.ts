@@ -112,8 +112,8 @@ describe("discovered canonical fixtures", () => {
     }
     // Rust publishes no example for CovenantReport, DatedCovenantReports,
     // the five credit-scoring inputs, MertonModel, CreditAssessment,
-    // DcfOptions, DcfSensitivityResult, ScenarioSet or ScenarioDiff; every
-    // other root carries one.
+    // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet or
+    // ScenarioDiff; every other root carries one.
     expect(withoutExamples).toEqual([
       "schemas/covenant_report.json",
       "schemas/dated_covenant_reports.json",
@@ -126,6 +126,8 @@ describe("discovered canonical fixtures", () => {
       "schemas/credit_assessment.json",
       "schemas/dcf_options.json",
       "schemas/dcf_sensitivity_result.json",
+      "schemas/lbo_config.json",
+      "schemas/lbo_result.json",
       "schemas/scenario_diff.json",
       "schemas/scenario_set.json",
     ]);
@@ -173,6 +175,30 @@ describe("discovered canonical fixtures", () => {
     expect((await schema("schemas/dcf_options.json")).parse(options)).toEqual(
       options,
     );
+  });
+  it("accepts the LBO config input and the captured native LBO result under their generated schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    for (const [schemaName, fixtureName] of [
+      ["schemas/lbo_config.json", "analyst-lbo-config.json"],
+      ["schemas/lbo_result.json", "analyst-lbo.json"],
+    ]) {
+      const validator = z.fromJSONSchema(
+        converterSchema(
+          JSON.parse(await readFile(resolve(generated, schemaName), "utf8")),
+        ),
+      );
+      const fixture = JSON.parse(
+        await readFile(
+          resolve(
+            repo,
+            "finstack-quant-ui/src/fixtures/statements",
+            fixtureName,
+          ),
+          "utf8",
+        ),
+      );
+      expect(validator.parse(fixture)).toEqual(fixture);
+    }
   });
   it("accepts the captured native covenant series under the generated DatedCovenantReports and CovenantReport schemas unchanged", async () => {
     const generated = resolve(repo, "finstack-quant-ui/src/generated");

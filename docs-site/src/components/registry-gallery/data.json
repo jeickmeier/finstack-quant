@@ -40638,6 +40638,64 @@
     "terminal_growth_up": 0.03,
     "terminal_growth_up_clamped": false
   },
+  "statementLboConfig": {
+    "entry_multiple": 8.5,
+    "entry_metric_node": "ebitda",
+    "transaction_fees": 12000000,
+    "sources": [
+      {
+        "name": "Term loan B",
+        "amount": 180000000
+      },
+      {
+        "name": "Senior notes",
+        "amount": 60000000
+      }
+    ],
+    "exit_multiple": 9,
+    "exit_metric_node": "ebitda",
+    "exit_net_debt_node": "total_debt",
+    "exit_period": "2025Q4"
+  },
+  "statementLbo": {
+    "entry_enterprise_value": {
+      "amount": "341360000",
+      "currency": "USD"
+    },
+    "entry_metric": 40160000,
+    "debt_total": {
+      "amount": "240000000",
+      "currency": "USD"
+    },
+    "equity_check": {
+      "amount": "113360000",
+      "currency": "USD"
+    },
+    "sources_total": {
+      "amount": "353360000",
+      "currency": "USD"
+    },
+    "uses_total": {
+      "amount": "353360000",
+      "currency": "USD"
+    },
+    "sources_uses_balanced": true,
+    "exit_enterprise_value": {
+      "amount": "552454229.493675",
+      "currency": "USD"
+    },
+    "exit_metric": 61383803.277075,
+    "exit_net_debt": {
+      "amount": "430000000",
+      "currency": "USD"
+    },
+    "exit_equity_proceeds": {
+      "amount": "122454229.493675",
+      "currency": "USD"
+    },
+    "moic": 1.0802243251029904,
+    "checks": null
+  },
   "statementScenarios": {
     "scenarios": {
       "base": {},

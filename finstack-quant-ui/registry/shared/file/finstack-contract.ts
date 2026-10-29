@@ -18,6 +18,7 @@ import type {
   CalendarYearLadderRow,
   CreditAssessment,
   DcfSensitivityResult,
+  LboResult,
   ArbitrageValidationResult,
   ApplicationReport,
   HorizonReport,
@@ -205,6 +206,12 @@ export interface EvaluateDcfRequest extends DcfSensitivityRequest {
 export type CorporateValuationResult = ReturnType<
   typeof statements_analytics.evaluateDcf
 >;
+/** A leveraged buyout of the statement model under Rust LboConfig JSON. */
+export interface EvaluateLboRequest {
+  readonly modelJson: string;
+  /** Rust LboConfig JSON; Rust rejects unknown keys. */
+  readonly configJson: string;
+}
 /** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
 export interface StatementRollupRequest {
   readonly modelJson: string;
@@ -1099,6 +1106,8 @@ export interface StatementsApi {
   dcfSensitivity(
     request: DcfSensitivityRequest,
   ): Promise<Envelope<DcfSensitivityResult>>;
+  /** statements_analytics.evaluateLbo: entry and exit values, sources and uses, MOIC and the optional LBO check report. */
+  evaluateLbo(request: EvaluateLboRequest): Promise<Envelope<LboResult>>;
 }
 /** Every worker method, grouped by the crate whose facade namespace it calls. */
 export type WorkerApi = {

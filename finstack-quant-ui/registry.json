@@ -4357,6 +4357,72 @@
       }
     },
     {
+      "name": "contract-lbo-config",
+      "type": "registry:lib",
+      "title": "Lbo config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust lbo_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/lbo_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/lbo_config.json"
+        },
+        {
+          "path": "src/generated/types/lbo_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/lbo_config.ts"
+        },
+        {
+          "path": "src/generated/meta/lbo_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/lbo_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-lbo-result",
+      "type": "registry:lib",
+      "title": "Lbo result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust lbo_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/lbo_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/lbo_result.json"
+        },
+        {
+          "path": "src/generated/types/lbo_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/lbo_result.ts"
+        },
+        {
+          "path": "src/generated/meta/lbo_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/lbo_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-scenario-diff",
       "type": "registry:lib",
       "title": "Scenario diff contract",

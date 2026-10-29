@@ -7,11 +7,14 @@ import {
 import { DcfReport } from "@/components/finstack/statements/components/dcf-report/dcf-report";
 import { useEvaluateDcf } from "@/hooks/statements/use-evaluate-dcf/use-evaluate-dcf";
 import { useDcfSensitivity } from "@/hooks/statements/use-dcf-sensitivity/use-dcf-sensitivity";
+import { LboReport } from "@/components/finstack/statements/components/lbo-report/lbo-report";
+import { useEvaluateLbo } from "@/hooks/statements/use-evaluate-lbo/use-evaluate-lbo";
 
 /**
  * The workbench Valuation tab: a native DCF of the current canonical model
- * and its enterprise-value tornado. Assumptions start empty (Rust supplies no
- * defaults for them) and the valuation reruns natively when the model changes.
+ * with its enterprise-value tornado, and a native LBO. Assumptions and the
+ * LBO config start empty (Rust supplies no defaults for them) and both rerun
+ * natively when the model changes.
  */
 export function ValuationPanel({
   modelJson,
@@ -36,6 +39,10 @@ export function ValuationPanel({
   );
   const sensitivity = useDcfSensitivity(
     assumptions ? { modelJson, ...assumptions } : null,
+  );
+  const [lboConfigJson, setLboConfigJson] = useState<string | null>(null);
+  const lbo = useEvaluateLbo(
+    lboConfigJson ? { modelJson, configJson: lboConfigJson } : null,
   );
   return (
     <div className="max-w-5xl space-y-6">
@@ -70,6 +77,23 @@ export function ValuationPanel({
             density={density}
           />
         )}
+      </section>
+      <section aria-label="LBO" className="space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-base font-medium">Leveraged buyout</h3>
+          <p className="text-sm text-muted-foreground">
+            Evaluates a sponsor buyout of the model natively
+            (statements_analytics.evaluateLbo) from the transaction config.
+          </p>
+        </div>
+        <LboReport
+          nodeIds={nodeIds}
+          onSubmit={setLboConfigJson}
+          result={lboConfigJson ? lbo.data : null}
+          loading={lbo.isFetching}
+          error={lbo.error?.message}
+          density={density}
+        />
       </section>
     </div>
   );

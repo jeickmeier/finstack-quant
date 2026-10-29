@@ -497,6 +497,13 @@ model is valued, because the facade has no standalone `DcfOptions` parse) and
 `DcfReport`, which shows the valuation, bridge fields, per-period present
 values, terminal value and the native tornado through `TornadoChart` as
 returned.
+`useEvaluateLbo` (`use-evaluate-lbo`) passes the model and `LboConfig` JSON
+to `statements_analytics.evaluateLbo`. The Valuation tab's `LboReport` edits
+the config with a schema form over the generated `lbo_config` contract (string
+`*_node` fields as id-comboboxes; checked structurally and validated by Rust on
+evaluation, as there is no standalone `LboConfig` parse) and shows the
+returned sources and uses, entry and exit values, MOIC and the LBO check
+report. Returns are MOIC only: IRR is not part of the native result.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useMetrics(instrumentType)` returns the standard metrics Rust registers for
 that type (`metricsForInstrument`), grouped by native category; `null` disables

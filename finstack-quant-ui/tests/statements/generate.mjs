@@ -66,6 +66,15 @@ await write(
   "analyst-dcf-sensitivity.json",
   serializeHost(native.dcfSensitivity(...dcfArguments)),
 );
+// Native evaluateLbo of the analyst model under the illustrative transaction
+// in analyst-lbo-config.json (no check_mappings: the model has no balance
+// sheet to map, so checks is null).
+await write(
+  "analyst-lbo.json",
+  serializeHost(
+    native.evaluateLbo(modelJson, await read("analyst-lbo-config.json")),
+  ),
+);
 // Native scenarioDiff over the analyst scenario set (base → downside → severe):
 // each scenario against its parent, over the P&L lines for the 2025 quarters.
 const scenarioSetJson = await read("analyst-scenarios.json");
