@@ -11,6 +11,10 @@ export type ValuationsNative = {
       | "priceInstrumentWithMarket"
       | "instrumentCashflowsWithMarket"
       | "trancheScenarioTable"
+      | "trancheMetrics"
+      | "trancheOas"
+      | "trancheDiscountMargin"
+      | "trancheBreakevenCdr"
       | "StructuredCredit"
       | "listModelsGrouped"
       | "listStandardMetricsGrouped"
@@ -24,6 +28,16 @@ export function createValuationsService(
   context: ServiceContext,
 ): ValuationsApi {
   const instruments = native.valuations.instruments;
+  type Deal = ReturnType<typeof instruments.StructuredCredit.fromJson>;
+  /** Load the deal once per call and free its handle whatever the native call does. */
+  function withDeal<T>(instrumentJson: string, call: (deal: Deal) => T): T {
+    const deal = instruments.StructuredCredit.fromJson(instrumentJson);
+    try {
+      return call(deal);
+    } finally {
+      deal.free();
+    }
+  }
   return {
     price(request) {
       return context.result(() => {
@@ -62,22 +76,69 @@ export function createValuationsService(
       });
     },
     scenarioTable(request) {
-      return context.result(() => {
-        const deal = instruments.StructuredCredit.fromJson(
-          request.instrumentJson,
-        );
-        try {
-          return instruments.trancheScenarioTable(
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheScenarioTable(
             deal,
             request.trancheId,
             request.marketJson,
             request.asOf,
             request.gridJson,
-          );
-        } finally {
-          deal.free();
-        }
-      });
+          ),
+        ),
+      );
+    },
+    trancheMetrics(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheMetrics(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.marketPricePct,
+            request.metrics == null ? request.metrics : [...request.metrics],
+          ),
+        ),
+      );
+    },
+    trancheOas(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheOas(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.marketPricePct,
+          ),
+        ),
+      );
+    },
+    trancheDiscountMargin(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheDiscountMargin(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.marketPricePct,
+          ),
+        ),
+      );
+    },
+    trancheBreakevenCdr(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheBreakevenCdr(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+          ),
+        ),
+      );
     },
     models: () => context.result(() => instruments.listModelsGrouped()),
     metrics: () =>

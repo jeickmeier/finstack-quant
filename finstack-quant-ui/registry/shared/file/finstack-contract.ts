@@ -9,6 +9,8 @@ import type {
   MoneyValue,
   ScenarioTable,
   ScenarioResults,
+  TrancheMetrics,
+  OasResult,
   StatementResult,
   Explanation,
   DependencyTree,
@@ -39,6 +41,24 @@ export interface ScenarioRequest {
   readonly asOf: string;
   /** Complete native ScenarioGrid JSON; no model inputs are inferred. */
   readonly gridJson: string;
+}
+/** One tranche of a structured-credit deal, priced on a complete market at a valuation date. */
+export interface TrancheRequest {
+  readonly instrumentJson: string;
+  readonly trancheId: string;
+  readonly marketJson: string;
+  readonly asOf: string;
+}
+/** Tranche metrics; an omitted price or metric list is left to Rust (deal quote, else model price; no registry metrics). */
+export interface TrancheMetricsRequest extends TrancheRequest {
+  /** Clean settlement price, percent of the tranche's current balance. */
+  readonly marketPricePct?: number | null;
+  /** Registry metric ids valued on this note. */
+  readonly metrics?: readonly string[] | null;
+}
+/** A tranche solve against an explicit clean price, percent of the tranche's current balance. */
+export interface TranchePriceRequest extends TrancheRequest {
+  readonly marketPricePct: number;
 }
 export interface CashflowRequest {
   readonly instrumentJson: string;
@@ -168,6 +188,18 @@ export interface ValuationsApi {
   cashflows(request: CashflowRequest): Promise<Envelope<CashflowEnvelope>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
   scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
+  /** valuations.instruments.StructuredCredit.fromJson + trancheMetrics; no OasConfig or price default is supplied. */
+  trancheMetrics(
+    request: TrancheMetricsRequest,
+  ): Promise<Envelope<TrancheMetrics>>;
+  /** valuations.instruments.StructuredCredit.fromJson + trancheOas under Rust's default OasConfig. */
+  trancheOas(request: TranchePriceRequest): Promise<Envelope<OasResult>>;
+  /** valuations.instruments.StructuredCredit.fromJson + trancheDiscountMargin: decimal discount margin of a floating-rate tranche. */
+  trancheDiscountMargin(
+    request: TranchePriceRequest,
+  ): Promise<Envelope<number>>;
+  /** valuations.instruments.StructuredCredit.fromJson + trancheBreakevenCdr: decimal break-even constant default rate. */
+  trancheBreakevenCdr(request: TrancheRequest): Promise<Envelope<number>>;
   /** valuations.instruments.listModelsGrouped. */
   models(): Promise<Envelope<Record<string, string[]>>>;
   /** valuations.instruments.listStandardMetricsGrouped. */

@@ -241,9 +241,15 @@
       "worker": "none"
     },
     {
+      "name": "tranche-analytics",
+      "type": "registry:component",
+      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. Nothing is computed, rescaled or defaulted. No worker is required.",
+      "worker": "none"
+    },
+    {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit scenarios. Host owns routes and domain inputs.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit tranche analytics and scenarios. Host owns routes and domain inputs.",
       "worker": "host"
     },
     {
@@ -386,6 +392,10 @@
     },
     {
       "name": "use-scenario-table",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-tranche-analytics",
       "type": "registry:hook"
     },
     {
@@ -857,6 +867,10 @@
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
       "sha256": "a22ca4c5dc62aa36a5f4e7387d634374c3edd3bcfbf9f830114e9294147880ec"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
+      "sha256": "0108a5ccd179e54a24ceb83322d3674e72fc3227b9f629f14349f2dc4e94b44b"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",

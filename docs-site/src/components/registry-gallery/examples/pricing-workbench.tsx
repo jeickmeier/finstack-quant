@@ -93,6 +93,7 @@ const scenario = {
   trancheId: data.scenarios.trancheId,
   gridJson: JSON.stringify(data.scenarios.grid),
   priceDomain: [80, 140] as const,
+  trancheMetrics: data.trancheAnalytics.cases[0]!.metrics,
 };
 
 export function Example({

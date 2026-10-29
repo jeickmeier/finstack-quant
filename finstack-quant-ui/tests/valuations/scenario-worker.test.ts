@@ -12,6 +12,7 @@ import {
 import { scenarioOptions } from "@/hooks/valuations/use-scenario-table/use-scenario-table";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import fixture from "./scenario-table/cases.json";
+import tranches from "./scenario-table/tranche-analytics.json";
 import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -106,6 +107,55 @@ it(
       expect(scenarioOptions(client, 1, null).enabled).toBe(false);
     } finally {
       query.clear();
+    }
+  },
+  budget(30000),
+);
+it(
+  "returns the captured native tranche analytics and errors through the real worker",
+  async () => {
+    for (const entry of tranches.cases) {
+      const request = {
+        instrumentJson: JSON.stringify(entry.instrument),
+        marketJson: JSON.stringify(entry.market),
+        asOf: entry.asOf,
+        trancheId: entry.trancheId,
+      };
+      const priced = { ...request, marketPricePct: entry.marketPricePct };
+      const results = entry.results as Record<
+        string,
+        {
+          value?: unknown;
+          error?: { name: string; kind: string; message: string };
+        }
+      >;
+      const expectResult = (
+        actual: { ok: boolean; value?: unknown; error?: unknown },
+        expected: (typeof results)[string],
+      ) =>
+        expected.error
+          ? expect(actual).toMatchObject({ ok: false, error: expected.error })
+          : expect(actual).toEqual({ ok: true, value: expected.value });
+      expectResult(
+        await worker.proxy.trancheMetrics(request),
+        results.defaultMetrics!,
+      );
+      expectResult(
+        await worker.proxy.trancheMetrics({
+          ...priced,
+          metrics: entry.metrics,
+        }),
+        results.metrics!,
+      );
+      expectResult(
+        await worker.proxy.trancheBreakevenCdr(request),
+        results.breakevenCdr!,
+      );
+      expectResult(
+        await worker.proxy.trancheDiscountMargin(priced),
+        results.discountMargin!,
+      );
+      expectResult(await worker.proxy.trancheOas(priced), results.oas!);
     }
   },
   budget(30000),

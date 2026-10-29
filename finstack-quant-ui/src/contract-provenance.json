@@ -1277,6 +1277,52 @@
         "declaration": "/**\n   * Scenario (CPR x CDR x severity) table for a tranche; returns a typed\n   * `ScenarioTable` object. `grid` is a JSON `ScenarioGrid` (`cprs`, `cdrs`,\n   * `severities`).\n   *\n   * The result is a plain object with snake_case fields — the same shape\n   * Python exposes through its typed `ScenarioTable` wrapper. Pass it to\n   * `JSON.stringify` if a wire string is needed.\n   * @returns Typed `ScenarioTable` object over the CPR/CDR/severity grid.\n   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.\n   * @param trancheId - Stable tranche identifier used to select the required domain object.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.\n   * @throws Error - Throws a JavaScript exception if the market or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.\n   */\n  trancheScenarioTable(\n    deal: StructuredCredit,\n    trancheId: string,\n    marketJson: JsonInput,\n    asOf: string,\n    grid: string\n  ): ScenarioTable;",
         "sha256": "c9009eb3ddfb1f48001beec3d4682559c65f8c4f09e26a24f3fe6e7e636ed1a9"
       }
+    },
+    {
+      "id": "tranche-analytics",
+      "route": "returned-metrics",
+      "convention": "Returned TrancheMetrics fields in the units each Rust field documents; break-even CDR, discount margin and OAS as returned decimals; prices percent of current tranche balance; no price default.",
+      "api": {
+        "name": "valuations.instruments.trancheMetrics",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "trancheMetrics",
+        "inputs": [
+          {
+            "name": "deal",
+            "type": "StructuredCredit",
+            "optional": false
+          },
+          {
+            "name": "trancheId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "marketJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "marketPricePct",
+            "type": "number | null",
+            "optional": true
+          },
+          {
+            "name": "metrics",
+            "type": "string[] | null",
+            "optional": true
+          }
+        ],
+        "returns": "TrancheMetrics",
+        "declaration": "/**\n   * Per-tranche valuation, yield, spread and risk metrics computed from one\n   * tranche's own cashflows — the one per-note analytics entry point.\n   *\n   * `marketPricePct`, when provided, is the quoted clean price (% of CURRENT balance)\n   * the yield, z-spread and CS01 are solved against; otherwise the deal quote,\n   * or the tranche's own model price (zero z-spread). `metrics` lists registry\n   * metric ids (`\"dv01\"`, `\"default01\"`, …) valued on this note and returned\n   * in `metrics`, so tranche sensitivities sum to the deal's. Returns a typed\n   * `TrancheMetrics` object — a plain object with the same snake_case fields\n   * Python exposes through its typed `TrancheMetrics` wrapper. Pass it to\n   * `JSON.stringify` if a wire string is needed.\n   * @returns Typed `TrancheMetrics` object (PV, clean/dirty price, accrued, WAL, yield, z-spread, CS01, effective duration and convexity, requested registry metrics).\n   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.\n   * @param trancheId - Stable tranche identifier used to select the required domain object.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param marketPricePct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.\n   * @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.\n   * @throws Error - Throws a JavaScript exception if the market JSON is malformed; a metric id is unknown; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.\n   */\n  trancheMetrics(\n    deal: StructuredCredit,\n    trancheId: string,\n    marketJson: JsonInput,\n    asOf: string,\n    marketPricePct?: number | null,\n    metrics?: string[] | null\n  ): TrancheMetrics;",
+        "sha256": "bc91ceb63532e92bfd4404b4bd0635320a59dc87948d1204aeaffa7d38ca3e92"
+      }
     }
   ],
   "hostDeclarations": [

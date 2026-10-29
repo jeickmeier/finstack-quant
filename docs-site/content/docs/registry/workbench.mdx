@@ -49,7 +49,9 @@ coordinate (expiry 1 year, strike 1.1, forward 1.12). These are demo inputs, not
 recommended market parameters. Applications supply their own `surfaceOptions`,
 `cubeOptions` and `fxOptions`; omitting them keeps stored data available. Optional
 `scenario` inputs specify the native tranche ID, grid JSON and price extent for
-structured-credit detail views. Registry checks preserve native output and do not
+structured-credit detail views, plus optional registry metric ids valued on the
+tranche; the tranche analytics above the scenario prices take no default price
+and solve OAS only on request. Registry checks preserve native output and do not
 certify the upstream diagnostic quote association or deferred quote-space fits.
 
 ## Print and publication output
