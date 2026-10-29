@@ -367,6 +367,30 @@ it("assesses the active period's credit and summarises the income lines natively
   );
 });
 
+it("shows a native P&L summary error in Metrics & ratios instead of hiding the summary", async () => {
+  const forward = call.getMockImplementation() as (
+    method: string,
+    arg: unknown,
+  ) => Promise<unknown>;
+  call.mockImplementation(async (method: string, arg: unknown) =>
+    method === "plSummaryReport"
+      ? Promise.reject(new Error("Validation error: bad line item"))
+      : forward(method, arg),
+  );
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  fireEvent.click(await screen.findByRole("tab", { name: "Metrics & ratios" }));
+  const summary = await screen.findByRole("region", { name: "P&L summary" });
+  await waitFor(() =>
+    expect(within(summary).getByRole("alert").textContent).toBe(
+      "Validation error: bad line item",
+    ),
+  );
+});
+
 it("values the current model with a native DCF, tornado and LBO in Valuation", async () => {
   render(
     <FinstackQueryProvider>

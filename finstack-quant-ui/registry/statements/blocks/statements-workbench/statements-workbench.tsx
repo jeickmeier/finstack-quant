@@ -956,7 +956,9 @@ export function StatementsWorkbench({
                     loading={creditAssessment.isFetching}
                     error={creditAssessment.error?.message}
                     plSummary={
-                      sections.income.length ? plSummary.data : undefined
+                      sections.income.length
+                        ? (plSummary.data ?? null)
+                        : undefined
                     }
                     plSummaryLoading={plSummary.isFetching}
                     plSummaryError={plSummary.error?.message}
