@@ -123,6 +123,8 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "cubeSmile",
     "migrationMatrix",
     "migrationProjection",
+    "validateMertonModel",
+    "mertonReport",
     // StatementsApi
     "validateStatementModel",
     "validateStatementFormula",

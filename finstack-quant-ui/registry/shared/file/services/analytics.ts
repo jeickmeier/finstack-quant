@@ -4,17 +4,15 @@ import type {
   DatedSeries,
   FiscalConfig,
 } from "finstack-quant-wasm";
-import {
-  errorValue,
-  type AnalyticsApi,
-  type BenchmarkReport,
-  type BenchmarkReportRequest,
-  type Envelope,
-  type PerformanceReport,
-  type PerformanceReportRequest,
-  type PerformanceSeries,
+import type {
+  AnalyticsApi,
+  BenchmarkReport,
+  BenchmarkReportRequest,
+  PerformanceReport,
+  PerformanceReportRequest,
+  PerformanceSeries,
 } from "../finstack-contract";
-import type { ServiceContext } from "./context";
+import { attempt, type ServiceContext } from "./context";
 /** analytics and core facade members this slice reads. */
 export type AnalyticsNative = {
   analytics: Pick<typeof analytics, "Performance">;
@@ -27,14 +25,6 @@ const series = (value: DatedSeries): PerformanceSeries => ({
 });
 /** Omitted options stay unset so Rust applies its own defaults. */
 const option = <T>(value: T | null | undefined) => value ?? undefined;
-/** A native call's value, or its error when that one call is rejected. */
-function attempt<T>(call: () => T): Envelope<T> {
-  try {
-    return { ok: true, value: call() };
-  } catch (error) {
-    return { ok: false, error: errorValue(error) };
-  }
-}
 /** AnalyticsApi over the analytics facade namespace; handles never outlive a call. */
 export function createAnalyticsService(
   native: AnalyticsNative,

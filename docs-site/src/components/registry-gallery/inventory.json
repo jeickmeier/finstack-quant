@@ -397,6 +397,12 @@
       "worker": "none"
     },
     {
+      "name": "merton-calculator",
+      "type": "registry:component",
+      "docs": "Edits a Merton structural-credit request: horizons, CDS maturity and recovery, and the model either with the schema form over the generated MertonModel contract (native validation through the caller's validate callback, usually useMertonModelValidator) or as a KMV equity calibration (equity value and volatility, short- and long-term debt, rate, payout, calibration maturity). Calculate passes the request to the caller (usually the useMertonReport request). The returned report is shown as Rust returned it: CDS par spread and implied equity value and volatility tiles, a term-structure table (default probability, distance to default, implied and debt spreads, master-scale grade and central PD per horizon) and the canonical model parameters with the KMV default point of an equity calibration. A measure Rust rejects for the model (such as the debt spread of a first-passage barrier) shows its native error beside the rest. Values are decimals with no units inferred. Accepts defaultRequest, validate, onSubmit, report, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
       "name": "financial-model-editor",
       "type": "registry:component",
       "docs": "Edit explicit FinancialModelSpec fields from the generated Rust schema. Native WASM validates and canonicalizes the model; formula fields show the opaque native parse preview. Requires FinstackQueryProvider and remounting for a new document.",
@@ -572,6 +578,14 @@
     },
     {
       "name": "use-migration-projection",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-merton-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-merton-model-validator",
       "type": "registry:hook"
     },
     {
@@ -983,6 +997,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-merton-model",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-portfolio-result",
       "type": "registry:lib"
     },
@@ -1099,6 +1117,10 @@
     {
       "path": "finstack-quant-ui/tests/models/credit/migration.json",
       "sha256": "71f1850a9c2cf9019088541839885698df210aa89ec8bb8bae153c68da2b48e8"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/credit/merton.json",
+      "sha256": "48b77a5c7a3318e00338c55d4a90b79a5e006e3a5b6754bb814ef92357aaf981"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",

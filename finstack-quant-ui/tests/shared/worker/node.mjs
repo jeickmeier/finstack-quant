@@ -224,6 +224,35 @@ class GeneratorMatrix extends migration.GeneratorMatrix {
   }
 }
 const project = (...args) => countMatrix(migration.project(...args));
+// Merton handles (fromJson and fromEquity) and the default master scale.
+const mertonCounts = {
+  mertonConstructed: 0,
+  mertonFreed: 0,
+  masterScaleConstructed: 0,
+  masterScaleFreed: 0,
+};
+function countHandle(kind, handle) {
+  mertonCounts[`${kind}Constructed`]++;
+  const free = handle.free.bind(handle);
+  handle.free = () => {
+    free();
+    mertonCounts[`${kind}Freed`]++;
+  };
+  return handle;
+}
+class MertonModel extends facade.models.credit.MertonModel {
+  static fromJson(...args) {
+    return countHandle("merton", super.fromJson(...args));
+  }
+  static fromEquity(...args) {
+    return countHandle("merton", super.fromEquity(...args));
+  }
+}
+class MasterScale extends facade.models.credit.pd.MasterScale {
+  static defaultCalibration() {
+    return countHandle("masterScale", super.defaultCalibration());
+  }
+}
 let simmSensitivitiesConstructed = 0,
   simmSensitivitiesFreed = 0,
   simmCalculatorConstructed = 0,
@@ -286,6 +315,8 @@ const service = createService({
     },
     credit: {
       ...facade.models.credit,
+      MertonModel,
+      pd: { ...facade.models.credit.pd, MasterScale },
       migration: { ...migration, TransitionMatrix, GeneratorMatrix, project },
     },
   },
@@ -330,6 +361,7 @@ expose(
       portfolioConstructed,
       portfolioFreed,
       ...migrationCounts,
+      ...mertonCounts,
       simmSensitivitiesConstructed,
       simmSensitivitiesFreed,
       simmCalculatorConstructed,

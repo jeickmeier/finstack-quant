@@ -40,6 +40,7 @@ import type {
 import type {
   attribution as attributionWire,
   core as wire,
+  models as modelsWire,
   scenarios as scenarioWire,
 } from "finstack-quant-wasm/types";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
@@ -362,6 +363,66 @@ export interface BenchmarkReport {
   battingAverage: number[];
   /** In tickerNames order. */
   tickers: BenchmarkTickerReport[];
+}
+/** Where a Merton report's model comes from. */
+export type MertonSource =
+  | {
+      /** models.credit.MertonModel.fromJson of canonical MertonModel JSON. */
+      readonly kind: "model";
+      readonly json: string;
+    }
+  | {
+      /** MertonModel.kmvDefaultPoint(shortTermDebt, longTermDebt), then MertonModel.fromEquity with it as total debt (KMV iteration). */
+      readonly kind: "equity";
+      /** Market value of equity, in the firm's monetary unit. */
+      readonly equityValue: number;
+      /** Annualized equity-return volatility, decimal. */
+      readonly equityVol: number;
+      /** Liabilities due within one year; a total-debt barrier is this with no long-term debt. */
+      readonly shortTermDebt: number;
+      /** Liabilities maturing beyond one year. */
+      readonly longTermDebt: number;
+      /** Continuously compounded risk-free rate, decimal. */
+      readonly riskFreeRate: number;
+      /** Continuous payout yield on assets, decimal. */
+      readonly payoutRate: number;
+      /** Calibration horizon in years. */
+      readonly maturity: number;
+    };
+/** A Merton structural-credit report: one model, a horizon grid and the CDS terms. */
+export interface MertonReportRequest {
+  readonly source: MertonSource;
+  /** Horizons in years for default probability, distance to default and spreads, in display order. */
+  readonly horizons: readonly number[];
+  /** CDS and implied-equity maturity in years. */
+  readonly maturity: number;
+  /** Recovery at default as a fraction of par, for the implied and CDS spreads. */
+  readonly recovery: number;
+}
+/** The native MertonModel and MasterScale results of one request; nothing is computed in TypeScript. */
+export interface MertonReport {
+  /** The model's canonical JSON (MertonModel#toJson), parsed. */
+  model: modelsWire.MertonModel;
+  /** The KMV default point of an equity source, else null. */
+  defaultPoint: number | null;
+  /** The requested horizons, in request order; every per-horizon array aligns with them. */
+  horizons: number[];
+  /** defaultProbabilities(horizons). */
+  defaultProbabilities: number[];
+  /** distanceToDefault per horizon. */
+  distanceToDefault: number[];
+  /** MasterScale.defaultCalibration().mapPds(defaultProbabilities). */
+  grades: modelsWire.MasterScaleResult[];
+  /** impliedSpread(horizon, recovery) per horizon, or the native error. */
+  impliedSpread: Envelope<number[]>;
+  /** debtSpread per horizon, or the native error (Rust defines it for a terminal barrier only). */
+  debtSpread: Envelope<number[]>;
+  maturity: number;
+  recovery: number;
+  /** cdsParSpread(maturity, recovery), or the native error. */
+  cdsParSpread: Envelope<number>;
+  /** impliedEquity(maturity) as returned: [equity value, equity volatility], or the native error. */
+  impliedEquity: Envelope<number[]>;
 }
 /** A portfolio valuation request; omitted options are left to Rust. */
 export interface PortfolioValuationRequest {
@@ -700,6 +761,10 @@ export interface ModelsApi {
   migrationProjection(
     request: MigrationProjectionRequest,
   ): Promise<Envelope<MigrationProjection>>;
+  /** models.credit.MertonModel.fromJson + toJson: canonical MertonModel JSON text; the handle is freed. */
+  validateMertonModel(json: string): Promise<Envelope<string>>;
+  /** MertonModel (fromJson, or kmvDefaultPoint + fromEquity) + default probabilities, distance to default, spreads, CDS par spread, implied equity and models.credit.pd.MasterScale.defaultCalibration().mapPds; per-field native errors are kept; both handles are freed. */
+  mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
 }
 /** statements and statements_analytics: model validation, evaluation and diagnostics. */
 export interface StatementsApi {

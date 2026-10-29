@@ -3,11 +3,13 @@ import { serializeHost } from "@/lib/finstack/codec.mjs";
 import type {
   CubeSlice,
   FxStrikeSurface,
+  MertonReport,
+  MertonReportRequest,
   MigrationMatrixRequest,
   ModelsApi,
 } from "../finstack-contract";
-import type { ServiceContext } from "./context";
-/** models.volatility evaluators, the core surface handles they sample and models.credit.migration. */
+import { attempt, type ServiceContext } from "./context";
+/** models.volatility evaluators, the core surface handles they sample, models.credit.migration, the Merton model and the PD master scale. */
 export type ModelsNative = {
   core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube">;
   models: {
@@ -24,11 +26,12 @@ export type ModelsNative = {
       | "SabrParameters"
       | "SabrSmile"
     >;
-    credit: {
+    credit: Pick<typeof models.credit, "MertonModel"> & {
       migration: Pick<
         typeof models.credit.migration,
         "TransitionMatrix" | "GeneratorMatrix" | "project"
       >;
+      pd: Pick<typeof models.credit.pd, "MasterScale">;
     };
   };
 };
@@ -262,6 +265,74 @@ export function createModelsService(
           }
         } finally {
           matrix.free();
+        }
+      });
+    },
+    validateMertonModel(json) {
+      return context.result(() => {
+        const model = native.models.credit.MertonModel.fromJson(json);
+        try {
+          return model.toJson();
+        } finally {
+          model.free();
+        }
+      });
+    },
+    mertonReport(request: MertonReportRequest) {
+      return context.result((): MertonReport => {
+        const { MertonModel } = native.models.credit;
+        const { source } = request;
+        const defaultPoint =
+          source.kind === "equity"
+            ? MertonModel.kmvDefaultPoint(
+                source.shortTermDebt,
+                source.longTermDebt,
+              )
+            : null;
+        const model =
+          source.kind === "equity"
+            ? MertonModel.fromEquity(
+                source.equityValue,
+                source.equityVol,
+                defaultPoint!,
+                source.riskFreeRate,
+                source.payoutRate,
+                source.maturity,
+              )
+            : MertonModel.fromJson(source.json);
+        let scale:
+          | InstanceType<ModelsNative["models"]["credit"]["pd"]["MasterScale"]>
+          | undefined;
+        try {
+          const { maturity, recovery } = request;
+          const horizons = [...request.horizons];
+          const defaultProbabilities = Array.from(
+            model.defaultProbabilities(horizons),
+          );
+          scale = native.models.credit.pd.MasterScale.defaultCalibration();
+          return {
+            model: JSON.parse(model.toJson()),
+            defaultPoint,
+            horizons,
+            defaultProbabilities,
+            distanceToDefault: horizons.map((h) => model.distanceToDefault(h)),
+            grades: scale.mapPds(defaultProbabilities),
+            // Rust rejects some measures for some models (debtSpread needs a
+            // terminal barrier); each keeps its own native error.
+            impliedSpread: attempt(() =>
+              horizons.map((h) => model.impliedSpread(h, recovery)),
+            ),
+            debtSpread: attempt(() => horizons.map((h) => model.debtSpread(h))),
+            maturity,
+            recovery,
+            cdsParSpread: attempt(() => model.cdsParSpread(maturity, recovery)),
+            impliedEquity: attempt(() =>
+              Array.from(model.impliedEquity(maturity)),
+            ),
+          };
+        } finally {
+          scale?.free();
+          model.free();
         }
       });
     },

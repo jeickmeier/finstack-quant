@@ -1843,6 +1843,27 @@
       ]
     },
     {
+      "id": "merton-calculator",
+      "route": "returned-model",
+      "convention": "Returned models.credit.MertonModel results of a model from canonical MertonModel JSON (natively validated) or from a KMV equity calibration (kmvDefaultPoint then fromEquity): default probabilities, distances to default, implied spreads (recovery as a fraction of par) and debt spreads per requested horizon, the CDS par spread and implied equity at the requested maturity, and models.credit.pd.MasterScale.defaultCalibration grades of the default probabilities. Decimals as returned (spreads per year, probabilities and volatilities as fractions), no unit inferred; a measure Rust rejects for the model shows its native error beside the rest.",
+      "api": {
+        "name": "models.credit.MertonModel#defaultProbabilities",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "MertonModel",
+        "member": "defaultProbabilities",
+        "inputs": [
+          {
+            "name": "horizons",
+            "type": "NumericArray",
+            "optional": false
+          }
+        ],
+        "returns": "Float64Array",
+        "declaration": "/**\n   * Risk-neutral default probabilities over a grid of horizons.\n   *\n   * Python returns the same values as a pandas Series labelled by horizon.\n   * @param horizons - Horizons in years, as a `number[]` or `Float64Array`.\n   * @returns One default probability per horizon, in input order.\n   * @throws Error - Throws a `TypeError` if `horizons` is not an array of numbers.\n   */\n  defaultProbabilities(horizons: NumericArray): Float64Array;",
+        "sha256": "d630514295e4e9bbd786e587a8243f7c653fadbe47b93282939119e504f6fb78"
+      }
+    },
+    {
       "id": "transition-matrix-heatmap",
       "route": "returned-model",
       "convention": "Returned models.credit.migration results: TransitionMatrix rows and default probabilities in RatingScale order, the GeneratorMatrix rows with its roundTripError and regularizationL1, and the default probabilities of project(generator, t) per requested horizon. Decimals as returned; an omitted round-trip tolerance is left to Rust. Heatmap colour domains are presentation only: [0, 1] for probabilities, the intensities' extent (centred on zero) for the generator.",

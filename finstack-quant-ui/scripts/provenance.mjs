@@ -377,6 +377,17 @@ const displays = [
       "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",
   },
   {
+    id: "merton-calculator",
+    api: [
+      "models.credit.MertonModel#defaultProbabilities",
+      "MertonModel",
+      "defaultProbabilities",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned models.credit.MertonModel results of a model from canonical MertonModel JSON (natively validated) or from a KMV equity calibration (kmvDefaultPoint then fromEquity): default probabilities, distances to default, implied spreads (recovery as a fraction of par) and debt spreads per requested horizon, the CDS par spread and implied equity at the requested maturity, and models.credit.pd.MasterScale.defaultCalibration grades of the default probabilities. Decimals as returned (spreads per year, probabilities and volatilities as fractions), no unit inferred; a measure Rust rejects for the model shows its native error beside the rest.",
+  },
+  {
     id: "transition-matrix-heatmap",
     api: [
       "models.credit.migration.TransitionMatrix#toRows",

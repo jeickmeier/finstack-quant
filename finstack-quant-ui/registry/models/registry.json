@@ -282,6 +282,53 @@
       }
     },
     {
+      "name": "merton-calculator",
+      "type": "registry:component",
+      "title": "Merton calculator",
+      "description": "Calculator of a native models.credit.MertonModel report: the generated MertonModel form or a KMV equity calibration, horizons and CDS terms, then the returned term structure, spreads, implied equity and master-scale grades.",
+      "docs": "Edits a Merton structural-credit request: horizons, CDS maturity and recovery, and the model either with the schema form over the generated MertonModel contract (native validation through the caller's validate callback, usually useMertonModelValidator) or as a KMV equity calibration (equity value and volatility, short- and long-term debt, rate, payout, calibration maturity). Calculate passes the request to the caller (usually the useMertonReport request). The returned report is shown as Rust returned it: CDS par spread and implied equity value and volatility tiles, a term-structure table (default probability, distance to default, implied and debt spreads, master-scale grade and central PD per horizon) and the canonical model parameters with the KMV default point of an equity calibration. A measure Rust rejects for the model (such as the debt spread of a first-passage barrier) shows its native error beside the rest. Values are decimals with no units inferred. Accepts defaultRequest, validate, onSubmit, report, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/merton-calculator/merton-calculator.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/merton-calculator/merton-calculator.tsx"
+        },
+        {
+          "path": "components/merton-calculator/merton.ts",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/merton-calculator/merton.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/schema-form",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "@finstack/contract-merton-model",
+        "@finstack/finstack-codec",
+        "button",
+        "input"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-migration-matrix",
       "type": "registry:hook",
       "title": "useMigrationMatrix",
@@ -321,6 +368,56 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-merton-report",
+      "type": "registry:hook",
+      "title": "useMertonReport",
+      "description": "Builds a native models.credit.MertonModel report graded on the default PD master scale through the WASM worker.",
+      "docs": "models.credit.MertonModel.fromJson of canonical MertonModel JSON, or MertonModel.kmvDefaultPoint(shortTermDebt, longTermDebt) then fromEquity with it as total debt; then defaultProbabilities over the horizons, distanceToDefault, impliedSpread(horizon, recovery) and debtSpread per horizon, cdsParSpread(maturity, recovery), impliedEquity(maturity), toJson, and models.credit.pd.MasterScale.defaultCalibration().mapPds of the default probabilities. A measure Rust rejects for the model keeps its native error beside the rest of the report. Both handles are freed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-merton-report/use-merton-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-merton-report/use-merton-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-merton-model-validator",
+      "type": "registry:hook",
+      "title": "useMertonModelValidator",
+      "description": "Validates MertonModel JSON natively through the WASM worker and returns its canonical form.",
+      "docs": "models.credit.MertonModel.fromJson then toJson; the handle is freed. Superseded revisions reject. Connect it to the merton-calculator validate prop. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-merton-model-validator/use-merton-model-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-merton-model-validator/use-merton-model-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
       "categories": [],
       "meta": {
         "version": "0.2.0",

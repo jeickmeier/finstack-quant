@@ -218,6 +218,13 @@ test("benchmark-report multi-factor regression", async ({ page }) => {
   await expect(multi.getByRole("table")).toBeVisible();
   await expect(multi).toHaveScreenshot("benchmark-report-multi-factor.png");
 });
+test("merton-calculator model parameters", async ({ page }) => {
+  const item = await open(page, "merton-calculator", "light", "comfortable");
+  // The four item baselines stop inside the term structure, above this table.
+  const model = item.getByRole("region", { name: "Model", exact: true });
+  await expect(model.getByRole("table")).toBeVisible();
+  await expect(model).toHaveScreenshot("merton-calculator-model.png");
+});
 test("transition-matrix-heatmap cumulative default probability", async ({
   page,
 }) => {

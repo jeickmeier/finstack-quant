@@ -38,6 +38,7 @@ const sources = {
   performance: "tests/analytics/explicit.json",
   benchmark: "tests/analytics/benchmark.json",
   credit: "tests/models/credit/migration.json",
+  merton: "tests/models/credit/merton.json",
   simm: "src/fixtures/margin/simm.json",
   portfolioValuation: "tests/portfolio/gallery.json",
   scenarioPnl: "tests/portfolio/scenario-pnl.json",
