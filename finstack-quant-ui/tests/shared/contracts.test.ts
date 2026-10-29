@@ -111,11 +111,17 @@ describe("discovered canonical fixtures", () => {
         expect(validator.parse(example)).toEqual(example);
     }
     // Rust publishes no example for CovenantReport, DatedCovenantReports,
-    // MertonModel, ScenarioSet or ScenarioDiff; every other root carries one.
+    // the five credit-scoring inputs, MertonModel, ScenarioSet or
+    // ScenarioDiff; every other root carries one.
     expect(withoutExamples).toEqual([
       "schemas/covenant_report.json",
       "schemas/dated_covenant_reports.json",
+      "schemas/altman_z_double_prime_input.json",
+      "schemas/altman_z_prime_input.json",
+      "schemas/altman_z_score_input.json",
       "schemas/merton_model.json",
+      "schemas/ohlson_o_score_input.json",
+      "schemas/zmijewski_input.json",
       "schemas/scenario_diff.json",
       "schemas/scenario_set.json",
     ]);

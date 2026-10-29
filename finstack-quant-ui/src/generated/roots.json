@@ -440,9 +440,34 @@
     "schema": "schemas/market_context_state.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/models/1/altman_z_double_prime_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/altman_z_double_prime_input.schema.json",
+    "schema": "schemas/altman_z_double_prime_input.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/altman_z_prime_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/altman_z_prime_input.schema.json",
+    "schema": "schemas/altman_z_prime_input.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/altman_z_score_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/altman_z_score_input.schema.json",
+    "schema": "schemas/altman_z_score_input.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json",
     "source": "finstack-quant/models/schemas/models/1/merton_model.schema.json",
     "schema": "schemas/merton_model.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/ohlson_o_score_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/ohlson_o_score_input.schema.json",
+    "schema": "schemas/ohlson_o_score_input.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/zmijewski_input.schema.json",
+    "schema": "schemas/zmijewski_input.json"
   },
   {
     "uri": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",

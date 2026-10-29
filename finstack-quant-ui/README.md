@@ -845,6 +845,25 @@ caller's request) or an equity-calibration form with the horizon and CDS
 inputs, and shows the returned report. The native fixture (the facade example
 firm and a KMV calibration) is `tests/models/credit/merton.json`.
 
+## Credit scorecard
+
+`useCreditScore` (`@finstack/use-credit-score`) calls one
+`models.credit.scoring` function (`altmanZScore`, `altmanZPrime`,
+`altmanZDoublePrime`, `altmanEmScore`, `ohlsonOScore` or `zmijewskiScore`)
+with the request's named ratios in the facade's positional order (one explicit
+call per model, conversion only; `tests/models/credit/scorecard.test.tsx` pins
+each order against `index.d.ts`), then
+`models.credit.pd.MasterScale.defaultCalibration().mapScore` of the result. A result Rust cannot grade (the Altman models return no implied PD)
+keeps that native error beside the score; the scale handle is freed.
+`CreditScorecard` takes its fields, their order and their help from the
+generated input contracts (`altman_z_score_input`, `altman_z_prime_input`,
+`altman_z_double_prime_input` for Z'' and EM, `ohlson_o_score_input`,
+`zmijewski_input`); Rust publishes no example for them and the facade has no
+native parse of the input structs, so there is no validator and the form starts
+from the caller's ratios. The returned score, zone and implied PD are shown as
+Rust returned them. The native fixture (the inputs of the Rust unit tests, one
+per model) is `tests/models/credit/scorecard.json`.
+
 ## Indicative SIMM initial margin
 
 `useSimmSensitivitiesValidator` (`@finstack/use-simm-sensitivities-validator`)

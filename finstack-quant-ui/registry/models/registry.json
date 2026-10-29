@@ -329,6 +329,52 @@
       }
     },
     {
+      "name": "credit-scorecard",
+      "type": "registry:component",
+      "title": "Credit scorecard",
+      "description": "Scorecard of a native models.credit.scoring model: the generated input-ratio form of Altman Z, Z', Z'' and EM, Ohlson O or Zmijewski, then the returned score, zone, implied PD and default master-scale grade.",
+      "docs": "Edits the input ratios of one accounting-based credit model (Altman Z-Score, Z'-Score, Z''-Score or EM-Score, Ohlson O-Score, Zmijewski probit). The fields, their order and their help text come from the generated input contract of the selected model (altman_z_score_input, altman_z_prime_input, altman_z_double_prime_input for both Z'' and EM, ohlson_o_score_input, zmijewski_input); each model keeps its own entries when another is selected. Score passes the model and the ratios to the caller (usually the useCreditScore request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned score, zone and implied PD are shown as Rust returned them, with the default PD master scale's grade and central PD of the implied PD, or Rust's error when the model returns no implied PD (the Altman models). Nothing is computed or classified here. Accepts defaultModel, defaultInputs, onSubmit, score, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/credit-scorecard/credit-scorecard.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/credit-scorecard/credit-scorecard.tsx"
+        },
+        {
+          "path": "components/credit-scorecard/scoring.ts",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/credit-scorecard/scoring.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/contract-altman-z-score-input",
+        "@finstack/contract-altman-z-prime-input",
+        "@finstack/contract-altman-z-double-prime-input",
+        "@finstack/contract-ohlson-o-score-input",
+        "@finstack/contract-zmijewski-input",
+        "button"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/altman_z_double_prime_input.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/altman_z_prime_input.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/altman_z_score_input.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/ohlson_o_score_input.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-migration-matrix",
       "type": "registry:hook",
       "title": "useMigrationMatrix",
@@ -418,6 +464,31 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-credit-score",
+      "type": "registry:hook",
+      "title": "useCreditScore",
+      "description": "Scores a firm with a native models.credit.scoring model graded on the default PD master scale through the WASM worker.",
+      "docs": "Calls one models.credit.scoring function (altmanZScore, altmanZPrime, altmanZDoublePrime, altmanEmScore, ohlsonOScore or zmijewskiScore) with the request's named ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result; a result Rust cannot grade (no implied PD) keeps its native error beside the score. The scale handle is freed. Keyed on the complete request (non-finite ratios stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-credit-score/use-credit-score.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-credit-score/use-credit-score.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
       "categories": [],
       "meta": {
         "version": "0.2.0",
