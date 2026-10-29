@@ -11,6 +11,8 @@ export type ScenariosNative = {
     | "scenarioSpecRequiresInstruments"
     | "scenarioSpecMutatesInstruments"
     | "applyScenario"
+    | "computeHorizonReturn"
+    | "horizonResultExplainText"
   >;
 };
 /** ScenariosApi over the scenarios facade namespace and the shared market cache. */
@@ -76,6 +78,21 @@ export function createScenariosService(
           asOf: applied.report.time_roll?.new_date ?? request.asOf,
           instrumentJson,
         };
+      });
+    },
+    horizonReturn(request) {
+      return context.result(() => {
+        // Omitted method, config and calendar stay unset so Rust applies its defaults.
+        const report = api.computeHorizonReturn(
+          request.instrumentJson,
+          request.marketJson,
+          request.asOf,
+          request.scenarioJson,
+          request.method ?? undefined,
+          undefined,
+          request.calendarId ?? undefined,
+        );
+        return { report, explain: api.horizonResultExplainText(report) };
       });
     },
   };

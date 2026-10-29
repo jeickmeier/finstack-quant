@@ -180,6 +180,7 @@ const output = await prettier.format(
       "calibration",
       "covenants",
       "scenarios",
+      "attribution",
       "analytics",
       "portfolio",
       "margin",

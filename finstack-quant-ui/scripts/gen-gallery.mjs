@@ -33,6 +33,8 @@ const sources = {
   trancheAnalytics: "tests/valuations/scenario-table/tranche-analytics.json",
   cashflows: "tests/valuations/cashflows/cases.json",
   marketScenario: "tests/scenarios/application/cases.json",
+  horizonReturn: "tests/scenarios/horizon/cases.json",
+  pnlAttribution: "tests/attribution/cases.json",
   performance: "tests/analytics/explicit.json",
   credit: "tests/models/credit/migration.json",
   simm: "src/fixtures/margin/simm.json",

@@ -48,6 +48,8 @@ import { Example as Example44 } from "./examples/transition-matrix-heatmap";
 import { Example as Example45 } from "./examples/simm-sensitivity-table";
 import { Example as Example46 } from "./examples/simm-report";
 import { Example as Example47 } from "./examples/simm-calculator";
+import { Example as Example48 } from "./examples/pnl-attribution-report";
+import { Example as Example49 } from "./examples/horizon-return-report";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -97,6 +99,8 @@ const examples = {
   "simm-sensitivity-table": Example45,
   "simm-report": Example46,
   "simm-calculator": Example47,
+  "pnl-attribution-report": Example48,
+  "horizon-return-report": Example49,
 };
 export function ComponentDemo({
   name,

@@ -71,6 +71,42 @@
       }
     },
     {
+      "name": "horizon-return-report",
+      "type": "registry:component",
+      "title": "Horizon return report",
+      "description": "Display of a native horizon total return: Rust's summary, horizon and endpoint values, explain text, the factor attribution and the scenario report.",
+      "docs": "Display-only view of the HorizonReport returned by scenarios.computeHorizonReturn (useHorizonReturn): total and annualized return and each factor contribution as the decimal fractions Rust computed (an undefined value, such as the annualized return without a time roll, reads \"not defined\", never zero), the horizon in calendar days, the exact initial and terminal values, the Rust explain text (scenarios.horizonResultExplainText), the attribution through pnl-attribution-report and the scenario application report through market-scenario-report in a disclosure. Nothing is computed here. Accepts report, explain, loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/horizon-return-report/horizon-return-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/scenarios/components/horizon-return-report/horizon-return-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/pnl-attribution-report",
+        "@finstack/market-scenario-report"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-market-scenario",
       "type": "registry:hook",
       "title": "useMarketScenario",
@@ -106,6 +142,31 @@
           "path": "hooks/use-apply-market-scenario/use-apply-market-scenario.ts",
           "type": "registry:hook",
           "target": "hooks/scenarios/use-apply-market-scenario/use-apply-market-scenario.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-horizon-return",
+      "type": "registry:hook",
+      "title": "useHorizonReturn",
+      "description": "Computes a priced instrument's horizon total return under a canonical scenario through the WASM worker.",
+      "docs": "scenarios.computeHorizonReturn on the supplied instrument, market, valuation date and ScenarioSpec, then scenarios.horizonResultExplainText. Returns {report, explain}: the native HorizonReport (HorizonResult plus Rust's summary, whose undefined values are null) and its explain text. Omitted method and calendarId, and the config, stay unset so Rust applies its defaults (the default attribution method; a weekends-only roll calendar); an unknown calendar or an attribution failure (for example metrics_based on a hazard curve without a calibration recipe) returns the native error unchanged. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-horizon-return/use-horizon-return.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-horizon-return/use-horizon-return.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

@@ -1495,6 +1495,78 @@
       }
     },
     {
+      "id": "horizon-return-report",
+      "route": "returned-report",
+      "convention": "Returned HorizonReport: Rust's summary total and annualized return and factor contributions as decimal fractions of the initial value (null shown as not defined, never 0), horizon calendar days, exact initial and terminal values, horizonResultExplainText, the PnlAttribution and the ApplicationReport. Omitted method, config and calendar are left to Rust; nothing is computed in TypeScript.",
+      "api": {
+        "name": "scenarios.computeHorizonReturn",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ScenariosNamespace",
+        "member": "computeHorizonReturn",
+        "inputs": [
+          {
+            "name": "instrumentJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "marketJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "scenarioJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": "JsonInput",
+            "optional": true
+          },
+          {
+            "name": "configJson",
+            "type": "JsonInput",
+            "optional": true
+          },
+          {
+            "name": "calendarId",
+            "type": "string",
+            "optional": true
+          }
+        ],
+        "returns": "HorizonReport",
+        "declaration": "/**\n   * Compute horizon total return under a scenario.\n   *\n   * Applies a scenario specification to project an instrument forward, then\n   * decomposes the resulting P&L using factor-based attribution.\n   *\n   * @param instrumentJson - Canonical `finstack_quant.instrument/1` envelope.\n   * @param marketJson - JSON-serialized `MarketContext`.\n   * @param asOf - Valuation date (ISO 8601).\n   * @param scenarioJson - JSON-serialized `ScenarioSpec`.\n   * @param method - `AttributionMethod` wire value: a unit variant name such as `\"parallel\"` or `\"metrics_based\"`, an object such as `{ waterfall: [\"carry\", \"rates_curves\"] }` or `{ taylor: {} }`, or the same value as JSON text. Omit for the Rust default (`AttributionMethod::default()`, currently \"parallel\"). \"metrics_based\" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, while failures calculating selected metrics throw.\n   * @param configJson - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.\n   * @param calendarId - Optional built-in holiday calendar (e.g. \"nyse\", \"target\") used to business-day adjust `time_roll_forward` targets under `business_days` mode. Omit for a weekends-only calendar; unknown identifiers throw.\n   * @returns The serde `HorizonResult` (`attribution`, `initial_value` and `terminal_value` as exact-decimal Money objects, `horizon_days`, null without a time roll, and `scenario_report`) plus `summary`: the Rust-computed `total_return`, `annualized_return`, `currency` and `factor_contributions` that Python exposes as `HorizonResult` accessors. Rust computes every derived value. Undefined derived values are null here and NaN in Python: total return and factor contributions require positive initial value and matching P&L currency; annualization also requires a positive horizon and total return at or above -100%.\n   * @throws Error - Rejects a malformed or invalid scenario; malformed instrument, market, or configuration JSON; an invalid ISO `as_of` date; an unsupported attribution `method`; an unknown `calendar_id`; invalid, unsupported, or unresolved scenario operations; missing market data; pricing or attribution failures; or failure to serialize the horizon result to JavaScript.\n   */\n  computeHorizonReturn(\n    instrumentJson: JsonInput,\n    marketJson: JsonInput,\n    asOf: string,\n    scenarioJson: JsonInput,\n    method?: JsonInput,\n    configJson?: JsonInput,\n    calendarId?: string\n  ): HorizonReport;",
+        "sha256": "ea0d95281e33c38249078c9a3ef8ca4e8edb9d2a4e9c2ca313812391b9038e4e"
+      }
+    },
+    {
+      "id": "pnl-attribution-report",
+      "route": "returned-report",
+      "convention": "Returned PnlAttribution: total, mark-to-market and endpoint values and every factor bucket as exact money; the waterfall only from waterfall_steps pv_before/pv_after; the residual with the returned residual_pct and tolerances, with a verdict only from pnlAttributionResidualWithinTolerance; shares only from pnlAttributionPctOfTotal; explain only from pnlAttributionExplainText. Nothing is summed, differenced or converted.",
+      "api": {
+        "name": "attribution.attributePnl",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "AttributionNamespace",
+        "member": "attributePnl",
+        "inputs": [
+          {
+            "name": "spec",
+            "type": "AttributionSpec | string",
+            "optional": false
+          }
+        ],
+        "returns": "PnlAttribution",
+        "declaration": "/**\n   * Run P&L attribution for a single instrument.\n   *\n   * Accepts an `AttributionSpec` object or its JSON text with an instrument payload, two market\n   * snapshots, dates, and a method descriptor. Returns the `PnlAttribution`\n   * result as a structured object with the canonical Rust serde field names;\n   * use `attributePnlJson` for the JSON wire string. `spec.config` may include\n   * `\"execution_policy\": \"parallel\"`, which opts into inner Rayon on native\n   * hosts; WebAssembly builds have no Rayon, so the field is accepted but\n   * ignored here and attribution always runs serially (same result).\n   * @param spec - Canonical `AttributionSpec` object or JSON text with the instrument payload, market states, ISO calendar dates, method and optional config.\n   * @returns The native-currency or configured reporting-currency `PnlAttribution` object.\n   * @throws Error - Throws a classified `FinstackError` for malformed or unknown spec fields, invalid dates, unavailable market data, pricing, currency, configuration or method failures, or a contained Rust panic. Invalid host types throw `TypeError`.\n   */\n  attributePnl(spec: AttributionSpec | string): PnlAttribution;",
+        "sha256": "140eea06fff272cda2644b91ef19b6975fa677b88cbc17f712cc6238eec78df6"
+      }
+    },
+    {
       "id": "scenario-heatmap",
       "route": "returned-prices",
       "convention": "Rust clean settlement price, percent of current tranche balance.",

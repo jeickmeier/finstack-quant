@@ -35,16 +35,16 @@ module, and live under `src/generated/types/` for type-only imports.
 
 ## Layout and extension
 
-| Path                                                 | Holds                                                                                                                                                                                                                                                                            |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `analytics`, `portfolio`, `margin`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
-| `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                                                                      |
-| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                                                                            |
-| `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                                                                        |
-| `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                                                                     |
-| `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                                                                               |
-| `tests/e2e/`, `tests/install/`, `tests/publishing/`  | The `ui-e2e`, `ui-install` and `ui-publish-check` gates.                                                                                                                                                                                                                         |
-| `tests/browser/`                                     | Worker smoke, footprint gate, the harness runner and shared consumer helpers.                                                                                                                                                                                                    |
+| Path                                                 | Holds                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `attribution`, `analytics`, `portfolio`, `margin`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
+| `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                                                                                     |
+| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                                                                                           |
+| `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                                                                                       |
+| `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                                                                                    |
+| `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                                                                                              |
+| `tests/e2e/`, `tests/install/`, `tests/publishing/`  | The `ui-e2e`, `ui-install` and `ui-publish-check` gates.                                                                                                                                                                                                                                        |
+| `tests/browser/`                                     | Worker smoke, footprint gate, the harness runner and shared consumer helpers.                                                                                                                                                                                                                   |
 
 Sources import through the paths an installed consumer uses. `tsconfig.json`
 maps them back here; `vitest.config.mts` copies that table into prefix aliases
@@ -170,9 +170,9 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the fifteen native fixture generators under
+`mise run ui-fixtures` runs the seventeen native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-cashflows → details; portfolio;
+horizon return, cashflows → details; portfolio; attribution;
 curves → market-browser; cubes, calibration, scenario-table;
 statements → covenants; analytics; models credit; margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
@@ -700,6 +700,32 @@ The panel edits the native `ScenarioGrid` (`contract-scenario-grid`) seeded from
 **Run scenarios**, and Rust validates the axis values and the cell cap.
 `calibrationChartOptions` forwards existing figure annotations, export refs and
 interaction callbacks; the workbench owns the shared report/chart selection.
+
+## Horizon return and P&L attribution
+
+`useHorizonReturn` (`@finstack/use-horizon-return`) calls
+`scenarios.computeHorizonReturn` on an instrument, its market and valuation
+date and a canonical `ScenarioSpec` (for example one built with
+`useMarketScenario`), then `horizonResultExplainText`. Omitted `method`,
+`calendarId` and the config stay unset, so Rust applies its default
+attribution method and a weekends-only roll calendar; an unknown calendar or a
+failing attribution (`metrics_based` needs a calibration recipe for every
+hazard curve) returns the native error. The display-only
+`HorizonReturnReport` shows Rust's summary (total and annualized return and
+factor contributions as decimal fractions; an undefined value, such as the
+annualized return without a time roll, reads "not defined", never zero), the
+horizon, the endpoint values, the explain text, the attribution and, in a
+disclosure, the scenario report. `PnlAttributionReport` (the `attribution`
+category; its worker half comes later) shows any returned `PnlAttribution`:
+total, mark-to-market and endpoint values, every factor bucket, a signed
+factor chart, the waterfall drawn only from Rust's `waterfall_steps`, the
+residual and the notes. Its optional `explain`, `residualWithinTolerance` and
+`pctOfTotal` props take Rust's `pnlAttributionExplainText`,
+`pnlAttributionResidualWithinTolerance` and `pnlAttributionPctOfTotal`;
+without the residual check no verdict is shown. In `pricing-workbench` the
+horizon return sits in the Market scenario results tab under the applied
+scenario, with method and roll-calendar choices. Native fixtures live in
+`tests/scenarios/horizon/` and `tests/attribution/`.
 
 ## Returned portfolio valuation
 

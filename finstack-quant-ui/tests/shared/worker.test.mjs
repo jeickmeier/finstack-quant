@@ -98,6 +98,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     // ScenariosApi
     "buildMarketScenario",
     "applyMarketScenario",
+    "horizonReturn",
     // AnalyticsApi
     "performanceReport",
     // PortfolioApi

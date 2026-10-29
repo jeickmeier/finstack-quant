@@ -7,12 +7,22 @@ import {
   type MarketScenarioDraft,
 } from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
 import { MarketScenarioReport } from "@/components/finstack/scenarios/components/market-scenario-report/market-scenario-report";
+import { HorizonReturnReport } from "@/components/finstack/scenarios/components/horizon-return-report/horizon-return-report";
+import {
+  EnumField,
+  type EnumOption,
+} from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import {
   useMarketScenario,
   type MarketScenarioRequest,
 } from "@/hooks/scenarios/use-market-scenario/use-market-scenario";
 import { useApplyMarketScenario } from "@/hooks/scenarios/use-apply-market-scenario/use-apply-market-scenario";
 import {
+  useHorizonReturn,
+  type HorizonReturnRequest,
+} from "@/hooks/scenarios/use-horizon-return/use-horizon-return";
+import {
+  useCalendars,
   useMetricMetadata,
   useMoneyFormat,
   usePriceInstrument,
@@ -20,6 +30,22 @@ import {
 } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
 import { returnedRounding } from "@/components/finstack/valuations/primitives/stamp-badge/stamp-badge";
 import { resolveModel } from "@/workers/finstack-contract";
+
+/** Horizon attribution methods offered here; blank leaves Rust's default. A waterfall needs a factor order, which this tab does not edit. */
+export type HorizonMethodChoice = "" | "parallel" | "metrics_based" | "taylor";
+const horizonMethods: EnumOption[] = [
+  { value: "", label: "Default", description: "Omitted; Rust's default" },
+  { value: "parallel", label: "parallel" },
+  { value: "metrics_based", label: "metrics_based" },
+  { value: "taylor", label: "taylor" },
+];
+/** The AttributionMethod wire value of a choice; Rust rejects a bare "taylor", so its config object is sent empty for Rust to fill. */
+function horizonMethod(
+  choice: HorizonMethodChoice,
+): HorizonReturnRequest["method"] {
+  if (choice === "") return null;
+  return choice === "taylor" ? { taylor: {} } : choice;
+}
 
 /** An empty market scenario: no shifts, no roll, every option left to Rust. */
 export const emptyMarketScenario: MarketScenarioDraft = {
@@ -82,6 +108,20 @@ export function useMarketScenarioSession(
           asOf: application.data.asOf,
         }
       : null;
+  const [horizonChoice, setHorizonChoice] = useState<HorizonMethodChoice>("");
+  const [calendarId, setCalendarId] = useState("");
+  const horizon = useHorizonReturn(
+    applied && base
+      ? {
+          instrumentJson: base.instrumentJson,
+          marketJson: base.marketJson,
+          asOf: base.asOf,
+          scenarioJson: applied,
+          method: horizonMethod(horizonChoice),
+          calendarId: calendarId || null,
+        }
+      : null,
+  );
   const shocked = usePriceInstrument(
     shockedRequest ?? base ?? emptyRequest,
     shockedRequest !== null,
@@ -106,6 +146,11 @@ export function useMarketScenarioSession(
     clear: () => setApplied(null),
     application,
     shocked,
+    horizon,
+    horizonChoice,
+    setHorizonChoice,
+    calendarId,
+    setCalendarId,
     /** Comparison props for MeasuresGrid and DimensionalMeasures; empty until a scenario is applied. */
     comparison:
       applied === null || base === null
@@ -249,6 +294,62 @@ export function MarketScenarioResults({
         error={application.error?.message}
         density={density}
       />
+      <HorizonReturnSection session={session} density={density} />
     </div>
+  );
+}
+
+/** Rust's horizon total return of the last priced request under the applied scenario. */
+function HorizonReturnSection({
+  session,
+  density,
+}: {
+  session: MarketScenarioSession;
+  density?: "compact" | "comfortable";
+}) {
+  const calendars = useCalendars();
+  const { horizon } = session;
+  return (
+    <section aria-label="Horizon return" className="flex flex-col gap-3">
+      <h3 className="text-sm font-semibold">Horizon return</h3>
+      <p className="text-xs text-muted-foreground">
+        The applied scenario's time roll sets the horizon; without one the
+        return is instantaneous and has no annualized value.
+      </p>
+      <div className="flex flex-wrap items-end gap-4">
+        <EnumField
+          label="Attribution method"
+          value={session.horizonChoice}
+          onValueChange={(choice) =>
+            session.setHorizonChoice(choice as HorizonMethodChoice)
+          }
+          options={horizonMethods}
+          layout="radio"
+        />
+        <EnumField
+          label="Roll calendar"
+          help="Holiday calendar for business-day roll targets."
+          value={session.calendarId}
+          onValueChange={session.setCalendarId}
+          options={[
+            {
+              value: "",
+              label: "Default",
+              description: "Omitted; Rust's weekends-only calendar",
+            },
+            ...(calendars.data ?? []).map((id) => ({ value: id, label: id })),
+          ]}
+          layout="select"
+          disabled={!calendars.data}
+        />
+      </div>
+      <HorizonReturnReport
+        report={horizon.data?.report}
+        explain={horizon.data?.explain}
+        loading={horizon.isFetching}
+        error={horizon.error?.message ?? calendars.error?.message}
+        density={density}
+      />
+    </section>
   );
 }

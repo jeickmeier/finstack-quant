@@ -109,6 +109,10 @@ beforeEach(() => {
         return unwrap(await scenarioService.buildMarketScenario(request));
       case "applyMarketScenario":
         return unwrap(await scenarioService.applyMarketScenario(request));
+      case "horizonReturn":
+        return unwrap(await scenarioService.horizonReturn(request));
+      case "calendars":
+        return native.availableCalendars();
       case "formatMoney":
         return formatMoney(request.value, request.rounding, native);
       case "cashflows":
@@ -897,6 +901,38 @@ it(
       name: "Time roll",
     });
     expect(within(timeRoll).getAllByTitle("4613.745264131")).toHaveLength(2);
+    // Rust's horizon return of the same base request under the applied
+    // scenario; method and calendar stay unset.
+    expect(
+      call.mock.calls.filter(([method]) => method === "horizonReturn"),
+    ).toEqual([
+      [
+        "horizonReturn",
+        {
+          instrumentJson: base!.instrumentJson,
+          marketJson: base!.marketJson,
+          asOf: base!.asOf,
+          scenarioJson: roll.scenarioJson,
+          method: null,
+          calendarId: null,
+        },
+      ],
+    ]);
+    const horizon = within(results).getByRole("region", {
+      name: "Horizon return",
+    });
+    const expected = native.computeHorizonReturn(
+      base!.instrumentJson,
+      base!.marketJson,
+      base!.asOf,
+      roll.scenarioJson,
+    );
+    await within(horizon).findByText(
+      String(expected.summary.annualized_return),
+      {},
+      { timeout: budget(5000) },
+    );
+    expect(within(horizon).getByText(/Horizon: 33 days/)).toBeTruthy();
     await userEvent.click(
       screen.getByRole("button", { name: "Clear scenario" }),
     );

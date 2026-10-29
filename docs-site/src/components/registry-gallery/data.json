@@ -15378,6 +15378,1968 @@
       }
     ]
   },
+  "horizonReturn": {
+    "description": "Native horizon total returns of the results-fixture bond: the Rust-built spec, scenarios.computeHorizonReturn (omitted method, config and calendar left to Rust) and horizonResultExplainText, or the native error.",
+    "sources": [
+      {
+        "path": "finstack-quant-ui/src/fixtures/results/bond.json",
+        "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+      }
+    ],
+    "base": {
+      "asOf": "2025-01-01"
+    },
+    "cases": [
+      {
+        "name": "roll-3m-50bp",
+        "draft": {
+          "id": "roll-3m-50bp",
+          "shifts": [
+            {
+              "curveKind": "discount",
+              "curveId": "USD-OIS",
+              "bp": "50"
+            }
+          ],
+          "roll": {
+            "period": "3M",
+            "rollMode": ""
+          },
+          "hazardBumpMode": ""
+        },
+        "scenarioJson": "{\"id\":\"roll-3m-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"time_roll_forward\",\"period\":\"3M\",\"apply_shocks\":true,\"roll_mode\":\"business_days\"},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
+        "method": null,
+        "calendarId": null,
+        "report": {
+          "attribution": {
+            "total_pnl": {
+              "amount": "8923.410832983",
+              "currency": "USD"
+            },
+            "mark_to_market_pnl": {
+              "amount": "8923.410832983",
+              "currency": "USD"
+            },
+            "pv_t0": {
+              "amount": "992091.570117712",
+              "currency": "USD"
+            },
+            "pv_t1": {
+              "amount": "1001014.980950695",
+              "currency": "USD"
+            },
+            "carry": {
+              "amount": "12654.157529919",
+              "currency": "USD"
+            },
+            "rates_curves_pnl": {
+              "amount": "-3730.746696937",
+              "currency": "USD"
+            },
+            "credit_curves_pnl": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "inflation_curves_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "correlations_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fx_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fx_translation_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "vol_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cross_factor_pnl": {
+              "amount": "0.000000001",
+              "currency": "USD"
+            },
+            "model_params_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "market_scalars_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "residual": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "carry_detail": {
+              "total": {
+                "amount": "12654.157529919",
+                "currency": "USD"
+              },
+              "coupon_income": {
+                "total": {
+                  "amount": "10566.29834254144",
+                  "currency": "USD"
+                }
+              },
+              "pull_to_par": {
+                "amount": "3683.90908709856",
+                "currency": "USD"
+              },
+              "roll_down": {
+                "total": {
+                  "amount": "-1596.049899721",
+                  "currency": "USD"
+                }
+              }
+            },
+            "rates_detail": null,
+            "credit_detail": null,
+            "inflation_detail": null,
+            "correlations_detail": null,
+            "fx_detail": null,
+            "vol_detail": null,
+            "cross_factor_detail": {
+              "total": {
+                "amount": "0.000000001",
+                "currency": "USD"
+              },
+              "by_pair": {
+                "Rates×Credit": {
+                  "amount": "0.000000001",
+                  "currency": "USD"
+                }
+              }
+            },
+            "model_params_detail": null,
+            "scalars_detail": null,
+            "meta": {
+              "method": "parallel",
+              "t0": "2025-01-01",
+              "t1": "2025-04-01",
+              "instrument_id": "US912828XG33",
+              "num_repricings": 10,
+              "tolerance_abs": 1,
+              "tolerance_pct": 0.1,
+              "residual_pct": 0,
+              "rounding": {
+                "mode": "bankers",
+                "ingest_scale_by_currency": {},
+                "output_scale_by_currency": {},
+                "tolerances": {
+                  "generic_epsilon": 1e-10
+                },
+                "version": 1
+              },
+              "execution_policy": "parallel",
+              "notes": []
+            },
+            "result_invalid": false
+          },
+          "initial_value": {
+            "amount": "992091.570117712",
+            "currency": "USD"
+          },
+          "terminal_value": {
+            "amount": "1001014.980950695",
+            "currency": "USD"
+          },
+          "horizon_days": 90,
+          "scenario_report": {
+            "operations_applied": 2,
+            "user_operations": 2,
+            "expanded_operations": 2,
+            "changes": {
+              "market_targets": [
+                {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              ],
+              "changed_instrument_indices": [],
+              "as_of_changed": true,
+              "portfolio_shape_changed": false,
+              "all_dirty": true
+            },
+            "applied_shocks": [
+              {
+                "applies_to": {
+                  "scope": "market",
+                  "target": {
+                    "kind": "curve",
+                    "curve_kind": "discount",
+                    "curve_id": "USD-OIS"
+                  }
+                },
+                "shock": {
+                  "kind": "uniform",
+                  "value": 50,
+                  "unit": "bp"
+                }
+              }
+            ],
+            "warnings": [],
+            "meta": {
+              "numeric_mode": "f64",
+              "rounding": {
+                "mode": "bankers",
+                "ingest_scale_by_currency": {},
+                "output_scale_by_currency": {},
+                "tolerances": {
+                  "generic_epsilon": 1e-10
+                },
+                "version": 1
+              },
+              "fx_policy_applied": null,
+              "version": "0.11.0"
+            },
+            "time_roll": {
+              "old_date": "2025-01-01",
+              "new_date": "2025-04-01",
+              "days": 90,
+              "instrument_carry": [],
+              "total_carry": {},
+              "failed_instruments": []
+            }
+          },
+          "summary": {
+            "total_return": 0.008994543549971132,
+            "annualized_return": 0.036982234305995565,
+            "currency": "USD",
+            "factor_contributions": {
+              "carry": 0.012755029788649026,
+              "rates_curves": -0.003760486238678901,
+              "credit_curves": 0,
+              "inflation_curves": 0,
+              "correlations": 0,
+              "fx": 0,
+              "volatility": 0,
+              "model_parameters": 0,
+              "market_scalars": 0
+            }
+          }
+        },
+        "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3730.75\n  Credit: USD 0.00\n  Residual: USD 0.00\n"
+      },
+      {
+        "name": "usd-ois-50bp",
+        "draft": {
+          "id": "usd-ois-50bp",
+          "shifts": [
+            {
+              "curveKind": "discount",
+              "curveId": "USD-OIS",
+              "bp": "50"
+            }
+          ],
+          "roll": null,
+          "hazardBumpMode": ""
+        },
+        "scenarioJson": "{\"id\":\"usd-ois-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
+        "method": null,
+        "calendarId": null,
+        "report": {
+          "attribution": {
+            "total_pnl": {
+              "amount": "-4895.657693227",
+              "currency": "USD"
+            },
+            "mark_to_market_pnl": {
+              "amount": "-4895.657693227",
+              "currency": "USD"
+            },
+            "pv_t0": {
+              "amount": "992091.570117712",
+              "currency": "USD"
+            },
+            "pv_t1": {
+              "amount": "987195.912424485",
+              "currency": "USD"
+            },
+            "carry": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "rates_curves_pnl": {
+              "amount": "-4895.657693227",
+              "currency": "USD"
+            },
+            "credit_curves_pnl": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "inflation_curves_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "correlations_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fx_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fx_translation_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "vol_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cross_factor_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "model_params_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "market_scalars_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "residual": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "carry_detail": {
+              "total": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "coupon_income": {
+                "total": {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              },
+              "pull_to_par": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "roll_down": {
+                "total": {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              }
+            },
+            "rates_detail": null,
+            "credit_detail": null,
+            "inflation_detail": null,
+            "correlations_detail": null,
+            "fx_detail": null,
+            "vol_detail": null,
+            "cross_factor_detail": null,
+            "model_params_detail": null,
+            "scalars_detail": null,
+            "meta": {
+              "method": "parallel",
+              "t0": "2025-01-01",
+              "t1": "2025-01-01",
+              "instrument_id": "US912828XG33",
+              "num_repricings": 10,
+              "tolerance_abs": 1,
+              "tolerance_pct": 0.1,
+              "residual_pct": 0,
+              "rounding": {
+                "mode": "bankers",
+                "ingest_scale_by_currency": {},
+                "output_scale_by_currency": {},
+                "tolerances": {
+                  "generic_epsilon": 1e-10
+                },
+                "version": 1
+              },
+              "execution_policy": "parallel",
+              "notes": []
+            },
+            "result_invalid": false
+          },
+          "initial_value": {
+            "amount": "992091.570117712",
+            "currency": "USD"
+          },
+          "terminal_value": {
+            "amount": "987195.912424485",
+            "currency": "USD"
+          },
+          "horizon_days": null,
+          "scenario_report": {
+            "operations_applied": 1,
+            "user_operations": 1,
+            "expanded_operations": 1,
+            "changes": {
+              "market_targets": [
+                {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              ],
+              "changed_instrument_indices": [],
+              "as_of_changed": false,
+              "portfolio_shape_changed": false,
+              "all_dirty": false
+            },
+            "applied_shocks": [
+              {
+                "applies_to": {
+                  "scope": "market",
+                  "target": {
+                    "kind": "curve",
+                    "curve_kind": "discount",
+                    "curve_id": "USD-OIS"
+                  }
+                },
+                "shock": {
+                  "kind": "uniform",
+                  "value": 50,
+                  "unit": "bp"
+                }
+              }
+            ],
+            "warnings": [],
+            "meta": {
+              "numeric_mode": "f64",
+              "rounding": {
+                "mode": "bankers",
+                "ingest_scale_by_currency": {},
+                "output_scale_by_currency": {},
+                "tolerances": {
+                  "generic_epsilon": 1e-10
+                },
+                "version": 1
+              },
+              "fx_policy_applied": null,
+              "version": "0.11.0"
+            }
+          },
+          "summary": {
+            "total_return": -0.0049346832900174,
+            "annualized_return": null,
+            "currency": "USD",
+            "factor_contributions": {
+              "carry": 0,
+              "rates_curves": -0.0049346832900174,
+              "credit_curves": 0,
+              "inflation_curves": 0,
+              "correlations": 0,
+              "fx": 0,
+              "volatility": 0,
+              "model_parameters": 0,
+              "market_scalars": 0
+            }
+          }
+        },
+        "explain": "Horizon Total Return: -0.4935%\nInitial Value: USD 992091.57\nTerminal Value: USD 987195.91\nTotal P&L: USD -4895.66\n  Carry: USD 0.00\n  Rates: USD -4895.66\n  Credit: USD 0.00\n  Residual: USD 0.00\n"
+      },
+      {
+        "name": "roll-3m-50bp-taylor",
+        "draft": {
+          "id": "roll-3m-50bp",
+          "shifts": [
+            {
+              "curveKind": "discount",
+              "curveId": "USD-OIS",
+              "bp": "50"
+            }
+          ],
+          "roll": {
+            "period": "3M",
+            "rollMode": ""
+          },
+          "hazardBumpMode": ""
+        },
+        "scenarioJson": "{\"id\":\"roll-3m-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"time_roll_forward\",\"period\":\"3M\",\"apply_shocks\":true,\"roll_mode\":\"business_days\"},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
+        "method": {
+          "taylor": {}
+        },
+        "calendarId": "nyse",
+        "report": {
+          "attribution": {
+            "total_pnl": {
+              "amount": "8923.410832983",
+              "currency": "USD"
+            },
+            "mark_to_market_pnl": {
+              "amount": "8923.410832983",
+              "currency": "USD"
+            },
+            "pv_t0": {
+              "amount": "992091.570117712",
+              "currency": "USD"
+            },
+            "pv_t1": {
+              "amount": "1001014.980950695",
+              "currency": "USD"
+            },
+            "carry": {
+              "amount": "12654.15752991894",
+              "currency": "USD"
+            },
+            "rates_curves_pnl": {
+              "amount": "-3818.581617124459",
+              "currency": "USD"
+            },
+            "credit_curves_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "inflation_curves_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "correlations_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fx_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fx_translation_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "vol_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cross_factor_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "model_params_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "market_scalars_pnl": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "residual": {
+              "amount": "87.834920188519",
+              "currency": "USD"
+            },
+            "carry_detail": {
+              "total": {
+                "amount": "12654.15752991894",
+                "currency": "USD"
+              },
+              "coupon_income": {
+                "total": {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              },
+              "roll_down": {
+                "total": {
+                  "amount": "12654.15752991894",
+                  "currency": "USD"
+                }
+              }
+            },
+            "rates_detail": null,
+            "credit_detail": null,
+            "inflation_detail": null,
+            "correlations_detail": null,
+            "fx_detail": null,
+            "vol_detail": null,
+            "cross_factor_detail": null,
+            "model_params_detail": null,
+            "scalars_detail": null,
+            "sensitivity_steps": [
+              {
+                "factor": "Rates:USD-OIS",
+                "move_unit": "basis_point",
+                "buckets": [
+                  {
+                    "tenor_years": 0.25,
+                    "sensitivity": {
+                      "amount": "-0.0570394655223936",
+                      "currency": "USD"
+                    },
+                    "market_move": 40.13702296227314
+                  },
+                  {
+                    "tenor_years": 0.5,
+                    "sensitivity": {
+                      "amount": "-1.126289745501708",
+                      "currency": "USD"
+                    },
+                    "market_move": 37.67123696157303
+                  },
+                  {
+                    "tenor_years": 1,
+                    "sensitivity": {
+                      "amount": "-96.7085813235026",
+                      "currency": "USD"
+                    },
+                    "market_move": 38.9041121789846
+                  },
+                  {
+                    "tenor_years": 2,
+                    "sensitivity": {
+                      "amount": "-0.2653747999574989",
+                      "currency": "USD"
+                    },
+                    "market_move": 43.34246664976893
+                  },
+                  {
+                    "tenor_years": 3,
+                    "sensitivity": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "market_move": 45.438357012340255
+                  },
+                  {
+                    "tenor_years": 5,
+                    "sensitivity": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "market_move": 48.29863048245696
+                  },
+                  {
+                    "tenor_years": 7,
+                    "sensitivity": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "market_move": 48.990215643583
+                  },
+                  {
+                    "tenor_years": 10,
+                    "sensitivity": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "market_move": 49.45753449793061
+                  },
+                  {
+                    "tenor_years": 15,
+                    "sensitivity": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "market_move": 49.63835633195371
+                  },
+                  {
+                    "tenor_years": 20,
+                    "sensitivity": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "market_move": 49.815068623895314
+                  },
+                  {
+                    "tenor_years": 30,
+                    "sensitivity": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "market_move": 49.95890419493103
+                  }
+                ],
+                "explained_pnl": {
+                  "amount": "-3818.581617124459",
+                  "currency": "USD"
+                }
+              },
+              {
+                "factor": "Theta",
+                "repriced_pv": {
+                  "amount": "1004745.727647631",
+                  "currency": "USD"
+                },
+                "explained_pnl": {
+                  "amount": "12654.15752991894",
+                  "currency": "USD"
+                }
+              }
+            ],
+            "meta": {
+              "method": {
+                "taylor": {
+                  "include_gamma": false,
+                  "rate_bump_bp": 1,
+                  "credit_spread_bump_bp": 1,
+                  "vol_bump": 0.01
+                }
+              },
+              "t0": "2025-01-01",
+              "t1": "2025-04-01",
+              "instrument_id": "US912828XG33",
+              "num_repricings": 26,
+              "tolerance_abs": 10,
+              "tolerance_pct": 5,
+              "residual_pct": 0.9843200300031097,
+              "rounding": {
+                "mode": "bankers",
+                "ingest_scale_by_currency": {},
+                "output_scale_by_currency": {},
+                "tolerances": {
+                  "generic_epsilon": 1e-10
+                },
+                "version": 1
+              },
+              "execution_policy": "parallel",
+              "notes": [
+                "Taylor bucketed credit sensitivities failed: Model failure: Metric 'bucketed_cs01' calculation failed: Calibration error: quote-space bucketed CS01 requires a lossless calibration recipe for hazard curve 'HZ' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=Bond, model=RatesCredit]",
+                "Taylor credit factor 'HZ' failed: Validation error: credit risk unavailable after bucket validation failed",
+                "Taylor attribution: 0.98% residual (2 factors, 26 repricings)",
+                "Taylor coverage: rates/credit/vol/FX-exposure/inflation/correlations/market-scalars/model-parameters/theta. Restore-and-reprice families (FX, inflation, correlations, scalars, model parameters) isolate the full family P&L; rates/credit/vol remain sensitivity × observed move."
+              ]
+            },
+            "result_invalid": true
+          },
+          "initial_value": {
+            "amount": "992091.570117712",
+            "currency": "USD"
+          },
+          "terminal_value": {
+            "amount": "1001014.980950695",
+            "currency": "USD"
+          },
+          "horizon_days": 90,
+          "scenario_report": {
+            "operations_applied": 2,
+            "user_operations": 2,
+            "expanded_operations": 2,
+            "changes": {
+              "market_targets": [
+                {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              ],
+              "changed_instrument_indices": [],
+              "as_of_changed": true,
+              "portfolio_shape_changed": false,
+              "all_dirty": true
+            },
+            "applied_shocks": [
+              {
+                "applies_to": {
+                  "scope": "market",
+                  "target": {
+                    "kind": "curve",
+                    "curve_kind": "discount",
+                    "curve_id": "USD-OIS"
+                  }
+                },
+                "shock": {
+                  "kind": "uniform",
+                  "value": 50,
+                  "unit": "bp"
+                }
+              }
+            ],
+            "warnings": [],
+            "meta": {
+              "numeric_mode": "f64",
+              "rounding": {
+                "mode": "bankers",
+                "ingest_scale_by_currency": {},
+                "output_scale_by_currency": {},
+                "tolerances": {
+                  "generic_epsilon": 1e-10
+                },
+                "version": 1
+              },
+              "fx_policy_applied": null,
+              "version": "0.11.0"
+            },
+            "time_roll": {
+              "old_date": "2025-01-01",
+              "new_date": "2025-04-01",
+              "days": 90,
+              "instrument_carry": [],
+              "total_carry": {},
+              "failed_instruments": []
+            }
+          },
+          "summary": {
+            "total_return": 0.008994543549971132,
+            "annualized_return": 0.036982234305995565,
+            "currency": "USD",
+            "factor_contributions": {
+              "carry": 0.012755029788648965,
+              "rates_curves": -0.0038490213324475515,
+              "credit_curves": 0,
+              "inflation_curves": 0,
+              "correlations": 0,
+              "fx": 0,
+              "volatility": 0,
+              "model_parameters": 0,
+              "market_scalars": 0
+            }
+          }
+        },
+        "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3818.58\n  Credit: USD 0.00\n  Residual: USD 87.83\n"
+      },
+      {
+        "name": "roll-3m-50bp-metrics-based",
+        "draft": {
+          "id": "roll-3m-50bp",
+          "shifts": [
+            {
+              "curveKind": "discount",
+              "curveId": "USD-OIS",
+              "bp": "50"
+            }
+          ],
+          "roll": {
+            "period": "3M",
+            "rollMode": ""
+          },
+          "hazardBumpMode": ""
+        },
+        "scenarioJson": "{\"id\":\"roll-3m-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"time_roll_forward\",\"period\":\"3M\",\"apply_shocks\":true,\"roll_mode\":\"business_days\"},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
+        "method": "metrics_based",
+        "calendarId": null,
+        "error": {
+          "kind": "computation",
+          "message": "Calibration error: Metric 'cs01' calculation failed: Calibration error: quote-space CS01 requires a lossless calibration recipe for hazard curve 'HZ' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=Bond, model=RatesCredit]"
+        }
+      }
+    ]
+  },
+  "pnlAttribution": {
+    "description": "Native single-instrument P&L attribution of a convertible bond whose credit spreads widen from 150bp to 300bp over one day, under the four Rust methods (attributePnlMany), with Rust's explain text, residual check and share of total per factor.",
+    "sources": [
+      {
+        "path": "finstack-quant/attribution/tests/fixtures/production_convertible_credit.json",
+        "sha256": "a3994a2dbd69f330345d3d15958b9204ebf814b3e3b5e9d56ba344c22995c7f4"
+      }
+    ],
+    "cases": [
+      {
+        "name": "parallel",
+        "method": "parallel",
+        "attribution": {
+          "total_pnl": {
+            "amount": "-1060.422577323474",
+            "currency": "USD"
+          },
+          "mark_to_market_pnl": {
+            "amount": "-60.422577323474",
+            "currency": "USD"
+          },
+          "pv_t0": {
+            "amount": "1045.695282268777",
+            "currency": "USD"
+          },
+          "pv_t1": {
+            "amount": "985.272704945303",
+            "currency": "USD"
+          },
+          "carry": {
+            "amount": "-999.899955113005",
+            "currency": "USD"
+          },
+          "rates_curves_pnl": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "credit_curves_pnl": {
+            "amount": "-60.522622210469",
+            "currency": "USD"
+          },
+          "inflation_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "correlations_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_translation_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "vol_pnl": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "cross_factor_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "model_params_pnl": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "market_scalars_pnl": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "residual": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "carry_detail": {
+            "total": {
+              "amount": "-999.899955113005",
+              "currency": "USD"
+            },
+            "coupon_income": {
+              "total": {
+                "amount": "0.136986301369863",
+                "currency": "USD"
+              }
+            },
+            "roll_down": {
+              "total": {
+                "amount": "-1000.036941414374863",
+                "currency": "USD"
+              }
+            }
+          },
+          "rates_detail": null,
+          "credit_detail": null,
+          "inflation_detail": null,
+          "correlations_detail": null,
+          "fx_detail": null,
+          "vol_detail": null,
+          "cross_factor_detail": null,
+          "model_params_detail": null,
+          "scalars_detail": null,
+          "meta": {
+            "method": "parallel",
+            "t0": "2025-01-01",
+            "t1": "2025-01-02",
+            "instrument_id": "CONV-CREDIT-ATTR",
+            "num_repricings": 16,
+            "tolerance_abs": 1,
+            "tolerance_pct": 0.1,
+            "residual_pct": 0,
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "execution_policy": "serial",
+            "notes": [
+              "carry pull-to-par unavailable: flat-yield repricing could not be resolved; roll_down contains the unpartitioned price-carry residual"
+            ]
+          },
+          "result_invalid": false
+        },
+        "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Coupon Income: USD 0.14\n  │   ├─ Roll-Down: USD -1000.04\n  ├─ Credit Curves: USD -60.52 (5.7%)\n  └─ Residual: USD 0.00 (-0.0%)",
+        "residualWithinTolerance": true,
+        "pctOfTotal": {
+          "carry": 94.29259396162338,
+          "rates_curves_pnl": 0,
+          "credit_curves_pnl": 5.707406038376626,
+          "inflation_curves_pnl": 0,
+          "correlations_pnl": 0,
+          "fx_pnl": 0,
+          "fx_translation_pnl": 0,
+          "vol_pnl": 0,
+          "cross_factor_pnl": 0,
+          "model_params_pnl": 0,
+          "market_scalars_pnl": 0,
+          "residual": 0
+        }
+      },
+      {
+        "name": "waterfall",
+        "method": {
+          "waterfall": [
+            "carry",
+            "rates_curves",
+            "credit_curves",
+            "inflation_curves",
+            "correlations",
+            "fx",
+            "volatility",
+            "model_parameters",
+            "market_scalars"
+          ]
+        },
+        "attribution": {
+          "total_pnl": {
+            "amount": "-1060.422577323474",
+            "currency": "USD"
+          },
+          "mark_to_market_pnl": {
+            "amount": "-60.422577323474",
+            "currency": "USD"
+          },
+          "pv_t0": {
+            "amount": "1045.695282268777",
+            "currency": "USD"
+          },
+          "pv_t1": {
+            "amount": "985.272704945303",
+            "currency": "USD"
+          },
+          "carry": {
+            "amount": "-999.899955113005",
+            "currency": "USD"
+          },
+          "rates_curves_pnl": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "credit_curves_pnl": {
+            "amount": "-60.522622210469",
+            "currency": "USD"
+          },
+          "inflation_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "correlations_pnl": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "fx_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_translation_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "vol_pnl": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "cross_factor_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "model_params_pnl": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "market_scalars_pnl": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "residual": {
+            "amount": "0.000000000000",
+            "currency": "USD"
+          },
+          "carry_detail": {
+            "total": {
+              "amount": "-999.899955113005",
+              "currency": "USD"
+            },
+            "coupon_income": {
+              "total": {
+                "amount": "0.136986301369863",
+                "currency": "USD"
+              }
+            },
+            "roll_down": {
+              "total": {
+                "amount": "-1000.036941414374863",
+                "currency": "USD"
+              }
+            }
+          },
+          "rates_detail": null,
+          "credit_detail": null,
+          "inflation_detail": null,
+          "correlations_detail": null,
+          "fx_detail": null,
+          "vol_detail": null,
+          "cross_factor_detail": null,
+          "model_params_detail": null,
+          "scalars_detail": null,
+          "waterfall_steps": [
+            {
+              "step_index": 0,
+              "factor": "carry",
+              "pv_before": {
+                "amount": "1045.695282268777",
+                "currency": "USD"
+              },
+              "pv_after": {
+                "amount": "1045.795327155772",
+                "currency": "USD"
+              },
+              "step_pnl": {
+                "amount": "0.100044886995",
+                "currency": "USD"
+              }
+            },
+            {
+              "step_index": 1,
+              "factor": "rates_curves",
+              "pv_before": {
+                "amount": "1045.795327155772",
+                "currency": "USD"
+              },
+              "pv_after": {
+                "amount": "1045.795327155772",
+                "currency": "USD"
+              },
+              "step_pnl": {
+                "amount": "0.000000000000",
+                "currency": "USD"
+              }
+            },
+            {
+              "step_index": 2,
+              "factor": "credit_curves",
+              "pv_before": {
+                "amount": "1045.795327155772",
+                "currency": "USD"
+              },
+              "pv_after": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "step_pnl": {
+                "amount": "-60.522622210469",
+                "currency": "USD"
+              }
+            },
+            {
+              "step_index": 3,
+              "factor": "inflation_curves",
+              "pv_before": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "pv_after": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "step_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "step_index": 4,
+              "factor": "correlations",
+              "pv_before": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "pv_after": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "step_pnl": {
+                "amount": "0.000000000000",
+                "currency": "USD"
+              }
+            },
+            {
+              "step_index": 5,
+              "factor": "fx",
+              "pv_before": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "pv_after": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "step_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "step_index": 6,
+              "factor": "volatility",
+              "pv_before": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "pv_after": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "step_pnl": {
+                "amount": "0.000000000000",
+                "currency": "USD"
+              }
+            },
+            {
+              "step_index": 7,
+              "factor": "model_parameters",
+              "pv_before": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "pv_after": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "step_pnl": {
+                "amount": "0.000000000000",
+                "currency": "USD"
+              }
+            },
+            {
+              "step_index": 8,
+              "factor": "market_scalars",
+              "pv_before": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "pv_after": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "step_pnl": {
+                "amount": "0.000000000000",
+                "currency": "USD"
+              }
+            }
+          ],
+          "meta": {
+            "method": {
+              "waterfall": [
+                "carry",
+                "rates_curves",
+                "credit_curves",
+                "inflation_curves",
+                "correlations",
+                "fx",
+                "volatility",
+                "model_parameters",
+                "market_scalars"
+              ]
+            },
+            "t0": "2025-01-01",
+            "t1": "2025-01-02",
+            "instrument_id": "CONV-CREDIT-ATTR",
+            "num_repricings": 12,
+            "tolerance_abs": 0.01,
+            "tolerance_pct": 0.001,
+            "residual_pct": 0,
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy": {
+              "strategy": "cashflow_date",
+              "target_currency": "USD",
+              "notes": "Waterfall FX attribution with full translation"
+            },
+            "execution_policy": "serial",
+            "notes": [
+              "waterfall order: Carry -> RatesCurves -> CreditCurves -> InflationCurves -> Correlations -> Fx -> Volatility -> ModelParameters -> MarketScalars",
+              "carry pull-to-par unavailable: flat-yield repricing could not be resolved; roll_down contains the unpartitioned price-carry residual",
+              "Model parameters attribution returned zero"
+            ]
+          },
+          "result_invalid": false
+        },
+        "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Coupon Income: USD 0.14\n  │   ├─ Roll-Down: USD -1000.04\n  ├─ Credit Curves: USD -60.52 (5.7%)\n  └─ Residual: USD 0.00 (-0.0%)",
+        "residualWithinTolerance": true,
+        "pctOfTotal": {
+          "carry": 94.29259396162338,
+          "rates_curves_pnl": 0,
+          "credit_curves_pnl": 5.707406038376626,
+          "inflation_curves_pnl": 0,
+          "correlations_pnl": 0,
+          "fx_pnl": 0,
+          "fx_translation_pnl": 0,
+          "vol_pnl": 0,
+          "cross_factor_pnl": 0,
+          "model_params_pnl": 0,
+          "market_scalars_pnl": 0,
+          "residual": 0
+        }
+      },
+      {
+        "name": "metrics_based",
+        "method": "metrics_based",
+        "attribution": {
+          "total_pnl": {
+            "amount": "-1060.422577323474",
+            "currency": "USD"
+          },
+          "mark_to_market_pnl": {
+            "amount": "-60.422577323474",
+            "currency": "USD"
+          },
+          "pv_t0": {
+            "amount": "1045.695282268777",
+            "currency": "USD"
+          },
+          "pv_t1": {
+            "amount": "985.272704945303",
+            "currency": "USD"
+          },
+          "carry": {
+            "amount": "-999.899955113005",
+            "currency": "USD"
+          },
+          "rates_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "credit_curves_pnl": {
+            "amount": "-63.5046028625197",
+            "currency": "USD"
+          },
+          "inflation_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "correlations_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_translation_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "vol_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "cross_factor_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "model_params_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "market_scalars_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "residual": {
+            "amount": "2.9819806520507",
+            "currency": "USD"
+          },
+          "carry_detail": {
+            "total": {
+              "amount": "-999.899955113005",
+              "currency": "USD"
+            },
+            "roll_down": {
+              "total": {
+                "amount": "-999.899955113005",
+                "currency": "USD"
+              }
+            }
+          },
+          "rates_detail": null,
+          "credit_detail": null,
+          "inflation_detail": null,
+          "correlations_detail": null,
+          "fx_detail": null,
+          "vol_detail": null,
+          "cross_factor_detail": null,
+          "model_params_detail": null,
+          "scalars_detail": null,
+          "sensitivity_steps": [
+            {
+              "factor": "Rates:USD-OIS",
+              "move_unit": "basis_point",
+              "buckets": [
+                {
+                  "tenor_years": 0.25,
+                  "sensitivity": {
+                    "amount": "-0.00001967197943031351",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 0.5,
+                  "sensitivity": {
+                    "amount": "-0.001182710761440831",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 1,
+                  "sensitivity": {
+                    "amount": "-0.004156861919454968",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 2,
+                  "sensitivity": {
+                    "amount": "-0.00911188568102261",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 3,
+                  "sensitivity": {
+                    "amount": "-0.0213835262294424",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 5,
+                  "sensitivity": {
+                    "amount": "-0.3827092005624309",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 7,
+                  "sensitivity": {
+                    "amount": "-0.000507207675923382",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 10,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 15,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 20,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 30,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                }
+              ],
+              "explained_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "Credit:USD-CREDIT",
+              "move_unit": "basis_point",
+              "buckets": [
+                {
+                  "tenor_years": 0.9805555555555555,
+                  "sensitivity": {
+                    "amount": "-0.000996439775008184",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                },
+                {
+                  "tenor_years": 3.0083333333333333,
+                  "sensitivity": {
+                    "amount": "-0.004392960218524422",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                },
+                {
+                  "tenor_years": 5.038888888888889,
+                  "sensitivity": {
+                    "amount": "-0.4083544508685009",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                },
+                {
+                  "tenor_years": 7.066666666666666,
+                  "sensitivity": {
+                    "amount": "-0.00962016822143141",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                },
+                {
+                  "tenor_years": 10.11111111111111,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                }
+              ],
+              "explained_pnl": {
+                "amount": "-63.5046028625197",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "Vol",
+              "move_unit": "vol_point",
+              "sensitivity": {
+                "amount": "3.136579888620983",
+                "currency": "USD"
+              },
+              "market_move": 0,
+              "explained_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "Spot",
+              "move_unit": "price_unit",
+              "sensitivity": {
+                "amount": "2.197210231685176",
+                "currency": "USD"
+              },
+              "market_move": 0,
+              "explained_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "SpotGamma",
+              "move_unit": "price_unit",
+              "market_move": 0,
+              "explained_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "gamma_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            }
+          ],
+          "meta": {
+            "method": "metrics_based",
+            "t0": "2025-01-01",
+            "t1": "2025-01-02",
+            "instrument_id": "CONV-CREDIT-ATTR",
+            "num_repricings": 2,
+            "tolerance_abs": 10,
+            "tolerance_pct": 1,
+            "residual_pct": -0.28120682413017595,
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "notes": [
+              "Rates attribution computed using key-rate (per-tenor) DV01 across 1 curve(s); non-parallel curve moves are attributed per tenor",
+              "Credit attribution computed using key-rate (per-tenor) BucketedCs01 across 1 curve(s); non-parallel credit-curve moves are attributed per tenor",
+              "Warning: Large credit spread move (150bp) exceeds 50bp threshold; consider parallel/waterfall attribution for more accurate results"
+            ]
+          },
+          "result_invalid": false
+        },
+        "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Roll-Down: USD -999.90\n  ├─ Credit Curves: USD -63.50 (6.0%)\n  └─ Residual: USD 2.98 (-0.3%)",
+        "residualWithinTolerance": true,
+        "pctOfTotal": {
+          "carry": 94.29259396162338,
+          "rates_curves_pnl": 0,
+          "credit_curves_pnl": 5.988612862506802,
+          "inflation_curves_pnl": 0,
+          "correlations_pnl": 0,
+          "fx_pnl": 0,
+          "fx_translation_pnl": 0,
+          "vol_pnl": 0,
+          "cross_factor_pnl": 0,
+          "model_params_pnl": 0,
+          "market_scalars_pnl": 0,
+          "residual": -0.28120682413017595
+        }
+      },
+      {
+        "name": "taylor",
+        "method": {
+          "taylor": {}
+        },
+        "attribution": {
+          "total_pnl": {
+            "amount": "-1060.422577323474",
+            "currency": "USD"
+          },
+          "mark_to_market_pnl": {
+            "amount": "-60.422577323474",
+            "currency": "USD"
+          },
+          "pv_t0": {
+            "amount": "1045.695282268777",
+            "currency": "USD"
+          },
+          "pv_t1": {
+            "amount": "985.272704945303",
+            "currency": "USD"
+          },
+          "carry": {
+            "amount": "-999.8999551130050349",
+            "currency": "USD"
+          },
+          "rates_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "credit_curves_pnl": {
+            "amount": "-63.5046028625197",
+            "currency": "USD"
+          },
+          "inflation_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "correlations_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_translation_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "vol_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "cross_factor_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "model_params_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "market_scalars_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "residual": {
+            "amount": "2.9819806520507349",
+            "currency": "USD"
+          },
+          "carry_detail": {
+            "total": {
+              "amount": "-999.8999551130050349",
+              "currency": "USD"
+            },
+            "coupon_income": {
+              "total": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            "roll_down": {
+              "total": {
+                "amount": "-999.8999551130050349",
+                "currency": "USD"
+              }
+            }
+          },
+          "rates_detail": null,
+          "credit_detail": null,
+          "inflation_detail": null,
+          "correlations_detail": null,
+          "fx_detail": null,
+          "vol_detail": null,
+          "cross_factor_detail": null,
+          "model_params_detail": null,
+          "scalars_detail": null,
+          "sensitivity_steps": [
+            {
+              "factor": "Rates:USD-OIS",
+              "move_unit": "basis_point",
+              "buckets": [
+                {
+                  "tenor_years": 0.25,
+                  "sensitivity": {
+                    "amount": "-0.00001967197943031351",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 0.5,
+                  "sensitivity": {
+                    "amount": "-0.001182710761440831",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 1,
+                  "sensitivity": {
+                    "amount": "-0.004156861919454968",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 2,
+                  "sensitivity": {
+                    "amount": "-0.00911188568102261",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 3,
+                  "sensitivity": {
+                    "amount": "-0.0213835262294424",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 5,
+                  "sensitivity": {
+                    "amount": "-0.3827092005624309",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 7,
+                  "sensitivity": {
+                    "amount": "-0.000507207675923382",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 10,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 15,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 20,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                },
+                {
+                  "tenor_years": 30,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 0
+                }
+              ],
+              "explained_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "Credit:USD-CREDIT",
+              "move_unit": "basis_point",
+              "buckets": [
+                {
+                  "tenor_years": 0.9805555555555555,
+                  "sensitivity": {
+                    "amount": "-0.000996439775008184",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                },
+                {
+                  "tenor_years": 3.0083333333333333,
+                  "sensitivity": {
+                    "amount": "-0.004392960218524422",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                },
+                {
+                  "tenor_years": 5.038888888888889,
+                  "sensitivity": {
+                    "amount": "-0.4083544508685009",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                },
+                {
+                  "tenor_years": 7.066666666666666,
+                  "sensitivity": {
+                    "amount": "-0.00962016822143141",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                },
+                {
+                  "tenor_years": 10.11111111111111,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 150
+                }
+              ],
+              "explained_pnl": {
+                "amount": "-63.5046028625197",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "Vol:scalars",
+              "repriced_pv": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "explained_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "MarketScalars",
+              "repriced_pv": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "explained_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "ModelParameters",
+              "repriced_pv": {
+                "amount": "985.272704945303",
+                "currency": "USD"
+              },
+              "explained_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "Theta",
+              "repriced_pv": {
+                "amount": "1045.795327155772",
+                "currency": "USD"
+              },
+              "explained_pnl": {
+                "amount": "-999.899955113005",
+                "currency": "USD"
+              }
+            }
+          ],
+          "meta": {
+            "method": {
+              "taylor": {
+                "include_gamma": false,
+                "rate_bump_bp": 1,
+                "credit_spread_bump_bp": 1,
+                "vol_bump": 0.01
+              }
+            },
+            "t0": "2025-01-01",
+            "t1": "2025-01-02",
+            "instrument_id": "CONV-CREDIT-ATTR",
+            "num_repricings": 29,
+            "tolerance_abs": 10,
+            "tolerance_pct": 5,
+            "residual_pct": -0.28120682413017917,
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "execution_policy": "serial",
+            "notes": [
+              "Taylor attribution: -0.28% residual (6 factors, 29 repricings)",
+              "Taylor coverage: rates/credit/vol/FX-exposure/inflation/correlations/market-scalars/model-parameters/theta. Restore-and-reprice families (FX, inflation, correlations, scalars, model parameters) isolate the full family P&L; rates/credit/vol remain sensitivity × observed move."
+            ]
+          },
+          "result_invalid": false
+        },
+        "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Coupon Income: USD 0.00\n  │   ├─ Roll-Down: USD -999.90\n  ├─ Credit Curves: USD -63.50 (6.0%)\n  └─ Residual: USD 2.98 (-0.3%)",
+        "residualWithinTolerance": true,
+        "pctOfTotal": {
+          "carry": 94.29259396162338,
+          "rates_curves_pnl": 0,
+          "credit_curves_pnl": 5.988612862506802,
+          "inflation_curves_pnl": 0,
+          "correlations_pnl": 0,
+          "fx_pnl": 0,
+          "fx_translation_pnl": 0,
+          "vol_pnl": 0,
+          "cross_factor_pnl": 0,
+          "model_params_pnl": 0,
+          "market_scalars_pnl": 0,
+          "residual": -0.28120682413017917
+        }
+      }
+    ]
+  },
   "performance": {
     "description": "Native analytics.Performance report of the reporting_performance_tearsheet.ipynb panel (756 business days, fund 0.0008 + 0.012·sin(i/30), benchmark 0.0004 + 0.008·sin(i/45)) with an explicit rate, confidence, window, episode count, lookback date and April fiscal year.",
     "name": "explicit",

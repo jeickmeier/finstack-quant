@@ -1,0 +1,44 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "pnl-attribution-report",
+      "type": "registry:component",
+      "title": "P&L attribution report",
+      "description": "Display of a native single-instrument P&L attribution: totals, factor buckets, a signed factor chart, the Rust waterfall steps, the residual and notes.",
+      "docs": "Display-only view of a PnlAttribution as returned (by attribution.attributePnl / attributePnlMany, or inside scenarios.computeHorizonReturn): total, mark-to-market and endpoint values, every factor bucket as exact money with a signed bar chart of the returned amounts, the waterfall drawn only from Rust's waterfall_steps (pv_before to pv_after per step; nothing when the method returns none), the residual with the returned residual_pct and tolerances, notes, the policy stamp and the JSON. Optional explain, residualWithinTolerance and pctOfTotal props take Rust's pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotal; without residualWithinTolerance no verdict is shown. Nothing is summed, differenced or converted. Accepts attribution, loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/pnl-attribution-report/pnl-attribution-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/attribution/components/pnl-attribution-report/pnl-attribution-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/stamp-badge",
+        "@finstack/json-viewer",
+        "badge"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

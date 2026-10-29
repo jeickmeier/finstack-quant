@@ -111,6 +111,13 @@ export const importHarnesses = {
       name: "use-apply-market-scenario",
       modules: modules.length,
     })),
+  "use-horizon-return": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-horizon-return/use-horizon-return"),
+    ]).then((modules) => ({
+      name: "use-horizon-return",
+      modules: modules.length,
+    })),
   "use-performance-report": () =>
     Promise.all([
       import("@/hooks/analytics/use-performance-report/use-performance-report"),
