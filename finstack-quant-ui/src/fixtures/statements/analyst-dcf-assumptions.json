@@ -1,0 +1,6 @@
+{
+  "wacc": 0.1,
+  "terminalValue": { "type": "gordon_growth", "stable_growth_rate": 0.02 },
+  "ufcfNode": "ufcf",
+  "options": { "shares_outstanding": 50000000 }
+}

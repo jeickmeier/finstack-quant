@@ -17,6 +17,7 @@ import type {
   CheckReport,
   CalendarYearLadderRow,
   CreditAssessment,
+  DcfSensitivityResult,
   ArbitrageValidationResult,
   ApplicationReport,
   HorizonReport,
@@ -177,6 +178,33 @@ export interface PlSummaryReportRequest {
   /** Period identifiers in column order. */
   readonly periods: readonly string[];
 }
+/** Rust TerminalValueSpec as the facade takes it: Gordon growth, exit multiple or H-model. */
+export type TerminalValueSpec = Exclude<
+  Parameters<typeof statements_analytics.evaluateDcf>[2],
+  string
+>;
+/** DCF assumptions for one statement model; an omitted optional argument stays unset so Rust applies its default. */
+export interface DcfSensitivityRequest {
+  readonly modelJson: string;
+  /** Weighted average cost of capital as a decimal (0.10 = 10%). */
+  readonly wacc: number;
+  readonly terminalValue: TerminalValueSpec;
+  /** Node of monetary unlevered free cash flow; omitted uses Rust's `ufcf`. */
+  readonly ufcfNode?: string;
+  /** Flat net debt in model currency in place of the model's debt and cash. */
+  readonly netDebtOverride?: number;
+  /** Rust DcfOptions JSON; Rust rejects unknown keys. */
+  readonly optionsJson?: string;
+}
+/** A DCF of the statement model; `asOf` is the valuation date and Rust requires it when `marketJson` is supplied. */
+export interface EvaluateDcfRequest extends DcfSensitivityRequest {
+  readonly marketJson?: string;
+  readonly asOf?: string;
+}
+/** Native CorporateValuationResult (not a top-level package export). */
+export type CorporateValuationResult = ReturnType<
+  typeof statements_analytics.evaluateDcf
+>;
 /** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
 export interface StatementRollupRequest {
   readonly modelJson: string;
@@ -1063,6 +1091,14 @@ export interface StatementsApi {
   plSummaryReport(
     request: PlSummaryReportRequest,
   ): Promise<Envelope<TableEnvelope>>;
+  /** statements_analytics.evaluateDcf: enterprise and equity value of the model's unlevered free cash flow, with the DCF working. */
+  evaluateDcf(
+    request: EvaluateDcfRequest,
+  ): Promise<Envelope<CorporateValuationResult>>;
+  /** statements_analytics.dcfSensitivity: enterprise-value tornado of the headline DCF assumptions (no market argument). */
+  dcfSensitivity(
+    request: DcfSensitivityRequest,
+  ): Promise<Envelope<DcfSensitivityResult>>;
 }
 /** Every worker method, grouped by the crate whose facade namespace it calls. */
 export type WorkerApi = {

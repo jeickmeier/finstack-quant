@@ -112,7 +112,8 @@ describe("discovered canonical fixtures", () => {
     }
     // Rust publishes no example for CovenantReport, DatedCovenantReports,
     // the five credit-scoring inputs, MertonModel, CreditAssessment,
-    // ScenarioSet or ScenarioDiff; every other root carries one.
+    // DcfOptions, DcfSensitivityResult, ScenarioSet or ScenarioDiff; every
+    // other root carries one.
     expect(withoutExamples).toEqual([
       "schemas/covenant_report.json",
       "schemas/dated_covenant_reports.json",
@@ -123,6 +124,8 @@ describe("discovered canonical fixtures", () => {
       "schemas/ohlson_o_score_input.json",
       "schemas/zmijewski_input.json",
       "schemas/credit_assessment.json",
+      "schemas/dcf_options.json",
+      "schemas/dcf_sensitivity_result.json",
       "schemas/scenario_diff.json",
       "schemas/scenario_set.json",
     ]);
@@ -146,6 +149,30 @@ describe("discovered canonical fixtures", () => {
     );
     const validator = z.fromJSONSchema(converterSchema(schema));
     expect(validator.parse(captured)).toEqual(captured);
+  });
+  it("accepts the captured native DCF sensitivity and the DCF options input under their generated schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const fixture = async (name: string) =>
+      JSON.parse(
+        await readFile(
+          resolve(repo, "finstack-quant-ui/src/fixtures/statements", name),
+          "utf8",
+        ),
+      );
+    const schema = async (name: string) =>
+      z.fromJSONSchema(
+        converterSchema(
+          JSON.parse(await readFile(resolve(generated, name), "utf8")),
+        ),
+      );
+    const sensitivity = await fixture("analyst-dcf-sensitivity.json");
+    expect(
+      (await schema("schemas/dcf_sensitivity_result.json")).parse(sensitivity),
+    ).toEqual(sensitivity);
+    const { options } = await fixture("analyst-dcf-assumptions.json");
+    expect((await schema("schemas/dcf_options.json")).parse(options)).toEqual(
+      options,
+    );
   });
   it("accepts the captured native covenant series under the generated DatedCovenantReports and CovenantReport schemas unchanged", async () => {
     const generated = resolve(repo, "finstack-quant-ui/src/generated");

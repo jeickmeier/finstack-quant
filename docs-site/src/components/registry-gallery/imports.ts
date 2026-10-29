@@ -399,6 +399,20 @@ export const importHarnesses = {
       name: "use-pl-summary-report",
       modules: modules.length,
     })),
+  "use-evaluate-dcf": () =>
+    Promise.all([
+      import("@/hooks/statements/use-evaluate-dcf/use-evaluate-dcf"),
+    ]).then((modules) => ({
+      name: "use-evaluate-dcf",
+      modules: modules.length,
+    })),
+  "use-dcf-sensitivity": () =>
+    Promise.all([
+      import("@/hooks/statements/use-dcf-sensitivity/use-dcf-sensitivity"),
+    ]).then((modules) => ({
+      name: "use-dcf-sensitivity",
+      modules: modules.length,
+    })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -1484,6 +1498,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/credit_assessment"),
     ]).then((modules) => ({
       name: "contract-credit-assessment",
+      modules: modules.length,
+    })),
+  "contract-dcf-options": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/dcf_options.json"),
+      import("@/lib/finstack/generated/types/dcf_options"),
+      import("@/lib/finstack/generated/meta/dcf_options"),
+    ]).then((modules) => ({
+      name: "contract-dcf-options",
+      modules: modules.length,
+    })),
+  "contract-dcf-sensitivity-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/dcf_sensitivity_result.json"),
+      import("@/lib/finstack/generated/types/dcf_sensitivity_result"),
+      import("@/lib/finstack/generated/meta/dcf_sensitivity_result"),
+    ]).then((modules) => ({
+      name: "contract-dcf-sensitivity-result",
       modules: modules.length,
     })),
   "contract-scenario-diff": () =>

@@ -273,6 +273,22 @@ test("credit-assessment-report P&L summary", async ({ page }) => {
     "credit-assessment-report-pl-summary.png",
   );
 });
+test("dcf-assumptions-form options", async ({ page }) => {
+  const item = await open(page, "dcf-assumptions-form", "light", "comfortable");
+  // The four item baselines show the options disclosure collapsed.
+  await item.getByText("DCF options", { exact: true }).click();
+  const options = item.locator("details").filter({ hasText: "DCF options" });
+  await expect(
+    options.getByRole("button", { name: "Add exit multiple bump" }),
+  ).toBeVisible();
+  await options
+    .getByRole("button", { name: "Add exit multiple metric node" })
+    .click();
+  await expect(
+    options.getByRole("combobox", { name: "Exit multiple metric node" }),
+  ).toBeVisible();
+  await expect(options).toHaveScreenshot("dcf-assumptions-form-options.png");
+});
 test("portfolio-risk-report risk budget", async ({ page }) => {
   const item = await open(
     page,

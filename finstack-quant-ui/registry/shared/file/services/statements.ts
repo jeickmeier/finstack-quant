@@ -25,6 +25,8 @@ export type StatementsNative = {
     | "scenarioSetTrace"
     | "creditAssessment"
     | "plSummaryReport"
+    | "evaluateDcf"
+    | "dcfSensitivity"
   >;
 };
 /** StatementsApi over the statements and statements_analytics facade namespaces. */
@@ -173,6 +175,32 @@ export function createStatementsService(
           request.resultsJson,
           [...request.lineItems],
           [...request.periods],
+        ),
+      );
+    },
+    evaluateDcf(request) {
+      return context.result(() =>
+        native.statements_analytics.evaluateDcf(
+          request.modelJson,
+          request.wacc,
+          request.terminalValue,
+          request.ufcfNode,
+          request.netDebtOverride,
+          request.optionsJson,
+          request.marketJson,
+          request.asOf,
+        ),
+      );
+    },
+    dcfSensitivity(request) {
+      return context.result(() =>
+        native.statements_analytics.dcfSensitivity(
+          request.modelJson,
+          request.wacc,
+          request.terminalValue,
+          request.ufcfNode,
+          request.netDebtOverride,
+          request.optionsJson,
         ),
       );
     },

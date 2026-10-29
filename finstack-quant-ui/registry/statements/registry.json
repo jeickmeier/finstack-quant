@@ -303,6 +303,119 @@
       }
     },
     {
+      "name": "tornado-chart",
+      "type": "registry:component",
+      "title": "Tornado chart",
+      "description": "Draws native tornado entries (statements_analytics TornadoEntry) as horizontal downside and upside bars from zero, in Rust's order, with the values in a table.",
+      "docs": "Present native TornadoEntry rows (for example DcfSensitivityResult.entries or generateTornadoEntries output) as returned: one band per parameter in Rust's order, a bar from zero to each returned downside and upside delta, and a table of the same values. Deltas Rust returns as non-finite are left out of the chart and shown in the table. Parameter labels default to labelFor; a host may inject parameterLabel and formatValue. It sorts, sums and computes nothing. Accepts entries, valueLabel, caption, parameterLabel, formatValue and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/tornado-chart/tornado-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/tornado-chart/tornado-chart.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "dcf-report",
+      "type": "registry:component",
+      "title": "DCF report",
+      "description": "Displays a native statements_analytics DCF valuation: enterprise and equity value, the returned bridge, per-period present values, the terminal value and an optional enterprise-value tornado.",
+      "docs": "Present a native CorporateValuationResult (statements_analytics.evaluateDcf) as returned: enterprise value, equity value and per-share value tiles; the enterprise-to-equity bridge fields (net debt, valuation discount, diluted shares) and the equity bridge inputs Rust used, in Rust's order; the explicit forecast periods with their free cash flow, discount years, discount factor and present value, and the explicit present value; the undiscounted terminal value, its discount years and present value, and the WACC. A supplied DcfSensitivityResult (statements_analytics.dcfSensitivity) adds the baseline enterprise value, the effective WACC and terminal-growth shocks with their clamp flags, and a tornado-chart of the returned deltas. Monetary amounts keep Rust's exact decimal text; nothing is summed, discounted or rearranged. Accepts result, sensitivity, loading, error, sensitivityLoading, sensitivityError, sensitivityNote, formatValue and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/dcf-report/dcf-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/dcf-report/dcf-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/tornado-chart",
+        "@finstack/contract-dcf-sensitivity-result"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "dcf-assumptions-form",
+      "type": "registry:component",
+      "title": "DCF assumptions form",
+      "description": "Edits the arguments of a native statements_analytics DCF: WACC, the terminal-value method and its fields, the UFCF node, an optional net-debt override and the generated DcfOptions form.",
+      "docs": "Edit the evaluateDcf assumptions: WACC as a decimal, the TerminalValueSpec variant (Gordon growth, exit multiple or H-model, the one hand-written Rust wire union) and its fields, the UFCF node and the exit-multiple metric node as id-comboboxes over the supplied model node ids, an optional net-debt override, and the remaining DcfOptions in the schema form over the generated contract. A cleared required number is sent as NaN, never 0; an empty optional value and empty options stay unset so Rust applies its defaults. The facade has no standalone DcfOptions parse, so the options are checked structurally here and validated by Rust (unknown keys included) when the model is valued. Calculate passes the submission to the caller (usually the useEvaluateDcf and useDcfSensitivity requests). Accepts defaultAssumptions, nodeIds, onSubmit, submitLabel, disabled and density props.",
+      "files": [
+        {
+          "path": "components/dcf-assumptions-form/dcf-assumptions-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/dcf-assumptions-form/dcf-assumptions-form.tsx"
+        },
+        {
+          "path": "components/dcf-assumptions-form/dcf-options.ts",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/dcf-assumptions-form/dcf-options.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/schema-form",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/id-combobox",
+        "@finstack/contract-dcf-options",
+        "@finstack/finstack-codec",
+        "button"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-evaluate-statement",
       "type": "registry:hook",
       "title": "useEvaluateStatement",
@@ -628,11 +741,61 @@
       }
     },
     {
+      "name": "use-evaluate-dcf",
+      "type": "registry:hook",
+      "title": "useEvaluateDcf",
+      "description": "Values a statement model with a native discounted cash flow through the WASM worker.",
+      "docs": "Native statements_analytics.evaluateDcf of the model with the WACC, TerminalValueSpec and the optional UFCF node, net-debt override, DcfOptions JSON, market and as-of date passed positionally as supplied; an omitted optional argument stays unset so Rust applies its default, and Rust requires the as-of date when a market is supplied. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-evaluate-dcf/use-evaluate-dcf.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-evaluate-dcf/use-evaluate-dcf.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-dcf-sensitivity",
+      "type": "registry:hook",
+      "title": "useDcfSensitivity",
+      "description": "Ranks a statement model's headline DCF assumptions by enterprise-value impact through the WASM worker.",
+      "docs": "Native statements_analytics.dcfSensitivity of the model with the WACC, TerminalValueSpec and the optional UFCF node, net-debt override and DcfOptions JSON passed positionally as supplied (the facade takes no market). Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-dcf-sensitivity/use-dcf-sensitivity.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-dcf-sensitivity/use-dcf-sensitivity.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -658,6 +821,11 @@
           "path": "blocks/statements-workbench/rollup.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/rollup.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/valuation-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/valuation-panel.tsx"
         }
       ],
       "registryDependencies": [
@@ -668,6 +836,8 @@
         "@finstack/statement-checks",
         "@finstack/variance-table",
         "@finstack/credit-assessment-report",
+        "@finstack/dcf-assumptions-form",
+        "@finstack/dcf-report",
         "@finstack/use-evaluate-statement",
         "@finstack/use-statement-model-validator",
         "@finstack/use-statement-formula-validator",
@@ -677,6 +847,8 @@
         "@finstack/use-trace-statement-scenario",
         "@finstack/use-credit-assessment",
         "@finstack/use-pl-summary-report",
+        "@finstack/use-evaluate-dcf",
+        "@finstack/use-dcf-sensitivity",
         "@finstack/use-linked-selection",
         "@finstack/use-finstack",
         "@finstack/json-viewer",
@@ -708,6 +880,8 @@
           "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
           "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"

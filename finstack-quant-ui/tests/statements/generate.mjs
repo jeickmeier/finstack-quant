@@ -46,6 +46,26 @@ await write(
   "analyst-credit-assessment.json",
   serializeHost(native.creditAssessment(resultJson, "2025Q4")),
 );
+// Native evaluateDcf and dcfSensitivity of the analyst model under the
+// illustrative assumptions in analyst-dcf-assumptions.json (the
+// dcf-assumptions-form shape; unset optional arguments stay unset).
+const dcf = JSON.parse(await read("analyst-dcf-assumptions.json"));
+const dcfArguments = [
+  modelJson,
+  dcf.wacc,
+  dcf.terminalValue,
+  dcf.ufcfNode,
+  dcf.netDebtOverride,
+  dcf.options === undefined ? undefined : JSON.stringify(dcf.options),
+];
+await write(
+  "analyst-dcf.json",
+  serializeHost(native.evaluateDcf(...dcfArguments)),
+);
+await write(
+  "analyst-dcf-sensitivity.json",
+  serializeHost(native.dcfSensitivity(...dcfArguments)),
+);
 // Native scenarioDiff over the analyst scenario set (base → downside → severe):
 // each scenario against its parent, over the P&L lines for the 2025 quarters.
 const scenarioSetJson = await read("analyst-scenarios.json");

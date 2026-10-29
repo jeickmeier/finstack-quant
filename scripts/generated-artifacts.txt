@@ -206,6 +206,8 @@ finstack-quant-ui/src/generated/meta/credit_assessment.ts
 finstack-quant-ui/src/generated/meta/credit_default_swap.ts
 finstack-quant-ui/src/generated/meta/csa_spec.ts
 finstack-quant-ui/src/generated/meta/dated_covenant_reports.ts
+finstack-quant-ui/src/generated/meta/dcf_options.ts
+finstack-quant-ui/src/generated/meta/dcf_sensitivity_result.ts
 finstack-quant-ui/src/generated/meta/deposit.ts
 finstack-quant-ui/src/generated/meta/discounted_cash_flow.ts
 finstack-quant-ui/src/generated/meta/dollar_roll.ts
@@ -317,6 +319,8 @@ finstack-quant-ui/src/generated/schemas/credit_assessment.json
 finstack-quant-ui/src/generated/schemas/credit_default_swap.json
 finstack-quant-ui/src/generated/schemas/csa_spec.json
 finstack-quant-ui/src/generated/schemas/dated_covenant_reports.json
+finstack-quant-ui/src/generated/schemas/dcf_options.json
+finstack-quant-ui/src/generated/schemas/dcf_sensitivity_result.json
 finstack-quant-ui/src/generated/schemas/deposit.json
 finstack-quant-ui/src/generated/schemas/discounted_cash_flow.json
 finstack-quant-ui/src/generated/schemas/dollar_roll.json
@@ -425,6 +429,8 @@ finstack-quant-ui/src/generated/types/credit_assessment.ts
 finstack-quant-ui/src/generated/types/credit_default_swap.ts
 finstack-quant-ui/src/generated/types/csa_spec.ts
 finstack-quant-ui/src/generated/types/dated_covenant_reports.ts
+finstack-quant-ui/src/generated/types/dcf_options.ts
+finstack-quant-ui/src/generated/types/dcf_sensitivity_result.ts
 finstack-quant-ui/src/generated/types/deposit.ts
 finstack-quant-ui/src/generated/types/discounted_cash_flow.ts
 finstack-quant-ui/src/generated/types/dollar_roll.ts

@@ -4291,6 +4291,72 @@
       }
     },
     {
+      "name": "contract-dcf-options",
+      "type": "registry:lib",
+      "title": "Dcf options contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust dcf_options contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/dcf_options.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/dcf_options.json"
+        },
+        {
+          "path": "src/generated/types/dcf_options.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/dcf_options.ts"
+        },
+        {
+          "path": "src/generated/meta/dcf_options.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/dcf_options.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-dcf-sensitivity-result",
+      "type": "registry:lib",
+      "title": "Dcf sensitivity result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust dcf_sensitivity_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/dcf_sensitivity_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/dcf_sensitivity_result.json"
+        },
+        {
+          "path": "src/generated/types/dcf_sensitivity_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/dcf_sensitivity_result.ts"
+        },
+        {
+          "path": "src/generated/meta/dcf_sensitivity_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/dcf_sensitivity_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-scenario-diff",
       "type": "registry:lib",
       "title": "Scenario diff contract",

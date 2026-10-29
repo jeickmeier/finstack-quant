@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ForecastEditor } from "./forecast-editor";
 import { MetricEditor } from "./metric-editor";
 import { ScenarioPanel } from "./scenario-panel";
+import { ValuationPanel } from "./valuation-panel";
 import {
   annualRollupSpecJson,
   initialRollupMethods,
@@ -52,12 +53,19 @@ import type {
 /** Rust DecimalWire: the exact decimal text a monetary amount accepts. */
 const decimalPattern = new RegExp(contracts.decimal.schema.pattern);
 type Tab =
-  "statements" | "forecast" | "scenarios" | "ratios" | "checks" | "advanced";
+  | "statements"
+  | "forecast"
+  | "scenarios"
+  | "ratios"
+  | "valuation"
+  | "checks"
+  | "advanced";
 const tabs: { id: Tab; label: string }[] = [
   { id: "statements", label: "Statements & editing" },
   { id: "forecast", label: "Forecast & roll forward" },
   { id: "scenarios", label: "Scenarios" },
   { id: "ratios", label: "Metrics & ratios" },
+  { id: "valuation", label: "Valuation" },
   { id: "checks", label: "Checks" },
   { id: "advanced", label: "Advanced" },
 ];
@@ -957,6 +965,17 @@ export function StatementsWorkbench({
                   />
                 </div>
               </div>
+            )}
+          </TabsContent>
+          <TabsContent value="valuation">
+            {model && request && (
+              <ValuationPanel
+                modelJson={request.modelJson}
+                nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
+                marketJson={marketJson}
+                asOf={asOf}
+                density={density}
+              />
             )}
           </TabsContent>
           <TabsContent value="checks">

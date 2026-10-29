@@ -505,6 +505,16 @@
     "schema": "schemas/credit_assessment.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/dcf_options.schema.json",
+    "schema": "schemas/dcf_options.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
+    "schema": "schemas/dcf_sensitivity_result.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/scenario_diff.schema.json",
     "schema": "schemas/scenario_diff.json"

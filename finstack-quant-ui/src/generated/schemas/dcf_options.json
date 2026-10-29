@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Optional configuration for DCF valuation beyond the core WACC/terminal parameters.",
+  "properties": {
+    "equity_bridge": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_3b4153c0b4e198eb5a05"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Structured equity bridge; when `Some` it is used as-is and the model's\ndebt/cash (and any net-debt override) are not consulted."
+    },
+    "exit_multiple_bump": {
+      "$ref": "#/$defs/d_09ef0399dbbc6b8ae6ff",
+      "default": {
+        "absolute": 1
+      },
+      "description": "Exit-multiple sensitivity bump (default: `ExitMultipleBump::Absolute(1.0)`).\n\nUse `ExitMultipleBump::Relative` for a proportional shock,\ne.g. `Relative(0.10)` for ±10% of the base multiple. Absolute\nbumps are clamped at zero on the downside."
+    },
+    "exit_multiple_metric_node": {
+      "default": null,
+      "description": "Statement flow node whose complete trailing calendar year supplies the\n[`TerminalValueSpec::ExitMultiple`] metric (default: `None`).\n\nWhen `Some`, sum contiguous actual and forecast periods over the year ending\nat the last forecast boundary. Values must be finite and monetary. Missing\nhistory or a partial boundary requires an explicit annual metric. When `None`, the\nspec's explicit `terminal_metric` is used. Ignored for Gordon\nGrowth and H-Model terminals.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "max_stable_growth_rate": {
+      "default": 0.05,
+      "description": "Maximum perpetual stable growth rate accepted by Gordon Growth and the\nH-Model (default `0.05` = 5%).\n\nThis is a policy ceiling, not merely the mathematical `g < WACC`\nconstraint. Set it to the valuation's defensible long-run nominal\neconomy or risk-free growth assumption.",
+      "format": "double",
+      "type": "number"
+    },
+    "mid_year_convention": {
+      "default": false,
+      "description": "Enable mid-year discounting convention (default: false).",
+      "type": "boolean"
+    },
+    "shares_outstanding": {
+      "default": null,
+      "description": "Basic shares outstanding for per-share value.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "valuation_discounts": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_5c3558d5cfe1f55bb86c"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Private company valuation discounts (DLOM, DLOC).\n\nDiscounts apply after the DCF EV-to-equity bridge. The reported DCF\nenterprise value remains pre-discount and will not reconcile to\ndiscounted equity value plus net debt when discounts are present."
+    },
+    "wacc_denominator_epsilon": {
+      "default": 0.005,
+      "description": "Minimum spread between WACC-down and the Gordon / H-Model growth\nrate in the terminal-value formula (default `0.005` = 50 bp).\n\nWhen `wacc - bump < growth + epsilon`, the down-shock is clamped\nto `growth + epsilon` so the `1/(wacc - g)` denominator stays\nwell defined. The clamp is reported in the trace so the caller\nknows the bump was shortened.",
+      "format": "double",
+      "type": "number"
+    },
+    "wacc_sensitivity_bump": {
+      "default": 0.01,
+      "description": "WACC sensitivity bump, in decimal (default `0.01` = ±100 bp).\n\nThe down-shock is clamped so the terminal-value denominator\n`wacc - g` cannot collapse (the resulting EV would blow up and\nobscure the true sensitivity). See\n[`DcfOptions::wacc_denominator_epsilon`].",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "title": "DcfOptions",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
+  "$defs": {
+    "d_09ef0399dbbc6b8ae6ff": {
+      "description": "Exit-multiple sensitivity shock shape.\n\nAbsolute bumps are in multiple-turn units (e.g. `Absolute(1.0)` is\n±1.0x). Relative bumps are decimal fractions of the base multiple\n(e.g. `Relative(0.10)` is ±10%).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Absolute bump in turns of the multiple.",
+          "properties": {
+            "absolute": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "absolute"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Proportional bump in decimal (0.10 = ±10%).",
+          "properties": {
+            "relative": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "relative"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_3b4153c0b4e198eb5a05": {
+      "additionalProperties": false,
+      "description": "Structured equity bridge for converting Enterprise Value to Equity Value.\n\nStandard professional bridge:\n```text\nEquity = EV - Total Debt + Cash - Preferred Equity - Minority Interest\n         + Non-Operating Assets + Σ(other adjustments)\n```\n\nEvery [`DiscountedCashFlow`] carries one; a flat net-debt deduction is\nwritten as `EquityBridge { total_debt, cash, ..Default::default() }`.",
+      "properties": {
+        "cash": {
+          "default": 0,
+          "description": "Cash and cash equivalents.",
+          "format": "double",
+          "type": "number"
+        },
+        "minority_interest": {
+          "default": 0,
+          "description": "Non-controlling (minority) interests.",
+          "format": "double",
+          "type": "number"
+        },
+        "non_operating_assets": {
+          "default": 0,
+          "description": "Non-operating assets (excess cash, investments, real estate, etc.).",
+          "format": "double",
+          "type": "number"
+        },
+        "other_adjustments": {
+          "description": "Named adjustments (e.g., unfunded pension, contingent liabilities).\nPositive values increase equity; negative values decrease it.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "preferred_equity": {
+          "default": 0,
+          "description": "Preferred stock at liquidation preference.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_debt": {
+          "default": 0,
+          "description": "Total interest-bearing debt.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "d_5c3558d5cfe1f55bb86c": {
+      "additionalProperties": false,
+      "description": "Valuation discounts for private company equity.\n\nApplied multiplicatively after the equity bridge:\n```text\nFMV = Equity Value × (1 - DLOC) × (1 - DLOM) × (1 - other_discount)\n```\n\nThe enterprise value reported by a DCF remains pre-discount. When discounts\nare present, `enterprise_value - net_debt` reconciles to pre-discount\nequity value, not to the discounted fair-market equity value.",
+      "properties": {
+        "dloc": {
+          "description": "Discount for Lack of Control (0.0–1.0, e.g., 0.20 for 20%).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "dlom": {
+          "description": "Discount for Lack of Marketability (0.0–1.0, e.g., 0.25 for 25%).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "other_discount": {
+          "description": "Additional discount (0.0–1.0).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  }
+}
