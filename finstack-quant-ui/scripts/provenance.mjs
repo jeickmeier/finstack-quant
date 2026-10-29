@@ -293,7 +293,11 @@ const displays = [
   },
   {
     id: "pnl-attribution-report",
-    api: ["attribution.attributePnl", "AttributionNamespace", "attributePnl"],
+    api: [
+      "attribution.attributePnlMany",
+      "AttributionNamespace",
+      "attributePnlMany",
+    ],
     route: "returned-report",
     convention:
       "Returned PnlAttribution: total, mark-to-market and endpoint values and every factor bucket as exact money; the waterfall only from waterfall_steps pv_before/pv_after; the residual with the returned residual_pct and tolerances, with a verdict only from pnlAttributionResidualWithinTolerance; shares only from pnlAttributionPctOfTotal; explain only from pnlAttributionExplainText. Nothing is summed, differenced or converted.",

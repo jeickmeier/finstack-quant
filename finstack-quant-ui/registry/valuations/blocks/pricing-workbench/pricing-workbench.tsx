@@ -28,6 +28,7 @@ import {
   noComparison,
   useMarketScenarioSession,
 } from "./market-scenario-panel";
+import { AttributionResults, useAttributionSession } from "./attribution-panel";
 import type { MarketScenarioDraft } from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
 import type { CalibrationFitChartProps } from "@/components/finstack/calibration/components/calibration-fit-chart/calibration-fit-chart";
 import { MeasuresGrid } from "@/components/finstack/valuations/components/measures-grid/measures-grid";
@@ -166,6 +167,10 @@ export function PricingWorkbench({
   const marketScenarioSession = useMarketScenarioSession(
     marketScenario,
     completed?.request ?? null,
+  );
+  const attributionSession = useAttributionSession(
+    completed?.request ?? null,
+    marketScenarioSession,
   );
   // The shocked valuation fills the existing comparison columns; no difference is computed.
   const comparison = printSnapshot
@@ -512,6 +517,9 @@ export function PricingWorkbench({
                     <TabsTrigger value="market-scenario">
                       Market scenario
                     </TabsTrigger>
+                    <TabsTrigger value="pnl-explain">
+                      P&amp;L explain
+                    </TabsTrigger>
                     <TabsTrigger value="request">Request</TabsTrigger>
                     {scenario && type === "structured_credit" && (
                       <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
@@ -595,6 +603,12 @@ export function PricingWorkbench({
                 <TabsContent value="market-scenario" className="print:hidden">
                   <MarketScenarioResults
                     session={marketScenarioSession}
+                    density={currentDensity}
+                  />
+                </TabsContent>
+                <TabsContent value="pnl-explain" className="print:hidden">
+                  <AttributionResults
+                    session={attributionSession}
                     density={currentDensity}
                   />
                 </TabsContent>

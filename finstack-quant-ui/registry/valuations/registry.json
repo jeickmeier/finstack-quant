@@ -525,6 +525,11 @@
           "target": "components/finstack/valuations/blocks/pricing-workbench/calibration-panel.tsx"
         },
         {
+          "path": "blocks/pricing-workbench/attribution-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/attribution-panel.tsx"
+        },
+        {
           "path": "blocks/pricing-workbench/market-scenario-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/market-scenario-panel.tsx"
@@ -607,7 +612,10 @@
         "@finstack/use-apply-market-scenario",
         "@finstack/horizon-return-report",
         "@finstack/use-horizon-return",
-        "@finstack/enum-field"
+        "@finstack/enum-field",
+        "@finstack/pnl-attribution-report",
+        "@finstack/use-attribute-pnl-many",
+        "@finstack/use-default-waterfall-order"
       ],
       "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.11.0"],
       "categories": ["Blocks"],

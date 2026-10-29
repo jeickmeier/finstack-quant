@@ -1550,20 +1550,25 @@
       "route": "returned-report",
       "convention": "Returned PnlAttribution: total, mark-to-market and endpoint values and every factor bucket as exact money; the waterfall only from waterfall_steps pv_before/pv_after; the residual with the returned residual_pct and tolerances, with a verdict only from pnlAttributionResidualWithinTolerance; shares only from pnlAttributionPctOfTotal; explain only from pnlAttributionExplainText. Nothing is summed, differenced or converted.",
       "api": {
-        "name": "attribution.attributePnl",
+        "name": "attribution.attributePnlMany",
         "source": "finstack-quant-wasm/index.d.ts",
         "owner": "AttributionNamespace",
-        "member": "attributePnl",
+        "member": "attributePnlMany",
         "inputs": [
           {
-            "name": "spec",
-            "type": "AttributionSpec | string",
+            "name": "inputs",
+            "type": "AttributionInputs | string",
+            "optional": false
+          },
+          {
+            "name": "instruments",
+            "type": "JsonInput[] | string",
             "optional": false
           }
         ],
-        "returns": "PnlAttribution",
-        "declaration": "/**\n   * Run P&L attribution for a single instrument.\n   *\n   * Accepts an `AttributionSpec` object or its JSON text with an instrument payload, two market\n   * snapshots, dates, and a method descriptor. Returns the `PnlAttribution`\n   * result as a structured object with the canonical Rust serde field names;\n   * use `attributePnlJson` for the JSON wire string. `spec.config` may include\n   * `\"execution_policy\": \"parallel\"`, which opts into inner Rayon on native\n   * hosts; WebAssembly builds have no Rayon, so the field is accepted but\n   * ignored here and attribution always runs serially (same result).\n   * @param spec - Canonical `AttributionSpec` object or JSON text with the instrument payload, market states, ISO calendar dates, method and optional config.\n   * @returns The native-currency or configured reporting-currency `PnlAttribution` object.\n   * @throws Error - Throws a classified `FinstackError` for malformed or unknown spec fields, invalid dates, unavailable market data, pricing, currency, configuration or method failures, or a contained Rust panic. Invalid host types throw `TypeError`.\n   */\n  attributePnl(spec: AttributionSpec | string): PnlAttribution;",
-        "sha256": "140eea06fff272cda2644b91ef19b6975fa677b88cbc17f712cc6238eec78df6"
+        "returns": "PnlAttribution[]",
+        "declaration": "/**\n   * Run one attribution configuration against many instruments (mirrors Python `attribute_pnl_many`).\n   * @param inputs - `AttributionInputs` object or JSON containing markets, dates, method and execution options; no placeholder instrument is required.\n   * @param instruments - Ordered array of canonical instrument envelopes, each an object or JSON string. The array itself may also be serialized JSON.\n   * @returns One `PnlAttribution` object per instrument, in input order.\n   * @throws Error - Throws a classified `FinstackError` for malformed inputs or envelopes, or the first instrument's pricing, market-data, currency or validation error.\n   */\n  attributePnlMany(\n    inputs: AttributionInputs | string,\n    instruments: JsonInput[] | string\n  ): PnlAttribution[];",
+        "sha256": "b5c10ef2a0ee9f766bc7cd86a4dbbbce5caf971ec3e89ebbabd23b5c34ffd3a7"
       }
     },
     {

@@ -50,14 +50,14 @@ Sources import through the paths an installed consumer uses. `tsconfig.json`
 maps them back here; `vitest.config.mts` copies that table into prefix aliases
 in order, so a specific key must precede its prefix.
 
-| Import                    | Source                                                                                                                                                                              |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                                                                  |
-| `@/lib/finstack/*`        | `src/*`                                                                                                                                                                             |
-| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `scenarios`, `analytics`, `portfolio`, `margin`, `models` and `statements`; a new crate adds its line |
-| `@/workers/*`             | `registry/shared/file/*`                                                                                                                                                            |
-| `@/components/finstack/*` | `registry/*`                                                                                                                                                                        |
-| `@/components/ui/*`       | `components/ui/*`                                                                                                                                                                   |
+| Import                    | Source                                                                                                                                                                                             |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                                                                                 |
+| `@/lib/finstack/*`        | `src/*`                                                                                                                                                                                            |
+| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `scenarios`, `attribution`, `analytics`, `portfolio`, `margin`, `models` and `statements`; a new crate adds its line |
+| `@/workers/*`             | `registry/shared/file/*`                                                                                                                                                                           |
+| `@/components/finstack/*` | `registry/*`                                                                                                                                                                                       |
+| `@/components/ui/*`       | `components/ui/*`                                                                                                                                                                                  |
 
 A new crate category also adds its directory name to the `include` list in
 `scripts/gen-registry.mjs`, then runs
@@ -172,7 +172,7 @@ test-only oracle for the supported construct and boundary corpus.
 
 `mise run ui-fixtures` runs the seventeen native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-horizon return, cashflows → details; portfolio; attribution;
+horizon return, attribution, cashflows → details; portfolio;
 curves → market-browser; cubes, calibration, scenario-table;
 statements → covenants; analytics; models credit; margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
@@ -716,7 +716,7 @@ factor contributions as decimal fractions; an undefined value, such as the
 annualized return without a time roll, reads "not defined", never zero), the
 horizon, the endpoint values, the explain text, the attribution and, in a
 disclosure, the scenario report. `PnlAttributionReport` (the `attribution`
-category; its worker half comes later) shows any returned `PnlAttribution`:
+category) shows any returned `PnlAttribution`:
 total, mark-to-market and endpoint values, every factor bucket, a signed
 factor chart, the waterfall drawn only from Rust's `waterfall_steps`, the
 residual and the notes. Its optional `explain`, `residualWithinTolerance` and
@@ -724,8 +724,26 @@ residual and the notes. Its optional `explain`, `residualWithinTolerance` and
 `pnlAttributionResidualWithinTolerance` and `pnlAttributionPctOfTotal`;
 without the residual check no verdict is shown. In `pricing-workbench` the
 horizon return sits in the Market scenario results tab under the applied
-scenario, with method and roll-calendar choices. Native fixtures live in
-`tests/scenarios/horizon/` and `tests/attribution/`.
+scenario, with method and roll-calendar choices.
+
+`useAttributePnlMany` (`@finstack/use-attribute-pnl-many`) calls
+`attribution.attributePnlMany` with one `AttributionInputs` built by splicing
+the two canonical market texts (through the worker's market cache) and the
+dates into JSON text, never parsing them, over the instrument envelopes in
+order (`attributePnl` takes an `AttributionSpec`, not an envelope). Each
+result comes back with `pnlAttributionExplainText`,
+`pnlAttributionResidualWithinTolerance` (the run's own tolerances) and
+`pnlAttributionPctOfTotal` per factor bucket, ready for
+`PnlAttributionReport`. Rust requires the method, so the request always
+carries one; every other input stays unset. `useDefaultWaterfallOrder` returns
+`defaultWaterfallOrder`, the factor order a `{waterfall: order}` method uses.
+The workbench's P&L explain results tab pins the last priced request's market
+and date as T0, takes T1 from the last priced request or the applied market
+scenario, and attributes the last priced instrument between them with a
+chosen method (none is preselected); a changed instrument is repriced at T0
+too, which the tab says. `metrics_based` fails on the workbench bond market
+(no calibration recipe for its hazard curve) and shows the native error.
+Native fixtures live in `tests/scenarios/horizon/` and `tests/attribution/`.
 
 ## Returned portfolio valuation
 
