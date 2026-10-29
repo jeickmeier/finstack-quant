@@ -98,13 +98,13 @@ const displays = [
     schema: `${base}covenants/1/dated_covenant_reports.schema.json`,
     pointer: "#",
     api: [
-      "covenants.CovenantEngine#evaluateSeries",
-      "CovenantEngine",
-      "evaluateSeries",
+      "statements_analytics.evaluateCovenants",
+      "StatementsAnalyticsNamespace",
+      "evaluateCovenants",
     ],
     route: "typed",
     convention:
-      "Returned DatedCovenantReports rows in input order and their verdicts; a covenant without a report on a date shows a dash. Statement rows come from statements.nodeToDatedSchedule per metric (period end), zipped by period from a chosen first period, with a non-finite value dropping that metric from its row; covenant windows decide which metrics a date requires.",
+      "Returned DatedCovenantReports rows in input order and their verdicts; a covenant without a report on a date shows a dash. Rust evaluates every statement result period at its end date with the covenants applicable on that date, reading a metric only where an applicable covenant needs it, so covenant windows decide which metrics a date requires; the component builds no rows.",
   },
   {
     id: "cashflow-viewer",

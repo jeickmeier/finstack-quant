@@ -34,10 +34,31 @@ function evaluateSeries(rows: unknown[]): DatedCovenantReportsWire[] {
 
 afterEach(cleanup);
 
-it("captures the native series the generator's row policy produces", () => {
-  // First test date 2024Q3; leverage is non-finite there and is dropped, which
-  // the engine allows because the leverage window opens on 2024-10-01.
+it("captures the native statement series Rust evaluates over every result period", () => {
+  const read = (name: string) =>
+    readFileSync(
+      resolve(import.meta.dirname, "../../src/fixtures/", name),
+      "utf8",
+    );
+  const engine = native.CovenantEngine.fromJson(engineJson);
+  try {
+    expect(
+      serializeHost(
+        native.evaluateCovenants(
+          read("statements/analyst-result.json"),
+          engine,
+          read("statements/analyst-model.json"),
+        ),
+      ),
+    ).toBe(serializeHost(series));
+  } finally {
+    engine.free();
+  }
+  // Every analyst period is tested; leverage is non-finite through 2024Q3,
+  // which Rust allows because the leverage window opens on 2024-10-01.
   expect(series.map((row) => row.as_of)).toEqual([
+    "2024-03-31",
+    "2024-06-30",
     "2024-09-30",
     "2024-12-31",
     "2025-03-31",
@@ -45,7 +66,10 @@ it("captures the native series the generator's row policy produces", () => {
     "2025-09-30",
     "2025-12-31",
   ]);
-  expect(Object.keys(series[0].reports)).toEqual(["min_interest_coverage"]);
+  for (const row of series.slice(0, 3)) {
+    expect(Object.keys(row.reports)).toEqual(["min_interest_coverage"]);
+  }
+  // The dated-row engine series over the captured values agrees.
   const rows = series.map((row) => ({
     date: row.as_of,
     metrics: Object.fromEntries(
@@ -56,7 +80,7 @@ it("captures the native series the generator's row policy produces", () => {
     ),
   }));
   expect(serializeHost(evaluateSeries(rows))).toBe(serializeHost(series));
-  // The same leverage NaN inside the window is rejected at the boundary.
+  // The dated-row path rejects a NaN at the JS boundary instead.
   expect(() =>
     evaluateSeries([
       {
@@ -83,8 +107,8 @@ it("grids returned verdicts by covenant and test date, with a dash where no repo
   ]);
   expect(cellText(rows[2])).toEqual([
     "max_debt_to_ebitda",
-    "—",
-    ...series.slice(1).map(() => "Passed"),
+    ...series.slice(0, 3).map(() => "—"),
+    ...series.slice(3).map(() => "Passed"),
   ]);
 });
 

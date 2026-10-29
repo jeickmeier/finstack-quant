@@ -6,7 +6,7 @@
       "type": "registry:component",
       "title": "Covenant compliance",
       "description": "Displays a native covenant series as a covenant by test-date grid of returned verdicts; selecting a date shows its covenant reports.",
-      "docs": "Present native DatedCovenantReports rows (CovenantEngine#evaluateSeries) as a grid: one column per test date in the order supplied, one row per covenant instance key in first-appearance order, each cell the returned verdict as Passed or Failed, or a dash when Rust returned no report for that covenant on that date. A date header button selects the date (the latest initially) and its reports render below through covenant-report. Nothing is computed, sorted or inferred. No worker is required.",
+      "docs": "Present native DatedCovenantReports rows (statements_analytics.evaluateCovenants over statement results, or CovenantEngine#evaluateSeries over dated rows) as a grid: one column per test date in the order supplied, one row per covenant instance key in first-appearance order, each cell the returned verdict as Passed or Failed, or a dash when Rust returned no report for that covenant on that date. A date header button selects the date (the latest initially) and its reports render below through covenant-report. Nothing is computed, sorted or inferred. No worker is required.",
       "files": [
         {
           "path": "components/covenant-compliance/covenant-compliance.tsx",
