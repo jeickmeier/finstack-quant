@@ -294,6 +294,13 @@ export const importHarnesses = {
       name: "use-credit-score",
       modules: modules.length,
     })),
+  "use-position-risk": () =>
+    Promise.all([
+      import("@/hooks/models/use-position-risk/use-position-risk"),
+    ]).then((modules) => ({
+      name: "use-position-risk",
+      modules: modules.length,
+    })),
   "use-evaluate-statement": () =>
     Promise.all([
       import("@/hooks/statements/use-evaluate-statement/use-evaluate-statement"),

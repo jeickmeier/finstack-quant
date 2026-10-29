@@ -8,10 +8,11 @@ import type {
   MertonReportRequest,
   MigrationMatrixRequest,
   ModelsApi,
+  PositionRisk,
   ScoringResult,
 } from "../finstack-contract";
 import { attempt, type ServiceContext } from "./context";
-/** models.volatility evaluators, the core surface handles they sample, models.credit.migration, the Merton model, the credit-scoring functions and the PD master scale. */
+/** models.volatility evaluators, the core surface handles they sample, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale and the models.factor.risk position decompositions. */
 export type ModelsNative = {
   core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube">;
   models: {
@@ -42,6 +43,16 @@ export type ModelsNative = {
         | "altmanEmScore"
         | "ohlsonOScore"
         | "zmijewskiScore"
+      >;
+    };
+    factor: {
+      risk: Pick<
+        typeof models.factor.risk,
+        | "parametricVarDecomposition"
+        | "historicalVarDecomposition"
+        | "positionComponentVar"
+        | "evaluateRiskBudget"
+        | "buildStressAttribution"
       >;
     };
   };
@@ -431,6 +442,62 @@ export function createModelsService(
         } finally {
           scale.free();
         }
+      });
+    },
+    positionRisk(request) {
+      return context.result((): PositionRisk => {
+        const risk = native.models.factor.risk;
+        const { source } = request;
+        const ids = [...request.positionIds];
+        // Omitted options stay unset so Rust applies its own defaults.
+        const confidence = request.confidence ?? undefined;
+        const rows = (matrix: readonly (readonly number[])[]) =>
+          matrix.map((row) => [...row]);
+        let decomposition;
+        if (source.kind === "parametric")
+          decomposition = risk.parametricVarDecomposition(
+            ids,
+            [...source.weights],
+            rows(source.covariance),
+            confidence,
+            source.computeIncremental ?? undefined,
+          );
+        else if (source.kind === "historical")
+          decomposition = risk.historicalVarDecomposition(
+            ids,
+            rows(source.pnls),
+            confidence,
+          );
+        else throw new RangeError("Unsupported position risk source");
+        const { budget } = request;
+        return {
+          decomposition,
+          budget:
+            budget == null
+              ? null
+              : attempt(() =>
+                  risk.evaluateRiskBudget(
+                    ids,
+                    ids.map((id) =>
+                      risk.positionComponentVar(decomposition, id),
+                    ),
+                    [...budget.targets],
+                    decomposition.portfolio_var,
+                    budget.utilizationThreshold ?? undefined,
+                  ),
+                ),
+          // Tail attribution needs scenario P&L, which only a historical source has.
+          stress:
+            source.kind === "historical"
+              ? attempt(() =>
+                  risk.buildStressAttribution(
+                    ids,
+                    rows(source.pnls),
+                    confidence,
+                  ),
+                )
+              : null,
+        };
       });
     },
   };

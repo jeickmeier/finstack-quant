@@ -864,6 +864,25 @@ from the caller's ratios. The returned score, zone and implied PD are shown as
 Rust returned them. The native fixture (the inputs of the Rust unit tests, one
 per model) is `tests/models/credit/scorecard.json`.
 
+## Position risk report
+
+`usePositionRisk` (`@finstack/use-position-risk`) decomposes position VaR and
+ES with `models.factor.risk.parametricVarDecomposition` (weights and a
+position covariance) or `historicalVarDecomposition` (position-major scenario
+P&L). With a budget it calls `evaluateRiskBudget` over
+`positionComponentVar(decomposition, id)` of each position, the target shares
+and the returned portfolio VaR; for a historical source it also calls
+`buildStressAttribution` of the same P&L. Omitted confidence, incremental flag
+and utilization threshold are left to Rust; the budget and stress attribution
+keep their own native errors beside the decomposition. `PortfolioRiskReport`
+shows the result as returned: losses negative, the Euler residual stamp (none
+for a historical decomposition), component-VaR bars, the VaR and ES
+contribution tables, the budget's `has_breach` and per-position utilization
+(Rust returns no per-position breach flag, so none is drawn) and the tail
+contributions in Rust's largest-driver-first order. The native fixture (the
+three-sleeve inputs of the `portfolio_risk_decomposition` notebook, parametric
+and historical) is `tests/models/risk/cases.json`.
+
 ## Indicative SIMM initial margin
 
 `useSimmSensitivitiesValidator` (`@finstack/use-simm-sensitivities-validator`)

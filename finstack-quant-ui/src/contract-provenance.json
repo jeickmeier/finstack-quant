@@ -1945,6 +1945,56 @@
       }
     },
     {
+      "id": "portfolio-risk-report",
+      "route": "returned-report",
+      "convention": "Returned models.factor.risk PositionRiskDecomposition (parametric or historical): portfolio VaR and ES, confidence, method and the Euler residual (null for historical) as returned, component VaR charted and tabulated in returned order with relative, marginal and incremental VaR and the ES contributions; evaluateRiskBudget over positionComponentVar of each position against the supplied target shares (has_breach, total_overbudget, utilization and excess as returned, an omitted threshold left to Rust); buildStressAttribution of a historical source's P&L in Rust's largest-driver-first order with the tail scenarios worst first. Losses negative, in the units of the supplied weights or P&L; nothing summed, flagged or re-sorted.",
+      "api": {
+        "name": "models.factor.risk.parametricVarDecomposition",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "FactorRiskNamespace",
+        "member": "parametricVarDecomposition",
+        "inputs": [
+          {
+            "name": "positionIds",
+            "type": "string[]",
+            "optional": false
+          },
+          {
+            "name": "weights",
+            "type": "NumericArray",
+            "optional": false
+          },
+          {
+            "name": "covariance",
+            "type": "NumericArray[]",
+            "optional": false
+          },
+          {
+            "name": "confidence",
+            "type": "number | null",
+            "optional": true
+          },
+          {
+            "name": "computeIncremental",
+            "type": "boolean | null",
+            "optional": true
+          }
+        ],
+        "returns": "PositionRiskDecomposition",
+        "declaration": "/**\n   * Decompose portfolio VaR and ES into position contributions via\n   * parametric Euler allocation.\n   *\n   * Returns the canonical `PositionRiskDecomposition` (the object Python's\n   * `parametric_var_decomposition` returns): portfolio VaR/ES (losses\n   * negative), `method`, and per-position `var_contributions` and\n   * `es_contributions` rows.\n   * @returns The canonical `PositionRiskDecomposition` with VaR and ES contributions.\n   * @param positionIds - Position identifiers, one per weight.\n   * @param weights - Position weights or exposures in portfolio currency.\n   * @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).\n   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.\n   * @param computeIncremental - Optional; when `true`, also computes incremental VaR (one full repricing per position). Defaults to `false`.\n   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; or `confidence` is not finite and in `(0.5, 1)`.\n   */\n  parametricVarDecomposition(\n    positionIds: string[],\n    weights: NumericArray,\n    covariance: NumericArray[],\n    confidence?: number | null,\n    computeIncremental?: boolean | null\n  ): PositionRiskDecomposition;",
+        "sha256": "4e5dbe5f9673aa752082aa74ef2f38503e633fe29103e4bf1ff27f33da18faa6"
+      },
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/models/1/position_risk_decomposition.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/models/schemas/models/1/position_risk_decomposition.schema.json",
+          "sha256": "1c415d57b487d84a504821d8ba2aebdf6d4ca4b72bc93333e86ca5092a0ceddc",
+          "description": "Complete position-level risk decomposition of a portfolio."
+        }
+      ]
+    },
+    {
       "id": "transition-matrix-heatmap",
       "route": "returned-model",
       "convention": "Returned models.credit.migration results: TransitionMatrix rows and default probabilities in RatingScale order, the GeneratorMatrix rows with its roundTripError and regularizationL1, and the default probabilities of project(generator, t) per requested horizon. Decimals as returned; an omitted round-trip tolerance is left to Rust. Heatmap colour domains are presentation only: [0, 1] for probabilities, the intensities' extent (centred on zero) for the generator.",

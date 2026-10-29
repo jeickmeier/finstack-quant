@@ -39,6 +39,8 @@ import type {
   CsaSpec,
   VmResult,
   MarginCall,
+  PositionRiskDecomposition,
+  RiskBudgetResult,
   models,
   statements_analytics,
   valuations,
@@ -493,6 +495,51 @@ export interface CreditScore {
   /** models.credit.pd.MasterScale.defaultCalibration().mapScore(result), or its native error (Rust rejects a result without an implied PD). */
   grade: Envelope<modelsWire.MasterScaleResult>;
 }
+/** Where a position VaR/ES decomposition comes from. */
+export type PositionRiskSource =
+  | {
+      /** models.factor.risk.parametricVarDecomposition (Euler allocation under normal returns). */
+      readonly kind: "parametric";
+      /** Position weights or exposures in portfolio currency, one per position id. */
+      readonly weights: readonly number[];
+      /** Position-return covariance, n x n rows in position order. */
+      readonly covariance: readonly (readonly number[])[];
+      /** Also compute incremental VaR (one repricing per position); omitted is left to Rust (false). */
+      readonly computeIncremental?: boolean | null;
+    }
+  | {
+      /** models.factor.risk.historicalVarDecomposition, plus buildStressAttribution of the same P&L. */
+      readonly kind: "historical";
+      /** Position-major scenario P&L: one row per position, one column per scenario (losses negative). */
+      readonly pnls: readonly (readonly number[])[];
+    };
+/** A position risk report request; omitted options are left to Rust. */
+export interface PositionRiskRequest {
+  /** Position identifiers, in the order of the source's rows. */
+  readonly positionIds: readonly string[];
+  /** Tail confidence as a decimal in (0.5, 1); omitted is left to Rust (0.95). */
+  readonly confidence?: number | null;
+  readonly source: PositionRiskSource;
+  /** Target shares of portfolio VaR per position for models.factor.risk.evaluateRiskBudget; omitted skips the budget. */
+  readonly budget?: {
+    readonly targets: readonly number[];
+    /** Actual-to-target ratio that flags a breach; omitted is left to Rust. */
+    readonly utilizationThreshold?: number | null;
+  } | null;
+}
+/** The native StressAttribution (VaR threshold, tail scenarios, per-position tail contributions). */
+export type StressAttribution = ReturnType<
+  typeof models.factor.risk.buildStressAttribution
+>;
+/** The native results of one position risk request; nothing is computed in TypeScript. */
+export interface PositionRisk {
+  /** The returned PositionRiskDecomposition (losses negative). */
+  decomposition: PositionRiskDecomposition;
+  /** evaluateRiskBudget over positionComponentVar of each position and the portfolio VaR, or its native error; null without a budget. */
+  budget: Envelope<RiskBudgetResult> | null;
+  /** buildStressAttribution of a historical source's P&L, or its native error; null for a parametric source. */
+  stress: Envelope<StressAttribution> | null;
+}
 /** A portfolio valuation request; omitted options are left to Rust. */
 export interface PortfolioValuationRequest {
   /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
@@ -916,6 +963,8 @@ export interface ModelsApi {
   mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
   /** One models.credit.scoring function over its input ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result (kept as an envelope); the scale handle is freed. */
   creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;
+  /** models.factor.risk parametric or historical VaR/ES decomposition, evaluateRiskBudget over positionComponentVar per position, and buildStressAttribution of a historical source; the budget and stress attribution keep their own native errors. */
+  positionRisk(request: PositionRiskRequest): Promise<Envelope<PositionRisk>>;
 }
 /** statements and statements_analytics: model validation, evaluation and diagnostics. */
 export interface StatementsApi {
