@@ -98,6 +98,56 @@
       }
     },
     {
+      "name": "use-cube-slice",
+      "type": "registry:hook",
+      "title": "useCubeSlice",
+      "description": "Materializes a fixed-tenor or fixed-expiry slice of a SABR volatility cube at explicit strikes through the WASM worker.",
+      "docs": "Native models.volatility.materializeCubeTenorSlice/ExpirySlice and their Normal variants with complete immutable cube/axis/value/strike/convention keys. Null means no request. Strikes are absolute in the stored forwards' rate units; off-node values are Rust-interpolated. Requires FinstackQueryProvider; returns the canonical slice JSON or native errors.",
+      "files": [
+        {
+          "path": "hooks/use-cube-slice/use-cube-slice.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-cube-slice/use-cube-slice.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-cube-smile",
+      "type": "registry:hook",
+      "title": "useCubeSmile",
+      "description": "Evaluates the SABR smile of one volatility-cube node, its static-arbitrage check and an optional repair through the WASM worker.",
+      "docs": "Native VolCube paramsAt/forwardAt, SabrParameters.fromJson and SabrSmile generateSmile, validateNoArbitrage and repairArbitrage with complete immutable keys. The continuously compounded decimal rate is required and never defaulted; omitted repair passes run no repair. Requires FinstackQueryProvider; errors are unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-cube-smile/use-cube-smile.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-cube-smile/use-cube-smile.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "fx-surface-chart",
       "type": "registry:component",
       "title": "FX surface chart",
@@ -129,11 +179,46 @@
       }
     },
     {
+      "name": "vol-cube-slice",
+      "type": "registry:component",
+      "title": "Volatility cube slice",
+      "description": "Rust-materialized fixed-tenor or fixed-expiry slice of a SABR volatility cube, plus one node's native SABR smile, arbitrage check and repair.",
+      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice[Normal], rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "components/vol-cube-slice/vol-cube-slice.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/vol-cube-slice/vol-cube-slice.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/use-cube-slice",
+        "@finstack/use-cube-smile",
+        "@finstack/vol-surface-chart",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/decimal-input",
+        "@finstack/enum-field"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "vol-cube-explorer",
       "type": "registry:component",
       "title": "Volatility cube explorer",
-      "description": "Explores a volatility cube by strike and convention using natively evaluated samples.",
-      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "description": "Explores a volatility cube by strike and convention using natively evaluated samples, with an optional Rust-materialized slice and node smile.",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Supplying slice (explicit initialStrikes, optional initialRate and repairIterations) adds vol-cube-slice. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
       "files": [
         {
           "path": "components/vol-cube-explorer/vol-cube-explorer.tsx",
@@ -147,7 +232,8 @@
         "@finstack/json-viewer",
         "@finstack/finstack-codec",
         "@finstack/decimal-input",
-        "@finstack/enum-field"
+        "@finstack/enum-field",
+        "@finstack/vol-cube-slice"
       ],
       "dependencies": ["react@19.2.8"],
       "categories": ["Individual Components"],

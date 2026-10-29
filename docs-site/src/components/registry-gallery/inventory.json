@@ -295,9 +295,15 @@
       "worker": "host"
     },
     {
+      "name": "vol-cube-slice",
+      "type": "registry:component",
+      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice[Normal], rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
+      "worker": "host"
+    },
+    {
       "name": "vol-cube-explorer",
       "type": "registry:component",
-      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Supplying slice (explicit initialStrikes, optional initialRate and repairIterations) adds vol-cube-slice. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
       "worker": "host"
     },
     {
@@ -412,6 +418,14 @@
     },
     {
       "name": "use-cube-samples",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-cube-slice",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-cube-smile",
       "type": "registry:hook"
     },
     {

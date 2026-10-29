@@ -25,6 +25,14 @@ export function Example({
       initialStrike={variant === "shifted" ? -0.005 : 0.05}
       initialConvention={variant === "shifted" ? "black_lognormal" : "normal"}
       colorDomains={{ normal: [0.003, 0.012], black_lognormal: [0.1, 0.7] }}
+      slice={{
+        initialStrikes:
+          variant === "shifted"
+            ? [-0.01, -0.005, 0, 0.005, 0.01, 0.02]
+            : [0.04, 0.045, 0.05, 0.055, 0.06],
+        initialRate: 0.04,
+        repairIterations: 10,
+      }}
       width={width}
       height={460}
     />

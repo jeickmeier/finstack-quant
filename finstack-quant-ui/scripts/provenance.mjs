@@ -130,7 +130,7 @@ const displays = [
     api: ["models.volatility.getCubeVol", "VolatilityNamespace", "getCubeVol"],
     route: "typed",
     convention:
-      "Annualized Black volatility as decimal; supply stored cube and explicit expiry, tenor, strike.",
+      "Annualized Black volatility as decimal; supply stored cube and explicit expiry, tenor, strike. Fixed-tenor and fixed-expiry slices are Rust-materialized (vol-cube-tenor-slice, vol-cube-expiry-slice).",
   },
   {
     id: "vol-cube-explorer-normal",
@@ -140,7 +140,59 @@ const displays = [
       "getCubeNormalVol",
     ],
     route: "typed",
-    convention: "Annualized normal volatility in absolute rate units.",
+    convention:
+      "Annualized normal volatility in absolute rate units. Normal slices are Rust-materialized (vol-cube-tenor-slice-normal, vol-cube-expiry-slice-normal).",
+  },
+  {
+    id: "vol-cube-tenor-slice",
+    api: [
+      "models.volatility.materializeCubeTenorSlice",
+      "VolatilityNamespace",
+      "materializeCubeTenorSlice",
+    ],
+    route: "returned-surface",
+    convention:
+      "Returned VolSurface JSON (expiry by strike, Black or shifted-Black quote type with displacements as Rust returns them); fixed tenor in years and absolute strikes in forward-rate units are explicit caller input. Off-node tenors are Rust-interpolated.",
+  },
+  {
+    id: "vol-cube-tenor-slice-normal",
+    api: [
+      "models.volatility.materializeCubeTenorSliceNormal",
+      "VolatilityNamespace",
+      "materializeCubeTenorSliceNormal",
+    ],
+    route: "returned-surface",
+    convention:
+      "Returned VolSurface JSON of normal volatilities (expiry by strike); fixed tenor and absolute strikes are explicit caller input. Off-node tenors are Rust-interpolated.",
+  },
+  {
+    id: "vol-cube-expiry-slice",
+    api: [
+      "models.volatility.materializeCubeExpirySlice",
+      "VolatilityNamespace",
+      "materializeCubeExpirySlice",
+    ],
+    route: "returned-slice",
+    convention:
+      "Returned VolCubeExpirySlice JSON (tenor by strike, tenor-major, Black or shifted-Black quote type with displacements as Rust returns them); fixed expiry in years and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
+  },
+  {
+    id: "vol-cube-expiry-slice-normal",
+    api: [
+      "models.volatility.materializeCubeExpirySliceNormal",
+      "VolatilityNamespace",
+      "materializeCubeExpirySliceNormal",
+    ],
+    route: "returned-slice",
+    convention:
+      "Returned VolCubeExpirySlice JSON of normal volatilities (tenor by strike); fixed expiry and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
+  },
+  {
+    id: "vol-cube-node-smile",
+    api: ["models.volatility.SabrSmile", "SabrSmile", "generateSmile"],
+    route: "returned-smile",
+    convention:
+      "SabrSmile of one stored cube node (paramsAt, forwardAt, the node expiry): normal volatility when beta < 1e-4, Black otherwise, as returned. validateNoArbitrage takes an explicit continuously compounded decimal rate; repairArbitrage runs only when the caller supplies its passes. Never routed through a surface check.",
   },
   {
     id: "fx-delta-surface",
@@ -320,6 +372,7 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
     "MoneyValue",
     "VolCubeConstructor",
     "FxDeltaVolSurfaceConstructor",
+    "SabrSmileConstructor",
   ];
   const hostDeclarations = hostTypes.map((name) => {
     const node = ast.statements.find(
@@ -368,7 +421,7 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
         "full-state-curve-evaluation":
           "Use stored nodes and parameters; no constructor-based curve recreation.",
         "off-grid-surface-evaluation":
-          "Stored nodes only; off-grid values come only from native evaluators or a Rust-materialized grid (fx-strike-grid).",
+          "Stored nodes only; off-grid values come only from native evaluators or a Rust-materialized grid (fx-strike-grid, vol-cube-tenor-slice, vol-cube-expiry-slice).",
         "quote-space-calibration-fits":
           "Returned residuals only until quote repricing is published.",
         "missing-financial-aggregates":

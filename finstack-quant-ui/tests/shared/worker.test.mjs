@@ -103,6 +103,8 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "sampleCube",
     "sampleFxDelta",
     "materializeFxSurface",
+    "cubeSlice",
+    "cubeSmile",
     // StatementsApi
     "validateStatementModel",
     "validateStatementFormula",

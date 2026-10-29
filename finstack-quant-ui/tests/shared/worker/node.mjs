@@ -71,6 +71,56 @@ function materializeFxDeltaSurface(...args) {
   };
   return handle;
 }
+let sliceConstructed = 0,
+  sliceFreed = 0;
+// The four cube-slice materializers share one constructed/freed count.
+const slices = Object.fromEntries(
+  [
+    "materializeCubeTenorSlice",
+    "materializeCubeTenorSliceNormal",
+    "materializeCubeExpirySlice",
+    "materializeCubeExpirySliceNormal",
+  ].map((name) => [
+    name,
+    (...args) => {
+      const handle = facade.models.volatility[name](...args);
+      sliceConstructed++;
+      const free = handle.free.bind(handle);
+      handle.free = () => {
+        free();
+        sliceFreed++;
+      };
+      return handle;
+    },
+  ]),
+);
+let sabrConstructed = 0,
+  sabrFreed = 0;
+class SabrParameters extends facade.models.volatility.SabrParameters {
+  static fromJson(json) {
+    const handle = super.fromJson(json);
+    sabrConstructed++;
+    const free = handle.free.bind(handle);
+    handle.free = () => {
+      free();
+      sabrFreed++;
+    };
+    return handle;
+  }
+}
+let smileConstructed = 0,
+  smileFreed = 0;
+class SabrSmile extends facade.models.volatility.SabrSmile {
+  constructor(...args) {
+    super(...args);
+    smileConstructed++;
+    const free = this.free.bind(this);
+    this.free = () => {
+      free();
+      smileFreed++;
+    };
+  }
+}
 let moneyConstructed = 0,
   moneyFreed = 0;
 class Money extends facade.core.Money {
@@ -99,7 +149,13 @@ const service = createService({
   core: { ...facade.core, FxDeltaVolSurface, MarketContext, Money, VolCube },
   models: {
     ...facade.models,
-    volatility: { ...facade.models.volatility, materializeFxDeltaSurface },
+    volatility: {
+      ...facade.models.volatility,
+      ...slices,
+      materializeFxDeltaSurface,
+      SabrParameters,
+      SabrSmile,
+    },
   },
   valuations: {
     ...facade.valuations,
@@ -124,6 +180,12 @@ expose(
       fxFreed,
       gridConstructed,
       gridFreed,
+      sliceConstructed,
+      sliceFreed,
+      sabrConstructed,
+      sabrFreed,
+      smileConstructed,
+      smileFreed,
       cubeConstructed,
       cubeFreed,
       cubeJson,
