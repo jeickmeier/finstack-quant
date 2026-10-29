@@ -475,9 +475,15 @@
       "worker": "none"
     },
     {
+      "name": "credit-assessment-report",
+      "type": "registry:component",
+      "docs": "Present a native CreditAssessment (statements_analytics.creditAssessment) as returned: tiles for leverage ratio, interest coverage and free cash flow at the assessed period, a line chart of the two ratios over the returned series (periods Rust returns without a value are left out of the chart and listed), and the series table with a dash for each missing value. A native P&L summary TableEnvelope (statements_analytics.plSummaryReport) renders below it through table-envelope when supplied. Free cash flow carries the host's model currency when one is passed; nothing is calculated, sorted or inferred. Accepts assessment, plSummary, currency, formatValue, loading, error, plSummaryLoading, plSummaryError and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -704,6 +710,14 @@
     },
     {
       "name": "use-trace-statement-scenario",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-credit-assessment",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-pl-summary-report",
       "type": "registry:hook"
     },
     {
@@ -1127,6 +1141,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-credit-assessment",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-scenario-diff",
       "type": "registry:lib"
     },
@@ -1287,6 +1305,10 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-pl-summary.json",
       "sha256": "ae0b624dc30e44539a907b91c25f18a8503ef58bd1e60c8d95e2ee28b2ed0b62"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-credit-assessment.json",
+      "sha256": "f54fb7eec15ae6e5a843366bdc5b49f5ca95635adc0d04fbe714a297916732ed"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",

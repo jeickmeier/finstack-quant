@@ -1,0 +1,56 @@
+{
+  "period": "2025Q4",
+  "leverage_ratio": 1.9188563760404616,
+  "interest_coverage": 6.194873653258923,
+  "free_cash_flow": 39354332.67060436,
+  "series": [
+    {
+      "period": "2024Q1",
+      "leverage_ratio": null,
+      "interest_coverage": null,
+      "free_cash_flow": 25419187.5
+    },
+    {
+      "period": "2024Q2",
+      "leverage_ratio": null,
+      "interest_coverage": null,
+      "free_cash_flow": 28713312.5
+    },
+    {
+      "period": "2024Q3",
+      "leverage_ratio": null,
+      "interest_coverage": null,
+      "free_cash_flow": 30490637.5
+    },
+    {
+      "period": "2024Q4",
+      "leverage_ratio": 2.215696743192739,
+      "interest_coverage": 5.132034113093811,
+      "free_cash_flow": 34726731.25
+    },
+    {
+      "period": "2025Q1",
+      "leverage_ratio": 2.166028611726778,
+      "interest_coverage": 5.415535702107345,
+      "free_cash_flow": 32827381.25
+    },
+    {
+      "period": "2025Q2",
+      "leverage_ratio": 2.0224928898239174,
+      "interest_coverage": 5.664993862101889,
+      "free_cash_flow": 34662352.5625
+    },
+    {
+      "period": "2025Q3",
+      "leverage_ratio": 1.888721960602909,
+      "interest_coverage": 5.992078049478986,
+      "free_cash_flow": 36575746.67268747
+    },
+    {
+      "period": "2025Q4",
+      "leverage_ratio": 1.9188563760404616,
+      "interest_coverage": 6.194873653258923,
+      "free_cash_flow": 39354332.67060436
+    }
+  ]
+}

@@ -40,6 +40,12 @@ await write(
     ),
   ),
 );
+// Native creditAssessment of the analyst result at its last forecast quarter,
+// presented by the credit-assessment-report item beside the P&L summary.
+await write(
+  "analyst-credit-assessment.json",
+  serializeHost(native.creditAssessment(resultJson, "2025Q4")),
+);
 // Native scenarioDiff over the analyst scenario set (base → downside → severe):
 // each scenario against its parent, over the P&L lines for the 2025 quarters.
 const scenarioSetJson = await read("analyst-scenarios.json");

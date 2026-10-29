@@ -264,6 +264,45 @@
       }
     },
     {
+      "name": "credit-assessment-report",
+      "type": "registry:component",
+      "title": "Credit assessment report",
+      "description": "Displays a native statements_analytics credit assessment: leverage, interest coverage and free cash flow at a period, the per-period series and an optional native P&L summary table.",
+      "docs": "Present a native CreditAssessment (statements_analytics.creditAssessment) as returned: tiles for leverage ratio, interest coverage and free cash flow at the assessed period, a line chart of the two ratios over the returned series (periods Rust returns without a value are left out of the chart and listed), and the series table with a dash for each missing value. A native P&L summary TableEnvelope (statements_analytics.plSummaryReport) renders below it through table-envelope when supplied. Free cash flow carries the host's model currency when one is passed; nothing is calculated, sorted or inferred. Accepts assessment, plSummary, currency, formatValue, loading, error, plSummaryLoading, plSummaryError and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/credit-assessment-report/credit-assessment-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/credit-assessment-report/credit-assessment-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/table-envelope",
+        "@finstack/contract-credit-assessment",
+        "@finstack/contract-table-envelope"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-evaluate-statement",
       "type": "registry:hook",
       "title": "useEvaluateStatement",
@@ -539,11 +578,61 @@
       }
     },
     {
+      "name": "use-credit-assessment",
+      "type": "registry:hook",
+      "title": "useCreditAssessment",
+      "description": "Assesses an evaluated statement result's credit natively through the WASM worker.",
+      "docs": "Native statements_analytics.creditAssessment of the host-serialized StatementResult at the requested period: leverage ratio, interest coverage and free cash flow there, plus the per-period series. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-credit-assessment/use-credit-assessment.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-credit-assessment/use-credit-assessment.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-pl-summary-report",
+      "type": "registry:hook",
+      "title": "usePlSummaryReport",
+      "description": "Builds a native P&L summary table from an evaluated statement result through the WASM worker.",
+      "docs": "Native statements_analytics.plSummaryReport TableEnvelope of the host-serialized StatementResult: one row per line item and period, line items in request order and periods in request order. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-pl-summary-report/use-pl-summary-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-pl-summary-report/use-pl-summary-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -578,6 +667,7 @@
         "@finstack/statement-explanation",
         "@finstack/statement-checks",
         "@finstack/variance-table",
+        "@finstack/credit-assessment-report",
         "@finstack/use-evaluate-statement",
         "@finstack/use-statement-model-validator",
         "@finstack/use-statement-formula-validator",
@@ -585,6 +675,8 @@
         "@finstack/use-evaluate-statement-scenarios",
         "@finstack/use-diff-statement-scenarios",
         "@finstack/use-trace-statement-scenario",
+        "@finstack/use-credit-assessment",
+        "@finstack/use-pl-summary-report",
         "@finstack/use-linked-selection",
         "@finstack/use-finstack",
         "@finstack/json-viewer",
@@ -615,8 +707,10 @@
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
-          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json"
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     }

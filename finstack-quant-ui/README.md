@@ -474,6 +474,16 @@ runs one query per scenario. The workbench scenario panel defaults each
 scenario's baseline to the entry before it in that lineage and shows Rust's
 `abs_var` as delta columns and the shown pair's `VarianceReport` in
 `VarianceTable`; capital-structure rows have no native diff and show none.
+`useCreditAssessment` (`use-credit-assessment`) and `usePlSummaryReport`
+(`use-pl-summary-report`) send the `serializeHost` text of an evaluated
+result; the worker calls `statements_analytics.creditAssessment` at the
+requested period and `plSummaryReport` over the line items and periods in
+request order. The workbench's Metrics & ratios tab asks for the active
+period's assessment and a P&L summary of the income-statement lines over every
+reported period, and shows both in `CreditAssessmentReport`: the returned
+values, the two ratios charted over Rust's series with the periods Rust leaves
+without a value listed instead of plotted, and the summary through
+`TableEnvelope`.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useMetrics(instrumentType)` returns the standard metrics Rust registers for
 that type (`metricsForInstrument`), grouped by native category; `null` disables

@@ -16,6 +16,7 @@ import type {
   DependencyTree,
   CheckReport,
   CalendarYearLadderRow,
+  CreditAssessment,
   ArbitrageValidationResult,
   ApplicationReport,
   HorizonReport,
@@ -160,6 +161,22 @@ export interface StatementScenarioTraceRequest {
 export type StatementScenarioDiff = ReturnType<
   typeof statements_analytics.scenarioDiff
 >;
+/** An evaluated StatementResult and the period its credit assessment is read at. */
+export interface CreditAssessmentRequest {
+  /** Host-serialized StatementResult from evaluateStatement. */
+  readonly resultsJson: string;
+  /** Statement period identifier, such as `2025Q4`. */
+  readonly period: string;
+}
+/** An evaluated StatementResult and the line items and periods of its P&L summary table. */
+export interface PlSummaryReportRequest {
+  /** Host-serialized StatementResult from evaluateStatement. */
+  readonly resultsJson: string;
+  /** Node ids in row order. */
+  readonly lineItems: readonly string[];
+  /** Period identifiers in column order. */
+  readonly periods: readonly string[];
+}
 /** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
 export interface StatementRollupRequest {
   readonly modelJson: string;
@@ -1038,6 +1055,14 @@ export interface StatementsApi {
   rollupStatement(
     request: StatementRollupRequest,
   ): Promise<Envelope<StatementResult>>;
+  /** statements_analytics.creditAssessment: leverage, interest coverage and free cash flow at a period, with the per-period series. */
+  creditAssessment(
+    request: CreditAssessmentRequest,
+  ): Promise<Envelope<CreditAssessment>>;
+  /** statements_analytics.plSummaryReport: the P&L summary TableEnvelope over the line items and periods. */
+  plSummaryReport(
+    request: PlSummaryReportRequest,
+  ): Promise<Envelope<TableEnvelope>>;
 }
 /** Every worker method, grouped by the crate whose facade namespace it calls. */
 export type WorkerApi = {

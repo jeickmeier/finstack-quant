@@ -111,8 +111,8 @@ describe("discovered canonical fixtures", () => {
         expect(validator.parse(example)).toEqual(example);
     }
     // Rust publishes no example for CovenantReport, DatedCovenantReports,
-    // the five credit-scoring inputs, MertonModel, ScenarioSet or
-    // ScenarioDiff; every other root carries one.
+    // the five credit-scoring inputs, MertonModel, CreditAssessment,
+    // ScenarioSet or ScenarioDiff; every other root carries one.
     expect(withoutExamples).toEqual([
       "schemas/covenant_report.json",
       "schemas/dated_covenant_reports.json",
@@ -122,9 +122,30 @@ describe("discovered canonical fixtures", () => {
       "schemas/merton_model.json",
       "schemas/ohlson_o_score_input.json",
       "schemas/zmijewski_input.json",
+      "schemas/credit_assessment.json",
       "schemas/scenario_diff.json",
       "schemas/scenario_set.json",
     ]);
+  });
+  it("accepts the captured native credit assessment under the generated CreditAssessment schema unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const schema = JSON.parse(
+      await readFile(
+        resolve(generated, "schemas/credit_assessment.json"),
+        "utf8",
+      ),
+    );
+    const captured = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/src/fixtures/statements/analyst-credit-assessment.json",
+        ),
+        "utf8",
+      ),
+    );
+    const validator = z.fromJSONSchema(converterSchema(schema));
+    expect(validator.parse(captured)).toEqual(captured);
   });
   it("accepts the captured native covenant series under the generated DatedCovenantReports and CovenantReport schemas unchanged", async () => {
     const generated = resolve(repo, "finstack-quant-ui/src/generated");

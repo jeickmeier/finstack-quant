@@ -202,6 +202,7 @@ finstack-quant-ui/src/generated/meta/commodity_swaption.ts
 finstack-quant-ui/src/generated/meta/composite.ts
 finstack-quant-ui/src/generated/meta/convertible_bond.ts
 finstack-quant-ui/src/generated/meta/covenant_report.ts
+finstack-quant-ui/src/generated/meta/credit_assessment.ts
 finstack-quant-ui/src/generated/meta/credit_default_swap.ts
 finstack-quant-ui/src/generated/meta/csa_spec.ts
 finstack-quant-ui/src/generated/meta/dated_covenant_reports.ts
@@ -312,6 +313,7 @@ finstack-quant-ui/src/generated/schemas/commodity_swaption.json
 finstack-quant-ui/src/generated/schemas/composite.json
 finstack-quant-ui/src/generated/schemas/convertible_bond.json
 finstack-quant-ui/src/generated/schemas/covenant_report.json
+finstack-quant-ui/src/generated/schemas/credit_assessment.json
 finstack-quant-ui/src/generated/schemas/credit_default_swap.json
 finstack-quant-ui/src/generated/schemas/csa_spec.json
 finstack-quant-ui/src/generated/schemas/dated_covenant_reports.json
@@ -419,6 +421,7 @@ finstack-quant-ui/src/generated/types/commodity_swaption.ts
 finstack-quant-ui/src/generated/types/composite.ts
 finstack-quant-ui/src/generated/types/convertible_bond.ts
 finstack-quant-ui/src/generated/types/covenant_report.ts
+finstack-quant-ui/src/generated/types/credit_assessment.ts
 finstack-quant-ui/src/generated/types/credit_default_swap.ts
 finstack-quant-ui/src/generated/types/csa_spec.ts
 finstack-quant-ui/src/generated/types/dated_covenant_reports.ts

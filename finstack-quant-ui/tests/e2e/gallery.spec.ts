@@ -256,6 +256,23 @@ test("csa-editor loads a Rust preset and its initial margin terms", async ({
   await expect(im).toBeVisible();
   await expect(im).toHaveScreenshot("csa-editor-im-params.png");
 });
+test("credit-assessment-report P&L summary", async ({ page }) => {
+  const item = await open(
+    page,
+    "credit-assessment-report",
+    "light",
+    "comfortable",
+  );
+  // The four item baselines stop inside the native P&L summary table.
+  const summary = item.getByRole("region", {
+    name: "P&L summary",
+    exact: true,
+  });
+  await expect(summary.getByRole("table")).toBeVisible();
+  await expect(summary).toHaveScreenshot(
+    "credit-assessment-report-pl-summary.png",
+  );
+});
 test("portfolio-risk-report risk budget", async ({ page }) => {
   const item = await open(
     page,

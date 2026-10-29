@@ -385,6 +385,20 @@ export const importHarnesses = {
       name: "use-trace-statement-scenario",
       modules: modules.length,
     })),
+  "use-credit-assessment": () =>
+    Promise.all([
+      import("@/hooks/statements/use-credit-assessment/use-credit-assessment"),
+    ]).then((modules) => ({
+      name: "use-credit-assessment",
+      modules: modules.length,
+    })),
+  "use-pl-summary-report": () =>
+    Promise.all([
+      import("@/hooks/statements/use-pl-summary-report/use-pl-summary-report"),
+    ]).then((modules) => ({
+      name: "use-pl-summary-report",
+      modules: modules.length,
+    })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -1461,6 +1475,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/valuation_result"),
     ]).then((modules) => ({
       name: "contract-valuation-result",
+      modules: modules.length,
+    })),
+  "contract-credit-assessment": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/credit_assessment.json"),
+      import("@/lib/finstack/generated/types/credit_assessment"),
+      import("@/lib/finstack/generated/meta/credit_assessment"),
+    ]).then((modules) => ({
+      name: "contract-credit-assessment",
       modules: modules.length,
     })),
   "contract-scenario-diff": () =>
