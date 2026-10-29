@@ -37,6 +37,7 @@ export const importHarnesses = {
       import("@/workers/services/cashflows"),
       import("@/workers/services/scenarios"),
       import("@/workers/services/analytics"),
+      import("@/workers/services/portfolio"),
       import("@/workers/services/calibration"),
       import("@/workers/services/models"),
       import("@/workers/services/statements"),
@@ -114,6 +115,27 @@ export const importHarnesses = {
       import("@/hooks/analytics/use-performance-report/use-performance-report"),
     ]).then((modules) => ({
       name: "use-performance-report",
+      modules: modules.length,
+    })),
+  "use-value-portfolio": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-value-portfolio/use-value-portfolio"),
+    ]).then((modules) => ({
+      name: "use-value-portfolio",
+      modules: modules.length,
+    })),
+  "use-portfolio-metric-series": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-portfolio-metric-series/use-portfolio-metric-series"),
+    ]).then((modules) => ({
+      name: "use-portfolio-metric-series",
+      modules: modules.length,
+    })),
+  "use-portfolio-spec-validator": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-portfolio-spec-validator/use-portfolio-spec-validator"),
+    ]).then((modules) => ({
+      name: "use-portfolio-spec-validator",
       modules: modules.length,
     })),
   "use-fx-delta-samples": () =>
@@ -1154,6 +1176,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/market_context_state"),
     ]).then((modules) => ({
       name: "contract-market-context-state",
+      modules: modules.length,
+    })),
+  "contract-portfolio-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/portfolio_result.json"),
+      import("@/lib/finstack/generated/types/portfolio_result"),
+      import("@/lib/finstack/generated/meta/portfolio_result"),
+    ]).then((modules) => ({
+      name: "contract-portfolio-result",
       modules: modules.length,
     })),
   "contract-instrument-cashflow": () =>

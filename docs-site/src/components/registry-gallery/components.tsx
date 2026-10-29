@@ -41,6 +41,9 @@ import { Example as Example37 } from "./examples/market-scenario-builder";
 import { Example as Example38 } from "./examples/market-scenario-report";
 import { Example as Example39 } from "./examples/performance-report";
 import { Example as Example40 } from "./examples/covenant-compliance";
+import { Example as Example41 } from "./examples/portfolio-summary";
+import { Example as Example42 } from "./examples/positions-table";
+import { Example as Example43 } from "./examples/portfolio-metrics";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -83,6 +86,9 @@ const examples = {
   "market-scenario-report": Example38,
   "performance-report": Example39,
   "covenant-compliance": Example40,
+  "portfolio-summary": Example41,
+  "positions-table": Example42,
+  "portfolio-metrics": Example43,
 };
 export function ComponentDemo({
   name,

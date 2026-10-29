@@ -310,6 +310,33 @@ const displays = [
     convention:
       "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
   },
+  {
+    id: "portfolio-summary",
+    api: ["portfolio.valuePortfolio", "PortfolioNamespace", "valuePortfolio"],
+    route: "returned-valuation",
+    convention:
+      "Returned PortfolioValuation: total_base_currency and by_entity as exact returned money (entity rows in Portfolio#entityIds registration order), the stamped fx_collapse_policy shown as text, degraded_positions with each risk_error; nothing summed or converted.",
+  },
+  {
+    id: "positions-table",
+    api: ["portfolio.valuePortfolio", "PortfolioNamespace", "valuePortfolio"],
+    route: "returned-valuation",
+    deferred: "machine-readable-units",
+    convention:
+      "Returned PositionValue rows in Portfolio#positionIds (spec) order: native and base money as returned, the applied fx_rate, risk completeness and inapplicable_metrics; the selected position's valuation_result through valuation-summary and measures-grid with Rust metricMetadata. Omitted metrics and strictRisk are left to Rust.",
+  },
+  {
+    id: "portfolio-metrics",
+    api: [
+      "portfolio.aggregateMetrics",
+      "PortfolioNamespace",
+      "aggregateMetrics",
+    ],
+    route: "returned-metrics",
+    deferred: "machine-readable-units",
+    convention:
+      "Returned PortfolioMetrics: aggregated totals with by-entity values, raw by-position metrics with their native currency, unaggregated_metrics, skipped_metrics and degraded_positions as returned. The portfolioMetricsSeries chart keeps Rust's (lexical) entry order, grouped by the first key component; no tenor sort while tenor ordering is an owner decision.",
+  },
 ];
 
 export async function generateProvenance(repo, contracts, fixtureManifest) {

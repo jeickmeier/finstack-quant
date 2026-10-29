@@ -23849,6 +23849,1199 @@
       }
     }
   },
+  "portfolioValuation": {
+    "request": {
+      "metrics": ["dv01", "bucketed_dv01", "theta", "cs01"]
+    },
+    "spec": {
+      "id": "GALLERY-BOOK",
+      "name": "Rates and credit book",
+      "base_currency": "USD",
+      "as_of": "2023-12-28",
+      "entities": {
+        "CREDIT": {
+          "id": "CREDIT",
+          "name": "Credit"
+        },
+        "RATES": {
+          "id": "RATES",
+          "name": "Rates"
+        }
+      },
+      "positions": [
+        {
+          "position_id": "BOND-1",
+          "entity_id": "CREDIT",
+          "instrument_id": "US912828XG33",
+          "instrument_spec": {
+            "type": "bond",
+            "spec": {
+              "id": "US912828XG33",
+              "notional": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "issue_date": "2024-01-15",
+              "maturity": "2034-01-15",
+              "cashflow_spec": {
+                "fixed": {
+                  "coupon_type": "cash",
+                  "rate": "0.0425",
+                  "frequency": {
+                    "count": 6,
+                    "unit": "months"
+                  },
+                  "day_count": "act_act_isma",
+                  "business_day_convention": "following",
+                  "calendar_id": "sifma",
+                  "stub": "short_front",
+                  "end_of_month": false,
+                  "payment_lag_days": 0
+                }
+              },
+              "discount_curve_id": "USD-TREASURY",
+              "credit_curve_id": null,
+              "call_put": null,
+              "attributes": {},
+              "settlement_days": 1,
+              "ex_coupon_days": 0,
+              "ex_coupon_calendar_id": "sifma"
+            }
+          },
+          "quantity": 1,
+          "unit": "units"
+        },
+        {
+          "position_id": "IRS-1",
+          "entity_id": "RATES",
+          "instrument_id": "IRS-5Y-USD-STD",
+          "instrument_spec": {
+            "type": "interest_rate_swap",
+            "spec": {
+              "id": "IRS-5Y-USD-STD",
+              "notional": {
+                "amount": "10000000",
+                "currency": "USD"
+              },
+              "side": "pay",
+              "fixed_leg": {
+                "discount_curve_id": "USD-OIS",
+                "rate": "0.04",
+                "frequency": {
+                  "count": 6,
+                  "unit": "months"
+                },
+                "day_count": "30_360",
+                "business_day_convention": "modified_following",
+                "calendar_id": "usny",
+                "stub": "short_front",
+                "start": "2024-01-02",
+                "end": "2029-01-02",
+                "payment_lag_days": 0,
+                "end_of_month": false
+              },
+              "float_leg": {
+                "discount_curve_id": "USD-OIS",
+                "forward_curve_id": "USD-SOFR-3M",
+                "spread_bp": "0",
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "business_day_convention": "modified_following",
+                "calendar_id": "usny",
+                "stub": "short_front",
+                "reset_lag_days": 2,
+                "fixing_calendar_id": "usny",
+                "start": "2024-01-02",
+                "end": "2029-01-02",
+                "compounding": "simple",
+                "payment_lag_days": 0,
+                "end_of_month": false
+              },
+              "adjust_fixed_accrual_dates": false,
+              "adjust_float_accrual_dates": false,
+              "attributes": {}
+            }
+          },
+          "quantity": 1,
+          "unit": "units"
+        }
+      ]
+    },
+    "report": {
+      "positionIds": ["BOND-1", "IRS-1"],
+      "entityIds": ["CREDIT", "RATES"],
+      "valuation": {
+        "as_of": "2023-12-28",
+        "position_values": {
+          "BOND-1": {
+            "position_id": "BOND-1",
+            "entity_id": "CREDIT",
+            "value_native": {
+              "amount": "1102021.868928519",
+              "currency": "USD"
+            },
+            "value_base": {
+              "amount": "1102021.868928519",
+              "currency": "USD"
+            },
+            "metric_scale": 1,
+            "risk_metrics_complete": true,
+            "valuation_result": {
+              "schema_version": 1,
+              "instrument_id": "US912828XG33",
+              "as_of": "2023-12-28",
+              "value": {
+                "amount": "1102021.868928519",
+                "currency": "USD"
+              },
+              "measures": {
+                "dv01": -926.8498348959256,
+                "bucketed_dv01": -926.8498233541613,
+                "theta": 91.96743387985043,
+                "cs01": -908.5606900539715,
+                "bucketed_dv01::USD-TREASURY::10y": -786.97045022354,
+                "bucketed_dv01::USD-TREASURY::15y": -9.564487969968468,
+                "bucketed_dv01::USD-TREASURY::1y": -3.58103819785174,
+                "bucketed_dv01::USD-TREASURY::20y": 0,
+                "bucketed_dv01::USD-TREASURY::2y": -7.983243822702207,
+                "bucketed_dv01::USD-TREASURY::30y": 0,
+                "bucketed_dv01::USD-TREASURY::3m": 0,
+                "bucketed_dv01::USD-TREASURY::3y": -19.097352369804867,
+                "bucketed_dv01::USD-TREASURY::5y": -36.43549219018314,
+                "bucketed_dv01::USD-TREASURY::6m": -1.0353061084169894,
+                "bucketed_dv01::USD-TREASURY::7y": -62.18245247169398,
+                "cs01::US912828XG33": -908.5606900539715,
+                "theta_period_days": 1
+              },
+              "meta": {
+                "numeric_mode": "f64",
+                "rounding": {
+                  "mode": "bankers",
+                  "ingest_scale_by_currency": {},
+                  "output_scale_by_currency": {},
+                  "tolerances": {
+                    "generic_epsilon": 1e-10
+                  },
+                  "version": 1
+                },
+                "fx_policy_applied": null,
+                "version": "0.11.0"
+              },
+              "covenants": null,
+              "provenance": {
+                "model": "discounting",
+                "requested_as_of": "2023-12-28",
+                "market_dependencies": {
+                  "curves": {
+                    "discount_curves": ["USD-TREASURY"],
+                    "forward_curves": [],
+                    "credit_curves": [],
+                    "inflation_curves": []
+                  },
+                  "market_scalar_ids": [],
+                  "volatility_dependencies": [],
+                  "fx_pairs": [],
+                  "series_ids": []
+                },
+                "sensitivity_bumps": {
+                  "rate_bump_bp": 1,
+                  "credit_spread_bump_bp": 1,
+                  "spot_bump_decimal": 0.01,
+                  "vol_bump_decimal": 0.01
+                }
+              }
+            }
+          },
+          "IRS-1": {
+            "position_id": "IRS-1",
+            "entity_id": "RATES",
+            "value_native": {
+              "amount": "8912.21632401552",
+              "currency": "USD"
+            },
+            "value_base": {
+              "amount": "8912.21632401552",
+              "currency": "USD"
+            },
+            "metric_scale": 1,
+            "risk_metrics_complete": true,
+            "inapplicable_metrics": ["cs01"],
+            "valuation_result": {
+              "schema_version": 1,
+              "instrument_id": "IRS-5Y-USD-STD",
+              "as_of": "2023-12-28",
+              "value": {
+                "amount": "8912.21632401552",
+                "currency": "USD"
+              },
+              "measures": {
+                "dv01": 4646.2148100399645,
+                "bucketed_dv01": 4646.214608195471,
+                "theta": 0.7437544469703425,
+                "bucketed_dv01::USD-OIS::10y": 0,
+                "bucketed_dv01::USD-OIS::15y": 0,
+                "bucketed_dv01::USD-OIS::1y": 0.011910163331776857,
+                "bucketed_dv01::USD-OIS::20y": 0,
+                "bucketed_dv01::USD-OIS::2y": 0.029114182223565876,
+                "bucketed_dv01::USD-OIS::30y": 0,
+                "bucketed_dv01::USD-OIS::3m": -2.4665555857354775,
+                "bucketed_dv01::USD-OIS::3y": -0.06902558368165046,
+                "bucketed_dv01::USD-OIS::5y": 21.374671394820325,
+                "bucketed_dv01::USD-OIS::6m": 1.2495632170466706,
+                "bucketed_dv01::USD-OIS::7y": 0.4102728351717815,
+                "bucketed_dv01::USD-SOFR-3M::10y": 0,
+                "bucketed_dv01::USD-SOFR-3M::15y": 0,
+                "bucketed_dv01::USD-SOFR-3M::1y": 714.3639620118774,
+                "bucketed_dv01::USD-SOFR-3M::20y": 0,
+                "bucketed_dv01::USD-SOFR-3M::2y": 934.0777982305735,
+                "bucketed_dv01::USD-SOFR-3M::30y": 0,
+                "bucketed_dv01::USD-SOFR-3M::3m": 490.76297601510305,
+                "bucketed_dv01::USD-SOFR-3M::3y": 1347.5502141811885,
+                "bucketed_dv01::USD-SOFR-3M::5y": 773.4885379035259,
+                "bucketed_dv01::USD-SOFR-3M::6m": 365.43116923002526,
+                "bucketed_dv01::USD-SOFR-3M::7y": 0,
+                "theta_period_days": 1
+              },
+              "meta": {
+                "numeric_mode": "f64",
+                "rounding": {
+                  "mode": "bankers",
+                  "ingest_scale_by_currency": {},
+                  "output_scale_by_currency": {},
+                  "tolerances": {
+                    "generic_epsilon": 1e-10
+                  },
+                  "version": 1
+                },
+                "fx_policy_applied": null,
+                "version": "0.11.0"
+              },
+              "covenants": null,
+              "provenance": {
+                "model": "discounting",
+                "requested_as_of": "2023-12-28",
+                "market_dependencies": {
+                  "curves": {
+                    "discount_curves": ["USD-OIS"],
+                    "forward_curves": ["USD-SOFR-3M"],
+                    "credit_curves": [],
+                    "inflation_curves": []
+                  },
+                  "market_scalar_ids": [],
+                  "volatility_dependencies": [],
+                  "fx_pairs": [],
+                  "series_ids": ["FIXING:USD-SOFR-3M"]
+                },
+                "sensitivity_bumps": {
+                  "rate_bump_bp": 1,
+                  "credit_spread_bump_bp": 1,
+                  "spot_bump_decimal": 0.01,
+                  "vol_bump_decimal": 0.01
+                }
+              }
+            }
+          }
+        },
+        "total_base_currency": {
+          "amount": "1110934.085252535",
+          "currency": "USD"
+        },
+        "by_entity": {
+          "CREDIT": {
+            "amount": "1102021.868928519",
+            "currency": "USD"
+          },
+          "RATES": {
+            "amount": "8912.21632401552",
+            "currency": "USD"
+          }
+        },
+        "fx_collapse_policy": "cashflow_date"
+      },
+      "metrics": {
+        "aggregated": {
+          "dv01": {
+            "metric_id": "dv01",
+            "total": 3719.364975144039,
+            "by_entity": {
+              "CREDIT": -926.8498348959256,
+              "RATES": 4646.2148100399645
+            }
+          },
+          "bucketed_dv01": {
+            "metric_id": "bucketed_dv01",
+            "total": 3719.3647848413093,
+            "by_entity": {
+              "CREDIT": -926.8498233541613,
+              "RATES": 4646.214608195471
+            }
+          },
+          "theta": {
+            "metric_id": "theta",
+            "total": 92.71118832682077,
+            "by_entity": {
+              "CREDIT": 91.96743387985043,
+              "RATES": 0.7437544469703425
+            }
+          },
+          "cs01": {
+            "metric_id": "cs01",
+            "total": -908.5606900539715,
+            "by_entity": {
+              "CREDIT": -908.5606900539715
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::10y": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::10y",
+            "total": -786.97045022354,
+            "by_entity": {
+              "CREDIT": -786.97045022354
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::15y": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::15y",
+            "total": -9.564487969968468,
+            "by_entity": {
+              "CREDIT": -9.564487969968468
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::1y": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::1y",
+            "total": -3.58103819785174,
+            "by_entity": {
+              "CREDIT": -3.58103819785174
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::20y": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::20y",
+            "total": 0,
+            "by_entity": {
+              "CREDIT": 0
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::2y": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::2y",
+            "total": -7.983243822702207,
+            "by_entity": {
+              "CREDIT": -7.983243822702207
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::30y": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::30y",
+            "total": 0,
+            "by_entity": {
+              "CREDIT": 0
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::3m": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::3m",
+            "total": 0,
+            "by_entity": {
+              "CREDIT": 0
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::3y": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::3y",
+            "total": -19.097352369804867,
+            "by_entity": {
+              "CREDIT": -19.097352369804867
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::5y": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::5y",
+            "total": -36.43549219018314,
+            "by_entity": {
+              "CREDIT": -36.43549219018314
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::6m": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::6m",
+            "total": -1.0353061084169894,
+            "by_entity": {
+              "CREDIT": -1.0353061084169894
+            }
+          },
+          "bucketed_dv01::USD-TREASURY::7y": {
+            "metric_id": "bucketed_dv01::USD-TREASURY::7y",
+            "total": -62.18245247169398,
+            "by_entity": {
+              "CREDIT": -62.18245247169398
+            }
+          },
+          "cs01::US912828XG33": {
+            "metric_id": "cs01::US912828XG33",
+            "total": -908.5606900539715,
+            "by_entity": {
+              "CREDIT": -908.5606900539715
+            }
+          },
+          "bucketed_dv01::USD-OIS::10y": {
+            "metric_id": "bucketed_dv01::USD-OIS::10y",
+            "total": 0,
+            "by_entity": {
+              "RATES": 0
+            }
+          },
+          "bucketed_dv01::USD-OIS::15y": {
+            "metric_id": "bucketed_dv01::USD-OIS::15y",
+            "total": 0,
+            "by_entity": {
+              "RATES": 0
+            }
+          },
+          "bucketed_dv01::USD-OIS::1y": {
+            "metric_id": "bucketed_dv01::USD-OIS::1y",
+            "total": 0.011910163331776857,
+            "by_entity": {
+              "RATES": 0.011910163331776857
+            }
+          },
+          "bucketed_dv01::USD-OIS::20y": {
+            "metric_id": "bucketed_dv01::USD-OIS::20y",
+            "total": 0,
+            "by_entity": {
+              "RATES": 0
+            }
+          },
+          "bucketed_dv01::USD-OIS::2y": {
+            "metric_id": "bucketed_dv01::USD-OIS::2y",
+            "total": 0.029114182223565876,
+            "by_entity": {
+              "RATES": 0.029114182223565876
+            }
+          },
+          "bucketed_dv01::USD-OIS::30y": {
+            "metric_id": "bucketed_dv01::USD-OIS::30y",
+            "total": 0,
+            "by_entity": {
+              "RATES": 0
+            }
+          },
+          "bucketed_dv01::USD-OIS::3m": {
+            "metric_id": "bucketed_dv01::USD-OIS::3m",
+            "total": -2.4665555857354775,
+            "by_entity": {
+              "RATES": -2.4665555857354775
+            }
+          },
+          "bucketed_dv01::USD-OIS::3y": {
+            "metric_id": "bucketed_dv01::USD-OIS::3y",
+            "total": -0.06902558368165046,
+            "by_entity": {
+              "RATES": -0.06902558368165046
+            }
+          },
+          "bucketed_dv01::USD-OIS::5y": {
+            "metric_id": "bucketed_dv01::USD-OIS::5y",
+            "total": 21.374671394820325,
+            "by_entity": {
+              "RATES": 21.374671394820325
+            }
+          },
+          "bucketed_dv01::USD-OIS::6m": {
+            "metric_id": "bucketed_dv01::USD-OIS::6m",
+            "total": 1.2495632170466706,
+            "by_entity": {
+              "RATES": 1.2495632170466706
+            }
+          },
+          "bucketed_dv01::USD-OIS::7y": {
+            "metric_id": "bucketed_dv01::USD-OIS::7y",
+            "total": 0.4102728351717815,
+            "by_entity": {
+              "RATES": 0.4102728351717815
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::10y": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::10y",
+            "total": 0,
+            "by_entity": {
+              "RATES": 0
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::15y": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::15y",
+            "total": 0,
+            "by_entity": {
+              "RATES": 0
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::1y": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::1y",
+            "total": 714.3639620118774,
+            "by_entity": {
+              "RATES": 714.3639620118774
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::20y": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::20y",
+            "total": 0,
+            "by_entity": {
+              "RATES": 0
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::2y": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::2y",
+            "total": 934.0777982305735,
+            "by_entity": {
+              "RATES": 934.0777982305735
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::30y": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::30y",
+            "total": 0,
+            "by_entity": {
+              "RATES": 0
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::3m": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::3m",
+            "total": 490.76297601510305,
+            "by_entity": {
+              "RATES": 490.76297601510305
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::3y": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::3y",
+            "total": 1347.5502141811885,
+            "by_entity": {
+              "RATES": 1347.5502141811885
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::5y": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::5y",
+            "total": 773.4885379035259,
+            "by_entity": {
+              "RATES": 773.4885379035259
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::6m": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::6m",
+            "total": 365.43116923002526,
+            "by_entity": {
+              "RATES": 365.43116923002526
+            }
+          },
+          "bucketed_dv01::USD-SOFR-3M::7y": {
+            "metric_id": "bucketed_dv01::USD-SOFR-3M::7y",
+            "total": 0,
+            "by_entity": {
+              "RATES": 0
+            }
+          }
+        },
+        "by_position": {
+          "BOND-1": {
+            "currency": "USD",
+            "metrics": {
+              "dv01": -926.8498348959256,
+              "bucketed_dv01": -926.8498233541613,
+              "theta": 91.96743387985043,
+              "cs01": -908.5606900539715,
+              "bucketed_dv01::USD-TREASURY::10y": -786.97045022354,
+              "bucketed_dv01::USD-TREASURY::15y": -9.564487969968468,
+              "bucketed_dv01::USD-TREASURY::1y": -3.58103819785174,
+              "bucketed_dv01::USD-TREASURY::20y": 0,
+              "bucketed_dv01::USD-TREASURY::2y": -7.983243822702207,
+              "bucketed_dv01::USD-TREASURY::30y": 0,
+              "bucketed_dv01::USD-TREASURY::3m": 0,
+              "bucketed_dv01::USD-TREASURY::3y": -19.097352369804867,
+              "bucketed_dv01::USD-TREASURY::5y": -36.43549219018314,
+              "bucketed_dv01::USD-TREASURY::6m": -1.0353061084169894,
+              "bucketed_dv01::USD-TREASURY::7y": -62.18245247169398,
+              "cs01::US912828XG33": -908.5606900539715,
+              "theta_period_days": 1
+            }
+          },
+          "IRS-1": {
+            "currency": "USD",
+            "metrics": {
+              "dv01": 4646.2148100399645,
+              "bucketed_dv01": 4646.214608195471,
+              "theta": 0.7437544469703425,
+              "bucketed_dv01::USD-OIS::10y": 0,
+              "bucketed_dv01::USD-OIS::15y": 0,
+              "bucketed_dv01::USD-OIS::1y": 0.011910163331776857,
+              "bucketed_dv01::USD-OIS::20y": 0,
+              "bucketed_dv01::USD-OIS::2y": 0.029114182223565876,
+              "bucketed_dv01::USD-OIS::30y": 0,
+              "bucketed_dv01::USD-OIS::3m": -2.4665555857354775,
+              "bucketed_dv01::USD-OIS::3y": -0.06902558368165046,
+              "bucketed_dv01::USD-OIS::5y": 21.374671394820325,
+              "bucketed_dv01::USD-OIS::6m": 1.2495632170466706,
+              "bucketed_dv01::USD-OIS::7y": 0.4102728351717815,
+              "bucketed_dv01::USD-SOFR-3M::10y": 0,
+              "bucketed_dv01::USD-SOFR-3M::15y": 0,
+              "bucketed_dv01::USD-SOFR-3M::1y": 714.3639620118774,
+              "bucketed_dv01::USD-SOFR-3M::20y": 0,
+              "bucketed_dv01::USD-SOFR-3M::2y": 934.0777982305735,
+              "bucketed_dv01::USD-SOFR-3M::30y": 0,
+              "bucketed_dv01::USD-SOFR-3M::3m": 490.76297601510305,
+              "bucketed_dv01::USD-SOFR-3M::3y": 1347.5502141811885,
+              "bucketed_dv01::USD-SOFR-3M::5y": 773.4885379035259,
+              "bucketed_dv01::USD-SOFR-3M::6m": 365.43116923002526,
+              "bucketed_dv01::USD-SOFR-3M::7y": 0,
+              "theta_period_days": 1
+            }
+          }
+        },
+        "unaggregated_metrics": ["theta_period_days"]
+      }
+    },
+    "series": {
+      "base": "bucketed_dv01",
+      "entries": [
+        {
+          "components": ["USD-TREASURY", "10y"],
+          "total": -786.97045022354,
+          "by_entity": {
+            "CREDIT": -786.97045022354
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "15y"],
+          "total": -9.564487969968468,
+          "by_entity": {
+            "CREDIT": -9.564487969968468
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "1y"],
+          "total": -3.58103819785174,
+          "by_entity": {
+            "CREDIT": -3.58103819785174
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "20y"],
+          "total": 0,
+          "by_entity": {
+            "CREDIT": 0
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "2y"],
+          "total": -7.983243822702207,
+          "by_entity": {
+            "CREDIT": -7.983243822702207
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "30y"],
+          "total": 0,
+          "by_entity": {
+            "CREDIT": 0
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "3m"],
+          "total": 0,
+          "by_entity": {
+            "CREDIT": 0
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "3y"],
+          "total": -19.097352369804867,
+          "by_entity": {
+            "CREDIT": -19.097352369804867
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "5y"],
+          "total": -36.43549219018314,
+          "by_entity": {
+            "CREDIT": -36.43549219018314
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "6m"],
+          "total": -1.0353061084169894,
+          "by_entity": {
+            "CREDIT": -1.0353061084169894
+          }
+        },
+        {
+          "components": ["USD-TREASURY", "7y"],
+          "total": -62.18245247169398,
+          "by_entity": {
+            "CREDIT": -62.18245247169398
+          }
+        },
+        {
+          "components": ["USD-OIS", "10y"],
+          "total": 0,
+          "by_entity": {
+            "RATES": 0
+          }
+        },
+        {
+          "components": ["USD-OIS", "15y"],
+          "total": 0,
+          "by_entity": {
+            "RATES": 0
+          }
+        },
+        {
+          "components": ["USD-OIS", "1y"],
+          "total": 0.011910163331776857,
+          "by_entity": {
+            "RATES": 0.011910163331776857
+          }
+        },
+        {
+          "components": ["USD-OIS", "20y"],
+          "total": 0,
+          "by_entity": {
+            "RATES": 0
+          }
+        },
+        {
+          "components": ["USD-OIS", "2y"],
+          "total": 0.029114182223565876,
+          "by_entity": {
+            "RATES": 0.029114182223565876
+          }
+        },
+        {
+          "components": ["USD-OIS", "30y"],
+          "total": 0,
+          "by_entity": {
+            "RATES": 0
+          }
+        },
+        {
+          "components": ["USD-OIS", "3m"],
+          "total": -2.4665555857354775,
+          "by_entity": {
+            "RATES": -2.4665555857354775
+          }
+        },
+        {
+          "components": ["USD-OIS", "3y"],
+          "total": -0.06902558368165046,
+          "by_entity": {
+            "RATES": -0.06902558368165046
+          }
+        },
+        {
+          "components": ["USD-OIS", "5y"],
+          "total": 21.374671394820325,
+          "by_entity": {
+            "RATES": 21.374671394820325
+          }
+        },
+        {
+          "components": ["USD-OIS", "6m"],
+          "total": 1.2495632170466706,
+          "by_entity": {
+            "RATES": 1.2495632170466706
+          }
+        },
+        {
+          "components": ["USD-OIS", "7y"],
+          "total": 0.4102728351717815,
+          "by_entity": {
+            "RATES": 0.4102728351717815
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "10y"],
+          "total": 0,
+          "by_entity": {
+            "RATES": 0
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "15y"],
+          "total": 0,
+          "by_entity": {
+            "RATES": 0
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "1y"],
+          "total": 714.3639620118774,
+          "by_entity": {
+            "RATES": 714.3639620118774
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "20y"],
+          "total": 0,
+          "by_entity": {
+            "RATES": 0
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "2y"],
+          "total": 934.0777982305735,
+          "by_entity": {
+            "RATES": 934.0777982305735
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "30y"],
+          "total": 0,
+          "by_entity": {
+            "RATES": 0
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "3m"],
+          "total": 490.76297601510305,
+          "by_entity": {
+            "RATES": 490.76297601510305
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "3y"],
+          "total": 1347.5502141811885,
+          "by_entity": {
+            "RATES": 1347.5502141811885
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "5y"],
+          "total": 773.4885379035259,
+          "by_entity": {
+            "RATES": 773.4885379035259
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "6m"],
+          "total": 365.43116923002526,
+          "by_entity": {
+            "RATES": 365.43116923002526
+          }
+        },
+        {
+          "components": ["USD-SOFR-3M", "7y"],
+          "total": 0,
+          "by_entity": {
+            "RATES": 0
+          }
+        }
+      ]
+    },
+    "metadata": [
+      {
+        "key": "dv01",
+        "metric": "dv01",
+        "components": [],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": false
+      },
+      {
+        "key": "bucketed_dv01",
+        "metric": "bucketed_dv01",
+        "components": [],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": false
+      },
+      {
+        "key": "theta",
+        "metric": "theta",
+        "components": [],
+        "unit": "currency",
+        "group": "Carry",
+        "bucketed": false
+      },
+      {
+        "key": "cs01",
+        "metric": "cs01",
+        "components": [],
+        "unit": "currency",
+        "group": "Credit",
+        "bucketed": false
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::10y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "10y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::15y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "15y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::1y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "1y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::20y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "20y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::2y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "2y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::30y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "30y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::3m",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "3m"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::3y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "3y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::5y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "5y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::6m",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "6m"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-TREASURY::7y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-TREASURY", "7y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "cs01::US912828XG33",
+        "metric": "cs01",
+        "components": ["US912828XG33"],
+        "unit": "currency",
+        "group": "Credit",
+        "bucketed": false
+      },
+      {
+        "key": "theta_period_days",
+        "metric": "theta_period_days",
+        "components": [],
+        "unit": "dimensionless",
+        "group": "Carry",
+        "bucketed": false
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::10y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "10y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::15y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "15y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::1y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "1y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::20y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "20y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::2y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "2y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::30y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "30y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::3m",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "3m"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::3y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "3y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::5y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "5y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::6m",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "6m"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-OIS::7y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-OIS", "7y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::10y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "10y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::15y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "15y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::1y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "1y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::20y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "20y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::2y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "2y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::30y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "30y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::3m",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "3m"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::3y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "3y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::5y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "5y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::6m",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "6m"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      },
+      {
+        "key": "bucketed_dv01::USD-SOFR-3M::7y",
+        "metric": "bucketed_dv01",
+        "components": ["USD-SOFR-3M", "7y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": true
+      }
+    ]
+  },
   "details": {
     "description": "Actual native results. Decode resultJson through the canonical wire codec, which yields the facade transport (bigint for schema int64/uint64 fields); tests compare with a fresh native call.",
     "sources": [

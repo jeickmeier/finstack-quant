@@ -1,0 +1,185 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "portfolio-summary",
+      "type": "registry:component",
+      "title": "Portfolio summary",
+      "description": "Display of a native portfolio valuation's totals: base-currency total, value by entity, the stamped FX collapse policy and degraded positions.",
+      "docs": "Display-only view of the valuation returned by useValuePortfolio (portfolio.valuePortfolio). Shows total_base_currency, the valuation date, fx_collapse_policy as the text Rust stamped, by_entity values in entity registration order (Portfolio#entityIds) and degraded_positions with each risk_error. Amounts are the exact returned money; nothing is summed or converted. Accepts report ({entityIds, valuation}), loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/portfolio-summary/portfolio-summary.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/portfolio/components/portfolio-summary/portfolio-summary.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/money-value",
+        "@finstack/finstack-table"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "positions-table",
+      "type": "registry:component",
+      "title": "Positions table",
+      "description": "Display of each position of a native portfolio valuation in spec order, with the selected position's valuation_result through valuation-summary and measures-grid.",
+      "docs": "Display-only view of the valuation returned by useValuePortfolio. Rows follow Portfolio#positionIds (spec order), never the position_values key order: entity, instrument, native and base values, the FX rate Rust applied, risk completeness and inapplicable_metrics (metrics on the requested menu the instrument has no calculator for). Activating a row shows that position's returned valuation_result with valuation-summary and measures-grid; pass Rust metricMetadata (useMetricMetadata) for measure labels. Accepts report ({positionIds, valuation}), metadata, initialPosition, loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/positions-table/positions-table.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/portfolio/components/positions-table/positions-table.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/money-value",
+        "@finstack/finstack-table",
+        "@finstack/valuation-summary",
+        "@finstack/measures-grid"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "portfolio-metrics",
+      "type": "registry:component",
+      "title": "Portfolio metrics",
+      "description": "Display of native aggregated portfolio metrics: a bucketed series chart in Rust order, aggregated totals by entity, raw metrics by position and the unaggregated, skipped and degraded lists.",
+      "docs": "Display-only view of the metrics returned by useValuePortfolio (portfolio.aggregateMetrics) and a series from usePortfolioMetricSeries (portfolio.portfolioMetricsSeries). The series is charted per first key component (the curve) with buckets in the order Rust returned them, which is lexical (10y, 15y, 1y, ...); no tenor sort is applied while tenor ordering is an open owner decision. Aggregated rows show each total with by-entity columns in entity registration order; the position table shows that position's raw metrics with its native currency. unaggregated_metrics, skipped_metrics and degraded_positions are listed as returned. Accepts report ({positionIds, entityIds, metrics}), series, metadata, initialPosition, formatValue, loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/portfolio-metrics/portfolio-metrics.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/portfolio/components/portfolio-metrics/portfolio-metrics.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/enum-field"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-value-portfolio",
+      "type": "registry:hook",
+      "title": "useValuePortfolio",
+      "description": "Values a host-supplied portfolio spec over a market through the WASM worker and aggregates its metrics.",
+      "docs": "portfolio.valuePortfolio over the shared cached Portfolio (Portfolio.fromSpec, keyed on canonical Portfolio#toJson) and MarketContext handles, then portfolio.aggregateMetrics over the same market. Returns {positionIds, entityIds, valuation, metrics}; position and entity ids come from the Portfolio handle in spec and registration order. Omitted metrics and strictRisk stay unset so Rust applies its defaults (PV plus dv01; fail closed). A metric on the menu that an instrument cannot compute is listed on that position's inapplicable_metrics rather than thrown. Each valuation_result keeps 64-bit fields as bigint. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-value-portfolio/use-value-portfolio.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-value-portfolio/use-value-portfolio.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-portfolio-metric-series",
+      "type": "registry:hook",
+      "title": "usePortfolioMetricSeries",
+      "description": "Decodes one base metric's series from returned portfolio metrics through the WASM worker.",
+      "docs": "portfolio.portfolioMetricsSeries over PortfolioMetrics returned by useValuePortfolio and a canonical base metric id such as bucketed_dv01. Entries ({components, total, by_entity}) arrive in the order Rust returns them, which is lexical by key; no tenor sort is applied. The metrics are plain numbers, so the snapshotted request carries no bigint into the query key. Native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-portfolio-metric-series/use-portfolio-metric-series.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-portfolio-metric-series/use-portfolio-metric-series.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-portfolio-spec-validator",
+      "type": "registry:hook",
+      "title": "usePortfolioSpecValidator",
+      "description": "Validates and canonicalizes portfolio spec JSON through the WASM worker, for schema-form.",
+      "docs": "Native PortfolioSpec validation using the existing FinstackProvider worker: portfolio.parsePortfolioSpecJson rejects malformed JSON and schema mismatches, then Portfolio.fromSpec (through the shared handle cache, which keeps the built book for the next valuation) rejects invalid positions, duplicate identifiers and unknown entity references. Returns canonical JSON and rejects superseded revisions.",
+      "files": [
+        {
+          "path": "hooks/use-portfolio-spec-validator/use-portfolio-spec-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-portfolio-spec-validator/use-portfolio-spec-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

@@ -21,6 +21,7 @@
       "@/hooks/statements/*": ["registry/statements/hooks/*"],
       "@/hooks/scenarios/*": ["registry/scenarios/hooks/*"],
       "@/hooks/analytics/*": ["registry/analytics/hooks/*"],
+      "@/hooks/portfolio/*": ["registry/portfolio/hooks/*"],
       "@/workers/*": ["registry/shared/file/*"],
       "@/components/finstack/*": ["registry/*"],
       "@/components/ui/*": ["components/ui/*"]

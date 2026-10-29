@@ -145,6 +145,31 @@ test("performance-report monthly returns", async ({ page }) => {
   ).toBeVisible();
   await expect(monthly).toHaveScreenshot("performance-report-monthly.png");
 });
+test("positions-table selected swap", async ({ page }) => {
+  const item = await open(page, "positions-table", "light", "comfortable");
+  // The four item baselines stop inside the first position's measures.
+  await item.getByRole("row", { name: /IRS-1/ }).click();
+  const swap = item.getByRole("region", {
+    name: "Position IRS-1",
+    exact: true,
+  });
+  await expect(swap.getByText("IRS-5Y-USD-STD").first()).toBeVisible();
+  await expect(swap).toHaveScreenshot("positions-table-swap.png");
+});
+test("portfolio-metrics by position", async ({ page }) => {
+  const item = await open(page, "portfolio-metrics", "light", "comfortable");
+  // The four item baselines stop inside the aggregated table, above this section.
+  const byPosition = item.getByRole("region", {
+    name: "Metrics by position",
+    exact: true,
+  });
+  await expect(
+    byPosition.getByRole("table", { name: "Metrics of position BOND-1" }),
+  ).toBeVisible();
+  await expect(byPosition).toHaveScreenshot(
+    "portfolio-metrics-by-position.png",
+  );
+});
 test("every nonvisual item imports without initializing WASM", async ({
   page,
 }) => {

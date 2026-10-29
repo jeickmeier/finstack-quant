@@ -35,29 +35,29 @@ module, and live under `src/generated/types/` for type-only imports.
 
 ## Layout and extension
 
-| Path                                                 | Holds                                                                                                                                                                                                                                                     |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `analytics`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
-| `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                                               |
-| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                                                     |
-| `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                                                 |
-| `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                                              |
-| `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                                                        |
-| `tests/e2e/`, `tests/install/`, `tests/publishing/`  | The `ui-e2e`, `ui-install` and `ui-publish-check` gates.                                                                                                                                                                                                  |
-| `tests/browser/`                                     | Worker smoke, footprint gate, the harness runner and shared consumer helpers.                                                                                                                                                                             |
+| Path                                                 | Holds                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `analytics`, `portfolio`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
+| `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                                                            |
+| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                                                                  |
+| `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                                                              |
+| `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                                                           |
+| `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                                                                     |
+| `tests/e2e/`, `tests/install/`, `tests/publishing/`  | The `ui-e2e`, `ui-install` and `ui-publish-check` gates.                                                                                                                                                                                                               |
+| `tests/browser/`                                     | Worker smoke, footprint gate, the harness runner and shared consumer helpers.                                                                                                                                                                                          |
 
 Sources import through the paths an installed consumer uses. `tsconfig.json`
 maps them back here; `vitest.config.mts` copies that table into prefix aliases
 in order, so a specific key must precede its prefix.
 
-| Import                    | Source                                                                                                                                                       |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                                           |
-| `@/lib/finstack/*`        | `src/*`                                                                                                                                                      |
-| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `scenarios`, `analytics`, `models` and `statements`; a new crate adds its line |
-| `@/workers/*`             | `registry/shared/file/*`                                                                                                                                     |
-| `@/components/finstack/*` | `registry/*`                                                                                                                                                 |
-| `@/components/ui/*`       | `components/ui/*`                                                                                                                                            |
+| Import                    | Source                                                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                                                        |
+| `@/lib/finstack/*`        | `src/*`                                                                                                                                                                   |
+| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `scenarios`, `analytics`, `portfolio`, `models` and `statements`; a new crate adds its line |
+| `@/workers/*`             | `registry/shared/file/*`                                                                                                                                                  |
+| `@/components/finstack/*` | `registry/*`                                                                                                                                                              |
+| `@/components/ui/*`       | `components/ui/*`                                                                                                                                                         |
 
 A new crate category also adds its directory name to the `include` list in
 `scripts/gen-registry.mjs`, then runs
@@ -170,9 +170,9 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twelve native fixture generators under
+`mise run ui-fixtures` runs the thirteen native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-cashflows → details;
+cashflows → details; portfolio;
 curves → market-browser; cubes, calibration, scenario-table;
 statements → covenants; analytics), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
@@ -700,6 +700,33 @@ The panel edits the native `ScenarioGrid` (`contract-scenario-grid`) seeded from
 **Run scenarios**, and Rust validates the axis values and the cell cap.
 `calibrationChartOptions` forwards existing figure annotations, export refs and
 interaction callbacks; the workbench owns the shared report/chart selection.
+
+## Returned portfolio valuation
+
+`useValuePortfolio` (`@finstack/use-value-portfolio`) values a host-supplied
+`PortfolioSpec` over a market: `portfolio.valuePortfolio` over the worker's
+cached `Portfolio` and `MarketContext` handles (each a four-entry LRU keyed on
+canonical JSON), then `aggregateMetrics` over the same market. It returns
+`{positionIds, entityIds, valuation, metrics}`; the ids come from the
+`Portfolio` handle in spec and registration order, because integer-like
+`position_values` and `by_entity` keys enumerate numerically in JavaScript.
+Omitted `metrics` and `strictRisk` are left to Rust (PV plus `dv01`; fail
+closed). A metric on the menu that an instrument cannot compute is listed on
+that position's `inapplicable_metrics` instead of thrown, unlike
+`priceInstrument`. `usePortfolioMetricSeries` decodes one base metric with
+`portfolioMetricsSeries`, and `usePortfolioSpecValidator` validates spec text
+(`parsePortfolioSpecJson`, then `Portfolio.fromSpec` through the cache).
+
+The display-only `PortfolioSummary` (total, the stamped `fx_collapse_policy`
+as text, value by entity, degraded positions), `PositionsTable` (rows in spec
+order; the selected row's `valuation_result` through `ValuationSummary` and
+`MeasuresGrid`) and `PortfolioMetrics` (the bucketed series chart, aggregated
+totals by entity, raw metrics by position, unaggregated, skipped and degraded
+lists) take the returned report as props. The series chart keeps the order
+Rust returns, which is lexical (`10y`, `15y`, `1y`, …); tenor ordering is an
+open owner decision, so no sort is applied. Native fixtures (the gallery bond
+and swap book over the pricing market, and the host-parity deposit book) live
+in `tests/portfolio/`.
 
 ## Served gallery checks
 

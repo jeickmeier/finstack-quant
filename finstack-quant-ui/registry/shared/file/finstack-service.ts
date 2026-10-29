@@ -18,6 +18,10 @@ import {
   type AnalyticsNative,
 } from "./services/analytics";
 import {
+  createPortfolioService,
+  type PortfolioNative,
+} from "./services/portfolio";
+import {
   createCalibrationService,
   type CalibrationNative,
 } from "./services/calibration";
@@ -34,6 +38,7 @@ export function createService(
     CashflowsNative &
     ScenariosNative &
     AnalyticsNative &
+    PortfolioNative &
     CalibrationNative &
     ModelsNative &
     StatementsNative,
@@ -52,6 +57,7 @@ export function createService(
     ...createCashflowsService(native, context),
     ...createScenariosService(native, context),
     ...createAnalyticsService(native, context),
+    ...createPortfolioService(native, context),
     ...createCalibrationService(native, context),
     ...createModelsService(native, context),
     ...createStatementsService(native, context),
