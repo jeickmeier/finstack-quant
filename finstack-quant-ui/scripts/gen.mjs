@@ -122,6 +122,7 @@ export async function generate(repo = repoRoot) {
           "dcf_sensitivity_result",
           "lbo_config",
           "lbo_result",
+          "sensitivity_result",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));

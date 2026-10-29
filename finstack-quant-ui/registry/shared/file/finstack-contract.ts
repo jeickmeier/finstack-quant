@@ -19,6 +19,9 @@ import type {
   CreditAssessment,
   DcfSensitivityResult,
   LboResult,
+  SensitivityResult,
+  TornadoEntry,
+  GoalSeekResult,
   ArbitrageValidationResult,
   ApplicationReport,
   HorizonReport,
@@ -211,6 +214,47 @@ export interface EvaluateLboRequest {
   readonly modelJson: string;
   /** Rust LboConfig JSON; Rust rejects unknown keys. */
   readonly configJson: string;
+}
+/** One sensitivity parameter: statements_analytics.parameterSpecWithPercentages arguments. */
+export interface SensitivityParameterRequest {
+  readonly nodeId: string;
+  /** Period whose value is varied, such as `2025Q4`. */
+  readonly periodId: string;
+  /** Base value of the node at the period, in the node's own units, read from the evaluated result. */
+  readonly baseValue: number;
+  /** Percentage moves of the base value, such as `[-10, 10]` for plus or minus 10%. */
+  readonly pctRange: readonly number[];
+}
+/** A sensitivity run of one model and the target metric and period its tornado reads. */
+export interface RunSensitivityRequest {
+  readonly modelJson: string;
+  /** Rust SensitivityMode wire value: `diagonal`, `full_grid` or `tornado`. */
+  readonly mode: string;
+  /** Parameters in the order Rust varies them. */
+  readonly parameters: readonly SensitivityParameterRequest[];
+  /** Target metric node tracked in every scenario and read by the tornado. */
+  readonly targetMetric: string;
+  /** Period at which the tornado reads the target metric. */
+  readonly period: string;
+}
+/** Native SensitivityResult and its tornado entries; `tornado` is null for a full-grid run, which Rust cannot rank. */
+export interface StatementSensitivity {
+  readonly result: SensitivityResult;
+  readonly tornado: TornadoEntry[] | null;
+}
+/** statements_analytics.goalSeek arguments; `bounds` stays unset unless supplied. */
+export interface GoalSeekRequest {
+  readonly modelJson: string;
+  readonly targetNode: string;
+  readonly targetPeriod: string;
+  /** Value the target node must reach, in its own units. */
+  readonly targetValue: number;
+  readonly driverNode: string;
+  readonly driverPeriod: string;
+  /** Whether the result carries the model with the solved driver written in. */
+  readonly updateModel: boolean;
+  /** `[lower, upper]` search bracket in the driver node's units. */
+  readonly bounds?: readonly [number, number];
 }
 /** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
 export interface StatementRollupRequest {
@@ -1108,6 +1152,12 @@ export interface StatementsApi {
   ): Promise<Envelope<DcfSensitivityResult>>;
   /** statements_analytics.evaluateLbo: entry and exit values, sources and uses, MOIC and the optional LBO check report. */
   evaluateLbo(request: EvaluateLboRequest): Promise<Envelope<LboResult>>;
+  /** statements_analytics.parameterSpecWithPercentages per parameter, runSensitivity, then generateTornadoEntries at the target metric and period (skipped for full_grid). */
+  runSensitivity(
+    request: RunSensitivityRequest,
+  ): Promise<Envelope<StatementSensitivity>>;
+  /** statements_analytics.goalSeek: the driver value that brings the target node to the target value, and optionally the updated model. */
+  goalSeek(request: GoalSeekRequest): Promise<Envelope<GoalSeekResult>>;
 }
 /** Every worker method, grouped by the crate whose facade namespace it calls. */
 export type WorkerApi = {

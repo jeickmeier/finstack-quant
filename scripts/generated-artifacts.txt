@@ -259,6 +259,7 @@ finstack-quant-ui/src/generated/meta/scenario_grid.ts
 finstack-quant-ui/src/generated/meta/scenario_pnl_batch_item.ts
 finstack-quant-ui/src/generated/meta/scenario_revalue_view.ts
 finstack-quant-ui/src/generated/meta/scenario_set.ts
+finstack-quant-ui/src/generated/meta/sensitivity_result.ts
 finstack-quant-ui/src/generated/meta/shared.ts
 finstack-quant-ui/src/generated/meta/simm_sensitivities_json.ts
 finstack-quant-ui/src/generated/meta/snowball.ts
@@ -374,6 +375,7 @@ finstack-quant-ui/src/generated/schemas/scenario_grid.json
 finstack-quant-ui/src/generated/schemas/scenario_pnl_batch_item.json
 finstack-quant-ui/src/generated/schemas/scenario_revalue_view.json
 finstack-quant-ui/src/generated/schemas/scenario_set.json
+finstack-quant-ui/src/generated/schemas/sensitivity_result.json
 finstack-quant-ui/src/generated/schemas/simm_sensitivities_json.json
 finstack-quant-ui/src/generated/schemas/snowball.json
 finstack-quant-ui/src/generated/schemas/statement_result.json
@@ -486,6 +488,7 @@ finstack-quant-ui/src/generated/types/scenario_grid.ts
 finstack-quant-ui/src/generated/types/scenario_pnl_batch_item.ts
 finstack-quant-ui/src/generated/types/scenario_revalue_view.ts
 finstack-quant-ui/src/generated/types/scenario_set.ts
+finstack-quant-ui/src/generated/types/sensitivity_result.ts
 finstack-quant-ui/src/generated/types/shared.ts
 finstack-quant-ui/src/generated/types/simm_sensitivities_json.ts
 finstack-quant-ui/src/generated/types/snowball.ts

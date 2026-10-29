@@ -505,9 +505,21 @@
       "worker": "none"
     },
     {
+      "name": "statement-sensitivity",
+      "type": "registry:component",
+      "docs": "Edit a sensitivity run: the SensitivityMode (the wire values read from the generated sensitivity_result contract), the target metric as an id-combobox, the tornado period, and each varied node and period with comma-separated percentage moves. Each parameter's base value is read from the supplied evaluated result (a missing or non-finite cell is sent as NaN, never defaulted) and passed with the moves to statements_analytics.parameterSpecWithPercentages; an empty move is NaN, so Rust rejects it. Run sensitivity passes the run to the caller (usually the useRunSensitivity request). The native tornado is shown through tornado-chart, parameter keys (node@period) labelled by node and period, and the target metric at the tornado period in the baseline and every returned scenario in Rust's order. A full-grid run has no tornado; the scenarios are still shown. Nothing is calculated. Accepts result, nodeIds, periods, defaultValues, onSubmit, data, loading, error, disabled and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "goal-seek-form",
+      "type": "registry:component",
+      "docs": "Edit statements_analytics.goalSeek arguments: target node and driver node as id-comboboxes over the supplied node ids, target and driver periods, the target value, and an optional lower and upper search bracket in the driver's units (both empty leave the bracket unset so Rust uses its own; a cleared number is sent as NaN, never 0). Solve passes the arguments to the caller (usually the useGoalSeek request); the native GoalSeekResult is shown as returned: solved value, residual, tolerance, evaluations and the converged flag. When onApply is supplied, Apply to model is a second, explicit action that hands the returned model (the input model with the solved driver written in) to the caller, such as the statements workbench's commit; there is no undo, and applyBlocked disables it with a reason. Nothing is calculated or defaulted. Accepts nodeIds, periods, defaultValues, onSubmit, result, loading, error, onApply, applyBlocked, disabled and density props.",
+      "worker": "none"
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -754,6 +766,14 @@
     },
     {
       "name": "use-evaluate-lbo",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-run-sensitivity",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-goal-seek",
       "type": "registry:hook"
     },
     {
@@ -1205,6 +1225,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-sensitivity-result",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-check-suite-spec",
       "type": "registry:lib"
     },
@@ -1381,6 +1405,22 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo.json",
       "sha256": "59dcff00879cc8da72f28bb28bab2a41d31c5301dbf020bfea91399aafa823a4"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity-run.json",
+      "sha256": "82f0502ca28c5ced000de03587db2e29eeff8e0aa6507309a500909ac20dd865"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
+      "sha256": "5a750acb5e89caf1fd6ece47cadfbfafc354353210f144fe2d9708c2d43b4609"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
+      "sha256": "211d3158caa5f15dacc2a404b5bd28e8be32bd8424d6d58fc296f13bada57f11"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek.json",
+      "sha256": "79cc93c5b3e7f5c891f92108ca343d7ba67cc22ccaeb23e57b60f7c3f5845361"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",

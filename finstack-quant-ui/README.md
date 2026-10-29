@@ -504,6 +504,18 @@ the config with a schema form over the generated `lbo_config` contract (string
 evaluation, as there is no standalone `LboConfig` parse) and shows the
 returned sources and uses, entry and exit values, MOIC and the LBO check
 report. Returns are MOIC only: IRR is not part of the native result.
+`useRunSensitivity` (`use-run-sensitivity`) builds each parameter with
+`statements_analytics.parameterSpecWithPercentages` (the base value is the
+evaluated cell, a missing or non-finite one sent as NaN), runs
+`runSensitivity` and returns its `generateTornadoEntries` at the target metric
+and period, or a null tornado for a `full_grid` run, which Rust cannot rank.
+`useGoalSeek` (`use-goal-seek`) passes the target, driver, update flag and an
+optional bracket to `goalSeek`, leaving an unset bracket unset. Below the
+Scenarios tab's scenario set, `StatementSensitivity` shows the native tornado
+and the target metric in every returned scenario, and `GoalSeekForm` solves
+only on Solve; Apply to model is a second, explicit action that commits the
+returned model through the workbench (no undo), blocked once the model has
+changed since the solve.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useMetrics(instrumentType)` returns the standard metrics Rust registers for
 that type (`metricsForInstrument`), grouped by native category; `null` disables

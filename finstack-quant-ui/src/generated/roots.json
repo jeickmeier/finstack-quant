@@ -535,6 +535,11 @@
     "schema": "schemas/scenario_set.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/sensitivity_result.schema.json",
+    "schema": "schemas/sensitivity_result.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
     "source": "finstack-quant/statements/schemas/statements/1/check_suite_spec.schema.json",
     "schema": "schemas/check_suite_spec.json"

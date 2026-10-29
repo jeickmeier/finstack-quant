@@ -155,6 +155,8 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "evaluateDcf",
     "dcfSensitivity",
     "evaluateLbo",
+    "runSensitivity",
+    "goalSeek",
   ];
   expect((await proxy.methods()).sort()).toEqual(expected.sort());
 });

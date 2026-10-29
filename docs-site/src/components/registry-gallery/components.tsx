@@ -63,6 +63,8 @@ import { Example as Example59 } from "./examples/tornado-chart";
 import { Example as Example60 } from "./examples/dcf-report";
 import { Example as Example61 } from "./examples/dcf-assumptions-form";
 import { Example as Example62 } from "./examples/lbo-report";
+import { Example as Example63 } from "./examples/statement-sensitivity";
+import { Example as Example64 } from "./examples/goal-seek-form";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -127,6 +129,8 @@ const examples = {
   "dcf-report": Example60,
   "dcf-assumptions-form": Example61,
   "lbo-report": Example62,
+  "statement-sensitivity": Example63,
+  "goal-seek-form": Example64,
 };
 export function ComponentDemo({
   name,
