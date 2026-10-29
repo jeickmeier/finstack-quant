@@ -113,6 +113,7 @@ export async function generate(repo = repoRoot) {
           "vm_result",
           "csa_spec",
           "merton_model",
+          "arbitrage_report",
           "altman_z_score_input",
           "altman_z_prime_input",
           "altman_z_double_prime_input",

@@ -294,6 +294,13 @@ export const importHarnesses = {
     Promise.all([import("@/hooks/models/use-cube-smile/use-cube-smile")]).then(
       (modules) => ({ name: "use-cube-smile", modules: modules.length }),
     ),
+  "use-check-surface": () =>
+    Promise.all([
+      import("@/hooks/models/use-check-surface/use-check-surface"),
+    ]).then((modules) => ({
+      name: "use-check-surface",
+      modules: modules.length,
+    })),
   "use-migration-matrix": () =>
     Promise.all([
       import("@/hooks/models/use-migration-matrix/use-migration-matrix"),
@@ -1496,6 +1503,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/altman_z_score_input"),
     ]).then((modules) => ({
       name: "contract-altman-z-score-input",
+      modules: modules.length,
+    })),
+  "contract-arbitrage-report": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/arbitrage_report.json"),
+      import("@/lib/finstack/generated/types/arbitrage_report"),
+      import("@/lib/finstack/generated/meta/arbitrage_report"),
+    ]).then((modules) => ({
+      name: "contract-arbitrage-report",
       modules: modules.length,
     })),
   "contract-merton-model": () =>

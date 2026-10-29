@@ -45,6 +45,20 @@ class VolCube extends facade.core.VolCube {
     return handle;
   }
 }
+let volSurfaceConstructed = 0,
+  volSurfaceFreed = 0;
+class VolSurface extends facade.core.VolSurface {
+  static fromJson(json) {
+    const handle = super.fromJson(json);
+    volSurfaceConstructed++;
+    const free = handle.free.bind(handle);
+    handle.free = () => {
+      free();
+      volSurfaceFreed++;
+    };
+    return handle;
+  }
+}
 let fxConstructed = 0,
   fxFreed = 0;
 class FxDeltaVolSurface extends facade.core.FxDeltaVolSurface {
@@ -314,6 +328,7 @@ const service = createService({
     MarketContext,
     Money,
     VolCube,
+    VolSurface,
   },
   analytics: { ...facade.analytics, Performance },
   portfolio: { ...facade.portfolio, Portfolio },
@@ -366,6 +381,8 @@ expose(
       cubeConstructed,
       cubeFreed,
       cubeJson,
+      volSurfaceConstructed,
+      volSurfaceFreed,
       moneyConstructed,
       moneyFreed,
       performanceConstructed,

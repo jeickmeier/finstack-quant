@@ -455,6 +455,11 @@
     "schema": "schemas/altman_z_score_input.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/arbitrage_report.schema.json",
+    "schema": "schemas/arbitrage_report.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json",
     "source": "finstack-quant/models/schemas/models/1/merton_model.schema.json",
     "schema": "schemas/merton_model.json"

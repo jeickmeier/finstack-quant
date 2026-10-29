@@ -868,6 +868,16 @@ export interface CubeSmile {
   /** Repaired vols aligned with the strikes; null when no repair was requested. */
   readonly repaired: number[] | null;
 }
+/** A stored Black lognormal strike-axis surface and host-supplied forwards for models.volatility.checkSurface. */
+export interface CheckSurfaceRequest {
+  readonly surface: StoredSurfaceWire;
+  /** Forward prices in the surface's strike units: one to broadcast or one per expiry. Host-supplied only; Rust rejects a missing, non-positive or mis-sized list. */
+  readonly forwards: readonly number[];
+  /** Non-negative tolerance in total-variance units; omitted leaves Rust's DEFAULT_ARBITRAGE_TOLERANCE. */
+  readonly tolerance?: number | null;
+}
+/** The native butterfly, calendar-spread and local-vol density report, violations most severe first. */
+export type ArbitrageReport = modelsWire.ArbitrageReport;
 /** A labelled rating transition matrix: rows and columns share one label order, the last label absorbing (TransitionMatrix.fromLabeled). */
 export interface MigrationMatrixRequest {
   /** Rating labels in row and column order; the last is the absorbing default state. */
@@ -1143,6 +1153,10 @@ export interface ModelsApi {
   cubeSlice(request: CubeSliceRequest): Promise<Envelope<CubeSlice>>;
   /** core.VolCube.fromJson + paramsAt/forwardAt + models.volatility.SabrParameters.fromJson + SabrSmile generateSmile, validateNoArbitrage and (when requested) repairArbitrage. */
   cubeSmile(request: CubeSmileRequest): Promise<Envelope<CubeSmile>>;
+  /** core.VolSurface.fromJson + models.volatility.checkSurface with every check enabled and the supplied forwards (and tolerance, when given); the handle is freed. */
+  checkSurface(
+    request: CheckSurfaceRequest,
+  ): Promise<Envelope<ArbitrageReport>>;
   /** models.credit.migration.TransitionMatrix.fromLabeled + toRows, defaultProbabilities, horizon and the scale's labels; every handle (including the scale getter's) is freed. */
   migrationMatrix(
     request: MigrationMatrixRequest,

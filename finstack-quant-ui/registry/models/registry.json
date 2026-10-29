@@ -148,6 +148,31 @@
       }
     },
     {
+      "name": "use-check-surface",
+      "type": "registry:hook",
+      "title": "useCheckSurface",
+      "description": "Checks a stored volatility surface for static arbitrage with host-supplied forwards through the WASM worker.",
+      "docs": "core.VolSurface.fromJson of the canonical stored surface, then models.volatility.checkSurface with every check enabled (butterfly, calendar spread, local-vol density), the supplied forward prices (one to broadcast or one per expiry, in the surface strike units) and the tolerance only when supplied (Rust DEFAULT_ARBITRAGE_TOLERANCE otherwise); the handle is freed. Keyed on the complete surface, forwards and tolerance and the worker session; null means no request. Rust rejects normal-quoted, shifted-Black and tenor-axis surfaces and missing or mis-sized forwards with a validation error, returned unchanged. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "hooks/use-check-surface/use-check-surface.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-check-surface/use-check-surface.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "fx-surface-chart",
       "type": "registry:component",
       "title": "FX surface chart",
@@ -209,6 +234,43 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "surface-arbitrage-badge",
+      "type": "registry:component",
+      "title": "Surface arbitrage badge",
+      "description": "Badge and popover of a stored volatility surface native static-arbitrage report: passed, violations by type and severity, not checked, or forwards not supplied.",
+      "docs": "Runs models.volatility.checkSurface (through useCheckSurface) on a canonical stored surface with host-supplied forwards (one to broadcast or one per expiry, in the surface strike units; never inferred) and an optional tolerance. The badge shows Passed, the violation count, Not checked (the native error, such as a normal-quoted, shifted-Black or tenor-axis surface Rust does not check) or Forwards not supplied (no request is made). The popover lists the returned counts by type and severity and every violation (type, severity, expiry, adjacent expiry, strike, magnitude in total variance, suggested fix, description) in the order Rust returned them. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "components/surface-arbitrage-badge/surface-arbitrage-badge.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/surface-arbitrage-badge/surface-arbitrage-badge.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/finstack-surface",
+        "@finstack/contract-arbitrage-report",
+        "@finstack/use-check-surface",
+        "badge",
+        "button",
+        "popover"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }

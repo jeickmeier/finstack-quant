@@ -1271,6 +1271,32 @@
       }
     },
     {
+      "id": "surface-arbitrage-badge",
+      "route": "returned-report",
+      "convention": "Returned ArbitrageReport of a stored surface (core.VolSurface.fromJson) with every check enabled and host-supplied forwards in strike units (one broadcast or one per expiry; never inferred, and no request without them); the tolerance is sent only when supplied. Counts by type and severity and the violations as returned, most severe first; a convention Rust does not check (normal, shifted Black, tenor axis) shows its native error as not checked.",
+      "api": {
+        "name": "models.volatility.checkSurface",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "VolatilityNamespace",
+        "member": "checkSurface",
+        "inputs": [
+          {
+            "name": "surface",
+            "type": "VolSurface",
+            "optional": false
+          },
+          {
+            "name": "config",
+            "type": "generated.models.ArbitrageCheckConfig | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.models.ArbitrageReport",
+        "declaration": "/**\n   * Run the configured butterfly, calendar-spread and local-vol density checks on a volatility surface.\n   * @param surface - `core.VolSurface` handle of unshifted Black lognormal volatilities on a strike axis (expiries in years, strikes in price units); it is read, not modified.\n   * @param config - `ArbitrageCheckConfig` as an object or JSON text. Every field is optional and an omitted one takes its Rust default: `check_butterfly`, `check_calendar_spread` and `check_local_vol_density` (default `true`); `forward_prices` (one finite positive forward to broadcast or one per expiry, required while any check is enabled); `tolerance` (non-negative, total-variance units, default `DEFAULT_ARBITRAGE_TOLERANCE` = 1e-10); `min_severity` (`\"negligible\"` default, `\"minor\"`, `\"major\"`, `\"critical\"`). Unknown fields are rejected.\n   * @returns The `ArbitrageReport` object (`vol_surface_id`, `violations` sorted most severe first, `passed`, `counts_by_type`, `counts_by_severity`).\n   * @throws Error - Throws a `validation` error if `config` has an unknown or mistyped field, the forwards are missing while a check is enabled, non-finite, non-positive or of the wrong length, the tolerance is negative or non-finite, or the surface is normal-quoted, shifted-Black or on a tenor axis.\n   */\n  checkSurface(\n    surface: VolSurface,\n    config: generated.models.ArbitrageCheckConfig | string\n  ): generated.models.ArbitrageReport;",
+        "sha256": "e191f83979476667090efc525ad3e3821188ec5915f0445ffa11bf2a261c1e82"
+      }
+    },
+    {
       "id": "fx-delta-surface",
       "route": "typed",
       "convention": "Annualized Black volatility as decimal; forward is explicit caller input for evaluated samples. The strike grid is Rust-materialized (fx-strike-grid).",

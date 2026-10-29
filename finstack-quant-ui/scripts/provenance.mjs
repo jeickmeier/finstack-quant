@@ -209,6 +209,17 @@ const displays = [
       "SabrSmile of one stored cube node (paramsAt, forwardAt, the node expiry): normal volatility when beta < 1e-4, Black otherwise, as returned. validateNoArbitrage takes an explicit continuously compounded decimal rate; repairArbitrage runs only when the caller supplies its passes. Never routed through a surface check.",
   },
   {
+    id: "surface-arbitrage-badge",
+    api: [
+      "models.volatility.checkSurface",
+      "VolatilityNamespace",
+      "checkSurface",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned ArbitrageReport of a stored surface (core.VolSurface.fromJson) with every check enabled and host-supplied forwards in strike units (one broadcast or one per expiry; never inferred, and no request without them); the tolerance is sent only when supplied. Counts by type and severity and the violations as returned, most severe first; a convention Rust does not check (normal, shifted Black, tenor axis) shows its native error as not checked.",
+  },
+  {
     id: "fx-delta-surface",
     schema: market,
     pointer: "#/properties/fx_delta_vol_surfaces",

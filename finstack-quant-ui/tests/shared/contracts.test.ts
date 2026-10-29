@@ -111,7 +111,7 @@ describe("discovered canonical fixtures", () => {
         expect(validator.parse(example)).toEqual(example);
     }
     // Rust publishes no example for CovenantReport, DatedCovenantReports,
-    // the five credit-scoring inputs, MertonModel, CreditAssessment,
+    // the five credit-scoring inputs, ArbitrageReport, MertonModel, CreditAssessment,
     // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet,
     // ScenarioDiff, SensitivityResult, BridgeChart, ForecastMetrics or
     // VarianceConfig; every other root carries one.
@@ -121,6 +121,7 @@ describe("discovered canonical fixtures", () => {
       "schemas/altman_z_double_prime_input.json",
       "schemas/altman_z_prime_input.json",
       "schemas/altman_z_score_input.json",
+      "schemas/arbitrage_report.json",
       "schemas/merton_model.json",
       "schemas/ohlson_o_score_input.json",
       "schemas/zmijewski_input.json",
