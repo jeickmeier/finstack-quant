@@ -32,7 +32,6 @@ import { budget } from "../shared/budget";
 import { createContext } from "@/workers/services/context";
 import { createScenariosService } from "@/workers/services/scenarios";
 import { createAttributionService } from "@/workers/services/attribution";
-import type { MarketScenarioDraft } from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
 import marketScenarios from "../scenarios/application/cases.json";
 const bondDisplay = formatRawMoney(fixture.result.value);
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
@@ -121,6 +120,10 @@ beforeEach(() => {
         return unwrap(await scenarioService.applyMarketScenario(request));
       case "horizonReturn":
         return unwrap(await scenarioService.horizonReturn(request));
+      case "validateScenarioSpec":
+        return unwrap(await scenarioService.validateScenarioSpec(request));
+      case "listBuiltinTemplateMetadata":
+        return unwrap(await scenarioService.listBuiltinTemplateMetadata());
       case "attributePnlMany":
         return unwrap(await attributionService.attributePnlMany(request));
       case "defaultWaterfallOrder":
@@ -843,7 +846,7 @@ it(
       <FinstackQueryProvider>
         <PricingWorkbench
           defaultRequest={fixture.request}
-          marketScenario={roll.draft as MarketScenarioDraft}
+          marketScenario={roll.scenarioJson}
         />
       </FinstackQueryProvider>,
     );

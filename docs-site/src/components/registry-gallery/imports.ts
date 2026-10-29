@@ -119,6 +119,41 @@ export const importHarnesses = {
       name: "use-horizon-return",
       modules: modules.length,
     })),
+  "use-scenario-spec-validator": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-scenario-spec-validator/use-scenario-spec-validator"),
+    ]).then((modules) => ({
+      name: "use-scenario-spec-validator",
+      modules: modules.length,
+    })),
+  "use-list-builtin-template-metadata": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-list-builtin-template-metadata/use-list-builtin-template-metadata"),
+    ]).then((modules) => ({
+      name: "use-list-builtin-template-metadata",
+      modules: modules.length,
+    })),
+  "use-build-from-template": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-build-from-template/use-build-from-template"),
+    ]).then((modules) => ({
+      name: "use-build-from-template",
+      modules: modules.length,
+    })),
+  "use-build-template-component": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-build-template-component/use-build-template-component"),
+    ]).then((modules) => ({
+      name: "use-build-template-component",
+      modules: modules.length,
+    })),
+  "use-compose-scenarios": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-compose-scenarios/use-compose-scenarios"),
+    ]).then((modules) => ({
+      name: "use-compose-scenarios",
+      modules: modules.length,
+    })),
   "use-attribute-pnl-many": () =>
     Promise.all([
       import("@/hooks/attribution/use-attribute-pnl-many/use-attribute-pnl-many"),
@@ -1542,6 +1577,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/valuation_result"),
     ]).then((modules) => ({
       name: "contract-valuation-result",
+      modules: modules.length,
+    })),
+  "contract-scenario-spec": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_spec.json"),
+      import("@/lib/finstack/generated/types/scenario_spec"),
+      import("@/lib/finstack/generated/meta/scenario_spec"),
+    ]).then((modules) => ({
+      name: "contract-scenario-spec",
       modules: modules.length,
     })),
   "contract-bridge-chart": () =>

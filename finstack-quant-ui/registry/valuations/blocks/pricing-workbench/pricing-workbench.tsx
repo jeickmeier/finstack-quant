@@ -29,7 +29,6 @@ import {
   useMarketScenarioSession,
 } from "./market-scenario-panel";
 import { AttributionResults, useAttributionSession } from "./attribution-panel";
-import type { MarketScenarioDraft } from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
 import type { CalibrationFitChartProps } from "@/components/finstack/calibration/components/calibration-fit-chart/calibration-fit-chart";
 import { MeasuresGrid } from "@/components/finstack/valuations/components/measures-grid/measures-grid";
 import {
@@ -84,8 +83,8 @@ export function PricingWorkbench({
     /** Registry metric ids valued on the tranche by trancheMetrics; omitted means none. */
     trancheMetrics?: readonly string[];
   };
-  /** Initial market scenario draft for the "Market scenario" tab; it is applied only on request. Defaults to an empty scenario. */
-  marketScenario?: MarketScenarioDraft;
+  /** Initial ScenarioSpec JSON for the "Market scenario" tab; it is applied only on request. Defaults to an empty scenario. */
+  marketScenario?: string;
   surfaceOptions?: MarketContextBrowserProps["surfaceOptions"];
   cubeOptions?(
     cube: MarketContextStateWire["vol_cubes"][number],

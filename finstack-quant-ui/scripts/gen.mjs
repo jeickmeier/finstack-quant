@@ -97,6 +97,7 @@ export async function generate(repo = repoRoot) {
           "check_suite_spec",
           "rollup_spec",
           "scenario_set",
+          "scenario_spec",
           "scenario_diff",
           "scenario_grid",
           "oas_config",

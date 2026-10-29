@@ -1449,6 +1449,30 @@
       }
     },
     {
+      "id": "market-scenario-builder",
+      "route": "schema",
+      "convention": "Canonical ScenarioSpec wire fields; templates, components, composition and added operations are returned by Rust, template metadata is shown as returned and template ids are placeholders the user maps to market ids.",
+      "api": {
+        "name": "scenarios.listBuiltinTemplateMetadata",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ScenariosNamespace",
+        "member": "listBuiltinTemplateMetadata",
+        "inputs": [],
+        "returns": "TemplateMetadata[]",
+        "declaration": "/**\n   * Get typed metadata for all built-in templates.\n   * @returns Metadata objects in deterministic registry order.\n   * @throws Error - Rejects if the embedded template registry cannot be parsed and validated, or if its metadata cannot be serialized to JSON.\n   */\n  listBuiltinTemplateMetadata(): TemplateMetadata[];",
+        "sha256": "afcd85b4fa978229861c051a7b26fdc8cca66b436371476f9efbd646040092f4"
+      },
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/scenarios/schemas/scenarios/1/scenario_spec.schema.json",
+          "sha256": "4e82c17192a03307d0baa7ff19899b77884c0751717d6db0d3789e8abdf92a0f",
+          "description": "Bare scenario specification: the ordered operations the scenario engine applies."
+        }
+      ]
+    },
+    {
       "id": "market-scenario-report",
       "route": "returned-report",
       "convention": "Returned ApplicationReport counters, applied shocks, time roll with carry and warnings; nothing summed or converted. The workbench prices the shocked market at the returned valuation date with the base model and metrics and shows both valuations; no P&L is computed.",

@@ -500,6 +500,11 @@
     "schema": "schemas/valuation_result.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
+    "source": "finstack-quant/scenarios/schemas/scenarios/1/scenario_spec.schema.json",
+    "schema": "schemas/scenario_spec.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/bridge_chart.schema.json",
     "schema": "schemas/bridge_chart.json"

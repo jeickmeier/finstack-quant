@@ -63,8 +63,12 @@
     "portfolio.scenarioPnlBatch",
     "portfolio.valuePortfolio",
     "scenarios.applyScenario",
+    "scenarios.buildFromTemplate",
+    "scenarios.buildTemplateComponent",
+    "scenarios.composeScenarios",
     "scenarios.computeHorizonReturn",
     "scenarios.horizonResultExplainText",
+    "scenarios.listBuiltinTemplateMetadata",
     "scenarios.operationSpecTimeRollForward",
     "scenarios.parallelBpMany",
     "scenarios.parseScenarioSpec",
@@ -118,11 +122,7 @@
     "covenants.lboStandard": "sd-covenant-engine-editor",
     "covenants.projectFinance": "sd-covenant-engine-editor",
     "covenants.realEstate": "sd-covenant-engine-editor",
-    "covenants.validateCovenantEngineJson": "sd-covenant-engine-editor",
-    "scenarios.buildFromTemplate": "SCN-3",
-    "scenarios.buildTemplateComponent": "SCN-3",
-    "scenarios.composeScenarios": "SCN-3",
-    "scenarios.listBuiltinTemplateMetadata": "SCN-3"
+    "covenants.validateCovenantEngineJson": "sd-covenant-engine-editor"
   },
   "excluded": {
     "calibration.calibrationStepBaseCorrelation": "schema-form",

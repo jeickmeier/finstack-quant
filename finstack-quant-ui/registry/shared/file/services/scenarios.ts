@@ -13,6 +13,10 @@ export type ScenariosNative = {
     | "applyScenario"
     | "computeHorizonReturn"
     | "horizonResultExplainText"
+    | "listBuiltinTemplateMetadata"
+    | "buildFromTemplate"
+    | "buildTemplateComponent"
+    | "composeScenarios"
   >;
 };
 /** ScenariosApi over the scenarios facade namespace and the shared market cache. */
@@ -94,6 +98,26 @@ export function createScenariosService(
         );
         return { report, explain: api.horizonResultExplainText(report) };
       });
+    },
+    validateScenarioSpec(json) {
+      return context.result(() => JSON.stringify(api.parseScenarioSpec(json)));
+    },
+    listBuiltinTemplateMetadata() {
+      return context.result(() => api.listBuiltinTemplateMetadata());
+    },
+    buildFromTemplate(templateId) {
+      return context.result(() => api.buildFromTemplate(templateId));
+    },
+    buildTemplateComponent(request) {
+      return context.result(() =>
+        api.buildTemplateComponent(request.templateId, request.componentId),
+      );
+    },
+    composeScenarios(specJsons) {
+      // Each text is parsed for transport only; Rust validates and composes.
+      return context.result(() =>
+        api.composeScenarios(specJsons.map((json) => JSON.parse(json))),
+      );
     },
   };
 }

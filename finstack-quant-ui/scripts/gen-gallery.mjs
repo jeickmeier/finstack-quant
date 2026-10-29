@@ -34,6 +34,7 @@ const sources = {
   cashflows: "tests/valuations/cashflows/cases.json",
   marketScenario: "tests/scenarios/application/cases.json",
   horizonReturn: "tests/scenarios/horizon/cases.json",
+  scenarioTemplates: "tests/scenarios/templates/cases.json",
   pnlAttribution: "tests/attribution/cases.json",
   performance: "tests/analytics/explicit.json",
   benchmark: "tests/analytics/benchmark.json",
