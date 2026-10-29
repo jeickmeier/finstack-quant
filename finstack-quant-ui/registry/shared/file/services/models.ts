@@ -3,10 +3,11 @@ import { serializeHost } from "@/lib/finstack/codec.mjs";
 import type {
   CubeSlice,
   FxStrikeSurface,
+  MigrationMatrixRequest,
   ModelsApi,
 } from "../finstack-contract";
 import type { ServiceContext } from "./context";
-/** models.volatility evaluators and the core surface handles they sample. */
+/** models.volatility evaluators, the core surface handles they sample and models.credit.migration. */
 export type ModelsNative = {
   core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube">;
   models: {
@@ -23,13 +24,44 @@ export type ModelsNative = {
       | "SabrParameters"
       | "SabrSmile"
     >;
+    credit: {
+      migration: Pick<
+        typeof models.credit.migration,
+        "TransitionMatrix" | "GeneratorMatrix" | "project"
+      >;
+    };
   };
 };
+type TransitionMatrix = InstanceType<
+  ModelsNative["models"]["credit"]["migration"]["TransitionMatrix"]
+>;
+/** Labels and default state of a matrix's scale; the getter returns a fresh handle, freed here. */
+function scaleOf(matrix: TransitionMatrix) {
+  const scale = matrix.scale;
+  try {
+    return {
+      labels: scale.labels(),
+      defaultState: scale.defaultState() ?? null,
+    };
+  } finally {
+    scale.free();
+  }
+}
+const orNull = (values: Float64Array | undefined) =>
+  values === undefined ? null : Array.from(values);
 /** ModelsApi over the models facade namespace. */
 export function createModelsService(
   native: ModelsNative,
   context: ServiceContext,
 ): ModelsApi {
+  const migration = native.models.credit.migration;
+  const labelled = (request: MigrationMatrixRequest) =>
+    migration.TransitionMatrix.fromLabeled(
+      request.labels,
+      request.labels,
+      request.rows.map((row) => [...row]),
+      request.horizon,
+    );
   return {
     sampleCube(request) {
       return context.result(() => {
@@ -176,6 +208,60 @@ export function createModelsService(
           }
         } finally {
           cube.free();
+        }
+      });
+    },
+    migrationMatrix(request) {
+      return context.result(() => {
+        const matrix = labelled(request);
+        try {
+          return {
+            ...scaleOf(matrix),
+            horizon: matrix.horizon,
+            rows: matrix.toRows(),
+            defaultProbabilities: orNull(matrix.defaultProbabilities()),
+          };
+        } finally {
+          matrix.free();
+        }
+      });
+    },
+    migrationProjection(request) {
+      return context.result(() => {
+        const matrix = labelled(request);
+        try {
+          // An omitted tolerance stays unset so Rust applies its default.
+          const generator = migration.GeneratorMatrix.fromTransitionMatrix(
+            matrix,
+            request.roundTripTol ?? undefined,
+          );
+          try {
+            return {
+              ...scaleOf(matrix),
+              generator: {
+                rows: generator.toRows(),
+                roundTripError: generator.roundTripError,
+                regularizationL1: generator.regularizationL1,
+              },
+              projections: request.horizons.map((t) => {
+                const projected = migration.project(generator, t);
+                try {
+                  return {
+                    horizon: projected.horizon,
+                    defaultProbabilities: orNull(
+                      projected.defaultProbabilities(),
+                    ),
+                  };
+                } finally {
+                  projected.free();
+                }
+              }),
+            };
+          } finally {
+            generator.free();
+          }
+        } finally {
+          matrix.free();
         }
       });
     },

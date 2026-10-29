@@ -349,6 +349,12 @@
       "worker": "host"
     },
     {
+      "name": "transition-matrix-heatmap",
+      "type": "registry:component",
+      "docs": "Display-only view of the results returned by useMigrationMatrix (models.credit.migration.TransitionMatrix.fromLabeled) and useMigrationProjection (GeneratorMatrix.fromTransitionMatrix, then models.credit.migration.project per horizon). Labels and the default state come from the matrix's RatingScale. The transition and generator matrices are heatmaps (origin by destination, scale order); probabilities use the colour domain [0, 1] and the generator the extent of its intensities, centred on zero when the negative diagonal and positive off-diagonals straddle it. The generator's round-trip error and L1 regularization are stamped beside it; cumulative default probabilities are drawn per origin state against the requested horizons. A view control switches every section to tables. A projection error (for example a round-trip tolerance Rust rejects) is shown inline while the matrix stays visible. Values are decimals as Rust returned them; nothing is computed. Accepts matrix, loading, error, projection, projectionLoading, projectionError, initialView, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "financial-model-editor",
       "type": "registry:component",
       "docs": "Edit explicit FinancialModelSpec fields from the generated Rust schema. Native WASM validates and canonicalizes the model; formula fields show the opaque native parse preview. Requires FinstackQueryProvider and remounting for a new document.",
@@ -492,6 +498,14 @@
     },
     {
       "name": "use-cube-smile",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-migration-matrix",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-migration-projection",
       "type": "registry:hook"
     },
     {
@@ -987,6 +1001,10 @@
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
       "sha256": "854fb65e7217219f57c52658e1f2e3b14cfab5884a32f726734edca87650e9eb"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/credit/migration.json",
+      "sha256": "71f1850a9c2cf9019088541839885698df210aa89ec8bb8bae153c68da2b48e8"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/gallery.json",

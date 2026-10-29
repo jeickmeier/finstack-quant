@@ -170,6 +170,29 @@ test("portfolio-metrics by position", async ({ page }) => {
     "portfolio-metrics-by-position.png",
   );
 });
+test("transition-matrix-heatmap cumulative default probability", async ({
+  page,
+}) => {
+  const item = await open(
+    page,
+    "transition-matrix-heatmap",
+    "light",
+    "comfortable",
+  );
+  // The four item baselines stop inside the generator heatmap, above this section.
+  const cumulative = item.getByRole("region", {
+    name: "Cumulative default probability",
+    exact: true,
+  });
+  await expect(
+    cumulative.getByRole("img", {
+      name: "Cumulative default probability by horizon",
+    }),
+  ).toBeVisible();
+  await expect(cumulative).toHaveScreenshot(
+    "transition-matrix-heatmap-cumulative.png",
+  );
+});
 test("every nonvisual item imports without initializing WASM", async ({
   page,
 }) => {

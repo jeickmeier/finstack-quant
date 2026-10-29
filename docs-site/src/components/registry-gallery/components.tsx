@@ -44,6 +44,7 @@ import { Example as Example40 } from "./examples/covenant-compliance";
 import { Example as Example41 } from "./examples/portfolio-summary";
 import { Example as Example42 } from "./examples/positions-table";
 import { Example as Example43 } from "./examples/portfolio-metrics";
+import { Example as Example44 } from "./examples/transition-matrix-heatmap";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -89,6 +90,7 @@ const examples = {
   "portfolio-summary": Example41,
   "positions-table": Example42,
   "portfolio-metrics": Example43,
+  "transition-matrix-heatmap": Example44,
 };
 export function ComponentDemo({
   name,
