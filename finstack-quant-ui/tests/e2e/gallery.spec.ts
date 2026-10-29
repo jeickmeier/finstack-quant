@@ -268,6 +268,21 @@ test("portfolio-risk-report risk budget", async ({ page }) => {
   await expect(budget.getByRole("table")).toBeVisible();
   await expect(budget).toHaveScreenshot("portfolio-risk-report-budget.png");
 });
+test("portfolio-risk-report factor contributions", async ({ page }) => {
+  const item = await open(
+    page,
+    "portfolio-risk-report",
+    "light",
+    "comfortable",
+  );
+  // Below the preview cut: the host-parity book's factor decomposition.
+  const factors = item.getByRole("region", {
+    name: "Factor contributions",
+    exact: true,
+  });
+  await expect(factors.getByRole("table").first()).toBeVisible();
+  await expect(factors).toHaveScreenshot("portfolio-risk-report-factors.png");
+});
 test("portfolio-risk-report historical stress attribution", async ({
   page,
 }) => {

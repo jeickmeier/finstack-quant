@@ -53,6 +53,7 @@ export type ModelsNative = {
         | "positionComponentVar"
         | "evaluateRiskBudget"
         | "buildStressAttribution"
+        | "decomposeFactors"
       >;
     };
   };
@@ -499,6 +500,16 @@ export function createModelsService(
               : null,
         };
       });
+    },
+    decomposeFactors(request) {
+      return context.result(() =>
+        // The JSON passes through; an omitted risk measure stays unset (Rust: variance).
+        native.models.factor.risk.decomposeFactors(
+          request.sensitivitiesJson,
+          request.covarianceJson,
+          request.riskMeasureJson ?? undefined,
+        ),
+      );
     },
   };
 }

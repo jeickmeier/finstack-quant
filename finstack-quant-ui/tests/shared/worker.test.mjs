@@ -112,6 +112,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "scenarioPnlBatch",
     "applyScenarioAndRevalue",
     "portfolioMargin",
+    "computeFactorSensitivities",
     // MarginApi
     "validateSimmSensitivities",
     "simmIm",
@@ -136,6 +137,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "mertonReport",
     "creditScore",
     "positionRisk",
+    "decomposeFactors",
     // StatementsApi
     "validateStatementModel",
     "validateStatementFormula",

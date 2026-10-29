@@ -41,6 +41,8 @@ import type {
   MarginCall,
   PositionRiskDecomposition,
   RiskBudgetResult,
+  RiskDecomposition,
+  SensitivityMatrixJson,
   models,
   statements_analytics,
   valuations,
@@ -540,6 +542,28 @@ export interface PositionRisk {
   /** buildStressAttribution of a historical source's P&L, or its native error; null for a parametric source. */
   stress: Envelope<StressAttribution> | null;
 }
+/** A portfolio factor-sensitivity request over the cached book and market handles; an omitted bump config is left to Rust. */
+export interface FactorSensitivitiesRequest {
+  /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
+  readonly specJson: string;
+  /** MarketContextState JSON bumped per factor; through the shared market handle cache. */
+  readonly marketJson: string;
+  /** FactorDefinition array JSON; every factor must map to market data. */
+  readonly factorsJson: string;
+  /** ISO-8601 valuation date. */
+  readonly asOf: string;
+  /** BumpSizeConfig JSON; omitted uses Rust's 1 bp / 1 % per factor type. */
+  readonly bumpConfigJson?: string | null;
+}
+/** A factor risk decomposition request; an omitted risk measure is left to Rust (variance). */
+export interface DecomposeFactorsRequest {
+  /** Sensitivity-matrix JSON, usually computeFactorSensitivities' result serialized. */
+  readonly sensitivitiesJson: string;
+  /** FactorCovarianceMatrix JSON aligned with the sensitivities' factor ids. */
+  readonly covarianceJson: string;
+  /** RiskMeasure JSON ("variance", "volatility", {"var": {"confidence": 0.99}}, ...). */
+  readonly riskMeasureJson?: string | null;
+}
 /** A portfolio valuation request; omitted options are left to Rust. */
 export interface PortfolioValuationRequest {
   /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
@@ -906,6 +930,10 @@ export interface PortfolioApi {
   portfolioMargin(
     request: PortfolioMarginRequest,
   ): Promise<Envelope<PortfolioMarginResult>>;
+  /** portfolio.computeFactorSensitivities over the cached Portfolio and MarketContext handles: the position-by-factor sensitivity matrix in the base currency. */
+  computeFactorSensitivities(
+    request: FactorSensitivitiesRequest,
+  ): Promise<Envelope<SensitivityMatrixJson>>;
 }
 /** margin: SIMM sensitivity validation and indicative initial margin; CSA presets and validation, variation margin and margin calls. */
 export interface MarginApi {
@@ -965,6 +993,10 @@ export interface ModelsApi {
   creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;
   /** models.factor.risk parametric or historical VaR/ES decomposition, evaluateRiskBudget over positionComponentVar per position, and buildStressAttribution of a historical source; the budget and stress attribution keep their own native errors. */
   positionRisk(request: PositionRiskRequest): Promise<Envelope<PositionRisk>>;
+  /** models.factor.risk.decomposeFactors: the parametric factor and position risk decomposition of a sensitivity matrix under a factor covariance. */
+  decomposeFactors(
+    request: DecomposeFactorsRequest,
+  ): Promise<Envelope<RiskDecomposition>>;
 }
 /** statements and statements_analytics: model validation, evaluation and diagnostics. */
 export interface StatementsApi {
