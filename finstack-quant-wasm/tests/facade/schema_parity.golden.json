@@ -2014,6 +2014,13 @@
             "bytes": 102983
           },
           {
+            "path": "schemas/scenarios/1/scenario_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
+            "type_name": "ScenarioSpec",
+            "kind": "input",
+            "bytes": 100598
+          },
+          {
             "path": "schemas/scenarios/1/template_metadata.schema.json",
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
             "type_name": "TemplateMetadata",
@@ -4510,6 +4517,14 @@
             "type_name": "ScenarioEnvelope",
             "kind": "input",
             "bytes": 102983
+          },
+          {
+            "domain": "scenarios",
+            "path": "schemas/scenarios/1/scenario_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
+            "type_name": "ScenarioSpec",
+            "kind": "input",
+            "bytes": 100598
           },
           {
             "domain": "scenarios",
