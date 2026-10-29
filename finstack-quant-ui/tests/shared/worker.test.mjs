@@ -111,6 +111,11 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     // MarginApi
     "validateSimmSensitivities",
     "simmIm",
+    "csaPreset",
+    "validateCsa",
+    "vm",
+    "marginCalls",
+    "marginCallDates",
     // CalibrationApi
     "validateCalibration",
     "dryRun",

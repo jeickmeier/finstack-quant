@@ -53,6 +53,8 @@ import { Example as Example49 } from "./examples/horizon-return-report";
 import { Example as Example50 } from "./examples/scenario-pnl-table";
 import { Example as Example51 } from "./examples/benchmark-report";
 import { Example as Example52 } from "./examples/merton-calculator";
+import { Example as Example53 } from "./examples/csa-editor";
+import { Example as Example54 } from "./examples/margin-call-table";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -107,6 +109,8 @@ const examples = {
   "scenario-pnl-table": Example50,
   "benchmark-report": Example51,
   "merton-calculator": Example52,
+  "csa-editor": Example53,
+  "margin-call-table": Example54,
 };
 export function ComponentDemo({
   name,

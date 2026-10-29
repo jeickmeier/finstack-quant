@@ -108,6 +108,8 @@ export async function generate(repo = repoRoot) {
           "scenario_revalue_view",
           "simm_sensitivities_json",
           "im_result",
+          "vm_result",
+          "csa_spec",
           "merton_model",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )

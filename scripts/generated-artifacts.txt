@@ -200,6 +200,7 @@ finstack-quant-ui/src/generated/meta/composite.ts
 finstack-quant-ui/src/generated/meta/convertible_bond.ts
 finstack-quant-ui/src/generated/meta/covenant_report.ts
 finstack-quant-ui/src/generated/meta/credit_default_swap.ts
+finstack-quant-ui/src/generated/meta/csa_spec.ts
 finstack-quant-ui/src/generated/meta/dated_covenant_reports.ts
 finstack-quant-ui/src/generated/meta/deposit.ts
 finstack-quant-ui/src/generated/meta/discounted_cash_flow.ts
@@ -261,6 +262,7 @@ finstack-quant-ui/src/generated/meta/trs_equity.ts
 finstack-quant-ui/src/generated/meta/trs_fixed_income_index.ts
 finstack-quant-ui/src/generated/meta/valuation_result.ts
 finstack-quant-ui/src/generated/meta/variance_swap.ts
+finstack-quant-ui/src/generated/meta/vm_result.ts
 finstack-quant-ui/src/generated/meta/volatility_index_future.ts
 finstack-quant-ui/src/generated/meta/volatility_index_future_option.ts
 finstack-quant-ui/src/generated/meta/xccy_swap.ts
@@ -302,6 +304,7 @@ finstack-quant-ui/src/generated/schemas/composite.json
 finstack-quant-ui/src/generated/schemas/convertible_bond.json
 finstack-quant-ui/src/generated/schemas/covenant_report.json
 finstack-quant-ui/src/generated/schemas/credit_default_swap.json
+finstack-quant-ui/src/generated/schemas/csa_spec.json
 finstack-quant-ui/src/generated/schemas/dated_covenant_reports.json
 finstack-quant-ui/src/generated/schemas/deposit.json
 finstack-quant-ui/src/generated/schemas/discounted_cash_flow.json
@@ -362,6 +365,7 @@ finstack-quant-ui/src/generated/schemas/trs_equity.json
 finstack-quant-ui/src/generated/schemas/trs_fixed_income_index.json
 finstack-quant-ui/src/generated/schemas/valuation_result.json
 finstack-quant-ui/src/generated/schemas/variance_swap.json
+finstack-quant-ui/src/generated/schemas/vm_result.json
 finstack-quant-ui/src/generated/schemas/volatility_index_future.json
 finstack-quant-ui/src/generated/schemas/volatility_index_future_option.json
 finstack-quant-ui/src/generated/schemas/xccy_swap.json
@@ -401,6 +405,7 @@ finstack-quant-ui/src/generated/types/composite.ts
 finstack-quant-ui/src/generated/types/convertible_bond.ts
 finstack-quant-ui/src/generated/types/covenant_report.ts
 finstack-quant-ui/src/generated/types/credit_default_swap.ts
+finstack-quant-ui/src/generated/types/csa_spec.ts
 finstack-quant-ui/src/generated/types/dated_covenant_reports.ts
 finstack-quant-ui/src/generated/types/deposit.ts
 finstack-quant-ui/src/generated/types/discounted_cash_flow.ts
@@ -462,6 +467,7 @@ finstack-quant-ui/src/generated/types/trs_equity.ts
 finstack-quant-ui/src/generated/types/trs_fixed_income_index.ts
 finstack-quant-ui/src/generated/types/valuation_result.ts
 finstack-quant-ui/src/generated/types/variance_swap.ts
+finstack-quant-ui/src/generated/types/vm_result.ts
 finstack-quant-ui/src/generated/types/volatility_index_future.ts
 finstack-quant-ui/src/generated/types/volatility_index_future_option.ts
 finstack-quant-ui/src/generated/types/xccy_swap.ts

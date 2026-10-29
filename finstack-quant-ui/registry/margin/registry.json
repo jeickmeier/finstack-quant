@@ -161,6 +161,206 @@
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
+    },
+    {
+      "name": "csa-editor",
+      "type": "registry:component",
+      "title": "CSA editor",
+      "description": "Edits a Credit Support Annex with the generated form, optionally starting from a Rust regulatory preset.",
+      "docs": "Composes schema-form over the generated csa_spec contract (started from defaultJson, else the Rust schema example). When loadPreset is supplied, a preset bar loads the Rust USD or EUR regulatory CSA (margin.csaSpecUsdRegulatory, csaSpecEurRegulatory) or regulatory terms for a typed currency, CSA id and collateral curve (margin.csaSpecRegulatory); the inputs start empty and a rejected preset shows the native error. Validation, presets and every term are native: connect validate to useCsaValidator, loadPreset to useCsaPreset and onSubmit to the useVm, useMarginCalls or useMarginCallDates request. Accepts defaultJson, validate, onSubmit, loadPreset and density props.",
+      "files": [
+        {
+          "path": "components/csa-editor/csa-editor.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/margin/components/csa-editor/csa-editor.tsx"
+        },
+        {
+          "path": "components/csa-editor/csa.ts",
+          "type": "registry:component",
+          "target": "components/finstack/margin/components/csa-editor/csa.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/schema-form",
+        "@finstack/field-frame",
+        "@finstack/contract-csa-spec",
+        "@finstack/finstack-codec",
+        "button",
+        "input"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/csa_spec.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "margin-call-table",
+      "type": "registry:component",
+      "title": "Margin call table",
+      "description": "Display of native variation margin: one date's result with Rust's call decision and net margin, a margin-call schedule and the contractual call dates.",
+      "docs": "Display-only view of what useVm, useMarginCalls and useMarginCallDates return. The variation margin section shows the Rust call decision (margin.vmResultRequiresCall) as a badge, the Rust net margin (margin.vmResultNetMargin: post minus collect, positive when the desk posts) in the result's currency, the date and settlement date, and the VmResult money terms (gross exposure, threshold, independent amount, net exposure, collateral balance, unrounded call, MTA, rounding increment, post and collect amounts) as exact money. The margin calls section lists VmCalculator#generateMarginCalls in returned order; the call dates section lists VmCalculator#marginCallDates. Nothing is netted, thresholded or rounded. Accepts vm, calls, callDates, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/margin-call-table/margin-call-table.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/margin/components/margin-call-table/margin-call-table.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "badge"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-csa-validator",
+      "type": "registry:hook",
+      "title": "useCsaValidator",
+      "description": "Validates CSA specification JSON natively and returns its canonical text through the WASM worker.",
+      "docs": "margin.csaSpecValidate (currencies, monetary bounds, calendar lookup, unknown fields), then new margin.VmCalculator(json)#csa serialized: canonical CsaSpec text, or the native error. The handle is freed. Pass it as schema-form's or csa-editor's validate. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-csa-validator/use-csa-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/margin/use-csa-validator/use-csa-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-csa-preset",
+      "type": "registry:hook",
+      "title": "useCsaPreset",
+      "description": "Loads a Rust regulatory CSA preset through the WASM worker.",
+      "docs": "Returns a loader: {kind: \"usd\"} calls margin.csaSpecUsdRegulatory, {kind: \"eur\"} csaSpecEurRegulatory, and {kind: \"regulatory\", currency, id, collateralCurve} csaSpecRegulatory; it resolves to the returned CsaSpec or rejects with the native error (unknown currency, a currency without regulatory terms, an empty id). Pass it as csa-editor's loadPreset. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-csa-preset/use-csa-preset.ts",
+          "type": "registry:hook",
+          "target": "hooks/margin/use-csa-preset/use-csa-preset.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-vm",
+      "type": "registry:hook",
+      "title": "useVm",
+      "description": "Calculates variation margin of one exposure under a CSA through the WASM worker.",
+      "docs": "new margin.VmCalculator(csaJson), then calculate(exposure, postedCollateral, the CSA's own base currency, asOf), with margin.vmResultRequiresCall and vmResultNetMargin on the result: {result, requiresCall, netMargin}. The handle is freed. An invalid CSA, a non-finite amount (a cleared field is NaN) or an unregistered calendar returns the native error unchanged. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-vm/use-vm.ts",
+          "type": "registry:hook",
+          "target": "hooks/margin/use-vm/use-vm.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-margin-calls",
+      "type": "registry:hook",
+      "title": "useMarginCalls",
+      "description": "Runs an exposure series into a native margin-call schedule through the WASM worker.",
+      "docs": "new margin.VmCalculator(csaJson)#generateMarginCalls(exposures, initialCollateral): one MarginCall per date that calls, in the order given; [ISO date, exposure] pairs are in the CSA base currency. The handle is freed. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-margin-calls/use-margin-calls.ts",
+          "type": "registry:hook",
+          "target": "hooks/margin/use-margin-calls/use-margin-calls.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-margin-call-dates",
+      "type": "registry:hook",
+      "title": "useMarginCallDates",
+      "description": "Lists the contractual margin-call dates of a CSA through the WASM worker.",
+      "docs": "new margin.VmCalculator(csaJson)#marginCallDates(start, end): ISO call dates on the CSA calendar at its VM frequency, inclusive. The handle is freed. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-margin-call-dates/use-margin-call-dates.ts",
+          "type": "registry:hook",
+          "target": "hooks/margin/use-margin-call-dates/use-margin-call-dates.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     }
   ]
 }

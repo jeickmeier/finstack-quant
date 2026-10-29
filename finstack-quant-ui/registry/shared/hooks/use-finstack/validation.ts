@@ -13,6 +13,7 @@ export function useNativeValidator<
     | "validateCheckSuiteSpec"
     | "validatePortfolio"
     | "validateSimmSensitivities"
+    | "validateCsa"
     | "validateMertonModel",
 >(operation: K, label: string) {
   const worker = useFinstack();

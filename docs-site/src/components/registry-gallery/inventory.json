@@ -367,6 +367,18 @@
       "worker": "none"
     },
     {
+      "name": "csa-editor",
+      "type": "registry:component",
+      "docs": "Composes schema-form over the generated csa_spec contract (started from defaultJson, else the Rust schema example). When loadPreset is supplied, a preset bar loads the Rust USD or EUR regulatory CSA (margin.csaSpecUsdRegulatory, csaSpecEurRegulatory) or regulatory terms for a typed currency, CSA id and collateral curve (margin.csaSpecRegulatory); the inputs start empty and a rejected preset shows the native error. Validation, presets and every term are native: connect validate to useCsaValidator, loadPreset to useCsaPreset and onSubmit to the useVm, useMarginCalls or useMarginCallDates request. Accepts defaultJson, validate, onSubmit, loadPreset and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "margin-call-table",
+      "type": "registry:component",
+      "docs": "Display-only view of what useVm, useMarginCalls and useMarginCallDates return. The variation margin section shows the Rust call decision (margin.vmResultRequiresCall) as a badge, the Rust net margin (margin.vmResultNetMargin: post minus collect, positive when the desk posts) in the result's currency, the date and settlement date, and the VmResult money terms (gross exposure, threshold, independent amount, net exposure, collateral balance, unrounded call, MTA, rounding increment, post and collect amounts) as exact money. The margin calls section lists VmCalculator#generateMarginCalls in returned order; the call dates section lists VmCalculator#marginCallDates. Nothing is netted, thresholded or rounded. Accepts vm, calls, callDates, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "monte-carlo-diagnostics",
       "type": "registry:component",
       "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat.",
@@ -550,6 +562,26 @@
     },
     {
       "name": "use-simm-sensitivities-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-csa-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-csa-preset",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-vm",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-margin-calls",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-margin-call-dates",
       "type": "registry:hook"
     },
     {
@@ -985,11 +1017,19 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-csa-spec",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-im-result",
       "type": "registry:lib"
     },
     {
       "name": "contract-simm-sensitivities-json",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-vm-result",
       "type": "registry:lib"
     },
     {
@@ -1125,6 +1165,10 @@
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",
       "sha256": "14bb83029ea43f4f60a5fe925f8850558b10a024406339dcbf293a2edda386e0"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/margin/vm.json",
+      "sha256": "59a6c331fbb048496e01bed09d924910c5538f5711efa208e5afa81b0c159152"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/gallery.json",

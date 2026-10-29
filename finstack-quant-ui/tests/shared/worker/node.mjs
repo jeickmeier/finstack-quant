@@ -282,6 +282,20 @@ class SimmCalculator extends facade.margin.SimmCalculator {
     };
   }
 }
+let vmCalculatorConstructed = 0,
+  vmCalculatorFreed = 0;
+class VmCalculator extends facade.margin.VmCalculator {
+  constructor(...args) {
+    // Counted only once Rust accepts the CSA, like every other handle here.
+    super(...args);
+    vmCalculatorConstructed++;
+    const free = this.free.bind(this);
+    this.free = () => {
+      free();
+      vmCalculatorFreed++;
+    };
+  }
+}
 const service = createService({
   initialize: async () => {
     if (workerData.fail)
@@ -303,7 +317,7 @@ const service = createService({
   },
   analytics: { ...facade.analytics, Performance },
   portfolio: { ...facade.portfolio, Portfolio },
-  margin: { ...facade.margin, SimmSensitivities, SimmCalculator },
+  margin: { ...facade.margin, SimmSensitivities, SimmCalculator, VmCalculator },
   models: {
     ...facade.models,
     volatility: {
@@ -368,6 +382,8 @@ expose(
       simmCalculatorFreed,
       // Whether each optional calculator argument was passed at all.
       simmCalculatorArgs: simmCalculatorArgs.map((arg) => arg === undefined),
+      vmCalculatorConstructed,
+      vmCalculatorFreed,
     }),
   },
   nodeEndpoint(parentPort),

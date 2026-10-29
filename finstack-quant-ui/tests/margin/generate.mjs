@@ -82,3 +82,92 @@ await emit(
 console.log(
   `${checking ? "Checked" : "Generated"} ${cases.length} native SIMM results.`,
 );
+// Variation margin under the Rust USD regulatory CSA (zero threshold, USD
+// 500,000 MTA, USD 10,000 rounding, daily calls on the usny calendar): the
+// worker's MarginApi over the raw package (margin.VmCalculator and the CSA and
+// VmResult functions re-export these raw exports unchanged).
+function withCalculator(csaJson, use) {
+  const calculator = new native.VmCalculator(csaJson);
+  try {
+    return use(calculator);
+  } finally {
+    calculator.free();
+  }
+}
+function validateCsa(json) {
+  native.csaSpecValidate(json);
+  return withCalculator(json, (calculator) => JSON.stringify(calculator.csa));
+}
+function vm({ csaJson, exposure, postedCollateral, asOf }) {
+  return withCalculator(csaJson, (calculator) => {
+    const result = calculator.calculate(
+      exposure,
+      postedCollateral,
+      calculator.csa.base_currency,
+      asOf,
+    );
+    return {
+      result,
+      requiresCall: native.vmResultRequiresCall(result),
+      netMargin: native.vmResultNetMargin(result),
+    };
+  });
+}
+const csaJson = JSON.stringify(native.csaSpecUsdRegulatory());
+const vmAsOf = "2024-06-17";
+const vmCases = [
+  // Collect above the MTA, post above the MTA, and an exposure below the MTA.
+  { name: "collect", exposure: 1_000_000, postedCollateral: 0 },
+  { name: "post", exposure: -750_000, postedCollateral: 0 },
+  { name: "below-mta", exposure: 100_000, postedCollateral: 0 },
+];
+const callsRequest = {
+  csaJson,
+  exposures: [
+    ["2024-06-17", 1_000_000],
+    ["2024-06-18", 1_200_000],
+    ["2024-06-20", -500_000],
+    ["2024-06-21", -450_000],
+  ],
+  initialCollateral: 0,
+};
+// 2024-06-19 (Juneteenth) is not a usny business day.
+const datesRequest = { csaJson, start: "2024-06-14", end: "2024-06-28" };
+await emit(
+  new URL("../../src/fixtures/margin/vm.json", import.meta.url),
+  JSON.stringify({
+    description:
+      "Native variation margin under margin.csaSpecUsdRegulatory() on 2024-06-17: the Rust CSA presets, the canonical CSA, three VmResults with Rust's call decision and net margin, a margin-call schedule over four exposures and the contractual call dates from 2024-06-14 to 2024-06-28.",
+    presets: {
+      usd: native.csaSpecUsdRegulatory(),
+      eur: native.csaSpecEurRegulatory(),
+      gbp: native.csaSpecRegulatory("GBP", "CSA-GBP", "GBP-SONIA"),
+    },
+    csaJson,
+    canonical: validateCsa(csaJson),
+    vm: Object.fromEntries(
+      vmCases.map(({ name, exposure, postedCollateral }) => {
+        const request = { csaJson, exposure, postedCollateral, asOf: vmAsOf };
+        return [name, { request, report: vm(request) }];
+      }),
+    ),
+    calls: {
+      request: callsRequest,
+      result: withCalculator(csaJson, (calculator) =>
+        calculator.generateMarginCalls(
+          callsRequest.exposures,
+          callsRequest.initialCollateral,
+        ),
+      ),
+    },
+    callDates: {
+      request: datesRequest,
+      result: withCalculator(csaJson, (calculator) =>
+        calculator.marginCallDates(datesRequest.start, datesRequest.end),
+      ),
+    },
+  }),
+);
+console.log(
+  `${checking ? "Checked" : "Generated"} ${vmCases.length} native variation margin results.`,
+);

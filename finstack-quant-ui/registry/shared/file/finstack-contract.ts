@@ -34,6 +34,9 @@ import type {
   ScenarioPnlBatchItem,
   ScenarioRevalueView,
   ImResult,
+  CsaSpec,
+  VmResult,
+  MarginCall,
   statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
@@ -618,6 +621,52 @@ export interface SimmImRequest {
   /** Margin period of risk in business days; omitted leaves the registry default. */
   readonly mporDays?: number | null;
 }
+/** A Rust regulatory CSA preset: the canonical USD or EUR CSA, or regulatory terms for any supported currency. */
+export type CsaPresetRequest =
+  | { readonly kind: "usd" }
+  | { readonly kind: "eur" }
+  | {
+      readonly kind: "regulatory";
+      /** ISO-4217 base currency; Rust rejects an unknown one or one without regulatory terms. */
+      readonly currency: string;
+      /** Identifier stamped on the specification; Rust rejects an empty one. */
+      readonly id: string;
+      /** Collateral discounting curve id such as "USD-OIS". */
+      readonly collateralCurve: string;
+    };
+/** One variation-margin calculation under one CSA. */
+export interface VmRequest {
+  /** CsaSpec text; Rust validates it and its base currency is the calculation currency. */
+  readonly csaJson: string;
+  /** Signed mark-to-market in the CSA base currency (positive: the counterparty owes the desk); a cleared field is NaN, never 0. */
+  readonly exposure: number;
+  /** Signed collateral balance in the CSA base currency (positive held, negative posted). */
+  readonly postedCollateral: number;
+  /** ISO calculation date; Rust dates the settlement on the CSA calendar. */
+  readonly asOf: string;
+}
+/** A returned VmResult with Rust's own call decision and net margin. */
+export interface VmReport {
+  readonly result: VmResult;
+  /** margin.vmResultRequiresCall: whether a post or collect amount is non-zero. */
+  readonly requiresCall: boolean;
+  /** margin.vmResultNetMargin: post minus collect in major units of the CSA base currency; positive means the desk posts. */
+  readonly netMargin: number;
+}
+/** An exposure series run into a margin-call schedule under one CSA. */
+export interface MarginCallsRequest {
+  readonly csaJson: string;
+  /** [ISO date, signed exposure in the CSA base currency] pairs, processed in the order given. */
+  readonly exposures: readonly (readonly [string, number])[];
+  /** Collateral balance before the first date, in major units of the CSA base currency. */
+  readonly initialCollateral: number;
+}
+/** Contractual call dates of one CSA between two ISO dates, inclusive. */
+export interface MarginCallDatesRequest {
+  readonly csaJson: string;
+  readonly start: string;
+  readonly end: string;
+}
 /** Explicit cloneable exception data; never Comlink's lossy default thrown-error transfer. */
 export interface ErrorValue {
   name: string;
@@ -721,12 +770,22 @@ export interface PortfolioApi {
     request: ScenarioRevalueRequest,
   ): Promise<Envelope<ScenarioRevalue>>;
 }
-/** margin: SIMM sensitivity validation and indicative initial margin. */
+/** margin: SIMM sensitivity validation and indicative initial margin; CSA presets and validation, variation margin and margin calls. */
 export interface MarginApi {
   /** margin.SimmSensitivities.fromJson + validate + toJson: canonical SimmSensitivitiesJson text; the handle is freed. */
   validateSimmSensitivities(json: string): Promise<Envelope<string>>;
   /** margin.SimmSensitivities.fromJson + new margin.SimmCalculator(version?, mporDays?) + calculateFromSensitivities in the set's base currency; both handles are freed. */
   simmIm(request: SimmImRequest): Promise<Envelope<ImResult>>;
+  /** margin.csaSpecUsdRegulatory, csaSpecEurRegulatory or csaSpecRegulatory(currency, id, collateralCurve): the Rust preset CsaSpec. */
+  csaPreset(request: CsaPresetRequest): Promise<Envelope<CsaSpec>>;
+  /** margin.csaSpecValidate, then new margin.VmCalculator(json)#csa: canonical CsaSpec text; the handle is freed. */
+  validateCsa(json: string): Promise<Envelope<string>>;
+  /** new margin.VmCalculator(csaJson)#calculate in the CSA's own base currency, with margin.vmResultRequiresCall and vmResultNetMargin; the handle is freed. */
+  vm(request: VmRequest): Promise<Envelope<VmReport>>;
+  /** new margin.VmCalculator(csaJson)#generateMarginCalls: one MarginCall per date that calls; the handle is freed. */
+  marginCalls(request: MarginCallsRequest): Promise<Envelope<MarginCall[]>>;
+  /** new margin.VmCalculator(csaJson)#marginCallDates: ISO call dates on the CSA calendar and frequency; the handle is freed. */
+  marginCallDates(request: MarginCallDatesRequest): Promise<Envelope<string[]>>;
 }
 /** calibration: envelope validation, static diagnostics and calibration runs. */
 export interface CalibrationApi {
