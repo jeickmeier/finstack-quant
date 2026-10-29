@@ -30,6 +30,9 @@ import {
 } from "@/hooks/statements/use-evaluate-statement/use-evaluate-statement";
 import { useStatementModelValidator } from "@/hooks/statements/use-statement-model-validator/use-statement-model-validator";
 import { useRollupStatement } from "@/hooks/statements/use-rollup-statement/use-rollup-statement";
+import { useCreditAssessment } from "@/hooks/statements/use-credit-assessment/use-credit-assessment";
+import { usePlSummaryReport } from "@/hooks/statements/use-pl-summary-report/use-pl-summary-report";
+import { CreditAssessmentReport } from "@/components/finstack/statements/components/credit-assessment-report/credit-assessment-report";
 import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import { useLinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
@@ -372,6 +375,21 @@ export function StatementsWorkbench({
       : (model?.id ?? "Financial statements");
   const currency =
     typeof model?.meta?.currency === "string" ? model.meta.currency : null;
+  // Credit assessment and P&L summary read the reported result: the active period and the income lines over every reported period.
+  const creditAssessment = useCreditAssessment(
+    tab === "ratios" && resultJson && activePeriod
+      ? { resultsJson: resultJson, period: activePeriod }
+      : null,
+  );
+  const plSummary = usePlSummaryReport(
+    tab === "ratios" && resultJson && model && sections.income.length
+      ? {
+          resultsJson: resultJson,
+          lineItems: sections.income,
+          periods: model.periods.map((period) => period.id),
+        }
+      : null,
+  );
   const forecastNodes = model
     ? Object.entries(model.nodes).filter(([, node]) => node.forecast)
     : [];
@@ -924,6 +942,20 @@ export function StatementsWorkbench({
                     No calculated metrics are supplied yet. Add one above.
                   </p>
                 )}
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <CreditAssessmentReport
+                    assessment={creditAssessment.data}
+                    loading={creditAssessment.isFetching}
+                    error={creditAssessment.error?.message}
+                    plSummary={
+                      sections.income.length ? plSummary.data : undefined
+                    }
+                    plSummaryLoading={plSummary.isFetching}
+                    plSummaryError={plSummary.error?.message}
+                    currency={currency}
+                    density={density}
+                  />
+                </div>
               </div>
             )}
           </TabsContent>

@@ -23,6 +23,8 @@ export type StatementsNative = {
     | "evaluateScenarioSetWithMarket"
     | "scenarioDiff"
     | "scenarioSetTrace"
+    | "creditAssessment"
+    | "plSummaryReport"
   >;
 };
 /** StatementsApi over the statements and statements_analytics facade namespaces. */
@@ -154,6 +156,23 @@ export function createStatementsService(
         native.statements_analytics.scenarioSetTrace(
           request.scenarioSetJson,
           request.scenario,
+        ),
+      );
+    },
+    creditAssessment(request) {
+      return context.result(() =>
+        native.statements_analytics.creditAssessment(
+          request.resultsJson,
+          request.period,
+        ),
+      );
+    },
+    plSummaryReport(request) {
+      return context.result(() =>
+        native.statements_analytics.plSummaryReport(
+          request.resultsJson,
+          [...request.lineItems],
+          [...request.periods],
         ),
       );
     },

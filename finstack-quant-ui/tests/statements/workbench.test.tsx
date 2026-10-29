@@ -27,6 +27,17 @@ vi.mock(
   "@/components/finstack/statements/components/statement-chart/statement-chart",
   () => ({ StatementChart: () => null }),
 );
+// Figures are drawn by the shared chart in the browser gates; here each one
+// is a labelled placeholder.
+vi.mock(
+  "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    FinstackChart: ({ ariaLabel }: { ariaLabel: string }) => (
+      <div role="img" aria-label={ariaLabel} />
+    ),
+  }),
+);
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -64,6 +75,14 @@ beforeEach(() => {
             arg.metrics,
             arg.periods,
           ),
+        );
+      case "creditAssessment":
+        return native.creditAssessment(arg.resultsJson, arg.period);
+      case "plSummaryReport":
+        return native.plSummaryReport(
+          arg.resultsJson,
+          arg.lineItems,
+          arg.periods,
         );
       default:
         throw new Error(`Unexpected worker call: ${method}`);
@@ -259,6 +278,71 @@ const description = (element: HTMLElement) =>
     .join(" ");
 const lastCall = (method: string) =>
   call.mock.calls.findLast(([name]) => name === method)?.[1];
+
+it("assesses the active period's credit and summarises the income lines natively in Metrics & ratios", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  fireEvent.click(await screen.findByRole("tab", { name: "Metrics & ratios" }));
+  const report = await screen.findByRole("region", {
+    name: "Credit assessment",
+  });
+  // The last reported actual period is active until the user picks another.
+  await waitFor(() =>
+    expect(
+      within(report).getByRole("heading", {
+        level: 3,
+        name: /Credit assessment at/,
+      }).textContent,
+    ).toBe("Credit assessment at 2025Q1"),
+  );
+  const resultsJson = lastCall("creditAssessment").resultsJson;
+  expect(lastCall("creditAssessment")).toEqual({
+    resultsJson,
+    period: "2025Q1",
+  });
+  const income = Object.entries(model.nodes)
+    .filter(([, node]) =>
+      (node as { tags?: string[] }).tags?.includes("income_statement"),
+    )
+    .map(([id]) => id);
+  await waitFor(() =>
+    expect(lastCall("plSummaryReport")).toEqual({
+      resultsJson,
+      lineItems: income,
+      periods: model.periods.map((period) => period.id),
+    }),
+  );
+  expect(
+    within(report)
+      .getByRole("region", { name: "Free cash flow (USD)" })
+      .querySelector("p")!.textContent,
+  ).toBe(
+    String(
+      native.creditAssessment(resultsJson, "2025Q1").free_cash_flow,
+    ).replace(/\B(?=(\d{3})+(?!\d))/g, ","),
+  );
+  const pl = await within(report).findByRole("table", {
+    name: "P&L summary by line item and period",
+  });
+  expect(within(pl).getAllByRole("row")).toHaveLength(
+    income.length * model.periods.length + 1,
+  );
+  fireEvent.click(
+    within(screen.getByRole("group", { name: "Reporting periods" })).getByRole(
+      "button",
+      { name: /2025Q3/ },
+    ),
+  );
+  await waitFor(() =>
+    expect(lastCall("creditAssessment")).toEqual({
+      resultsJson,
+      period: "2025Q3",
+    }),
+  );
+});
 
 it("rolls reported quarters up to native annual values with editable methods", async () => {
   render(

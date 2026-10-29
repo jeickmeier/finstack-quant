@@ -4258,6 +4258,39 @@
       }
     },
     {
+      "name": "contract-credit-assessment",
+      "type": "registry:lib",
+      "title": "Credit assessment contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust credit_assessment contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/credit_assessment.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/credit_assessment.json"
+        },
+        {
+          "path": "src/generated/types/credit_assessment.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/credit_assessment.ts"
+        },
+        {
+          "path": "src/generated/meta/credit_assessment.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/credit_assessment.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-scenario-diff",
       "type": "registry:lib",
       "title": "Scenario diff contract",

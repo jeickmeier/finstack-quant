@@ -117,6 +117,7 @@ export async function generate(repo = repoRoot) {
           "altman_z_double_prime_input",
           "ohlson_o_score_input",
           "zmijewski_input",
+          "credit_assessment",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));
