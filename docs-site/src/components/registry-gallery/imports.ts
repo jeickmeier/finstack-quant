@@ -287,6 +287,13 @@ export const importHarnesses = {
       name: "use-merton-model-validator",
       modules: modules.length,
     })),
+  "use-credit-score": () =>
+    Promise.all([
+      import("@/hooks/models/use-credit-score/use-credit-score"),
+    ]).then((modules) => ({
+      name: "use-credit-score",
+      modules: modules.length,
+    })),
   "use-evaluate-statement": () =>
     Promise.all([
       import("@/hooks/statements/use-evaluate-statement/use-evaluate-statement"),
@@ -1334,6 +1341,33 @@ export const importHarnesses = {
       name: "contract-market-context-state",
       modules: modules.length,
     })),
+  "contract-altman-z-double-prime-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/altman_z_double_prime_input.json"),
+      import("@/lib/finstack/generated/types/altman_z_double_prime_input"),
+      import("@/lib/finstack/generated/meta/altman_z_double_prime_input"),
+    ]).then((modules) => ({
+      name: "contract-altman-z-double-prime-input",
+      modules: modules.length,
+    })),
+  "contract-altman-z-prime-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/altman_z_prime_input.json"),
+      import("@/lib/finstack/generated/types/altman_z_prime_input"),
+      import("@/lib/finstack/generated/meta/altman_z_prime_input"),
+    ]).then((modules) => ({
+      name: "contract-altman-z-prime-input",
+      modules: modules.length,
+    })),
+  "contract-altman-z-score-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/altman_z_score_input.json"),
+      import("@/lib/finstack/generated/types/altman_z_score_input"),
+      import("@/lib/finstack/generated/meta/altman_z_score_input"),
+    ]).then((modules) => ({
+      name: "contract-altman-z-score-input",
+      modules: modules.length,
+    })),
   "contract-merton-model": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/merton_model.json"),
@@ -1341,6 +1375,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/merton_model"),
     ]).then((modules) => ({
       name: "contract-merton-model",
+      modules: modules.length,
+    })),
+  "contract-ohlson-o-score-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/ohlson_o_score_input.json"),
+      import("@/lib/finstack/generated/types/ohlson_o_score_input"),
+      import("@/lib/finstack/generated/meta/ohlson_o_score_input"),
+    ]).then((modules) => ({
+      name: "contract-ohlson-o-score-input",
+      modules: modules.length,
+    })),
+  "contract-zmijewski-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/zmijewski_input.json"),
+      import("@/lib/finstack/generated/types/zmijewski_input"),
+      import("@/lib/finstack/generated/meta/zmijewski_input"),
+    ]).then((modules) => ({
+      name: "contract-zmijewski-input",
       modules: modules.length,
     })),
   "contract-portfolio-margin-result": () =>

@@ -401,6 +401,17 @@ const displays = [
       "Returned models.credit.MertonModel results of a model from canonical MertonModel JSON (natively validated) or from a KMV equity calibration (kmvDefaultPoint then fromEquity): default probabilities, distances to default, implied spreads (recovery as a fraction of par) and debt spreads per requested horizon, the CDS par spread and implied equity at the requested maturity, and models.credit.pd.MasterScale.defaultCalibration grades of the default probabilities. Decimals as returned (spreads per year, probabilities and volatilities as fractions), no unit inferred; a measure Rust rejects for the model shows its native error beside the rest.",
   },
   {
+    id: "credit-scorecard",
+    api: [
+      "models.credit.scoring.zmijewskiScore",
+      "CreditScoringNamespace",
+      "zmijewskiScore",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned models.credit.scoring ScoringResult of one model (Altman Z, Z', Z'' or EM, Ohlson O, Zmijewski) over ratios entered in the fields of its generated input contract and passed in the facade's positional order: score, zone and implied PD as returned (probabilities as fractions), and models.credit.pd.MasterScale.defaultCalibration().mapScore of the result, or Rust's error when the result has no implied PD (the Altman models). No zone, threshold or grade is derived here.",
+  },
+  {
     id: "transition-matrix-heatmap",
     api: [
       "models.credit.migration.TransitionMatrix#toRows",

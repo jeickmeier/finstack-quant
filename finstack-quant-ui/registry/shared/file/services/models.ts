@@ -1,15 +1,17 @@
 import type { core, models } from "finstack-quant-wasm";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import type {
+  CreditScoreRequest,
   CubeSlice,
   FxStrikeSurface,
   MertonReport,
   MertonReportRequest,
   MigrationMatrixRequest,
   ModelsApi,
+  ScoringResult,
 } from "../finstack-contract";
 import { attempt, type ServiceContext } from "./context";
-/** models.volatility evaluators, the core surface handles they sample, models.credit.migration, the Merton model and the PD master scale. */
+/** models.volatility evaluators, the core surface handles they sample, models.credit.migration, the Merton model, the credit-scoring functions and the PD master scale. */
 export type ModelsNative = {
   core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube">;
   models: {
@@ -32,6 +34,15 @@ export type ModelsNative = {
         "TransitionMatrix" | "GeneratorMatrix" | "project"
       >;
       pd: Pick<typeof models.credit.pd, "MasterScale">;
+      scoring: Pick<
+        typeof models.credit.scoring,
+        | "altmanZScore"
+        | "altmanZPrime"
+        | "altmanZDoublePrime"
+        | "altmanEmScore"
+        | "ohlsonOScore"
+        | "zmijewskiScore"
+      >;
     };
   };
 };
@@ -48,6 +59,77 @@ function scaleOf(matrix: TransitionMatrix) {
     };
   } finally {
     scale.free();
+  }
+}
+/**
+ * One scoring function with the request's named ratios in its positional
+ * argument order (conversion only: the facade takes numbers, not the Rust
+ * input struct; tests/models/credit/scorecard.test.tsx pins every order).
+ * Values pass through unchanged, so Rust rejects a missing or non-finite one.
+ */
+function score(
+  scoring: ModelsNative["models"]["credit"]["scoring"],
+  request: CreditScoreRequest,
+): ScoringResult {
+  switch (request.model) {
+    case "altmanZScore": {
+      const r = request.input;
+      return scoring.altmanZScore(
+        r.working_capital_to_total_assets,
+        r.retained_earnings_to_total_assets,
+        r.ebit_to_total_assets,
+        r.market_equity_to_total_liabilities,
+        r.sales_to_total_assets,
+      );
+    }
+    case "altmanZPrime": {
+      const r = request.input;
+      return scoring.altmanZPrime(
+        r.working_capital_to_total_assets,
+        r.retained_earnings_to_total_assets,
+        r.ebit_to_total_assets,
+        r.book_equity_to_total_liabilities,
+        r.sales_to_total_assets,
+      );
+    }
+    case "altmanZDoublePrime":
+    case "altmanEmScore": {
+      const r = request.input;
+      return (
+        request.model === "altmanEmScore"
+          ? scoring.altmanEmScore
+          : scoring.altmanZDoublePrime
+      )(
+        r.working_capital_to_total_assets,
+        r.retained_earnings_to_total_assets,
+        r.ebit_to_total_assets,
+        r.book_equity_to_total_liabilities,
+      );
+    }
+    case "ohlsonOScore": {
+      const r = request.input;
+      return scoring.ohlsonOScore(
+        r.log_total_assets_adjusted,
+        r.total_liabilities_to_total_assets,
+        r.working_capital_to_total_assets,
+        r.current_liabilities_to_current_assets,
+        r.liabilities_exceed_assets,
+        r.net_income_to_total_assets,
+        r.funds_from_operations_to_total_liabilities,
+        r.negative_net_income_two_years,
+        r.net_income_change,
+      );
+    }
+    case "zmijewskiScore": {
+      const r = request.input;
+      return scoring.zmijewskiScore(
+        r.net_income_to_total_assets,
+        r.total_liabilities_to_total_assets,
+        r.current_assets_to_current_liabilities,
+      );
+    }
+    default:
+      throw new RangeError("Unsupported scoring model");
   }
 }
 const orNull = (values: Float64Array | undefined) =>
@@ -333,6 +415,21 @@ export function createModelsService(
         } finally {
           scale?.free();
           model.free();
+        }
+      });
+    },
+    creditScore(request) {
+      return context.result(() => {
+        const result = score(native.models.credit.scoring, request);
+        const scale = native.models.credit.pd.MasterScale.defaultCalibration();
+        try {
+          return {
+            model: request.model,
+            result,
+            grade: attempt(() => scale.mapScore(result)),
+          };
+        } finally {
+          scale.free();
         }
       });
     },

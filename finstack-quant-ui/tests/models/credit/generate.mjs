@@ -213,6 +213,140 @@ await emit(
     ...merton,
   }),
 );
+// The worker's ModelsApi.creditScore over the raw package
+// (models.credit.scoring re-exports these raw functions unchanged): each
+// function's positional arguments in the facade order, then the default master
+// scale's mapScore of the result (Rust rejects a result without an implied PD).
+const scoringArguments = {
+  altmanZScore: [
+    "working_capital_to_total_assets",
+    "retained_earnings_to_total_assets",
+    "ebit_to_total_assets",
+    "market_equity_to_total_liabilities",
+    "sales_to_total_assets",
+  ],
+  altmanZPrime: [
+    "working_capital_to_total_assets",
+    "retained_earnings_to_total_assets",
+    "ebit_to_total_assets",
+    "book_equity_to_total_liabilities",
+    "sales_to_total_assets",
+  ],
+  altmanZDoublePrime: [
+    "working_capital_to_total_assets",
+    "retained_earnings_to_total_assets",
+    "ebit_to_total_assets",
+    "book_equity_to_total_liabilities",
+  ],
+  altmanEmScore: [
+    "working_capital_to_total_assets",
+    "retained_earnings_to_total_assets",
+    "ebit_to_total_assets",
+    "book_equity_to_total_liabilities",
+  ],
+  ohlsonOScore: [
+    "log_total_assets_adjusted",
+    "total_liabilities_to_total_assets",
+    "working_capital_to_total_assets",
+    "current_liabilities_to_current_assets",
+    "liabilities_exceed_assets",
+    "net_income_to_total_assets",
+    "funds_from_operations_to_total_liabilities",
+    "negative_net_income_two_years",
+    "net_income_change",
+  ],
+  zmijewskiScore: [
+    "net_income_to_total_assets",
+    "total_liabilities_to_total_assets",
+    "current_assets_to_current_liabilities",
+  ],
+};
+function envelope(call) {
+  try {
+    return { ok: true, value: call() };
+  } catch (error) {
+    // The worker's errorValue shape for a facade FinstackError.
+    return {
+      ok: false,
+      error: { name: error.name, message: error.message, kind: error.kind },
+    };
+  }
+}
+function creditScore({ model, input }) {
+  const result = native[model](
+    ...scoringArguments[model].map((field) => input[field]),
+  );
+  const scale = native.MasterScale.defaultCalibration();
+  try {
+    return { model, result, grade: envelope(() => scale.mapScore(result)) };
+  } finally {
+    scale.free();
+  }
+}
+// One case per model, each the input of a Rust unit test in
+// finstack-quant/models/src/credit/scoring/tests.rs (the pinned score in
+// brackets): z_score_safe_zone (3.595), z_prime_private_firm (2.62415),
+// z_double_prime_non_manufacturer (3.366), em_score_is_z_double_prime_plus_constant
+// (7.808), o_score_healthy_firm and zmijewski_healthy_firm.
+const scoringCases = {
+  altmanZScore: {
+    working_capital_to_total_assets: 0.1,
+    retained_earnings_to_total_assets: 0.2,
+    ebit_to_total_assets: 0.15,
+    market_equity_to_total_liabilities: 1.5,
+    sales_to_total_assets: 1.8,
+  },
+  altmanZPrime: {
+    working_capital_to_total_assets: 0.1,
+    retained_earnings_to_total_assets: 0.2,
+    ebit_to_total_assets: 0.15,
+    book_equity_to_total_liabilities: 1,
+    sales_to_total_assets: 1.5,
+  },
+  altmanZDoublePrime: {
+    working_capital_to_total_assets: 0.1,
+    retained_earnings_to_total_assets: 0.2,
+    ebit_to_total_assets: 0.15,
+    book_equity_to_total_liabilities: 1,
+  },
+  altmanEmScore: {
+    working_capital_to_total_assets: 0.2,
+    retained_earnings_to_total_assets: 0.3,
+    ebit_to_total_assets: 0.15,
+    book_equity_to_total_liabilities: 1.2,
+  },
+  ohlsonOScore: {
+    log_total_assets_adjusted: 8,
+    total_liabilities_to_total_assets: 0.4,
+    working_capital_to_total_assets: 0.2,
+    current_liabilities_to_current_assets: 0.5,
+    liabilities_exceed_assets: 0,
+    net_income_to_total_assets: 0.1,
+    funds_from_operations_to_total_liabilities: 0.3,
+    negative_net_income_two_years: 0,
+    net_income_change: 0.1,
+  },
+  zmijewskiScore: {
+    net_income_to_total_assets: 0.1,
+    total_liabilities_to_total_assets: 0.4,
+    current_assets_to_current_liabilities: 2,
+  },
+};
+const scorecard = Object.fromEntries(
+  Object.entries(scoringCases).map(([model, input]) => {
+    const request = { model, input };
+    return [model, { request, score: creditScore(request) }];
+  }),
+);
+assertFinite(scorecard, "scorecard");
+await emit(
+  new URL("scorecard.json", import.meta.url),
+  JSON.stringify({
+    description:
+      "Native models.credit.scoring results, one per model, each graded with models.credit.pd.MasterScale.defaultCalibration().mapScore (Altman results carry no implied PD, so their grade is Rust's error). Inputs are those of the Rust unit tests in finstack-quant/models/src/credit/scoring/tests.rs.",
+    ...scorecard,
+  }),
+);
 console.log(
-  `${checking ? "Checked" : "Generated"} the native migration matrix and projection and two Merton reports.`,
+  `${checking ? "Checked" : "Generated"} the native migration matrix and projection, two Merton reports and six credit scores.`,
 );

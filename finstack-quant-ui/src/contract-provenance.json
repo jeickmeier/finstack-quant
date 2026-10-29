@@ -1914,6 +1914,37 @@
       }
     },
     {
+      "id": "credit-scorecard",
+      "route": "returned-model",
+      "convention": "Returned models.credit.scoring ScoringResult of one model (Altman Z, Z', Z'' or EM, Ohlson O, Zmijewski) over ratios entered in the fields of its generated input contract and passed in the facade's positional order: score, zone and implied PD as returned (probabilities as fractions), and models.credit.pd.MasterScale.defaultCalibration().mapScore of the result, or Rust's error when the result has no implied PD (the Altman models). No zone, threshold or grade is derived here.",
+      "api": {
+        "name": "models.credit.scoring.zmijewskiScore",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "CreditScoringNamespace",
+        "member": "zmijewskiScore",
+        "inputs": [
+          {
+            "name": "netIncomeToTotalAssets",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "totalLiabilitiesToTotalAssets",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "currentAssetsToCurrentLiabilities",
+            "type": "number",
+            "optional": false
+          }
+        ],
+        "returns": "generated.models.ScoringResult",
+        "declaration": "/**\n   * Zmijewski (1984) probit financial-distress model.\n   * @param netIncomeToTotalAssets - Net income divided by total assets.\n   * @param totalLiabilitiesToTotalAssets - Total liabilities divided by total assets.\n   * @param currentAssetsToCurrentLiabilities - Current assets divided by current liabilities.\n   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).\n   * @throws Error - Throws a `validation` error if any ratio is non-finite.\n   */\n  zmijewskiScore(\n    netIncomeToTotalAssets: number,\n    totalLiabilitiesToTotalAssets: number,\n    currentAssetsToCurrentLiabilities: number\n  ): generated.models.ScoringResult;",
+        "sha256": "5d342facdf2f36061814181111926e76856cc28f152ba6014eb1396deb92eea8"
+      }
+    },
+    {
       "id": "transition-matrix-heatmap",
       "route": "returned-model",
       "convention": "Returned models.credit.migration results: TransitionMatrix rows and default probabilities in RatingScale order, the GeneratorMatrix rows with its roundTripError and regularizationL1, and the default probabilities of project(generator, t) per requested horizon. Decimals as returned; an omitted round-trip tolerance is left to Rust. Heatmap colour domains are presentation only: [0, 1] for probabilities, the intensities' extent (centred on zero) for the generator.",

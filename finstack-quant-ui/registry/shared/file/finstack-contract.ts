@@ -39,6 +39,7 @@ import type {
   CsaSpec,
   VmResult,
   MarginCall,
+  models,
   statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
@@ -454,6 +455,43 @@ export interface MertonReport {
   cdsParSpread: Envelope<number>;
   /** impliedEquity(maturity) as returned: [equity value, equity volatility], or the native error. */
   impliedEquity: Envelope<number[]>;
+}
+/** One models.credit.scoring function and its named input ratios; altmanEmScore takes the Z''-Score ratios. */
+export type CreditScoreRequest =
+  | {
+      readonly model: "altmanZScore";
+      readonly input: Readonly<modelsWire.AltmanZScoreInput>;
+    }
+  | {
+      readonly model: "altmanZPrime";
+      readonly input: Readonly<modelsWire.AltmanZPrimeInput>;
+    }
+  | {
+      readonly model: "altmanZDoublePrime" | "altmanEmScore";
+      readonly input: Readonly<modelsWire.AltmanZDoublePrimeInput>;
+    }
+  | {
+      readonly model: "ohlsonOScore";
+      readonly input: Readonly<modelsWire.OhlsonOScoreInput>;
+    }
+  | {
+      readonly model: "zmijewskiScore";
+      readonly input: Readonly<modelsWire.ZmijewskiInput>;
+    };
+/** A models.credit.scoring function name. */
+export type CreditScoreModel = CreditScoreRequest["model"];
+/** The native ScoringResult of one model (score, zone, implied_pd, model). */
+export type ScoringResult = ReturnType<
+  typeof models.credit.scoring.zmijewskiScore
+>;
+/** One scoring result and its master-scale grade; nothing is computed in TypeScript. */
+export interface CreditScore {
+  /** The facade function that scored the input. */
+  model: CreditScoreModel;
+  /** The returned ScoringResult. */
+  result: ScoringResult;
+  /** models.credit.pd.MasterScale.defaultCalibration().mapScore(result), or its native error (Rust rejects a result without an implied PD). */
+  grade: Envelope<modelsWire.MasterScaleResult>;
 }
 /** A portfolio valuation request; omitted options are left to Rust. */
 export interface PortfolioValuationRequest {
@@ -876,6 +914,8 @@ export interface ModelsApi {
   validateMertonModel(json: string): Promise<Envelope<string>>;
   /** MertonModel (fromJson, or kmvDefaultPoint + fromEquity) + default probabilities, distance to default, spreads, CDS par spread, implied equity and models.credit.pd.MasterScale.defaultCalibration().mapPds; per-field native errors are kept; both handles are freed. */
   mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
+  /** One models.credit.scoring function over its input ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result (kept as an envelope); the scale handle is freed. */
+  creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;
 }
 /** statements and statements_analytics: model validation, evaluation and diagnostics. */
 export interface StatementsApi {

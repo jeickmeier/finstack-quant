@@ -112,6 +112,11 @@ export async function generate(repo = repoRoot) {
           "vm_result",
           "csa_spec",
           "merton_model",
+          "altman_z_score_input",
+          "altman_z_prime_input",
+          "altman_z_double_prime_input",
+          "ohlson_o_score_input",
+          "zmijewski_input",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));

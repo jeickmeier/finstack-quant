@@ -421,6 +421,12 @@
       "worker": "none"
     },
     {
+      "name": "credit-scorecard",
+      "type": "registry:component",
+      "docs": "Edits the input ratios of one accounting-based credit model (Altman Z-Score, Z'-Score, Z''-Score or EM-Score, Ohlson O-Score, Zmijewski probit). The fields, their order and their help text come from the generated input contract of the selected model (altman_z_score_input, altman_z_prime_input, altman_z_double_prime_input for both Z'' and EM, ohlson_o_score_input, zmijewski_input); each model keeps its own entries when another is selected. Score passes the model and the ratios to the caller (usually the useCreditScore request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned score, zone and implied PD are shown as Rust returned them, with the default PD master scale's grade and central PD of the implied PD, or Rust's error when the model returns no implied PD (the Altman models). Nothing is computed or classified here. Accepts defaultModel, defaultInputs, onSubmit, score, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
       "name": "financial-model-editor",
       "type": "registry:component",
       "docs": "Edit explicit FinancialModelSpec fields from the generated Rust schema. Native WASM validates and canonicalizes the model; formula fields show the opaque native parse preview. Requires FinstackQueryProvider and remounting for a new document.",
@@ -636,6 +642,10 @@
     },
     {
       "name": "use-merton-model-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-credit-score",
       "type": "registry:hook"
     },
     {
@@ -1055,7 +1065,27 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-altman-z-double-prime-input",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-altman-z-prime-input",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-altman-z-score-input",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-merton-model",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-ohlson-o-score-input",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-zmijewski-input",
       "type": "registry:lib"
     },
     {
@@ -1183,6 +1213,10 @@
     {
       "path": "finstack-quant-ui/tests/models/credit/merton.json",
       "sha256": "48b77a5c7a3318e00338c55d4a90b79a5e006e3a5b6754bb814ef92357aaf981"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/credit/scorecard.json",
+      "sha256": "687c7b5a8716926a445b1fbe9faf1094c4cdd7a6615ae891ef0258b1a53495d8"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",
