@@ -80,6 +80,7 @@ it("opens complete statements, applies an explicit edit, and rolls forward from 
   });
   expect(within(income).getByRole("row", { name: /Revenue/ })).toBeTruthy();
   expect(within(income).getByText("USD in millions")).toBeTruthy();
+  expect(within(income).getByText("Cell source:")).toBeTruthy();
   expect(screen.getByText("Explain selected value")).toBeTruthy();
   expect(
     within(income).getByRole("columnheader", { name: "2024Q1 Historical" }),
@@ -97,7 +98,9 @@ it("opens complete statements, applies an explicit edit, and rolls forward from 
     screen.getAllByText("2024Q1 · display in millions").length,
   ).toBeGreaterThan(0);
   fireEvent.click(
-    within(income).getByRole("button", { name: "Revenue 2024Q1, edit value" }),
+    within(income).getByRole("button", {
+      name: "Revenue 2024Q1, value source, edit value",
+    }),
   );
   const exactValue = screen.getByRole("textbox", {
     name: "Revenue 2024Q1 exact value",
@@ -112,11 +115,14 @@ it("opens complete statements, applies an explicit edit, and rolls forward from 
     JSON.parse(accepted.mock.lastCall![0]).nodes.revenue.values["2024Q1"]
       .amount,
   ).toBe("190000000");
-  await screen.findByRole("button", { name: "Revenue 2024Q1, edit value" });
+  await screen.findByRole("button", {
+    name: "Revenue 2024Q1, value source, edit value",
+  });
   expect(
-    screen.getByRole("button", { name: "Revenue 2024Q1, edit value" })
-      .textContent,
-  ).toBe("190.0");
+    screen.getByRole("button", {
+      name: "Revenue 2024Q1, value source, edit value",
+    }).textContent,
+  ).toBe("■190.0");
   expect(
     call.mock.calls.filter(([method]) => method === "evaluateStatement"),
   ).toHaveLength(accepted.mock.calls.length);
@@ -175,14 +181,14 @@ it("changes a native forecast method and calculates a newly added metric", async
     target: { value: "revenue_to_debt" },
   });
   fireEvent.change(screen.getByRole("textbox", { name: "Formula" }), {
-    target: { value: "revenue / debt_closing" },
+    target: { value: "revenue / total_debt" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Add and calculate" }));
   await waitFor(() => expect(accepted).toHaveBeenCalledTimes(3));
   const metricModel = JSON.parse(accepted.mock.lastCall![0]);
   expect(metricModel.nodes.revenue_to_debt).toMatchObject({
     node_type: "calculated",
-    formula_text: "revenue / debt_closing",
+    formula_text: "revenue / total_debt",
     value_type: { type: "scalar" },
   });
   const nativeResult = new native.Evaluator().evaluate(
@@ -202,12 +208,14 @@ it("changes a native forecast method and calculates a newly added metric", async
   ).toBeTruthy();
   expect(
     within(ratios).getByRole("button", {
-      name: "Revenue to debt 2024Q1, inspect value",
+      name: "Revenue to debt 2024Q1, formula source, inspect value",
     }).textContent,
-  ).toBe("0.445");
+  ).toBe("ƒ0.445");
   fireEvent.click(screen.getByRole("tab", { name: "Statements & editing" }));
   fireEvent.click(
-    screen.getByRole("button", { name: "Revenue 2024Q1, edit value" }),
+    screen.getByRole("button", {
+      name: "Revenue 2024Q1, value source, edit value",
+    }),
   );
   fireEvent.change(
     screen.getByRole("textbox", { name: "Revenue 2024Q1 exact value" }),
@@ -222,9 +230,9 @@ it("changes a native forecast method and calculates a newly added metric", async
   await waitFor(() =>
     expect(
       within(refreshedRatios).getByRole("button", {
-        name: "Revenue to debt 2024Q1, inspect value",
+        name: "Revenue to debt 2024Q1, formula source, inspect value",
       }).textContent,
-    ).toBe("0.463"),
+    ).toBe("ƒ0.463"),
   );
 });
 
@@ -257,7 +265,8 @@ it("rolls reported quarters up to native annual values with editable methods", a
   expect(
     JSON.parse(lastCall("rollupStatement").specJson).methods,
   ).toMatchObject({
-    debt_closing: "period_end",
+    total_debt: "period_end",
+    cash: "period_end",
     leverage: "formula",
     ebitda_margin_pct: "formula",
   });
@@ -288,6 +297,8 @@ it("rolls reported quarters up to native annual values with editable methods", a
   expect(
     within(income).queryByRole("button", { name: "Revenue 2024, edit value" }),
   ).toBeNull();
+  // A native rollup records no node_sources, so annual cells carry no source marker.
+  expect(within(income).queryByText("Cell source:")).toBeNull();
 
   await userEvent.click(
     screen.getByRole("combobox", {
@@ -305,7 +316,7 @@ it("rolls reported quarters up to native annual values with editable methods", a
   fireEvent.click(screen.getByRole("button", { name: "Reported" }));
   await within(
     await screen.findByRole("region", { name: "Income statement" }),
-  ).findByRole("button", { name: "Revenue 2024Q1, edit value" });
+  ).findByRole("button", { name: "Revenue 2024Q1, value source, edit value" });
 });
 
 it("runs scenarios with forecast overrides and compares them natively", async () => {
@@ -478,7 +489,9 @@ it("rejects grid amounts outside the Rust decimal contract before validation", a
       .length;
   const before = validations();
   fireEvent.click(
-    within(income).getByRole("button", { name: "Revenue 2024Q1, edit value" }),
+    within(income).getByRole("button", {
+      name: "Revenue 2024Q1, value source, edit value",
+    }),
   );
   const exactValue = screen.getByRole("textbox", {
     name: "Revenue 2024Q1 exact value",
