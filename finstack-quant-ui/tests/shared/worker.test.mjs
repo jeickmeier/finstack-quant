@@ -107,6 +107,8 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "traceStatement",
     "runStatementChecks",
     "evaluateStatementScenarios",
+    "diffStatementScenarios",
+    "traceStatementScenario",
     "rollupStatement",
   ];
   expect((await proxy.methods()).sort()).toEqual(expected.sort());

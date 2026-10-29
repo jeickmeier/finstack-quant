@@ -16172,6 +16172,445 @@
       "source": "pl_summary_report"
     }
   },
+  "statementScenarios": {
+    "scenarios": {
+      "base": {},
+      "downside": {
+        "parent": "base",
+        "forecast_overrides": {
+          "revenue": {
+            "method": "growth_pct",
+            "params": {
+              "rate": -0.02
+            }
+          }
+        }
+      },
+      "severe": {
+        "parent": "downside",
+        "forecast_overrides": {
+          "revenue": {
+            "method": "growth_pct",
+            "params": {
+              "rate": -0.06
+            }
+          },
+          "opex": {
+            "method": "growth_pct",
+            "params": {
+              "rate": 0.04
+            }
+          }
+        }
+      }
+    }
+  },
+  "statementScenarioDiff": [
+    {
+      "baseline": "base",
+      "comparison": "downside",
+      "variance": {
+        "baseline_label": "base",
+        "comparison_label": "downside",
+        "rows": [
+          {
+            "period": "2025Q1",
+            "metric": "revenue",
+            "baseline": 208300000,
+            "comparison": 208300000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "revenue",
+            "baseline": 214549000,
+            "comparison": 204134000,
+            "abs_var": -10415000,
+            "pct_var": -0.04854368932038835
+          },
+          {
+            "period": "2025Q3",
+            "metric": "revenue",
+            "baseline": 222058214.99999997,
+            "comparison": 200051320,
+            "abs_var": -22006894.99999997,
+            "pct_var": -0.09910416959804876
+          },
+          {
+            "period": "2025Q4",
+            "metric": "revenue",
+            "baseline": 231384660.02999997,
+            "comparison": 196050293.6,
+            "abs_var": -35334366.42999998,
+            "pct_var": -0.1527083360902954
+          },
+          {
+            "period": "2025Q1",
+            "metric": "cogs",
+            "baseline": 70820000,
+            "comparison": 70820000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "cogs",
+            "baseline": 72410287.5,
+            "comparison": 68895225,
+            "abs_var": -3515062.5,
+            "pct_var": -0.04854368932038835
+          },
+          {
+            "period": "2025Q3",
+            "metric": "cogs",
+            "baseline": 74944647.5625,
+            "comparison": 67517320.5,
+            "abs_var": -7427327.0625,
+            "pct_var": -0.09910416959804887
+          },
+          {
+            "period": "2025Q4",
+            "metric": "cogs",
+            "baseline": 78092322.760125,
+            "comparison": 66166974.09,
+            "abs_var": -11925348.670124993,
+            "pct_var": -0.1527083360902954
+          },
+          {
+            "period": "2025Q1",
+            "metric": "gross_profit",
+            "baseline": 137480000,
+            "comparison": 137480000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "gross_profit",
+            "baseline": 142138712.5,
+            "comparison": 135238775,
+            "abs_var": -6899937.5,
+            "pct_var": -0.04854368932038835
+          },
+          {
+            "period": "2025Q3",
+            "metric": "gross_profit",
+            "baseline": 147113567.43749997,
+            "comparison": 132533999.5,
+            "abs_var": -14579567.93749997,
+            "pct_var": -0.09910416959804869
+          },
+          {
+            "period": "2025Q4",
+            "metric": "gross_profit",
+            "baseline": 153292337.269875,
+            "comparison": 129883319.50999999,
+            "abs_var": -23409017.759875,
+            "pct_var": -0.1527083360902955
+          },
+          {
+            "period": "2025Q1",
+            "metric": "opex",
+            "baseline": 86100000,
+            "comparison": 86100000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "opex",
+            "baseline": 87994200,
+            "comparison": 87994200,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q3",
+            "metric": "opex",
+            "baseline": 89930072.4,
+            "comparison": 89930072.4,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q4",
+            "metric": "opex",
+            "baseline": 91908533.99280001,
+            "comparison": 91908533.99280001,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q1",
+            "metric": "ebitda",
+            "baseline": 51380000,
+            "comparison": 51380000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "ebitda",
+            "baseline": 54144512.5,
+            "comparison": 47244575,
+            "abs_var": -6899937.5,
+            "pct_var": -0.12743558269178248
+          },
+          {
+            "period": "2025Q3",
+            "metric": "ebitda",
+            "baseline": 57183495.037499964,
+            "comparison": 42603927.099999994,
+            "abs_var": -14579567.93749997,
+            "pct_var": -0.2549611199514639
+          },
+          {
+            "period": "2025Q4",
+            "metric": "ebitda",
+            "baseline": 61383803.27707498,
+            "comparison": 37974785.51719998,
+            "abs_var": -23409017.759875,
+            "pct_var": -0.38135495863967706
+          },
+          {
+            "period": "2025Q1",
+            "metric": "net_income",
+            "baseline": 23100131.25,
+            "comparison": 23100131.25,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "net_income",
+            "baseline": 25007247.5625,
+            "comparison": 19728795.375,
+            "abs_var": -5278452.1875,
+            "pct_var": -0.21107689578022107
+          },
+          {
+            "period": "2025Q3",
+            "metric": "net_income",
+            "baseline": 27326928.097687475,
+            "comparison": 16173558.625499997,
+            "abs_var": -11153369.472187478,
+            "pct_var": -0.4081457466538775
+          },
+          {
+            "period": "2025Q4",
+            "metric": "net_income",
+            "baseline": 30285257.205054358,
+            "comparison": 12377358.618749984,
+            "abs_var": -17907898.586304374,
+            "pct_var": -0.591307462408333
+          }
+        ]
+      }
+    },
+    {
+      "baseline": "downside",
+      "comparison": "severe",
+      "variance": {
+        "baseline_label": "downside",
+        "comparison_label": "severe",
+        "rows": [
+          {
+            "period": "2025Q1",
+            "metric": "revenue",
+            "baseline": 208300000,
+            "comparison": 208300000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "revenue",
+            "baseline": 204134000,
+            "comparison": 195802000,
+            "abs_var": -8332000,
+            "pct_var": -0.04081632653061224
+          },
+          {
+            "period": "2025Q3",
+            "metric": "revenue",
+            "baseline": 200051320,
+            "comparison": 184053880,
+            "abs_var": -15997440,
+            "pct_var": -0.07996668054977094
+          },
+          {
+            "period": "2025Q4",
+            "metric": "revenue",
+            "baseline": 196050293.6,
+            "comparison": 173010647.2,
+            "abs_var": -23039646.400000006,
+            "pct_var": -0.1175190609354946
+          },
+          {
+            "period": "2025Q1",
+            "metric": "cogs",
+            "baseline": 70820000,
+            "comparison": 70820000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "cogs",
+            "baseline": 68895225,
+            "comparison": 66083175.00000001,
+            "abs_var": -2812049.9999999925,
+            "pct_var": -0.04081632653061214
+          },
+          {
+            "period": "2025Q3",
+            "metric": "cogs",
+            "baseline": 67517320.5,
+            "comparison": 62118184.50000001,
+            "abs_var": -5399135.999999993,
+            "pct_var": -0.07996668054977082
+          },
+          {
+            "period": "2025Q4",
+            "metric": "cogs",
+            "baseline": 66166974.09,
+            "comparison": 58391093.43,
+            "abs_var": -7775880.660000004,
+            "pct_var": -0.11751906093549462
+          },
+          {
+            "period": "2025Q1",
+            "metric": "gross_profit",
+            "baseline": 137480000,
+            "comparison": 137480000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "gross_profit",
+            "baseline": 135238775,
+            "comparison": 129718825,
+            "abs_var": -5519950,
+            "pct_var": -0.04081632653061224
+          },
+          {
+            "period": "2025Q3",
+            "metric": "gross_profit",
+            "baseline": 132533999.5,
+            "comparison": 121935695.5,
+            "abs_var": -10598304,
+            "pct_var": -0.07996668054977094
+          },
+          {
+            "period": "2025Q4",
+            "metric": "gross_profit",
+            "baseline": 129883319.50999999,
+            "comparison": 114619553.76999998,
+            "abs_var": -15263765.74000001,
+            "pct_var": -0.11751906093549465
+          },
+          {
+            "period": "2025Q1",
+            "metric": "opex",
+            "baseline": 86100000,
+            "comparison": 86100000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "opex",
+            "baseline": 87994200,
+            "comparison": 89544000,
+            "abs_var": 1549800,
+            "pct_var": 0.01761252446183953
+          },
+          {
+            "period": "2025Q3",
+            "metric": "opex",
+            "baseline": 89930072.4,
+            "comparison": 93125760,
+            "abs_var": 3195687.599999994,
+            "pct_var": 0.03553524994159789
+          },
+          {
+            "period": "2025Q4",
+            "metric": "opex",
+            "baseline": 91908533.99280001,
+            "comparison": 96850790.4,
+            "abs_var": 4942256.407199994,
+            "pct_var": 0.05377363986229139
+          },
+          {
+            "period": "2025Q1",
+            "metric": "ebitda",
+            "baseline": 51380000,
+            "comparison": 51380000,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "ebitda",
+            "baseline": 47244575,
+            "comparison": 40174825,
+            "abs_var": -7069750,
+            "pct_var": -0.14964151968771017
+          },
+          {
+            "period": "2025Q3",
+            "metric": "ebitda",
+            "baseline": 42603927.099999994,
+            "comparison": 28809935.5,
+            "abs_var": -13793991.599999994,
+            "pct_var": -0.3237727725808637
+          },
+          {
+            "period": "2025Q4",
+            "metric": "ebitda",
+            "baseline": 37974785.51719998,
+            "comparison": 17768763.369999975,
+            "abs_var": -20206022.147200003,
+            "pct_var": -0.5320904877276544
+          },
+          {
+            "period": "2025Q1",
+            "metric": "net_income",
+            "baseline": 23100131.25,
+            "comparison": 23100131.25,
+            "abs_var": 0,
+            "pct_var": 0
+          },
+          {
+            "period": "2025Q2",
+            "metric": "net_income",
+            "baseline": 19728795.375,
+            "comparison": 14320436.625,
+            "abs_var": -5408358.75,
+            "pct_var": -0.27413527522584485
+          },
+          {
+            "period": "2025Q3",
+            "metric": "net_income",
+            "baseline": 16173558.625499997,
+            "comparison": 5621155.0515,
+            "abs_var": -10552403.573999997,
+            "pct_var": -0.6524478513567558
+          },
+          {
+            "period": "2025Q4",
+            "metric": "net_income",
+            "baseline": 12377358.618749984,
+            "comparison": -3080248.32385802,
+            "abs_var": -15457606.942608003,
+            "pct_var": -1.2488615235880673
+          }
+        ]
+      }
+    }
+  ],
   "statementRollForward2025Q2": {
     "schema_version": 1,
     "id": "ACME-SOFTWARE-3STMT",

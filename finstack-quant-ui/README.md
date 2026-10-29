@@ -461,6 +461,17 @@ conversion and any scenario price shock (Rust requires PVs in the units of the
 amounts). `CashflowViewer`'s optional `ladder` (and `ladderError`) props add a
 Schedule / Annual ladder toggle with one table per currency headed Native PV;
 nothing is summed or converted across currencies.
+`useDiffStatementScenarios` (`use-diff-statement-scenarios`) sends the scenario
+set, the `serializeHost` text of its evaluated results, baseline/comparison
+pairs, metric ids and periods; the worker calls
+`statements_analytics.scenarioDiff` once per pair, in pair order, and a metric
+missing at a period fails the request with the native error.
+`useTraceStatementScenario` (`use-trace-statement-scenario`) returns
+`scenarioSetTrace`'s lineage, root first; its `useTraceStatementScenarios`
+runs one query per scenario. The workbench scenario panel defaults each
+scenario's baseline to the entry before it in that lineage and shows Rust's
+`abs_var` as delta columns and the shown pair's `VarianceReport` in
+`VarianceTable`; capital-structure rows have no native diff and show none.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useInstrumentValidator` accepts canonical text and an optional abort signal;
 `SchemaForm` owns the 250ms debounce and prevents superseded responses from

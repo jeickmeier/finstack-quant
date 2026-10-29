@@ -410,6 +410,11 @@
     "schema": "schemas/valuation_result.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/scenario_diff.schema.json",
+    "schema": "schemas/scenario_diff.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/scenario_set.schema.json",
     "schema": "schemas/scenario_set.json"

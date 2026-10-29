@@ -40,6 +40,8 @@ const sources = {
   statementResult: "src/fixtures/statements/analyst-result.json",
   statementCheckReport: "src/fixtures/statements/analyst-check-report.json",
   statementPlSummary: "src/fixtures/statements/analyst-pl-summary.json",
+  statementScenarios: "src/fixtures/statements/analyst-scenarios.json",
+  statementScenarioDiff: "src/fixtures/statements/analyst-scenario-diff.json",
   statementRollForward2025Q2:
     "src/fixtures/statements/roll-forward-2025Q2.json",
   statementRollForward2025Q3:

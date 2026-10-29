@@ -34,6 +34,7 @@ import { Example as Example30 } from "./examples/statement-explanation";
 import { Example as Example31 } from "./examples/statement-checks";
 import { Example as Example32 } from "./examples/statement-check-report";
 import { Example as Example33 } from "./examples/statements-workbench";
+import { Example as Example34 } from "./examples/variance-table";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -69,6 +70,7 @@ const examples = {
   "statement-checks": Example31,
   "statement-check-report": Example32,
   "statements-workbench": Example33,
+  "variance-table": Example34,
 };
 export function ComponentDemo({
   name,

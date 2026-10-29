@@ -234,6 +234,36 @@
       }
     },
     {
+      "name": "variance-table",
+      "type": "registry:component",
+      "title": "Variance table",
+      "description": "Displays a native statements_analytics variance report: baseline, comparison, variance and variance percent per metric and period.",
+      "docs": "Present a native VarianceReport (for example ScenarioDiff.variance) as is: rows in native order, baseline and comparison columns under their native labels, abs_var as the variance and pct_var as a percent of the fraction Rust returns, with an unset pct_var (baseline effectively zero) shown as n/m. Metric labels default to labelFor; a host may inject metricLabel and formatValue. It sorts, totals and computes nothing. No worker is required.",
+      "files": [
+        {
+          "path": "components/variance-table/variance-table.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/variance-table/variance-table.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/contract-scenario-diff"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-evaluate-statement",
       "type": "registry:hook",
       "title": "useEvaluateStatement",
@@ -459,11 +489,61 @@
       }
     },
     {
+      "name": "use-diff-statement-scenarios",
+      "type": "registry:hook",
+      "title": "useDiffStatementScenarios",
+      "description": "Diffs pairs of evaluated statement scenarios natively through the WASM worker.",
+      "docs": "One native ScenarioDiff per baseline/comparison pair, in pair order, from statements_analytics.scenarioDiff over the scenario set, its host-serialized results, the metric node ids and the periods. Keyed by the complete immutable request and worker session; null disables the diff. A metric missing at a period in either scenario fails the whole request with the native error.",
+      "files": [
+        {
+          "path": "hooks/use-diff-statement-scenarios/use-diff-statement-scenarios.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-diff-statement-scenarios/use-diff-statement-scenarios.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-trace-statement-scenario",
+      "type": "registry:hook",
+      "title": "useTraceStatementScenario",
+      "description": "Traces a statement scenario's inheritance lineage through the WASM worker.",
+      "docs": "Native statements_analytics.scenarioSetTrace lineage, root ancestor first and the scenario last, keyed by the immutable scenario set and scenario name in the current worker session. useTraceStatementScenario takes one request (null disables it); useTraceStatementScenarios runs one query per request, in request order.",
+      "files": [
+        {
+          "path": "hooks/use-trace-statement-scenario/use-trace-statement-scenario.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-trace-statement-scenario/use-trace-statement-scenario.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -497,11 +577,14 @@
         "@finstack/statement-chart",
         "@finstack/statement-explanation",
         "@finstack/statement-checks",
+        "@finstack/variance-table",
         "@finstack/use-evaluate-statement",
         "@finstack/use-statement-model-validator",
         "@finstack/use-statement-formula-validator",
         "@finstack/use-rollup-statement",
         "@finstack/use-evaluate-statement-scenarios",
+        "@finstack/use-diff-statement-scenarios",
+        "@finstack/use-trace-statement-scenario",
         "@finstack/use-linked-selection",
         "@finstack/use-finstack",
         "@finstack/json-viewer",
@@ -532,6 +615,7 @@
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json"
         ]
       }
