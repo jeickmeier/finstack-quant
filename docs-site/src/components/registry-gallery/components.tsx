@@ -37,6 +37,8 @@ import { Example as Example33 } from "./examples/statements-workbench";
 import { Example as Example34 } from "./examples/variance-table";
 import { Example as Example35 } from "./examples/tranche-analytics";
 import { Example as Example36 } from "./examples/vol-cube-slice";
+import { Example as Example37 } from "./examples/market-scenario-builder";
+import { Example as Example38 } from "./examples/market-scenario-report";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -75,6 +77,8 @@ const examples = {
   "variance-table": Example34,
   "tranche-analytics": Example35,
   "vol-cube-slice": Example36,
+  "market-scenario-builder": Example37,
+  "market-scenario-report": Example38,
 };
 export function ComponentDemo({
   name,

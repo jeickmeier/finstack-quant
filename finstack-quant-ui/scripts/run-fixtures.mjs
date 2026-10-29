@@ -4,15 +4,16 @@ import { requireWasm } from "./require-wasm.mjs";
 
 // Regenerates (or, with --check, verifies) every native fixture the tests and
 // the gallery pin, in dependency order: results writes src/fixtures/results/
-// bond.json, which cashflows and details embed; curves writes the curve-link
-// market that market-browser extends; gen-gallery copies the fixtures into
-// docs-site last. Each generator runs in its own process so the WASM instances
-// do not share memory.
+// bond.json, which the scenario application, cashflows and details embed;
+// curves writes the curve-link market that market-browser extends; gen-gallery
+// copies the fixtures into docs-site last. Each generator runs in its own
+// process so the WASM instances do not share memory.
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const checking = process.argv.includes("--check");
 requireWasm(["pkg-node"]);
 const generators = [
   "tests/valuations/results/generate.mjs",
+  "tests/scenarios/application/generate.mjs",
   "tests/valuations/cashflows/generate.mjs",
   "tests/valuations/details/generate.mjs",
   "tests/core/curves/generate.mjs",

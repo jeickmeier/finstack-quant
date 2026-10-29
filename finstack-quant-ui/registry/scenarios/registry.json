@@ -1,0 +1,124 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "market-scenario-builder",
+      "type": "registry:component",
+      "title": "Market scenario builder",
+      "description": "Controlled editor of a market-only scenario: parallel curve shifts, an optional time roll and the hazard bump mode, beside the Rust-built spec.",
+      "docs": "Controlled editor of a market-only scenario: parallel shifts (curve family, a free-text curve id with the supplied market ids as suggestions, basis points), an optional time roll (tenor text and roll mode) and the hazard bump mode. Blank options are omitted so Rust applies its defaults. It calls no worker: the host builds the canonical ScenarioSpec with useMarketScenario and passes it back as specJson, shown with any native error.",
+      "files": [
+        {
+          "path": "components/market-scenario-builder/market-scenario-builder.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "@finstack/id-combobox",
+        "@finstack/decimal-input",
+        "@finstack/json-viewer",
+        "button",
+        "input"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "market-scenario-report",
+      "type": "registry:component",
+      "title": "Market scenario report",
+      "description": "Display of a native scenario application report: counters, applied shocks, time roll and carry, warnings and the policy stamp.",
+      "docs": "Display-only view of the ApplicationReport returned by scenarios.applyScenario: operation and effect counters, every applied shock, the time roll with its returned per-instrument and total carry, every warning variant shown generically by kind and fields, the ResultsMeta stamp and the report JSON. Values are shown as returned; nothing is summed or converted. Accepts report, loading and error props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/market-scenario-report/market-scenario-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/scenarios/components/market-scenario-report/market-scenario-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/stamp-badge",
+        "@finstack/json-viewer"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-market-scenario",
+      "type": "registry:hook",
+      "title": "useMarketScenario",
+      "description": "Builds the canonical ScenarioSpec text of a market scenario from native operations through the WASM worker.",
+      "docs": "Rust-built operations (scenarios.operationSpecTimeRollForward and parallelBpMany per shift) validated and canonicalized by scenarios.parseScenarioSpec, returned as JSON text. Omitted options stay unset so Rust applies its defaults. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-market-scenario/use-market-scenario.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-market-scenario/use-market-scenario.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-apply-market-scenario",
+      "type": "registry:hook",
+      "title": "useApplyMarketScenario",
+      "description": "Applies a canonical scenario to a priced instrument's market through the WASM worker and returns the native report with the shocked pricing inputs.",
+      "docs": "scenarios.applyScenario on the supplied market and valuation date, with the instrument as a one-entry inventory only when scenarios.scenarioSpecRequiresInstruments says so. Returns the native ApplicationReport, the shocked market as canonical JSON, the rolled valuation date (else the supplied one) and the shocked instrument when scenarios.scenarioSpecMutatesInstruments says so (else the supplied one). Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider. No P&L is computed.",
+      "files": [
+        {
+          "path": "hooks/use-apply-market-scenario/use-apply-market-scenario.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-apply-market-scenario/use-apply-market-scenario.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

@@ -260,6 +260,13 @@ const displays = [
     deferred: "quote-space-calibration-fits",
   },
   {
+    id: "market-scenario-report",
+    api: ["scenarios.applyScenario", "ScenariosNamespace", "applyScenario"],
+    route: "returned-report",
+    convention:
+      "Returned ApplicationReport counters, applied shocks, time roll with carry and warnings; nothing summed or converted. The workbench prices the shocked market at the returned valuation date with the base model and metrics and shows both valuations; no P&L is computed.",
+  },
+  {
     id: "scenario-heatmap",
     api: [
       "valuations.instruments.trancheScenarioTable",

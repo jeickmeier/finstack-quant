@@ -25,9 +25,14 @@ import {
   type PriceRequest,
   FinstackError,
   errorValue,
+  unwrap,
 } from "@/workers/finstack-contract";
 import { formatMoney, formatRawMoney } from "../../src/format/format";
 import { budget } from "../shared/budget";
+import { createContext } from "@/workers/services/context";
+import { createScenariosService } from "@/workers/services/scenarios";
+import type { MarketScenarioDraft } from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
+import marketScenarios from "../scenarios/application/cases.json";
 const bondDisplay = formatRawMoney(fixture.result.value);
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
@@ -49,6 +54,14 @@ const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
 let call: ReturnType<typeof vi.fn>, close: ReturnType<typeof vi.fn>;
+// The production ScenariosApi over the Node facade; its envelopes unwrap as the client does.
+const scenarioService = createScenariosService(
+  { scenarios: native },
+  createContext({
+    initialize: async () => undefined,
+    core: { MarketContext: native.MarketContext },
+  }),
+);
 beforeEach(() => {
   vi.stubGlobal("Worker", class {});
   call = vi.fn(async (method: string, request: any) => {
@@ -91,6 +104,10 @@ beforeEach(() => {
           deal.free();
         }
       }
+      case "buildMarketScenario":
+        return unwrap(await scenarioService.buildMarketScenario(request));
+      case "applyMarketScenario":
+        return unwrap(await scenarioService.applyMarketScenario(request));
       case "formatMoney":
         return formatMoney(request.value, request.rounding, native);
       case "cashflows":
@@ -797,3 +814,95 @@ it("keeps shortcuts within the focused workbench and leaves field typing intact"
   first.unmount();
   second.unmount();
 });
+it(
+  "prices the applied market scenario beside the base valuation and never subtracts them",
+  async () => {
+    const roll = marketScenarios.cases.find(
+      (entry) => entry.name === "roll-1m-25bp",
+    )!;
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={fixture.request}
+          marketScenario={roll.draft as MarketScenarioDraft}
+        />
+      </FinstackQueryProvider>,
+    );
+    const results = screen.getByRole("region", { name: "Results" });
+    await within(results).findByTitle(
+      fixture.result.value.amount,
+      {},
+      { timeout: budget(3000) },
+    );
+    expect(within(results).queryByText("Comparison valuation")).toBeNull();
+    await userEvent.click(
+      within(screen.getByRole("tablist", { name: "Pricing inputs" })).getByRole(
+        "tab",
+        { name: "Market scenario" },
+      ),
+    );
+    const apply = screen.getByRole("button", { name: "Apply scenario" });
+    await waitFor(
+      () => expect((apply as HTMLButtonElement).disabled).toBe(false),
+      {
+        timeout: budget(3000),
+      },
+    );
+    expect(
+      call.mock.calls.filter(([method]) => method === "applyMarketScenario"),
+    ).toEqual([]);
+    await userEvent.click(apply);
+    await waitFor(() => expect(prices()).toHaveLength(2), {
+      timeout: budget(5000),
+    });
+    const [base, shocked] = prices();
+    expect(
+      call.mock.calls.filter(([method]) => method === "applyMarketScenario"),
+    ).toEqual([
+      [
+        "applyMarketScenario",
+        {
+          scenarioJson: roll.scenarioJson,
+          marketJson: base!.marketJson,
+          asOf: base!.asOf,
+          instrumentJson: base!.instrumentJson,
+        },
+      ],
+    ]);
+    // Same model, metrics and instrument; the rolled date and the shocked market.
+    expect(shocked).toEqual({
+      ...base,
+      asOf: "2025-02-03",
+      marketJson: shocked!.marketJson,
+    });
+    expect(shocked!.marketJson).not.toBe(base!.marketJson);
+    await within(results).findByTitle(
+      roll.shocked.value.amount,
+      {},
+      { timeout: budget(3000) },
+    );
+    expect(within(results).getByText("Comparison valuation")).toBeTruthy();
+    expect(
+      within(results).getByTitle(fixture.result.value.amount),
+    ).toBeTruthy();
+    expect(within(results).getByText("2025-02-03")).toBeTruthy();
+    await userEvent.click(
+      within(screen.getByRole("tablist", { name: "Result views" })).getByRole(
+        "tab",
+        { name: "Market scenario" },
+      ),
+    );
+    const timeRoll = await within(results).findByRole("region", {
+      name: "Time roll",
+    });
+    expect(within(timeRoll).getAllByTitle("4613.745264131")).toHaveLength(2);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear scenario" }),
+    );
+    await waitFor(() =>
+      expect(within(results).queryByText("Comparison valuation")).toBeNull(),
+    );
+    expect(prices()).toHaveLength(2);
+  },
+  budget(20000),
+);

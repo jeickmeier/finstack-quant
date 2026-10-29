@@ -17,10 +17,14 @@ import type {
   CheckReport,
   CalendarYearLadderRow,
   ArbitrageValidationResult,
+  ApplicationReport,
   statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
-import type { core as wire } from "finstack-quant-wasm/types";
+import type {
+  core as wire,
+  scenarios as scenarioWire,
+} from "finstack-quant-wasm/types";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
 export interface PriceRequest {
   readonly instrumentJson: string;
@@ -142,6 +146,46 @@ export type CashflowEnvelope = ReturnType<
 export interface CurrencyLadder {
   readonly currency: CashflowEnvelope["flows"][number]["currency"];
   readonly rows: CalendarYearLadderRow[];
+}
+/** One parallel shift: scenarios.parallelBpMany over the listed curve ids of one curve family. */
+export interface MarketScenarioShift {
+  readonly curveKind: scenarioWire.CurveKind;
+  /** Market curve ids, in operation order; Rust resolves them when the scenario is applied. */
+  readonly curveIds: readonly string[];
+  /** Additive basis points; percent of forward for commodity curves. */
+  readonly bp: number;
+}
+/** A scenarios.operationSpecTimeRollForward operation; an omitted roll mode is left to Rust. */
+export interface MarketScenarioRoll {
+  /** Tenor text such as "1M", parsed by Rust. */
+  readonly period: string;
+  readonly rollMode?: scenarioWire.TimeRollMode | null;
+}
+/** A market-only ScenarioSpec built from native operations; omitted options keep Rust's defaults. */
+export interface MarketScenarioRequest {
+  /** Scenario id; Rust rejects a blank one. */
+  readonly id: string;
+  readonly shifts: readonly MarketScenarioShift[];
+  readonly roll?: MarketScenarioRoll | null;
+  readonly hazardBumpMode?: scenarioWire.HazardBumpMode | null;
+}
+/** Canonical ScenarioSpec text applied to a priced instrument's market at its valuation date. */
+export interface MarketScenarioApplicationRequest {
+  readonly scenarioJson: string;
+  readonly marketJson: string;
+  readonly asOf: string;
+  /** Instrument envelope JSON; supplied to Rust only when the scenario requires instruments. */
+  readonly instrumentJson: string;
+}
+/** The native application report and the shocked pricing inputs it implies. */
+export interface MarketScenarioApplication {
+  readonly report: ApplicationReport;
+  /** Canonical JSON of the shocked market. */
+  readonly marketJson: string;
+  /** The rolled valuation date (report.time_roll.new_date), else the request's. */
+  readonly asOf: string;
+  /** The shocked instrument when the scenario mutates instruments, else the request's. */
+  readonly instrumentJson: string;
 }
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
@@ -277,6 +321,17 @@ export interface CashflowsApi {
     cashflows: CashflowEnvelope,
   ): Promise<Envelope<CurrencyLadder[]>>;
 }
+/** scenarios: market scenario construction and application. */
+export interface ScenariosApi {
+  /** scenarios.operationSpecTimeRollForward + parallelBpMany per shift + parseScenarioSpec: canonical ScenarioSpec text. */
+  buildMarketScenario(
+    request: MarketScenarioRequest,
+  ): Promise<Envelope<string>>;
+  /** scenarios.scenarioSpecRequiresInstruments + applyScenario (the instrument only when required) + scenarioSpecMutatesInstruments; the shocked market is canonicalized through the market cache. */
+  applyMarketScenario(
+    request: MarketScenarioApplicationRequest,
+  ): Promise<Envelope<MarketScenarioApplication>>;
+}
 /** calibration: envelope validation, static diagnostics and calibration runs. */
 export interface CalibrationApi {
   /** calibration.validateCalibration: full envelope includes prior_market, quote sets, data and every plan setting. */
@@ -353,6 +408,7 @@ export type WorkerApi = {
 } & CoreApi &
   ValuationsApi &
   CashflowsApi &
+  ScenariosApi &
   CalibrationApi &
   ModelsApi &
   StatementsApi;

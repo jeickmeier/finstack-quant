@@ -283,6 +283,18 @@
       "worker": "none"
     },
     {
+      "name": "market-scenario-builder",
+      "type": "registry:component",
+      "docs": "Controlled editor of a market-only scenario: parallel shifts (curve family, a free-text curve id with the supplied market ids as suggestions, basis points), an optional time roll (tenor text and roll mode) and the hazard bump mode. Blank options are omitted so Rust applies its defaults. It calls no worker: the host builds the canonical ScenarioSpec with useMarketScenario and passes it back as specJson, shown with any native error.",
+      "worker": "none"
+    },
+    {
+      "name": "market-scenario-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the ApplicationReport returned by scenarios.applyScenario: operation and effect counters, every applied shock, the time roll with its returned per-instrument and total carry, every warning variant shown generically by kind and fields, the ResultsMeta stamp and the report JSON. Values are shown as returned; nothing is summed or converted. Accepts report, loading and error props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "monte-carlo-diagnostics",
       "type": "registry:component",
       "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat.",
@@ -406,6 +418,14 @@
     },
     {
       "name": "use-calibrate",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-market-scenario",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-apply-market-scenario",
       "type": "registry:hook"
     },
     {
@@ -901,6 +921,10 @@
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
       "sha256": "b05946f519838643a7a443317e73971c16fdcf9e654df46eff6e0ce7b8f9f1f7"
+    },
+    {
+      "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
+      "sha256": "2df669e995742cd83fa991c28adff9ea992532594fcf3911aa3bd54ed83ad0c9"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
