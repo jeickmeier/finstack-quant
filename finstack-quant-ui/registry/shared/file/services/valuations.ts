@@ -4,7 +4,19 @@ import { resolveModel, type ValuationsApi } from "../finstack-contract";
 import type { ServiceContext } from "./context";
 /** valuations facade members this slice reads. */
 export type ValuationsNative = {
-  valuations: Pick<typeof valuations, "instruments" | "valuationResultToJson">;
+  valuations: Pick<typeof valuations, "valuationResultToJson"> & {
+    instruments: Pick<
+      typeof valuations.instruments,
+      | "validateInstrumentJson"
+      | "priceInstrumentWithMarket"
+      | "instrumentCashflowsWithMarket"
+      | "trancheScenarioTable"
+      | "StructuredCredit"
+      | "listModelsGrouped"
+      | "listStandardMetricsGrouped"
+      | "metricMetadata"
+    >;
+  };
 };
 /** ValuationsApi over the valuations facade namespace and the shared market cache. */
 export function createValuationsService(
