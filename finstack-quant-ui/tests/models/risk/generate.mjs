@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
 const native = createRequire(import.meta.url)(
@@ -116,15 +117,63 @@ const reports = Object.fromEntries(
     { request, report: positionRisk(request) },
   ]),
 );
+// The worker's PortfolioApi.computeFactorSensitivities (over the cached
+// Portfolio and MarketContext handles) and ModelsApi.decomposeFactors of the
+// returned matrix's JSON, as the useFactorRisk chain calls them, over the raw
+// package (portfolio and models.factor.risk re-export these unchanged).
+function factorRisk(request) {
+  const book = native.Portfolio.fromSpec(request.specJson);
+  const market = native.MarketContext.fromJson(request.marketJson);
+  try {
+    const sensitivities = native.computeFactorSensitivities(
+      book,
+      request.factorsJson,
+      market,
+      request.asOf,
+      optional(request.bumpConfigJson),
+    );
+    return {
+      sensitivities,
+      decomposition: native.decomposeFactors(
+        JSON.stringify(sensitivities),
+        request.covarianceJson,
+        optional(request.riskMeasureJson),
+      ),
+    };
+  } finally {
+    book.free();
+    market.free();
+  }
+}
+// The Py/WASM host-parity book (two USD deposits) and market at t0 with its
+// factor_model_config: one usd_rates factor (parallel USD-OIS shift in bp)
+// and a 1x1 covariance; the risk measure is left to Rust (variance).
+const { inputs } = JSON.parse(
+  readFileSync(
+    new URL(
+      "../../../../finstack-quant/portfolio/tests/fixtures/host_parity.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+const factorRequest = {
+  specJson: JSON.stringify(inputs.portfolio_spec),
+  marketJson: JSON.stringify(inputs.market_t0),
+  factorsJson: JSON.stringify(inputs.factor_model_config.factors),
+  asOf: inputs.as_of_t0,
+  covarianceJson: JSON.stringify(inputs.factor_model_config.covariance),
+};
+reports.factor = { request: factorRequest, report: factorRisk(factorRequest) };
 assertFinite(reports, "risk");
 await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({
     description:
-      "Native models.factor.risk position risk reports for the three-sleeve inputs of the portfolio_risk_decomposition notebook (Equity, Credit, Rates): a 99% parametric decomposition with incremental VaR and a 50/30/20 risk budget at a 1.10 utilization threshold, and a 95% historical decomposition of 250 deterministic scenarios with the same budget (Rust's default threshold) and its tail stress attribution.",
+      "Native models.factor.risk position risk reports for the three-sleeve inputs of the portfolio_risk_decomposition notebook (Equity, Credit, Rates): a 99% parametric decomposition with incremental VaR and a 50/30/20 risk budget at a 1.10 utilization threshold, and a 95% historical decomposition of 250 deterministic scenarios with the same budget (Rust's default threshold) and its tail stress attribution; and the factor sensitivities and variance decomposition of the Py/WASM host-parity book (two USD deposits, market at t0) under its one-factor usd_rates model.",
     ...reports,
   }),
 );
 console.log(
-  `${checking ? "Checked" : "Generated"} the parametric and historical position risk reports.`,
+  `${checking ? "Checked" : "Generated"} the parametric and historical position risk reports and the host-parity factor decomposition.`,
 );

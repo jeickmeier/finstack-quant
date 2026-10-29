@@ -378,8 +378,8 @@
       "name": "portfolio-risk-report",
       "type": "registry:component",
       "title": "Portfolio risk report",
-      "description": "Report of a native models.factor.risk position decomposition: portfolio VaR and ES, component-VaR bars, VaR and ES contributions, the risk budget and the tail stress attribution as returned.",
-      "docs": "Presents the report the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). A budget or stress attribution Rust rejects shows its native error beside the rest. Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. Accepts report, loading, error, formatValue and density props.",
+      "description": "Report of native models.factor.risk results: portfolio VaR and ES, component-VaR bars, VaR and ES contributions, the risk budget, the tail stress attribution and a book's factor contributions as returned.",
+      "docs": "Presents the report the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). A budget or stress attribution Rust rejects shows its native error beside the rest. Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. With factors (usually from useFactorRisk) it adds a Factor contributions section: total and residual risk under the returned measure, risk by factor (absolute, relative and marginal), risk by position and factor, any residual risk by position, and the portfolio.computeFactorSensitivities matrix it decomposed in the book's base currency; the factor chain's native error shows in that section. Either part renders without the other. Accepts report, factors, factorsError, loading, error, formatValue and density props.",
       "files": [
         {
           "path": "components/portfolio-risk-report/portfolio-risk-report.tsx",
@@ -546,6 +546,31 @@
           "path": "hooks/use-position-risk/use-position-risk.ts",
           "type": "registry:hook",
           "target": "hooks/models/use-position-risk/use-position-risk.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-factor-risk",
+      "type": "registry:hook",
+      "title": "useFactorRisk",
+      "description": "Computes a host-supplied book's native factor sensitivities and decomposes them under a factor covariance through the WASM worker.",
+      "docs": "portfolio.computeFactorSensitivities(portfolio, factorsJson, market, asOf, bumpConfigJson) over the worker's cached Portfolio and MarketContext handles, then models.factor.risk.decomposeFactors of the returned matrix's JSON, the covariance JSON and the optional risk-measure JSON. Omitted bump config and risk measure are left to Rust (1 bp / 1 % per factor type; variance). Returns { sensitivities, decomposition } as Rust returned them, or the first native error. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-factor-risk/use-factor-risk.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-factor-risk/use-factor-risk.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

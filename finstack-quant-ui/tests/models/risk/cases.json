@@ -1,5 +1,5 @@
 {
-  "description": "Native models.factor.risk position risk reports for the three-sleeve inputs of the portfolio_risk_decomposition notebook (Equity, Credit, Rates): a 99% parametric decomposition with incremental VaR and a 50/30/20 risk budget at a 1.10 utilization threshold, and a 95% historical decomposition of 250 deterministic scenarios with the same budget (Rust's default threshold) and its tail stress attribution.",
+  "description": "Native models.factor.risk position risk reports for the three-sleeve inputs of the portfolio_risk_decomposition notebook (Equity, Credit, Rates): a 99% parametric decomposition with incremental VaR and a 50/30/20 risk budget at a 1.10 utilization threshold, and a 95% historical decomposition of 250 deterministic scenarios with the same budget (Rust's default threshold) and its tail stress attribution; and the factor sensitivities and variance decomposition of the Py/WASM host-parity book (two USD deposits, market at t0) under its one-factor usd_rates model.",
   "parametric": {
     "request": {
       "positionIds": ["Equity", "Credit", "Rates"],
@@ -616,6 +616,49 @@
             }
           ]
         }
+      }
+    }
+  },
+  "factor": {
+    "request": {
+      "specJson": "{\"id\":\"HOST-PARITY\",\"as_of\":\"2025-01-15\",\"base_currency\":\"USD\",\"entities\":{\"FUND\":{\"id\":\"FUND\"}},\"positions\":[{\"position_id\":\"POS-0\",\"entity_id\":\"FUND\",\"instrument_id\":\"DEP-0\",\"instrument_spec\":{\"type\":\"deposit\",\"spec\":{\"id\":\"DEP-0\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"start_date\":\"2025-01-15\",\"maturity\":\"2025-07-15\",\"day_count\":\"act_360\",\"fixed_rate\":\"0.04\",\"discount_curve_id\":\"USD-OIS\",\"attributes\":{}}},\"quantity\":1,\"unit\":\"units\"},{\"position_id\":\"POS-1\",\"entity_id\":\"FUND\",\"instrument_id\":\"DEP-1\",\"instrument_spec\":{\"type\":\"deposit\",\"spec\":{\"id\":\"DEP-1\",\"notional\":{\"amount\":\"2000000\",\"currency\":\"USD\"},\"start_date\":\"2025-01-15\",\"maturity\":\"2025-07-15\",\"day_count\":\"act_360\",\"fixed_rate\":\"0.04\",\"discount_curve_id\":\"USD-OIS\",\"attributes\":{}}},\"quantity\":1,\"unit\":\"units\"}]}",
+      "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2025-01-15\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[0.5,0.9801986733067553],[1,0.9607894391523232],[2,0.9231163463866358]],\"interp_style\":\"monotone_convex\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":-0.005,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+      "factorsJson": "[{\"id\":\"usd_rates\",\"factor_type\":\"rates\",\"market_mapping\":{\"curve_parallel\":{\"curve_ids\":[\"USD-OIS\"],\"units\":\"rate_bp\"}},\"description\":\"Parallel USD rates shift\"}]",
+      "asOf": "2025-01-15",
+      "covarianceJson": "{\"factor_ids\":[\"usd_rates\"],\"n\":1,\"data\":[0.0001]}"
+    },
+    "report": {
+      "sensitivities": {
+        "base_currency": "USD",
+        "position_ids": ["POS-0", "POS-1"],
+        "factor_ids": ["usd_rates"],
+        "data": [[-49.59280692151515], [-99.1856138430303]]
+      },
+      "decomposition": {
+        "total_risk": 2.2135018485192126,
+        "measure": "variance",
+        "factor_contributions": [
+          {
+            "factor_id": "usd_rates",
+            "absolute_risk": 2.2135018485192126,
+            "relative_risk": 1,
+            "marginal_risk": -0.02975568415290909
+          }
+        ],
+        "residual_risk": 0,
+        "position_factor_contributions": [
+          {
+            "position_id": "POS-0",
+            "factor_id": "usd_rates",
+            "risk_contribution": 0.7378339495064042
+          },
+          {
+            "position_id": "POS-1",
+            "factor_id": "usd_rates",
+            "risk_contribution": 1.4756678990128085
+          }
+        ],
+        "position_residual_contributions": []
       }
     }
   }

@@ -12,6 +12,7 @@ export type PortfolioNative = {
     | "scenarioPnlBatch"
     | "applyScenarioAndRevalue"
     | "portfolioMargin"
+    | "computeFactorSensitivities"
   >;
 };
 /** PortfolioApi over the portfolio facade namespace and the shared handle caches. */
@@ -89,6 +90,18 @@ export function createPortfolioService(
           context.market(request.marketJson).handle,
           request.asOf,
           request.currentImCollateral ?? undefined,
+        ),
+      );
+    },
+    computeFactorSensitivities(request) {
+      return context.result(() =>
+        // The factor and bump JSON pass through; an omitted bump config stays unset.
+        native.portfolio.computeFactorSensitivities(
+          context.portfolio(request.specJson).handle,
+          request.factorsJson,
+          context.market(request.marketJson).handle,
+          request.asOf,
+          request.bumpConfigJson ?? undefined,
         ),
       );
     },

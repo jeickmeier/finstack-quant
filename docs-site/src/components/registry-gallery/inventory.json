@@ -429,7 +429,7 @@
     {
       "name": "portfolio-risk-report",
       "type": "registry:component",
-      "docs": "Presents the report the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). A budget or stress attribution Rust rejects shows its native error beside the rest. Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. Accepts report, loading, error, formatValue and density props.",
+      "docs": "Presents the report the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). A budget or stress attribution Rust rejects shows its native error beside the rest. Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. With factors (usually from useFactorRisk) it adds a Factor contributions section: total and residual risk under the returned measure, risk by factor (absolute, relative and marginal), risk by position and factor, any residual risk by position, and the portfolio.computeFactorSensitivities matrix it decomposed in the book's base currency; the factor chain's native error shows in that section. Either part renders without the other. Accepts report, factors, factorsError, loading, error, formatValue and density props.",
       "worker": "none"
     },
     {
@@ -656,6 +656,10 @@
     },
     {
       "name": "use-position-risk",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-factor-risk",
       "type": "registry:hook"
     },
     {
@@ -1230,7 +1234,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/models/risk/cases.json",
-      "sha256": "def9960509fcc268bf387aaf65d175e756429989661421fb8bd62b16e3fb1dcc"
+      "sha256": "87628356e80638606a1e4e17876b0d4058d6277d555d1b4e5faf9517ce060a4e"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",

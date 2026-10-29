@@ -883,6 +883,18 @@ contributions in Rust's largest-driver-first order. The native fixture (the
 three-sleeve inputs of the `portfolio_risk_decomposition` notebook, parametric
 and historical) is `tests/models/risk/cases.json`.
 
+`useFactorRisk` (`@finstack/use-factor-risk`) chains two worker calls:
+`portfolio.computeFactorSensitivities` of a host-supplied book over the cached
+`Portfolio` and `MarketContext` handles (`PortfolioApi`), then
+`models.factor.risk.decomposeFactors` of the returned matrix's JSON under the
+supplied factor covariance (`ModelsApi`). Omitted bump config and risk measure
+are left to Rust. Passed to `PortfolioRiskReport` as `factors`, the result is
+the Factor contributions section: total and residual risk, risk by factor and
+by position and factor, and the sensitivity matrix in the book's base
+currency. The fixture is the host-parity book at t0 under its one-factor
+`usd_rates` model (`factor` in `tests/models/risk/cases.json`); a richer factor
+set needs a Rust-owned example.
+
 ## Indicative SIMM initial margin
 
 `useSimmSensitivitiesValidator` (`@finstack/use-simm-sensitivities-validator`)

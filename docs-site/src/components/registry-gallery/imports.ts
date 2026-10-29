@@ -301,6 +301,13 @@ export const importHarnesses = {
       name: "use-position-risk",
       modules: modules.length,
     })),
+  "use-factor-risk": () =>
+    Promise.all([
+      import("@/hooks/models/use-factor-risk/use-factor-risk"),
+    ]).then((modules) => ({
+      name: "use-factor-risk",
+      modules: modules.length,
+    })),
   "use-evaluate-statement": () =>
     Promise.all([
       import("@/hooks/statements/use-evaluate-statement/use-evaluate-statement"),

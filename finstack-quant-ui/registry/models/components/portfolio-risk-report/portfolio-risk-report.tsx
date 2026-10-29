@@ -5,7 +5,10 @@ import { barY, defineChart } from "@tanstack/charts";
 import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
-import type { models as modelsWire } from "finstack-quant-wasm/types";
+import type {
+  models as modelsWire,
+  portfolio as portfolioWire,
+} from "finstack-quant-wasm/types";
 import { formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
@@ -23,9 +26,20 @@ export interface PositionRiskData {
   /** The returned StressAttribution or its native error; null for a parametric source. */
   stress: Outcome<modelsWire.StressAttribution> | null;
 }
+/** A book's native factor sensitivities and their decomposition (the useFactorRisk result). */
+export interface FactorRiskData {
+  /** portfolio.computeFactorSensitivities: position-by-factor rows in the base currency. */
+  sensitivities: portfolioWire.SensitivityMatrixJson;
+  /** models.factor.risk.decomposeFactors of those sensitivities. */
+  decomposition: modelsWire.RiskDecomposition;
+}
 export interface PortfolioRiskReportProps {
-  /** The returned report; null while none is available. */
+  /** The returned position report; null while none is available. */
   report: PositionRiskData | null;
+  /** A book's returned factor sensitivities and decomposition, shown as the Factor contributions section. */
+  factors?: FactorRiskData | null;
+  /** The native error of the factor chain, shown in that section as returned. */
+  factorsError?: string;
   loading?: boolean;
   /** The native error of the whole report, shown as returned. */
   error?: string;
@@ -133,6 +147,8 @@ function componentChart(rows: readonly modelsWire.PositionVarContribution[]) {
  */
 export function PortfolioRiskReport({
   report,
+  factors,
+  factorsError,
   loading,
   error,
   formatValue = String,
@@ -206,8 +222,25 @@ export function PortfolioRiskReport({
         Calculating position risk…
       </p>
     );
+  const factorSection =
+    factors || factorsError ? (
+      <FactorSection
+        factors={factors ?? null}
+        error={factorsError}
+        format={format}
+        density={density}
+      />
+    ) : null;
   if (!report || !decomposition)
-    return (
+    return factorSection ? (
+      <section
+        aria-label="Portfolio risk report"
+        data-density={density}
+        className="@container space-y-6 font-sans text-sm text-foreground"
+      >
+        {factorSection}
+      </section>
+    ) : (
       <p role="status" className="text-muted-foreground">
         No position risk report
       </p>
@@ -314,6 +347,7 @@ export function PortfolioRiskReport({
           )}
         </Section>
       )}
+      {factorSection}
     </section>
   );
 }
@@ -386,5 +420,138 @@ function StressView({
         emptyState="No tail scenarios returned"
       />
     </>
+  );
+}
+interface SensitivityRow {
+  position_id: string;
+  values: readonly number[];
+}
+/** The returned factor decomposition and the sensitivity matrix it decomposed, as returned. */
+function FactorSection({
+  factors,
+  error,
+  format,
+  density,
+}: {
+  factors: FactorRiskData | null;
+  error?: string;
+  format: Format;
+  density: "compact" | "comfortable";
+}) {
+  const factorColumns = useMemo(
+    () =>
+      fieldColumns<modelsWire.FactorContribution>(
+        ["factor_id", "absolute_risk", "relative_risk", "marginal_risk"],
+        format,
+      ),
+    [format],
+  );
+  const positionColumns = useMemo(
+    () =>
+      fieldColumns<modelsWire.PositionFactorContribution>(
+        ["position_id", "factor_id", "risk_contribution"],
+        format,
+      ),
+    [format],
+  );
+  const residualColumns = useMemo(
+    () =>
+      fieldColumns<modelsWire.PositionResidualContribution>(
+        ["position_id", "residual_variance", "source"],
+        format,
+      ),
+    [format],
+  );
+  const sensitivities = factors?.sensitivities;
+  // One column per returned factor id, index-aligned with each data row.
+  const sensitivityColumns = useMemo<ColumnDef<{}, SensitivityRow, any>[]>(
+    () =>
+      sensitivities
+        ? [
+            {
+              id: "position_id",
+              header: labelFor("position_id"),
+              accessorFn: (row) => row.position_id,
+              meta: { className: "text-left" },
+            },
+            ...sensitivities.factor_ids.map(
+              (id, index): ColumnDef<{}, SensitivityRow, any> => ({
+                id: `factor:${index}`,
+                header: id,
+                accessorFn: (row) => row.values[index],
+                cell: ({ getValue }) => shown(getValue(), format),
+                meta: { className: "text-right finstack-numeric" },
+              }),
+            ),
+          ]
+        : [],
+    [sensitivities, format],
+  );
+  if (error || !factors)
+    return (
+      <Section title="Factor contributions">
+        <p role="alert" className="text-xs text-error">
+          {error ?? "No factor decomposition"}
+        </p>
+      </Section>
+    );
+  const { decomposition } = factors;
+  const measure = decomposition.measure;
+  return (
+    <Section title="Factor contributions">
+      <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
+        <Tile label={labelFor("total_risk")}>
+          {shown(decomposition.total_risk, format)}
+        </Tile>
+        <Tile label={labelFor("measure")}>
+          {typeof measure === "string" ? measure : JSON.stringify(measure)}
+        </Tile>
+        <Tile label={labelFor("residual_risk")}>
+          {shown(decomposition.residual_risk, format)}
+        </Tile>
+      </div>
+      <FinstackTable
+        data={decomposition.factor_contributions}
+        columns={factorColumns}
+        getRowId={(row) => row.factor_id}
+        caption="Risk by factor"
+        density={density}
+        emptyState="No factor contributions returned"
+      />
+      <FinstackTable
+        data={decomposition.position_factor_contributions}
+        columns={positionColumns}
+        getRowId={(row) => `${row.position_id}:${row.factor_id}`}
+        caption="Risk by position and factor"
+        density={density}
+        emptyState="No position contributions returned"
+      />
+      {decomposition.position_residual_contributions.length > 0 && (
+        <FinstackTable
+          data={decomposition.position_residual_contributions}
+          columns={residualColumns}
+          getRowId={(row) => row.position_id}
+          caption="Residual risk by position"
+          density={density}
+          emptyState="No residual contributions returned"
+        />
+      )}
+      <FinstackTable
+        data={factors.sensitivities.position_ids.map((position_id, index) => ({
+          position_id,
+          values: factors.sensitivities.data[index] ?? [],
+        }))}
+        columns={sensitivityColumns}
+        getRowId={(row) => row.position_id}
+        caption={`Factor sensitivities (${factors.sensitivities.base_currency})`}
+        density={density}
+        emptyState="No sensitivities returned"
+      />
+      <p className="text-xs text-muted-foreground">
+        Values as Rust returned them under the returned measure (variance and
+        volatility positive, VaR and ES losses negative); sensitivities in the
+        book&apos;s base currency per factor bump.
+      </p>
+    </Section>
   );
 }
