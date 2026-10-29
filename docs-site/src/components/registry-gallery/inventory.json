@@ -325,6 +325,24 @@
       "worker": "none"
     },
     {
+      "name": "simm-sensitivity-table",
+      "type": "registry:component",
+      "docs": "Display-only view of a SimmSensitivitiesJson document (for example the canonical text useSimmSensitivitiesValidator returns, parsed). Sections follow the SIMM risk classes (interest rate, credit qualifying, credit non-qualifying, equity, commodity, FX); each holds the class's delta and vega tuples in input order, with columns named after the Rust tuple positions, and the curvature entries whose risk_class is that class. Empty fields are omitted. Nothing is summed, netted, regrouped or converted; amounts are in the set's base currency, which is shown. Accepts sensitivities, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "simm-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the ImResult returned by useSimmIm (margin.SimmCalculator#calculateFromSensitivities). The headline is the returned amount with methodology, as_of, mpor_days and the detail's mpor_scale. An Indicative badge is always shown, beside the returned approximation flag: the result is for indicative funding and capacity analysis, not for reconciling a counterparty margin call. The breakdown lists the returned component amounts as exact money in returned key order; the drill-down shows the returned risk_class_margins and, for a selected component, its buckets (k, signed_sum) and weighted sensitivities (risk weight, concentration factor). Nothing is aggregated. Accepts result, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "simm-calculator",
+      "type": "registry:component",
+      "docs": "Composes schema-form over the generated simm_sensitivities_json contract (started from defaultJson, else the Rust schema example), a date-input for the calculation date, simm-sensitivity-table over the natively validated canonical set and simm-report over the returned ImResult. Validation and calculation are caller callbacks: connect validate to useSimmSensitivitiesValidator and onSubmit plus result, loading and error to useSimmIm. Rust accepts only USD-based sets; another base currency surfaces the native error in the report. Accepts defaultJson, asOf, onAsOfChange, validate, onSubmit, result, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
       "name": "monte-carlo-diagnostics",
       "type": "registry:component",
       "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat.",
@@ -478,6 +496,14 @@
     },
     {
       "name": "use-portfolio-spec-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-simm-im",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-simm-sensitivities-validator",
       "type": "registry:hook"
     },
     {
@@ -905,6 +931,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-im-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-simm-sensitivities-json",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-market-context-state",
       "type": "registry:lib"
     },
@@ -1005,6 +1039,10 @@
     {
       "path": "finstack-quant-ui/tests/models/credit/migration.json",
       "sha256": "71f1850a9c2cf9019088541839885698df210aa89ec8bb8bae153c68da2b48e8"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/margin/simm.json",
+      "sha256": "14bb83029ea43f4f60a5fe925f8850558b10a024406339dcbf293a2edda386e0"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/gallery.json",

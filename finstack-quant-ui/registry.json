@@ -13,6 +13,7 @@
     "registry/scenarios/registry.json",
     "registry/analytics/registry.json",
     "registry/portfolio/registry.json",
+    "registry/margin/registry.json",
     "registry/models/registry.json",
     "registry/statements/registry.json"
   ],
@@ -3691,6 +3692,72 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-im-result",
+      "type": "registry:lib",
+      "title": "Im result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust im_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/im_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/im_result.json"
+        },
+        {
+          "path": "src/generated/types/im_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/im_result.ts"
+        },
+        {
+          "path": "src/generated/meta/im_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/im_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-simm-sensitivities-json",
+      "type": "registry:lib",
+      "title": "Simm sensitivities json contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust simm_sensitivities_json contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/simm_sensitivities_json.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/simm_sensitivities_json.json"
+        },
+        {
+          "path": "src/generated/types/simm_sensitivities_json.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/simm_sensitivities_json.ts"
+        },
+        {
+          "path": "src/generated/meta/simm_sensitivities_json.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/simm_sensitivities_json.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json"
         ]
       }
     },

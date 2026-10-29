@@ -38,6 +38,7 @@ export const importHarnesses = {
       import("@/workers/services/scenarios"),
       import("@/workers/services/analytics"),
       import("@/workers/services/portfolio"),
+      import("@/workers/services/margin"),
       import("@/workers/services/calibration"),
       import("@/workers/services/models"),
       import("@/workers/services/statements"),
@@ -136,6 +137,17 @@ export const importHarnesses = {
       import("@/hooks/portfolio/use-portfolio-spec-validator/use-portfolio-spec-validator"),
     ]).then((modules) => ({
       name: "use-portfolio-spec-validator",
+      modules: modules.length,
+    })),
+  "use-simm-im": () =>
+    Promise.all([import("@/hooks/margin/use-simm-im/use-simm-im")]).then(
+      (modules) => ({ name: "use-simm-im", modules: modules.length }),
+    ),
+  "use-simm-sensitivities-validator": () =>
+    Promise.all([
+      import("@/hooks/margin/use-simm-sensitivities-validator/use-simm-sensitivities-validator"),
+    ]).then((modules) => ({
+      name: "use-simm-sensitivities-validator",
       modules: modules.length,
     })),
   "use-fx-delta-samples": () =>
@@ -1181,6 +1193,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/examples/yoy_inflation_swap.json"),
     ]).then((modules) => ({
       name: "contract-yoy-inflation-swap",
+      modules: modules.length,
+    })),
+  "contract-im-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/im_result.json"),
+      import("@/lib/finstack/generated/types/im_result"),
+      import("@/lib/finstack/generated/meta/im_result"),
+    ]).then((modules) => ({
+      name: "contract-im-result",
+      modules: modules.length,
+    })),
+  "contract-simm-sensitivities-json": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/simm_sensitivities_json.json"),
+      import("@/lib/finstack/generated/types/simm_sensitivities_json"),
+      import("@/lib/finstack/generated/meta/simm_sensitivities_json"),
+    ]).then((modules) => ({
+      name: "contract-simm-sensitivities-json",
       modules: modules.length,
     })),
   "contract-market-context-state": () =>

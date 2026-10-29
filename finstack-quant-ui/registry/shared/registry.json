@@ -408,6 +408,11 @@
           "target": "workers/services/portfolio.ts"
         },
         {
+          "path": "file/services/margin.ts",
+          "type": "registry:file",
+          "target": "workers/services/margin.ts"
+        },
+        {
           "path": "file/services/calibration.ts",
           "type": "registry:file",
           "target": "workers/services/calibration.ts"

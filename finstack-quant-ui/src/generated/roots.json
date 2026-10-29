@@ -415,6 +415,16 @@
     "schema": "schemas/yoy_inflation_swap.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
+    "source": "finstack-quant/margin/schemas/margin/1/im_result.schema.json",
+    "schema": "schemas/im_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
+    "source": "finstack-quant/margin/schemas/margin/1/simm_sensitivities_json.schema.json",
+    "schema": "schemas/simm_sensitivities_json.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
     "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
     "schema": "schemas/market_context_state.json"

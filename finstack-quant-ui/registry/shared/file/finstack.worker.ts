@@ -10,6 +10,7 @@ import init, {
   statements,
   statements_analytics,
   portfolio,
+  margin,
 } from "finstack-quant-wasm";
 import { createService } from "./finstack-service";
 // WASM initialization occurs only in this worker, after the initialize request.
@@ -26,5 +27,6 @@ expose(
     statements_analytics,
     valuations,
     portfolio,
+    margin,
   }),
 );

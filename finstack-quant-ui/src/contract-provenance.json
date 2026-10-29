@@ -1722,6 +1722,74 @@
         "declaration": "/**\n   * Transition probabilities as one row per starting state.\n   * @returns An array of `number[]` rows in scale order.\n   * @throws Error - Throws a `validation` error if the rows cannot be converted.\n   */\n  toRows(): number[][];",
         "sha256": "8e1a74edfa63e8112eeb432433698cb8afc589e4bee65730342e21c8481c2632"
       }
+    },
+    {
+      "id": "simm-sensitivity-table",
+      "route": "supplied-input",
+      "convention": "A supplied or natively canonicalized SimmSensitivitiesJson: delta and vega tuples and curvature entries listed under their SIMM risk class in input order, columns named by the Rust tuple positions; amounts in the stated base currency, never summed, netted or converted.",
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/margin/schemas/margin/1/simm_sensitivities_json.schema.json",
+          "sha256": "ec381e900d8ba549ef4fe92399ff8642e0ddc13654eb98d022439c7790d78033",
+          "description": "JSON-friendly representation of `SimmSensitivities`."
+        }
+      ]
+    },
+    {
+      "id": "simm-report",
+      "route": "returned-report",
+      "convention": "Returned ImResult of SimmCalculator#calculateFromSensitivities in the set's own base currency (Rust accepts only USD): exact amount and breakdown money, methodology, as_of, mpor_days, the approximation flag beside an always-shown Indicative badge, and the simm_detail risk-class margins, buckets and weighted sensitivities as returned. Omitted version and MPOR are left to Rust.",
+      "api": {
+        "name": "margin.SimmCalculator#calculateFromSensitivities",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "SimmCalculator",
+        "member": "calculateFromSensitivities",
+        "inputs": [
+          {
+            "name": "sensitivities",
+            "type": "SimmSensitivities",
+            "optional": false
+          },
+          {
+            "name": "currency",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "ImResult",
+        "declaration": "/**\n   * Calculate SIMM initial margin from explicit sensitivities.\n   * @param sensitivities - Sensitivity set to aggregate; validated first, so an unknown tenor or commodity bucket throws instead of pricing to zero.\n   * @param currency - Reporting currency; must be `\"USD\"` and match the sensitivities' base currency (concentration thresholds are in USD).\n   * @param asOf - ISO-8601 calculation date stamped on the result.\n   * @returns The `ImResult` as a plain object: `amount` (Money), `methodology`, `mpor_days`, `as_of`, `approximation`, the SIMM component `breakdown`, and `simm_detail` (per-component buckets with weighted sensitivities, concentration factors and bucket `k`, plus `risk_class_margins` and `mpor_scale`).\n   * @throws Error - Throws if the sensitivities fail validation, the input or output currency is not USD, or the date is not ISO 8601.\n   */\n  calculateFromSensitivities(\n    sensitivities: SimmSensitivities,\n    currency: string,\n    asOf: string\n  ): ImResult;",
+        "sha256": "b4d57d86c841a8a9f842d5f29933aed74ba7a751b520e810cb5057da141e5e9b"
+      },
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/margin/schemas/margin/1/im_result.schema.json",
+          "sha256": "0a5487230c45ddbf25cc09a43769039dfb866fd36ce6bec2dea09285d9d57834",
+          "description": "Initial margin calculation result."
+        }
+      ]
+    },
+    {
+      "id": "simm-calculator",
+      "route": "schema",
+      "convention": "Generated simm_sensitivities_json form (Rust example as the default document) and an ISO calculation date; the natively validated set and the returned ImResult are presented by simm-sensitivity-table and simm-report.",
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/margin/schemas/margin/1/simm_sensitivities_json.schema.json",
+          "sha256": "ec381e900d8ba549ef4fe92399ff8642e0ddc13654eb98d022439c7790d78033",
+          "description": "JSON-friendly representation of `SimmSensitivities`."
+        }
+      ]
     }
   ],
   "hostDeclarations": [

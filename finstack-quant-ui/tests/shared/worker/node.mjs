@@ -224,6 +224,35 @@ class GeneratorMatrix extends migration.GeneratorMatrix {
   }
 }
 const project = (...args) => countMatrix(migration.project(...args));
+let simmSensitivitiesConstructed = 0,
+  simmSensitivitiesFreed = 0,
+  simmCalculatorConstructed = 0,
+  simmCalculatorFreed = 0,
+  simmCalculatorArgs = [];
+class SimmSensitivities extends facade.margin.SimmSensitivities {
+  static fromJson(json) {
+    const handle = super.fromJson(json);
+    simmSensitivitiesConstructed++;
+    const free = handle.free.bind(handle);
+    handle.free = () => {
+      free();
+      simmSensitivitiesFreed++;
+    };
+    return handle;
+  }
+}
+class SimmCalculator extends facade.margin.SimmCalculator {
+  constructor(...args) {
+    super(...args);
+    simmCalculatorConstructed++;
+    simmCalculatorArgs = args;
+    const free = this.free.bind(this);
+    this.free = () => {
+      free();
+      simmCalculatorFreed++;
+    };
+  }
+}
 const service = createService({
   initialize: async () => {
     if (workerData.fail)
@@ -245,6 +274,7 @@ const service = createService({
   },
   analytics: { ...facade.analytics, Performance },
   portfolio: { ...facade.portfolio, Portfolio },
+  margin: { ...facade.margin, SimmSensitivities, SimmCalculator },
   models: {
     ...facade.models,
     volatility: {
@@ -300,6 +330,12 @@ expose(
       portfolioConstructed,
       portfolioFreed,
       ...migrationCounts,
+      simmSensitivitiesConstructed,
+      simmSensitivitiesFreed,
+      simmCalculatorConstructed,
+      simmCalculatorFreed,
+      // Whether each optional calculator argument was passed at all.
+      simmCalculatorArgs: simmCalculatorArgs.map((arg) => arg === undefined),
     }),
   },
   nodeEndpoint(parentPort),

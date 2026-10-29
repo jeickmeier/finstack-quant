@@ -26,6 +26,7 @@ import type {
   PortfolioMetrics,
   PortfolioMetricSeriesEntry,
   PortfolioValuation,
+  ImResult,
   statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
@@ -413,6 +414,17 @@ export interface MigrationProjection {
     readonly defaultProbabilities: number[] | null;
   }[];
 }
+/** A SIMM initial-margin calculation over one sensitivity set. */
+export interface SimmImRequest {
+  /** SimmSensitivitiesJson text; its own base_currency is the reporting currency (Rust accepts only USD). */
+  readonly sensitivitiesJson: string;
+  /** ISO calculation date stamped on the result. */
+  readonly asOf: string;
+  /** SIMM version label such as "v2_6"; omitted leaves Rust's default version. */
+  readonly version?: string | null;
+  /** Margin period of risk in business days; omitted leaves the registry default. */
+  readonly mporDays?: number | null;
+}
 /** Explicit cloneable exception data; never Comlink's lossy default thrown-error transfer. */
 export interface ErrorValue {
   name: string;
@@ -499,6 +511,13 @@ export interface PortfolioApi {
   ): Promise<Envelope<PortfolioMetricSeriesEntry[]>>;
   /** portfolio.parsePortfolioSpecJson, then Portfolio.fromSpec through the handle cache: canonical PortfolioSpec JSON of a book that builds. */
   validatePortfolio(specJson: string): Promise<Envelope<string>>;
+}
+/** margin: SIMM sensitivity validation and indicative initial margin. */
+export interface MarginApi {
+  /** margin.SimmSensitivities.fromJson + validate + toJson: canonical SimmSensitivitiesJson text; the handle is freed. */
+  validateSimmSensitivities(json: string): Promise<Envelope<string>>;
+  /** margin.SimmSensitivities.fromJson + new margin.SimmCalculator(version?, mporDays?) + calculateFromSensitivities in the set's base currency; both handles are freed. */
+  simmIm(request: SimmImRequest): Promise<Envelope<ImResult>>;
 }
 /** calibration: envelope validation, static diagnostics and calibration runs. */
 export interface CalibrationApi {
@@ -587,6 +606,7 @@ export type WorkerApi = {
   ScenariosApi &
   AnalyticsApi &
   PortfolioApi &
+  MarginApi &
   CalibrationApi &
   ModelsApi &
   StatementsApi;
