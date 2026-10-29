@@ -499,9 +499,15 @@
       "worker": "none"
     },
     {
+      "name": "lbo-report",
+      "type": "registry:component",
+      "docs": "Edit an LboConfig with the schema form over the generated lbo_config contract, every string *_node field as an id-combobox over the supplied model node ids. The facade has no standalone LboConfig parse, so the config is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native LboResult (statements_analytics.evaluateLbo) is shown as returned: equity check, exit equity proceeds and MOIC tiles, the sources and uses (debt, equity check, totals, entry enterprise value, the balanced flag), the entry and exit metrics, enterprise values and exit net debt, and the statement-check-report of the LBO checks when the config maps them. Returns are MOIC only: IRR is not part of the native result (Rust points to portfolio.mwrXirr). Nothing is calculated. Accepts defaultConfig, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -744,6 +750,10 @@
     },
     {
       "name": "use-dcf-sensitivity",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-lbo",
       "type": "registry:hook"
     },
     {
@@ -1179,6 +1189,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-lbo-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-lbo-result",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-scenario-diff",
       "type": "registry:lib"
     },
@@ -1355,6 +1373,14 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf-sensitivity.json",
       "sha256": "089dfac66922bb8abb11bcab8e4fa88a67436ae100733ae09828cb9cad8cbf89"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo-config.json",
+      "sha256": "f8dd984ea23d9ff130ef0cf8eb49c2f4fda28f4e4f399cf9b7b0d69872b5f681"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo.json",
+      "sha256": "59dcff00879cc8da72f28bb28bab2a41d31c5301dbf020bfea91399aafa823a4"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",

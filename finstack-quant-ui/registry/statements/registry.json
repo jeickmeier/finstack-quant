@@ -416,6 +416,50 @@
       }
     },
     {
+      "name": "lbo-report",
+      "type": "registry:component",
+      "title": "LBO report",
+      "description": "Edits a Rust LboConfig with the generated schema form and displays the native statements_analytics LBO result: entry valuation, sources and uses, exit returns as MOIC and the optional check report.",
+      "docs": "Edit an LboConfig with the schema form over the generated lbo_config contract, every string *_node field as an id-combobox over the supplied model node ids. The facade has no standalone LboConfig parse, so the config is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native LboResult (statements_analytics.evaluateLbo) is shown as returned: equity check, exit equity proceeds and MOIC tiles, the sources and uses (debt, equity check, totals, entry enterprise value, the balanced flag), the entry and exit metrics, enterprise values and exit net debt, and the statement-check-report of the LBO checks when the config maps them. Returns are MOIC only: IRR is not part of the native result (Rust points to portfolio.mwrXirr). Nothing is calculated. Accepts defaultConfig, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/lbo-report/lbo-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/lbo-report/lbo-report.tsx"
+        },
+        {
+          "path": "components/lbo-report/lbo-config.ts",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/lbo-report/lbo-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/schema-form",
+        "@finstack/id-combobox",
+        "@finstack/money-value",
+        "@finstack/statement-check-report",
+        "@finstack/contract-lbo-config",
+        "@finstack/contract-lbo-result",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-evaluate-statement",
       "type": "registry:hook",
       "title": "useEvaluateStatement",
@@ -791,11 +835,36 @@
       }
     },
     {
+      "name": "use-evaluate-lbo",
+      "type": "registry:hook",
+      "title": "useEvaluateLbo",
+      "description": "Evaluates a leveraged buyout of a statement model natively through the WASM worker.",
+      "docs": "Native statements_analytics.evaluateLbo of the model under the supplied LboConfig JSON: entry and exit enterprise values, sources and uses with the solved sponsor equity check, exit equity proceeds, MOIC and, when the config carries check_mappings, the LBO check report. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-evaluate-lbo/use-evaluate-lbo.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-evaluate-lbo/use-evaluate-lbo.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -838,6 +907,7 @@
         "@finstack/credit-assessment-report",
         "@finstack/dcf-assumptions-form",
         "@finstack/dcf-report",
+        "@finstack/lbo-report",
         "@finstack/use-evaluate-statement",
         "@finstack/use-statement-model-validator",
         "@finstack/use-statement-formula-validator",
@@ -849,6 +919,7 @@
         "@finstack/use-pl-summary-report",
         "@finstack/use-evaluate-dcf",
         "@finstack/use-dcf-sensitivity",
+        "@finstack/use-evaluate-lbo",
         "@finstack/use-linked-selection",
         "@finstack/use-finstack",
         "@finstack/json-viewer",
@@ -882,6 +953,8 @@
           "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
           "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"

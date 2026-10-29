@@ -27,6 +27,7 @@ export type StatementsNative = {
     | "plSummaryReport"
     | "evaluateDcf"
     | "dcfSensitivity"
+    | "evaluateLbo"
   >;
 };
 /** StatementsApi over the statements and statements_analytics facade namespaces. */
@@ -201,6 +202,14 @@ export function createStatementsService(
           request.ufcfNode,
           request.netDebtOverride,
           request.optionsJson,
+        ),
+      );
+    },
+    evaluateLbo(request) {
+      return context.result(() =>
+        native.statements_analytics.evaluateLbo(
+          request.modelJson,
+          request.configJson,
         ),
       );
     },

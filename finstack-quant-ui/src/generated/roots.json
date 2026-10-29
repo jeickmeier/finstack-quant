@@ -515,6 +515,16 @@
     "schema": "schemas/dcf_sensitivity_result.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/lbo_config.schema.json",
+    "schema": "schemas/lbo_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/lbo_result.schema.json",
+    "schema": "schemas/lbo_result.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/scenario_diff.schema.json",
     "schema": "schemas/scenario_diff.json"

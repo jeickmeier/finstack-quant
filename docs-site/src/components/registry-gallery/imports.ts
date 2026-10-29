@@ -413,6 +413,13 @@ export const importHarnesses = {
       name: "use-dcf-sensitivity",
       modules: modules.length,
     })),
+  "use-evaluate-lbo": () =>
+    Promise.all([
+      import("@/hooks/statements/use-evaluate-lbo/use-evaluate-lbo"),
+    ]).then((modules) => ({
+      name: "use-evaluate-lbo",
+      modules: modules.length,
+    })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -1516,6 +1523,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/dcf_sensitivity_result"),
     ]).then((modules) => ({
       name: "contract-dcf-sensitivity-result",
+      modules: modules.length,
+    })),
+  "contract-lbo-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/lbo_config.json"),
+      import("@/lib/finstack/generated/types/lbo_config"),
+      import("@/lib/finstack/generated/meta/lbo_config"),
+    ]).then((modules) => ({
+      name: "contract-lbo-config",
+      modules: modules.length,
+    })),
+  "contract-lbo-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/lbo_result.json"),
+      import("@/lib/finstack/generated/types/lbo_result"),
+      import("@/lib/finstack/generated/meta/lbo_result"),
+    ]).then((modules) => ({
+      name: "contract-lbo-result",
       modules: modules.length,
     })),
   "contract-scenario-diff": () =>

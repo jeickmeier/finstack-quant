@@ -62,6 +62,7 @@ import { Example as Example58 } from "./examples/credit-assessment-report";
 import { Example as Example59 } from "./examples/tornado-chart";
 import { Example as Example60 } from "./examples/dcf-report";
 import { Example as Example61 } from "./examples/dcf-assumptions-form";
+import { Example as Example62 } from "./examples/lbo-report";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -125,6 +126,7 @@ const examples = {
   "tornado-chart": Example59,
   "dcf-report": Example60,
   "dcf-assumptions-form": Example61,
+  "lbo-report": Example62,
 };
 export function ComponentDemo({
   name,
