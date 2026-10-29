@@ -31,6 +31,9 @@ export function Example({
       ].flatMap(({ expiry, forward }) =>
         [1.05, 1.1, 1.15].map((strike) => ({ expiry, strike, forward })),
       )}
+      initialSpot={1.1}
+      initialDomesticRate={0.04}
+      initialForeignRate={0.03}
       colorDomain={[0.07, 0.13]}
       width={width}
       height={460}

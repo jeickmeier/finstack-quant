@@ -48,6 +48,31 @@
       }
     },
     {
+      "name": "use-fx-strike-surface",
+      "type": "registry:hook",
+      "title": "useFxStrikeSurface",
+      "description": "Materializes an FX delta surface as a strike-space volatility surface through the WASM worker.",
+      "docs": "Native models.volatility.materializeFxDeltaSurface with complete immutable quote/spot/rate keys. Null means no request. Spot is domestic per unit of foreign; rates are continuously compounded decimals, never defaulted. Requires FinstackQueryProvider; returns the canonical stored-surface JSON or native errors.",
+      "files": [
+        {
+          "path": "hooks/use-fx-strike-surface/use-fx-strike-surface.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-fx-strike-surface/use-fx-strike-surface.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-cube-samples",
       "type": "registry:hook",
       "title": "useCubeSamples",
@@ -76,8 +101,8 @@
       "name": "fx-surface-chart",
       "type": "registry:component",
       "title": "FX surface chart",
-      "description": "FX volatility surface: raw quotes plus natively evaluated Black volatilities as a heatmap, table and slices.",
-      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "description": "FX volatility surface: raw quotes, natively evaluated Black volatilities and a Rust-materialized strike grid as heatmaps, tables and slices.",
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. The strike grid materializes the quotes natively (models.volatility.materializeFxDeltaSurface) from an editable spot (domestic per unit of foreign) and continuously compounded domestic and foreign decimal rates, seeded only from initialSpot, initialDomesticRate and initialForeignRate. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
       "files": [
         {
           "path": "components/fx-surface-chart/fx-surface-chart.tsx",
@@ -88,7 +113,9 @@
       "registryDependencies": [
         "@finstack/vol-surface-chart",
         "@finstack/fx-delta-quotes",
-        "@finstack/use-fx-delta-samples"
+        "@finstack/use-fx-delta-samples",
+        "@finstack/use-fx-strike-surface",
+        "@finstack/decimal-input"
       ],
       "dependencies": ["react@19.2.8"],
       "categories": ["Individual Components"],

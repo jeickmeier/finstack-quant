@@ -1,6 +1,6 @@
 import type { core, models } from "finstack-quant-wasm";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
-import type { ModelsApi } from "../finstack-contract";
+import type { FxStrikeSurface, ModelsApi } from "../finstack-contract";
 import type { ServiceContext } from "./context";
 /** models.volatility evaluators and the core surface handles they sample. */
 export type ModelsNative = {
@@ -8,7 +8,10 @@ export type ModelsNative = {
   models: {
     volatility: Pick<
       typeof models.volatility,
-      "getFxDeltaVol" | "getCubeVol" | "getCubeNormalVol"
+      | "getFxDeltaVol"
+      | "getCubeVol"
+      | "getCubeNormalVol"
+      | "materializeFxDeltaSurface"
     >;
   };
 };
@@ -54,6 +57,28 @@ export function createModelsService(
               c.forward,
             ),
           );
+        } finally {
+          handle.free();
+        }
+      });
+    },
+    materializeFxSurface(request) {
+      return context.result(() => {
+        const handle = native.core.FxDeltaVolSurface.fromJson(
+          serializeHost(request.surface),
+        );
+        try {
+          const surface = native.models.volatility.materializeFxDeltaSurface(
+            handle,
+            request.spot,
+            request.domesticRate,
+            request.foreignRate,
+          );
+          try {
+            return JSON.parse(surface.toJson()) as FxStrikeSurface;
+          } finally {
+            surface.free();
+          }
         } finally {
           handle.free();
         }
