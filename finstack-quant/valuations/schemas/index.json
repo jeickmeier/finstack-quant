@@ -163,6 +163,15 @@
       "type_name": "Money"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+      "bytes": 2370,
+      "kind": "input",
+      "path": "schemas/common/1/oas_config.schema.json",
+      "summary": "Structured-credit OAS solver configuration: paths, stochastic dimensions and seed.",
+      "title": "OasConfig",
+      "type_name": "OasConfig"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
       "bytes": 10046,
       "kind": "component",
@@ -170,6 +179,15 @@
       "summary": "Market conventions of one interest-rate index.",
       "title": "RateIndexConventions",
       "type_name": "RateIndexConventions"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+      "bytes": 1521,
+      "kind": "input",
+      "path": "schemas/common/1/scenario_grid.schema.json",
+      "summary": "Structured-credit CPR x CDR x severity grid swept by the tranche scenario table.",
+      "title": "ScenarioGrid",
+      "type_name": "ScenarioGrid"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
