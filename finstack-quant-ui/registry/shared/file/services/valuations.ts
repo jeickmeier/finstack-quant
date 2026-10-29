@@ -17,7 +17,7 @@ export type ValuationsNative = {
       | "trancheBreakevenCdr"
       | "StructuredCredit"
       | "listModelsGrouped"
-      | "listStandardMetricsGrouped"
+      | "metricsForInstrument"
       | "metricMetadata"
     >;
   };
@@ -141,8 +141,8 @@ export function createValuationsService(
       );
     },
     models: () => context.result(() => instruments.listModelsGrouped()),
-    metrics: () =>
-      context.result(() => instruments.listStandardMetricsGrouped()),
+    metrics: (instrumentType) =>
+      context.result(() => instruments.metricsForInstrument(instrumentType)),
     metricMetadata: (keys) =>
       context.result(() => instruments.metricMetadata([...keys])),
     exportResult: (value) =>

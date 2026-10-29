@@ -193,7 +193,7 @@ export function useWorkbenchSession({
   const validate = useInstrumentValidator();
   const validateMarket = useMarketValidator();
   const models = useModels(),
-    metrics = useMetrics();
+    metrics = useMetrics(type || null);
   const candidate = useMemo<PriceRequest | null>(
     () =>
       instrument &&

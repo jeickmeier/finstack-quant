@@ -18,7 +18,7 @@ const result = native.priceInstrument(
 const fixture = {
   request,
   result,
-  groups: native.listStandardMetricsGrouped(),
+  groups: native.metricsForInstrument("bond"),
   metadata: native.metricMetadata(Object.keys(result.measures)),
   comparisonMetadata: native.metricMetadata([
     "ytm",

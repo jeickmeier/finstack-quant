@@ -473,6 +473,10 @@ scenario's baseline to the entry before it in that lineage and shows Rust's
 `abs_var` as delta columns and the shown pair's `VarianceReport` in
 `VarianceTable`; capital-structure rows have no native diff and show none.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
+`useMetrics(instrumentType)` returns the standard metrics Rust registers for
+that type (`metricsForInstrument`), grouped by native category; `null` disables
+it. `PricingParamsForm` reports selected metrics the type does not offer and
+never drops them.
 `useInstrumentValidator` accepts canonical text and an optional abort signal;
 `SchemaForm` owns the 250ms debounce and prevents superseded responses from
 replacing the current validation state.

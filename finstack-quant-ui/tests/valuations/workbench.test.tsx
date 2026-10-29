@@ -58,7 +58,7 @@ beforeEach(() => {
       case "models":
         return native.listModelsGrouped();
       case "metrics":
-        return native.listStandardMetricsGrouped();
+        return native.metricsForInstrument(request);
       case "metricMetadata":
         return native.metricMetadata(request);
       case "validate":

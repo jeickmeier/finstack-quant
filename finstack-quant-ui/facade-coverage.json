@@ -38,8 +38,8 @@
     "valuations.instruments.StructuredCredit",
     "valuations.instruments.instrumentCashflowsWithMarket",
     "valuations.instruments.listModelsGrouped",
-    "valuations.instruments.listStandardMetricsGrouped",
     "valuations.instruments.metricMetadata",
+    "valuations.instruments.metricsForInstrument",
     "valuations.instruments.priceInstrumentWithMarket",
     "valuations.instruments.trancheBreakevenCdr",
     "valuations.instruments.trancheDiscountMargin",
@@ -122,8 +122,7 @@
     "statements_analytics.plSummaryReport": "sd-credit-assessment",
     "statements_analytics.runSensitivity": "sd-sensitivity-goal-seek",
     "statements_analytics.runVariance": "sd-roll-forward-variance",
-    "statements_analytics.varianceBridge": "sd-roll-forward-variance",
-    "valuations.instruments.metricsForInstrument": "vd-metric-picker-per-instrument"
+    "statements_analytics.varianceBridge": "sd-roll-forward-variance"
   },
   "excluded": {
     "calibration.calibrationStepBaseCorrelation": "schema-form",

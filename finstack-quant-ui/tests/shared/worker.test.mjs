@@ -198,9 +198,12 @@ it("keys every pricing input, preserves snapshots, and forwards native history",
 });
 it("uses the exact native option registries and canonicalizes instrument text", async () => {
   expect(unwrap(await proxy.models())).toEqual(native.listModelsGrouped());
-  expect(unwrap(await proxy.metrics())).toEqual(
-    native.listStandardMetricsGrouped(),
-  );
+  for (const type of ["bond", "fx_option", "structured_credit"])
+    expect(unwrap(await proxy.metrics(type))).toEqual(
+      native.metricsForInstrument(type),
+    );
+  const unknown = await proxy.metrics("not_an_instrument");
+  expect(unknown.ok).toBe(false);
   expect(unwrap(await proxy.calendars())).toEqual(native.availableCalendars());
   expect(unwrap(await proxy.validate(requests.bond.instrumentJson))).toBe(
     native.validateInstrumentJson(requests.bond.instrumentJson),
