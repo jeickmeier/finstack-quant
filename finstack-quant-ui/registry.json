@@ -11,6 +11,7 @@
     "registry/calibration/registry.json",
     "registry/covenants/registry.json",
     "registry/scenarios/registry.json",
+    "registry/analytics/registry.json",
     "registry/models/registry.json",
     "registry/statements/registry.json"
   ],

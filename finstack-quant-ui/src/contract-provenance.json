@@ -1550,6 +1550,33 @@
         "declaration": "/**\n   * Per-tranche valuation, yield, spread and risk metrics computed from one\n   * tranche's own cashflows — the one per-note analytics entry point.\n   *\n   * `marketPricePct`, when provided, is the quoted clean price (% of CURRENT balance)\n   * the yield, z-spread and CS01 are solved against; otherwise the deal quote,\n   * or the tranche's own model price (zero z-spread). `metrics` lists registry\n   * metric ids (`\"dv01\"`, `\"default01\"`, …) valued on this note and returned\n   * in `metrics`, so tranche sensitivities sum to the deal's. Returns a typed\n   * `TrancheMetrics` object — a plain object with the same snake_case fields\n   * Python exposes through its typed `TrancheMetrics` wrapper. Pass it to\n   * `JSON.stringify` if a wire string is needed.\n   * @returns Typed `TrancheMetrics` object (PV, clean/dirty price, accrued, WAL, yield, z-spread, CS01, effective duration and convexity, requested registry metrics).\n   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.\n   * @param trancheId - Stable tranche identifier used to select the required domain object.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param marketPricePct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.\n   * @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.\n   * @throws Error - Throws a JavaScript exception if the market JSON is malformed; a metric id is unknown; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.\n   */\n  trancheMetrics(\n    deal: StructuredCredit,\n    trancheId: string,\n    marketJson: JsonInput,\n    asOf: string,\n    marketPricePct?: number | null,\n    metrics?: string[] | null\n  ): TrancheMetrics;",
         "sha256": "bc91ceb63532e92bfd4404b4bd0635320a59dc87948d1204aeaffa7d38ca3e92"
       }
+    },
+    {
+      "id": "performance-report",
+      "route": "returned-analytics",
+      "deferred": "machine-readable-units",
+      "convention": "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
+      "api": {
+        "name": "analytics.Performance#summary",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "Performance",
+        "member": "summary",
+        "inputs": [
+          {
+            "name": "riskFreeRate",
+            "type": "number | null",
+            "optional": true
+          },
+          {
+            "name": "confidence",
+            "type": "number | null",
+            "optional": true
+          }
+        ],
+        "returns": "TableEnvelope",
+        "declaration": "/**\n   * The standard per-ticker summary as a table envelope: one row per ticker\n   * with 22 metric columns plus a leading `ticker` dimension column. Same\n   * rows as the Python `Performance.to_dataframe`.\n   * @returns Column-oriented table envelope of the summary metrics.\n   * @param riskFreeRate - Annualized risk-free rate as a decimal (0.02 = 2%); affects only `sharpe`. Defaults to 0.0.\n   * @param confidence - Tail confidence as a decimal probability applied to VaR, ES and tail ratio; defaults to 0.95.\n   * @throws Error - Throws a JavaScript exception if the panel is too short to annualize (`cagr` / `calmar`) or the table cannot be converted.\n   */\n  summary(riskFreeRate?: number | null, confidence?: number | null): TableEnvelope;",
+        "sha256": "b6948ac2b6f84f9f0eec52dbaafee5803f0d35c0785561763f7666fade6a8acb"
+      }
     }
   ],
   "hostDeclarations": [

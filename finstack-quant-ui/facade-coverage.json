@@ -1,10 +1,12 @@
 {
   "covered": [
+    "analytics.Performance",
     "calibration.calibrate",
     "calibration.dryRun",
     "calibration.validateCalibration",
     "cashflows.calendarYearLadder",
     "core.Currency",
+    "core.FiscalConfig",
     "core.FxDeltaVolSurface",
     "core.MarketContext",
     "core.Money",
@@ -56,13 +58,11 @@
     "valuations.valuationResultToJson"
   ],
   "planned": {
-    "analytics.Performance": "AN-1",
     "attribution.attributePnlMany": "ATR-1",
     "attribution.defaultWaterfallOrder": "ATR-1",
     "attribution.pnlAttributionExplainText": "ATR-1",
     "attribution.pnlAttributionPctOfTotal": "ATR-1",
     "attribution.pnlAttributionResidualWithinTolerance": "ATR-1",
-    "core.FiscalConfig": "AN-1",
     "core.VolSurface": "vd-surface-arbitrage-badge",
     "covenants.covLite": "sd-covenant-engine-editor",
     "covenants.lboStandard": "sd-covenant-engine-editor",

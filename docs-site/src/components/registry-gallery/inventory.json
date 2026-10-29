@@ -295,6 +295,12 @@
       "worker": "none"
     },
     {
+      "name": "performance-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the report returned by usePerformanceReport (analytics.Performance over a host-supplied panel). A ticker control selects the per-ticker sections. Lookback tiles show MTD, QTD, YTD and FYTD to the returned reference date; the summary is the returned TableEnvelope; cumulative returns (every ticker), drawdown, rolling series, monthly returns (heatmap) and annual returns are drawn against each ticker's own active dates; drawdown episodes are listed largest first. Values are the decimal fractions and ratios Rust returns, with no units inferred; non-finite values are left out of figures and shown as returned elsewhere. The monthly colour domain is the caller's, else the extent of the returned values. Accepts report, loading, error, initialTicker, monthlyDomain, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "monte-carlo-diagnostics",
       "type": "registry:component",
       "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat.",
@@ -426,6 +432,10 @@
     },
     {
       "name": "use-apply-market-scenario",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-performance-report",
       "type": "registry:hook"
     },
     {
@@ -925,6 +935,10 @@
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
       "sha256": "2df669e995742cd83fa991c28adff9ea992532594fcf3911aa3bd54ed83ad0c9"
+    },
+    {
+      "path": "finstack-quant-ui/tests/analytics/explicit.json",
+      "sha256": "854fb65e7217219f57c52658e1f2e3b14cfab5884a32f726734edca87650e9eb"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",

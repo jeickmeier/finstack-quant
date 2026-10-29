@@ -18,6 +18,11 @@ import type {
   CalendarYearLadderRow,
   ArbitrageValidationResult,
   ApplicationReport,
+  DatedSeries,
+  DrawdownEpisode,
+  LookbackReturns,
+  PeriodicReturn,
+  TableEnvelope,
   statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
@@ -187,6 +192,75 @@ export interface MarketScenarioApplication {
   /** The shocked instrument when the scenario mutates instruments, else the request's. */
   readonly instrumentJson: string;
 }
+/** A ticker-major panel for analytics.Performance; every omitted option is left to Rust. */
+export interface PerformanceReportRequest {
+  /** ISO-8601 observation dates, ascending, one per value of each series. */
+  readonly dates: readonly string[];
+  /** `values[ticker][date]`: simple decimal returns ("returns") or price levels ("prices"). */
+  readonly values: readonly (readonly number[])[];
+  /** "returns" builds with Performance.fromReturns, "prices" with new Performance. */
+  readonly kind: "returns" | "prices";
+  /** Ticker labels aligned with the outer elements of `values`. */
+  readonly tickerNames: readonly string[];
+  /** Ticker used as the benchmark series; omitted leaves it to Rust. */
+  readonly benchmarkTicker?: string | null;
+  /** Observation frequency token such as "daily"; omitted is Rust's default. */
+  readonly frequency?: string | null;
+  /** Annualized decimal risk-free rate for summary() and rollingSharpe; omitted is Rust's default. */
+  readonly riskFreeRate?: number | null;
+  /** Tail confidence for summary() VaR, ES and tail ratio; omitted is Rust's default. */
+  readonly confidence?: number | null;
+  /** Rolling window in observations; omitted is Rust's default. */
+  readonly window?: number | null;
+  /** Number of drawdown episodes per ticker; omitted is Rust's default. */
+  readonly episodes?: number | null;
+  /** Lookback end date; omitted is the last active panel date. */
+  readonly lookbackDate?: string | null;
+  /** Fiscal-year start for FYTD (a core.FiscalConfig); omitted is Rust's calendar year. */
+  readonly fiscalYearStart?: {
+    readonly month: number;
+    readonly day: number;
+  } | null;
+}
+/** A native rolling series with its values as a plain array (non-finite windows stay NaN). */
+export type PerformanceSeries = Omit<DatedSeries, "values"> & {
+  values: number[];
+};
+/** One ticker's native series, each aligned with that ticker's own active dates. */
+export interface PerformanceTickerReport {
+  /** getActiveDatesForTicker: the dates `cumulativeReturns` and `drawdowns` align with. */
+  activeDates: string[];
+  cumulativeReturns: number[];
+  drawdowns: number[];
+  /** drawdownDetails, largest first. */
+  drawdownEpisodes: DrawdownEpisode[];
+  rollingSharpe: PerformanceSeries;
+  rollingVolatility: PerformanceSeries;
+}
+/** The native analytics.Performance results of one panel; nothing is computed in TypeScript. */
+export interface PerformanceReport {
+  tickerNames: string[];
+  /** getBenchmarkIdx when the request named a benchmark, else null. */
+  benchmarkIdx: number | null;
+  frequency: string;
+  activeDates: string[];
+  summary: TableEnvelope;
+  /** In tickerNames order. */
+  tickers: PerformanceTickerReport[];
+  /** periodicReturns("monthly"), ticker-major. */
+  monthly: PeriodicReturn[][];
+  /** periodicReturns("annual"), ticker-major. */
+  annual: PeriodicReturn[][];
+  lookback: {
+    /** The requested lookback date, else the last active panel date. */
+    refDate: string;
+    returns: LookbackReturns;
+    /** The fiscal-year start passed to Rust, else null (calendar year). */
+    fiscalYearStart: { month: number; day: number } | null;
+  };
+  /** correlationMatrix rows in tickerNames order. */
+  correlation: { matrix: number[][]; repaired: boolean };
+}
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -332,6 +406,13 @@ export interface ScenariosApi {
     request: MarketScenarioApplicationRequest,
   ): Promise<Envelope<MarketScenarioApplication>>;
 }
+/** analytics: performance reports over a host-supplied panel. */
+export interface AnalyticsApi {
+  /** analytics.Performance (fromReturns or the price constructor) + summary, series, drawdowns, rolling, periodic, lookback (core.FiscalConfig when a fiscal start is set) and correlation; every handle is freed. */
+  performanceReport(
+    request: PerformanceReportRequest,
+  ): Promise<Envelope<PerformanceReport>>;
+}
 /** calibration: envelope validation, static diagnostics and calibration runs. */
 export interface CalibrationApi {
   /** calibration.validateCalibration: full envelope includes prior_market, quote sets, data and every plan setting. */
@@ -409,6 +490,7 @@ export type WorkerApi = {
   ValuationsApi &
   CashflowsApi &
   ScenariosApi &
+  AnalyticsApi &
   CalibrationApi &
   ModelsApi &
   StatementsApi;

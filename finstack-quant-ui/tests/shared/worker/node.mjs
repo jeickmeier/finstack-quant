@@ -135,6 +135,39 @@ class Money extends facade.core.Money {
     return handle;
   }
 }
+let performanceConstructed = 0,
+  performanceFreed = 0;
+function countPerformance(handle) {
+  performanceConstructed++;
+  const free = handle.free.bind(handle);
+  handle.free = () => {
+    free();
+    performanceFreed++;
+  };
+  return handle;
+}
+class Performance extends facade.analytics.Performance {
+  constructor(...args) {
+    super(...args);
+    countPerformance(this);
+  }
+  static fromReturns(...args) {
+    return countPerformance(super.fromReturns(...args));
+  }
+}
+let fiscalConstructed = 0,
+  fiscalFreed = 0;
+class FiscalConfig extends facade.core.FiscalConfig {
+  constructor(...args) {
+    super(...args);
+    fiscalConstructed++;
+    const free = this.free.bind(this);
+    this.free = () => {
+      free();
+      fiscalFreed++;
+    };
+  }
+}
 const service = createService({
   initialize: async () => {
     if (workerData.fail)
@@ -146,7 +179,15 @@ const service = createService({
     await init({ module_or_path: readFileSync(workerData.wasmPath) });
   },
   ...facade,
-  core: { ...facade.core, FxDeltaVolSurface, MarketContext, Money, VolCube },
+  core: {
+    ...facade.core,
+    FiscalConfig,
+    FxDeltaVolSurface,
+    MarketContext,
+    Money,
+    VolCube,
+  },
+  analytics: { ...facade.analytics, Performance },
   models: {
     ...facade.models,
     volatility: {
@@ -191,6 +232,10 @@ expose(
       cubeJson,
       moneyConstructed,
       moneyFreed,
+      performanceConstructed,
+      performanceFreed,
+      fiscalConstructed,
+      fiscalFreed,
     }),
   },
   nodeEndpoint(parentPort),

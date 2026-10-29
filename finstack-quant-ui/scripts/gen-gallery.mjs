@@ -33,6 +33,7 @@ const sources = {
   trancheAnalytics: "tests/valuations/scenario-table/tranche-analytics.json",
   cashflows: "tests/valuations/cashflows/cases.json",
   marketScenario: "tests/scenarios/application/cases.json",
+  performance: "tests/analytics/explicit.json",
   details: "tests/valuations/details/cases.json",
   irsInstrument:
     "../finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
