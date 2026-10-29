@@ -28,3 +28,15 @@ const reportJson = serializeHost(
 );
 await write("analyst-result.json", resultJson);
 await write("analyst-check-report.json", reportJson);
+// Native P&L summary TableEnvelope (long layout) over the canonical income
+// lines for the four 2025 quarters, presented by the table-envelope item.
+await write(
+  "analyst-pl-summary.json",
+  serializeHost(
+    native.plSummaryReport(
+      resultJson,
+      ["revenue", "cogs", "gross_profit", "opex", "ebitda", "net_income"],
+      ["2025Q1", "2025Q2", "2025Q3", "2025Q4"],
+    ),
+  ),
+);

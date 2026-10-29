@@ -19,6 +19,12 @@
       "worker": "none"
     },
     {
+      "name": "table-envelope",
+      "type": "registry:ui",
+      "docs": "Display-only table-envelope primitive. Import the installed finstack theme. Pass the TableEnvelope a Rust table function returned (for example statements_analytics.plSummaryReport or Performance#summary) and a caption. Columns and rows keep their native order; numeric columns are right-aligned with every supplied digit; nothing is sorted, grouped, totalled, rounded or converted. No worker or workbench is required.",
+      "worker": "none"
+    },
+    {
       "name": "enum-field",
       "type": "registry:ui",
       "docs": "Controlled enum-field primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
@@ -793,6 +799,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-table-envelope",
+      "type": "registry:lib"
+    },
+    {
       "name": "instrument-catalogue",
       "type": "registry:lib"
     },
@@ -861,6 +871,10 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
       "sha256": "36f2c7475ea85b8f3101f649330243ff9d94c4c8d4d98b13c3178ddb6e655722"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-pl-summary.json",
+      "sha256": "ae0b624dc30e44539a907b91c25f18a8503ef58bd1e60c8d95e2ee28b2ed0b62"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",

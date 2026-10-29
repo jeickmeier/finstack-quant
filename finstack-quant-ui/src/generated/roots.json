@@ -433,5 +433,10 @@
     "uri": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
     "source": "finstack-quant/statements/schemas/statements/1/statement_result.schema.json",
     "schema": "schemas/statement_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
+    "source": "finstack-quant/core/schemas/table/1/table_envelope.schema.json",
+    "schema": "schemas/table_envelope.json"
   }
 ]

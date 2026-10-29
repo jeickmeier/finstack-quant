@@ -1125,6 +1125,15 @@ export const importHarnesses = {
       name: "contract-statement-result",
       modules: modules.length,
     })),
+  "contract-table-envelope": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/table_envelope.json"),
+      import("@/lib/finstack/generated/types/table_envelope"),
+      import("@/lib/finstack/generated/meta/table_envelope"),
+    ]).then((modules) => ({
+      name: "contract-table-envelope",
+      modules: modules.length,
+    })),
   "instrument-catalogue": () =>
     Promise.all([
       import("@/lib/finstack/generated/instruments"),

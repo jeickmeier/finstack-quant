@@ -79,6 +79,37 @@
       }
     },
     {
+      "name": "table-envelope",
+      "type": "registry:ui",
+      "title": "Table envelope",
+      "description": "Presents a native column-oriented TableEnvelope in its own column and row order, with labelFor headers, exact numeric digits and null cells as an em dash.",
+      "docs": "Display-only table-envelope primitive. Import the installed finstack theme. Pass the TableEnvelope a Rust table function returned (for example statements_analytics.plSummaryReport or Performance#summary) and a caption. Columns and rows keep their native order; numeric columns are right-aligned with every supplied digit; nothing is sorted, grouped, totalled, rounded or converted. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "table/table-envelope/table-envelope.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/table/table-envelope/table-envelope.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/contract-table-envelope"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4"],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "enum-field",
       "type": "registry:ui",
       "title": "Enum field",

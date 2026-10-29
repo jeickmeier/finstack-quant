@@ -243,6 +243,7 @@ finstack-quant-ui/src/generated/meta/snowball.ts
 finstack-quant-ui/src/generated/meta/statement_result.ts
 finstack-quant-ui/src/generated/meta/structured_credit.ts
 finstack-quant-ui/src/generated/meta/swaption.ts
+finstack-quant-ui/src/generated/meta/table_envelope.ts
 finstack-quant-ui/src/generated/meta/tarn.ts
 finstack-quant-ui/src/generated/meta/term_loan.ts
 finstack-quant-ui/src/generated/meta/trs_equity.ts
@@ -332,6 +333,7 @@ finstack-quant-ui/src/generated/schemas/snowball.json
 finstack-quant-ui/src/generated/schemas/statement_result.json
 finstack-quant-ui/src/generated/schemas/structured_credit.json
 finstack-quant-ui/src/generated/schemas/swaption.json
+finstack-quant-ui/src/generated/schemas/table_envelope.json
 finstack-quant-ui/src/generated/schemas/tarn.json
 finstack-quant-ui/src/generated/schemas/term_loan.json
 finstack-quant-ui/src/generated/schemas/trs_equity.json
@@ -420,6 +422,7 @@ finstack-quant-ui/src/generated/types/snowball.ts
 finstack-quant-ui/src/generated/types/statement_result.ts
 finstack-quant-ui/src/generated/types/structured_credit.ts
 finstack-quant-ui/src/generated/types/swaption.ts
+finstack-quant-ui/src/generated/types/table_envelope.ts
 finstack-quant-ui/src/generated/types/tarn.ts
 finstack-quant-ui/src/generated/types/term_loan.ts
 finstack-quant-ui/src/generated/types/trs_equity.ts
