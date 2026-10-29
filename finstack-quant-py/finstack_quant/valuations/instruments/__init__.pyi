@@ -142,6 +142,7 @@ from finstack_quant.valuations.instruments._pricing import (
     list_standard_metrics as list_standard_metrics,
     list_standard_metrics_grouped as list_standard_metrics_grouped,
     metric_metadata as metric_metadata,
+    metrics_for_instrument as metrics_for_instrument,
     price_instrument as price_instrument,
 )
 from finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms import (
@@ -256,6 +257,7 @@ __all__ = [
     "list_standard_metrics",
     "list_standard_metrics_grouped",
     "metric_metadata",
+    "metrics_for_instrument",
     "pretty_instrument_json",
     "price_instrument",
     "tranche_breakeven_cdr",

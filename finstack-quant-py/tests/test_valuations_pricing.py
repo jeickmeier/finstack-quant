@@ -9,6 +9,8 @@ import pytest
 
 from finstack_quant.valuations.instruments import (
     instrument_cashflows,
+    list_standard_metrics_grouped,
+    metrics_for_instrument,
     price_instrument,
     tranche_breakeven_cdr,
     tranche_discount_margin,
@@ -739,3 +741,21 @@ def test_commodity_spot_cash_claim_survives_json_replay() -> None:
     assert float(value.price) == pytest.approx(10_000.0, abs=1e-8)
     paid = price_instrument(encoded, json.dumps(market), "2024-01-21", model="black76")
     assert float(paid.price) == 0.0
+
+
+def test_metrics_for_instrument_keeps_only_registered_metrics_per_type() -> None:
+    """Each type lists the grouped standard metrics Rust applies to it."""
+    standard = list_standard_metrics_grouped()
+    fx_option = metrics_for_instrument("fx_option")
+    assert fx_option
+    for group, ids in fx_option.items():
+        assert ids
+        assert set(ids) <= set(standard[group])
+    assert not any("wal" in ids for ids in fx_option.values())
+    assert any("wal" in ids for ids in metrics_for_instrument("structured_credit").values())
+
+
+def test_metrics_for_instrument_rejects_unknown_type() -> None:
+    """An unknown instrument type maps to ValueError."""
+    with pytest.raises(ValueError, match="Unknown instrument type"):
+        metrics_for_instrument("not_an_instrument")

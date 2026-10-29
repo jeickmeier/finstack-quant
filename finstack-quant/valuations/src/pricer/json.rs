@@ -316,6 +316,68 @@ pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
         .collect()
 }
 
+/// List the standard metrics registered for one instrument type, grouped by
+/// display category.
+///
+/// This is the per-instrument counterpart to [`list_standard_metrics_grouped`]:
+/// each group keeps only the metrics for which the standard registry's
+/// [`MetricRegistry::is_applicable`](crate::metrics::MetricRegistry::is_applicable)
+/// holds for `instrument_type`, and groups left empty are omitted. A listed
+/// metric is registered for the type; whether it computes under a particular
+/// pricing model still depends on that model. Metrics outside every display
+/// group are not listed (see
+/// [`MetricRegistry::metrics_for_instrument`](crate::metrics::MetricRegistry::metrics_for_instrument)
+/// for the flat, ungrouped list).
+///
+/// # Arguments
+///
+/// * `instrument_type` - Canonical [`InstrumentType`](crate::pricer::InstrumentType)
+///   display string, matched exactly (snake case, for example `"bond"`,
+///   `"fx_option"` or `"structured_credit"`); the same tag an instrument
+///   envelope carries in its `type` field.
+///
+/// # Returns
+///
+/// A map from display-group name to that group's applicable metric IDs in
+/// ascending order, in ascending group-name order.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `instrument_type` is not a known
+/// instrument type.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_valuations::pricer::metrics_for_instrument;
+///
+/// let fx = metrics_for_instrument("fx_option")?;
+/// assert!(!fx.values().flatten().any(|id| id == "wal"));
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn metrics_for_instrument(
+    instrument_type: &str,
+) -> finstack_quant_core::Result<BTreeMap<String, Vec<String>>> {
+    let instrument = instrument_type
+        .parse::<super::InstrumentType>()
+        .map_err(|e| {
+            Error::Validation(format!("Unknown instrument type: '{instrument_type}'. {e}"))
+        })?;
+    let registry = crate::pricer::STANDARD.metrics();
+    Ok(registry
+        .available_metrics_grouped()
+        .into_iter()
+        .filter_map(|(group, metrics)| {
+            let ids: Vec<String> = metrics
+                .into_iter()
+                .filter(|metric| registry.is_applicable(metric, instrument))
+                .map(|metric| metric.to_string())
+                .collect();
+            (!ids.is_empty()).then(|| (group.display_name().to_string(), ids))
+        })
+        .collect())
+}
+
 /// Canonical per-key metric interpretation for host presentation.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -1025,6 +1087,37 @@ mod tests {
             "notional": {"amount": "1000000", "currency": "EUR"},
             "attributes": {},
         })
+    }
+
+    #[test]
+    fn metrics_for_instrument_filters_by_registered_applicability() {
+        let offers = |ty: &str| -> bool {
+            metrics_for_instrument(ty)
+                .expect("known instrument type")
+                .values()
+                .flatten()
+                .any(|id| id == "wal")
+        };
+        assert!(!offers("fx_option"), "fx_option must not offer wal");
+        assert!(
+            offers("structured_credit"),
+            "structured_credit must offer wal"
+        );
+
+        let fx = metrics_for_instrument("fx_option").expect("fx_option");
+        let all = list_standard_metrics_grouped();
+        assert!(!fx.is_empty());
+        for (group, ids) in &fx {
+            assert!(!ids.is_empty(), "empty group {group} must be omitted");
+            let standard = all.get(group).expect("group of the standard listing");
+            assert!(ids.iter().all(|id| standard.contains(id)));
+        }
+    }
+
+    #[test]
+    fn metrics_for_instrument_rejects_unknown_type() {
+        let err = metrics_for_instrument("not_an_instrument").expect_err("unknown type");
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
     }
 
     #[test]
