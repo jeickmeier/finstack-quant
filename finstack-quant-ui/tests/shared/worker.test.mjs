@@ -89,6 +89,8 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "metrics",
     "metricMetadata",
     "exportResult",
+    // CashflowsApi
+    "cashflowLadder",
     // CalibrationApi
     "validateCalibration",
     "dryRun",
@@ -128,6 +130,20 @@ it("compares real worker results and errors with the direct native facade", asyn
       requests.bond.model,
     ),
   );
+  // One native ladder per row currency of the returned envelope.
+  const ladder = unwrap(await proxy.cashflowLadder(cashflows));
+  expect(ladder).toEqual([
+    {
+      currency: "USD",
+      rows: native.calendarYearLadder(
+        cashflows.flows.map((flow) => flow.date),
+        cashflows.flows.map((flow) => flow.kind),
+        cashflows.flows.map((flow) => flow.amount),
+        cashflows.flows.map((flow) => flow.native_pv),
+      ),
+    },
+  ]);
+  expect(cashflows.flows.every((flow) => flow.currency === "USD")).toBe(true);
 });
 it("keys every pricing input, preserves snapshots, and forwards native history", async () => {
   const query = new QueryClient();

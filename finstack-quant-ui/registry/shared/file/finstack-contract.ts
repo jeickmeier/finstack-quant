@@ -13,6 +13,7 @@ import type {
   Explanation,
   DependencyTree,
   CheckReport,
+  CalendarYearLadderRow,
   valuations,
 } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
@@ -81,6 +82,15 @@ export interface StatementRollupRequest {
   readonly resultsJson: string;
   readonly specJson: string;
 }
+/** Native cashflow envelope object returned by the facade's instrument cashflow export. */
+export type CashflowEnvelope = ReturnType<
+  typeof valuations.instruments.instrumentCashflowsWithMarket
+>;
+/** One row currency's native calendar-year ladder, in the units of that currency. */
+export interface CurrencyLadder {
+  readonly currency: CashflowEnvelope["flows"][number]["currency"];
+  readonly rows: CalendarYearLadderRow[];
+}
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -130,13 +140,7 @@ export interface ValuationsApi {
   /** valuations.instruments.validateInstrumentJson: validate and canonicalize instrument JSON. */
   validate(instrumentJson: string): Promise<Envelope<string>>;
   /** valuations.instruments.validateInstrumentJson + instrumentCashflowsWithMarket over the cached market handle; the native envelope object. */
-  cashflows(
-    request: CashflowRequest,
-  ): Promise<
-    Envelope<
-      ReturnType<typeof valuations.instruments.instrumentCashflowsWithMarket>
-    >
-  >;
+  cashflows(request: CashflowRequest): Promise<Envelope<CashflowEnvelope>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
   scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
   /** valuations.instruments.listModelsGrouped. */
@@ -147,6 +151,13 @@ export interface ValuationsApi {
   metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */
   exportResult(value: ValuationResult): Promise<Envelope<string>>;
+}
+/** cashflows: aggregation of an exported cashflow envelope. */
+export interface CashflowsApi {
+  /** cashflows.calendarYearLadder once per row currency, in first-appearance order, over each flow's date, kind, amount and native_pv (row-currency PV before FX conversion and any scenario price shock). */
+  cashflowLadder(
+    cashflows: CashflowEnvelope,
+  ): Promise<Envelope<CurrencyLadder[]>>;
 }
 /** calibration: envelope validation, static diagnostics and calibration runs. */
 export interface CalibrationApi {
@@ -207,6 +218,7 @@ export type WorkerApi = {
   ): Promise<Envelope<{ state: "ready"; worker: boolean }>>;
 } & CoreApi &
   ValuationsApi &
+  CashflowsApi &
   CalibrationApi &
   ModelsApi &
   StatementsApi;

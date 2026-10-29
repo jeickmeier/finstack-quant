@@ -357,6 +357,11 @@
           "target": "workers/services/valuations.ts"
         },
         {
+          "path": "file/services/cashflows.ts",
+          "type": "registry:file",
+          "target": "workers/services/cashflows.ts"
+        },
+        {
           "path": "file/services/calibration.ts",
           "type": "registry:file",
           "target": "workers/services/calibration.ts"

@@ -34,6 +34,7 @@ export const importHarnesses = {
       import("@/workers/services/context"),
       import("@/workers/services/core"),
       import("@/workers/services/valuations"),
+      import("@/workers/services/cashflows"),
       import("@/workers/services/calibration"),
       import("@/workers/services/models"),
       import("@/workers/services/statements"),
@@ -67,6 +68,13 @@ export const importHarnesses = {
     Promise.all([
       import("@/hooks/valuations/use-cashflows/use-cashflows"),
     ]).then((modules) => ({ name: "use-cashflows", modules: modules.length })),
+  "use-cashflow-ladder": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-cashflow-ladder/use-cashflow-ladder"),
+    ]).then((modules) => ({
+      name: "use-cashflow-ladder",
+      modules: modules.length,
+    })),
   "use-scenario-table": () =>
     Promise.all([
       import("@/hooks/valuations/use-scenario-table/use-scenario-table"),

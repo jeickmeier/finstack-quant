@@ -1,5 +1,6 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
   Table,
   TableHeader,
@@ -13,7 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import { formatRaw, formatRawMoney } from "@/lib/finstack/format/format";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
-import { readCashflows, type CashflowSchedule } from "./cashflow-data";
+import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import {
+  readCashflows,
+  type CashflowLadder,
+  type CashflowSchedule,
+} from "./cashflow-data";
 
 const diagnostics = [
   ["rate", "Rate", "Projected or contractual rate, as supplied"],
@@ -32,15 +39,61 @@ const extraDiagnostics = [
   ["beginning_balance", "Beginning balance"],
   ["ending_balance", "Ending balance"],
 ] as const;
-/** Native cashflow envelope as a table, with a host serialization of the supplied object. */
+const views = [
+  { value: "schedule", label: "Schedule" },
+  { value: "ladder", label: "Annual ladder" },
+] as const;
+type LadderRow = CashflowLadder["rows"][number];
+/** Supplied native ladder rows in a row currency; values are formatted, never summed. */
+function ladderColumns(
+  currency: CashflowLadder["currency"],
+): ColumnDef<{}, LadderRow, any>[] {
+  const money = (
+    id: "non_principal" | "principal" | "pv",
+    header: string,
+    title?: string,
+  ): ColumnDef<{}, LadderRow, any> => ({
+    id,
+    header: () => <span title={title}>{header}</span>,
+    accessorFn: (row) => row[id],
+    meta: { className: "text-right finstack-numeric font-sans" },
+    cell: (context) => (
+      <span className="whitespace-nowrap" title={String(context.getValue())}>
+        {formatRawMoney({ amount: String(context.getValue()), currency })}
+      </span>
+    ),
+  });
+  return [
+    {
+      id: "year",
+      header: "Year",
+      accessorFn: (row) => row.year,
+      meta: { className: "font-mono", rowHeader: true },
+    },
+    money("non_principal", "Non-principal"),
+    money("principal", "Principal"),
+    money(
+      "pv",
+      "Native PV",
+      "Row-currency present value before FX conversion and any scenario price shock",
+    ),
+  ];
+}
+/** Native cashflow envelope as a table, with an optional native annual ladder and a host serialization of the supplied object. */
 export function CashflowViewer({
   cashflows,
+  ladder,
+  ladderError,
   loading = false,
   error: suppliedError,
   density = "compact",
 }: {
   /** Native cashflow envelope object as returned by the facade; no worker or query provider is required. */
   cashflows?: CashflowSchedule | null;
+  /** Native calendar-year ladder per row currency of the same envelope (useCashflowLadder); supplying it, even as null while pending, adds the Annual ladder view. */
+  ladder?: readonly CashflowLadder[] | null;
+  /** Native ladder error supplied by the owner of the ladder request. */
+  ladderError?: string | null;
   loading?: boolean;
   /** Native query error supplied by the owner of the request. */
   error?: string | null;
@@ -65,6 +118,9 @@ export function CashflowViewer({
       return null;
     }
   }, [cashflows]);
+  const [view, setView] = useState<"schedule" | "ladder">("schedule");
+  const hasLadder = ladder !== undefined || Boolean(ladderError);
+  const showLadder = hasLadder && view === "ladder";
   const schedule = presentation.schedule;
   const error = suppliedError
     ? `Cashflows unavailable: ${suppliedError}`
@@ -107,7 +163,54 @@ export function CashflowViewer({
               {schedule.model}
             </span>
           </div>
-          {schedule.flows.length ? (
+          {hasLadder && (
+            <div className="mb-3 print:hidden">
+              <EnumField
+                label="Cashflow view"
+                orientation="horizontal"
+                layout="radio"
+                value={view}
+                onValueChange={(next) =>
+                  setView(next === "ladder" ? "ladder" : "schedule")
+                }
+                options={views}
+              />
+            </div>
+          )}
+          {showLadder ? (
+            <div aria-label="Annual ladder" role="group" className="space-y-4">
+              {ladderError ? (
+                <p role="alert" className="text-sm text-error">
+                  Annual ladder unavailable: {ladderError}
+                </p>
+              ) : !ladder ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Loading annual ladder…
+                </p>
+              ) : ladder.length ? (
+                ladder.map((entry) => (
+                  <FinstackTable
+                    key={entry.currency}
+                    data={[...entry.rows]}
+                    columns={ladderColumns(entry.currency)}
+                    getRowId={(row) => String(row.year)}
+                    caption={`Annual ladder · ${entry.currency}`}
+                    density={density}
+                    emptyState="No ladder rows returned."
+                  />
+                ))
+              ) : (
+                <p className="py-4 text-sm text-muted-foreground">
+                  No ladder rows returned.
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Rust calendar-year ladder per row currency. Amounts and native
+                PV are in that currency, before FX conversion and any scenario
+                price shock; no FX conversion or totals across currencies.
+              </p>
+            </div>
+          ) : schedule.flows.length ? (
             <div className="max-w-full [&_[data-slot=table-container]]:print:overflow-visible">
               <Table
                 aria-label="Cashflow schedule"
@@ -285,10 +388,12 @@ export function CashflowViewer({
                 `Total PV · ${formatRawMoney({ amount: String(schedule.total_pv), currency: schedule.currency })}`}
             </span>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Amounts use each row’s currency. PV and total PV use reporting
-            currency {schedule.currency}.
-          </p>
+          {!showLadder && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Amounts use each row’s currency. PV and total PV use reporting
+              currency {schedule.currency}.
+            </p>
+          )}
         </>
       )}
       {!loading && !error && !schedule && (

@@ -419,7 +419,8 @@ the consumer's source directory (`src/` when the application has one).
 The worker uses the consumer's standard `@/lib/finstack` alias for the installed
 codec. The shared registry index owns these worker files.
 The contract (`workers/finstack-contract.ts`) groups the API by crate
-(`CoreApi`, `ValuationsApi`, `CalibrationApi`, `ModelsApi`, `StatementsApi`), and
+(`CoreApi`, `ValuationsApi`, `CashflowsApi`, `CalibrationApi`, `ModelsApi`,
+`StatementsApi`), and
 each method's comment names the facade call it wraps. The service
 (`workers/finstack-service.ts`) is a composer over `workers/services/<crate>.ts`,
 which share `workers/services/context.ts`. A new crate adds its interface to the
@@ -452,6 +453,14 @@ clone values; export through the worker's `exportResult` method for native
 canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns the native cashflow
 envelope object. `CashflowViewer` accepts that object as `cashflows` plus optional loading/error props and needs no provider. It presents native rows in a table, with `serializeHost` JSON copy/download in a secondary **Envelope JSON** disclosure;
 unsupported export preserves caller pricing/model state and shows the native error. The workbench owns one cashflow query for both display and its print snapshot.
+`useCashflowLadder` (the individual `use-cashflow-ladder` item, beside
+`use-cashflows`) takes that envelope object; the worker partitions its flows by
+row currency in first-appearance order and calls `cashflows.calendarYearLadder`
+once per currency over each flow's `native_pv`, the row-currency PV before FX
+conversion and any scenario price shock (Rust requires PVs in the units of the
+amounts). `CashflowViewer`'s optional `ladder` (and `ladderError`) props add a
+Schedule / Annual ladder toggle with one table per currency headed Native PV;
+nothing is summed or converted across currencies.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useInstrumentValidator` accepts canonical text and an optional abort signal;
 `SchemaForm` owns the 250ms debounce and prevents superseded responses from

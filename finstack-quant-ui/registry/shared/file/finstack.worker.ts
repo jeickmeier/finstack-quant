@@ -2,6 +2,7 @@ import { expose } from "comlink";
 import init, {
   core,
   valuations,
+  cashflows,
   models,
   calibration,
   statements,
@@ -13,6 +14,7 @@ expose(
   createService({
     initialize: (url) => init(url ? { module_or_path: url } : undefined),
     core,
+    cashflows,
     models,
     calibration,
     statements,

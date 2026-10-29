@@ -55,8 +55,29 @@ export async function verifyItem(page, item, evidence, repo, harness) {
     const download = await downloadPromise;
     assert.equal(download.suggestedFilename(), "cashflows.json");
     assert.equal(await readFile(await download.path(), "utf8"), expected);
+    // The annual ladder: one native table per row currency, in the supplied
+    // order and row count (years only; the gallery bundle may rewrite digits).
+    const ladder = data.cashflows.cases.find(
+      (entry) => entry.type === "xccy_swap",
+    ).ladder;
+    await viewer
+      .getByRole("radio", { name: "Annual ladder", exact: true })
+      .click();
+    const group = viewer.getByRole("group", { name: "Annual ladder" });
+    for (const { currency, rows } of ladder) {
+      const table = group.getByRole("table", {
+        name: `Annual ladder · ${currency}`,
+        exact: true,
+      });
+      await expect(table).toBeVisible();
+      assert.deepEqual(
+        await table.locator("tbody tr > :first-child").allTextContents(),
+        rows.map((row) => String(row.year)),
+      );
+    }
+    assert.equal(await group.getByRole("table").count(), ladder.length);
     checks.push(
-      "mixed-currency native envelope tabled; shown JSON is its host serialization; copy and download equal the shown text",
+      "mixed-currency native envelope tabled; shown JSON is its host serialization; copy and download equal the shown text; annual ladder tabled per row currency",
     );
   }
   if (item.name === "finstack-chart") {

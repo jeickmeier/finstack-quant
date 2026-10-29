@@ -117,6 +117,7 @@ export function PricingWorkbench({
     shown,
     measureMetadata,
     cashflows,
+    cashflowLadder,
     cashflowModel,
     preparing,
     printMarket,
@@ -512,6 +513,8 @@ export function PricingWorkbench({
                     <CashflowViewer
                       density={currentDensity}
                       cashflows={cashflows.data}
+                      ladder={cashflowLadder.data ?? null}
+                      ladderError={cashflowLadder.error?.message}
                       loading={
                         cashflows.isFetching ||
                         cashflows.workerStatus === "starting"
