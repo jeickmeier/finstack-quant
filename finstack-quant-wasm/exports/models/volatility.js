@@ -27,6 +27,7 @@ export const volatility = {
   checkButterflyGrid: wasm.checkButterflyGrid,
   checkCalendarSpreadGrid: wasm.checkCalendarSpreadGrid,
   checkLocalVolDensityGrid: wasm.checkLocalVolDensityGrid,
+  checkSurface: wasm.checkSurface,
   checkSurfaceGrid: wasm.checkSurfaceGrid,
   getSurfaceVol: wasm.getSurfaceVol,
   getSurfaceVolClamped: wasm.getSurfaceVolClamped,

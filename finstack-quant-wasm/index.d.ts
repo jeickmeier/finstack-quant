@@ -28665,6 +28665,17 @@ export interface VolatilityNamespace {
     forwardPrices: NumericArray
   ): generated.models.ArbitrageViolation[];
   /**
+   * Run the configured butterfly, calendar-spread and local-vol density checks on a volatility surface.
+   * @param surface - `core.VolSurface` handle of unshifted Black lognormal volatilities on a strike axis (expiries in years, strikes in price units); it is read, not modified.
+   * @param config - `ArbitrageCheckConfig` as an object or JSON text. Every field is optional and an omitted one takes its Rust default: `check_butterfly`, `check_calendar_spread` and `check_local_vol_density` (default `true`); `forward_prices` (one finite positive forward to broadcast or one per expiry, required while any check is enabled); `tolerance` (non-negative, total-variance units, default `DEFAULT_ARBITRAGE_TOLERANCE` = 1e-10); `min_severity` (`"negligible"` default, `"minor"`, `"major"`, `"critical"`). Unknown fields are rejected.
+   * @returns The `ArbitrageReport` object (`vol_surface_id`, `violations` sorted most severe first, `passed`, `counts_by_type`, `counts_by_severity`).
+   * @throws Error - Throws a `validation` error if `config` has an unknown or mistyped field, the forwards are missing while a check is enabled, non-finite, non-positive or of the wrong length, the tolerance is negative or non-finite, or the surface is normal-quoted, shifted-Black or on a tenor axis.
+   */
+  checkSurface(
+    surface: VolSurface,
+    config: generated.models.ArbitrageCheckConfig | string
+  ): generated.models.ArbitrageReport;
+  /**
    * Run every static-arbitrage check on a strike by expiry volatility grid.
    * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.

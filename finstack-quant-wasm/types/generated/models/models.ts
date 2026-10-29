@@ -1945,15 +1945,15 @@ export interface ArbitrageCheckConfig {
   /**
    * Run butterfly (strike convexity) check.
    */
-  check_butterfly: boolean;
+  check_butterfly?: boolean;
   /**
    * Run calendar spread (expiry monotonicity) check.
    */
-  check_calendar_spread: boolean;
+  check_calendar_spread?: boolean;
   /**
    * Run Dupire local vol density check.
    */
-  check_local_vol_density: boolean;
+  check_local_vol_density?: boolean;
   /**
    * Optional per-expiry forward prices used by butterfly, calendar, and
    * local-vol density checks.
@@ -1966,11 +1966,11 @@ export interface ArbitrageCheckConfig {
    * Minimum severity to include in the report.
    * Violations below this severity are filtered out.
    */
-  min_severity: ArbitrageSeverity;
+  min_severity?: ArbitrageSeverity;
   /**
    * Tolerance for all checks (total-variance units).
    */
-  tolerance: number;
+  tolerance?: number;
 }
 /**
  * Aggregated arbitrage report for a volatility surface.

@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/arbitrage_check_config.schema.json",
-      "bytes": 2942,
+      "bytes": 2949,
       "kind": "input",
       "path": "schemas/models/1/arbitrage_check_config.schema.json",
       "summary": "Configuration for the arbitrage detection suite.",
