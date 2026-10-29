@@ -36,6 +36,7 @@ const sources = {
   horizonReturn: "tests/scenarios/horizon/cases.json",
   pnlAttribution: "tests/attribution/cases.json",
   performance: "tests/analytics/explicit.json",
+  benchmark: "tests/analytics/benchmark.json",
   credit: "tests/models/credit/migration.json",
   simm: "src/fixtures/margin/simm.json",
   portfolioValuation: "tests/portfolio/gallery.json",

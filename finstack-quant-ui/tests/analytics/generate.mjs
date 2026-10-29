@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { checking, emit } from "../../scripts/fixture-output.mjs";
 const native = createRequire(import.meta.url)(
@@ -148,6 +149,154 @@ for (const { name, options, summary } of requests) {
     }),
   );
 }
+// The worker's AnalyticsApi.benchmarkReport over the raw package; every
+// benchmark-relative method is a plain raw export.
+function benchmarkReport(request) {
+  const performance = native.Performance.fromReturns(
+    request.dates,
+    request.values,
+    request.tickerNames,
+    request.benchmarkTicker,
+    option(request.frequency),
+  );
+  try {
+    const rate = option(request.riskFreeRate);
+    const window = option(request.window);
+    const factors = request.factors;
+    const outperformance = performance.cumulativeReturnsOutperformance();
+    const drawdownDifference = performance.drawdownDifference();
+    const tickerNames = performance.getTickerNames();
+    const attempt = (call) => {
+      try {
+        return { ok: true, value: call() };
+      } catch (error) {
+        return {
+          ok: false,
+          error: { name: error.name, message: error.message, kind: error.kind },
+        };
+      }
+    };
+    return {
+      tickerNames,
+      benchmarkIdx: performance.getBenchmarkIdx(),
+      frequency: performance.getFrequency(),
+      activeDates: performance.getActiveDates(),
+      factorNames: factors ? [...factors.names] : null,
+      greeks: performance.greeks(rate),
+      beta: performance.beta(),
+      trackingError: Array.from(performance.trackingError()),
+      informationRatio: Array.from(performance.informationRatio()),
+      treynor: Array.from(performance.treynor(rate)),
+      mSquared: Array.from(performance.mSquared(rate)),
+      upCapture: Array.from(performance.upCapture()),
+      downCapture: Array.from(performance.downCapture()),
+      captureRatio: Array.from(performance.captureRatio()),
+      battingAverage: Array.from(performance.battingAverage()),
+      tickers: tickerNames.map((_, index) => {
+        const rolling = performance.rollingGreeks(index, window, rate);
+        return {
+          activeDates: performance.getActiveDatesForTicker(index),
+          outperformance: Array.from(outperformance[index]),
+          drawdownDifference: Array.from(drawdownDifference[index]),
+          rollingGreeks: {
+            ...rolling,
+            alphas: Array.from(rolling.alphas),
+            betas: Array.from(rolling.betas),
+          },
+          multiFactor: factors
+            ? attempt(() =>
+                performance.multiFactorGreeks(
+                  index,
+                  factors.returns,
+                  option(factors.returnKind),
+                  option(factors.riskFreeRate),
+                ),
+              )
+            : null,
+        };
+      }),
+    };
+  } finally {
+    performance.free();
+  }
+}
+// Benchmark case 1 (the gallery's): the tear-sheet panel with every option
+// left to Rust (rolling window 63, rf 0) and two illustrative already-excess
+// factor waves.
+const benchmarkRequest = {
+  ...panel,
+  factors: {
+    names: ["Market", "Carry"],
+    returns: [
+      dates.map((_, i) => 0.0003 + 0.007 * Math.sin(i / 40)),
+      dates.map((_, i) => 0.0001 + 0.003 * Math.cos(i / 25)),
+    ],
+  },
+};
+// Benchmark case 2: the shared analytics invariants panel
+// (finstack-quant/analytics/tests/data/api_invariants_data.json), whose
+// expected rolling greeks were produced with a five-observation window.
+const invariants = JSON.parse(
+  await readFile(
+    new URL(
+      "../../../finstack-quant/analytics/tests/data/api_invariants_data.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+const invariantsRequest = {
+  dates: invariants.dates,
+  values: [invariants.returns, invariants.benchmark],
+  kind: "returns",
+  tickerNames: ["TARGET", "BENCH"],
+  benchmarkTicker: "BENCH",
+  frequency: "daily",
+  window: 5,
+  factors: { names: ["Factor 1", "Factor 2"], returns: invariants.factors },
+};
+const benchmark = benchmarkReport(benchmarkRequest);
+const invariantsReport = benchmarkReport(invariantsRequest);
+assertFinite(benchmark, "benchmark");
+assertFinite(invariantsReport, "invariants");
+// Pin the invariants report to the Rust, Python and WASM parity expectations.
+const close = (actual, expected, path) => {
+  if (Math.abs(actual - expected) > 1e-12)
+    throw new Error(`${path}: ${actual} differs from ${expected}`);
+};
+const expected = invariants.expected;
+const target = invariantsReport.tickers[0];
+if (!target.multiFactor.ok) throw new Error(target.multiFactor.error.message);
+for (const key of ["alpha", "r_squared", "adjusted_r_squared", "residual_vol"])
+  close(target.multiFactor.value[key], expected.multi_factor_greeks[key], key);
+expected.multi_factor_greeks.betas.forEach((beta, i) =>
+  close(target.multiFactor.value.betas[i], beta, `betas[${i}]`),
+);
+for (const key of ["alphas", "betas"]) {
+  if (target.rollingGreeks[key].length !== expected.rolling_greeks[key].length)
+    throw new Error(`rolling ${key} length`);
+  expected.rolling_greeks[key].forEach((value, i) =>
+    close(target.rollingGreeks[key][i], value, `rolling ${key}[${i}]`),
+  );
+}
+for (const [file, description, request, report] of [
+  [
+    "benchmark.json",
+    "Native analytics.Performance benchmark report of the reporting_performance_tearsheet.ipynb panel (756 business days, fund 0.0008 + 0.012·sin(i/30) against benchmark 0.0004 + 0.008·sin(i/45)) with every option left to Rust and two illustrative already-excess factors (Market 0.0003 + 0.007·sin(i/40), Carry 0.0001 + 0.003·cos(i/25)).",
+    benchmarkRequest,
+    benchmark,
+  ],
+  [
+    "benchmark-invariants.json",
+    "Native analytics.Performance benchmark report of the shared analytics invariants panel (finstack-quant/analytics/tests/data/api_invariants_data.json: TARGET against BENCH, daily, a five-observation rolling window and its two factors); TARGET's rolling greeks and multi-factor regression equal that file's expected values to 1e-12.",
+    invariantsRequest,
+    invariantsReport,
+  ],
+])
+  await emit(
+    new URL(file, import.meta.url),
+    JSON.stringify({ description, request, report }),
+  );
 console.log(
-  `${checking ? "Checked" : "Generated"} ${requests.length} native performance reports.`,
+  `${checking ? "Checked" : "Generated"} ${requests.length} native performance reports and 2 benchmark reports.`,
 );

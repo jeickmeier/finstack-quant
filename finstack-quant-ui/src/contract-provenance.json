@@ -1681,6 +1681,28 @@
       }
     },
     {
+      "id": "benchmark-report",
+      "route": "returned-analytics",
+      "deferred": "machine-readable-units",
+      "convention": "Returned analytics.Performance benchmark-relative results of a host-supplied panel against a named benchmark: greeks, beta with its confidence bounds, tracking error, information ratio, Treynor, M squared, captures and batting average per ticker; outperformance and drawdown difference against each ticker's own active dates; rollingGreeks against the returned window ends; multiFactorGreeks per ticker (or that ticker's native error) only when a factor panel is supplied. Decimal fractions and ratios as returned, alphas annualized by Rust, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The default fund is the first ticker that is not the benchmark (presentation only).",
+      "api": {
+        "name": "analytics.Performance#greeks",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "Performance",
+        "member": "greeks",
+        "inputs": [
+          {
+            "name": "riskFreeRate",
+            "type": "number",
+            "optional": true
+          }
+        ],
+        "returns": "GreeksResult[]",
+        "declaration": "/**\n   * Benchmark regression annualized Jensen alpha/beta statistics per asset.\n   * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.\n   * @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared, n_obs }` objects in `getTickerNames()` order; `n_obs` is the paired-observation count.\n   * @throws Error - Rejects if the regression results cannot be serialized to JavaScript.\n   */\n  greeks(riskFreeRate?: number): GreeksResult[];",
+        "sha256": "69e64f91896d67e578c8625dd46dc789b46ce9d6e0b79f0f4a52f1d0bed45f1f"
+      }
+    },
+    {
       "id": "portfolio-summary",
       "route": "returned-valuation",
       "convention": "Returned PortfolioValuation: total_base_currency and by_entity as exact returned money (entity rows in Portfolio#entityIds registration order), the stamped fx_collapse_policy shown as text, degraded_positions with each risk_error; nothing summed or converted.",

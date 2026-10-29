@@ -319,6 +319,12 @@
       "worker": "none"
     },
     {
+      "name": "benchmark-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the report returned by useBenchmarkReport (analytics.Performance against a named benchmark over a host-supplied panel). A fund control selects the ticker, defaulting to the first ticker that is not the benchmark. Key-value tables show the fund's greeks (alpha, beta, R squared, adjusted R squared, observations), its beta estimate with standard error and confidence bounds, and its tracking error, information ratio, Treynor, M squared, up and down capture, capture ratio and batting average. Cumulative outperformance and drawdown difference are drawn against the fund's own active dates, rolling alpha and beta against the returned window-end dates; the multi-factor regression (alpha, one beta per factor, R squared, adjusted R squared, residual volatility, observations) or its native error is shown when a factor panel was supplied. Values are the decimal fractions and ratios Rust returns, with no units inferred; non-finite values are left out of figures and shown as returned elsewhere. Accepts report, loading, error, initialTicker, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "portfolio-summary",
       "type": "registry:component",
       "docs": "Display-only view of the valuation returned by useValuePortfolio (portfolio.valuePortfolio). Shows total_base_currency, the valuation date, fx_collapse_policy as the text Rust stamped, by_entity values in entity registration order (Portfolio#entityIds) and degraded_positions with each risk_error. Amounts are the exact returned money; nothing is summed or converted. Accepts report ({entityIds, valuation}), loading, error and density props; no worker or query provider required.",
@@ -506,6 +512,10 @@
     },
     {
       "name": "use-performance-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-benchmark-report",
       "type": "registry:hook"
     },
     {
@@ -1081,6 +1091,10 @@
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
       "sha256": "854fb65e7217219f57c52658e1f2e3b14cfab5884a32f726734edca87650e9eb"
+    },
+    {
+      "path": "finstack-quant-ui/tests/analytics/benchmark.json",
+      "sha256": "f8faac19b3e614cd3b307280fb4e09b1e6cfc2750a00448d4ba1c53ff7756e8d"
     },
     {
       "path": "finstack-quant-ui/tests/models/credit/migration.json",

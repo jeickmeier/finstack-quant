@@ -125,6 +125,13 @@ export const importHarnesses = {
       name: "use-performance-report",
       modules: modules.length,
     })),
+  "use-benchmark-report": () =>
+    Promise.all([
+      import("@/hooks/analytics/use-benchmark-report/use-benchmark-report"),
+    ]).then((modules) => ({
+      name: "use-benchmark-report",
+      modules: modules.length,
+    })),
   "use-value-portfolio": () =>
     Promise.all([
       import("@/hooks/portfolio/use-value-portfolio/use-value-portfolio"),

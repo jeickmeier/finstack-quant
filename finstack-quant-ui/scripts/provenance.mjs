@@ -329,6 +329,14 @@ const displays = [
       "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
   },
   {
+    id: "benchmark-report",
+    api: ["analytics.Performance#greeks", "Performance", "greeks"],
+    route: "returned-analytics",
+    deferred: "machine-readable-units",
+    convention:
+      "Returned analytics.Performance benchmark-relative results of a host-supplied panel against a named benchmark: greeks, beta with its confidence bounds, tracking error, information ratio, Treynor, M squared, captures and batting average per ticker; outperformance and drawdown difference against each ticker's own active dates; rollingGreeks against the returned window ends; multiFactorGreeks per ticker (or that ticker's native error) only when a factor panel is supplied. Decimal fractions and ratios as returned, alphas annualized by Rust, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The default fund is the first ticker that is not the benchmark (presentation only).",
+  },
+  {
     id: "portfolio-summary",
     api: ["portfolio.valuePortfolio", "PortfolioNamespace", "valuePortfolio"],
     route: "returned-valuation",

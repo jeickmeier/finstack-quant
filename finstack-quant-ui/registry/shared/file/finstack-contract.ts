@@ -19,8 +19,12 @@ import type {
   ArbitrageValidationResult,
   ApplicationReport,
   HorizonReport,
+  BetaResult,
   DatedSeries,
   DrawdownEpisode,
+  GreeksResult,
+  MultiFactorResult,
+  RollingGreeks,
   LookbackReturns,
   PeriodicReturn,
   TableEnvelope,
@@ -290,6 +294,74 @@ export interface PerformanceReport {
   };
   /** correlationMatrix rows in tickerNames order. */
   correlation: { matrix: number[][]; repaired: boolean };
+}
+/** A ticker-major panel measured against a named benchmark; every omitted option is left to Rust. */
+export interface BenchmarkReportRequest {
+  /** ISO-8601 observation dates, ascending, one per value of each series. */
+  readonly dates: readonly string[];
+  /** `values[ticker][date]`: simple decimal returns ("returns") or price levels ("prices"). */
+  readonly values: readonly (readonly number[])[];
+  /** "returns" builds with Performance.fromReturns, "prices" with new Performance. */
+  readonly kind: "returns" | "prices";
+  /** Ticker labels aligned with the outer elements of `values`. */
+  readonly tickerNames: readonly string[];
+  /** Ticker every relative measure is taken against; Rust rejects an unknown one. */
+  readonly benchmarkTicker: string;
+  /** Observation frequency token such as "daily"; omitted is Rust's default. */
+  readonly frequency?: string | null;
+  /** Annualized decimal risk-free rate for greeks, treynor, mSquared and rollingGreeks; omitted is Rust's default. */
+  readonly riskFreeRate?: number | null;
+  /** rollingGreeks window in observations; omitted is Rust's default. */
+  readonly window?: number | null;
+  /** Factor panel for multiFactorGreeks of every ticker; omitted skips the regression. */
+  readonly factors?: {
+    /** Display labels, one per factor row. */
+    readonly names: readonly string[];
+    /** `returns[factor][observation]`: already-excess decimal factor returns. */
+    readonly returns: readonly (readonly number[])[];
+    /** "excess" or "total"; omitted is Rust's default. */
+    readonly returnKind?: string | null;
+    /** Annualized decimal risk-free rate of a "total" regression; omitted is Rust's default. */
+    readonly riskFreeRate?: number | null;
+  } | null;
+}
+/** One ticker's native relative series, aligned with that ticker's own active dates. */
+export interface BenchmarkTickerReport {
+  /** getActiveDatesForTicker: the dates `outperformance` and `drawdownDifference` align with. */
+  activeDates: string[];
+  /** cumulativeReturnsOutperformance. */
+  outperformance: number[];
+  drawdownDifference: number[];
+  /** rollingGreeks with its typed arrays copied out. */
+  rollingGreeks: Omit<RollingGreeks, "alphas" | "betas"> & {
+    alphas: number[];
+    betas: number[];
+  };
+  /** multiFactorGreeks of this ticker, or its native error; null without a factor panel. */
+  multiFactor: Envelope<MultiFactorResult> | null;
+}
+/** The native analytics.Performance benchmark-relative results of one panel; nothing is computed in TypeScript. */
+export interface BenchmarkReport {
+  tickerNames: string[];
+  /** getBenchmarkIdx. */
+  benchmarkIdx: number;
+  frequency: string;
+  activeDates: string[];
+  /** The factor labels of the request, else null. */
+  factorNames: string[] | null;
+  /** Per-ticker results in tickerNames order. */
+  greeks: GreeksResult[];
+  beta: BetaResult[];
+  trackingError: number[];
+  informationRatio: number[];
+  treynor: number[];
+  mSquared: number[];
+  upCapture: number[];
+  downCapture: number[];
+  captureRatio: number[];
+  battingAverage: number[];
+  /** In tickerNames order. */
+  tickers: BenchmarkTickerReport[];
 }
 /** A portfolio valuation request; omitted options are left to Rust. */
 export interface PortfolioValuationRequest {
@@ -562,6 +634,10 @@ export interface AnalyticsApi {
   performanceReport(
     request: PerformanceReportRequest,
   ): Promise<Envelope<PerformanceReport>>;
+  /** analytics.Performance against a named benchmark: greeks, beta, the relative ratios and captures, outperformance and drawdown difference, rollingGreeks and (with a factor panel) multiFactorGreeks per ticker; the handle is freed. */
+  benchmarkReport(
+    request: BenchmarkReportRequest,
+  ): Promise<Envelope<BenchmarkReport>>;
 }
 /** portfolio: valuation, metric aggregation, spec validation and scenario P&L of a host-supplied book. */
 export interface PortfolioApi {
