@@ -194,6 +194,72 @@
       }
     },
     {
+      "name": "contract-oas-config",
+      "type": "registry:lib",
+      "title": "OAS config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust oas_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/oas_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/oas_config.json"
+        },
+        {
+          "path": "src/generated/types/oas_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/oas_config.ts"
+        },
+        {
+          "path": "src/generated/meta/oas_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/oas_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-scenario-grid",
+      "type": "registry:lib",
+      "title": "Scenario grid contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_grid contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_grid.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_grid.json"
+        },
+        {
+          "path": "src/generated/types/scenario_grid.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_grid.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_grid.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_grid.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-commodity-asian-option",
       "type": "registry:lib",
       "title": "Commodity asian option contract",

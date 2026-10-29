@@ -5,6 +5,16 @@
     "schema": "schemas/calibration.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+    "source": "finstack-quant/valuations/schemas/common/1/oas_config.schema.json",
+    "schema": "schemas/oas_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+    "source": "finstack-quant/valuations/schemas/common/1/scenario_grid.schema.json",
+    "schema": "schemas/scenario_grid.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
     "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_asian_option.schema.json",
     "schema": "schemas/commodity_asian_option.json"

@@ -230,6 +230,7 @@ finstack-quant-ui/src/generated/meta/levered_real_estate_equity.ts
 finstack-quant-ui/src/generated/meta/lookback_option.ts
 finstack-quant-ui/src/generated/meta/market_context_state.ts
 finstack-quant-ui/src/generated/meta/ndf.ts
+finstack-quant-ui/src/generated/meta/oas_config.ts
 finstack-quant-ui/src/generated/meta/private_markets_fund.ts
 finstack-quant-ui/src/generated/meta/quanto_option.ts
 finstack-quant-ui/src/generated/meta/range_accrual.ts
@@ -238,6 +239,7 @@ finstack-quant-ui/src/generated/meta/repo.ts
 finstack-quant-ui/src/generated/meta/revolving_credit.ts
 finstack-quant-ui/src/generated/meta/rollup_spec.ts
 finstack-quant-ui/src/generated/meta/scenario_diff.ts
+finstack-quant-ui/src/generated/meta/scenario_grid.ts
 finstack-quant-ui/src/generated/meta/scenario_set.ts
 finstack-quant-ui/src/generated/meta/shared.ts
 finstack-quant-ui/src/generated/meta/snowball.ts
@@ -322,6 +324,7 @@ finstack-quant-ui/src/generated/schemas/levered_real_estate_equity.json
 finstack-quant-ui/src/generated/schemas/lookback_option.json
 finstack-quant-ui/src/generated/schemas/market_context_state.json
 finstack-quant-ui/src/generated/schemas/ndf.json
+finstack-quant-ui/src/generated/schemas/oas_config.json
 finstack-quant-ui/src/generated/schemas/private_markets_fund.json
 finstack-quant-ui/src/generated/schemas/quanto_option.json
 finstack-quant-ui/src/generated/schemas/range_accrual.json
@@ -330,6 +333,7 @@ finstack-quant-ui/src/generated/schemas/repo.json
 finstack-quant-ui/src/generated/schemas/revolving_credit.json
 finstack-quant-ui/src/generated/schemas/rollup_spec.json
 finstack-quant-ui/src/generated/schemas/scenario_diff.json
+finstack-quant-ui/src/generated/schemas/scenario_grid.json
 finstack-quant-ui/src/generated/schemas/scenario_set.json
 finstack-quant-ui/src/generated/schemas/snowball.json
 finstack-quant-ui/src/generated/schemas/statement_result.json
@@ -411,6 +415,7 @@ finstack-quant-ui/src/generated/types/levered_real_estate_equity.ts
 finstack-quant-ui/src/generated/types/lookback_option.ts
 finstack-quant-ui/src/generated/types/market_context_state.ts
 finstack-quant-ui/src/generated/types/ndf.ts
+finstack-quant-ui/src/generated/types/oas_config.ts
 finstack-quant-ui/src/generated/types/private_markets_fund.ts
 finstack-quant-ui/src/generated/types/quanto_option.ts
 finstack-quant-ui/src/generated/types/range_accrual.ts
@@ -419,6 +424,7 @@ finstack-quant-ui/src/generated/types/repo.ts
 finstack-quant-ui/src/generated/types/revolving_credit.ts
 finstack-quant-ui/src/generated/types/rollup_spec.ts
 finstack-quant-ui/src/generated/types/scenario_diff.ts
+finstack-quant-ui/src/generated/types/scenario_grid.ts
 finstack-quant-ui/src/generated/types/scenario_set.ts
 finstack-quant-ui/src/generated/types/shared.ts
 finstack-quant-ui/src/generated/types/snowball.ts

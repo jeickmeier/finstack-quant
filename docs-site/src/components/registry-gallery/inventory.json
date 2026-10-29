@@ -243,13 +243,13 @@
     {
       "name": "tranche-analytics",
       "type": "registry:component",
-      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. Nothing is computed, rescaled or defaulted. No worker is required.",
+      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. With onOasConfigChange, an OAS configuration disclosure edits the generated OasConfig contract, starting from its Rust example (OasConfig::default()), and hands complete JSON to the host on apply. Nothing is computed, rescaled or defaulted. No worker is required.",
       "worker": "none"
     },
     {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit tranche analytics and scenarios. Host owns routes and domain inputs.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid. Host owns routes and domain inputs.",
       "worker": "host"
     },
     {
@@ -494,6 +494,14 @@
     },
     {
       "name": "contract-calibration",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-oas-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-scenario-grid",
       "type": "registry:lib"
     },
     {

@@ -111,6 +111,7 @@ export function createValuationsService(
             request.marketJson,
             request.asOf,
             request.marketPricePct,
+            request.configJson,
           ),
         ),
       );

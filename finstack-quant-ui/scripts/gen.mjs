@@ -98,6 +98,8 @@ export async function generate(repo = repoRoot) {
           "rollup_spec",
           "scenario_set",
           "scenario_diff",
+          "scenario_grid",
+          "oas_config",
           "table_envelope",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )

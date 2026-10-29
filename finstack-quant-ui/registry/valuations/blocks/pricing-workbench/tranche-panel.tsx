@@ -11,7 +11,8 @@ import { TrancheAnalytics } from "@/components/finstack/valuations/components/tr
 /**
  * Native analytics of the completed request's tranche. No price is assumed:
  * metrics use Rust's default target until one is typed, discount margin waits
- * for a price, and OAS runs only when requested at the current price.
+ * for a price, and OAS runs only when requested at the current price and the
+ * applied OasConfig (Rust's default until one is applied).
  */
 export function TranchePanel({
   request,
@@ -24,7 +25,12 @@ export function TranchePanel({
   density?: "compact" | "comfortable";
 }) {
   const [price, setPrice] = useState("");
-  const [oasPrice, setOasPrice] = useState<number | null>(null);
+  // Undefined leaves the configuration to Rust's default OasConfig.
+  const [oasConfig, setOasConfig] = useState<string | undefined>();
+  const [oasSolve, setOasSolve] = useState<{
+    price: number;
+    configJson?: string;
+  } | null>(null);
   const marketPricePct = price.trim() === "" ? null : Number(price);
   const tile = <T,>(query: {
     data?: T;
@@ -45,8 +51,20 @@ export function TranchePanel({
     marketPricePct === null ? null : { ...request, marketPricePct },
   );
   const oas = useTrancheOas(
-    oasPrice === null ? null : { ...request, marketPricePct: oasPrice },
+    oasSolve === null
+      ? null
+      : {
+          ...request,
+          marketPricePct: oasSolve.price,
+          ...(oasSolve.configJson === undefined
+            ? {}
+            : { configJson: oasSolve.configJson }),
+        },
   );
+  const solved =
+    oasSolve !== null &&
+    oasSolve.price === marketPricePct &&
+    oasSolve.configJson === oasConfig;
   return (
     <TrancheAnalytics
       trancheId={request.trancheId}
@@ -56,11 +74,15 @@ export function TranchePanel({
       breakevenCdr={tile(cdr)}
       discountMargin={tile(dm)}
       oas={
-        oasPrice === null || oasPrice === marketPricePct
+        oasSolve === null || solved
           ? tile(oas)
           : { error: undefined, value: undefined, loading: false }
       }
-      onSolveOas={() => setOasPrice(marketPricePct)}
+      onSolveOas={() =>
+        marketPricePct !== null &&
+        setOasSolve({ price: marketPricePct, configJson: oasConfig })
+      }
+      onOasConfigChange={setOasConfig}
       density={density}
     />
   );
