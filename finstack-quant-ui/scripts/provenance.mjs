@@ -89,8 +89,22 @@ const displays = [
     schema: result,
     pointer: "#/properties/covenants",
     api: price,
-    route: "raw",
-    convention: "Returned verdicts; no recalculation.",
+    route: "typed",
+    convention:
+      "Returned CovenantReport fields keyed by covenant instance key, in the order supplied: test description, actual, threshold and headroom in the metric's own units, the passed verdict and details; unset fields shown as a dash, complete reports kept as JSON. No verdict, headroom or threshold is computed.",
+  },
+  {
+    id: "covenant-compliance",
+    schema: `${base}covenants/1/dated_covenant_reports.schema.json`,
+    pointer: "#",
+    api: [
+      "covenants.CovenantEngine#evaluateSeries",
+      "CovenantEngine",
+      "evaluateSeries",
+    ],
+    route: "typed",
+    convention:
+      "Returned DatedCovenantReports rows in input order and their verdicts; a covenant without a report on a date shows a dash. Statement rows come from statements.nodeToDatedSchedule per metric (period end), zipped by period from a chosen first period, with a non-finite value dropping that metric from its row; covenant windows decide which metrics a date requires.",
   },
   {
     id: "cashflow-viewer",

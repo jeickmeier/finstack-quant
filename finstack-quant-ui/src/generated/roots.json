@@ -15,6 +15,16 @@
     "schema": "schemas/scenario_grid.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/covenant_report.schema.json",
+    "schema": "schemas/covenant_report.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/dated_covenant_reports.schema.json",
+    "schema": "schemas/dated_covenant_reports.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
     "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_asian_option.schema.json",
     "schema": "schemas/commodity_asian_option.json"

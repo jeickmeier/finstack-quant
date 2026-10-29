@@ -110,11 +110,40 @@ describe("discovered canonical fixtures", () => {
       for (const example of schema.examples)
         expect(validator.parse(example)).toEqual(example);
     }
-    // Rust publishes no example for ScenarioSet or ScenarioDiff; every other root carries one.
+    // Rust publishes no example for CovenantReport, DatedCovenantReports,
+    // ScenarioSet or ScenarioDiff; every other root carries one.
     expect(withoutExamples).toEqual([
+      "schemas/covenant_report.json",
+      "schemas/dated_covenant_reports.json",
       "schemas/scenario_diff.json",
       "schemas/scenario_set.json",
     ]);
+  });
+  it("accepts the captured native covenant series under the generated DatedCovenantReports and CovenantReport schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const read = async (name: string) =>
+      JSON.parse(await readFile(resolve(generated, name), "utf8"));
+    const dated = z.fromJSONSchema(
+      converterSchema(await read("schemas/dated_covenant_reports.json")),
+    );
+    const report = z.fromJSONSchema(
+      converterSchema(await read("schemas/covenant_report.json")),
+    );
+    const series = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",
+        ),
+        "utf8",
+      ),
+    );
+    expect(series).toHaveLength(6);
+    for (const row of series) {
+      expect(dated.parse(row)).toEqual(row);
+      for (const value of Object.values(row.reports))
+        expect(report.parse(value)).toEqual(value);
+    }
   });
   it("accepts the captured native scenario diffs under the generated ScenarioDiff schema unchanged", async () => {
     const generated = resolve(repo, "finstack-quant-ui/src/generated");

@@ -101,6 +101,8 @@ export async function generate(repo = repoRoot) {
           "scenario_grid",
           "oas_config",
           "table_envelope",
+          "covenant_report",
+          "dated_covenant_reports",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));

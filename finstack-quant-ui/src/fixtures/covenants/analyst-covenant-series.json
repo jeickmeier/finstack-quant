@@ -1,0 +1,285 @@
+[
+  {
+    "as_of": "2024-09-30",
+    "reports": {
+      "min_interest_coverage": {
+        "covenant_type": "Interest Coverage >= 3.00x",
+        "covenant_id": "min_interest_coverage",
+        "passed": true,
+        "actual_value": 5.10772520716386,
+        "threshold": 3,
+        "details": null,
+        "headroom": 0.7025750690546199,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  },
+  {
+    "as_of": "2024-12-31",
+    "reports": {
+      "max_debt_to_ebitda": {
+        "covenant_type": "Debt/EBITDA <= 3.50x",
+        "covenant_id": "max_debt_to_ebitda",
+        "passed": true,
+        "actual_value": 2.215696743192739,
+        "threshold": 3.5,
+        "details": null,
+        "headroom": 0.3669437876592175,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      },
+      "min_interest_coverage": {
+        "covenant_type": "Interest Coverage >= 3.00x",
+        "covenant_id": "min_interest_coverage",
+        "passed": true,
+        "actual_value": 5.985413513141599,
+        "threshold": 3,
+        "details": null,
+        "headroom": 0.9951378377138663,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  },
+  {
+    "as_of": "2025-03-31",
+    "reports": {
+      "max_debt_to_ebitda": {
+        "covenant_type": "Debt/EBITDA <= 3.50x",
+        "covenant_id": "max_debt_to_ebitda",
+        "passed": true,
+        "actual_value": 2.166028611726778,
+        "threshold": 3.5,
+        "details": null,
+        "headroom": 0.38113468236377773,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      },
+      "min_interest_coverage": {
+        "covenant_type": "Interest Coverage >= 3.00x",
+        "covenant_id": "min_interest_coverage",
+        "passed": true,
+        "actual_value": 5.656254300261456,
+        "threshold": 3,
+        "details": null,
+        "headroom": 0.885418100087152,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  },
+  {
+    "as_of": "2025-06-30",
+    "reports": {
+      "max_debt_to_ebitda": {
+        "covenant_type": "Debt/EBITDA <= 3.50x",
+        "covenant_id": "max_debt_to_ebitda",
+        "passed": true,
+        "actual_value": 2.0224928898239174,
+        "threshold": 3.5,
+        "details": null,
+        "headroom": 0.4221448886217379,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      },
+      "min_interest_coverage": {
+        "covenant_type": "Interest Coverage >= 3.00x",
+        "covenant_id": "min_interest_coverage",
+        "passed": true,
+        "actual_value": 5.92552804377565,
+        "threshold": 3,
+        "details": null,
+        "headroom": 0.9751760145918832,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  },
+  {
+    "as_of": "2025-09-30",
+    "reports": {
+      "max_debt_to_ebitda": {
+        "covenant_type": "Debt/EBITDA <= 3.50x",
+        "covenant_id": "max_debt_to_ebitda",
+        "passed": true,
+        "actual_value": 1.888721960602909,
+        "threshold": 3.5,
+        "details": null,
+        "headroom": 0.4603651541134545,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      },
+      "min_interest_coverage": {
+        "covenant_type": "Interest Coverage >= 3.00x",
+        "covenant_id": "min_interest_coverage",
+        "passed": true,
+        "actual_value": 6.408909502661806,
+        "threshold": 3,
+        "details": null,
+        "headroom": 1.1363031675539352,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  },
+  {
+    "as_of": "2025-12-31",
+    "reports": {
+      "max_debt_to_ebitda": {
+        "covenant_type": "Debt/EBITDA <= 3.50x",
+        "covenant_id": "max_debt_to_ebitda",
+        "passed": true,
+        "actual_value": 1.9188563760404616,
+        "threshold": 3.5,
+        "details": null,
+        "headroom": 0.4517553211312967,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      },
+      "min_interest_coverage": {
+        "covenant_type": "Interest Coverage >= 3.00x",
+        "covenant_id": "min_interest_coverage",
+        "passed": true,
+        "actual_value": 6.7977633750913595,
+        "threshold": 3,
+        "details": null,
+        "headroom": 1.2659211250304532,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  }
+]

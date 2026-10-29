@@ -40,6 +40,7 @@ import { Example as Example36 } from "./examples/vol-cube-slice";
 import { Example as Example37 } from "./examples/market-scenario-builder";
 import { Example as Example38 } from "./examples/market-scenario-report";
 import { Example as Example39 } from "./examples/performance-report";
+import { Example as Example40 } from "./examples/covenant-compliance";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -81,6 +82,7 @@ const examples = {
   "market-scenario-builder": Example37,
   "market-scenario-report": Example38,
   "performance-report": Example39,
+  "covenant-compliance": Example40,
 };
 export function ComponentDemo({
   name,

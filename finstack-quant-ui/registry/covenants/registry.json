@@ -2,11 +2,44 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
+      "name": "covenant-compliance",
+      "type": "registry:component",
+      "title": "Covenant compliance",
+      "description": "Displays a native covenant series as a covenant by test-date grid of returned verdicts; selecting a date shows its covenant reports.",
+      "docs": "Present native DatedCovenantReports rows (CovenantEngine#evaluateSeries) as a grid: one column per test date in the order supplied, one row per covenant instance key in first-appearance order, each cell the returned verdict as Passed or Failed, or a dash when Rust returned no report for that covenant on that date. A date header button selects the date (the latest initially) and its reports render below through covenant-report. Nothing is computed, sorted or inferred. No worker is required.",
+      "files": [
+        {
+          "path": "components/covenant-compliance/covenant-compliance.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-compliance/covenant-compliance.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-table",
+        "button",
+        "@finstack/covenant-report",
+        "@finstack/contract-dated-covenant-reports"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "covenant-report",
       "type": "registry:component",
       "title": "Covenant report",
-      "description": "Lossless disclosure of a valuation result's optional covenant payload.",
-      "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred.",
+      "description": "Displays native covenant reports: test, actual, threshold, headroom, verdict and details per covenant, with the complete JSON.",
+      "docs": "Present native CovenantReport values keyed by covenant instance key (CovenantEngine#evaluate, one DatedCovenantReports row, or a valuation result's covenants) as a typed table in the order supplied: Rust's test description, actual value, threshold and headroom with every supplied digit (a host may inject formatValue), the passed verdict as Passed or Failed, and details; a field Rust leaves unset shows as a dash. The complete reports stay available as JSON in a Covenants disclosure. No verdict, headroom or threshold is computed. No worker is required.",
       "files": [
         {
           "path": "components/covenant-report/covenant-report.tsx",
@@ -15,15 +48,20 @@
         }
       ],
       "registryDependencies": [
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
         "@finstack/json-viewer",
-        "@finstack/finstack-codec"
+        "@finstack/finstack-codec",
+        "@finstack/contract-covenant-report"
       ],
-      "dependencies": ["react@19.2.8"],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
