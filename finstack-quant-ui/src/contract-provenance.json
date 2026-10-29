@@ -876,8 +876,8 @@
     },
     {
       "id": "covenant-report",
-      "route": "raw",
-      "convention": "Returned verdicts; no recalculation.",
+      "route": "typed",
+      "convention": "Returned CovenantReport fields keyed by covenant instance key, in the order supplied: test description, actual, threshold and headroom in the metric's own units, the passed verdict and details; unset fields shown as a dash, complete reports kept as JSON. No verdict, headroom or threshold is computed.",
       "api": {
         "name": "valuations.instruments.priceInstrument",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -936,6 +936,36 @@
           "source": "finstack-quant/valuations/schemas/results/1/valuation_result.schema.json",
           "sha256": "a373dd46f13b9ff36ffac804b82e2606c4eac841c657980231d61577513bafbc",
           "description": "Covenant compliance results for structured products.\n\nPresent only for instruments with covenants (loans, structured credit).\nEach covenant is keyed by its identifier with pass/fail status and details."
+        }
+      ]
+    },
+    {
+      "id": "covenant-compliance",
+      "route": "typed",
+      "convention": "Returned DatedCovenantReports rows in input order and their verdicts; a covenant without a report on a date shows a dash. Statement rows come from statements.nodeToDatedSchedule per metric (period end), zipped by period from a chosen first period, with a non-finite value dropping that metric from its row; covenant windows decide which metrics a date requires.",
+      "api": {
+        "name": "covenants.CovenantEngine#evaluateSeries",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "CovenantEngine",
+        "member": "evaluateSeries",
+        "inputs": [
+          {
+            "name": "metrics",
+            "type": "readonly generated.covenants.DatedMetrics[]",
+            "optional": false
+          }
+        ],
+        "returns": "generated.covenants.DatedCovenantReports[]",
+        "declaration": "/**\n   * Evaluate the engine on each dated row of metric values.\n   *\n   * Each row is evaluated independently; the breach history is not updated.\n   *\n   * @param metrics - `DatedMetrics` rows (`{ date, metrics }`): metric values per ISO-8601 test date, evaluated in the order given. (Python takes a date-indexed DataFrame.)\n   * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per input row in input order. (Python returns the same reports as a long DataFrame.)\n   * @throws If `metrics` is not an array of `DatedMetrics`, the engine is invalid (kind `validation`), or a required metric is missing on a date (kind `not_found`).\n   */\n  evaluateSeries(\n    metrics: readonly generated.covenants.DatedMetrics[]\n  ): generated.covenants.DatedCovenantReports[];",
+        "sha256": "b238b3d5afb151e585fea2d0e414c9b5669dded022ddb91d50c11b6799c65a96"
+      },
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/covenants/schemas/covenants/1/dated_covenant_reports.schema.json",
+          "sha256": "18297a2251159303e675a419d9ceaa75e2268d1d043c76f9677b702cbe1e2da0",
+          "description": "Covenant reports produced for one test date of a series evaluation."
         }
       ]
     },

@@ -277,9 +277,15 @@
       "worker": "none"
     },
     {
+      "name": "covenant-compliance",
+      "type": "registry:component",
+      "docs": "Present native DatedCovenantReports rows (CovenantEngine#evaluateSeries) as a grid: one column per test date in the order supplied, one row per covenant instance key in first-appearance order, each cell the returned verdict as Passed or Failed, or a dash when Rust returned no report for that covenant on that date. A date header button selects the date (the latest initially) and its reports render below through covenant-report. Nothing is computed, sorted or inferred. No worker is required.",
+      "worker": "none"
+    },
+    {
       "name": "covenant-report",
       "type": "registry:component",
-      "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred.",
+      "docs": "Present native CovenantReport values keyed by covenant instance key (CovenantEngine#evaluate, one DatedCovenantReports row, or a valuation result's covenants) as a typed table in the order supplied: Rust's test description, actual value, threshold and headroom with every supplied digit (a host may inject formatValue), the passed verdict as Passed or Failed, and details; a field Rust leaves unset shows as a dash. The complete reports stay available as JSON in a Covenants disclosure. No verdict, headroom or threshold is computed. No worker is required.",
       "worker": "none"
     },
     {
@@ -532,6 +538,14 @@
     },
     {
       "name": "contract-scenario-grid",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-covenant-report",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-dated-covenant-reports",
       "type": "registry:lib"
     },
     {
@@ -991,6 +1005,10 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json",
       "sha256": "491a9c962636ba06701882cd2794f257ee536e9d45da2035a7bdb30178c9ae5f"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",
+      "sha256": "da2f33910806338792970ba4e06064f313d281cb3c7c4ba59d8c0721fc4c3764"
     }
   ]
 }

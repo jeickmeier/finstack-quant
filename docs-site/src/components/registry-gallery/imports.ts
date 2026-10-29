@@ -283,6 +283,24 @@ export const importHarnesses = {
       name: "contract-scenario-grid",
       modules: modules.length,
     })),
+  "contract-covenant-report": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/covenant_report.json"),
+      import("@/lib/finstack/generated/types/covenant_report"),
+      import("@/lib/finstack/generated/meta/covenant_report"),
+    ]).then((modules) => ({
+      name: "contract-covenant-report",
+      modules: modules.length,
+    })),
+  "contract-dated-covenant-reports": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/dated_covenant_reports.json"),
+      import("@/lib/finstack/generated/types/dated_covenant_reports"),
+      import("@/lib/finstack/generated/meta/dated_covenant_reports"),
+    ]).then((modules) => ({
+      name: "contract-dated-covenant-reports",
+      modules: modules.length,
+    })),
   "contract-commodity-asian-option": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/commodity_asian_option.json"),

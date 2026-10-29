@@ -426,6 +426,7 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
@@ -614,6 +615,7 @@
           "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
           "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json",

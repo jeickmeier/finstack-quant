@@ -198,7 +198,9 @@ finstack-quant-ui/src/generated/meta/commodity_swap.ts
 finstack-quant-ui/src/generated/meta/commodity_swaption.ts
 finstack-quant-ui/src/generated/meta/composite.ts
 finstack-quant-ui/src/generated/meta/convertible_bond.ts
+finstack-quant-ui/src/generated/meta/covenant_report.ts
 finstack-quant-ui/src/generated/meta/credit_default_swap.ts
+finstack-quant-ui/src/generated/meta/dated_covenant_reports.ts
 finstack-quant-ui/src/generated/meta/deposit.ts
 finstack-quant-ui/src/generated/meta/discounted_cash_flow.ts
 finstack-quant-ui/src/generated/meta/dollar_roll.ts
@@ -292,7 +294,9 @@ finstack-quant-ui/src/generated/schemas/commodity_swap.json
 finstack-quant-ui/src/generated/schemas/commodity_swaption.json
 finstack-quant-ui/src/generated/schemas/composite.json
 finstack-quant-ui/src/generated/schemas/convertible_bond.json
+finstack-quant-ui/src/generated/schemas/covenant_report.json
 finstack-quant-ui/src/generated/schemas/credit_default_swap.json
+finstack-quant-ui/src/generated/schemas/dated_covenant_reports.json
 finstack-quant-ui/src/generated/schemas/deposit.json
 finstack-quant-ui/src/generated/schemas/discounted_cash_flow.json
 finstack-quant-ui/src/generated/schemas/dollar_roll.json
@@ -383,7 +387,9 @@ finstack-quant-ui/src/generated/types/commodity_swap.ts
 finstack-quant-ui/src/generated/types/commodity_swaption.ts
 finstack-quant-ui/src/generated/types/composite.ts
 finstack-quant-ui/src/generated/types/convertible_bond.ts
+finstack-quant-ui/src/generated/types/covenant_report.ts
 finstack-quant-ui/src/generated/types/credit_default_swap.ts
+finstack-quant-ui/src/generated/types/dated_covenant_reports.ts
 finstack-quant-ui/src/generated/types/deposit.ts
 finstack-quant-ui/src/generated/types/discounted_cash_flow.ts
 finstack-quant-ui/src/generated/types/dollar_roll.ts

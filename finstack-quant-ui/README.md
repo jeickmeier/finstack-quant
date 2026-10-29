@@ -170,11 +170,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the eleven native fixture generators under
+`mise run ui-fixtures` runs the twelve native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 cashflows → details;
-curves → market-browser; cubes, calibration, scenario-table, statements,
-analytics), then
+curves → market-browser; cubes, calibration, scenario-table;
+statements → covenants; analytics), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
 `mise run wasm-pkg` (release). `mise run ui-fixtures --check` verifies that every

@@ -262,6 +262,72 @@
       }
     },
     {
+      "name": "contract-covenant-report",
+      "type": "registry:lib",
+      "title": "Covenant report contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust covenant_report contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/covenant_report.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/covenant_report.json"
+        },
+        {
+          "path": "src/generated/types/covenant_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/covenant_report.ts"
+        },
+        {
+          "path": "src/generated/meta/covenant_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/covenant_report.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-dated-covenant-reports",
+      "type": "registry:lib",
+      "title": "Dated covenant reports contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust dated_covenant_reports contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/dated_covenant_reports.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/dated_covenant_reports.json"
+        },
+        {
+          "path": "src/generated/types/dated_covenant_reports.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/dated_covenant_reports.ts"
+        },
+        {
+          "path": "src/generated/meta/dated_covenant_reports.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/dated_covenant_reports.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-commodity-asian-option",
       "type": "registry:lib",
       "title": "Commodity asian option contract",
