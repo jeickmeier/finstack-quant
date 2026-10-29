@@ -420,6 +420,17 @@ export const importHarnesses = {
       name: "use-evaluate-lbo",
       modules: modules.length,
     })),
+  "use-run-sensitivity": () =>
+    Promise.all([
+      import("@/hooks/statements/use-run-sensitivity/use-run-sensitivity"),
+    ]).then((modules) => ({
+      name: "use-run-sensitivity",
+      modules: modules.length,
+    })),
+  "use-goal-seek": () =>
+    Promise.all([
+      import("@/hooks/statements/use-goal-seek/use-goal-seek"),
+    ]).then((modules) => ({ name: "use-goal-seek", modules: modules.length })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -1559,6 +1570,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/scenario_set"),
     ]).then((modules) => ({
       name: "contract-scenario-set",
+      modules: modules.length,
+    })),
+  "contract-sensitivity-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/sensitivity_result.json"),
+      import("@/lib/finstack/generated/types/sensitivity_result"),
+      import("@/lib/finstack/generated/meta/sensitivity_result"),
+    ]).then((modules) => ({
+      name: "contract-sensitivity-result",
       modules: modules.length,
     })),
   "contract-check-suite-spec": () =>

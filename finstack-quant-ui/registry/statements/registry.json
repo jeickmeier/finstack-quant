@@ -460,6 +460,88 @@
       }
     },
     {
+      "name": "statement-sensitivity",
+      "type": "registry:component",
+      "title": "Statement sensitivity",
+      "description": "Edits a native statements_analytics sensitivity run of a statement model and presents its tornado and the target metric in every returned scenario.",
+      "docs": "Edit a sensitivity run: the SensitivityMode (the wire values read from the generated sensitivity_result contract), the target metric as an id-combobox, the tornado period, and each varied node and period with comma-separated percentage moves. Each parameter's base value is read from the supplied evaluated result (a missing or non-finite cell is sent as NaN, never defaulted) and passed with the moves to statements_analytics.parameterSpecWithPercentages; an empty move is NaN, so Rust rejects it. Run sensitivity passes the run to the caller (usually the useRunSensitivity request). The native tornado is shown through tornado-chart, parameter keys (node@period) labelled by node and period, and the target metric at the tornado period in the baseline and every returned scenario in Rust's order. A full-grid run has no tornado; the scenarios are still shown. Nothing is calculated. Accepts result, nodeIds, periods, defaultValues, onSubmit, data, loading, error, disabled and density props.",
+      "files": [
+        {
+          "path": "components/statement-sensitivity/statement-sensitivity.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-sensitivity/statement-sensitivity.tsx"
+        },
+        {
+          "path": "components/statement-sensitivity/sensitivity.ts",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-sensitivity/sensitivity.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-worker",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "@finstack/id-combobox",
+        "@finstack/finstack-table",
+        "@finstack/tornado-chart",
+        "@finstack/contract-sensitivity-result",
+        "button",
+        "input"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "goal-seek-form",
+      "type": "registry:component",
+      "title": "Goal seek form",
+      "description": "Edits the arguments of a native statements_analytics goal seek, shows the returned solution and applies the solved model on an explicit second action.",
+      "docs": "Edit statements_analytics.goalSeek arguments: target node and driver node as id-comboboxes over the supplied node ids, target and driver periods, the target value, and an optional lower and upper search bracket in the driver's units (both empty leave the bracket unset so Rust uses its own; a cleared number is sent as NaN, never 0). Solve passes the arguments to the caller (usually the useGoalSeek request); the native GoalSeekResult is shown as returned: solved value, residual, tolerance, evaluations and the converged flag. When onApply is supplied, Apply to model is a second, explicit action that hands the returned model (the input model with the solved driver written in) to the caller, such as the statements workbench's commit; there is no undo, and applyBlocked disables it with a reason. Nothing is calculated or defaulted. Accepts nodeIds, periods, defaultValues, onSubmit, result, loading, error, onApply, applyBlocked, disabled and density props.",
+      "files": [
+        {
+          "path": "components/goal-seek-form/goal-seek-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/goal-seek-form/goal-seek-form.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-worker",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/id-combobox",
+        "button"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-evaluate-statement",
       "type": "registry:hook",
       "title": "useEvaluateStatement",
@@ -860,11 +942,61 @@
       }
     },
     {
+      "name": "use-run-sensitivity",
+      "type": "registry:hook",
+      "title": "useRunSensitivity",
+      "description": "Runs a native sensitivity analysis of a statement model and its tornado through the WASM worker.",
+      "docs": "Native statements_analytics.parameterSpecWithPercentages for each parameter (node, period, base value and percentage moves), runSensitivity over the SensitivityConfig of the mode, those parameters and the target metric, then generateTornadoEntries of the result at the target metric and period; a full_grid run, which Rust cannot rank, returns a null tornado. Returns {result, tornado}. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-run-sensitivity/use-run-sensitivity.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-run-sensitivity/use-run-sensitivity.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-goal-seek",
+      "type": "registry:hook",
+      "title": "useGoalSeek",
+      "description": "Solves a native goal seek on a statement model through the WASM worker.",
+      "docs": "Native statements_analytics.goalSeek of the model with the target node, period and value, the driver node and period, the updateModel flag and the optional [lower, upper] bracket passed positionally as supplied; an unset bracket stays unset so Rust uses its own. The returned GoalSeekResult carries the model with the solved driver written in when updateModel is true. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query, so a caller solves only on an explicit action. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-goal-seek/use-goal-seek.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-goal-seek/use-goal-seek.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -895,6 +1027,11 @@
           "path": "blocks/statements-workbench/valuation-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/valuation-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/sensitivity-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/sensitivity-panel.tsx"
         }
       ],
       "registryDependencies": [
@@ -908,6 +1045,8 @@
         "@finstack/dcf-assumptions-form",
         "@finstack/dcf-report",
         "@finstack/lbo-report",
+        "@finstack/statement-sensitivity",
+        "@finstack/goal-seek-form",
         "@finstack/use-evaluate-statement",
         "@finstack/use-statement-model-validator",
         "@finstack/use-statement-formula-validator",
@@ -920,6 +1059,8 @@
         "@finstack/use-evaluate-dcf",
         "@finstack/use-dcf-sensitivity",
         "@finstack/use-evaluate-lbo",
+        "@finstack/use-run-sensitivity",
+        "@finstack/use-goal-seek",
         "@finstack/use-linked-selection",
         "@finstack/use-finstack",
         "@finstack/json-viewer",
@@ -957,6 +1098,7 @@
           "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
           "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }

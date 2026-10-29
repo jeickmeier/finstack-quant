@@ -28,6 +28,10 @@ export type StatementsNative = {
     | "evaluateDcf"
     | "dcfSensitivity"
     | "evaluateLbo"
+    | "parameterSpecWithPercentages"
+    | "runSensitivity"
+    | "generateTornadoEntries"
+    | "goalSeek"
   >;
 };
 /** StatementsApi over the statements and statements_analytics facade namespaces. */
@@ -210,6 +214,53 @@ export function createStatementsService(
         native.statements_analytics.evaluateLbo(
           request.modelJson,
           request.configJson,
+        ),
+      );
+    },
+    runSensitivity(request) {
+      return context.result(() => {
+        const api = native.statements_analytics;
+        const config = {
+          mode: request.mode,
+          parameters: request.parameters.map((parameter) =>
+            api.parameterSpecWithPercentages(
+              parameter.nodeId,
+              parameter.periodId,
+              parameter.baseValue,
+              [...parameter.pctRange],
+            ),
+          ),
+          target_metrics: [request.targetMetric],
+        };
+        const result = api.runSensitivity(
+          request.modelJson,
+          JSON.stringify(config),
+        );
+        // Rust ranks only one-at-a-time runs; a full-grid result has no tornado.
+        const tornado =
+          request.mode === "full_grid"
+            ? null
+            : api.generateTornadoEntries(
+                result,
+                request.targetMetric,
+                request.period,
+              );
+        return { result, tornado };
+      });
+    },
+    goalSeek(request) {
+      return context.result(() =>
+        native.statements_analytics.goalSeek(
+          request.modelJson,
+          request.targetNode,
+          request.targetPeriod,
+          request.targetValue,
+          request.driverNode,
+          request.driverPeriod,
+          request.updateModel,
+          request.bounds === undefined
+            ? undefined
+            : [request.bounds[0], request.bounds[1]],
         ),
       );
     },

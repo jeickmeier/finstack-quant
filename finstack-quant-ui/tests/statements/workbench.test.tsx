@@ -107,6 +107,42 @@ beforeEach(() => {
         );
       case "evaluateLbo":
         return native.evaluateLbo(arg.modelJson, arg.configJson);
+      case "runSensitivity": {
+        const result = native.runSensitivity(
+          arg.modelJson,
+          JSON.stringify({
+            mode: arg.mode,
+            parameters: arg.parameters.map((parameter: any) =>
+              native.parameterSpecWithPercentages(
+                parameter.nodeId,
+                parameter.periodId,
+                parameter.baseValue,
+                parameter.pctRange,
+              ),
+            ),
+            target_metrics: [arg.targetMetric],
+          }),
+        );
+        return {
+          result,
+          tornado: native.generateTornadoEntries(
+            result,
+            arg.targetMetric,
+            arg.period,
+          ),
+        };
+      }
+      case "goalSeek":
+        return native.goalSeek(
+          arg.modelJson,
+          arg.targetNode,
+          arg.targetPeriod,
+          arg.targetValue,
+          arg.driverNode,
+          arg.driverPeriod,
+          arg.updateModel,
+          arg.bounds,
+        );
       default:
         throw new Error(`Unexpected worker call: ${method}`);
     }
@@ -455,6 +491,126 @@ it("values the current model with a native DCF, tornado and LBO in Valuation", a
   ).toBe("");
   expect(within(lbo).getByText("No LBO evaluation available.")).toBeTruthy();
   expect(lastCall("evaluateLbo")).toBeUndefined();
+});
+
+it("runs a native sensitivity and applies a goal-seek solution only on explicit actions in Scenarios", async () => {
+  const accepted = vi.fn();
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench
+        defaultModelJson={JSON.stringify(model)}
+        onModelAccepted={accepted}
+      />
+    </FinstackQueryProvider>,
+  );
+  fireEvent.click(await screen.findByRole("tab", { name: "Scenarios" }));
+  const sensitivity = await screen.findByRole("region", {
+    name: "Sensitivity analysis",
+  });
+  const choose = async (scope: HTMLElement, label: string, option: string) => {
+    await userEvent.click(within(scope).getByRole("combobox", { name: label }));
+    await userEvent.click(await screen.findByRole("option", { name: option }));
+  };
+  fireEvent.click(within(sensitivity).getByRole("radio", { name: "Diagonal" }));
+  fireEvent.change(
+    within(sensitivity).getByRole("combobox", { name: "Target metric" }),
+    { target: { value: "ebitda" } },
+  );
+  await choose(sensitivity, "Tornado period", "2025Q4");
+  const row = within(sensitivity).getByRole("group", { name: "Parameter 1" });
+  fireEvent.change(within(row).getByRole("combobox", { name: "Node" }), {
+    target: { value: "revenue" },
+  });
+  await choose(row, "Period", "2025Q4");
+  fireEvent.change(
+    within(row).getByRole("textbox", { name: "Percentage moves" }),
+    { target: { value: "-10, 10" } },
+  );
+  expect(lastCall("runSensitivity")).toBeUndefined();
+  fireEvent.click(
+    within(sensitivity).getByRole("button", { name: "Run sensitivity" }),
+  );
+  await waitFor(() => expect(lastCall("runSensitivity")).toBeDefined());
+  const modelJson = lastCall("runSensitivity").modelJson;
+  const evaluated = new native.Evaluator().evaluate(modelJson);
+  expect(lastCall("runSensitivity")).toEqual({
+    modelJson,
+    mode: "diagonal",
+    targetMetric: "ebitda",
+    period: "2025Q4",
+    parameters: [
+      {
+        nodeId: "revenue",
+        periodId: "2025Q4",
+        baseValue: evaluated.nodes.revenue["2025Q4"],
+        pctRange: [-10, 10],
+      },
+    ],
+  });
+  expect(
+    await within(sensitivity).findByRole("table", {
+      name: "Sensitivity tornado",
+    }),
+  ).toBeTruthy();
+  // Goal seek solves on Solve with the updated model, and writes it back only on Apply.
+  const seek = screen.getByRole("region", { name: "Goal seek" });
+  fireEvent.change(
+    within(seek).getByRole("combobox", { name: "Target node" }),
+    {
+      target: { value: "ebitda" },
+    },
+  );
+  await choose(seek, "Target period", "2025Q4");
+  fireEvent.change(
+    within(seek).getByRole("textbox", { name: "Target value" }),
+    {
+      target: { value: "70000000" },
+    },
+  );
+  fireEvent.change(
+    within(seek).getByRole("combobox", { name: "Driver node" }),
+    {
+      target: { value: "revenue" },
+    },
+  );
+  await choose(seek, "Driver period", "2025Q4");
+  fireEvent.change(within(seek).getByRole("textbox", { name: "Lower bound" }), {
+    target: { value: "100000000" },
+  });
+  fireEvent.change(within(seek).getByRole("textbox", { name: "Upper bound" }), {
+    target: { value: "500000000" },
+  });
+  expect(lastCall("goalSeek")).toBeUndefined();
+  fireEvent.click(within(seek).getByRole("button", { name: "Solve" }));
+  await waitFor(() => expect(lastCall("goalSeek")).toBeDefined());
+  expect(lastCall("goalSeek")).toEqual({
+    modelJson,
+    targetNode: "ebitda",
+    targetPeriod: "2025Q4",
+    targetValue: 70000000,
+    driverNode: "revenue",
+    driverPeriod: "2025Q4",
+    updateModel: true,
+    bounds: [100000000, 500000000],
+  });
+  const apply = await within(seek).findByRole("button", {
+    name: "Apply to model",
+  });
+  await waitFor(() =>
+    expect((apply as HTMLButtonElement).disabled).toBe(false),
+  );
+  const before = accepted.mock.calls.length;
+  fireEvent.click(apply);
+  await waitFor(() => expect(accepted.mock.calls.length).toBe(before + 1));
+  expect(
+    JSON.parse(accepted.mock.lastCall![0]).nodes.revenue.values["2025Q4"],
+  ).toEqual({ amount: "244390239.9891321", currency: "USD" });
+  await within(seek).findByText("Applied to the model.");
+  // The solve is not repeated on the applied model, and the sensitivity of the old model is hidden.
+  expect(
+    call.mock.calls.filter(([method]) => method === "goalSeek"),
+  ).toHaveLength(1);
+  await within(sensitivity).findByText("No sensitivity run available.");
 });
 
 it("rolls reported quarters up to native annual values with editable methods", async () => {

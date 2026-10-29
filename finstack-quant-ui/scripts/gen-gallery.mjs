@@ -64,6 +64,11 @@ const sources = {
     "src/fixtures/statements/analyst-dcf-sensitivity.json",
   statementLboConfig: "src/fixtures/statements/analyst-lbo-config.json",
   statementLbo: "src/fixtures/statements/analyst-lbo.json",
+  statementSensitivityRun:
+    "src/fixtures/statements/analyst-sensitivity-run.json",
+  statementSensitivity: "src/fixtures/statements/analyst-sensitivity.json",
+  statementGoalSeekRun: "src/fixtures/statements/analyst-goal-seek-run.json",
+  statementGoalSeek: "src/fixtures/statements/analyst-goal-seek.json",
   statementScenarios: "src/fixtures/statements/analyst-scenarios.json",
   statementScenarioDiff: "src/fixtures/statements/analyst-scenario-diff.json",
   statementRollForward2025Q2:

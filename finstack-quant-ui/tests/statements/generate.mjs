@@ -75,6 +75,57 @@ await write(
     native.evaluateLbo(modelJson, await read("analyst-lbo-config.json")),
   ),
 );
+// Native sensitivity of the analyst model under analyst-sensitivity-run.json
+// (the statement-sensitivity shape): each parameter's base value is the
+// evaluated cell, passed with its percentage moves to
+// parameterSpecWithPercentages, then runSensitivity and the tornado at the
+// target metric and period, as the worker's runSensitivity does.
+const evaluated = JSON.parse(resultJson);
+const sensitivity = JSON.parse(await read("analyst-sensitivity-run.json"));
+const sensitivityResult = native.runSensitivity(
+  modelJson,
+  JSON.stringify({
+    mode: sensitivity.mode,
+    parameters: sensitivity.parameters.map((parameter) =>
+      native.parameterSpecWithPercentages(
+        parameter.nodeId,
+        parameter.periodId,
+        evaluated.nodes[parameter.nodeId][parameter.periodId],
+        parameter.pctRange,
+      ),
+    ),
+    target_metrics: [sensitivity.targetMetric],
+  }),
+);
+await write(
+  "analyst-sensitivity.json",
+  serializeHost({
+    result: sensitivityResult,
+    tornado: native.generateTornadoEntries(
+      sensitivityResult,
+      sensitivity.targetMetric,
+      sensitivity.period,
+    ),
+  }),
+);
+// Native goalSeek under analyst-goal-seek-run.json, captured without the
+// updated model (updateModel false) to keep the fixture small.
+const seek = JSON.parse(await read("analyst-goal-seek-run.json"));
+await write(
+  "analyst-goal-seek.json",
+  serializeHost(
+    native.goalSeek(
+      modelJson,
+      seek.targetNode,
+      seek.targetPeriod,
+      seek.targetValue,
+      seek.driverNode,
+      seek.driverPeriod,
+      false,
+      seek.bounds,
+    ),
+  ),
+);
 // Native scenarioDiff over the analyst scenario set (base → downside → severe):
 // each scenario against its parent, over the P&L lines for the 2025 quarters.
 const scenarioSetJson = await read("analyst-scenarios.json");

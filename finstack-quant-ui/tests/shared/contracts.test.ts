@@ -112,8 +112,8 @@ describe("discovered canonical fixtures", () => {
     }
     // Rust publishes no example for CovenantReport, DatedCovenantReports,
     // the five credit-scoring inputs, MertonModel, CreditAssessment,
-    // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet or
-    // ScenarioDiff; every other root carries one.
+    // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet,
+    // ScenarioDiff or SensitivityResult; every other root carries one.
     expect(withoutExamples).toEqual([
       "schemas/covenant_report.json",
       "schemas/dated_covenant_reports.json",
@@ -130,6 +130,7 @@ describe("discovered canonical fixtures", () => {
       "schemas/lbo_result.json",
       "schemas/scenario_diff.json",
       "schemas/scenario_set.json",
+      "schemas/sensitivity_result.json",
     ]);
   });
   it("accepts the captured native credit assessment under the generated CreditAssessment schema unchanged", async () => {
@@ -199,6 +200,30 @@ describe("discovered canonical fixtures", () => {
       );
       expect(validator.parse(fixture)).toEqual(fixture);
     }
+  });
+  it("accepts the captured native sensitivity result under the generated SensitivityResult schema unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const validator = z.fromJSONSchema(
+      converterSchema(
+        JSON.parse(
+          await readFile(
+            resolve(generated, "schemas/sensitivity_result.json"),
+            "utf8",
+          ),
+        ),
+      ),
+    );
+    const { result } = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
+        ),
+        "utf8",
+      ),
+    );
+    expect(result.scenarios).toHaveLength(4);
+    expect(validator.parse(result)).toEqual(result);
   });
   it("accepts the captured native covenant series under the generated DatedCovenantReports and CovenantReport schemas unchanged", async () => {
     const generated = resolve(repo, "finstack-quant-ui/src/generated");

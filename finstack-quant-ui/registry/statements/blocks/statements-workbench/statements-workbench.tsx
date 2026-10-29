@@ -8,6 +8,7 @@ import { ForecastEditor } from "./forecast-editor";
 import { MetricEditor } from "./metric-editor";
 import { ScenarioPanel } from "./scenario-panel";
 import { ValuationPanel } from "./valuation-panel";
+import { SensitivityPanel } from "./sensitivity-panel";
 import {
   annualRollupSpecJson,
   initialRollupMethods,
@@ -881,6 +882,18 @@ export function StatementsWorkbench({
                 defaultScenarioSetJson={defaultScenarioSetJson}
                 density={density}
               />
+            )}
+            {model && request && result && (
+              <div className="mt-8 border-t border-border pt-6">
+                <SensitivityPanel
+                  modelJson={request.modelJson}
+                  result={result}
+                  nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
+                  periods={model.periods.map((period) => period.id)}
+                  onApply={(json) => commit(json, true)}
+                  density={density}
+                />
+              </div>
             )}
           </TabsContent>
           <TabsContent value="ratios">
