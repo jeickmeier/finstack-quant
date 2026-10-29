@@ -398,6 +398,11 @@
           "target": "workers/services/scenarios.ts"
         },
         {
+          "path": "file/services/analytics.ts",
+          "type": "registry:file",
+          "target": "workers/services/analytics.ts"
+        },
+        {
           "path": "file/services/calibration.ts",
           "type": "registry:file",
           "target": "workers/services/calibration.ts"

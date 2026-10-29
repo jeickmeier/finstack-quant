@@ -22,6 +22,7 @@ const generators = [
   "tests/calibration/generate.mjs",
   "tests/valuations/scenario-table/generate.mjs",
   "tests/statements/generate.mjs",
+  "tests/analytics/generate.mjs",
   "scripts/gen-gallery.mjs",
 ];
 for (const script of generators) {

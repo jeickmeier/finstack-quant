@@ -180,6 +180,7 @@ const output = await prettier.format(
       "calibration",
       "covenants",
       "scenarios",
+      "analytics",
       "models",
       "statements",
     ].map((category) => `registry/${category}/registry.json`),

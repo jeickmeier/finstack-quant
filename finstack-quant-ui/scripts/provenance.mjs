@@ -288,6 +288,14 @@ const displays = [
     convention:
       "Returned TrancheMetrics fields in the units each Rust field documents; break-even CDR, discount margin and OAS as returned decimals; prices percent of current tranche balance; no price default.",
   },
+  {
+    id: "performance-report",
+    api: ["analytics.Performance#summary", "Performance", "summary"],
+    route: "returned-analytics",
+    deferred: "machine-readable-units",
+    convention:
+      "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
+  },
 ];
 
 export async function generateProvenance(repo, contracts, fixtureManifest) {
@@ -299,17 +307,26 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
     ts.ScriptTarget.Latest,
     true,
   );
-  const interfaces = new Map(
-    ast.statements
-      .filter(ts.isInterfaceDeclaration)
-      .map((node) => [node.name.text, node]),
+  // Published owners: namespace interfaces and declared handle classes (such
+  // as analytics.Performance, merged with a same-named interface).
+  const owners = Map.groupBy(
+    ast.statements.filter(
+      (node) =>
+        (ts.isInterfaceDeclaration(node) || ts.isClassDeclaration(node)) &&
+        node.name,
+    ),
+    (node) => node.name.text,
   );
   const digest = (value) => createHash("sha256").update(value).digest("hex");
   function apiSource([name, owner, method]) {
-    const member = interfaces
+    const member = owners
       .get(owner)
-      ?.members.find((node) => node.name?.getText(ast) === method);
-    if (!member || !ts.isMethodSignature(member))
+      ?.flatMap((node) => [...node.members])
+      .find((node) => node.name?.getText(ast) === method);
+    if (
+      !member ||
+      !(ts.isMethodSignature(member) || ts.isMethodDeclaration(member))
+    )
       throw new Error(`Missing published API: ${owner}.${method}`);
     const declaration = member.getFullText(ast).trim();
     return {

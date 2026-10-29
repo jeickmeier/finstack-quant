@@ -131,6 +131,20 @@ test("cube node smile", async ({ page }) => {
   ).toBeVisible();
   await expect(smile).toHaveScreenshot("cube-node-smile.png");
 });
+test("performance-report monthly returns", async ({ page }) => {
+  const item = await open(page, "performance-report", "light", "comfortable");
+  // The four item baselines stop at the preview's scroll height, above the heatmap.
+  const monthly = item.getByRole("region", {
+    name: "Global Macro Composite monthly returns",
+    exact: true,
+  });
+  await expect(
+    monthly.getByRole("img", {
+      name: "Global Macro Composite monthly returns heatmap",
+    }),
+  ).toBeVisible();
+  await expect(monthly).toHaveScreenshot("performance-report-monthly.png");
+});
 test("every nonvisual item imports without initializing WASM", async ({
   page,
 }) => {
