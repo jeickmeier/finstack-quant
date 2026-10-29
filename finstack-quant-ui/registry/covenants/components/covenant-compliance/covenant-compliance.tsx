@@ -11,7 +11,7 @@ import {
 
 type Row = { key: string };
 export interface CovenantComplianceProps {
-  /** Native DatedCovenantReports rows (CovenantEngine#evaluateSeries), one column each, in the order supplied. */
+  /** Native DatedCovenantReports rows (statements_analytics.evaluateCovenants or CovenantEngine#evaluateSeries), one column each, in the order supplied. */
   series: readonly DatedCovenantReportsWire[];
   caption?: string;
   captionVisibility?: "visible" | "sr-only";

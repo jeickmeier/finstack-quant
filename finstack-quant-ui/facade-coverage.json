@@ -123,7 +123,9 @@
     "covenants.lboStandard": "sd-covenant-engine-editor",
     "covenants.projectFinance": "sd-covenant-engine-editor",
     "covenants.realEstate": "sd-covenant-engine-editor",
-    "covenants.validateCovenantEngineJson": "sd-covenant-engine-editor"
+    "covenants.validateCovenantEngineJson": "sd-covenant-engine-editor",
+    "statements_analytics.evaluateCovenants": "sd-covenant-engine-editor",
+    "statements_analytics.forecastBreaches": "sd-covenant-breach-forecast"
   },
   "excluded": {
     "calibration.calibrationStepBaseCorrelation": "schema-form",

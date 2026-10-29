@@ -1,5 +1,61 @@
 [
   {
+    "as_of": "2024-03-31",
+    "reports": {
+      "min_interest_coverage": {
+        "covenant_type": "Interest Coverage >= 3.00x",
+        "covenant_id": "min_interest_coverage",
+        "passed": true,
+        "actual_value": 4.500980666853461,
+        "threshold": 3,
+        "details": null,
+        "headroom": 0.5003268889511535,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  },
+  {
+    "as_of": "2024-06-30",
+    "reports": {
+      "min_interest_coverage": {
+        "covenant_type": "Interest Coverage >= 3.00x",
+        "covenant_id": "min_interest_coverage",
+        "passed": true,
+        "actual_value": 4.924760601915184,
+        "threshold": 3,
+        "details": null,
+        "headroom": 0.6415868673050614,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  },
+  {
     "as_of": "2024-09-30",
     "reports": {
       "min_interest_coverage": {

@@ -297,7 +297,7 @@ describe("discovered canonical fixtures", () => {
         "utf8",
       ),
     );
-    expect(series).toHaveLength(6);
+    expect(series).toHaveLength(8);
     for (const row of series) {
       expect(dated.parse(row)).toEqual(row);
       for (const value of Object.values(row.reports))

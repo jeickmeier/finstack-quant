@@ -942,22 +942,32 @@
     {
       "id": "covenant-compliance",
       "route": "typed",
-      "convention": "Returned DatedCovenantReports rows in input order and their verdicts; a covenant without a report on a date shows a dash. Statement rows come from statements.nodeToDatedSchedule per metric (period end), zipped by period from a chosen first period, with a non-finite value dropping that metric from its row; covenant windows decide which metrics a date requires.",
+      "convention": "Returned DatedCovenantReports rows in input order and their verdicts; a covenant without a report on a date shows a dash. Rust evaluates every statement result period at its end date with the covenants applicable on that date, reading a metric only where an applicable covenant needs it, so covenant windows decide which metrics a date requires; the component builds no rows.",
       "api": {
-        "name": "covenants.CovenantEngine#evaluateSeries",
+        "name": "statements_analytics.evaluateCovenants",
         "source": "finstack-quant-wasm/index.d.ts",
-        "owner": "CovenantEngine",
-        "member": "evaluateSeries",
+        "owner": "StatementsAnalyticsNamespace",
+        "member": "evaluateCovenants",
         "inputs": [
           {
-            "name": "metrics",
-            "type": "readonly generated.covenants.DatedMetrics[]",
+            "name": "results",
+            "type": "StatementResult | string",
+            "optional": false
+          },
+          {
+            "name": "covenants",
+            "type": "CovenantEngine",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "JsonInput",
             "optional": false
           }
         ],
         "returns": "generated.covenants.DatedCovenantReports[]",
-        "declaration": "/**\n   * Evaluate the engine on each dated row of metric values.\n   *\n   * Each row is evaluated independently; the breach history is not updated.\n   *\n   * @param metrics - `DatedMetrics` rows (`{ date, metrics }`): metric values per ISO-8601 test date, evaluated in the order given. (Python takes a date-indexed DataFrame.)\n   * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per input row in input order. (Python returns the same reports as a long DataFrame.)\n   * @throws If `metrics` is not an array of `DatedMetrics`, the engine is invalid (kind `validation`), or a required metric is missing on a date (kind `not_found`).\n   */\n  evaluateSeries(\n    metrics: readonly generated.covenants.DatedMetrics[]\n  ): generated.covenants.DatedCovenantReports[];",
-        "sha256": "b238b3d5afb151e585fea2d0e414c9b5669dded022ddb91d50c11b6799c65a96"
+        "declaration": "/**\n   * Evaluate covenant compliance at the end of every statement result period.\n   *\n   * Each period that carries a value in `results` is tested on its last\n   * calendar day (from the model calendar) with the covenants applicable on\n   * that date: a covenant window covering the date replaces the engine's\n   * top-level specifications, and waivers and threshold schedules apply. A\n   * node is read only when an applicable covenant needs it, so a node that is\n   * missing or non-finite in a period where no applicable covenant reads it\n   * (for example a trailing ratio before four quarters of history, outside the\n   * window that tests it) does not throw. The engine's breach history is not\n   * updated.\n   *\n   * @param results - Evaluated `StatementResult` (object or JSON). Node ids are the covenant metric ids (`metric_id`, or each covenant type's conventional name); ratios in turns (`3.5` means 3.5x), amounts in the model currency.\n   * @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.\n   * @param model - `FinancialModelSpec` (object or JSON) whose period calendar gives each result period's test date.\n   * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in ascending period order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)\n   * @throws If `results` or `model` is malformed, a result period is missing from the model calendar, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).\n   */\n  evaluateCovenants(\n    results: StatementResult | string,\n    covenants: CovenantEngine,\n    model: JsonInput\n  ): generated.covenants.DatedCovenantReports[];",
+        "sha256": "063126dfd5a8e83b4dea308360241d2a1430e6b7ae4884b6bcaf91aee397d395"
       },
       "schemas": [
         {
