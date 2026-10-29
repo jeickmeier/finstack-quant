@@ -23,6 +23,9 @@ import type {
   LookbackReturns,
   PeriodicReturn,
   TableEnvelope,
+  PortfolioMetrics,
+  PortfolioMetricSeriesEntry,
+  PortfolioValuation,
   statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
@@ -261,6 +264,35 @@ export interface PerformanceReport {
   /** correlationMatrix rows in tickerNames order. */
   correlation: { matrix: number[][]; repaired: boolean };
 }
+/** A portfolio valuation request; omitted options are left to Rust. */
+export interface PortfolioValuationRequest {
+  /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
+  readonly specJson: string;
+  /** MarketContextState JSON; canonicalized through the shared market handle cache. */
+  readonly marketJson: string;
+  /** Risk-metric menu offered to every position; omitted is Rust's standard set (PV plus dv01), empty is PV only. */
+  readonly metrics?: readonly string[] | null;
+  /** Fail closed on a requested metric that fails to compute; omitted is Rust's default (true). */
+  readonly strictRisk?: boolean | null;
+}
+/** One native portfolio valuation and its aggregated metrics; nothing is summed or converted in TypeScript. */
+export interface PortfolioValuationReport {
+  /** Position ids in spec order (Portfolio#positionIds); `position_values` keys do not keep it. */
+  positionIds: string[];
+  /** Entity ids in registration order (Portfolio#entityIds); `by_entity` keys do not keep it. */
+  entityIds: string[];
+  /** portfolio.valuePortfolio; each `valuation_result` keeps 64-bit fields as bigint. */
+  valuation: PortfolioValuation;
+  /** portfolio.aggregateMetrics over `valuation` and the same market. */
+  metrics: PortfolioMetrics;
+}
+/** One base metric's series request over returned aggregated metrics. */
+export interface PortfolioMetricSeriesRequest {
+  /** PortfolioMetrics returned by valuePortfolio (plain numbers; no bigint crosses the query key). */
+  readonly metrics: PortfolioMetrics;
+  /** Canonical base metric id, for example "bucketed_dv01". */
+  readonly base: string;
+}
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -413,6 +445,19 @@ export interface AnalyticsApi {
     request: PerformanceReportRequest,
   ): Promise<Envelope<PerformanceReport>>;
 }
+/** portfolio: valuation, metric aggregation and spec validation of a host-supplied book. */
+export interface PortfolioApi {
+  /** portfolio.valuePortfolio over the cached Portfolio and MarketContext handles, then aggregateMetrics over the same market. */
+  valuePortfolio(
+    request: PortfolioValuationRequest,
+  ): Promise<Envelope<PortfolioValuationReport>>;
+  /** portfolio.portfolioMetricsSeries: decoded entries of one base metric, in the order Rust returns them. */
+  portfolioMetricSeries(
+    request: PortfolioMetricSeriesRequest,
+  ): Promise<Envelope<PortfolioMetricSeriesEntry[]>>;
+  /** portfolio.parsePortfolioSpecJson, then Portfolio.fromSpec through the handle cache: canonical PortfolioSpec JSON of a book that builds. */
+  validatePortfolio(specJson: string): Promise<Envelope<string>>;
+}
 /** calibration: envelope validation, static diagnostics and calibration runs. */
 export interface CalibrationApi {
   /** calibration.validateCalibration: full envelope includes prior_market, quote sets, data and every plan setting. */
@@ -491,6 +536,7 @@ export type WorkerApi = {
   CashflowsApi &
   ScenariosApi &
   AnalyticsApi &
+  PortfolioApi &
   CalibrationApi &
   ModelsApi &
   StatementsApi;

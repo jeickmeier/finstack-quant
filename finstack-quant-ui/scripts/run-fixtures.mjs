@@ -14,6 +14,7 @@ const checking = process.argv.includes("--check");
 requireWasm(["pkg-node"]);
 const generators = [
   "tests/valuations/results/generate.mjs",
+  "tests/portfolio/generate.mjs",
   "tests/scenarios/application/generate.mjs",
   "tests/valuations/cashflows/generate.mjs",
   "tests/valuations/details/generate.mjs",

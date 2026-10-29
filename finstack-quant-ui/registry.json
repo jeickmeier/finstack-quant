@@ -12,6 +12,7 @@
     "registry/covenants/registry.json",
     "registry/scenarios/registry.json",
     "registry/analytics/registry.json",
+    "registry/portfolio/registry.json",
     "registry/models/registry.json",
     "registry/statements/registry.json"
   ],
@@ -3723,6 +3724,39 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-portfolio-result",
+      "type": "registry:lib",
+      "title": "Portfolio result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust portfolio_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/portfolio_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/portfolio_result.json"
+        },
+        {
+          "path": "src/generated/types/portfolio_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/portfolio_result.ts"
+        },
+        {
+          "path": "src/generated/meta/portfolio_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/portfolio_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json"
         ]
       }
     },

@@ -1607,6 +1607,106 @@
         "declaration": "/**\n   * The standard per-ticker summary as a table envelope: one row per ticker\n   * with 22 metric columns plus a leading `ticker` dimension column. Same\n   * rows as the Python `Performance.to_dataframe`.\n   * @returns Column-oriented table envelope of the summary metrics.\n   * @param riskFreeRate - Annualized risk-free rate as a decimal (0.02 = 2%); affects only `sharpe`. Defaults to 0.0.\n   * @param confidence - Tail confidence as a decimal probability applied to VaR, ES and tail ratio; defaults to 0.95.\n   * @throws Error - Throws a JavaScript exception if the panel is too short to annualize (`cagr` / `calmar`) or the table cannot be converted.\n   */\n  summary(riskFreeRate?: number | null, confidence?: number | null): TableEnvelope;",
         "sha256": "b6948ac2b6f84f9f0eec52dbaafee5803f0d35c0785561763f7666fade6a8acb"
       }
+    },
+    {
+      "id": "portfolio-summary",
+      "route": "returned-valuation",
+      "convention": "Returned PortfolioValuation: total_base_currency and by_entity as exact returned money (entity rows in Portfolio#entityIds registration order), the stamped fx_collapse_policy shown as text, degraded_positions with each risk_error; nothing summed or converted.",
+      "api": {
+        "name": "portfolio.valuePortfolio",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "valuePortfolio",
+        "inputs": [
+          {
+            "name": "portfolio",
+            "type": "Portfolio",
+            "optional": false
+          },
+          {
+            "name": "market",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "strictRisk",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "metrics",
+            "type": "string[]",
+            "optional": true
+          }
+        ],
+        "returns": "PortfolioValuation",
+        "declaration": "/**\n   * Value an already-built `Portfolio` handle. Skips the per-call\n   * `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that\n   * `valuePortfolio` performs; use this when sweeping market scenarios\n   * against a fixed portfolio.\n   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).\n   * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.\n   * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.\n   * @param strictRisk - Optional; when omitted or `undefined`, uses the Rust `PortfolioValuationOptions` default, `true` (fail closed when a requested risk metric fails to compute). Pass `false` only for an intentional PV-preserving fallback.\n   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` matches what `priceInstrument` returns: the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain numbers, so serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `\"10\"`, `\"2\"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.\n   * @throws Error - Throws a JavaScript exception if a requested metric name is unknown, portfolio valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.\n   */\n  valuePortfolio(\n    portfolio: Portfolio,\n    market: MarketContext,\n    strictRisk?: boolean,\n    metrics?: string[]\n  ): PortfolioValuation;",
+        "sha256": "f5fd1d0bfc7e4aeed02a0da53c3299fc6557a3146fe2a07f6eb8c1062b1d1232"
+      }
+    },
+    {
+      "id": "positions-table",
+      "route": "returned-valuation",
+      "deferred": "machine-readable-units",
+      "convention": "Returned PositionValue rows in Portfolio#positionIds (spec) order: native and base money as returned, the applied fx_rate, risk completeness and inapplicable_metrics; the selected position's valuation_result through valuation-summary and measures-grid with Rust metricMetadata. Omitted metrics and strictRisk are left to Rust.",
+      "api": {
+        "name": "portfolio.valuePortfolio",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "valuePortfolio",
+        "inputs": [
+          {
+            "name": "portfolio",
+            "type": "Portfolio",
+            "optional": false
+          },
+          {
+            "name": "market",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "strictRisk",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "metrics",
+            "type": "string[]",
+            "optional": true
+          }
+        ],
+        "returns": "PortfolioValuation",
+        "declaration": "/**\n   * Value an already-built `Portfolio` handle. Skips the per-call\n   * `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that\n   * `valuePortfolio` performs; use this when sweeping market scenarios\n   * against a fixed portfolio.\n   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).\n   * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.\n   * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.\n   * @param strictRisk - Optional; when omitted or `undefined`, uses the Rust `PortfolioValuationOptions` default, `true` (fail closed when a requested risk metric fails to compute). Pass `false` only for an intentional PV-preserving fallback.\n   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` matches what `priceInstrument` returns: the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain numbers, so serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `\"10\"`, `\"2\"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.\n   * @throws Error - Throws a JavaScript exception if a requested metric name is unknown, portfolio valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.\n   */\n  valuePortfolio(\n    portfolio: Portfolio,\n    market: MarketContext,\n    strictRisk?: boolean,\n    metrics?: string[]\n  ): PortfolioValuation;",
+        "sha256": "f5fd1d0bfc7e4aeed02a0da53c3299fc6557a3146fe2a07f6eb8c1062b1d1232"
+      }
+    },
+    {
+      "id": "portfolio-metrics",
+      "route": "returned-metrics",
+      "deferred": "machine-readable-units",
+      "convention": "Returned PortfolioMetrics: aggregated totals with by-entity values, raw by-position metrics with their native currency, unaggregated_metrics, skipped_metrics and degraded_positions as returned. The portfolioMetricsSeries chart keeps Rust's (lexical) entry order, grouped by the first key component; no tenor sort while tenor ordering is an owner decision.",
+      "api": {
+        "name": "portfolio.aggregateMetrics",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "aggregateMetrics",
+        "inputs": [
+          {
+            "name": "valuationJson",
+            "type": "PortfolioValuation | string",
+            "optional": false
+          },
+          {
+            "name": "market",
+            "type": "MarketContext",
+            "optional": false
+          }
+        ],
+        "returns": "PortfolioMetrics",
+        "declaration": "/**\n   * Aggregate portfolio metrics from a valuation.\n   *\n   * Metrics are aggregated in the valuation's base currency, with FX spots\n   * read at the valuation's `as_of`.\n   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).\n   * @param valuationJson - `PortfolioValuation` object or JSON, for example the result of `valuePortfolio`.\n   * @param market - `core.MarketContext` handle supplying the FX spots that convert out-of-base metrics.\n   * @throws Error - Throws a JavaScript exception if the valuation input is malformed, a required FX conversion is unavailable or invalid, or the metrics cannot be converted to a JavaScript value.\n   */\n  aggregateMetrics(\n    valuationJson: PortfolioValuation | string,\n    market: MarketContext\n  ): PortfolioMetrics;",
+        "sha256": "0cade7144a0748bd562c8610ca5d5425e575fdd294669e523441b6dda3a8c076"
+      }
     }
   ],
   "hostDeclarations": [

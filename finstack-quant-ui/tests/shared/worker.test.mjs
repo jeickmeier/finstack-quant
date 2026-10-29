@@ -100,6 +100,10 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "applyMarketScenario",
     // AnalyticsApi
     "performanceReport",
+    // PortfolioApi
+    "valuePortfolio",
+    "portfolioMetricSeries",
+    "validatePortfolio",
     // CalibrationApi
     "validateCalibration",
     "dryRun",

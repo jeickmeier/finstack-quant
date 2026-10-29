@@ -168,6 +168,20 @@ class FiscalConfig extends facade.core.FiscalConfig {
     };
   }
 }
+let portfolioConstructed = 0,
+  portfolioFreed = 0;
+class Portfolio extends facade.portfolio.Portfolio {
+  static fromSpec(...args) {
+    const handle = super.fromSpec(...args);
+    portfolioConstructed++;
+    const free = handle.free.bind(handle);
+    handle.free = () => {
+      free();
+      portfolioFreed++;
+    };
+    return handle;
+  }
+}
 const service = createService({
   initialize: async () => {
     if (workerData.fail)
@@ -188,6 +202,7 @@ const service = createService({
     VolCube,
   },
   analytics: { ...facade.analytics, Performance },
+  portfolio: { ...facade.portfolio, Portfolio },
   models: {
     ...facade.models,
     volatility: {
@@ -236,6 +251,8 @@ expose(
       performanceFreed,
       fiscalConstructed,
       fiscalFreed,
+      portfolioConstructed,
+      portfolioFreed,
     }),
   },
   nodeEndpoint(parentPort),
