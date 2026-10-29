@@ -445,6 +445,11 @@
     "schema": "schemas/merton_model.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
+    "source": "finstack-quant/portfolio/schemas/portfolio/1/portfolio_margin_result.schema.json",
+    "schema": "schemas/portfolio_margin_result.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json",
     "source": "finstack-quant/portfolio/schemas/portfolio/1/portfolio_result.schema.json",
     "schema": "schemas/portfolio_result.json"

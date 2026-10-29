@@ -182,6 +182,13 @@ export const importHarnesses = {
       name: "use-apply-scenario-and-revalue",
       modules: modules.length,
     })),
+  "use-portfolio-margin": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-portfolio-margin/use-portfolio-margin"),
+    ]).then((modules) => ({
+      name: "use-portfolio-margin",
+      modules: modules.length,
+    })),
   "use-simm-im": () =>
     Promise.all([import("@/hooks/margin/use-simm-im/use-simm-im")]).then(
       (modules) => ({ name: "use-simm-im", modules: modules.length }),
@@ -1334,6 +1341,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/merton_model"),
     ]).then((modules) => ({
       name: "contract-merton-model",
+      modules: modules.length,
+    })),
+  "contract-portfolio-margin-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/portfolio_margin_result.json"),
+      import("@/lib/finstack/generated/types/portfolio_margin_result"),
+      import("@/lib/finstack/generated/meta/portfolio_margin_result"),
+    ]).then((modules) => ({
+      name: "contract-portfolio-margin-result",
       modules: modules.length,
     })),
   "contract-portfolio-result": () =>

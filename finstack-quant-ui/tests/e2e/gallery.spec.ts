@@ -225,6 +225,24 @@ test("merton-calculator model parameters", async ({ page }) => {
   await expect(model.getByRole("table")).toBeVisible();
   await expect(model).toHaveScreenshot("merton-calculator-model.png");
 });
+test("portfolio-margin-report selected netting set", async ({ page }) => {
+  const item = await open(
+    page,
+    "portfolio-margin-report",
+    "light",
+    "comfortable",
+  );
+  // The four item baselines stop inside the first set's sensitivities.
+  await item
+    .getByRole("row", { name: /bilateral · CSA USD-REGULATORY-CSA/ })
+    .click();
+  const set = item.getByRole("region", {
+    name: "Netting set USD-REGULATORY-CSA · CSA USD-REGULATORY-CSA",
+    exact: true,
+  });
+  await expect(set.getByRole("table", { name: "IR delta" })).toBeVisible();
+  await expect(set).toHaveScreenshot("portfolio-margin-report-netting-set.png");
+});
 test("csa-editor loads a Rust preset and its initial margin terms", async ({
   page,
 }) => {

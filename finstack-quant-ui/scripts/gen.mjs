@@ -106,6 +106,7 @@ export async function generate(repo = repoRoot) {
           "portfolio_result",
           "scenario_pnl_batch_item",
           "scenario_revalue_view",
+          "portfolio_margin_result",
           "simm_sensitivities_json",
           "im_result",
           "vm_result",

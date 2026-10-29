@@ -267,6 +267,68 @@
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
+    },
+    {
+      "name": "portfolio-margin-report",
+      "type": "registry:component",
+      "title": "Portfolio margin report",
+      "description": "Display of a native portfolio margin run: totals, netting sets with their approximation flag, IM collateral by CSA, degraded positions and the selected set's IM breakdown and SIMM sensitivities.",
+      "docs": "Display-only view of the PortfolioMarginResult returned by usePortfolioMargin (portfolio.portfolioMargin): the total margin with an always-shown Indicative badge, every returned total (initial, variation, required and segregated IM collateral, IM transfer) as exact base-currency money, positions_without_margin and total_positions as the counts Rust returns, netting sets in returned order (id, methodology, position count, IM, VM, total and the returned is_approximate flag), IM collateral by CSA in the netting sets' CSA order (then any other returned CSA), degraded positions with Rust's messages, and for the selected netting set its im_breakdown and SIMM sensitivities through simm-sensitivity-table. Amounts are shown as returned, including a -0 variation margin; nothing is summed, netted or converted. Accepts result, loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/portfolio-margin-report/portfolio-margin-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/portfolio/components/portfolio-margin-report/portfolio-margin-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/simm-sensitivity-table",
+        "badge"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
+          "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-portfolio-margin",
+      "type": "registry:hook",
+      "title": "usePortfolioMargin",
+      "description": "Calculates a host-supplied portfolio's margin by netting set through the WASM worker.",
+      "docs": "portfolio.portfolioMargin over the shared cached Portfolio (Portfolio.fromSpec, keyed on canonical Portfolio#toJson) and MarketContext handles on the requested date. Positions whose instruments carry a margin_spec form netting sets; the rest count toward positions_without_margin. An omitted currentImCollateral stays unset (Rust treats it as none held); a collateral entry for a CSA the book does not have, or conflicting margin terms within one netting set, return the native validation error. Returns the PortfolioMarginResult as returned. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-portfolio-margin/use-portfolio-margin.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-portfolio-margin/use-portfolio-margin.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     }
   ]
 }

@@ -349,6 +349,12 @@
       "worker": "none"
     },
     {
+      "name": "portfolio-margin-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the PortfolioMarginResult returned by usePortfolioMargin (portfolio.portfolioMargin): the total margin with an always-shown Indicative badge, every returned total (initial, variation, required and segregated IM collateral, IM transfer) as exact base-currency money, positions_without_margin and total_positions as the counts Rust returns, netting sets in returned order (id, methodology, position count, IM, VM, total and the returned is_approximate flag), IM collateral by CSA in the netting sets' CSA order (then any other returned CSA), degraded positions with Rust's messages, and for the selected netting set its im_breakdown and SIMM sensitivities through simm-sensitivity-table. Amounts are shown as returned, including a -0 variation margin; nothing is summed, netted or converted. Accepts result, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "simm-sensitivity-table",
       "type": "registry:component",
       "docs": "Display-only view of a SimmSensitivitiesJson document (for example the canonical text useSimmSensitivitiesValidator returns, parsed). Sections follow the SIMM risk classes (interest rate, credit qualifying, credit non-qualifying, equity, commodity, FX); each holds the class's delta and vega tuples in input order, with columns named after the Rust tuple positions, and the curvature entries whose risk_class is that class. Empty fields are omitted. Nothing is summed, netted, regrouped or converted; amounts are in the set's base currency, which is shown. Accepts sensitivities, formatValue and density props; no worker or query provider required.",
@@ -562,6 +568,10 @@
     },
     {
       "name": "use-apply-scenario-and-revalue",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-portfolio-margin",
       "type": "registry:hook"
     },
     {
@@ -1049,6 +1059,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-portfolio-margin-result",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-portfolio-result",
       "type": "registry:lib"
     },
@@ -1185,6 +1199,10 @@
     {
       "path": "finstack-quant-ui/tests/portfolio/scenario-pnl.json",
       "sha256": "d803505d3192eb99918c7ce6b7b6949f76e99c7059f6b107e1cf0054ecaf6137"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
+      "sha256": "5de939f6497e41c47b65175dca788d1dbecf7c5a1c8488d720a8df588dedc657"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",

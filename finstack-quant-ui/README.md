@@ -170,9 +170,9 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the seventeen native fixture generators under
+`mise run ui-fixtures` runs the eighteen native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-horizon return, attribution, cashflows → details; portfolio;
+horizon return, attribution, cashflows → details; portfolio → portfolio margin;
 curves → market-browser; cubes, calibration, scenario-table;
 statements → covenants; analytics; models credit; margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
@@ -786,6 +786,25 @@ scenario's returned `pnl.total`, a bar chart of those totals and each
 scenario's report; nothing is summed. Its fixture
 (`tests/portfolio/scenario-pnl.json`, the host-parity book under the parity
 scenarios) matches the batch the Py/WASM parity tests pin.
+
+`usePortfolioMargin` (`@finstack/use-portfolio-margin`) calls
+`portfolio.portfolioMargin` over the same cached handles on the requested date.
+Positions whose instruments carry a `margin_spec` form netting sets; the rest
+count toward `positions_without_margin`. An omitted `currentImCollateral`
+stays unset (none held); collateral under a CSA the book does not have, or
+conflicting margin terms within one netting set, return the native validation
+error. The display-only `PortfolioMarginReport` shows the returned
+`PortfolioMarginResult`: the totals as exact base-currency money, the two
+counts as returned (`total_positions` counts positions inside netting sets),
+netting sets in returned order with Rust's `is_approximate` flag beside an
+always-shown Indicative badge (SIMM sets use Rust's default SIMM version;
+cleared sets a standalone proxy), IM collateral by CSA in the netting sets'
+CSA order, degraded positions, and the selected set's `im_breakdown` and its
+SIMM sensitivities through `SimmSensitivityTable`. Rust serializes a zero
+variation margin as `-0`, and the report shows it as returned. Nothing is
+summed, netted or converted. The fixture (`tests/portfolio/margin/`: two swaps
+under the Rust USD regulatory CSA and a regulatory CSA-B, plus an unmargined
+deposit, over the pricing market) also pins collateral held and an unknown CSA.
 
 ## Returned rating migration
 

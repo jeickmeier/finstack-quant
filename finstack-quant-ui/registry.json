@@ -3895,6 +3895,39 @@
       }
     },
     {
+      "name": "contract-portfolio-margin-result",
+      "type": "registry:lib",
+      "title": "Portfolio margin result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust portfolio_margin_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/portfolio_margin_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/portfolio_margin_result.json"
+        },
+        {
+          "path": "src/generated/types/portfolio_margin_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/portfolio_margin_result.ts"
+        },
+        {
+          "path": "src/generated/meta/portfolio_margin_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/portfolio_margin_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-portfolio-result",
       "type": "registry:lib",
       "title": "Portfolio result contract",

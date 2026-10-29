@@ -368,6 +368,15 @@ const displays = [
       "Returned PortfolioMetrics: aggregated totals with by-entity values, raw by-position metrics with their native currency, unaggregated_metrics, skipped_metrics and degraded_positions as returned. The portfolioMetricsSeries chart keeps Rust's (lexical) entry order, grouped by the first key component; no tenor sort while tenor ordering is an owner decision.",
   },
   {
+    id: "portfolio-margin-report",
+    schema: `${base}portfolio/1/portfolio_margin_result.schema.json`,
+    pointer: "#",
+    api: ["portfolio.portfolioMargin", "PortfolioNamespace", "portfolioMargin"],
+    route: "returned-report",
+    convention:
+      "Returned PortfolioMarginResult: every total as exact base-currency money (including a -0 variation margin, as returned), total_positions and positions_without_margin as returned counts, netting sets in returned order with the returned is_approximate flag beside an always-shown Indicative badge, by_csa collateral in the netting sets' CSA order, degraded positions, and the selected set's im_breakdown and SIMM sensitivities. Omitted collateral is left to Rust; nothing summed, netted or converted.",
+  },
+  {
     id: "scenario-pnl-table",
     schema: `${base}portfolio/1/scenario_pnl_batch_item.schema.json`,
     pointer: "#",

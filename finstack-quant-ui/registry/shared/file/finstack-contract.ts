@@ -34,6 +34,7 @@ import type {
   PortfolioValuation,
   ScenarioPnlBatchItem,
   ScenarioRevalueView,
+  PortfolioMarginResult,
   ImResult,
   CsaSpec,
   VmResult,
@@ -517,6 +518,17 @@ export interface ScenarioRevalue {
   /** portfolio.applyScenarioAndRevalue; each `valuation_result` keeps 64-bit fields as bigint. */
   readonly view: ScenarioRevalueView;
 }
+/** A host-supplied book's margin run over a market on one date. */
+export interface PortfolioMarginRequest {
+  /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. Positions whose instruments carry a margin_spec form the netting sets. */
+  readonly specJson: string;
+  /** MarketContext JSON; canonicalized through the shared market cache. */
+  readonly marketJson: string;
+  /** ISO valuation date of the margin run. */
+  readonly asOf: string;
+  /** One-way IM collateral already held, keyed by CSA id in that CSA's currency; omitted is none (Rust treats a missing key as zero), and an unknown CSA id is a native validation error. */
+  readonly currentImCollateral?: Readonly<Record<string, MoneyValue>> | null;
+}
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -785,7 +797,7 @@ export interface AnalyticsApi {
     request: BenchmarkReportRequest,
   ): Promise<Envelope<BenchmarkReport>>;
 }
-/** portfolio: valuation, metric aggregation, spec validation and scenario P&L of a host-supplied book. */
+/** portfolio: valuation, metric aggregation, spec validation, scenario P&L and margin of a host-supplied book. */
 export interface PortfolioApi {
   /** portfolio.valuePortfolio over the cached Portfolio and MarketContext handles, then aggregateMetrics over the same market. */
   valuePortfolio(
@@ -805,6 +817,10 @@ export interface PortfolioApi {
   applyScenarioAndRevalue(
     request: ScenarioRevalueRequest,
   ): Promise<Envelope<ScenarioRevalue>>;
+  /** portfolio.portfolioMargin over the cached Portfolio and MarketContext handles; omitted collateral stays unset. */
+  portfolioMargin(
+    request: PortfolioMarginRequest,
+  ): Promise<Envelope<PortfolioMarginResult>>;
 }
 /** margin: SIMM sensitivity validation and indicative initial margin; CSA presets and validation, variation margin and margin calls. */
 export interface MarginApi {
