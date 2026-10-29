@@ -11,7 +11,8 @@ export function useNativeValidator<
     | "validateStatementModel"
     | "validateStatementFormula"
     | "validateCheckSuiteSpec"
-    | "validatePortfolio",
+    | "validatePortfolio"
+    | "validateSimmSensitivities",
 >(operation: K, label: string) {
   const worker = useFinstack();
   return useCallback(

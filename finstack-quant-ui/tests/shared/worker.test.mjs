@@ -104,6 +104,9 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "valuePortfolio",
     "portfolioMetricsSeries",
     "validatePortfolio",
+    // MarginApi
+    "validateSimmSensitivities",
+    "simmIm",
     // CalibrationApi
     "validateCalibration",
     "dryRun",

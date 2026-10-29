@@ -27,6 +27,7 @@ const generators = [
   "tests/covenants/generate.mjs",
   "tests/analytics/generate.mjs",
   "tests/models/credit/generate.mjs",
+  "tests/margin/generate.mjs",
   "scripts/gen-gallery.mjs",
 ];
 for (const script of generators) {

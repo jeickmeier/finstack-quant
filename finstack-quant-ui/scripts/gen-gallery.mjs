@@ -35,6 +35,7 @@ const sources = {
   marketScenario: "tests/scenarios/application/cases.json",
   performance: "tests/analytics/explicit.json",
   credit: "tests/models/credit/migration.json",
+  simm: "src/fixtures/margin/simm.json",
   portfolioValuation: "tests/portfolio/gallery.json",
   details: "tests/valuations/details/cases.json",
   irsInstrument:

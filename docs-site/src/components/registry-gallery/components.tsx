@@ -45,6 +45,9 @@ import { Example as Example41 } from "./examples/portfolio-summary";
 import { Example as Example42 } from "./examples/positions-table";
 import { Example as Example43 } from "./examples/portfolio-metrics";
 import { Example as Example44 } from "./examples/transition-matrix-heatmap";
+import { Example as Example45 } from "./examples/simm-sensitivity-table";
+import { Example as Example46 } from "./examples/simm-report";
+import { Example as Example47 } from "./examples/simm-calculator";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -91,6 +94,9 @@ const examples = {
   "positions-table": Example42,
   "portfolio-metrics": Example43,
   "transition-matrix-heatmap": Example44,
+  "simm-sensitivity-table": Example45,
+  "simm-report": Example46,
+  "simm-calculator": Example47,
 };
 export function ComponentDemo({
   name,

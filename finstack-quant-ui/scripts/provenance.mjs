@@ -348,6 +348,35 @@ const displays = [
     convention:
       "Returned models.credit.migration results: TransitionMatrix rows and default probabilities in RatingScale order, the GeneratorMatrix rows with its roundTripError and regularizationL1, and the default probabilities of project(generator, t) per requested horizon. Decimals as returned; an omitted round-trip tolerance is left to Rust. Heatmap colour domains are presentation only: [0, 1] for probabilities, the intensities' extent (centred on zero) for the generator.",
   },
+  {
+    id: "simm-sensitivity-table",
+    schema: `${base}margin/1/simm_sensitivities_json.schema.json`,
+    pointer: "#",
+    route: "supplied-input",
+    convention:
+      "A supplied or natively canonicalized SimmSensitivitiesJson: delta and vega tuples and curvature entries listed under their SIMM risk class in input order, columns named by the Rust tuple positions; amounts in the stated base currency, never summed, netted or converted.",
+  },
+  {
+    id: "simm-report",
+    schema: `${base}margin/1/im_result.schema.json`,
+    pointer: "#",
+    api: [
+      "margin.SimmCalculator#calculateFromSensitivities",
+      "SimmCalculator",
+      "calculateFromSensitivities",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned ImResult of SimmCalculator#calculateFromSensitivities in the set's own base currency (Rust accepts only USD): exact amount and breakdown money, methodology, as_of, mpor_days, the approximation flag beside an always-shown Indicative badge, and the simm_detail risk-class margins, buckets and weighted sensitivities as returned. Omitted version and MPOR are left to Rust.",
+  },
+  {
+    id: "simm-calculator",
+    schema: `${base}margin/1/simm_sensitivities_json.schema.json`,
+    pointer: "#",
+    route: "schema",
+    convention:
+      "Generated simm_sensitivities_json form (Rust example as the default document) and an ISO calculation date; the natively validated set and the returned ImResult are presented by simm-sensitivity-table and simm-report.",
+  },
 ];
 
 export async function generateProvenance(repo, contracts, fixtureManifest) {

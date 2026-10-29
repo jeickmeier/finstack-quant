@@ -23982,6 +23982,179 @@
       ]
     }
   },
+  "simm": {
+    "description": "Native indicative SIMM (default version and MPOR) on 2025-01-15: the simm_sensitivities_json schema example and a single USD 5Y IR delta of 1000, each with its canonical sensitivities text and returned ImResult.",
+    "example": {
+      "request": {
+        "sensitivitiesJson": "{\"base_currency\":\"USD\",\"commodity_delta\":[],\"commodity_vega\":[],\"credit_non_qualifying_delta\":[],\"credit_non_qualifying_vega\":[],\"credit_qualifying_delta\":[],\"credit_qualifying_vega\":[],\"curvature\":[],\"equity_delta\":[[\"AAPL\",250000]],\"equity_vega\":[],\"fx_delta\":[[\"EUR\",400000]],\"fx_vega\":[],\"ir_delta\":[[\"USD\",\"10Y\",-8000],[\"USD\",\"5Y\",12500]],\"ir_vega\":[]}",
+        "asOf": "2025-01-15"
+      },
+      "canonical": "{\"base_currency\":\"USD\",\"ir_delta\":[[\"USD\",\"10Y\",-8000.0],[\"USD\",\"5Y\",12500.0]],\"ir_vega\":[],\"credit_qualifying_delta\":[],\"credit_qualifying_vega\":[],\"credit_non_qualifying_delta\":[],\"credit_non_qualifying_vega\":[],\"equity_delta\":[[\"AAPL\",250000.0]],\"equity_vega\":[],\"fx_delta\":[[\"EUR\",400000.0]],\"fx_vega\":[],\"commodity_delta\":[],\"commodity_vega\":[],\"curvature\":[]}",
+      "result": {
+        "amount": {
+          "amount": "13958205.61533609",
+          "currency": "USD"
+        },
+        "methodology": "simm",
+        "as_of": "2025-01-15",
+        "mpor_days": 10,
+        "breakdown": {
+          "Equity_Delta": {
+            "amount": "12500000",
+            "currency": "USD"
+          },
+          "FX_Delta": {
+            "amount": "2960000",
+            "currency": "USD"
+          },
+          "IR_Delta": {
+            "amount": "330000",
+            "currency": "USD"
+          }
+        },
+        "approximation": true,
+        "simm_detail": {
+          "components": [
+            {
+              "component": "IR_Delta",
+              "risk_class": "interest_rate",
+              "historical_volatility_ratio": 1,
+              "buckets": [
+                {
+                  "bucket": "USD",
+                  "weighted_sensitivities": [
+                    {
+                      "risk_factor": "USD",
+                      "tenor": "10Y",
+                      "sensitivity": -8000,
+                      "risk_weight": 60,
+                      "concentration_factor": 1,
+                      "weighted_sensitivity": -480000
+                    },
+                    {
+                      "risk_factor": "USD",
+                      "tenor": "5Y",
+                      "sensitivity": 12500,
+                      "risk_weight": 60,
+                      "concentration_factor": 1,
+                      "weighted_sensitivity": 750000
+                    }
+                  ],
+                  "k": 330000,
+                  "signed_sum": 270000
+                }
+              ],
+              "margin": 330000
+            },
+            {
+              "component": "Equity_Delta",
+              "risk_class": "equity",
+              "historical_volatility_ratio": 1,
+              "buckets": [
+                {
+                  "bucket": "AAPL",
+                  "weighted_sensitivities": [
+                    {
+                      "risk_factor": "AAPL",
+                      "sensitivity": 250000,
+                      "risk_weight": 50,
+                      "concentration_factor": 1,
+                      "weighted_sensitivity": 12500000
+                    }
+                  ],
+                  "k": 12500000,
+                  "signed_sum": 12500000
+                }
+              ],
+              "margin": 12500000
+            },
+            {
+              "component": "FX_Delta",
+              "risk_class": "fx",
+              "historical_volatility_ratio": 1,
+              "buckets": [
+                {
+                  "bucket": "fx",
+                  "weighted_sensitivities": [
+                    {
+                      "risk_factor": "EUR",
+                      "sensitivity": 400000,
+                      "risk_weight": 7.4,
+                      "concentration_factor": 1,
+                      "weighted_sensitivity": 2960000
+                    }
+                  ],
+                  "k": 2960000,
+                  "signed_sum": 2960000
+                }
+              ],
+              "margin": 2960000
+            }
+          ],
+          "risk_class_margins": {
+            "interest_rate": 330000,
+            "equity": 12500000,
+            "fx": 2960000
+          },
+          "mpor_scale": 1
+        }
+      }
+    },
+    "ir-5y": {
+      "request": {
+        "sensitivitiesJson": "{\"base_currency\":\"USD\",\"ir_delta\":[[\"USD\",\"5Y\",1000]]}",
+        "asOf": "2025-01-15"
+      },
+      "canonical": "{\"base_currency\":\"USD\",\"ir_delta\":[[\"USD\",\"5Y\",1000.0]],\"ir_vega\":[],\"credit_qualifying_delta\":[],\"credit_qualifying_vega\":[],\"credit_non_qualifying_delta\":[],\"credit_non_qualifying_vega\":[],\"equity_delta\":[],\"equity_vega\":[],\"fx_delta\":[],\"fx_vega\":[],\"commodity_delta\":[],\"commodity_vega\":[],\"curvature\":[]}",
+      "result": {
+        "amount": {
+          "amount": "60000",
+          "currency": "USD"
+        },
+        "methodology": "simm",
+        "as_of": "2025-01-15",
+        "mpor_days": 10,
+        "breakdown": {
+          "IR_Delta": {
+            "amount": "60000",
+            "currency": "USD"
+          }
+        },
+        "approximation": true,
+        "simm_detail": {
+          "components": [
+            {
+              "component": "IR_Delta",
+              "risk_class": "interest_rate",
+              "historical_volatility_ratio": 1,
+              "buckets": [
+                {
+                  "bucket": "USD",
+                  "weighted_sensitivities": [
+                    {
+                      "risk_factor": "USD",
+                      "tenor": "5Y",
+                      "sensitivity": 1000,
+                      "risk_weight": 60,
+                      "concentration_factor": 1,
+                      "weighted_sensitivity": 60000
+                    }
+                  ],
+                  "k": 60000,
+                  "signed_sum": 60000
+                }
+              ],
+              "margin": 60000
+            }
+          ],
+          "risk_class_margins": {
+            "interest_rate": 60000
+          },
+          "mpor_scale": 1
+        }
+      }
+    }
+  },
   "portfolioValuation": {
     "request": {
       "metrics": ["dv01", "bucketed_dv01", "theta", "cs01"]

@@ -221,6 +221,7 @@ finstack-quant-ui/src/generated/meta/fx_spot.ts
 finstack-quant-ui/src/generated/meta/fx_swap.ts
 finstack-quant-ui/src/generated/meta/fx_touch_option.ts
 finstack-quant-ui/src/generated/meta/fx_variance_swap.ts
+finstack-quant-ui/src/generated/meta/im_result.ts
 finstack-quant-ui/src/generated/meta/inflation_cap_floor.ts
 finstack-quant-ui/src/generated/meta/inflation_linked_bond.ts
 finstack-quant-ui/src/generated/meta/inflation_swap.ts
@@ -245,6 +246,7 @@ finstack-quant-ui/src/generated/meta/scenario_diff.ts
 finstack-quant-ui/src/generated/meta/scenario_grid.ts
 finstack-quant-ui/src/generated/meta/scenario_set.ts
 finstack-quant-ui/src/generated/meta/shared.ts
+finstack-quant-ui/src/generated/meta/simm_sensitivities_json.ts
 finstack-quant-ui/src/generated/meta/snowball.ts
 finstack-quant-ui/src/generated/meta/statement_result.ts
 finstack-quant-ui/src/generated/meta/structured_credit.ts
@@ -318,6 +320,7 @@ finstack-quant-ui/src/generated/schemas/fx_spot.json
 finstack-quant-ui/src/generated/schemas/fx_swap.json
 finstack-quant-ui/src/generated/schemas/fx_touch_option.json
 finstack-quant-ui/src/generated/schemas/fx_variance_swap.json
+finstack-quant-ui/src/generated/schemas/im_result.json
 finstack-quant-ui/src/generated/schemas/inflation_cap_floor.json
 finstack-quant-ui/src/generated/schemas/inflation_linked_bond.json
 finstack-quant-ui/src/generated/schemas/inflation_swap.json
@@ -341,6 +344,7 @@ finstack-quant-ui/src/generated/schemas/rollup_spec.json
 finstack-quant-ui/src/generated/schemas/scenario_diff.json
 finstack-quant-ui/src/generated/schemas/scenario_grid.json
 finstack-quant-ui/src/generated/schemas/scenario_set.json
+finstack-quant-ui/src/generated/schemas/simm_sensitivities_json.json
 finstack-quant-ui/src/generated/schemas/snowball.json
 finstack-quant-ui/src/generated/schemas/statement_result.json
 finstack-quant-ui/src/generated/schemas/structured_credit.json
@@ -412,6 +416,7 @@ finstack-quant-ui/src/generated/types/fx_spot.ts
 finstack-quant-ui/src/generated/types/fx_swap.ts
 finstack-quant-ui/src/generated/types/fx_touch_option.ts
 finstack-quant-ui/src/generated/types/fx_variance_swap.ts
+finstack-quant-ui/src/generated/types/im_result.ts
 finstack-quant-ui/src/generated/types/inflation_cap_floor.ts
 finstack-quant-ui/src/generated/types/inflation_linked_bond.ts
 finstack-quant-ui/src/generated/types/inflation_swap.ts
@@ -436,6 +441,7 @@ finstack-quant-ui/src/generated/types/scenario_diff.ts
 finstack-quant-ui/src/generated/types/scenario_grid.ts
 finstack-quant-ui/src/generated/types/scenario_set.ts
 finstack-quant-ui/src/generated/types/shared.ts
+finstack-quant-ui/src/generated/types/simm_sensitivities_json.ts
 finstack-quant-ui/src/generated/types/snowball.ts
 finstack-quant-ui/src/generated/types/statement_result.ts
 finstack-quant-ui/src/generated/types/structured_credit.ts

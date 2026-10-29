@@ -193,6 +193,28 @@ test("transition-matrix-heatmap cumulative default probability", async ({
     "transition-matrix-heatmap-cumulative.png",
   );
 });
+test("simm-calculator validated set and initial margin", async ({ page }) => {
+  const item = await open(page, "simm-calculator", "light", "comfortable");
+  // The four item baselines stop inside the sensitivity form, above these sections.
+  const sensitivities = item.getByRole("region", {
+    name: "SIMM sensitivities",
+    exact: true,
+  });
+  await expect(
+    sensitivities.getByRole("region", { name: "Interest rate" }),
+  ).toBeVisible();
+  await expect(sensitivities).toHaveScreenshot(
+    "simm-calculator-sensitivities.png",
+  );
+  const report = item.getByRole("region", {
+    name: "SIMM initial margin",
+    exact: true,
+  });
+  await expect(report.getByLabel("Initial margin")).toHaveText(
+    "USD 13,958,205.61533609",
+  );
+  await expect(report).toHaveScreenshot("simm-calculator-report.png");
+});
 test("every nonvisual item imports without initializing WASM", async ({
   page,
 }) => {

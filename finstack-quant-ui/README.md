@@ -35,29 +35,29 @@ module, and live under `src/generated/types/` for type-only imports.
 
 ## Layout and extension
 
-| Path                                                 | Holds                                                                                                                                                                                                                                                                  |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `analytics`, `portfolio`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
-| `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                                                            |
-| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                                                                  |
-| `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                                                              |
-| `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                                                           |
-| `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                                                                     |
-| `tests/e2e/`, `tests/install/`, `tests/publishing/`  | The `ui-e2e`, `ui-install` and `ui-publish-check` gates.                                                                                                                                                                                                               |
-| `tests/browser/`                                     | Worker smoke, footprint gate, the harness runner and shared consumer helpers.                                                                                                                                                                                          |
+| Path                                                 | Holds                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `analytics`, `portfolio`, `margin`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
+| `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                                                                      |
+| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                                                                            |
+| `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                                                                        |
+| `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                                                                     |
+| `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                                                                               |
+| `tests/e2e/`, `tests/install/`, `tests/publishing/`  | The `ui-e2e`, `ui-install` and `ui-publish-check` gates.                                                                                                                                                                                                                         |
+| `tests/browser/`                                     | Worker smoke, footprint gate, the harness runner and shared consumer helpers.                                                                                                                                                                                                    |
 
 Sources import through the paths an installed consumer uses. `tsconfig.json`
 maps them back here; `vitest.config.mts` copies that table into prefix aliases
 in order, so a specific key must precede its prefix.
 
-| Import                    | Source                                                                                                                                                                    |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                                                        |
-| `@/lib/finstack/*`        | `src/*`                                                                                                                                                                   |
-| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `scenarios`, `analytics`, `portfolio`, `models` and `statements`; a new crate adds its line |
-| `@/workers/*`             | `registry/shared/file/*`                                                                                                                                                  |
-| `@/components/finstack/*` | `registry/*`                                                                                                                                                              |
-| `@/components/ui/*`       | `components/ui/*`                                                                                                                                                         |
+| Import                    | Source                                                                                                                                                                              |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                                                                  |
+| `@/lib/finstack/*`        | `src/*`                                                                                                                                                                             |
+| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `scenarios`, `analytics`, `portfolio`, `margin`, `models` and `statements`; a new crate adds its line |
+| `@/workers/*`             | `registry/shared/file/*`                                                                                                                                                            |
+| `@/components/finstack/*` | `registry/*`                                                                                                                                                                        |
+| `@/components/ui/*`       | `components/ui/*`                                                                                                                                                                   |
 
 A new crate category also adds its directory name to the `include` list in
 `scripts/gen-registry.mjs`, then runs
@@ -170,11 +170,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the fourteen native fixture generators under
+`mise run ui-fixtures` runs the fifteen native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 cashflows → details; portfolio;
 curves → market-browser; cubes, calibration, scenario-table;
-statements → covenants; analytics; models credit), then
+statements → covenants; analytics; models credit; margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
 `mise run wasm-pkg` (release). `mise run ui-fixtures --check` verifies that every
@@ -747,6 +747,25 @@ shows a projection error inline beside the matrix. Probabilities are coloured
 over `[0, 1]`; the generator's colour domain is the extent of its intensities,
 centred on zero, because its diagonal is negative. The native fixture (an
 illustrative eight-state one-year matrix) lives in `tests/models/credit/`.
+
+## Indicative SIMM initial margin
+
+`useSimmSensitivitiesValidator` (`@finstack/use-simm-sensitivities-validator`)
+returns canonical `SimmSensitivitiesJson` text (`margin.SimmSensitivities.fromJson`,
+`validate`, `toJson`). `useSimmIm` builds the set and a
+`margin.SimmCalculator` (omitted `version` and `mporDays` stay unset, so Rust's
+defaults apply) and calls `calculateFromSensitivities` in the set's own base
+currency; both handles are freed per call. Rust accepts only USD-based sets,
+because SIMM concentration thresholds are in USD; another base currency
+returns the native error. The display-only `SimmSensitivityTable` lists a set
+by risk class as supplied, and `SimmReport` shows the returned amount, an
+always-shown Indicative badge beside the returned `approximation` flag, the
+component breakdown and the `simm_detail` drill-down; nothing is aggregated in
+TypeScript. `SimmCalculator` composes `SchemaForm` over the generated
+`simm_sensitivities_json` contract, a `DateInput`, the table and the report,
+with validation and calculation as caller callbacks. The native fixture (the
+schema example and a single USD 5Y IR delta of 1000, whose IM is 60000) is
+`src/fixtures/margin/simm.json`.
 
 ## Served gallery checks
 
