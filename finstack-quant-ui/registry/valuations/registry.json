@@ -300,7 +300,7 @@
       "type": "registry:component",
       "title": "Pricing parameters form",
       "description": "Controlled pricing parameters: model, metrics, metric pricing overrides and market history.",
-      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
+      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels and useMetrics(instrumentType). Selected metrics the type does not offer are reported, never dropped. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
       "files": [
         {
           "path": "components/pricing-params-form/pricing-params-form.tsx",

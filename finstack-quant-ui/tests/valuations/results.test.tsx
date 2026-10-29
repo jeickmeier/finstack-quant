@@ -44,7 +44,7 @@ it("matches the retained fixture against the real Node facade", () => {
     request.metrics,
   );
   expect(current).toEqual(fixture.result);
-  expect(native.listStandardMetricsGrouped()).toEqual(fixture.groups);
+  expect(native.metricsForInstrument("bond")).toEqual(fixture.groups);
 });
 it("keeps every supplied key and raw value when metadata is unavailable", () => {
   render(<MeasuresGrid result={fixture.result} />);

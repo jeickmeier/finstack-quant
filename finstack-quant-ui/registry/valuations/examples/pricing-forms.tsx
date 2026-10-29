@@ -29,7 +29,7 @@ function Forms() {
   const [request, setRequest] = useState<PriceRequest | null>(null);
   const validate = useInstrumentValidator();
   const models = useModels(),
-    metrics = useMetrics();
+    metrics = useMetrics(type);
   const price = usePriceInstrument(
     request ?? fixture.request,
     request !== null,

@@ -258,8 +258,8 @@ export interface ValuationsApi {
   trancheBreakevenCdr(request: TrancheRequest): Promise<Envelope<number>>;
   /** valuations.instruments.listModelsGrouped. */
   models(): Promise<Envelope<Record<string, string[]>>>;
-  /** valuations.instruments.listStandardMetricsGrouped. */
-  metrics(): Promise<Envelope<Record<string, string[]>>>;
+  /** valuations.instruments.metricsForInstrument: standard metrics registered for one instrument type, by native display group. */
+  metrics(instrumentType: string): Promise<Envelope<Record<string, string[]>>>;
   /** valuations.instruments.metricMetadata: native per-key interpretation (units, decoded coordinates, groups) for metric keys. */
   metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */

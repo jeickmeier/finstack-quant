@@ -213,7 +213,7 @@
     {
       "name": "pricing-params-form",
       "type": "registry:component",
-      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
+      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels and useMetrics(instrumentType). Selected metrics the type does not offer are reported, never dropped. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
       "worker": "none"
     },
     {
@@ -868,7 +868,7 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "258d9b9fe1903364892bdac6ed0fd14bc9448de6bd156925132a7083be06f71c"
+      "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
@@ -892,11 +892,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "d4022cde9b8c494dde5090e85c9456f5f3d22d246d250c96c9d1a0354d94df6a"
+      "sha256": "b05946f519838643a7a443317e73971c16fdcf9e654df46eff6e0ce7b8f9f1f7"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "59f8dbca57a419bc8d97b2f449bd6817d02b9eca0df10aa8c6639fced065eefe"
+      "sha256": "fc81f82963a40b36138180dc64d62ff55d12d483413f31055f55fad32abeb49a"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
