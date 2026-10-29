@@ -20,6 +20,7 @@ import {
   type FxSurfaceChartProps,
 } from "@/components/finstack/models/components/fx-surface-chart/fx-surface-chart";
 import { ScenarioPanel } from "./scenario-panel";
+import { TranchePanel } from "./tranche-panel";
 import { CalibrationPanel } from "./calibration-panel";
 import type { CalibrationFitChartProps } from "@/components/finstack/calibration/components/calibration-fit-chart/calibration-fit-chart";
 import { MeasuresGrid } from "@/components/finstack/valuations/components/measures-grid/measures-grid";
@@ -71,6 +72,8 @@ export function PricingWorkbench({
     trancheId: string;
     gridJson: string;
     priceDomain: readonly [number, number];
+    /** Registry metric ids valued on the tranche by trancheMetrics; omitted means none. */
+    trancheMetrics?: readonly string[];
   };
   surfaceOptions?: MarketContextBrowserProps["surfaceOptions"];
   cubeOptions?(
@@ -572,25 +575,43 @@ export function PricingWorkbench({
                 <TabsContent value="scenarios" className="print:hidden">
                   {scenario &&
                   completed?.instrumentType === "structured_credit" ? (
-                    <details
-                      onToggle={(event) =>
-                        setScenariosOpen(event.currentTarget.open)
-                      }
-                    >
-                      <summary>Scenario prices</summary>
-                      {scenariosOpen && (
-                        <ScenarioPanel
-                          request={{
-                            instrumentJson: completed.request.instrumentJson,
-                            marketJson: completed.request.marketJson,
-                            asOf: completed.request.asOf,
-                            trancheId: scenario.trancheId,
-                            gridJson: scenario.gridJson,
-                          }}
-                          priceDomain={scenario.priceDomain}
-                        />
-                      )}
-                    </details>
+                    <>
+                      <TranchePanel
+                        key={JSON.stringify([
+                          completed.request.instrumentJson,
+                          completed.request.marketJson,
+                          completed.request.asOf,
+                          scenario.trancheId,
+                        ])}
+                        request={{
+                          instrumentJson: completed.request.instrumentJson,
+                          marketJson: completed.request.marketJson,
+                          asOf: completed.request.asOf,
+                          trancheId: scenario.trancheId,
+                        }}
+                        metrics={scenario.trancheMetrics}
+                        density={currentDensity}
+                      />
+                      <details
+                        onToggle={(event) =>
+                          setScenariosOpen(event.currentTarget.open)
+                        }
+                      >
+                        <summary>Scenario prices</summary>
+                        {scenariosOpen && (
+                          <ScenarioPanel
+                            request={{
+                              instrumentJson: completed.request.instrumentJson,
+                              marketJson: completed.request.marketJson,
+                              asOf: completed.request.asOf,
+                              trancheId: scenario.trancheId,
+                              gridJson: scenario.gridJson,
+                            }}
+                            priceDomain={scenario.priceDomain}
+                          />
+                        )}
+                      </details>
+                    </>
                   ) : (
                     <p>Scenario prices are unavailable for this instrument.</p>
                   )}

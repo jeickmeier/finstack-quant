@@ -207,6 +207,17 @@ const displays = [
     convention:
       "Rust clean settlement price, percent of current tranche balance.",
   },
+  {
+    id: "tranche-analytics",
+    api: [
+      "valuations.instruments.trancheMetrics",
+      "ValuationInstrumentsNamespace",
+      "trancheMetrics",
+    ],
+    route: "returned-metrics",
+    convention:
+      "Returned TrancheMetrics fields in the units each Rust field documents; break-even CDR, discount margin and OAS as returned decimals; prices percent of current tranche balance; no price default.",
+  },
 ];
 
 export async function generateProvenance(repo, contracts, fixtureManifest) {

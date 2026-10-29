@@ -462,11 +462,47 @@
       }
     },
     {
+      "name": "tranche-analytics",
+      "type": "registry:component",
+      "title": "Tranche analytics",
+      "description": "Displays one structured-credit tranche's native metrics, break-even CDR, discount margin and OAS, each with its own native error.",
+      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. Nothing is computed, rescaled or defaulted. No worker is required.",
+      "files": [
+        {
+          "path": "components/tranche-analytics/tranche-analytics.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/tranche-analytics/tranche-analytics.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/measure-value",
+        "@finstack/decimal-input",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "pricing-workbench",
       "type": "registry:block",
       "title": "Pricing workbench",
-      "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows and scenarios.",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit scenarios. Host owns routes and domain inputs.",
+      "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, tranche analytics and scenarios.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit tranche analytics and scenarios. Host owns routes and domain inputs.",
       "files": [
         {
           "path": "blocks/pricing-workbench/pricing-workbench.tsx",
@@ -482,6 +518,11 @@
           "path": "blocks/pricing-workbench/scenario-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/scenario-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/tranche-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/tranche-panel.tsx"
         },
         {
           "path": "blocks/pricing-workbench/workbench-status.ts",
@@ -526,6 +567,8 @@
         "@finstack/use-calibrate",
         "@finstack/use-scenario-table",
         "@finstack/scenario-heatmap",
+        "@finstack/use-tranche-analytics",
+        "@finstack/tranche-analytics",
         "button",
         "label",
         "popover",
@@ -738,6 +781,31 @@
           "path": "hooks/use-scenario-table/use-scenario-table.ts",
           "type": "registry:hook",
           "target": "hooks/valuations/use-scenario-table/use-scenario-table.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-tranche-analytics",
+      "type": "registry:hook",
+      "title": "useTrancheAnalytics",
+      "description": "Fetches native structured-credit tranche metrics, OAS, discount margin and break-even CDR through the WASM worker.",
+      "docs": "Four query option builders and hooks over valuations.instruments.trancheMetrics, trancheOas, trancheDiscountMargin and trancheBreakevenCdr, each keyed by its complete immutable request and the worker session; null disables a call. An omitted metrics price or metric list is left to Rust; OAS and discount margin require an explicit clean price, and OAS uses Rust's default OasConfig. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-tranche-analytics/use-tranche-analytics.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-tranche-analytics/use-tranche-analytics.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

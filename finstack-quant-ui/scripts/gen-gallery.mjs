@@ -30,6 +30,7 @@ const sources = {
   cubes: "tests/core/cubes/cases.json",
   calibration: "tests/calibration/cases.json",
   scenarios: "tests/valuations/scenario-table/cases.json",
+  trancheAnalytics: "tests/valuations/scenario-table/tranche-analytics.json",
   cashflows: "tests/valuations/cashflows/cases.json",
   details: "tests/valuations/details/cases.json",
   irsInstrument:

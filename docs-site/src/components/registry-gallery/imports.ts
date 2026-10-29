@@ -82,6 +82,13 @@ export const importHarnesses = {
       name: "use-scenario-table",
       modules: modules.length,
     })),
+  "use-tranche-analytics": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-tranche-analytics/use-tranche-analytics"),
+    ]).then((modules) => ({
+      name: "use-tranche-analytics",
+      modules: modules.length,
+    })),
   "use-calibrate": () =>
     Promise.all([
       import("@/hooks/calibration/use-calibrate/use-calibrate"),

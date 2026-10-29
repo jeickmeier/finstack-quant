@@ -612,6 +612,27 @@ or WAL/writedown overlay is performed. Neither the component nor its panel
 requires a worker or workbench block. Native fixtures, including a factor-adjusted
 tranche, live in `tests/valuations/scenario-table/cases.json`.
 
+## Returned tranche analytics
+
+`TrancheAnalytics` (`@finstack/tranche-analytics`) presents one tranche's native
+`trancheMetrics`, `trancheBreakevenCdr`, `trancheDiscountMargin` and `trancheOas`
+results, each passed as `{value, error, loading}` so every tile shows its own
+native error. `TrancheMetrics` fields appear in Rust declaration order with the
+unit each Rust field documents (bp, years, decimal, percent of current balance,
+the returned currency); requested registry metrics stay raw. Break-even CDR,
+discount margin and OAS are returned decimals. The clean price is a controlled
+exact-decimal input, percent of current balance, with no default: the
+discount margin waits for one, and OAS runs only through `onSolveOas`.
+`use-tranche-analytics` holds the four query option builders and hooks
+(`TrancheRequest` plus an optional metrics price and metric ids, or a required
+`marketPricePct` for OAS and discount margin); the worker loads the deal once
+per call and frees it, and OAS uses Rust's default `OasConfig`. The workbench
+mounts it above the scenario prices for the configured `scenario.trancheId`,
+valuing `scenario.trancheMetrics` registry metric ids on the note. Native
+fixtures (fixed-rate `CLONOTES-A` and the floating `SENIOR` note of the CLO
+mezzanine regression golden) live in
+`tests/valuations/scenario-table/tranche-analytics.json`.
+
 The complete workbench is installed with `npx shadcn@4.21.0 add @finstack/pricing-workbench`.
 Embed `PricingWorkbench` inside `FinstackQueryProvider`. Supply an explicit
 a required `defaultRequest` (the caller owns example/default data) and optionally `defaultCalibrationJson` (a complete canonical
