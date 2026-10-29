@@ -59,20 +59,26 @@ certify the upstream diagnostic quote association or deferred quote-space fits.
 
 ## Market scenario
 
-The Market scenario input tab edits a market-only scenario: parallel shifts by
-curve family and curve id (the market's curve ids are suggestions, never
-filtered by family), an optional time roll and the hazard bump mode. Blank
-options are omitted, so Rust applies its defaults. Rust builds and validates the
-spec as you edit. **Apply scenario** runs the native `applyScenario` on the last
-priced request's market and valuation date, then reprices the instrument with the
-same model and metrics on the shocked market, at the rolled date when the
-scenario rolls time. The measures grid shows that shocked valuation in its
-comparison column beside the base; no difference or P&L is computed. The Market
-scenario result tab shows the native report: counters, applied shocks, the time
-roll with its returned carry, warnings and the policy stamp. A `par_cds` shift on
-a hazard curve without a calibration recipe needs the `first_order_shift` bump
-mode; the native error is shown otherwise. Optional `marketScenario` supplies the
-initial draft; this demo seeds a 50bp USD-OIS shift, applied only on request.
+The Market scenario input tab edits a complete `ScenarioSpec` with the generated
+form: every operation kind, with the market's curve ids as suggestions on the
+curve, surface and equity id fields (free text, never filtered by kind). A
+built-in template, or one component of it, loads through the native
+`buildFromTemplate` or `buildTemplateComponent`, or composes with the current
+scenario through `composeScenarios`; template ids are placeholders to map to
+the market's ids. **Add parallel shift** and **Add roll** append the operations
+Rust builds. Rust validates the spec as you edit. **Apply scenario** runs the
+native `applyScenario` on the last priced request's market and valuation date,
+then reprices the instrument with the same model and metrics on the shocked
+market, at the rolled date when the scenario rolls time. The measures grid shows
+that shocked valuation in its comparison column beside the base; no difference
+or P&L is computed. The Market scenario result tab shows the native report:
+counters, applied shocks, the time roll with its returned carry, warnings (an
+equity id missing from the market warns) and the policy stamp; a failure (a
+curve or surface id missing from the market) shows the native error. A
+`par_cds` shift on a hazard curve without a calibration recipe needs the
+`first_order_shift` bump mode. Optional `marketScenario` supplies the initial
+`ScenarioSpec` JSON; this demo seeds a 50bp USD-OIS shift, applied only on
+request.
 
 Below the report, **Horizon return** runs the native `computeHorizonReturn` of
 the last priced request under the applied scenario: the scenario's time roll

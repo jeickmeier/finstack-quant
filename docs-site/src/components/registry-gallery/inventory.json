@@ -291,7 +291,7 @@
     {
       "name": "market-scenario-builder",
       "type": "registry:component",
-      "docs": "Controlled editor of a market-only scenario: parallel shifts (curve family, a free-text curve id with the supplied market ids as suggestions, basis points), an optional time roll (tenor text and roll mode) and the hazard bump mode. Blank options are omitted so Rust applies its defaults. It calls no worker: the host builds the canonical ScenarioSpec with useMarketScenario and passes it back as specJson, shown with any native error.",
+      "docs": "Composes schema-form over the generated scenario_spec contract (started from defaultJson, else the Rust schema example), with IdCombobox on the operation curve_id, discount_curve_id, vol_surface_id, surface_id and ids fields: free text with the supplied market ids as suggestions, never filtered by kind. When templates is supplied, a picker lists scenarios.listBuiltinTemplateMetadata (useListBuiltinTemplateMetadata) with the selected template's returned description, severity, event date, asset classes and tags; Load template replaces the document with scenarios.buildFromTemplate or, for a chosen component, buildTemplateComponent, and Compose with scenario merges the current scenario and the template through scenarios.composeScenarios (Rust's priority order, id and hazard-bump-mode rule). Template ids are placeholders the user maps to market ids. When buildMarketScenario is supplied (useBuildMarketScenario), Add parallel shift and Add roll append the operations Rust builds (scenarios.parallelBpMany, operationSpecTimeRollForward); a blank size is NaN and a blank roll mode is omitted, so Rust rejects or defaults them. Validation is native (connect validate to useScenarioSpecValidator); onSpecChange receives the canonical spec, or null while an edit is pending or rejected, and the canonical spec is shown as JSON. Every failure is the native error. Accepts defaultJson, validate, onSpecChange, curveIds, templates, templatesError, buildFromTemplate, buildTemplateComponent, composeScenarios, buildMarketScenario, disabled and density props.",
       "worker": "none"
     },
     {
@@ -604,6 +604,26 @@
     },
     {
       "name": "use-horizon-return",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-scenario-spec-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-list-builtin-template-metadata",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-build-from-template",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-build-template-component",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-compose-scenarios",
       "type": "registry:hook"
     },
     {
@@ -1235,6 +1255,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-scenario-spec",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-bridge-chart",
       "type": "registry:lib"
     },
@@ -1359,6 +1383,10 @@
     {
       "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
       "sha256": "27d8b8f197a8a66b854dee54fdf2fce7b70e2f830e05cbf3f65243fa24f3f2f6"
+    },
+    {
+      "path": "finstack-quant-ui/tests/scenarios/templates/cases.json",
+      "sha256": "783868f8887f254595172255ceaa037e93a39869a88e799b5e649c6574204b53"
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",

@@ -4258,6 +4258,39 @@
       }
     },
     {
+      "name": "contract-scenario-spec",
+      "type": "registry:lib",
+      "title": "Scenario spec contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_spec contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_spec.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_spec.json"
+        },
+        {
+          "path": "src/generated/types/scenario_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_spec.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_spec.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-bridge-chart",
       "type": "registry:lib",
       "title": "Bridge chart contract",

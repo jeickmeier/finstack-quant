@@ -2,20 +2,19 @@
 import { useEffect, useState } from "react";
 import type { MetricMetadata, ValuationResult } from "finstack-quant-wasm";
 import { Button } from "@/components/ui/button";
-import {
-  MarketScenarioBuilder,
-  type MarketScenarioDraft,
-} from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
+import { MarketScenarioBuilder } from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
 import { MarketScenarioReport } from "@/components/finstack/scenarios/components/market-scenario-report/market-scenario-report";
 import { HorizonReturnReport } from "@/components/finstack/scenarios/components/horizon-return-report/horizon-return-report";
 import {
   EnumField,
   type EnumOption,
 } from "@/components/finstack/shared/primitives/enum-field/enum-field";
-import {
-  useMarketScenario,
-  type MarketScenarioRequest,
-} from "@/hooks/scenarios/use-market-scenario/use-market-scenario";
+import { useBuildMarketScenario } from "@/hooks/scenarios/use-market-scenario/use-market-scenario";
+import { useScenarioSpecValidator } from "@/hooks/scenarios/use-scenario-spec-validator/use-scenario-spec-validator";
+import { useListBuiltinTemplateMetadata } from "@/hooks/scenarios/use-list-builtin-template-metadata/use-list-builtin-template-metadata";
+import { useBuildFromTemplate } from "@/hooks/scenarios/use-build-from-template/use-build-from-template";
+import { useBuildTemplateComponent } from "@/hooks/scenarios/use-build-template-component/use-build-template-component";
+import { useComposeScenarios } from "@/hooks/scenarios/use-compose-scenarios/use-compose-scenarios";
 import { useApplyMarketScenario } from "@/hooks/scenarios/use-apply-market-scenario/use-apply-market-scenario";
 import {
   useHorizonReturn,
@@ -47,30 +46,11 @@ function horizonMethod(
   return choice === "taylor" ? { taylor: {} } : choice;
 }
 
-/** An empty market scenario: no shifts, no roll, every option left to Rust. */
-export const emptyMarketScenario: MarketScenarioDraft = {
+/** An empty market scenario: no operations, every option left to Rust. */
+export const emptyMarketScenario = JSON.stringify({
   id: "market-scenario",
-  shifts: [],
-  roll: null,
-  hazardBumpMode: "",
-};
-
-/** The edited draft as a worker request; blank options are omitted and a blank size stays non-numeric for Rust to reject. */
-function scenarioRequest(draft: MarketScenarioDraft): MarketScenarioRequest {
-  return {
-    id: draft.id,
-    shifts: draft.shifts.map((shift) => ({
-      curveKind: shift.curveKind,
-      curveIds: [shift.curveId],
-      bp: shift.bp.trim() === "" ? Number.NaN : Number(shift.bp),
-    })),
-    roll: draft.roll && {
-      period: draft.roll.period,
-      rollMode: draft.roll.rollMode || null,
-    },
-    hazardBumpMode: draft.hazardBumpMode || null,
-  };
-}
+  operations: [],
+});
 
 /**
  * Market scenario state for one workbench: the edited draft, its Rust-built
@@ -79,16 +59,17 @@ function scenarioRequest(draft: MarketScenarioDraft): MarketScenarioRequest {
  * metrics at the returned market and valuation date. No P&L is computed.
  */
 export function useMarketScenarioSession(
-  initial: MarketScenarioDraft | undefined,
+  initial: string | undefined,
   base: PriceRequest | null,
 ) {
-  const [draft, setDraft] = useState(() => initial ?? emptyMarketScenario);
+  // The editor's starting document; its canonical form arrives through setSpec.
+  const [draft] = useState(() => initial ?? emptyMarketScenario);
+  const [spec, setSpec] = useState<string | null>(null);
   const [applied, setApplied] = useState<string | null>(null);
   // Loading another example drops the completed base; its scenario no longer applies.
   useEffect(() => {
     if (base === null) setApplied(null);
   }, [base]);
-  const spec = useMarketScenario(scenarioRequest(draft));
   const application = useApplyMarketScenario(
     applied && base
       ? {
@@ -139,10 +120,10 @@ export function useMarketScenarioSession(
   );
   return {
     draft,
-    setDraft,
     spec,
+    setSpec,
     applied,
-    apply: () => setApplied(spec.data ?? null),
+    apply: () => setApplied(spec),
     clear: () => setApplied(null),
     application,
     shocked,
@@ -207,22 +188,32 @@ export function MarketScenarioInputs({
   density?: "compact" | "comfortable";
 }) {
   const { spec } = session;
+  const validate = useScenarioSpecValidator();
+  const templates = useListBuiltinTemplateMetadata();
+  const buildFromTemplate = useBuildFromTemplate();
+  const buildTemplateComponent = useBuildTemplateComponent();
+  const composeScenarios = useComposeScenarios();
+  const buildMarketScenario = useBuildMarketScenario();
   return (
     <div className="flex flex-col gap-3">
       <MarketScenarioBuilder
-        value={session.draft}
-        onValueChange={session.setDraft}
+        defaultJson={session.draft}
+        validate={validate}
+        onSpecChange={session.setSpec}
         curveIds={curveIds}
-        specJson={spec.data}
-        loading={spec.isFetching}
-        error={spec.error?.message}
+        templates={templates.data}
+        templatesError={templates.error?.message}
+        buildFromTemplate={buildFromTemplate}
+        buildTemplateComponent={buildTemplateComponent}
+        composeScenarios={composeScenarios}
+        buildMarketScenario={buildMarketScenario}
         density={density}
       />
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           size="sm"
-          disabled={!priced || !spec.data || spec.data === session.applied}
+          disabled={!priced || !spec || spec === session.applied}
           onClick={session.apply}
         >
           Apply scenario
@@ -241,7 +232,7 @@ export function MarketScenarioInputs({
             ? "Price the instrument to apply a scenario."
             : session.applied === null
               ? "No scenario applied."
-              : session.applied === spec.data
+              : session.applied === spec
                 ? "Applied to the last priced request."
                 : "Edited since applied."}
         </span>

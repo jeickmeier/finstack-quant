@@ -4,7 +4,7 @@ import { requireWasm } from "./require-wasm.mjs";
 
 // Regenerates (or, with --check, verifies) every native fixture the tests and
 // the gallery pin, in dependency order: results writes src/fixtures/results/
-// bond.json, which the scenario application, horizon return, attribution,
+// bond.json, which the scenario application, horizon return, templates, attribution,
 // cashflows and details embed (attribution also reads the scenario
 // application cases); curves writes the curve-link market that market-browser
 // extends; covenants reads the analyst result that statements writes;
@@ -19,6 +19,7 @@ const generators = [
   "tests/portfolio/margin/generate.mjs",
   "tests/scenarios/application/generate.mjs",
   "tests/scenarios/horizon/generate.mjs",
+  "tests/scenarios/templates/generate.mjs",
   "tests/attribution/generate.mjs",
   "tests/valuations/cashflows/generate.mjs",
   "tests/valuations/details/generate.mjs",

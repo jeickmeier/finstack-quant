@@ -28,6 +28,8 @@ import type {
   ArbitrageValidationResult,
   ApplicationReport,
   HorizonReport,
+  ScenarioSpec,
+  TemplateMetadata,
   PnlAttribution,
   BetaResult,
   DatedSeries,
@@ -339,6 +341,13 @@ export interface MarketScenarioRequest {
   readonly shifts: readonly MarketScenarioShift[];
   readonly roll?: MarketScenarioRoll | null;
   readonly hazardBumpMode?: scenarioWire.HazardBumpMode | null;
+}
+/** One built-in scenario template, or one component of a composite template. */
+export interface TemplateComponentRequest {
+  /** Built-in template id from scenarios.listBuiltinTemplateMetadata. */
+  readonly templateId: string;
+  /** Component id from that template's metadata `components`. */
+  readonly componentId: string;
 }
 /** Canonical ScenarioSpec text applied to a priced instrument's market at its valuation date. */
 export interface MarketScenarioApplicationRequest {
@@ -1028,6 +1037,20 @@ export interface ScenariosApi {
   horizonReturn(
     request: HorizonReturnRequest,
   ): Promise<Envelope<HorizonReturn>>;
+  /** scenarios.parseScenarioSpec: canonical ScenarioSpec text, or the native error. */
+  validateScenarioSpec(json: string): Promise<Envelope<string>>;
+  /** scenarios.listBuiltinTemplateMetadata: every built-in template in registry order. */
+  listBuiltinTemplateMetadata(): Promise<Envelope<TemplateMetadata[]>>;
+  /** scenarios.buildFromTemplate: the whole built-in template as a ScenarioSpec. */
+  buildFromTemplate(templateId: string): Promise<Envelope<ScenarioSpec>>;
+  /** scenarios.buildTemplateComponent: one component of a built-in composite template. */
+  buildTemplateComponent(
+    request: TemplateComponentRequest,
+  ): Promise<Envelope<ScenarioSpec>>;
+  /** scenarios.composeScenarios over the ScenarioSpec texts, in Rust's priority order. */
+  composeScenarios(
+    specJsons: readonly string[],
+  ): Promise<Envelope<ScenarioSpec>>;
 }
 /** attribution: single-instrument T0 -> T1 P&L attribution and its Rust helpers. */
 export interface AttributionApi {

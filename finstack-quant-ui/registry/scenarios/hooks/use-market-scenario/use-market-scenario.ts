@@ -1,4 +1,6 @@
 "use client";
+import { useCallback } from "react";
+import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import {
   useWorkerQuery,
   workerQueryOptions,
@@ -31,4 +33,20 @@ export function useMarketScenario(request: MarketScenarioRequest | null) {
     ...marketScenarioOptions(worker.client, worker.session, request),
     enabled: worker.status === "ready" && request !== null,
   }));
+}
+/** A builder of canonical ScenarioSpec text from native operations, called on demand; rejects with the native error. */
+export function useBuildMarketScenario() {
+  const worker = useFinstack();
+  return useCallback(
+    async (request: MarketScenarioRequest) => {
+      if (worker.error) throw worker.error;
+      if (worker.status !== "ready" || !worker.client)
+        throw new Error("Market scenario is waiting for the worker");
+      return worker.client.call(
+        "buildMarketScenario",
+        structuredClone(request),
+      );
+    },
+    [worker.client, worker.status, worker.error],
+  );
 }

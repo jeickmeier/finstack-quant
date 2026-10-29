@@ -170,11 +170,12 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the eighteen native fixture generators under
+`mise run ui-fixtures` runs the twenty native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-horizon return, attribution, cashflows → details; portfolio → portfolio margin;
-curves → market-browser; cubes, calibration, scenario-table;
-statements → covenants; analytics; models credit; margin), then
+horizon return, scenario templates, attribution, cashflows → details;
+portfolio → portfolio margin; curves → market-browser; cubes, calibration,
+scenario-table; statements → covenants; analytics; models credit and risk;
+margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
 `mise run wasm-pkg` (release). `mise run ui-fixtures --check` verifies that every
@@ -771,8 +772,8 @@ interaction callbacks; the workbench owns the shared report/chart selection.
 
 `useHorizonReturn` (`@finstack/use-horizon-return`) calls
 `scenarios.computeHorizonReturn` on an instrument, its market and valuation
-date and a canonical `ScenarioSpec` (for example one built with
-`useMarketScenario`), then `horizonResultExplainText`. Omitted `method`,
+date and a canonical `ScenarioSpec` (for example one edited in
+`market-scenario-builder`), then `horizonResultExplainText`. Omitted `method`,
 `calendarId` and the config stay unset, so Rust applies its default
 attribution method and a weekends-only roll calendar; an unknown calendar or a
 failing attribution (`metrics_based` needs a calibration recipe for every

@@ -2,7 +2,6 @@
 import type { ExampleProps } from "./props";
 import { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";
 import type { PriceRequest } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
-import type { MarketScenarioDraft } from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
 import data from "../data.json";
 
 const cashflowCase = (type: string) =>
@@ -100,7 +99,7 @@ const scenario = {
 /** A 50bp USD-OIS parallel shift, applied only when the reader asks. */
 const marketScenario = data.marketScenario.cases.find(
   (entry) => entry.name === "usd-ois-50bp",
-)!.draft as MarketScenarioDraft;
+)!.scenarioJson;
 
 export function Example({
   density = "compact",

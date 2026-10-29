@@ -4,7 +4,6 @@ import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { useState } from "react";
 import {
   afterAll,
   afterEach,
@@ -14,26 +13,12 @@ import {
   it,
   vi,
 } from "vitest";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
+import { cleanup } from "@testing-library/react";
 import {
   marketScenarioOptions,
-  useMarketScenario,
   type MarketScenarioRequest,
 } from "@/hooks/scenarios/use-market-scenario/use-market-scenario";
 import { applyMarketScenarioOptions } from "@/hooks/scenarios/use-apply-market-scenario/use-apply-market-scenario";
-import {
-  MarketScenarioBuilder,
-  type MarketScenarioDraft,
-} from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
 import {
   unwrap,
   type MarketScenarioApplicationRequest,
@@ -74,11 +59,22 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
+/** The fixture's operations draft: one curve id per shift and basis points as typed. */
+interface MarketScenarioDraft {
+  id: string;
+  shifts: {
+    curveKind: MarketScenarioRequest["shifts"][number]["curveKind"];
+    curveId: string;
+    bp: string;
+  }[];
+  roll: { period: string; rollMode: string } | null;
+  hazardBumpMode: string;
+}
 const drafts = fixture.cases.map((entry) => ({
   ...entry,
   draft: entry.draft as MarketScenarioDraft,
 }));
-/** The panel's conversion: the draft's curve id as a one-entry list and bp as a number. */
+/** The builder's conversion: the draft's curve id as a one-entry list and bp as a number. */
 const request = (draft: MarketScenarioDraft): MarketScenarioRequest => ({
   id: draft.id,
   shifts: draft.shifts.map((shift) => ({
@@ -88,9 +84,12 @@ const request = (draft: MarketScenarioDraft): MarketScenarioRequest => ({
   })),
   roll: draft.roll && {
     period: draft.roll.period,
-    rollMode: draft.roll.rollMode || null,
+    rollMode: (draft.roll.rollMode || null) as NonNullable<
+      MarketScenarioRequest["roll"]
+    >["rollMode"],
   },
-  hazardBumpMode: draft.hazardBumpMode || null,
+  hazardBumpMode: (draft.hazardBumpMode ||
+    null) as MarketScenarioRequest["hazardBumpMode"],
 });
 const base = bond.request;
 const application = (
@@ -197,108 +196,4 @@ it("keys both queries on the worker session and the complete snapshotted request
     applying,
   ]);
   expect(applyMarketScenarioOptions(null, 4, null).enabled).toBe(false);
-});
-function Controlled({
-  initial,
-  onChange,
-}: {
-  initial: MarketScenarioDraft;
-  onChange: (draft: MarketScenarioDraft) => void;
-}) {
-  const [draft, setDraft] = useState(initial);
-  return (
-    <MarketScenarioBuilder
-      value={draft}
-      onValueChange={(next) => {
-        setDraft(next);
-        onChange(next);
-      }}
-      curveIds={["USD-OIS", "HZ"]}
-    />
-  );
-}
-it("edits shifts, the roll and the hazard bump mode without calling the worker", async () => {
-  const onChange = vi.fn();
-  render(
-    <Controlled
-      initial={{ id: "s", shifts: [], roll: null, hazardBumpMode: "" }}
-      onChange={onChange}
-    />,
-  );
-  expect(screen.getByText("No curve shifts.")).toBeTruthy();
-  await userEvent.click(screen.getByRole("button", { name: "Add shift" }));
-  const shift = screen.getByRole("group", { name: "Shift 1" });
-  fireEvent.change(
-    within(shift).getByRole("textbox", { name: "Shift 1 size" }),
-    {
-      target: { value: "-12.5" },
-    },
-  );
-  fireEvent.change(
-    within(shift).getByRole("combobox", { name: "Shift 1 curve id" }),
-    { target: { value: "HZ" } },
-  );
-  await userEvent.click(
-    within(shift).getByRole("combobox", { name: "Shift 1 curve kind" }),
-  );
-  await userEvent.click(await screen.findByRole("option", { name: "par_cds" }));
-  await userEvent.click(screen.getByRole("button", { name: "Add roll" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "Roll period" }), {
-    target: { value: "3M" },
-  });
-  await userEvent.click(
-    screen.getByRole("radio", { name: "first_order_shift" }),
-  );
-  expect(onChange).toHaveBeenLastCalledWith({
-    id: "s",
-    shifts: [{ curveKind: "par_cds", curveId: "HZ", bp: "-12.5" }],
-    roll: { period: "3M", rollMode: "" },
-    hazardBumpMode: "first_order_shift",
-  });
-  await userEvent.click(screen.getByRole("button", { name: "Remove" }));
-  await userEvent.click(screen.getByRole("button", { name: "Remove roll" }));
-  expect(onChange).toHaveBeenLastCalledWith({
-    id: "s",
-    shifts: [],
-    roll: null,
-    hazardBumpMode: "first_order_shift",
-  });
-  expect(call).not.toHaveBeenCalled();
-});
-function Connected({ initial }: { initial: MarketScenarioDraft }) {
-  const [draft, setDraft] = useState(initial);
-  const spec = useMarketScenario(request(draft));
-  return (
-    <MarketScenarioBuilder
-      value={draft}
-      onValueChange={setDraft}
-      curveIds={["USD-OIS"]}
-      specJson={spec.data}
-      loading={spec.isFetching}
-      error={spec.error?.message}
-    />
-  );
-}
-it("shows the Rust-built spec, then the native error for an invalid roll period", async () => {
-  const entry = drafts[1]!;
-  render(
-    <FinstackQueryProvider>
-      <Connected initial={entry.draft} />
-    </FinstackQueryProvider>,
-  );
-  const viewer = screen.getByRole("region", { name: "Scenario spec" });
-  await waitFor(
-    () =>
-      expect(viewer.textContent).toContain(
-        JSON.parse(entry.scenarioJson).operations[0].kind,
-      ),
-    { timeout: budget(5000) },
-  );
-  fireEvent.change(screen.getByRole("textbox", { name: "Roll period" }), {
-    target: { value: "1 month" },
-  });
-  await waitFor(
-    () => expect(viewer.textContent).toContain("not a valid tenor"),
-    { timeout: budget(5000) },
-  );
 });

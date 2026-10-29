@@ -99,6 +99,11 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "buildMarketScenario",
     "applyMarketScenario",
     "horizonReturn",
+    "validateScenarioSpec",
+    "listBuiltinTemplateMetadata",
+    "buildFromTemplate",
+    "buildTemplateComponent",
+    "composeScenarios",
     // AttributionApi
     "attributePnlMany",
     "defaultWaterfallOrder",

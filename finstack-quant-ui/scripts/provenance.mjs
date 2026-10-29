@@ -274,6 +274,19 @@ const displays = [
     deferred: "quote-space-calibration-fits",
   },
   {
+    id: "market-scenario-builder",
+    schema: `${base}scenarios/1/scenario_spec.schema.json`,
+    pointer: "#",
+    api: [
+      "scenarios.listBuiltinTemplateMetadata",
+      "ScenariosNamespace",
+      "listBuiltinTemplateMetadata",
+    ],
+    route: "schema",
+    convention:
+      "Canonical ScenarioSpec wire fields; templates, components, composition and added operations are returned by Rust, template metadata is shown as returned and template ids are placeholders the user maps to market ids.",
+  },
+  {
     id: "market-scenario-report",
     api: ["scenarios.applyScenario", "ScenariosNamespace", "applyScenario"],
     route: "returned-report",

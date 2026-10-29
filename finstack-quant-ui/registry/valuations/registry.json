@@ -609,6 +609,11 @@
         "@finstack/market-scenario-builder",
         "@finstack/market-scenario-report",
         "@finstack/use-market-scenario",
+        "@finstack/use-scenario-spec-validator",
+        "@finstack/use-list-builtin-template-metadata",
+        "@finstack/use-build-from-template",
+        "@finstack/use-build-template-component",
+        "@finstack/use-compose-scenarios",
         "@finstack/use-apply-market-scenario",
         "@finstack/horizon-return-report",
         "@finstack/use-horizon-return",
@@ -707,7 +712,8 @@
           "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json"
         ]
       }
     },
