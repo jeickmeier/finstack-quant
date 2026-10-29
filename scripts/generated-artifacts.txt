@@ -236,6 +236,7 @@ finstack-quant-ui/src/generated/meta/market_context_state.ts
 finstack-quant-ui/src/generated/meta/merton_model.ts
 finstack-quant-ui/src/generated/meta/ndf.ts
 finstack-quant-ui/src/generated/meta/oas_config.ts
+finstack-quant-ui/src/generated/meta/portfolio_margin_result.ts
 finstack-quant-ui/src/generated/meta/portfolio_result.ts
 finstack-quant-ui/src/generated/meta/private_markets_fund.ts
 finstack-quant-ui/src/generated/meta/quanto_option.ts
@@ -340,6 +341,7 @@ finstack-quant-ui/src/generated/schemas/market_context_state.json
 finstack-quant-ui/src/generated/schemas/merton_model.json
 finstack-quant-ui/src/generated/schemas/ndf.json
 finstack-quant-ui/src/generated/schemas/oas_config.json
+finstack-quant-ui/src/generated/schemas/portfolio_margin_result.json
 finstack-quant-ui/src/generated/schemas/portfolio_result.json
 finstack-quant-ui/src/generated/schemas/private_markets_fund.json
 finstack-quant-ui/src/generated/schemas/quanto_option.json
@@ -441,6 +443,7 @@ finstack-quant-ui/src/generated/types/market_context_state.ts
 finstack-quant-ui/src/generated/types/merton_model.ts
 finstack-quant-ui/src/generated/types/ndf.ts
 finstack-quant-ui/src/generated/types/oas_config.ts
+finstack-quant-ui/src/generated/types/portfolio_margin_result.ts
 finstack-quant-ui/src/generated/types/portfolio_result.ts
 finstack-quant-ui/src/generated/types/private_markets_fund.ts
 finstack-quant-ui/src/generated/types/quanto_option.ts

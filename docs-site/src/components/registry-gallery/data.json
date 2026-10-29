@@ -36054,6 +36054,428 @@
       ]
     }
   },
+  "portfolioMargin": {
+    "description": "Native portfolio margin (portfolio.portfolioMargin) of a book with two interest rate swaps margined bilaterally under the Rust USD regulatory CSA and a regulatory CSA-B (quantity 2), and an unmargined deposit, over the pricing market; without collateral, with 1,000,000 USD held under the USD regulatory CSA, and with collateral for an unknown CSA (native validation error). The market is not stored.",
+    "sources": [
+      {
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
+        "sha256": "0faab80df23980587977e0dbe118897fb1182f3f706839209ab1298c8b21fd9d"
+      },
+      {
+        "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
+        "sha256": "75ccf0330466b637a2869e34652dd502cf8505e76293d0178d7b9d4976550885"
+      },
+      {
+        "path": "finstack-quant/valuations/tests/instruments/json_examples/deposit.json",
+        "sha256": "5cffcc3b025813b71a68a7809361aa46b42df4fc2e96b623d1e78341e5544120"
+      },
+      {
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
+      }
+    ],
+    "asOf": "2023-12-28",
+    "specJson": "{\"id\":\"MARGIN-BOOK\",\"name\":\"Margined rates book\",\"base_currency\":\"USD\",\"as_of\":\"2023-12-28\",\"entities\":{\"RATES\":{\"id\":\"RATES\",\"name\":\"Rates\"}},\"positions\":[{\"position_id\":\"IRS-A\",\"entity_id\":\"RATES\",\"instrument_id\":\"IRS-A\",\"instrument_spec\":{\"spec\":{\"adjust_fixed_accrual_dates\":false,\"adjust_float_accrual_dates\":false,\"attributes\":{},\"fixed_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"day_count\":\"30_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.04\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"float_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"compounding\":\"simple\",\"day_count\":\"act_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"fixing_calendar_id\":\"usny\",\"forward_curve_id\":\"USD-SOFR-3M\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"payment_lag_days\":0,\"reset_lag_days\":2,\"spread_bp\":\"0\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"id\":\"IRS-A\",\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"side\":\"pay\",\"margin_spec\":{\"clearing_status\":\"bilateral\",\"csa\":{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}}},\"type\":\"interest_rate_swap\"},\"quantity\":1,\"unit\":\"units\"},{\"position_id\":\"IRS-B\",\"entity_id\":\"RATES\",\"instrument_id\":\"IRS-B\",\"instrument_spec\":{\"spec\":{\"adjust_fixed_accrual_dates\":false,\"adjust_float_accrual_dates\":false,\"attributes\":{},\"fixed_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"day_count\":\"30_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.04\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"float_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"compounding\":\"simple\",\"day_count\":\"act_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"fixing_calendar_id\":\"usny\",\"forward_curve_id\":\"USD-SOFR-3M\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"payment_lag_days\":0,\"reset_lag_days\":2,\"spread_bp\":\"0\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"id\":\"IRS-B\",\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"side\":\"pay\",\"margin_spec\":{\"clearing_status\":\"bilateral\",\"csa\":{\"id\":\"CSA-B\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}}},\"type\":\"interest_rate_swap\"},\"quantity\":2,\"unit\":\"units\"},{\"position_id\":\"DEP-1\",\"entity_id\":\"RATES\",\"instrument_id\":\"DEP-USD-6M\",\"instrument_spec\":{\"spec\":{\"attributes\":{},\"business_day_convention\":\"modified_following\",\"calendar_id\":null,\"day_count\":\"act_360\",\"discount_curve_id\":\"USD-OIS\",\"fixed_rate\":\"0.045\",\"id\":\"DEP-USD-6M\",\"maturity\":\"2024-07-01\",\"notional\":{\"amount\":\"100000\",\"currency\":\"USD\"},\"start_date\":\"2024-01-03\"},\"type\":\"deposit\"},\"quantity\":1,\"unit\":\"units\"}]}",
+    "cases": [
+      {
+        "name": "no-collateral",
+        "currentImCollateral": null,
+        "ok": true,
+        "result": {
+          "as_of": "2023-12-28",
+          "base_currency": "USD",
+          "total_initial_margin": {
+            "amount": "846166.135084171",
+            "currency": "USD"
+          },
+          "by_csa": {
+            "CSA-B": {
+              "gross_initial_margin": {
+                "amount": "564110.756722781",
+                "currency": "USD"
+              },
+              "required_collateral": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "current_collateral": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "transfer": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "segregated": true
+            },
+            "USD-REGULATORY-CSA": {
+              "gross_initial_margin": {
+                "amount": "282055.3783613904",
+                "currency": "USD"
+              },
+              "required_collateral": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "current_collateral": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "transfer": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "segregated": true
+            }
+          },
+          "total_required_im_collateral": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "total_im_transfer": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "total_segregated_im": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "total_variation_margin": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "total_margin": {
+            "amount": "846166.135084171",
+            "currency": "USD"
+          },
+          "netting_sets": [
+            {
+              "netting_set_id": {
+                "kind": "bilateral",
+                "counterparty_id": "CSA-B",
+                "csa_id": "CSA-B"
+              },
+              "csa_id": "CSA-B",
+              "as_of": "2023-12-28",
+              "initial_margin": {
+                "amount": "564110.756722781",
+                "currency": "USD"
+              },
+              "variation_margin": {
+                "amount": "-0",
+                "currency": "USD"
+              },
+              "total_margin": {
+                "amount": "564110.756722781",
+                "currency": "USD"
+              },
+              "position_count": 1,
+              "im_methodology": "simm",
+              "is_approximate": true,
+              "sensitivities": {
+                "base_currency": "USD",
+                "ir_delta": [
+                  ["USD", "10Y", 0.820545670343563],
+                  ["USD", "15Y", 0],
+                  ["USD", "1Y", 1428.7517443504184],
+                  ["USD", "20Y", 0],
+                  ["USD", "2Y", 1868.2138248255942],
+                  ["USD", "30Y", 0],
+                  ["USD", "3Y", 2694.9623771950137],
+                  ["USD", "5Y", 1589.7264185966924],
+                  ["USD", "6M", 1709.954305752879]
+                ],
+                "ir_vega": [],
+                "credit_qualifying_delta": [],
+                "credit_qualifying_vega": [],
+                "credit_non_qualifying_delta": [],
+                "credit_non_qualifying_vega": [],
+                "equity_delta": [],
+                "equity_vega": [],
+                "fx_delta": [],
+                "fx_vega": [],
+                "commodity_delta": [],
+                "commodity_vega": [],
+                "curvature": []
+              },
+              "im_breakdown": {
+                "IR_Delta": {
+                  "amount": "564110.756722781",
+                  "currency": "USD"
+                }
+              }
+            },
+            {
+              "netting_set_id": {
+                "kind": "bilateral",
+                "counterparty_id": "USD-REGULATORY-CSA",
+                "csa_id": "USD-REGULATORY-CSA"
+              },
+              "csa_id": "USD-REGULATORY-CSA",
+              "as_of": "2023-12-28",
+              "initial_margin": {
+                "amount": "282055.3783613904",
+                "currency": "USD"
+              },
+              "variation_margin": {
+                "amount": "-0",
+                "currency": "USD"
+              },
+              "total_margin": {
+                "amount": "282055.3783613904",
+                "currency": "USD"
+              },
+              "position_count": 1,
+              "im_methodology": "simm",
+              "is_approximate": true,
+              "sensitivities": {
+                "base_currency": "USD",
+                "ir_delta": [
+                  ["USD", "10Y", 0.4102728351717815],
+                  ["USD", "15Y", 0],
+                  ["USD", "1Y", 714.3758721752092],
+                  ["USD", "20Y", 0],
+                  ["USD", "2Y", 934.1069124127971],
+                  ["USD", "30Y", 0],
+                  ["USD", "3Y", 1347.4811885975068],
+                  ["USD", "5Y", 794.8632092983462],
+                  ["USD", "6M", 854.9771528764395]
+                ],
+                "ir_vega": [],
+                "credit_qualifying_delta": [],
+                "credit_qualifying_vega": [],
+                "credit_non_qualifying_delta": [],
+                "credit_non_qualifying_vega": [],
+                "equity_delta": [],
+                "equity_vega": [],
+                "fx_delta": [],
+                "fx_vega": [],
+                "commodity_delta": [],
+                "commodity_vega": [],
+                "curvature": []
+              },
+              "im_breakdown": {
+                "IR_Delta": {
+                  "amount": "282055.3783613904",
+                  "currency": "USD"
+                }
+              }
+            }
+          ],
+          "total_positions": 2,
+          "positions_without_margin": 1,
+          "degraded_positions": []
+        }
+      },
+      {
+        "name": "usd-collateral-held",
+        "currentImCollateral": {
+          "USD-REGULATORY-CSA": {
+            "amount": "1000000",
+            "currency": "USD"
+          }
+        },
+        "ok": true,
+        "result": {
+          "as_of": "2023-12-28",
+          "base_currency": "USD",
+          "total_initial_margin": {
+            "amount": "846166.135084171",
+            "currency": "USD"
+          },
+          "by_csa": {
+            "CSA-B": {
+              "gross_initial_margin": {
+                "amount": "564110.756722781",
+                "currency": "USD"
+              },
+              "required_collateral": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "current_collateral": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "transfer": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "segregated": true
+            },
+            "USD-REGULATORY-CSA": {
+              "gross_initial_margin": {
+                "amount": "282055.3783613904",
+                "currency": "USD"
+              },
+              "required_collateral": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "current_collateral": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "transfer": {
+                "amount": "-1000000",
+                "currency": "USD"
+              },
+              "segregated": true
+            }
+          },
+          "total_required_im_collateral": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "total_im_transfer": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
+          "total_segregated_im": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "total_variation_margin": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "total_margin": {
+            "amount": "846166.135084171",
+            "currency": "USD"
+          },
+          "netting_sets": [
+            {
+              "netting_set_id": {
+                "kind": "bilateral",
+                "counterparty_id": "CSA-B",
+                "csa_id": "CSA-B"
+              },
+              "csa_id": "CSA-B",
+              "as_of": "2023-12-28",
+              "initial_margin": {
+                "amount": "564110.756722781",
+                "currency": "USD"
+              },
+              "variation_margin": {
+                "amount": "-0",
+                "currency": "USD"
+              },
+              "total_margin": {
+                "amount": "564110.756722781",
+                "currency": "USD"
+              },
+              "position_count": 1,
+              "im_methodology": "simm",
+              "is_approximate": true,
+              "sensitivities": {
+                "base_currency": "USD",
+                "ir_delta": [
+                  ["USD", "10Y", 0.820545670343563],
+                  ["USD", "15Y", 0],
+                  ["USD", "1Y", 1428.7517443504184],
+                  ["USD", "20Y", 0],
+                  ["USD", "2Y", 1868.2138248255942],
+                  ["USD", "30Y", 0],
+                  ["USD", "3Y", 2694.9623771950137],
+                  ["USD", "5Y", 1589.7264185966924],
+                  ["USD", "6M", 1709.954305752879]
+                ],
+                "ir_vega": [],
+                "credit_qualifying_delta": [],
+                "credit_qualifying_vega": [],
+                "credit_non_qualifying_delta": [],
+                "credit_non_qualifying_vega": [],
+                "equity_delta": [],
+                "equity_vega": [],
+                "fx_delta": [],
+                "fx_vega": [],
+                "commodity_delta": [],
+                "commodity_vega": [],
+                "curvature": []
+              },
+              "im_breakdown": {
+                "IR_Delta": {
+                  "amount": "564110.756722781",
+                  "currency": "USD"
+                }
+              }
+            },
+            {
+              "netting_set_id": {
+                "kind": "bilateral",
+                "counterparty_id": "USD-REGULATORY-CSA",
+                "csa_id": "USD-REGULATORY-CSA"
+              },
+              "csa_id": "USD-REGULATORY-CSA",
+              "as_of": "2023-12-28",
+              "initial_margin": {
+                "amount": "282055.3783613904",
+                "currency": "USD"
+              },
+              "variation_margin": {
+                "amount": "-0",
+                "currency": "USD"
+              },
+              "total_margin": {
+                "amount": "282055.3783613904",
+                "currency": "USD"
+              },
+              "position_count": 1,
+              "im_methodology": "simm",
+              "is_approximate": true,
+              "sensitivities": {
+                "base_currency": "USD",
+                "ir_delta": [
+                  ["USD", "10Y", 0.4102728351717815],
+                  ["USD", "15Y", 0],
+                  ["USD", "1Y", 714.3758721752092],
+                  ["USD", "20Y", 0],
+                  ["USD", "2Y", 934.1069124127971],
+                  ["USD", "30Y", 0],
+                  ["USD", "3Y", 1347.4811885975068],
+                  ["USD", "5Y", 794.8632092983462],
+                  ["USD", "6M", 854.9771528764395]
+                ],
+                "ir_vega": [],
+                "credit_qualifying_delta": [],
+                "credit_qualifying_vega": [],
+                "credit_non_qualifying_delta": [],
+                "credit_non_qualifying_vega": [],
+                "equity_delta": [],
+                "equity_vega": [],
+                "fx_delta": [],
+                "fx_vega": [],
+                "commodity_delta": [],
+                "commodity_vega": [],
+                "curvature": []
+              },
+              "im_breakdown": {
+                "IR_Delta": {
+                  "amount": "282055.3783613904",
+                  "currency": "USD"
+                }
+              }
+            }
+          ],
+          "total_positions": 2,
+          "positions_without_margin": 1,
+          "degraded_positions": []
+        }
+      },
+      {
+        "name": "unknown-csa",
+        "currentImCollateral": {
+          "NO-SUCH-CSA": {
+            "amount": "1",
+            "currency": "USD"
+          }
+        },
+        "ok": false,
+        "kind": "validation",
+        "message": "Invalid input: Unknown IM collateral CSA 'NO-SUCH-CSA'"
+      }
+    ]
+  },
   "details": {
     "description": "Actual native results. Decode resultJson through the canonical wire codec, which yields the facade transport (bigint for schema int64/uint64 fields); tests compare with a fresh native call.",
     "sources": [

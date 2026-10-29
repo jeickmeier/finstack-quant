@@ -16,6 +16,7 @@ requireWasm(["pkg-node"]);
 const generators = [
   "tests/valuations/results/generate.mjs",
   "tests/portfolio/generate.mjs",
+  "tests/portfolio/margin/generate.mjs",
   "tests/scenarios/application/generate.mjs",
   "tests/scenarios/horizon/generate.mjs",
   "tests/attribution/generate.mjs",

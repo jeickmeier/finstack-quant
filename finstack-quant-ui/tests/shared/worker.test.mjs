@@ -111,6 +111,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "validatePortfolio",
     "scenarioPnlBatch",
     "applyScenarioAndRevalue",
+    "portfolioMargin",
     // MarginApi
     "validateSimmSensitivities",
     "simmIm",

@@ -11,6 +11,7 @@ export type PortfolioNative = {
     | "parsePortfolioSpecJson"
     | "scenarioPnlBatch"
     | "applyScenarioAndRevalue"
+    | "portfolioMargin"
   >;
 };
 /** PortfolioApi over the portfolio facade namespace and the shared handle caches. */
@@ -79,6 +80,17 @@ export function createPortfolioService(
           ),
         };
       });
+    },
+    portfolioMargin(request) {
+      return context.result(() =>
+        // Omitted collateral stays unset; Rust treats it as none held.
+        native.portfolio.portfolioMargin(
+          context.portfolio(request.specJson).handle,
+          context.market(request.marketJson).handle,
+          request.asOf,
+          request.currentImCollateral ?? undefined,
+        ),
+      );
     },
   };
 }
