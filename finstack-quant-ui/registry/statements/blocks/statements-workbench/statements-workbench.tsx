@@ -371,9 +371,7 @@ export function StatementsWorkbench({
       ? model.meta.entity
       : (model?.id ?? "Financial statements");
   const currency =
-    typeof model?.meta?.reporting_currency === "string"
-      ? model.meta.reporting_currency
-      : null;
+    typeof model?.meta?.currency === "string" ? model.meta.currency : null;
   const forecastNodes = model
     ? Object.entries(model.nodes).filter(([, node]) => node.forecast)
     : [];

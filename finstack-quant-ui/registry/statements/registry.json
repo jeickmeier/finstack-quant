@@ -49,7 +49,7 @@
       "type": "registry:component",
       "title": "Statement grid",
       "description": "Report-style table of evaluated statement values with historical and forecast columns and optional inline editing.",
-      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
+      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Each cell shows the evaluation layer Rust recorded in node_sources (value, forecast, formula or where mask) as a glyph with a legend and accessible text; results without node_sources, such as rollups, show no marker. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
       "files": [
         {
           "path": "components/statement-grid/statement-grid.tsx",

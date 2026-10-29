@@ -8,6 +8,10 @@ import { groupDecimal } from "@/lib/finstack/format/format";
 import Big from "big.js";
 
 const resultCodec = createWireCodec(statementSchema);
+/** The native evaluation layer that produced a cell (`Value > Forecast > Formula`, after a `where` mask). */
+export type StatementCellSource = NonNullable<
+  StatementResultWire["node_sources"]
+>[string][string];
 export type StatementPeriod = FinancialModelSpecWire["periods"][number];
 export interface StatementCell {
   periodId: string;
@@ -15,6 +19,8 @@ export interface StatementCell {
   text: string;
   /** The unmodified native number or sentinel; monetary values retain their Money wire object. */
   value: unknown;
+  /** The layer Rust recorded in `node_sources`; absent for results without it (for example a rollup). */
+  source?: StatementCellSource;
 }
 /** Explicit presentation scaling only; the returned value and exact text remain untouched. */
 export function displayStatementCell(
@@ -100,11 +106,13 @@ export function statementRows(
         const monetary = result.monetary_nodes?.[nodeId]?.[period.id];
         const numeric = result.nodes[nodeId]?.[period.id];
         const present = monetary !== undefined || numeric !== undefined;
+        const source = result.node_sources?.[nodeId]?.[period.id];
         return [
           period.id,
           {
             periodId: period.id,
             present,
+            ...(source === undefined ? {} : { source }),
             value: monetary ?? numeric,
             text: monetary
               ? formatRawMoney(monetary)

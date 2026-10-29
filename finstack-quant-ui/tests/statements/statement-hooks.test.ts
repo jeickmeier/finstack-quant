@@ -59,7 +59,7 @@ const scenarioSetJson = JSON.stringify({
 });
 const specJson = JSON.stringify({
   frequency: "annual",
-  methods: { debt_closing: "period_end", leverage: "formula" },
+  methods: { total_debt: "period_end", leverage: "formula" },
 });
 const configJson = JSON.stringify({
   name: "growth",

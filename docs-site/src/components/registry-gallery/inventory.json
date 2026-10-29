@@ -297,7 +297,7 @@
     {
       "name": "statement-grid",
       "type": "registry:component",
-      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
+      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Each cell shows the evaluation layer Rust recorded in node_sources (value, forecast, formula or where mask) as a glyph with a legend and accessible text; results without node_sources, such as rollups, show no marker. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
       "worker": "none"
     },
     {
@@ -844,15 +844,15 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
-      "sha256": "31672706059cd54c41f6828b05277425997e608d3b4f70c60bf7a3518e3745c1"
+      "sha256": "c5cded3ac073240076f1bca6031c2dfb957200b7621e614fb241adf4023a6855"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
-      "sha256": "e995ed7ad473fd7f2a3563cccb0b8f103a52901790f0b94bf8433ca5bf7bb2c4"
+      "sha256": "5d6b62d74046ac0eb1285859d824c261cd2d387b8b1918bbe14ff3bc6c2181b2"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "9a61c094f492c6890a85e43d3e56aacde794bc0d8bd87c93784b250b4bff6847"
+      "sha256": "d1fd212ddead1af04973c6f987e915805259140b7f856a4ade693e488632e46a"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
@@ -860,15 +860,15 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",
-      "sha256": "9590ef050c757480ec4e3c03e6512be17d124939f4018eb1d10d19a6c6bfd1c6"
+      "sha256": "40280f9e8b70fb22783c66f77bd2074047d28cad132053510e6c78446a567915"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q3.json",
-      "sha256": "7968499bd6ce525be29dc38e4fc5a6a520e4a411f12bf151299df851a76d99f6"
+      "sha256": "37e06e6d0bd15951c553768171201ce8798258b0efd1f1bcdbe028135de29643"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json",
-      "sha256": "fdd3e7bc000eb686c86b7f236a3be50c2f3bc4a595ce6589cbd798f1e3b8ffe0"
+      "sha256": "491a9c962636ba06701882cd2794f257ee536e9d45da2035a7bdb30178c9ae5f"
     }
   ]
 }
