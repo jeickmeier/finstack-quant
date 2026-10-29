@@ -58,9 +58,14 @@ use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface, VolSu
 use std::collections::BTreeMap;
 
 /// Configuration for the arbitrage detection suite.
+///
+/// Every field is optional on the wire: an omitted field takes its
+/// [`Default`] value, so `{"forward_prices": [100.0]}` runs all three checks
+/// at [`DEFAULT_ARBITRAGE_TOLERANCE`] and reports every severity. Unknown
+/// fields are rejected.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct ArbitrageCheckConfig {
     /// Run butterfly (strike convexity) check.
     pub check_butterfly: bool,

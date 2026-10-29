@@ -3298,6 +3298,7 @@
       "checkButterflyGrid",
       "checkCalendarSpreadGrid",
       "checkLocalVolDensityGrid",
+      "checkSurface",
       "checkSurfaceGrid",
       "convertAtmVolatility",
       "deltaToStrike",
@@ -3440,6 +3441,9 @@
     "kind": "function"
   },
   "models.volatility.checkLocalVolDensityGrid": {
+    "kind": "function"
+  },
+  "models.volatility.checkSurface": {
     "kind": "function"
   },
   "models.volatility.checkSurfaceGrid": {
