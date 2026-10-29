@@ -427,6 +427,23 @@ const displays = [
     convention:
       "Generated simm_sensitivities_json form (Rust example as the default document) and an ISO calculation date; the natively validated set and the returned ImResult are presented by simm-sensitivity-table and simm-report.",
   },
+  {
+    id: "csa-editor",
+    schema: `${base}margin/1/csa_spec.schema.json`,
+    pointer: "#",
+    route: "schema",
+    convention:
+      "Generated csa_spec form (Rust example as the default document), optionally replaced by a Rust regulatory preset (margin.csaSpecUsdRegulatory, csaSpecEurRegulatory, or csaSpecRegulatory over a typed currency, id and collateral curve, which start empty); validated natively by csaSpecValidate and canonicalized through VmCalculator#csa.",
+  },
+  {
+    id: "margin-call-table",
+    schema: `${base}margin/1/vm_result.schema.json`,
+    pointer: "#",
+    api: ["margin.VmCalculator#calculate", "VmCalculator", "calculate"],
+    route: "returned-report",
+    convention:
+      "Returned VmResult of VmCalculator#calculate in the CSA's own base currency, with Rust's vmResultRequiresCall decision and vmResultNetMargin (post minus collect, positive when the desk posts, major units); its money terms as exact returned money; the generateMarginCalls schedule in returned order and the marginCallDates list. Nothing netted, thresholded or rounded in the UI.",
+  },
 ];
 
 export async function generateProvenance(repo, contracts, fixtureManifest) {

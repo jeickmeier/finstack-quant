@@ -827,6 +827,26 @@ with validation and calculation as caller callbacks. The native fixture (the
 schema example and a single USD 5Y IR delta of 1000, whose IM is 60000) is
 `src/fixtures/margin/simm.json`.
 
+## CSA and variation margin
+
+`useCsaPreset` (`@finstack/use-csa-preset`) returns a loader of the Rust
+regulatory CSAs (`margin.csaSpecUsdRegulatory`, `csaSpecEurRegulatory`, or
+`csaSpecRegulatory` for a currency, id and collateral curve), and
+`useCsaValidator` returns canonical `CsaSpec` text (`margin.csaSpecValidate`,
+then the `csa` of a `margin.VmCalculator` built from it). `useVm` builds a
+`VmCalculator` per call and runs `calculate` in the CSA's own base currency,
+returning the `VmResult` with Rust's `vmResultRequiresCall` decision and
+`vmResultNetMargin` (post minus collect; positive when the desk posts).
+`useMarginCalls` and `useMarginCallDates` run `generateMarginCalls` and
+`marginCallDates` on a calculator bound to the CSA. Every calculator is freed
+per call; a cleared amount is sent as `NaN` for Rust to reject. `CsaEditor`
+composes `SchemaForm` over the generated `csa_spec` contract (the Rust example
+by default) with an optional preset bar whose regulatory inputs start empty;
+the display-only `MarginCallTable` presents the returned result, decision, net
+margin, schedule and call dates. No threshold, MTA, rounding or call decision
+is computed in TypeScript. The native fixture (USD regulatory CSA on
+2024-06-17) is `src/fixtures/margin/vm.json`.
+
 ## Served gallery checks
 
 The public namespace is

@@ -40,6 +40,7 @@ const sources = {
   credit: "tests/models/credit/migration.json",
   merton: "tests/models/credit/merton.json",
   simm: "src/fixtures/margin/simm.json",
+  vm: "src/fixtures/margin/vm.json",
   portfolioValuation: "tests/portfolio/gallery.json",
   scenarioPnl: "tests/portfolio/scenario-pnl.json",
   details: "tests/valuations/details/cases.json",

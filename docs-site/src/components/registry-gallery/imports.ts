@@ -178,6 +178,36 @@ export const importHarnesses = {
       name: "use-simm-sensitivities-validator",
       modules: modules.length,
     })),
+  "use-csa-validator": () =>
+    Promise.all([
+      import("@/hooks/margin/use-csa-validator/use-csa-validator"),
+    ]).then((modules) => ({
+      name: "use-csa-validator",
+      modules: modules.length,
+    })),
+  "use-csa-preset": () =>
+    Promise.all([import("@/hooks/margin/use-csa-preset/use-csa-preset")]).then(
+      (modules) => ({ name: "use-csa-preset", modules: modules.length }),
+    ),
+  "use-vm": () =>
+    Promise.all([import("@/hooks/margin/use-vm/use-vm")]).then((modules) => ({
+      name: "use-vm",
+      modules: modules.length,
+    })),
+  "use-margin-calls": () =>
+    Promise.all([
+      import("@/hooks/margin/use-margin-calls/use-margin-calls"),
+    ]).then((modules) => ({
+      name: "use-margin-calls",
+      modules: modules.length,
+    })),
+  "use-margin-call-dates": () =>
+    Promise.all([
+      import("@/hooks/margin/use-margin-call-dates/use-margin-call-dates"),
+    ]).then((modules) => ({
+      name: "use-margin-call-dates",
+      modules: modules.length,
+    })),
   "use-fx-delta-samples": () =>
     Promise.all([
       import("@/hooks/models/use-fx-delta-samples/use-fx-delta-samples"),
@@ -1237,6 +1267,15 @@ export const importHarnesses = {
       name: "contract-yoy-inflation-swap",
       modules: modules.length,
     })),
+  "contract-csa-spec": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/csa_spec.json"),
+      import("@/lib/finstack/generated/types/csa_spec"),
+      import("@/lib/finstack/generated/meta/csa_spec"),
+    ]).then((modules) => ({
+      name: "contract-csa-spec",
+      modules: modules.length,
+    })),
   "contract-im-result": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/im_result.json"),
@@ -1253,6 +1292,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/simm_sensitivities_json"),
     ]).then((modules) => ({
       name: "contract-simm-sensitivities-json",
+      modules: modules.length,
+    })),
+  "contract-vm-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/vm_result.json"),
+      import("@/lib/finstack/generated/types/vm_result"),
+      import("@/lib/finstack/generated/meta/vm_result"),
+    ]).then((modules) => ({
+      name: "contract-vm-result",
       modules: modules.length,
     })),
   "contract-market-context-state": () =>

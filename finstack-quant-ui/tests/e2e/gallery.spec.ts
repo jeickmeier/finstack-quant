@@ -225,6 +225,19 @@ test("merton-calculator model parameters", async ({ page }) => {
   await expect(model.getByRole("table")).toBeVisible();
   await expect(model).toHaveScreenshot("merton-calculator-model.png");
 });
+test("csa-editor loads a Rust preset and its initial margin terms", async ({
+  page,
+}) => {
+  const item = await open(page, "csa-editor", "light", "comfortable");
+  await item.getByRole("button", { name: "EUR regulatory" }).click();
+  await expect(item.getByLabel("Id", { exact: true })).toHaveValue(
+    "EUR-REGULATORY-CSA",
+  );
+  // The four item baselines stop inside the eligible collateral, above these terms.
+  const im = item.getByRole("group", { name: "Im params" });
+  await expect(im).toBeVisible();
+  await expect(im).toHaveScreenshot("csa-editor-im-params.png");
+});
 test("transition-matrix-heatmap cumulative default probability", async ({
   page,
 }) => {

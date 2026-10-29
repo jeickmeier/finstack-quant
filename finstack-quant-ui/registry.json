@@ -3697,6 +3697,39 @@
       }
     },
     {
+      "name": "contract-csa-spec",
+      "type": "registry:lib",
+      "title": "Csa spec contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust csa_spec contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/csa_spec.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/csa_spec.json"
+        },
+        {
+          "path": "src/generated/types/csa_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/csa_spec.ts"
+        },
+        {
+          "path": "src/generated/meta/csa_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/csa_spec.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/csa_spec.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-im-result",
       "type": "registry:lib",
       "title": "Im result contract",
@@ -3759,6 +3792,39 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-vm-result",
+      "type": "registry:lib",
+      "title": "Vm result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust vm_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/vm_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/vm_result.json"
+        },
+        {
+          "path": "src/generated/types/vm_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/vm_result.ts"
+        },
+        {
+          "path": "src/generated/meta/vm_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/vm_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json"
         ]
       }
     },
