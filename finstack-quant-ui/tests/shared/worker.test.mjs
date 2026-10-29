@@ -101,6 +101,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "horizonReturn",
     // AnalyticsApi
     "performanceReport",
+    "benchmarkReport",
     // PortfolioApi
     "valuePortfolio",
     "portfolioMetricsSeries",

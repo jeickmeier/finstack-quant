@@ -51,6 +51,7 @@ import { Example as Example47 } from "./examples/simm-calculator";
 import { Example as Example48 } from "./examples/pnl-attribution-report";
 import { Example as Example49 } from "./examples/horizon-return-report";
 import { Example as Example50 } from "./examples/scenario-pnl-table";
+import { Example as Example51 } from "./examples/benchmark-report";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -103,6 +104,7 @@ const examples = {
   "pnl-attribution-report": Example48,
   "horizon-return-report": Example49,
   "scenario-pnl-table": Example50,
+  "benchmark-report": Example51,
 };
 export function ComponentDemo({
   name,

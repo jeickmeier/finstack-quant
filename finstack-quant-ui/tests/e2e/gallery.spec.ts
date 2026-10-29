@@ -208,6 +208,16 @@ test("horizon-return-report attribution", async ({ page }) => {
     "horizon-return-report-attribution.png",
   );
 });
+test("benchmark-report multi-factor regression", async ({ page }) => {
+  const item = await open(page, "benchmark-report", "light", "comfortable");
+  // The four item baselines stop at the preview's scroll height, above this table.
+  const multi = item.getByRole("region", {
+    name: "Global Macro Composite multi-factor regression",
+    exact: true,
+  });
+  await expect(multi.getByRole("table")).toBeVisible();
+  await expect(multi).toHaveScreenshot("benchmark-report-multi-factor.png");
+});
 test("transition-matrix-heatmap cumulative default probability", async ({
   page,
 }) => {
