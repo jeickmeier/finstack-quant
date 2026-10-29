@@ -43,7 +43,7 @@
   ],
   "properties": {
     "base_currency": {
-      "$ref": "#/$defs/d_cf929f23f904a243bf1f",
+      "$ref": "#/$defs/d_be98333e68c25ab5ae57",
       "description": "Base currency for the sensitivities."
     },
     "commodity_delta": {
@@ -232,7 +232,7 @@
         "minItems": 2,
         "prefixItems": [
           {
-            "$ref": "#/$defs/d_cf929f23f904a243bf1f"
+            "$ref": "#/$defs/d_be98333e68c25ab5ae57"
           },
           {
             "format": "double",
@@ -251,10 +251,10 @@
         "minItems": 3,
         "prefixItems": [
           {
-            "$ref": "#/$defs/d_cf929f23f904a243bf1f"
+            "$ref": "#/$defs/d_be98333e68c25ab5ae57"
           },
           {
-            "$ref": "#/$defs/d_cf929f23f904a243bf1f"
+            "$ref": "#/$defs/d_be98333e68c25ab5ae57"
           },
           {
             "format": "double",
@@ -273,7 +273,7 @@
         "minItems": 3,
         "prefixItems": [
           {
-            "$ref": "#/$defs/d_cf929f23f904a243bf1f"
+            "$ref": "#/$defs/d_be98333e68c25ab5ae57"
           },
           {
             "type": "string"
@@ -295,7 +295,7 @@
         "minItems": 3,
         "prefixItems": [
           {
-            "$ref": "#/$defs/d_cf929f23f904a243bf1f"
+            "$ref": "#/$defs/d_be98333e68c25ab5ae57"
           },
           {
             "type": "string"
@@ -387,8 +387,14 @@
         }
       ]
     },
-    "d_cf929f23f904a243bf1f": {
-      "description": "ISO 4217 currency enumeration",
+    "d_be98333e68c25ab5ae57": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "ISO 4217 currency code.",
+      "examples": [
+        "USD",
+        "EUR",
+        "JPY"
+      ],
       "oneOf": [
         {
           "const": "AED",
@@ -1185,7 +1191,8 @@
           "description": "Zimbabwe Dollar (932)",
           "type": "string"
         }
-      ]
+      ],
+      "title": "Currency"
     },
     "d_e1f02d0395bdbbc8fea9": {
       "description": "Risk classes for SIMM categorization.",

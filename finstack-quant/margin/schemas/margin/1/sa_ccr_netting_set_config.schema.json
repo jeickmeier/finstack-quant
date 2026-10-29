@@ -1,10 +1,5 @@
 {
   "$defs": {
-    "DateWire": {
-      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-      "format": "date",
-      "type": "string"
-    },
     "NettingSetId": {
       "description": "Identifies a margin netting set.\n\nInstruments in the same netting set can offset each other for margin\ncalculation purposes. The netting set is typically defined by the\nCSA agreement (bilateral) or by CCP membership (cleared) — these two\nshapes are mutually exclusive, so the type encodes them as enum\nvariants rather than as a struct with two `Option<String>` fields\nthat could in principle both be set or both be unset.",
       "oneOf": [
@@ -76,7 +71,7 @@
   ],
   "properties": {
     "as_of": {
-      "$ref": "#/$defs/DateWire",
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
       "description": "Valuation date used for forward-start and remaining-maturity calculations."
     },
     "collateral": {
