@@ -95,6 +95,9 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "exportResult",
     // CashflowsApi
     "cashflowLadder",
+    // ScenariosApi
+    "buildMarketScenario",
+    "applyMarketScenario",
     // CalibrationApi
     "validateCalibration",
     "dryRun",

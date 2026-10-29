@@ -35,6 +35,7 @@ export const importHarnesses = {
       import("@/workers/services/core"),
       import("@/workers/services/valuations"),
       import("@/workers/services/cashflows"),
+      import("@/workers/services/scenarios"),
       import("@/workers/services/calibration"),
       import("@/workers/services/models"),
       import("@/workers/services/statements"),
@@ -93,6 +94,20 @@ export const importHarnesses = {
     Promise.all([
       import("@/hooks/calibration/use-calibrate/use-calibrate"),
     ]).then((modules) => ({ name: "use-calibrate", modules: modules.length })),
+  "use-market-scenario": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-market-scenario/use-market-scenario"),
+    ]).then((modules) => ({
+      name: "use-market-scenario",
+      modules: modules.length,
+    })),
+  "use-apply-market-scenario": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-apply-market-scenario/use-apply-market-scenario"),
+    ]).then((modules) => ({
+      name: "use-apply-market-scenario",
+      modules: modules.length,
+    })),
   "use-fx-delta-samples": () =>
     Promise.all([
       import("@/hooks/models/use-fx-delta-samples/use-fx-delta-samples"),

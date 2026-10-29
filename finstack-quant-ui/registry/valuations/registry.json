@@ -524,6 +524,11 @@
           "target": "components/finstack/valuations/blocks/pricing-workbench/calibration-panel.tsx"
         },
         {
+          "path": "blocks/pricing-workbench/market-scenario-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/market-scenario-panel.tsx"
+        },
+        {
           "path": "blocks/pricing-workbench/scenario-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/scenario-panel.tsx"
@@ -594,7 +599,11 @@
         "@finstack/finstack-worker",
         "@finstack/schema-form",
         "@finstack/contract-scenario-grid",
-        "@finstack/finstack-codec"
+        "@finstack/finstack-codec",
+        "@finstack/market-scenario-builder",
+        "@finstack/market-scenario-report",
+        "@finstack/use-market-scenario",
+        "@finstack/use-apply-market-scenario"
       ],
       "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.11.0"],
       "categories": ["Blocks"],

@@ -1419,6 +1419,52 @@
       }
     },
     {
+      "id": "market-scenario-report",
+      "route": "returned-report",
+      "convention": "Returned ApplicationReport counters, applied shocks, time roll with carry and warnings; nothing summed or converted. The workbench prices the shocked market at the returned valuation date with the base model and metrics and shows both valuations; no P&L is computed.",
+      "api": {
+        "name": "scenarios.applyScenario",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ScenariosNamespace",
+        "member": "applyScenario",
+        "inputs": [
+          {
+            "name": "scenarioJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "marketJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "modelJson",
+            "type": "JsonInput",
+            "optional": true
+          },
+          {
+            "name": "instrumentsJson",
+            "type": "JsonInput",
+            "optional": true
+          },
+          {
+            "name": "configJson",
+            "type": "JsonInput",
+            "optional": true
+          }
+        ],
+        "returns": "ApplicationEnvelope",
+        "declaration": "/**\n   * Apply a scenario to copied market data and an optional financial model.\n   *\n   * Returns a JavaScript object with `market` and `model` (the mutated\n   * contexts as objects, not JSON strings), and a canonical `report` containing `operations_applied`,\n   * `user_operations`, `expanded_operations`, `changes` (a\n   * `ScenarioChangeManifest`), `warnings`, `meta` (a `ResultsMeta` audit stamp\n   * carrying the numeric mode, rounding context, and FX policy; omitted when\n   * absent), and `time_roll` (a `RollForwardReport`, only present when the\n   * scenario contained a `time_roll_forward` operation).\n   *\n   * Optional instrument envelopes are copied and returned in `instruments`, in\n   * input order. The Rust engine rejects instrument-scoped operations without\n   * an inventory. No holiday calendar is supplied; business-day rolls use\n   * weekends-only adjustment.\n   * @returns Mutated market and optional model after applying the scenario.\n   * @param scenarioJson - JSON-serialized ScenarioSpec to validate and apply.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param modelJson - Optional FinancialModelSpec JSON; omit for market-only scenarios.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param instrumentsJson - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.\n   * @param configJson - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.\n   * @throws Error - Rejects a malformed or invalid scenario (checked before the market is parsed), malformed market, model, instrument, or configuration JSON, instrument-scoped operations without `instruments_json`, a model that fails semantic validation (the same `FinancialModelSpec::from_json` check the statements exports and Python `apply_scenario` apply), an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, statement-model execution failures, failure to encode the mutated contexts, or failure to serialize the application envelope to JavaScript.\n   */\n  applyScenario(\n    scenarioJson: JsonInput,\n    marketJson: JsonInput,\n    asOf: string,\n    modelJson?: JsonInput,\n    instrumentsJson?: JsonInput,\n    configJson?: JsonInput\n  ): ApplicationEnvelope;",
+        "sha256": "579cd4d5aab6611fdf0a1d808cf5c0ff838f1840fe33fc10ae732b7a11d5281e"
+      }
+    },
+    {
       "id": "scenario-heatmap",
       "route": "returned-prices",
       "convention": "Rust clean settlement price, percent of current tranche balance.",

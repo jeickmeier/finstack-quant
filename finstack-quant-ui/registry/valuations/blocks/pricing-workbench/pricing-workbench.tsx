@@ -22,6 +22,13 @@ import {
 import { ScenarioPanel } from "./scenario-panel";
 import { TranchePanel } from "./tranche-panel";
 import { CalibrationPanel } from "./calibration-panel";
+import {
+  MarketScenarioInputs,
+  MarketScenarioResults,
+  noComparison,
+  useMarketScenarioSession,
+} from "./market-scenario-panel";
+import type { MarketScenarioDraft } from "@/components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder";
 import type { CalibrationFitChartProps } from "@/components/finstack/calibration/components/calibration-fit-chart/calibration-fit-chart";
 import { MeasuresGrid } from "@/components/finstack/valuations/components/measures-grid/measures-grid";
 import {
@@ -49,6 +56,7 @@ export function PricingWorkbench({
   fxOptions,
   calibrationChartOptions,
   scenario,
+  marketScenario,
   brand,
 }: {
   /** Complete initial instrument request and canonical market snapshot. Remount to load another document. */
@@ -75,6 +83,8 @@ export function PricingWorkbench({
     /** Registry metric ids valued on the tranche by trancheMetrics; omitted means none. */
     trancheMetrics?: readonly string[];
   };
+  /** Initial market scenario draft for the "Market scenario" tab; it is applied only on request. Defaults to an empty scenario. */
+  marketScenario?: MarketScenarioDraft;
   surfaceOptions?: MarketContextBrowserProps["surfaceOptions"];
   cubeOptions?(
     cube: MarketContextStateWire["vol_cubes"][number],
@@ -153,6 +163,14 @@ export function PricingWorkbench({
     exampleResultTabs,
     onInstrumentTypeChange,
   });
+  const marketScenarioSession = useMarketScenarioSession(
+    marketScenario,
+    completed?.request ?? null,
+  );
+  // The shocked valuation fills the existing comparison columns; no difference is computed.
+  const comparison = printSnapshot
+    ? noComparison
+    : marketScenarioSession.comparison;
   const dimensionalCount = dimensionalMeasureCount({
     result: shown?.result,
     metadata: measureMetadata.data,
@@ -229,6 +247,9 @@ export function PricingWorkbench({
                   <span className="finstack-kbd">2</span> Market
                 </TabsTrigger>
                 <TabsTrigger value="calibrate">Calibrate</TabsTrigger>
+                <TabsTrigger value="market-scenario">
+                  Market scenario
+                </TabsTrigger>
               </TabsList>
               <div className="finstack-workbench__context">
                 {pricingContext}
@@ -413,6 +434,17 @@ export function PricingWorkbench({
                   }}
                 />
               </TabsContent>
+              <TabsContent
+                value="market-scenario"
+                className="finstack-workbench__panel print:hidden"
+              >
+                <MarketScenarioInputs
+                  session={marketScenarioSession}
+                  curveIds={market?.state.curves.map((curve) => curve.id) ?? []}
+                  priced={completed !== null}
+                  density={currentDensity}
+                />
+              </TabsContent>
             </section>
             <section
               aria-label="Results"
@@ -436,6 +468,7 @@ export function PricingWorkbench({
                 <div className="finstack-workbench__summary-body">
                   <MeasuresGrid
                     {...measureGridProps}
+                    {...comparison}
                     content={printSnapshot ? "all" : "summary"}
                   />
                   {printSnapshot && shown && (
@@ -476,6 +509,9 @@ export function PricingWorkbench({
                     <TabsTrigger value="trace">
                       <span className="finstack-kbd">5</span> Trace
                     </TabsTrigger>
+                    <TabsTrigger value="market-scenario">
+                      Market scenario
+                    </TabsTrigger>
                     <TabsTrigger value="request">Request</TabsTrigger>
                     {scenario && type === "structured_credit" && (
                       <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
@@ -485,6 +521,7 @@ export function PricingWorkbench({
                 <TabsContent value="measures" className="print:hidden">
                   <MeasuresGrid
                     {...measureGridProps}
+                    {...comparison}
                     content="measures"
                     excludeDimensional
                   />
@@ -503,6 +540,8 @@ export function PricingWorkbench({
                     <DimensionalMeasures
                       result={shown?.result}
                       metadata={measureMetadata.data}
+                      compareTo={comparison.compareTo}
+                      comparisonMetadata={comparison.comparisonMetadata}
                     />
                   )}
                 </TabsContent>
@@ -552,6 +591,12 @@ export function PricingWorkbench({
                       No explanation trace returned
                     </p>
                   )}
+                </TabsContent>
+                <TabsContent value="market-scenario" className="print:hidden">
+                  <MarketScenarioResults
+                    session={marketScenarioSession}
+                    density={currentDensity}
+                  />
                 </TabsContent>
                 <TabsContent value="request" className="print:hidden">
                   <details
