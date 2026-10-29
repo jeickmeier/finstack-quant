@@ -71,6 +71,11 @@ const sources = {
   statementGoalSeek: "src/fixtures/statements/analyst-goal-seek.json",
   statementBridge: "src/fixtures/statements/analyst-bridge.json",
   statementBacktest: "src/fixtures/statements/analyst-backtest.json",
+  statementMonteCarloConfig:
+    "src/fixtures/statements/analyst-monte-carlo-config.json",
+  statementMonteCarlo: "src/fixtures/statements/analyst-monte-carlo.json",
+  statementMonteCarloBreach:
+    "src/fixtures/statements/analyst-monte-carlo-breach.json",
   statementScenarios: "src/fixtures/statements/analyst-scenarios.json",
   statementScenarioDiff: "src/fixtures/statements/analyst-scenario-diff.json",
   statementRollForward2025Q2:

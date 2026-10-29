@@ -4692,6 +4692,72 @@
       }
     },
     {
+      "name": "contract-monte-carlo-config",
+      "type": "registry:lib",
+      "title": "Monte carlo config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust monte_carlo_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/monte_carlo_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/monte_carlo_config.json"
+        },
+        {
+          "path": "src/generated/types/monte_carlo_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/monte_carlo_config.ts"
+        },
+        {
+          "path": "src/generated/meta/monte_carlo_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/monte_carlo_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-monte-carlo-results",
+      "type": "registry:lib",
+      "title": "Monte carlo results contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust monte_carlo_results contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/monte_carlo_results.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/monte_carlo_results.json"
+        },
+        {
+          "path": "src/generated/types/monte_carlo_results.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/monte_carlo_results.ts"
+        },
+        {
+          "path": "src/generated/meta/monte_carlo_results.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/monte_carlo_results.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-rollup-spec",
       "type": "registry:lib",
       "title": "Rollup spec contract",

@@ -151,6 +151,19 @@ beforeEach(() => {
         );
       case "backtestForecast":
         return native.backtestForecast(arg.actual, arg.forecast);
+      case "evaluateMonteCarlo":
+        return new native.Evaluator().evaluateMonteCarlo(
+          arg.modelJson,
+          arg.configJson,
+        );
+      case "monteCarloBreachProbability":
+        return (
+          native.monteCarloBreachProbability(
+            arg.resultsJson,
+            arg.metric,
+            arg.threshold,
+          ) ?? null
+        );
       case "goalSeek":
         return native.goalSeek(
           arg.modelJson,
@@ -717,6 +730,61 @@ it("reviews the variance, bridge and forecast backtest since the last roll forwa
   );
   expect(
     await within(review).findByRole("table", { name: "Ebitda bridge, 2025Q2" }),
+  ).toBeTruthy();
+});
+
+it("simulates the current model in the Monte Carlo tab only once a config is submitted", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  fireEvent.click(await screen.findByRole("tab", { name: "Monte Carlo" }));
+  const simulation = await screen.findByRole("region", {
+    name: "Monte Carlo simulation",
+  });
+  expect(
+    within(simulation).getByText("No Monte Carlo results available."),
+  ).toBeTruthy();
+  fireEvent.change(
+    within(simulation).getByRole("textbox", { name: "N paths" }),
+    { target: { value: "8" } },
+  );
+  fireEvent.change(within(simulation).getByRole("textbox", { name: "Seed" }), {
+    target: { value: "9007199254740993" },
+  });
+  const simulate = within(simulation).getByRole("button", { name: "Simulate" });
+  await waitFor(() =>
+    expect((simulate as HTMLButtonElement).disabled).toBe(false),
+  );
+  expect(lastCall("evaluateMonteCarlo")).toBeUndefined();
+  fireEvent.click(simulate);
+  await waitFor(() => expect(lastCall("evaluateMonteCarlo")).toBeDefined());
+  // The seed beyond 2^53 reaches the worker as its exact integer token.
+  expect(lastCall("evaluateMonteCarlo").configJson).toBe(
+    '{"n_paths":8,"seed":9007199254740993}',
+  );
+  expect(
+    await within(simulation).findByRole("table", {
+      name: /percentiles by forecast period/,
+    }),
+  ).toBeTruthy();
+  // Without the path table Rust reports no breach probability.
+  const readout = within(simulation).getByRole("region", {
+    name: "Breach probability",
+  });
+  fireEvent.change(
+    within(readout).getByRole("textbox", { name: "Threshold" }),
+    {
+      target: { value: "1" },
+    },
+  );
+  fireEvent.click(within(readout).getByRole("button", { name: "Test breach" }));
+  await waitFor(() =>
+    expect(lastCall("monteCarloBreachProbability")?.threshold).toBe(1),
+  );
+  expect(
+    await within(readout).findByText(/Rust reports no probability/),
   ).toBeTruthy();
 });
 

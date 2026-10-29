@@ -9,6 +9,7 @@ import { MetricEditor } from "./metric-editor";
 import { ScenarioPanel } from "./scenario-panel";
 import { ValuationPanel } from "./valuation-panel";
 import { SensitivityPanel } from "./sensitivity-panel";
+import { MonteCarloPanel } from "./monte-carlo-panel";
 import { RollForwardReview, type EvaluatedModel } from "./roll-forward-review";
 import {
   annualRollupSpecJson,
@@ -60,6 +61,7 @@ type Tab =
   | "scenarios"
   | "ratios"
   | "valuation"
+  | "monte-carlo"
   | "checks"
   | "advanced";
 const tabs: { id: Tab; label: string }[] = [
@@ -68,6 +70,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "scenarios", label: "Scenarios" },
   { id: "ratios", label: "Metrics & ratios" },
   { id: "valuation", label: "Valuation" },
+  { id: "monte-carlo", label: "Monte Carlo" },
   { id: "checks", label: "Checks" },
   { id: "advanced", label: "Advanced" },
 ];
@@ -1004,6 +1007,14 @@ export function StatementsWorkbench({
                 nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
                 marketJson={marketJson}
                 asOf={asOf}
+                density={density}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="monte-carlo">
+            {model && request && (
+              <MonteCarloPanel
+                modelJson={request.modelJson}
                 density={density}
               />
             )}

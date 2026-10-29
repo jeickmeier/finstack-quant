@@ -452,6 +452,20 @@ export const importHarnesses = {
       name: "use-backtest-forecast",
       modules: modules.length,
     })),
+  "use-evaluate-monte-carlo": () =>
+    Promise.all([
+      import("@/hooks/statements/use-evaluate-monte-carlo/use-evaluate-monte-carlo"),
+    ]).then((modules) => ({
+      name: "use-evaluate-monte-carlo",
+      modules: modules.length,
+    })),
+  "use-monte-carlo-breach-probability": () =>
+    Promise.all([
+      import("@/hooks/statements/use-monte-carlo-breach-probability/use-monte-carlo-breach-probability"),
+    ]).then((modules) => ({
+      name: "use-monte-carlo-breach-probability",
+      modules: modules.length,
+    })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -1646,6 +1660,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/examples/financial_model_spec.json"),
     ]).then((modules) => ({
       name: "contract-financial-model-spec",
+      modules: modules.length,
+    })),
+  "contract-monte-carlo-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/monte_carlo_config.json"),
+      import("@/lib/finstack/generated/types/monte_carlo_config"),
+      import("@/lib/finstack/generated/meta/monte_carlo_config"),
+    ]).then((modules) => ({
+      name: "contract-monte-carlo-config",
+      modules: modules.length,
+    })),
+  "contract-monte-carlo-results": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/monte_carlo_results.json"),
+      import("@/lib/finstack/generated/types/monte_carlo_results"),
+      import("@/lib/finstack/generated/meta/monte_carlo_results"),
+    ]).then((modules) => ({
+      name: "contract-monte-carlo-results",
       modules: modules.length,
     })),
   "contract-rollup-spec": () =>

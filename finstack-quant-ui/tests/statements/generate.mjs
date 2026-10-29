@@ -180,6 +180,46 @@ await write(
     ),
   ),
 );
+// Native Monte Carlo of analyst-model-stochastic.json (the analyst model with
+// a log-normal revenue forecast) under analyst-monte-carlo-config.json,
+// captured without the path table. The breach probability of leverage above
+// 2.25x needs the paths, so it comes from the same config with
+// include_path_data and only the returned fraction is kept (the 200-path
+// table is about 750 KB).
+const stochasticJson = native.validateFinancialModelJson(
+  await read("analyst-model-stochastic.json"),
+);
+const monteCarloConfig = JSON.parse(
+  await read("analyst-monte-carlo-config.json"),
+);
+const monteCarlo = new native.Evaluator();
+await write(
+  "analyst-monte-carlo.json",
+  serializeHost(
+    monteCarlo.evaluateMonteCarlo(
+      stochasticJson,
+      JSON.stringify(monteCarloConfig),
+    ),
+  ),
+);
+const withPaths = monteCarlo.evaluateMonteCarlo(
+  stochasticJson,
+  JSON.stringify({ ...monteCarloConfig, include_path_data: true }),
+);
+monteCarlo.free();
+const breach = { metric: "leverage", threshold: 2.25 };
+await write(
+  "analyst-monte-carlo-breach.json",
+  serializeHost({
+    ...breach,
+    probability:
+      native.monteCarloBreachProbability(
+        serializeHost(withPaths),
+        breach.metric,
+        breach.threshold,
+      ) ?? null,
+  }),
+);
 // Native scenarioDiff over the analyst scenario set (base → downside → severe):
 // each scenario against its parent, over the P&L lines for the 2025 quarters.
 const scenarioSetJson = await read("analyst-scenarios.json");

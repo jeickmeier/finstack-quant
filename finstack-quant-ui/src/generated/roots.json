@@ -565,6 +565,16 @@
     "schema": "schemas/financial_model_spec.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/monte_carlo_config.schema.json",
+    "schema": "schemas/monte_carlo_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/monte_carlo_results.schema.json",
+    "schema": "schemas/monte_carlo_results.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
     "source": "finstack-quant/statements/schemas/statements/1/rollup_spec.schema.json",
     "schema": "schemas/rollup_spec.json"

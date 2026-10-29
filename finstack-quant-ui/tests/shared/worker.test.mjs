@@ -160,6 +160,8 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "runVariance",
     "varianceBridge",
     "backtestForecast",
+    "evaluateMonteCarlo",
+    "monteCarloBreachProbability",
   ];
   expect((await proxy.methods()).sort()).toEqual(expected.sort());
 });
