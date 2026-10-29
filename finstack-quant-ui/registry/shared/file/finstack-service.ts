@@ -1,5 +1,5 @@
 import type { WorkerApi } from "./finstack-contract";
-import { createContext } from "./services/context";
+import { createContext, type ContextNative } from "./services/context";
 import { createCoreService, type CoreNative } from "./services/core";
 import {
   createValuationsService,
@@ -28,7 +28,8 @@ import {
 } from "./services/statements";
 /** Dependencies are the published facade; injection permits the same service in a real Node worker. */
 export function createService(
-  native: { initialize(wasmUrl?: string): Promise<unknown> } & CoreNative &
+  native: ContextNative &
+    CoreNative &
     ValuationsNative &
     CashflowsNative &
     ScenariosNative &
