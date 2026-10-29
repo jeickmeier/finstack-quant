@@ -94,13 +94,11 @@ beforeEach(() => {
       case "formatMoney":
         return formatMoney(request.value, request.rounding, native);
       case "cashflows":
-        return JSON.stringify(
-          native.instrumentCashflows(
-            request.instrumentJson,
-            request.marketJson,
-            request.asOf,
-            request.model,
-          ),
+        return native.instrumentCashflows(
+          request.instrumentJson,
+          request.marketJson,
+          request.asOf,
+          request.model,
         );
       case "price":
         try {
@@ -439,7 +437,7 @@ it.each(detailFixtures.cases)(
   20000,
 );
 it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
-  "keeps $type pricing intact with exact cashflow output or its actual native export error",
+  "keeps $type pricing intact with the native cashflow envelope or its actual native export error",
   async (entry) => {
     mount(entry.request);
     const results = within(screen.getByRole("region", { name: "Results" }));
@@ -469,11 +467,13 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
       });
       await within(viewer).findByRole("table", { name: "Cashflow schedule" });
       fireEvent.click(
-        within(viewer).getByText("Original JSON", { exact: true }),
+        within(viewer).getByText("Envelope JSON", { exact: true }),
       );
       await waitFor(() => {
         showOriginal(viewer);
-        expect(viewer.querySelector("pre")!.textContent).toBe(entry.cashflows);
+        expect(viewer.querySelector("pre")!.textContent).toBe(
+          serializeHost(entry.cashflows),
+        );
       });
     }
     expect(JSON.parse(result.querySelector("pre")!.textContent!).value).toEqual(

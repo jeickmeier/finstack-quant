@@ -511,7 +511,7 @@ export function PricingWorkbench({
                   ) : shown ? (
                     <CashflowViewer
                       density={currentDensity}
-                      text={cashflows.data}
+                      cashflows={cashflows.data}
                       loading={
                         cashflows.isFetching ||
                         cashflows.workerStatus === "starting"

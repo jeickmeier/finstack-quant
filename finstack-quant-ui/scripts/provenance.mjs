@@ -101,9 +101,9 @@ const displays = [
       "ValuationInstrumentsNamespace",
       "instrumentCashflows",
     ],
-    route: "native-json-table",
+    route: "native-envelope-table",
     convention:
-      "Rust-generated cashflow schema and lossless presentation tokens. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. The service serializes the typed Rust envelope for presentation.",
+      "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Its JSON view is a host serialization, not native text.",
   },
   {
     id: "curve-chart",

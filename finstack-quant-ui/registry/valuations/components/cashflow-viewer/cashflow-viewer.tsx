@@ -10,9 +10,10 @@ import {
   TableFooter,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { formatRawMoney } from "@/lib/finstack/format/format";
+import { formatRaw, formatRawMoney } from "@/lib/finstack/format/format";
+import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
-import { readCashflows } from "./cashflow-data";
+import { readCashflows, type CashflowSchedule } from "./cashflow-data";
 
 const diagnostics = [
   ["rate", "Rate", "Projected or contractual rate, as supplied"],
@@ -31,39 +32,48 @@ const extraDiagnostics = [
   ["beginning_balance", "Beginning balance"],
   ["ending_balance", "Ending balance"],
 ] as const;
-/** Native cashflow schedule with exact numeric tokens and an unchanged JSON export. */
+/** Native cashflow envelope as a table, with a host serialization of the supplied object. */
 export function CashflowViewer({
-  text,
+  cashflows,
   loading = false,
   error: suppliedError,
   density = "compact",
 }: {
-  /** Unmodified native cashflow JSON; no worker or query provider is required. */
-  text?: string | null;
+  /** Native cashflow envelope object as returned by the facade; no worker or query provider is required. */
+  cashflows?: CashflowSchedule | null;
   loading?: boolean;
   /** Native query error supplied by the owner of the request. */
   error?: string | null;
   density?: "compact" | "comfortable";
 }) {
   const presentation = useMemo(() => {
-    if (!text) return {};
+    if (!cashflows) return {};
     try {
-      return { schedule: readCashflows(text) };
+      return { schedule: readCashflows(cashflows) };
     } catch (error) {
       return {
         error: `Cashflow table unavailable: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
-  }, [text]);
+  }, [cashflows]);
+  // Host serialization of the supplied object for copy and download; not native text.
+  const text = useMemo(() => {
+    if (!cashflows) return null;
+    try {
+      return serializeHost(cashflows);
+    } catch {
+      return null;
+    }
+  }, [cashflows]);
   const schedule = presentation.schedule;
   const error = suppliedError
     ? `Cashflows unavailable: ${suppliedError}`
     : presentation.error;
   const columns = diagnostics.filter(([key]) =>
-    schedule?.flows.some((row) => row[key] !== undefined),
+    schedule?.flows.some((row) => row[key] != null),
   );
   const hasExtra = schedule?.flows.some((row) =>
-    extraDiagnostics.some(([key]) => row[key] !== undefined),
+    extraDiagnostics.some(([key]) => row[key] != null),
   );
   const numeric = "text-right finstack-numeric font-sans";
   const cell = density === "compact" ? "py-1.5" : "py-3";
@@ -150,11 +160,11 @@ export function CashflowViewer({
                       </TableCell>
                       <TableCell
                         className={`${cell} ${numeric} align-top`}
-                        title={row.amount}
+                        title={String(row.amount)}
                       >
                         <span className="whitespace-nowrap">
                           {formatRawMoney({
-                            amount: row.amount,
+                            amount: String(row.amount),
                             currency: row.currency,
                           })}
                         </span>
@@ -163,9 +173,11 @@ export function CashflowViewer({
                         <TableCell
                           key={key}
                           className={`${cell} ${numeric} align-top print:hidden`}
-                          title={row[key]}
+                          title={
+                            row[key] == null ? undefined : String(row[key])
+                          }
                         >
-                          {row[key] ?? "—"}
+                          {formatRaw(row[key])}
                         </TableCell>
                       ))}
                       <TableCell
@@ -174,7 +186,7 @@ export function CashflowViewer({
                         <dl className="space-y-1">
                           {[...columns, ...extraDiagnostics].flatMap(
                             ([key, label]) =>
-                              row[key] === undefined
+                              row[key] == null
                                 ? []
                                 : [
                                     <div
@@ -185,7 +197,7 @@ export function CashflowViewer({
                                         {label}
                                       </dt>
                                       <dd className="finstack-numeric whitespace-nowrap font-sans">
-                                        {row[key]}
+                                        {formatRaw(row[key])}
                                       </dd>
                                     </div>,
                                   ],
@@ -194,11 +206,11 @@ export function CashflowViewer({
                       </TableCell>
                       <TableCell
                         className={`${cell} ${numeric} align-top`}
-                        title={row.pv}
+                        title={String(row.pv)}
                       >
                         <span className="whitespace-nowrap">
                           {formatRawMoney({
-                            amount: row.pv,
+                            amount: String(row.pv),
                             currency: schedule.currency,
                           })}
                         </span>
@@ -207,7 +219,7 @@ export function CashflowViewer({
                         <TableCell className={`${cell} align-top print:hidden`}>
                           <dl>
                             {extraDiagnostics.flatMap(([key, label]) =>
-                              row[key] === undefined
+                              row[key] == null
                                 ? []
                                 : [
                                     <div
@@ -215,7 +227,9 @@ export function CashflowViewer({
                                       className="flex justify-between gap-3"
                                     >
                                       <dt>{label}</dt>
-                                      <dd className={numeric}>{row[key]}</dd>
+                                      <dd className={numeric}>
+                                        {formatRaw(row[key])}
+                                      </dd>
                                     </div>,
                                   ],
                             )}
@@ -239,10 +253,13 @@ export function CashflowViewer({
                     >
                       Total PV · {schedule.currency}
                     </TableCell>
-                    <TableCell className={numeric} title={schedule.total_pv}>
+                    <TableCell
+                      className={numeric}
+                      title={String(schedule.total_pv)}
+                    >
                       <span className="whitespace-nowrap">
                         {formatRawMoney({
-                          amount: schedule.total_pv,
+                          amount: String(schedule.total_pv),
                           currency: schedule.currency,
                         })}
                       </span>
@@ -265,7 +282,7 @@ export function CashflowViewer({
             </Badge>
             <span>
               {!schedule.flows.length &&
-                `Total PV · ${formatRawMoney({ amount: schedule.total_pv, currency: schedule.currency })}`}
+                `Total PV · ${formatRawMoney({ amount: String(schedule.total_pv), currency: schedule.currency })}`}
             </span>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
@@ -279,7 +296,7 @@ export function CashflowViewer({
       )}
       <details className="mt-4 text-xs print:hidden">
         <summary className="cursor-pointer text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
-          Original JSON
+          Envelope JSON
         </summary>
         <div className="mt-2">
           <JsonViewer

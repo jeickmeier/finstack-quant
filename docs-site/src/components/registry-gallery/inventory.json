@@ -213,7 +213,7 @@
     {
       "name": "cashflow-viewer",
       "type": "registry:component",
-      "docs": "Supplied native cashflow JSON table with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download. Accepts text, loading and error props; no worker or query provider required.",
+      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, loading and error props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -828,7 +828,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "0e8b2e340f9ed6292519d003f16c0d31e1abf5f6fab42c59509fe4a18b9c665f"
+      "sha256": "50da76ba33eb0a839af315bca3ebd222c7852f4494fbf0af7c15ba54636f4e5b"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",

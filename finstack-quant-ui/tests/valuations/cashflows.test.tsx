@@ -28,9 +28,12 @@ import {
   useCashflows,
 } from "@/hooks/valuations/use-cashflows/use-cashflows";
 import { CashflowViewer } from "@/components/finstack/valuations/components/cashflow-viewer/cashflow-viewer";
+import type { InstrumentCashflowWire } from "@/lib/finstack/generated/types/instrument_cashflow";
+import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { unwrap, type CashflowRequest } from "@/workers/finstack-contract";
 import { startWorker } from "../shared/worker/harness.mjs";
 import fixture from "./cashflows/cases.json";
+const envelope = (value: unknown) => value as InstrumentCashflowWire;
 import { budget } from "../shared/budget";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
@@ -85,10 +88,12 @@ it("pins the JSON inputs the cashflow fixture was built from", () => {
     ).toBe(source.sha256);
 });
 it.each(fixture.cases.filter((c) => c.cashflows !== null))(
-  "tables and copies exact native $type cashflows at both densities",
+  "tables and copies the native $type envelope at both densities",
   async (entry) => {
+    const cashflows = envelope(entry.cashflows);
+    const text = serializeHost(cashflows);
     const tree = (density: "compact" | "comfortable") => (
-      <CashflowViewer text={entry.cashflows} density={density} />
+      <CashflowViewer cashflows={cashflows} density={density} />
     );
     const { rerender } = render(tree("compact"));
     const viewer = screen.getByRole("region", { name: "Cashflows" });
@@ -97,7 +102,7 @@ it.each(fixture.cases.filter((c) => c.cashflows !== null))(
         within(viewer).getByRole("table", { name: "Cashflow schedule" }),
       ).toBeTruthy(),
     );
-    const nativeRows = JSON.parse(entry.cashflows!).flows;
+    const nativeRows = cashflows.flows;
     expect(viewer.querySelectorAll("tbody tr")).toHaveLength(nativeRows.length);
     expect(viewer.querySelector("details")!.open).toBe(false);
     expect(viewer.querySelector("details")!.className).toContain(
@@ -110,22 +115,20 @@ it.each(fixture.cases.filter((c) => c.cashflows !== null))(
       expect(rows[i].children[2].textContent).toContain(`${row.currency} `);
       expect(
         rows[i].children[rows[i].children.length - 1].textContent,
-      ).toContain(`${JSON.parse(entry.cashflows!).currency} `);
+      ).toContain(`${cashflows.currency} `);
     }
-    fireEvent.click(within(viewer).getByText("Original JSON", { exact: true }));
+    fireEvent.click(within(viewer).getByText("Envelope JSON", { exact: true }));
     fireEvent.click(within(viewer).getByRole("button", { name: "Original" }));
     await waitFor(() =>
-      expect(viewer.querySelector("pre")?.textContent).toBe(entry.cashflows),
+      expect(viewer.querySelector("pre")?.textContent).toBe(text),
     );
     for (const density of ["compact", "comfortable"] as const) {
       rerender(tree(density));
       expect(viewer.dataset.density).toBe(density);
-      expect(viewer.querySelector("pre")!.textContent).toBe(entry.cashflows);
+      expect(viewer.querySelector("pre")!.textContent).toBe(text);
       fireEvent.click(within(viewer).getByRole("button", { name: "Copy" }));
       await waitFor(() =>
-        expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
-          entry.cashflows,
-        ),
+        expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(text),
       );
     }
     expect(
@@ -168,7 +171,7 @@ it("shows loading, then the actual unsupported error without changing caller val
   expect(screen.getByLabelText("Selected model").textContent).toBe(
     entry.request.model,
   );
-  fireEvent.click(within(viewer).getByText("Original JSON", { exact: true }));
+  fireEvent.click(within(viewer).getByText("Envelope JSON", { exact: true }));
   expect(
     (within(viewer).getByRole("button", { name: "Copy" }) as HTMLButtonElement)
       .disabled,
@@ -184,7 +187,7 @@ it("snapshots every export input and separates worker sessions in the query key"
   const options = cashflowOptions(client, 10, request);
   request.model = "black76";
   expect(options.queryKey.at(-1)).toMatchObject({ model: "discounting" });
-  await expect(query.fetchQuery(options)).resolves.toBe(
+  await expect(query.fetchQuery(options)).resolves.toEqual(
     fixture.cases[0].cashflows,
   );
   const original = exportRequest(fixture.cases[0].request);
@@ -207,32 +210,58 @@ it("snapshots every export input and separates worker sessions in the query key"
   query.clear();
 });
 
-function suppliedExport(text: string) {
-  return render(<CashflowViewer text={text} />);
+function suppliedExport(cashflows: unknown) {
+  return render(<CashflowViewer cashflows={envelope(cashflows)} />);
 }
 function ConnectedCashflows({ request }: { request: CashflowRequest }) {
   const query = useCashflows(request);
   return (
     <CashflowViewer
-      text={query.data}
+      cashflows={query.data}
       loading={query.isFetching || query.workerStatus === "starting"}
       error={query.error?.message}
     />
   );
 }
-it("preserves wide signed tokens, row currencies, zero and absent diagnostics without summing or rounding", async () => {
-  const json = `{"instrument_id":"EXACT","discount_curve_id":"USD-OIS","currency":"USD","model":"discounting","as_of":"2025-01-01","total_pv":9007199254740993.123456789,"reconciles_with_base_value":false,"flows":[{"date":"2026-01-01","kind":"fixed","currency":"EUR","amount":-9007199254740993.123456789,"accrual_factor":0,"year_fraction":1.00000000000000001,"discount_factor":0,"discount_curve_id":"EUR-OIS","native_pv":0,"pv":0,"rate":0,"survival_probability":0}]}`;
-  suppliedExport(json);
+it("presents returned numbers, row currencies, zero and absent diagnostics without summing or rounding", async () => {
+  const cashflows = {
+    instrument_id: "EXACT",
+    discount_curve_id: "USD-OIS",
+    currency: "USD",
+    model: "discounting",
+    as_of: "2025-01-01",
+    total_pv: 1234567.125,
+    reconciles_with_base_value: false,
+    flows: [
+      {
+        date: "2026-01-01",
+        kind: "fixed",
+        currency: "EUR",
+        amount: -1e-7,
+        accrual_factor: 0,
+        year_fraction: 1.0000000000000002,
+        discount_factor: 0,
+        discount_curve_id: "EUR-OIS",
+        native_pv: 0,
+        pv: 0,
+        rate: null,
+        survival_probability: 0,
+      },
+    ],
+  };
+  suppliedExport(cashflows);
   const table = await screen.findByRole("table", { name: "Cashflow schedule" });
-  expect(
-    within(table).getByTitle("-9007199254740993.123456789").textContent,
-  ).toBe("EUR -9,007,199,254,740,993.123456789");
-  expect(
-    within(table).getByTitle("9007199254740993.123456789").textContent,
-  ).toBe("USD 9,007,199,254,740,993.123456789");
-  expect(within(table).getByTitle("1.00000000000000001").textContent).toBe(
-    "1.00000000000000001",
+  expect(within(table).getByTitle("-1e-7").textContent).toBe("EUR -0.0000001");
+  expect(within(table).getByTitle("1234567.125").textContent).toBe(
+    "USD 1,234,567.125",
   );
+  expect(within(table).getByTitle("1.0000000000000002").textContent).toBe(
+    "1.0000000000000002",
+  );
+  // A null optional is absent: no Rate column when no row carries one.
+  expect(
+    within(table).queryByRole("columnheader", { name: "Rate" }),
+  ).toBeNull();
   expect(
     within(table).getByRole("columnheader", { name: "PV · USD" }),
   ).toBeTruthy();
@@ -244,13 +273,18 @@ it("preserves wide signed tokens, row currencies, zero and absent diagnostics wi
   expect(screen.getByText("Not reconciled to base value")).toBeTruthy();
   const totalRow = table.querySelector("tfoot tr")!;
   expect(totalRow.children).toHaveLength(4);
-  expect(totalRow.children[2].textContent).toBe(
-    "USD 9,007,199,254,740,993.123456789",
-  );
+  expect(totalRow.children[2].textContent).toBe("USD 1,234,567.125");
   expect(totalRow.children[3].textContent).toBe("");
+  fireEvent.click(screen.getByText("Envelope JSON", { exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+  await waitFor(() =>
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
+      serializeHost(cashflows),
+    ),
+  );
 });
 it("keeps the schedule a named keyboard stop inside its scroll container", async () => {
-  suppliedExport(fixture.cases[0].cashflows!);
+  suppliedExport(fixture.cases[0].cashflows);
   // Wide schedules overflow narrow viewports; focusing the table lets arrow
   // keys scroll the stock table container around it.
   const table = await screen.findByRole("table", { name: "Cashflow schedule" });
@@ -258,33 +292,35 @@ it("keeps the schedule a named keyboard stop inside its scroll container", async
   expect(table.parentElement!.dataset.slot).toBe("table-container");
 });
 it("omits absent optional columns and retains zero total for an empty native schedule", async () => {
-  const envelope = JSON.parse(fixture.cases[0].cashflows!);
-  envelope.flows = [];
-  envelope.total_pv = 0;
-  suppliedExport(JSON.stringify(envelope));
+  suppliedExport({ ...fixture.cases[0].cashflows, flows: [], total_pv: 0 });
   await screen.findByText("No cashflows returned.");
   expect(screen.queryByRole("table")).toBeNull();
   expect(screen.getByText("Total PV · USD 0")).toBeTruthy();
 });
+const { discount_curve_id: _omitted, ...withoutCurve } =
+  fixture.cases[0].cashflows!;
 it.each([
-  "not JSON",
-  fixture.cases[0].cashflows!.replace(/,"discount_curve_id":"[^"]+"/, ""),
-  '{"flows":[]}',
-  fixture.cases[0].cashflows!.replace(
-    '"amount":-1000000',
-    '"amount":"-1000000"',
-  ),
+  withoutCurve,
+  { flows: [] },
+  {
+    ...fixture.cases[0].cashflows,
+    flows: fixture.cases[0].cashflows!.flows.map((row, index) =>
+      index === 0 ? { ...row, amount: String(row.amount) } : row,
+    ),
+  },
 ])(
-  "rejects malformed/unsupported envelopes visibly and preserves the source",
-  async (text) => {
-    suppliedExport(text);
+  "rejects malformed/unsupported envelopes visibly and still serializes the supplied object",
+  async (cashflows) => {
+    suppliedExport(cashflows);
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/^Cashflow table unavailable:/);
     expect(screen.queryByRole("table")).toBeNull();
-    fireEvent.click(screen.getByText("Original JSON", { exact: true }));
+    fireEvent.click(screen.getByText("Envelope JSON", { exact: true }));
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() =>
-      expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(text),
+      expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
+        serializeHost(cashflows),
+      ),
     );
   },
 );

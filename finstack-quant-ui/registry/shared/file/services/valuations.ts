@@ -53,13 +53,11 @@ export function createValuationsService(
         const instrument = instruments.validateInstrumentJson(
           request.instrumentJson,
         );
-        return JSON.stringify(
-          instruments.instrumentCashflowsWithMarket(
-            instrument,
-            context.market(request.marketJson).handle,
-            request.asOf,
-            resolveModel(request.model),
-          ),
+        return instruments.instrumentCashflowsWithMarket(
+          instrument,
+          context.market(request.marketJson).handle,
+          request.asOf,
+          resolveModel(request.model),
         );
       });
     },

@@ -59,13 +59,11 @@ const cases = inputs.map(({ type, request }) => {
   let cashflows = null,
     error = null;
   try {
-    cashflows = JSON.stringify(
-      native.instrumentCashflows(
-        request.instrumentJson,
-        request.marketJson,
-        request.asOf,
-        request.model,
-      ),
+    cashflows = native.instrumentCashflows(
+      request.instrumentJson,
+      request.marketJson,
+      request.asOf,
+      request.model,
     );
   } catch (failure) {
     error = failure.message;
@@ -84,7 +82,7 @@ await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({
     description:
-      "Serialized native cashflow envelopes; no inferred row schema or financial reconciliation.",
+      "Native cashflow envelope objects; no inferred row schema or financial reconciliation.",
     sources,
     cases,
   }),

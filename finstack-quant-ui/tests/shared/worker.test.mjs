@@ -120,14 +120,12 @@ it("compares real worker results and errors with the direct native facade", asyn
   const exported = unwrap(await proxy.exportResult(stochastic));
   expect(exported).toContain(`"seed":${stochastic.details.data.seed}`);
   const cashflows = unwrap(await proxy.cashflows(requests.bond));
-  expect(cashflows).toBe(
-    JSON.stringify(
-      native.instrumentCashflows(
-        requests.bond.instrumentJson,
-        requests.bond.marketJson,
-        requests.bond.asOf,
-        requests.bond.model,
-      ),
+  expect(cashflows).toEqual(
+    native.instrumentCashflows(
+      requests.bond.instrumentJson,
+      requests.bond.marketJson,
+      requests.bond.asOf,
+      requests.bond.model,
     ),
   );
 });
@@ -335,13 +333,11 @@ it("keeps native instrument and override validation ahead of market errors", asy
   const bad = { ...requests.bond, instrumentJson: "{", marketJson: "{" };
   let error;
   try {
-    JSON.stringify(
-      native.instrumentCashflows(
-        bad.instrumentJson,
-        bad.marketJson,
-        bad.asOf,
-        bad.model,
-      ),
+    native.instrumentCashflows(
+      bad.instrumentJson,
+      bad.marketJson,
+      bad.asOf,
+      bad.model,
     );
   } catch (e) {
     error = errorValue(e);

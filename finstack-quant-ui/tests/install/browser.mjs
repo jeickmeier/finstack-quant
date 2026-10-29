@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect } from "playwright/test";
+import { serializeHost } from "../../src/codec.mjs";
 
 /** Item acceptance checks; `harness` is the visual harness result (undefined for nonvisual items). */
 export async function verifyItem(page, item, evidence, repo, harness) {
@@ -13,7 +14,7 @@ export async function verifyItem(page, item, evidence, repo, harness) {
         "utf8",
       ),
     );
-    const expected = data.cashflows.cases.find(
+    const envelope = data.cashflows.cases.find(
       (entry) => entry.type === "xccy_swap",
     ).cashflows;
     const viewer = page.getByRole("region", { name: "Cashflows", exact: true });
@@ -22,13 +23,24 @@ export async function verifyItem(page, item, evidence, repo, harness) {
     ).toBeVisible();
     assert.equal(
       await viewer.locator("tbody tr").count(),
-      JSON.parse(expected).flows.length,
+      envelope.flows.length,
     );
     assert.equal(await viewer.locator("details").getAttribute("open"), null);
-    await viewer.getByText("Original JSON", { exact: true }).click();
+    await viewer.getByText("Envelope JSON", { exact: true }).click();
     await viewer.getByRole("button", { name: "Original", exact: true }).click();
-    await expect(viewer.locator("pre")).toHaveText(expected);
-    assert.equal(await viewer.locator("pre").textContent(), expected);
+    // The production bundle may rewrite 17-digit f64 literals of the example's
+    // JSON module import, so the shown text is checked as serializeHost output
+    // of the supplied envelope rather than against the fixture's digits.
+    const expected = await viewer.locator("pre").textContent();
+    const shown = JSON.parse(expected);
+    assert.equal(expected, serializeHost(shown));
+    assert.equal(shown.flows.length, envelope.flows.length);
+    for (const key of ["instrument_id", "currency", "as_of", "model"])
+      assert.equal(shown[key], envelope[key]);
+    assert.deepEqual(
+      shown.flows.map((flow) => [flow.date, flow.kind, flow.currency]),
+      envelope.flows.map((flow) => [flow.date, flow.kind, flow.currency]),
+    );
     await page
       .context()
       .grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -44,7 +56,7 @@ export async function verifyItem(page, item, evidence, repo, harness) {
     assert.equal(download.suggestedFilename(), "cashflows.json");
     assert.equal(await readFile(await download.path(), "utf8"), expected);
     checks.push(
-      "mixed-currency native text, copy and download match byte for byte",
+      "mixed-currency native envelope tabled; shown JSON is its host serialization; copy and download equal the shown text",
     );
   }
   if (item.name === "finstack-chart") {

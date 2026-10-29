@@ -176,35 +176,28 @@ it("tests u64::MAX as a transport boundary on an actual result, not a repricing 
     ),
   ).toThrow();
 });
-it("transports original bond and mixed-currency cashflow text byte for byte", () => {
+it("transports bond and mixed-currency cashflow envelopes through structured clone", () => {
   for (const instrument of [bond, fxSwap]) {
-    const text = JSON.stringify(
-      valuations.instruments.instrumentCashflows(
-        JSON.stringify(instrument),
-        JSON.stringify(instrument === bond ? creditMarket : market),
-        instrument === bond ? "2025-01-01" : "2024-01-01",
-        "discounting",
-      ),
+    const envelope = valuations.instruments.instrumentCashflows(
+      JSON.stringify(instrument),
+      JSON.stringify(instrument === bond ? creditMarket : market),
+      instrument === bond ? "2025-01-01" : "2024-01-01",
+      "discounting",
     );
-    expect(typeof text).toBe("string");
-    expect(Buffer.from(structuredClone({ text }).text)).toEqual(
-      Buffer.from(text),
-    );
+    expect(typeof envelope).toBe("object");
+    expect(structuredClone(envelope)).toEqual(envelope);
     if (instrument === fxSwap) {
-      // Test evidence only: production views retain the opaque text.
-      expect(
-        new Set(JSON.parse(text).flows.map((flow) => flow.currency)),
-      ).toEqual(new Set(["EUR", "USD"]));
+      expect(new Set(envelope.flows.map((flow) => flow.currency))).toEqual(
+        new Set(["EUR", "USD"]),
+      );
     }
   }
   expect(() =>
-    JSON.stringify(
-      valuations.instruments.instrumentCashflows(
-        JSON.stringify(fxSwap),
-        JSON.stringify(market),
-        "2024-01-01",
-        "invalid",
-      ),
+    valuations.instruments.instrumentCashflows(
+      JSON.stringify(fxSwap),
+      JSON.stringify(market),
+      "2024-01-01",
+      "invalid",
     ),
   ).toThrow();
 });
