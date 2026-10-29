@@ -9,6 +9,8 @@ export type PortfolioNative = {
     | "aggregateMetrics"
     | "portfolioMetricsSeries"
     | "parsePortfolioSpecJson"
+    | "scenarioPnlBatch"
+    | "applyScenarioAndRevalue"
   >;
 };
 /** PortfolioApi over the portfolio facade namespace and the shared handle caches. */
@@ -48,6 +50,34 @@ export function createPortfolioService(
         // built handle is retained for the valuation that usually follows.
         const canonical = native.portfolio.parsePortfolioSpecJson(specJson);
         return context.portfolio(canonical).json;
+      });
+    },
+    scenarioPnlBatch(request) {
+      return context.result(() => {
+        const book = context.portfolio(request.specJson).handle;
+        const market = context.market(request.marketJson).handle;
+        // The scenario texts are joined into one JSON array; none is parsed here.
+        const items = native.portfolio.scenarioPnlBatch(
+          book,
+          `[${request.scenarioJsons.join(",")}]`,
+          market,
+        );
+        return { positionIds: book.positionIds, items };
+      });
+    },
+    applyScenarioAndRevalue(request) {
+      return context.result(() => {
+        const book = context.portfolio(request.specJson).handle;
+        const market = context.market(request.marketJson).handle;
+        return {
+          positionIds: book.positionIds,
+          entityIds: book.entityIds,
+          view: native.portfolio.applyScenarioAndRevalue(
+            book,
+            request.scenarioJson,
+            market,
+          ),
+        };
       });
     },
   };

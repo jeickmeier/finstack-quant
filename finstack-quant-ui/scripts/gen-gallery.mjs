@@ -39,6 +39,7 @@ const sources = {
   credit: "tests/models/credit/migration.json",
   simm: "src/fixtures/margin/simm.json",
   portfolioValuation: "tests/portfolio/gallery.json",
+  scenarioPnl: "tests/portfolio/scenario-pnl.json",
   details: "tests/valuations/details/cases.json",
   irsInstrument:
     "../finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",

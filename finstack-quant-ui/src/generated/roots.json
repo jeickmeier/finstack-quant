@@ -435,6 +435,16 @@
     "schema": "schemas/portfolio_result.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+    "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+    "schema": "schemas/scenario_pnl_batch_item.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json",
+    "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_revalue_view.schema.json",
+    "schema": "schemas/scenario_revalue_view.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
     "source": "finstack-quant/valuations/schemas/results/1/instrument_cashflow.schema.json",
     "schema": "schemas/instrument_cashflow.json"

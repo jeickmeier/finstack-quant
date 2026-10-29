@@ -754,6 +754,21 @@ open owner decision, so no sort is applied. Native fixtures (the gallery bond
 and swap book over the pricing market, and the host-parity deposit book) live
 in `tests/portfolio/`.
 
+`useScenarioPnlBatch` (`@finstack/use-scenario-pnl-batch`) calls
+`portfolio.scenarioPnlBatch` over the same cached handles with the
+`ScenarioSpec` texts joined into one JSON array (never parsed in TypeScript):
+Rust values the base once, then each scenario, and returns one
+`ScenarioPnlBatchItem` per scenario in input order with the book's
+`positionIds`. A batch fails whole with the earliest failing scenario's error.
+`useApplyScenarioAndRevalue` returns `applyScenarioAndRevalue`'s stressed
+valuation and report with the book's id orders, for `PortfolioSummary` and
+`PositionsTable`. The display-only `ScenarioPnlTable` shows positions (spec
+order) by scenarios (batch order) as returned, a total row from each
+scenario's returned `pnl.total`, a bar chart of those totals and each
+scenario's report; nothing is summed. Its fixture
+(`tests/portfolio/scenario-pnl.json`, the host-parity book under the parity
+scenarios) matches the batch the Py/WASM parity tests pin.
+
 ## Returned rating migration
 
 `useMigrationMatrix` (`@finstack/use-migration-matrix`) builds a

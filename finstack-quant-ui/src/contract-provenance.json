@@ -1781,6 +1781,46 @@
       }
     },
     {
+      "id": "scenario-pnl-table",
+      "route": "returned-pnl",
+      "convention": "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",
+      "api": {
+        "name": "portfolio.scenarioPnlBatch",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "scenarioPnlBatch",
+        "inputs": [
+          {
+            "name": "portfolio",
+            "type": "Portfolio",
+            "optional": false
+          },
+          {
+            "name": "scenarios",
+            "type": "ScenarioSpec[] | string",
+            "optional": false
+          },
+          {
+            "name": "market",
+            "type": "MarketContext",
+            "optional": false
+          }
+        ],
+        "returns": "ScenarioPnlBatchItem[]",
+        "declaration": "/**\n   * Compute ordered portfolio P&L for a batch of scenarios.\n   *\n   * The Rust batch engine values the unstressed base leg once for the whole\n   * request, then applies and revalues each scenario independently. Returns one\n   * `ScenarioPnlBatchItem` (`scenario_id`, `pnl`, `report`) per input scenario,\n   * in input order; an empty batch returns `[]` without a valuation.\n   * @param portfolio - Built portfolio valued for the shared base and every scenario.\n   * @param scenarios - Array of `ScenarioSpec` objects, or its JSON.\n   * @param market - `core.MarketContext` handle holding the unshocked market snapshot.\n   * @returns The ordered `ScenarioPnlBatchItem` array.\n   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `scenarios` is not a JSON string or array, and a `FinstackError` if a scenario is malformed or inconsistent (kind `validation`), or scenario application, valuation or base-currency differencing fails; the error is the earliest failing scenario's.\n   */\n  scenarioPnlBatch(\n    portfolio: Portfolio,\n    scenarios: ScenarioSpec[] | string,\n    market: MarketContext\n  ): ScenarioPnlBatchItem[];",
+        "sha256": "baebdac14e1f8705e39ecc5ec67e0720c37806ccb1c2cd0355a5748144695c5e"
+      },
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+          "sha256": "978246566c98e933f3a7e24fde106b675f8bfc71fbc00418ababb92e13ce228f",
+          "description": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`."
+        }
+      ]
+    },
+    {
       "id": "transition-matrix-heatmap",
       "route": "returned-model",
       "convention": "Returned models.credit.migration results: TransitionMatrix rows and default probabilities in RatingScale order, the GeneratorMatrix rows with its roundTripError and regularizationL1, and the default probabilities of project(generator, t) per requested horizon. Decimals as returned; an omitted round-trip tolerance is left to Rust. Heatmap colour domains are presentation only: [0, 1] for probabilities, the intensities' extent (centred on zero) for the generator.",

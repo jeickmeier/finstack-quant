@@ -146,6 +146,20 @@ export const importHarnesses = {
       name: "use-portfolio-spec-validator",
       modules: modules.length,
     })),
+  "use-scenario-pnl-batch": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-scenario-pnl-batch/use-scenario-pnl-batch"),
+    ]).then((modules) => ({
+      name: "use-scenario-pnl-batch",
+      modules: modules.length,
+    })),
+  "use-apply-scenario-and-revalue": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-apply-scenario-and-revalue/use-apply-scenario-and-revalue"),
+    ]).then((modules) => ({
+      name: "use-apply-scenario-and-revalue",
+      modules: modules.length,
+    })),
   "use-simm-im": () =>
     Promise.all([import("@/hooks/margin/use-simm-im/use-simm-im")]).then(
       (modules) => ({ name: "use-simm-im", modules: modules.length }),
@@ -1236,6 +1250,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/portfolio_result"),
     ]).then((modules) => ({
       name: "contract-portfolio-result",
+      modules: modules.length,
+    })),
+  "contract-scenario-pnl-batch-item": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_pnl_batch_item.json"),
+      import("@/lib/finstack/generated/types/scenario_pnl_batch_item"),
+      import("@/lib/finstack/generated/meta/scenario_pnl_batch_item"),
+    ]).then((modules) => ({
+      name: "contract-scenario-pnl-batch-item",
+      modules: modules.length,
+    })),
+  "contract-scenario-revalue-view": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_revalue_view.json"),
+      import("@/lib/finstack/generated/types/scenario_revalue_view"),
+      import("@/lib/finstack/generated/meta/scenario_revalue_view"),
+    ]).then((modules) => ({
+      name: "contract-scenario-revalue-view",
       modules: modules.length,
     })),
   "contract-instrument-cashflow": () =>
