@@ -627,6 +627,41 @@ it(
       { timeout: budget(5000) },
     );
     expect(prices()).toHaveLength(1);
+    // The ScenarioGrid editor is seeded from the host grid; an edit runs only on submit.
+    // Queries stay inside the disclosure: the whole workbench DOM is large.
+    const panel = within(toggle.closest("details")!);
+    const cpr = panel.getByLabelText(/^cprs 2$/i) as HTMLInputElement;
+    expect(Number(cpr.value)).toBe(scenarioCases.grid.cprs[1]);
+    fireEvent.change(cpr, { target: { value: "0.1" } });
+    const run = panel.getByRole("button", {
+      name: "Run scenarios",
+    }) as HTMLButtonElement;
+    await waitFor(() => expect(run.disabled).toBe(false), {
+      timeout: budget(5000),
+    });
+    const tables = () =>
+      call.mock.calls.filter(([method]) => method === "scenarioTable");
+    expect(tables()).toHaveLength(1);
+    fireEvent.click(run);
+    await waitFor(() => expect(tables()).toHaveLength(2), {
+      timeout: budget(5000),
+    });
+    const edited = tables()[1]![1];
+    expect({ ...edited, gridJson: undefined }).toEqual({
+      ...invocation,
+      gridJson: undefined,
+    });
+    expect(JSON.parse(edited.gridJson)).toEqual({
+      ...scenarioCases.grid,
+      cprs: [scenarioCases.grid.cprs[0], 0.1, scenarioCases.grid.cprs[2]],
+    });
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector('[aria-label="CLONOTES-A scenario prices"]'),
+        ).toBeTruthy(),
+      { timeout: budget(5000) },
+    );
   },
   budget(30000),
 );

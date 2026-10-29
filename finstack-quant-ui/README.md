@@ -630,7 +630,12 @@ discount margin waits for one, and OAS runs only through `onSolveOas`.
 `use-tranche-analytics` holds the four query option builders and hooks
 (`TrancheRequest` plus an optional metrics price and metric ids, or a required
 `marketPricePct` for OAS and discount margin); the worker loads the deal once
-per call and frees it, and OAS uses Rust's default `OasConfig`. The workbench
+per call and frees it. OAS takes an optional complete `OasConfig` JSON
+(`configJson`) and otherwise uses Rust's default; with `onOasConfigChange` the
+component shows an OAS configuration disclosure over the generated
+`contract-oas-config`, seeded from its Rust example (`OasConfig::default()`,
+since the type carries no per-field schema defaults), and hands the applied
+JSON to the host. The workbench
 mounts it above the scenario prices for the configured `scenario.trancheId`,
 valuing `scenario.trancheMetrics` registry metric ids on the note. Native
 fixtures (fixed-rate `CLONOTES-A` and the floating `SENIOR` note of the CLO
@@ -688,6 +693,9 @@ and the repaired line appears only when `repairIterations` is supplied; neither
 is defaulted, and without `slice` no slice is shown. Without
 options, the market browser retains exact stored data. Scenario prices are fetched
 only when the detail panel is opened for a completed structured-credit request.
+The panel edits the native `ScenarioGrid` (`contract-scenario-grid`) seeded from
+`scenario.gridJson`: the supplied grid runs as given, an edited grid runs only on
+**Run scenarios**, and Rust validates the axis values and the cell cap.
 `calibrationChartOptions` forwards existing figure annotations, export refs and
 interaction callbacks; the workbench owns the shared report/chart selection.
 

@@ -257,6 +257,10 @@ test("structured-credit scenario prices use the completed native request", async
     String(scenarios.cases[0]!.table.cells[0]!.price),
   );
   await expect(scenario).toContainText("trancheScenarioTable");
+  // The native ScenarioGrid editor is seeded from the host grid.
+  await expect(
+    results.getByRole("button", { name: "Run scenarios" }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -294,6 +298,7 @@ test("structured-credit tranche analytics take no default price and solve OAS on
   ).toContainText("is fixed-rate");
   const oas = tranche.getByRole("region", { name: "Option-adjusted spread" });
   await expect(oas).toContainText("OAS runs on request");
+  await expect(oas.getByText("OAS configuration")).toBeVisible();
   await tranche.getByRole("button", { name: "Solve OAS" }).click();
   await expect(oas).toContainText("Num paths");
   await expect(oas).toContainText(

@@ -62,6 +62,11 @@ export interface TrancheMetricsRequest extends TrancheRequest {
 export interface TranchePriceRequest extends TrancheRequest {
   readonly marketPricePct: number;
 }
+/** A tranche OAS solve; an omitted configuration is left to Rust's default OasConfig. */
+export interface TrancheOasRequest extends TranchePriceRequest {
+  /** Complete native OasConfig JSON. */
+  readonly configJson?: string | null;
+}
 export interface CashflowRequest {
   readonly instrumentJson: string;
   readonly marketJson: string;
@@ -248,8 +253,8 @@ export interface ValuationsApi {
   trancheMetrics(
     request: TrancheMetricsRequest,
   ): Promise<Envelope<TrancheMetrics>>;
-  /** valuations.instruments.StructuredCredit.fromJson + trancheOas under Rust's default OasConfig. */
-  trancheOas(request: TranchePriceRequest): Promise<Envelope<OasResult>>;
+  /** valuations.instruments.StructuredCredit.fromJson + trancheOas under the supplied OasConfig, else Rust's default. */
+  trancheOas(request: TrancheOasRequest): Promise<Envelope<OasResult>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheDiscountMargin: decimal discount margin of a floating-rate tranche. */
   trancheDiscountMargin(
     request: TranchePriceRequest,

@@ -7,11 +7,13 @@ import {
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type {
   TrancheMetricsRequest,
+  TrancheOasRequest,
   TranchePriceRequest,
   TrancheRequest,
 } from "@/workers/finstack-contract";
 export type {
   TrancheMetricsRequest,
+  TrancheOasRequest,
   TranchePriceRequest,
   TrancheRequest,
 } from "@/workers/finstack-contract";
@@ -30,11 +32,11 @@ export function trancheMetricsOptions(
     queryFn: (ready) => ready.call("trancheMetrics", snapshot!),
   });
 }
-/** Snapshot the deal, tranche, market, date and explicit price. Null disables the solve. */
+/** Snapshot the deal, tranche, market, date, explicit price and optional OasConfig. Null disables the solve. */
 export function trancheOasOptions(
   client: FinstackClient | null,
   session: number,
-  request: TranchePriceRequest | null,
+  request: TrancheOasRequest | null,
 ) {
   const { snapshot, key } = requestSnapshot(request);
   return workerQueryOptions({
@@ -84,8 +86,8 @@ export function useTrancheMetrics(request: TrancheMetricsRequest | null) {
     enabled: worker.status === "ready" && request !== null,
   }));
 }
-/** Native OasResult under Rust's default OasConfig; pass null until the user asks for the solve. */
-export function useTrancheOas(request: TranchePriceRequest | null) {
+/** Native OasResult under the supplied OasConfig, else Rust's default; pass null until the user asks for the solve. */
+export function useTrancheOas(request: TrancheOasRequest | null) {
   return useWorkerQuery((worker) => ({
     ...trancheOasOptions(worker.client, worker.session, request),
     enabled: worker.status === "ready" && request !== null,

@@ -7,6 +7,8 @@ import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { MeasureValue } from "@/components/finstack/valuations/primitives/measure-value/measure-value";
+import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
+import { oasConfigModule } from "./oas-config";
 
 /** One native result tile: its value, its own native error, or a pending state. */
 export interface TrancheTile<T> {
@@ -160,15 +162,22 @@ export interface TrancheAnalyticsProps {
   breakevenCdr: TrancheTile<number>;
   /** Native trancheDiscountMargin result at the price (decimal). */
   discountMargin: TrancheTile<number>;
-  /** Native trancheOas result at the price under Rust's default OasConfig. */
+  /** Native trancheOas result at the price, under the applied OasConfig or Rust's default. */
   oas: TrancheTile<OasResult>;
   /** Request the OAS solve; omit when the host supplies the result. */
   onSolveOas?: () => void;
+  /**
+   * Receives complete OasConfig JSON when the OAS configuration form is applied.
+   * The form starts from the schema's Rust example (`OasConfig::default()`); omit
+   * this to hide the form and leave the configuration to the host.
+   */
+  onOasConfigChange?: (json: string) => void;
   density?: "compact" | "comfortable";
 }
 /**
  * Presents one structured-credit tranche's native analytics: TrancheMetrics,
- * break-even CDR, discount margin and OAS, each with its own native error.
+ * break-even CDR, discount margin and OAS, each with its own native error, and
+ * optionally an editor for the native OasConfig.
  * Units are the ones each Rust field documents; nothing is computed, rescaled
  * or defaulted here, and no price is assumed.
  */
@@ -181,6 +190,7 @@ export function TrancheAnalytics({
   discountMargin,
   oas,
   onSolveOas,
+  onOasConfigChange,
   density,
 }: TrancheAnalyticsProps) {
   const noPrice = price.trim() === "";
@@ -262,6 +272,23 @@ export function TrancheAnalytics({
               >
                 Solve OAS
               </Button>
+            )}
+            {onOasConfigChange && (
+              <details className="text-sm">
+                <summary>OAS configuration</summary>
+                <p className="text-xs text-muted-foreground">
+                  Starts from Rust&apos;s default OasConfig; applied to the next
+                  solve.
+                </p>
+                <SchemaForm
+                  module={oasConfigModule}
+                  layout="full"
+                  submitLabel="Apply configuration"
+                  submitVariant="outline"
+                  validate={async (json) => json}
+                  onSubmit={onOasConfigChange}
+                />
+              </details>
             )}
             <TileState
               tile={oas}

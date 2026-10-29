@@ -242,6 +242,24 @@ export const importHarnesses = {
       name: "contract-calibration",
       modules: modules.length,
     })),
+  "contract-oas-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/oas_config.json"),
+      import("@/lib/finstack/generated/types/oas_config"),
+      import("@/lib/finstack/generated/meta/oas_config"),
+    ]).then((modules) => ({
+      name: "contract-oas-config",
+      modules: modules.length,
+    })),
+  "contract-scenario-grid": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_grid.json"),
+      import("@/lib/finstack/generated/types/scenario_grid"),
+      import("@/lib/finstack/generated/meta/scenario_grid"),
+    ]).then((modules) => ({
+      name: "contract-scenario-grid",
+      modules: modules.length,
+    })),
   "contract-commodity-asian-option": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/commodity_asian_option.json"),

@@ -21,6 +21,9 @@ export function Example({ density = "compact" }: ExampleProps) {
       breakevenCdr={{ value: results.breakevenCdr.value as number }}
       discountMargin={{ value: results.discountMargin.value as number }}
       oas={{ value: results.oas.value as OasResult }}
+      // Shows the OasConfig disclosure; the captured OAS used Rust's default,
+      // so this static example discards an applied configuration.
+      onOasConfigChange={() => {}}
       density={density}
     />
   );

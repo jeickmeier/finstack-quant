@@ -11,6 +11,8 @@ import {
 import { createRequire } from "node:module";
 import type { OasResult, TrancheMetrics } from "finstack-quant-wasm";
 import fixture from "./scenario-table/tranche-analytics.json";
+import { budget } from "../shared/budget";
+import oasConfigSchema from "../../src/generated/schemas/oas_config.json";
 import { TrancheAnalytics } from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
 import { TranchePanel } from "@/components/finstack/valuations/blocks/pricing-workbench/tranche-panel";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
@@ -28,6 +30,7 @@ const byName = (name: string) =>
     results: Record<string, { value?: unknown; error?: { message: string } }>;
   };
 const floating = byName("floating");
+const oasDefault = oasConfigSchema.examples[0];
 const fixed = byName("fixed");
 let call: ReturnType<typeof vi.fn>;
 beforeEach(() => {
@@ -49,7 +52,7 @@ beforeEach(() => {
         case "trancheDiscountMargin":
           return native.trancheDiscountMargin(...head, arg.marketPricePct);
         case "trancheOas":
-          return native.trancheOas(...head, arg.marketPricePct);
+          return native.trancheOas(...head, arg.marketPricePct, arg.configJson);
         default:
           throw new Error(`Unexpected worker call: ${method}`);
       }
@@ -222,4 +225,56 @@ it("assumes no price: metrics use Rust's target, discount margin waits for a pri
   });
   await waitFor(() => expect(oas.textContent).toContain("OAS runs on request"));
   expect(calls("trancheOas")).toHaveLength(1);
+});
+
+it("solves OAS under an applied OasConfig that starts from Rust's default", async () => {
+  render(
+    <FinstackQueryProvider>
+      <TranchePanel request={request(fixed)} metrics={fixed.metrics} />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("table", { name: "CLONOTES-A tranche metrics" });
+  fireEvent.change(screen.getByLabelText("Clean price"), {
+    target: { value: "100" },
+  });
+  const oas = screen.getByRole("region", { name: "Option-adjusted spread" });
+  // Untouched, the solve omits the configuration and Rust uses its default.
+  fireEvent.click(within(oas).getByRole("button", { name: "Solve OAS" }));
+  await within(oas).findByText(
+    "Num paths",
+    { selector: "dt" },
+    { timeout: budget(10000) },
+  );
+  expect(calls("trancheOas")).toEqual([
+    { ...request(fixed), marketPricePct: 100 },
+  ]);
+  const paths = within(oas).getByLabelText("Num paths") as HTMLInputElement;
+  // The form shows the schema's Rust example, OasConfig::default().
+  expect(paths.value).toBe("256");
+  fireEvent.change(paths, { target: { value: "8" } });
+  const apply = within(oas).getByRole("button", {
+    name: "Apply configuration",
+  }) as HTMLButtonElement;
+  // Apply waits for the (structural) validation of the edit to settle.
+  await waitFor(() => expect(apply.disabled).toBe(false), {
+    timeout: budget(5000),
+  });
+  fireEvent.click(apply);
+  // An applied configuration hides the default-config result and runs nothing.
+  await waitFor(() => expect(oas.textContent).toContain("OAS runs on request"));
+  expect(calls("trancheOas")).toHaveLength(1);
+  fireEvent.click(within(oas).getByRole("button", { name: "Solve OAS" }));
+  await waitFor(() => expect(calls("trancheOas")).toHaveLength(2));
+  const sent = calls("trancheOas")[1];
+  expect(sent.marketPricePct).toBe(100);
+  expect(JSON.parse(sent.configJson)).toEqual({
+    ...(oasDefault as Record<string, unknown>),
+    num_paths: 8,
+  });
+  const solved = await within(oas).findByText(
+    "Num paths",
+    { selector: "dt" },
+    { timeout: budget(10000) },
+  );
+  expect(solved.nextElementSibling!.textContent).toContain("8");
 });

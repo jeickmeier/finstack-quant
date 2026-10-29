@@ -134,6 +134,26 @@ describe("discovered canonical fixtures", () => {
     expect(diffs).toHaveLength(2);
     for (const diff of diffs) expect(validator.parse(diff)).toEqual(diff);
   });
+  it("accepts the native scenario-table fixture grid under the generated ScenarioGrid schema unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const schema = JSON.parse(
+      await readFile(resolve(generated, "schemas/scenario_grid.json"), "utf8"),
+    );
+    const cases = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
+        ),
+        "utf8",
+      ),
+    );
+    const validator = z.fromJSONSchema(converterSchema(schema));
+    expect(validator.parse(cases.grid)).toEqual(cases.grid);
+    expect(validator.safeParse({ ...cases.grid, cpr: [0.1] }).success).toBe(
+      false,
+    );
+  });
   it("round-trips the analyst check suite through the generated CheckSuiteSpec codec", async () => {
     const text = await readFile(
       resolve(
