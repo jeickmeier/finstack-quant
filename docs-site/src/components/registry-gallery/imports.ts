@@ -114,6 +114,14 @@ export const importHarnesses = {
       name: "use-cube-samples",
       modules: modules.length,
     })),
+  "use-cube-slice": () =>
+    Promise.all([import("@/hooks/models/use-cube-slice/use-cube-slice")]).then(
+      (modules) => ({ name: "use-cube-slice", modules: modules.length }),
+    ),
+  "use-cube-smile": () =>
+    Promise.all([import("@/hooks/models/use-cube-smile/use-cube-smile")]).then(
+      (modules) => ({ name: "use-cube-smile", modules: modules.length }),
+    ),
   "use-evaluate-statement": () =>
     Promise.all([
       import("@/hooks/statements/use-evaluate-statement/use-evaluate-statement"),

@@ -119,6 +119,18 @@ test("fx strike grid", async ({ page }) => {
   ).toBeVisible();
   await expect(grid).toHaveScreenshot("fx-strike-grid.png");
 });
+test("cube node smile", async ({ page }) => {
+  const item = await open(page, "vol-cube-slice", "light", "comfortable");
+  // The four item baselines stop at the preview's scroll height, above the smile.
+  const smile = item.getByRole("region", {
+    name: "USD-SWAPTION-NORMAL-VOL node smile",
+    exact: true,
+  });
+  await expect(
+    smile.getByRole("table", { name: "Node smile values" }),
+  ).toBeVisible();
+  await expect(smile).toHaveScreenshot("cube-node-smile.png");
+});
 test("every nonvisual item imports without initializing WASM", async ({
   page,
 }) => {

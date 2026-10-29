@@ -16,9 +16,11 @@ import type {
   DependencyTree,
   CheckReport,
   CalendarYearLadderRow,
+  ArbitrageValidationResult,
   statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
+import type { core as wire } from "finstack-quant-wasm/types";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
 export interface PriceRequest {
   readonly instrumentJson: string;
@@ -162,7 +164,9 @@ export interface FxStrikeSurfaceRequest {
   readonly foreignRate: number;
 }
 /** Canonical stored-surface JSON of a native VolSurface (`toJson`). */
-export type FxStrikeSurface = MarketContextStateWire["surfaces"][number];
+export type StoredSurfaceWire = MarketContextStateWire["surfaces"][number];
+/** Canonical stored-surface JSON of the materialized FX strike grid. */
+export type FxStrikeSurface = StoredSurfaceWire;
 export interface CubeSampleRequest {
   readonly cube: MarketContextStateWire["vol_cubes"][number];
   readonly coordinates: readonly {
@@ -171,6 +175,46 @@ export interface CubeSampleRequest {
     strike: number;
   }[];
   readonly convention: "normal" | "black_lognormal";
+}
+/** One materialized slice of a SABR cube at explicit strikes; off-node values are Rust-interpolated. */
+export interface CubeSliceRequest {
+  readonly cube: MarketContextStateWire["vol_cubes"][number];
+  /** "tenor" fixes the underlying tenor (expiry by strike grid); "expiry" fixes the option expiry (tenor by strike grid). */
+  readonly axis: "tenor" | "expiry";
+  /** Fixed tenor or expiry in years, within the cube grid. */
+  readonly at: number;
+  /** Absolute strikes in the stored forwards' rate units; Rust requires them strictly increasing. */
+  readonly strikes: readonly number[];
+  readonly convention: CubeSampleRequest["convention"];
+}
+/** Canonical JSON of the returned slice: a stored surface (tenor axis) or a VolCubeExpirySlice (expiry axis). */
+export type CubeSlice =
+  | { readonly axis: "tenor"; readonly surface: StoredSurfaceWire }
+  | { readonly axis: "expiry"; readonly slice: wire.VolCubeExpirySlice };
+/** SABR smile of one cube node at explicit strikes and an explicit continuously compounded decimal rate. */
+export interface CubeSmileRequest {
+  readonly cube: MarketContextStateWire["vol_cubes"][number];
+  /** Zero-based index into cube.expiries. */
+  readonly expiryIndex: number;
+  /** Zero-based index into cube.tenors. */
+  readonly tenorIndex: number;
+  /** Absolute strikes in the model domain, strictly increasing. */
+  readonly strikes: readonly number[];
+  /** Continuously compounded decimal rate discounting the arbitrage-check prices; never defaulted. */
+  readonly rate: number;
+  /** Repair passes for SabrSmile#repairArbitrage; omitted means no repair is run. */
+  readonly repairIterations?: number | null;
+}
+/** Native smile values for one node, in the facade's convention (normal when beta < 1e-4, else Black). */
+export interface CubeSmile {
+  readonly parameters: wire.SabrParameterData;
+  readonly forward: number;
+  /** The node's option expiry in years, the smile's time to expiry. */
+  readonly expiry: number;
+  readonly vols: number[];
+  readonly arbitrage: ArbitrageValidationResult;
+  /** Repaired vols aligned with the strikes; null when no repair was requested. */
+  readonly repaired: number[] | null;
 }
 /** Explicit cloneable exception data; never Comlink's lossy default thrown-error transfer. */
 export interface ErrorValue {
@@ -249,6 +293,10 @@ export interface ModelsApi {
   materializeFxSurface(
     request: FxStrikeSurfaceRequest,
   ): Promise<Envelope<FxStrikeSurface>>;
+  /** core.VolCube.fromJson + models.volatility.materializeCube{Tenor,Expiry}Slice[Normal], as the returned slice's JSON. */
+  cubeSlice(request: CubeSliceRequest): Promise<Envelope<CubeSlice>>;
+  /** core.VolCube.fromJson + paramsAt/forwardAt + models.volatility.SabrParameters.fromJson + SabrSmile generateSmile, validateNoArbitrage and (when requested) repairArbitrage. */
+  cubeSmile(request: CubeSmileRequest): Promise<Envelope<CubeSmile>>;
 }
 /** statements and statements_analytics: model validation, evaluation and diagnostics. */
 export interface StatementsApi {

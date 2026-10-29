@@ -1017,7 +1017,7 @@
     {
       "id": "vol-cube-explorer-black",
       "route": "typed",
-      "convention": "Annualized Black volatility as decimal; supply stored cube and explicit expiry, tenor, strike.",
+      "convention": "Annualized Black volatility as decimal; supply stored cube and explicit expiry, tenor, strike. Fixed-tenor and fixed-expiry slices are Rust-materialized (vol-cube-tenor-slice, vol-cube-expiry-slice).",
       "api": {
         "name": "models.volatility.getCubeVol",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1062,7 +1062,7 @@
     {
       "id": "vol-cube-explorer-normal",
       "route": "typed",
-      "convention": "Annualized normal volatility in absolute rate units.",
+      "convention": "Annualized normal volatility in absolute rate units. Normal slices are Rust-materialized (vol-cube-tenor-slice-normal, vol-cube-expiry-slice-normal).",
       "api": {
         "name": "models.volatility.getCubeNormalVol",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1093,6 +1093,151 @@
         "returns": "number",
         "declaration": "/**\n   * Evaluate checked normal/Bachelier volatility from a data-only SABR cube.\n   * @returns Annualized normal volatility in absolute rate units.\n   * @param cube - Structurally validated data-only volatility cube.\n   * @param expiry - Positive option expiry in years within the cube grid.\n   * @param tenor - Positive underlying tenor in years within the cube grid.\n   * @param strike - Finite strike in the same rate units as the stored forwards.\n   * @throws Error - Throws a JavaScript exception for out-of-grid coordinates, an invalid shifted-SABR domain, or a failed normal-volatility expansion.\n   */\n  getCubeNormalVol(cube: VolCube, expiry: number, tenor: number, strike: number): number;",
         "sha256": "b157b0227119159271e00b8af73f8f2eb3484b89c718f6c8f9ad33b564565e43"
+      }
+    },
+    {
+      "id": "vol-cube-tenor-slice",
+      "route": "returned-surface",
+      "convention": "Returned VolSurface JSON (expiry by strike, Black or shifted-Black quote type with displacements as Rust returns them); fixed tenor in years and absolute strikes in forward-rate units are explicit caller input. Off-node tenors are Rust-interpolated.",
+      "api": {
+        "name": "models.volatility.materializeCubeTenorSlice",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "VolatilityNamespace",
+        "member": "materializeCubeTenorSlice",
+        "inputs": [
+          {
+            "name": "cube",
+            "type": "VolCube",
+            "optional": false
+          },
+          {
+            "name": "tenor",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "strikes",
+            "type": "NumericArray",
+            "optional": false
+          }
+        ],
+        "returns": "VolSurface",
+        "declaration": "/**\n   * Materialize the Black volatility slice of a SABR cube at one underlying tenor.\n   * @param cube - `core.VolCube` handle.\n   * @param tenor - Underlying tenor in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @returns The expiry by strike `core.VolSurface` handle.\n   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.\n   */\n  materializeCubeTenorSlice(cube: VolCube, tenor: number, strikes: NumericArray): VolSurface;",
+        "sha256": "6231f7ed2990885c24a6762e7e57b1983c18b32a225895f805d45a8d0cb25b4c"
+      }
+    },
+    {
+      "id": "vol-cube-tenor-slice-normal",
+      "route": "returned-surface",
+      "convention": "Returned VolSurface JSON of normal volatilities (expiry by strike); fixed tenor and absolute strikes are explicit caller input. Off-node tenors are Rust-interpolated.",
+      "api": {
+        "name": "models.volatility.materializeCubeTenorSliceNormal",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "VolatilityNamespace",
+        "member": "materializeCubeTenorSliceNormal",
+        "inputs": [
+          {
+            "name": "cube",
+            "type": "VolCube",
+            "optional": false
+          },
+          {
+            "name": "tenor",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "strikes",
+            "type": "NumericArray",
+            "optional": false
+          }
+        ],
+        "returns": "VolSurface",
+        "declaration": "/**\n   * Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.\n   * @param cube - `core.VolCube` handle.\n   * @param tenor - Underlying tenor in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @returns The expiry by strike `core.VolSurface` handle of normal volatilities.\n   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.\n   */\n  materializeCubeTenorSliceNormal(cube: VolCube, tenor: number, strikes: NumericArray): VolSurface;",
+        "sha256": "a4479575295da1212f944da76a416ce67bea85fda503a1025b2c11a57d562a37"
+      }
+    },
+    {
+      "id": "vol-cube-expiry-slice",
+      "route": "returned-slice",
+      "convention": "Returned VolCubeExpirySlice JSON (tenor by strike, tenor-major, Black or shifted-Black quote type with displacements as Rust returns them); fixed expiry in years and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
+      "api": {
+        "name": "models.volatility.materializeCubeExpirySlice",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "VolatilityNamespace",
+        "member": "materializeCubeExpirySlice",
+        "inputs": [
+          {
+            "name": "cube",
+            "type": "VolCube",
+            "optional": false
+          },
+          {
+            "name": "expiry",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "strikes",
+            "type": "NumericArray",
+            "optional": false
+          }
+        ],
+        "returns": "VolCubeExpirySlice",
+        "declaration": "/**\n   * Materialize the Black volatility slice of a SABR cube at one option expiry.\n   * @param cube - `core.VolCube` handle.\n   * @param expiry - Option expiry in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @returns The tenor by strike `core.VolCubeExpirySlice` handle.\n   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.\n   */\n  materializeCubeExpirySlice(\n    cube: VolCube,\n    expiry: number,\n    strikes: NumericArray\n  ): VolCubeExpirySlice;",
+        "sha256": "73bb5e514fdaf5c5ed222e37b4ab15de42a5b36677da2778131369281da3bde8"
+      }
+    },
+    {
+      "id": "vol-cube-expiry-slice-normal",
+      "route": "returned-slice",
+      "convention": "Returned VolCubeExpirySlice JSON of normal volatilities (tenor by strike); fixed expiry and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
+      "api": {
+        "name": "models.volatility.materializeCubeExpirySliceNormal",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "VolatilityNamespace",
+        "member": "materializeCubeExpirySliceNormal",
+        "inputs": [
+          {
+            "name": "cube",
+            "type": "VolCube",
+            "optional": false
+          },
+          {
+            "name": "expiry",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "strikes",
+            "type": "NumericArray",
+            "optional": false
+          }
+        ],
+        "returns": "VolCubeExpirySlice",
+        "declaration": "/**\n   * Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.\n   * @param cube - `core.VolCube` handle.\n   * @param expiry - Option expiry in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @returns The tenor by strike `core.VolCubeExpirySlice` handle of normal volatilities.\n   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.\n   */\n  materializeCubeExpirySliceNormal(\n    cube: VolCube,\n    expiry: number,\n    strikes: NumericArray\n  ): VolCubeExpirySlice;",
+        "sha256": "99713d01e08f74dea55bb03fc5ce28a31bcfdbe8216df13eb6d680739d4909a3"
+      }
+    },
+    {
+      "id": "vol-cube-node-smile",
+      "route": "returned-smile",
+      "convention": "SabrSmile of one stored cube node (paramsAt, forwardAt, the node expiry): normal volatility when beta < 1e-4, Black otherwise, as returned. validateNoArbitrage takes an explicit continuously compounded decimal rate; repairArbitrage runs only when the caller supplies its passes. Never routed through a surface check.",
+      "api": {
+        "name": "models.volatility.SabrSmile",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "SabrSmile",
+        "member": "generateSmile",
+        "inputs": [
+          {
+            "name": "strikes",
+            "type": "number[]",
+            "optional": false
+          }
+        ],
+        "returns": "Float64Array",
+        "declaration": "/**\n   * Implied volatilities for a strike grid.\n   * @returns One implied vol per strike, in the same order as `strikes` (normal vol when beta < 1e-4, Black decimal vol otherwise).\n   * @param strikes - Option strikes at which to evaluate the SABR volatility smile.\n   * @throws Error - Throws a JavaScript exception if the smile's expiry or forward, or any supplied strike, is outside the model domain, or the Hagan expansion produces an invalid volatility.\n   */\n  generateSmile(strikes: number[]): Float64Array;",
+        "sha256": "ce9f6e7ec0994cdf168fb7f72ed9fdb1801d0f442a56160f961ae002da9e1b2a"
       }
     },
     {
@@ -1397,6 +1542,12 @@
       "source": "finstack-quant-wasm/index.d.ts",
       "declaration": "/**\n * FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional\n * 10-delta wings).\n *\n * Stores market-standard FX delta quotes (Wystup 2006, Clark 2011). The delta\n * convention is **forward delta (premium-unadjusted)**.\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const surface = new core.FxDeltaVolSurface(\n *   \"EURUSD-VOL\",\n *   [1],\n *   [0.12],\n *   [0.01],\n *   [0.002]\n * );\n * console.log(surface.id, surface.expiries.length);\n * surface.free();\n * ```\n */\nexport interface FxDeltaVolSurfaceConstructor {\n  /**\n   * Construct an FX delta-quoted vol surface with 25-delta wings.\n   *\n   * Optional `rr10d` / `bf10d` add 10-delta wings for richer wing\n   * interpolation. Omit both (`undefined`/`null`) for a three-point smile;\n   * the Rust constructor rejects one without the other.\n   *\n   * @returns An `FxDeltaVolSurface` handle.\n   * @param id - Stable surface identifier.\n   * @param expiries - Strictly increasing positive expiry times (years).\n   * @param atmVols - ATM delta-neutral straddle vols per expiry.\n   * @param rr25d - 25-delta risk reversal per expiry (call vol − put vol).\n   * @param bf25d - 25-delta butterfly per expiry (wing avg − ATM).\n   * @param rr10d - Optional 10-delta risk reversal per expiry.\n   * @param bf10d - Optional 10-delta butterfly per expiry.\n   * @throws Error - Throws a JavaScript exception if `rr10d` and `bf10d` are not both present or both absent; quote arrays are empty or have mismatched lengths; expiries are not finite, positive, and strictly increasing; ATM vols are not finite and positive; or any risk reversal or butterfly is non-finite.\n   */\n  new (\n    id: string,\n    expiries: NumericArray,\n    atmVols: NumericArray,\n    rr25d: NumericArray,\n    bf25d: NumericArray,\n    rr10d?: NumericArray,\n    bf10d?: NumericArray\n  ): FxDeltaVolSurface;\n  /**\n   * Deserialize canonical FX delta quotes without reconstructing positional arrays.\n   *\n   * @example\n   * ```typescript\n   * import init, { core } from \"finstack-quant-wasm\";\n   * await init();\n   * const surface = core.FxDeltaVolSurface.fromJson(\n   *   JSON.stringify({\n   *     id: \"EURUSD\",\n   *     expiries: [1],\n   *     atm_vols: [0.12],\n   *     rr_25d: [0.01],\n   *     bf_25d: [0.002],\n   *     rr_10d: null,\n   *     bf_10d: null,\n   *   })\n   * );\n   * console.log(surface.id);\n   * surface.free();\n   * ```\n   * @param json - Canonical FxDeltaVolSurface JSON with expiries in years and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.\n   * @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().\n   * @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.\n   */\n  fromJson(json: JsonInput): FxDeltaVolSurface;\n}",
       "sha256": "03202e93b1f2b5ddf54f934b5052661a0fbeeb802b911627ec957a248015e0f7"
+    },
+    {
+      "name": "SabrSmileConstructor",
+      "source": "finstack-quant-wasm/index.d.ts",
+      "declaration": "/**\n * Volatility smile generator for a fixed `(forward, t)` pair.\n *\n * Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.\n * @example\n * ```typescript\n * import init, { models } from \"finstack-quant-wasm\";\n * await init();\n * const params = models.volatility.SabrParameters.ratesDefault();\n * const smile = new models.volatility.SabrSmile(params, 0.03, 2);\n * console.log(smile.generateSmile([0.02, 0.03, 0.04]));\n * smile.free();\n * params.free();\n * ```\n */\nexport interface SabrSmileConstructor {\n  /**\n   * Create a SABR smile for a fixed forward and expiry.\n   * @returns A `SabrSmile` handle for the supplied forward and expiry.\n   * @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.\n   * @param forward - Forward price or rate in the same quote convention as the strike.\n   * @param t - Time from the curve base date in years.\n   */\n  new (params: SabrParameters, forward: number, t: number): SabrSmile;\n}",
+      "sha256": "08d18c22858df083b62de16d3ae17b79792fd9300eaa33f42f9e61341d8fde59"
     }
   ],
   "hostContract": {
@@ -1432,7 +1583,7 @@
   "deferred": {
     "machine-readable-units": "Generic values stay raw; do not infer units from names or decimal refs.",
     "full-state-curve-evaluation": "Use stored nodes and parameters; no constructor-based curve recreation.",
-    "off-grid-surface-evaluation": "Stored nodes only; off-grid values come only from native evaluators or a Rust-materialized grid (fx-strike-grid).",
+    "off-grid-surface-evaluation": "Stored nodes only; off-grid values come only from native evaluators or a Rust-materialized grid (fx-strike-grid, vol-cube-tenor-slice, vol-cube-expiry-slice).",
     "quote-space-calibration-fits": "Returned residuals only until quote repricing is published.",
     "missing-financial-aggregates": "Unavailable unless an existing canonical result supplies the value."
   }

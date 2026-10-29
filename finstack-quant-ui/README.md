@@ -653,6 +653,11 @@ Evaluated market views take explicit domain inputs through public options:
     initialStrike: 0.05,
     initialConvention: "normal",
     colorDomains: { normal: [0, 0.1], black_lognormal: [0, 2] },
+    slice: {
+      initialStrikes: [0.03, 0.04, 0.05, 0.06, 0.07],
+      initialRate: 0.04,
+      repairIterations: 10,
+    },
   })}
   fxOptions={() => ({
     coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }],
@@ -670,7 +675,13 @@ strike, forward and coordinates appropriate to the supplied objects. The FX
 strike grid (`models.volatility.materializeFxDeltaSurface`) takes a spot in
 domestic per unit of foreign and continuously compounded decimal rates; the FX
 delta state carries no currency pair, so the workbench cannot look either up and
-leaves the fields empty unless `fxOptions` seeds them. Without
+leaves the fields empty unless `fxOptions` seeds them. The cube `slice` option
+mounts `vol-cube-slice`: a fixed-tenor or fixed-expiry slice that Rust
+materializes (`models.volatility.materializeCube{Tenor,Expiry}Slice[Normal]`) at
+the given absolute strikes, plus the selected node's native SABR smile. The
+smile's arbitrage check takes an explicit continuously compounded decimal rate
+and the repaired line appears only when `repairIterations` is supplied; neither
+is defaulted, and without `slice` no slice is shown. Without
 options, the market browser retains exact stored data. Scenario prices are fetched
 only when the detail panel is opened for a completed structured-credit request.
 `calibrationChartOptions` forwards existing figure annotations, export refs and
