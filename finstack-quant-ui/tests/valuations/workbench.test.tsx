@@ -60,6 +60,7 @@ const scenarioService = createScenariosService(
   createContext({
     initialize: async () => undefined,
     core: { MarketContext: native.MarketContext },
+    portfolio: { Portfolio: native.Portfolio },
   }),
 );
 beforeEach(() => {
