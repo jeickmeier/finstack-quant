@@ -167,6 +167,20 @@ export const importHarnesses = {
     Promise.all([import("@/hooks/models/use-cube-smile/use-cube-smile")]).then(
       (modules) => ({ name: "use-cube-smile", modules: modules.length }),
     ),
+  "use-migration-matrix": () =>
+    Promise.all([
+      import("@/hooks/models/use-migration-matrix/use-migration-matrix"),
+    ]).then((modules) => ({
+      name: "use-migration-matrix",
+      modules: modules.length,
+    })),
+  "use-migration-projection": () =>
+    Promise.all([
+      import("@/hooks/models/use-migration-projection/use-migration-projection"),
+    ]).then((modules) => ({
+      name: "use-migration-projection",
+      modules: modules.length,
+    })),
   "use-evaluate-statement": () =>
     Promise.all([
       import("@/hooks/statements/use-evaluate-statement/use-evaluate-statement"),

@@ -337,6 +337,17 @@ const displays = [
     convention:
       "Returned PortfolioMetrics: aggregated totals with by-entity values, raw by-position metrics with their native currency, unaggregated_metrics, skipped_metrics and degraded_positions as returned. The portfolioMetricsSeries chart keeps Rust's (lexical) entry order, grouped by the first key component; no tenor sort while tenor ordering is an owner decision.",
   },
+  {
+    id: "transition-matrix-heatmap",
+    api: [
+      "models.credit.migration.TransitionMatrix#toRows",
+      "TransitionMatrix",
+      "toRows",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned models.credit.migration results: TransitionMatrix rows and default probabilities in RatingScale order, the GeneratorMatrix rows with its roundTripError and regularizationL1, and the default probabilities of project(generator, t) per requested horizon. Decimals as returned; an omitted round-trip tolerance is left to Rust. Heatmap colour domains are presentation only: [0, 1] for probabilities, the intensities' extent (centred on zero) for the generator.",
+  },
 ];
 
 export async function generateProvenance(repo, contracts, fixtureManifest) {

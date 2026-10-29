@@ -170,11 +170,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirteen native fixture generators under
+`mise run ui-fixtures` runs the fourteen native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 cashflows → details; portfolio;
 curves → market-browser; cubes, calibration, scenario-table;
-statements → covenants; analytics), then
+statements → covenants; analytics; models credit), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
 `mise run wasm-pkg` (release). `mise run ui-fixtures --check` verifies that every
@@ -727,6 +727,26 @@ Rust returns, which is lexical (`10y`, `15y`, `1y`, …); tenor ordering is an
 open owner decision, so no sort is applied. Native fixtures (the gallery bond
 and swap book over the pricing market, and the host-parity deposit book) live
 in `tests/portfolio/`.
+
+## Returned rating migration
+
+`useMigrationMatrix` (`@finstack/use-migration-matrix`) builds a
+`models.credit.migration.TransitionMatrix` from labelled rows with
+`TransitionMatrix.fromLabeled` (rows and columns share one label order; the
+last label is the absorbing default state) and returns its rows, default
+probabilities and horizon with the labels and default state of its
+`RatingScale`. `useMigrationProjection` estimates the generator with
+`GeneratorMatrix.fromTransitionMatrix` (an omitted `roundTripTol` stays unset,
+so Rust's default applies) and calls `models.credit.migration.project` once
+per requested horizon. Every handle is freed, including the fresh
+`RatingScale` each `scale` read returns. The display-only
+`TransitionMatrixHeatmap` draws the matrix and the generator as heatmaps and
+the projected default probabilities per origin state, or shows them as
+tables; it stamps the generator's `roundTripError` and `regularizationL1` and
+shows a projection error inline beside the matrix. Probabilities are coloured
+over `[0, 1]`; the generator's colour domain is the extent of its intensities,
+centred on zero, because its diagonal is negative. The native fixture (an
+illustrative eight-state one-year matrix) lives in `tests/models/credit/`.
 
 ## Served gallery checks
 

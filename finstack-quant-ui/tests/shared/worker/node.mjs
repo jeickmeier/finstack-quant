@@ -182,6 +182,48 @@ class Portfolio extends facade.portfolio.Portfolio {
     return handle;
   }
 }
+// Rating-migration handles: matrices (fromLabeled and project), generators
+// and the fresh RatingScale every TransitionMatrix#scale read returns.
+const migration = facade.models.credit.migration;
+const migrationCounts = {
+  matrixConstructed: 0,
+  matrixFreed: 0,
+  generatorConstructed: 0,
+  generatorFreed: 0,
+  scaleConstructed: 0,
+  scaleFreed: 0,
+};
+function countMigration(kind, handle) {
+  migrationCounts[`${kind}Constructed`]++;
+  const free = handle.free.bind(handle);
+  handle.free = () => {
+    free();
+    migrationCounts[`${kind}Freed`]++;
+  };
+  return handle;
+}
+const scaleGetter = Object.getOwnPropertyDescriptor(
+  migration.TransitionMatrix.prototype,
+  "scale",
+).get;
+function countMatrix(handle) {
+  countMigration("matrix", handle);
+  Object.defineProperty(handle, "scale", {
+    get: () => countMigration("scale", scaleGetter.call(handle)),
+  });
+  return handle;
+}
+class TransitionMatrix extends migration.TransitionMatrix {
+  static fromLabeled(...args) {
+    return countMatrix(super.fromLabeled(...args));
+  }
+}
+class GeneratorMatrix extends migration.GeneratorMatrix {
+  static fromTransitionMatrix(...args) {
+    return countMigration("generator", super.fromTransitionMatrix(...args));
+  }
+}
+const project = (...args) => countMatrix(migration.project(...args));
 const service = createService({
   initialize: async () => {
     if (workerData.fail)
@@ -211,6 +253,10 @@ const service = createService({
       materializeFxDeltaSurface,
       SabrParameters,
       SabrSmile,
+    },
+    credit: {
+      ...facade.models.credit,
+      migration: { ...migration, TransitionMatrix, GeneratorMatrix, project },
     },
   },
   valuations: {
@@ -253,6 +299,7 @@ expose(
       fiscalFreed,
       portfolioConstructed,
       portfolioFreed,
+      ...migrationCounts,
     }),
   },
   nodeEndpoint(parentPort),

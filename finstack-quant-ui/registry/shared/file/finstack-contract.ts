@@ -371,6 +371,48 @@ export interface CubeSmile {
   /** Repaired vols aligned with the strikes; null when no repair was requested. */
   readonly repaired: number[] | null;
 }
+/** A labelled rating transition matrix: rows and columns share one label order, the last label absorbing (TransitionMatrix.fromLabeled). */
+export interface MigrationMatrixRequest {
+  /** Rating labels in row and column order; the last is the absorbing default state. */
+  readonly labels: readonly string[];
+  /** Transition probabilities, one row per origin state; each row sums to one (validated by Rust). */
+  readonly rows: readonly (readonly number[])[];
+  /** Positive horizon in years the probabilities cover. */
+  readonly horizon: number;
+}
+/** The matrix as Rust returns it: labels and default state from its RatingScale, rows and default probabilities from the matrix. */
+export interface MigrationMatrix {
+  readonly labels: string[];
+  /** RatingScale#defaultState; null when the scale has none. */
+  readonly defaultState: number | null;
+  readonly horizon: number;
+  readonly rows: number[][];
+  /** TransitionMatrix#defaultProbabilities; null when the scale has no default state. */
+  readonly defaultProbabilities: number[] | null;
+}
+/** Generator estimation and projection of a labelled matrix to explicit horizons. */
+export interface MigrationProjectionRequest extends MigrationMatrixRequest {
+  /** Positive horizons in years for models.credit.migration.project, in display order. */
+  readonly horizons: readonly number[];
+  /** Largest accepted round-trip error of GeneratorMatrix.fromTransitionMatrix; omitted leaves Rust's default. */
+  readonly roundTripTol?: number | null;
+}
+/** The regularized generator and the default probabilities of each projected matrix. */
+export interface MigrationProjection {
+  readonly labels: string[];
+  readonly defaultState: number | null;
+  readonly generator: {
+    /** Intensities per year, one row per origin state. */
+    readonly rows: number[][];
+    readonly roundTripError: number;
+    readonly regularizationL1: number;
+  };
+  /** One entry per requested horizon, in request order; horizon is the projected matrix's own. */
+  readonly projections: {
+    readonly horizon: number;
+    readonly defaultProbabilities: number[] | null;
+  }[];
+}
 /** Explicit cloneable exception data; never Comlink's lossy default thrown-error transfer. */
 export interface ErrorValue {
   name: string;
@@ -469,7 +511,7 @@ export interface CalibrationApi {
   /** calibration.calibrate. */
   calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
 }
-/** models: volatility sampling over core surface handles. */
+/** models: volatility sampling over core surface handles and rating migration. */
 export interface ModelsApi {
   /** core.VolCube.fromJson + models.volatility.getCubeNormalVol or getCubeVol, per coordinate. */
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
@@ -483,6 +525,14 @@ export interface ModelsApi {
   cubeSlice(request: CubeSliceRequest): Promise<Envelope<CubeSlice>>;
   /** core.VolCube.fromJson + paramsAt/forwardAt + models.volatility.SabrParameters.fromJson + SabrSmile generateSmile, validateNoArbitrage and (when requested) repairArbitrage. */
   cubeSmile(request: CubeSmileRequest): Promise<Envelope<CubeSmile>>;
+  /** models.credit.migration.TransitionMatrix.fromLabeled + toRows, defaultProbabilities, horizon and the scale's labels; every handle (including the scale getter's) is freed. */
+  migrationMatrix(
+    request: MigrationMatrixRequest,
+  ): Promise<Envelope<MigrationMatrix>>;
+  /** TransitionMatrix.fromLabeled + GeneratorMatrix.fromTransitionMatrix + models.credit.migration.project per horizon; every handle is freed. */
+  migrationProjection(
+    request: MigrationProjectionRequest,
+  ): Promise<Envelope<MigrationProjection>>;
 }
 /** statements and statements_analytics: model validation, evaluation and diagnostics. */
 export interface StatementsApi {
