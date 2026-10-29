@@ -103,7 +103,7 @@ a submodule.
 | Scenarios | `ScenarioSet`, `ScenarioDefinition`, `ScenarioResults`, `ScenarioDiff` |
 | Sensitivity | `run_sensitivity`, `SensitivityConfig`, `SensitivityMode`, `SensitivityResult`, `ParameterSpec`, `TornadoEntry`, `generate_tornado_entries` |
 | Variance | `run_variance`, `variance_bridge`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
-| Credit | `compute_credit_context`, `CreditContextMetrics`, `forecast_breaches`, `StatementsAdapter` |
+| Credit | `compute_credit_context`, `CreditContextMetrics`, `evaluate_covenants`, `forecast_breaches`, `StatementsAdapter` |
 | Checks | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `render_check_report_text`, `render_check_report_html`, plus reconciliation / consistency / credit check types |
 | ECL | `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure` |
 | Comps | `PeerSet`, `PeerFilter`, `PeerStats`, `compute_peer_multiples`, `compute_multiple`, `regression_fair_value`, `score_relative_value`, `percentile_rank`, `z_score` |
@@ -144,8 +144,13 @@ mixed-currency ratios fail. LTV is `debt_t / value_t`; scalar EV references may
 be broadcast across periods. Metrics include cash DSCR, total (PIK) DSCR, and
 fee-inclusive DSCR. `StatementsAdapter` implements the covenants crate's
 `ModelTimeSeries` bridge, so covenant forecasts do not make that crate depend
-on statements: pass `StatementsAdapter::new(&results, &model)` to
-`finstack_quant_covenants::forecast_covenant_generic` for a single covenant.
+on statements. `evaluate_covenants(&results, &engine, &model)` tests compliance
+at every result period end and `forecast_breaches` projects breaches over the
+same periods; each period uses the covenants applicable on its end date (a
+covenant window replaces the top-level set), and a metric is read only when an
+applicable covenant needs it, so a missing or non-finite node fails only where
+it is tested. For a single covenant pass `StatementsAdapter::new(&results,
+&model)` to `finstack_quant_covenants::forecast_covenant_generic`.
 
 **Checks.** `analysis::checks` extends the structural checks in
 `finstack_quant_statements::checks::builtins` with cross-statement

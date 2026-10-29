@@ -1345,11 +1345,19 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 #   same three entry points (classifyStage, computeEcl, computeEclWeighted);
 #   the two PDs are arguments there because the Python Exposure carries them.
 #   `stage` is required in every host (classify first).
-# - analysis::credit covenant forecasting (forecast_breaches,
-#   compute_credit_context with per-period
+# - analysis::credit: compute_credit_context with per-period
 #   reference_values, CreditContextMetrics including dscr_incl_fees,
-#   CorporateAnalysisBuilder.ltv_value_node — the last is bound on
-#   run_corporate_analysis), StatementsAdapter, compute_peer_multiples, and
+#   CorporateAnalysisBuilder.ltv_value_node (the last is bound on
+#   run_corporate_analysis), and the StatementsAdapter type itself. The two
+#   statement covenant entry points built on StatementsAdapter are bound in
+#   both hosts (plan RT-23 reversed the earlier Rust-only decision, so a host
+#   no longer zips statement rows itself): evaluate_covenants /
+#   evaluateCovenants (compliance at every result period end; covenant windows
+#   decide which metrics a date requires) and forecast_breaches /
+#   forecastBreaches. Python returns the evaluation as the long DataFrame of
+#   CovenantEngine.evaluate_series and the forecast as FutureBreach objects;
+#   WASM returns DatedCovenantReports rows and FutureBreach wire objects.
+# - compute_peer_multiples, and
 #   the comps/scenarios/reports/valuation typed result surfaces beyond the
 #   bound entry points. lbo_model_checks is reached in both hosts through the
 #   `check_mappings` of the LboConfig that evaluate_lbo / evaluateLbo take.
@@ -1436,11 +1444,13 @@ public = [
     "credit_assessment",
     "credit_assessment_report_text",
     "dcf_sensitivity",
+    "evaluate_covenants",
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",
+    "forecast_breaches",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",

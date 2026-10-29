@@ -28,6 +28,10 @@ from finstack_quant.statements_analytics._analysis import (
     scenario_diff as scenario_diff,
     variance_bridge as variance_bridge,
 )
+from finstack_quant.statements_analytics._covenants import (
+    evaluate_covenants as evaluate_covenants,
+    forecast_breaches as forecast_breaches,
+)
 from finstack_quant.statements_analytics._scorecards import (
     CreditScorecardExtension as CreditScorecardExtension,
     ScorecardConfig as ScorecardConfig,
@@ -218,11 +222,13 @@ __all__ = [
     "credit_assessment",
     "credit_assessment_report_text",
     "dcf_sensitivity",
+    "evaluate_covenants",
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",
+    "forecast_breaches",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",

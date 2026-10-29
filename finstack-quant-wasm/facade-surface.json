@@ -4154,6 +4154,7 @@
       "creditAssessment",
       "creditAssessmentReportText",
       "dcfSensitivity",
+      "evaluateCovenants",
       "evaluateDcf",
       "evaluateLbo",
       "evaluateScenarioSet",
@@ -4161,6 +4162,7 @@
       "explainFormula",
       "explainFormulaText",
       "explanationToText",
+      "forecastBreaches",
       "forecastMetricsSummaryText",
       "generateTornadoEntries",
       "goalSeek",
@@ -4273,6 +4275,12 @@
     "kind": "function"
   },
   "statements_analytics.creditAssessment": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateCovenants": {
+    "kind": "function"
+  },
+  "statements_analytics.forecastBreaches": {
     "kind": "function"
   },
   "statements_analytics.runChecks": {

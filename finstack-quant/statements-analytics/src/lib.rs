@@ -34,7 +34,7 @@
 //!
 //! | Module | Purpose |
 //! |--------|---------|
-//! | [`analysis`] | DCF valuation, scenario sets, sensitivity, goal seek, backtesting, introspection, reports, covenant forecasting, ECL |
+//! | [`analysis`] | DCF valuation, scenario sets, sensitivity, goal seek, backtesting, introspection, reports, covenant evaluation and forecasting, ECL |
 //! | [`extensions`] | Corkscrew roll-forward validation and credit scorecard rating assignment |
 //! | [`templates`] | Real estate, roll-forward, and vintage model builders |
 //!

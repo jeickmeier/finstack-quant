@@ -7,6 +7,8 @@
 mod analysis_boundary_regressions;
 #[path = "analysis_corporate.rs"]
 mod analysis_corporate;
+#[path = "analysis_covenants.rs"]
+mod analysis_covenants;
 #[path = "analysis_ecl.rs"]
 mod analysis_ecl;
 #[path = "analysis_goal_seek.rs"]

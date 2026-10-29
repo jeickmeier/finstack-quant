@@ -10,6 +10,7 @@ mod analysis;
 mod checks;
 mod comps;
 mod corkscrew;
+mod covenants;
 mod ecl;
 mod reports;
 mod scorecards;
@@ -81,6 +82,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     typed::register(py, &m)?;
     valuation::register(py, &m)?;
     checks::register(py, &m)?;
+    covenants::register(py, &m)?;
     reports::register(py, &m)?;
     ecl::register(py, &m)?;
     comps::register(py, &m)?;
@@ -173,11 +175,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "credit_assessment",
             "credit_assessment_report_text",
             "dcf_sensitivity",
+            "evaluate_covenants",
             "evaluate_dcf",
             "evaluate_lbo",
             "evaluate_scenario_set",
             "evaluate_scenario_set_with_market",
             "explain_formula",
+            "forecast_breaches",
             "generate_tornado_entries",
             "goal_seek",
             "peer_stats",

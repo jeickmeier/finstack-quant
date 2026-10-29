@@ -7,7 +7,9 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, display_to_py, value_error};
-use finstack_quant_covenants::{CovenantBreach, CovenantEngine, DatedMetrics, HashMapMetricSource};
+use finstack_quant_covenants::{
+    CovenantBreach, CovenantEngine, DatedCovenantReports, DatedMetrics, HashMapMetricSource,
+};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -77,6 +79,35 @@ const SERIES_COLUMNS: [ColumnSchema<'static>; 8] = [
     ("headroom", "float64"),
     ("details", "str"),
 ];
+
+/// Flatten dated covenant reports into the long frame of `SERIES_COLUMNS`:
+/// one row per (test date, covenant), dates in series order and covenants in
+/// engine order. Shared by `CovenantEngine.evaluate_series` and
+/// `statements_analytics.evaluate_covenants`.
+pub(crate) fn dated_reports_frame(
+    py: Python<'_>,
+    series: Vec<DatedCovenantReports>,
+) -> PyResult<Bound<'_, PyAny>> {
+    let records: Vec<serde_json::Value> = series
+        .into_iter()
+        .flat_map(|dated| {
+            let as_of = dated.as_of.to_string();
+            dated.reports.into_iter().map(move |(key, report)| {
+                serde_json::json!({
+                    "as_of": as_of,
+                    "covenant": key,
+                    "covenant_type": report.covenant_type,
+                    "passed": report.passed,
+                    "actual_value": report.actual_value,
+                    "threshold": report.threshold,
+                    "headroom": report.headroom,
+                    "details": report.details,
+                })
+            })
+        })
+        .collect();
+    serde_rows_to_dataframe_with_schema(py, &records, &SERIES_COLUMNS)
+}
 
 /// Read a date-indexed metrics frame into Rust `DatedMetrics` rows.
 ///
@@ -265,25 +296,7 @@ impl PyCovenantEngine {
     ) -> PyResult<Bound<'py, PyAny>> {
         let rows = extract_metric_frame(metrics)?;
         let evaluated = py.detach(|| self.inner.evaluate_series(&rows).map_err(core_to_py))?;
-        let records: Vec<serde_json::Value> = evaluated
-            .into_iter()
-            .flat_map(|dated| {
-                let as_of = dated.as_of.to_string();
-                dated.reports.into_iter().map(move |(key, report)| {
-                    serde_json::json!({
-                        "as_of": as_of,
-                        "covenant": key,
-                        "covenant_type": report.covenant_type,
-                        "passed": report.passed,
-                        "actual_value": report.actual_value,
-                        "threshold": report.threshold,
-                        "headroom": report.headroom,
-                        "details": report.details,
-                    })
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(py, &records, &SERIES_COLUMNS)
+        dated_reports_frame(py, evaluated)
     }
 
     /// Deserialize from JSON; only ``specs`` is required.

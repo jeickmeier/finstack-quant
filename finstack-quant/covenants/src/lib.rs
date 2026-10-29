@@ -99,7 +99,8 @@ pub use metric::{CovenantMetricId, CovenantMetricSource, HashMapMetricSource};
 pub use report::CovenantReport;
 pub use schedule::ThresholdSchedule;
 pub use series::{
-    forecast_breaches, forecast_covenant, DatedCovenantReports, DatedMetricSeries, DatedMetrics,
+    evaluate_series_generic, forecast_breaches, forecast_covenant, DatedCovenantReports,
+    DatedMetricSeries, DatedMetrics,
 };
 
 /// Compiles the crate `README.md` Rust samples as doctests.
