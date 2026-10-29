@@ -5,7 +5,7 @@
  * Initial margin calculation result.
  */
 export interface ImResultWire {
-  amount: DBc5433C4E038748Aff30;
+  amount: Money;
   /**
    * Whether the amount is an approximation rather than
    * an exact computation under the named methodology.
@@ -36,7 +36,7 @@ export interface ImResultWire {
    * `interest_rate`). Values are IM amounts for that component.
    */
   breakdown: {
-    [k: string]: DBc5433C4E038748Aff301;
+    [k: string]: Money1;
   };
   /**
    * Methodology used for calculation
@@ -60,7 +60,7 @@ export interface ImResultWire {
 /**
  * Calculated initial margin amount
  */
-export interface DBc5433C4E038748Aff30 {
+export interface Money {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -233,24 +233,9 @@ export interface DBc5433C4E038748Aff30 {
     | "ZWL";
 }
 /**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
+ * Currency-tagged monetary amount.
  */
-export interface DBc5433C4E038748Aff301 {
+export interface Money1 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with

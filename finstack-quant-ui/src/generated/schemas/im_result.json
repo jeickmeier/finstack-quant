@@ -26,7 +26,7 @@
   ],
   "properties": {
     "amount": {
-      "$ref": "#/$defs/d_bc5433c4e038748aff30",
+      "$ref": "#/$defs/d_4ba43030fede59fe5993",
       "description": "Calculated initial margin amount"
     },
     "approximation": {
@@ -39,7 +39,7 @@
     },
     "breakdown": {
       "additionalProperties": {
-        "$ref": "#/$defs/d_bc5433c4e038748aff30"
+        "$ref": "#/$defs/d_4ba43030fede59fe5993"
       },
       "description": "Breakdown by risk class (if available)\n\nKeys are methodology-specific component labels. SIMM publishes\n`IR_Delta`, `IR_Vega`, `Credit_Qualifying_Delta`,\n`Credit_Qualifying_Vega`, `Credit_NonQualifying_Delta`,\n`Credit_NonQualifying_Vega`, `Equity_Delta`, `Equity_Vega`, `FX_Delta`,\n`FX_Vega`, `Commodity_Delta`, `Commodity_Vega` and `Curvature`; the\nschedule calculator publishes the normalised asset class (for example\n`interest_rate`). Values are IM amounts for that component.",
       "type": "object"
@@ -78,11 +78,6 @@
   "type": "object",
   "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
   "$defs": {
-    "d_19d60d3659da4feb5699": {
-      "description": "Exact decimal encoded only as a JSON string.",
-      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
-      "type": "string"
-    },
     "d_40588ec783a0405c77b7": {
       "additionalProperties": false,
       "description": "One weighted sensitivity inside a SIMM bucket.\n\nFor delta and vega components\n`weighted_sensitivity = sensitivity × historical_volatility_ratio ×\nrisk_weight × concentration_factor` (the ratio is the component's). For\ncurvature components `sensitivity` is the factor's curvature risk\nexposure after the expiry scaling factor and netting, and the weight and\nconcentration factor are `1`.",
@@ -126,6 +121,37 @@
         "concentration_factor",
         "weighted_sensitivity"
       ],
+      "type": "object"
+    },
+    "d_4ba43030fede59fe5993": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount.",
+      "examples": [
+        {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        {
+          "amount": "-2500.75",
+          "currency": "EUR"
+        }
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/d_bdf84b73c34f6ec51af5",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/d_9bbbe0cc70b45831cb71",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "title": "Money",
       "type": "object"
     },
     "d_65bb0c9d3b7473f90d76": {
@@ -192,7 +218,7 @@
         }
       ]
     },
-    "d_abf38793cf359543b86e": {
+    "d_9bbbe0cc70b45831cb71": {
       "description": "ISO 4217 currency enumeration",
       "oneOf": [
         {
@@ -1024,25 +1050,6 @@
       ],
       "type": "object"
     },
-    "d_bc5433c4e038748aff30": {
-      "additionalProperties": false,
-      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
-      "properties": {
-        "amount": {
-          "$ref": "#/$defs/d_19d60d3659da4feb5699",
-          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
-        },
-        "currency": {
-          "$ref": "#/$defs/d_abf38793cf359543b86e",
-          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
-        }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ],
-      "type": "object"
-    },
     "d_bcda0f59e8c84776e25e": {
       "description": "Risk classes for SIMM categorization.",
       "oneOf": [
@@ -1077,6 +1084,11 @@
           "type": "string"
         }
       ]
+    },
+    "d_bdf84b73c34f6ec51af5": {
+      "description": "Exact decimal encoded only as a JSON string.",
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+      "type": "string"
     },
     "d_ec4d9317c8ed1ebeb884": {
       "additionalProperties": false,

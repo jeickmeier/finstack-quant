@@ -1887,7 +1887,7 @@
           "uri": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
           "pointer": "#",
           "source": "finstack-quant/margin/schemas/margin/1/simm_sensitivities_json.schema.json",
-          "sha256": "ec381e900d8ba549ef4fe92399ff8642e0ddc13654eb98d022439c7790d78033",
+          "sha256": "4e16a0b0dacec9a4060cafbdc16e28a58c5ed55c42f4212d425755398a69c750",
           "description": "JSON-friendly representation of `SimmSensitivities`."
         }
       ]
@@ -1927,7 +1927,7 @@
           "uri": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
           "pointer": "#",
           "source": "finstack-quant/margin/schemas/margin/1/im_result.schema.json",
-          "sha256": "0a5487230c45ddbf25cc09a43769039dfb866fd36ce6bec2dea09285d9d57834",
+          "sha256": "f0410484c739549626e047c0fb4950cee2470b28f59e1eb683d7da65a0609c17",
           "description": "Initial margin calculation result."
         }
       ]
@@ -1941,7 +1941,7 @@
           "uri": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
           "pointer": "#",
           "source": "finstack-quant/margin/schemas/margin/1/simm_sensitivities_json.schema.json",
-          "sha256": "ec381e900d8ba549ef4fe92399ff8642e0ddc13654eb98d022439c7790d78033",
+          "sha256": "4e16a0b0dacec9a4060cafbdc16e28a58c5ed55c42f4212d425755398a69c750",
           "description": "JSON-friendly representation of `SimmSensitivities`."
         }
       ]

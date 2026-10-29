@@ -1,4 +1,5 @@
 // Generated from the finstack-quant-margin JSON schemas by scripts/generate-contract-types.mjs. Do not edit.
+import type * as valuations from '../valuations/index.js';
 
 /**
  * Built-in [`ScheduleAssetClass`] spellings.
@@ -55,193 +56,6 @@ export type CollateralAssetClass =
  */
 export type CorrelationScenario = "low" | "medium" | "high";
 /**
- * ISO 4217 currency enumeration
- */
-export type Currency =
-  | "AED"
-  | "AFN"
-  | "ALL"
-  | "AMD"
-  | "ANG"
-  | "AOA"
-  | "ARS"
-  | "AUD"
-  | "AWG"
-  | "AZN"
-  | "BAM"
-  | "BBD"
-  | "BDT"
-  | "BGN"
-  | "BHD"
-  | "BIF"
-  | "BMD"
-  | "BND"
-  | "BOB"
-  | "BRL"
-  | "BSD"
-  | "BTN"
-  | "BWP"
-  | "BYN"
-  | "BZD"
-  | "CAD"
-  | "CDF"
-  | "CHF"
-  | "CLF"
-  | "CLP"
-  | "CNY"
-  | "COP"
-  | "CRC"
-  | "CUC"
-  | "CUP"
-  | "CVE"
-  | "CZK"
-  | "DJF"
-  | "DKK"
-  | "DOP"
-  | "DZD"
-  | "EGP"
-  | "ERN"
-  | "ETB"
-  | "EUR"
-  | "FJD"
-  | "FKP"
-  | "GBP"
-  | "GEL"
-  | "GHS"
-  | "GIP"
-  | "GMD"
-  | "GNF"
-  | "GTQ"
-  | "GYD"
-  | "HKD"
-  | "HNL"
-  | "HRK"
-  | "HTG"
-  | "HUF"
-  | "IDR"
-  | "ILS"
-  | "INR"
-  | "IQD"
-  | "IRR"
-  | "ISK"
-  | "JMD"
-  | "JOD"
-  | "JPY"
-  | "KES"
-  | "KGS"
-  | "KHR"
-  | "KMF"
-  | "KPW"
-  | "KRW"
-  | "KWD"
-  | "KYD"
-  | "KZT"
-  | "LAK"
-  | "LBP"
-  | "LKR"
-  | "LRD"
-  | "LSL"
-  | "LYD"
-  | "MAD"
-  | "MDL"
-  | "MGA"
-  | "MKD"
-  | "MMK"
-  | "MNT"
-  | "MOP"
-  | "MRU"
-  | "MUR"
-  | "MVR"
-  | "MWK"
-  | "MXN"
-  | "MYR"
-  | "MZN"
-  | "NAD"
-  | "NGN"
-  | "NIO"
-  | "NOK"
-  | "NPR"
-  | "NZD"
-  | "OMR"
-  | "PAB"
-  | "PEN"
-  | "PGK"
-  | "PHP"
-  | "PKR"
-  | "PLN"
-  | "PYG"
-  | "QAR"
-  | "RON"
-  | "RSD"
-  | "RUB"
-  | "RWF"
-  | "SAR"
-  | "SBD"
-  | "SCR"
-  | "SDG"
-  | "SEK"
-  | "SGD"
-  | "SHP"
-  | "SLE"
-  | "SLL"
-  | "SOS"
-  | "SRD"
-  | "SSP"
-  | "STN"
-  | "SYP"
-  | "SZL"
-  | "THB"
-  | "TJS"
-  | "TMT"
-  | "TND"
-  | "TOP"
-  | "TRY"
-  | "TTD"
-  | "TWD"
-  | "TZS"
-  | "UAH"
-  | "UGX"
-  | "USD"
-  | "UYU"
-  | "UZS"
-  | "VED"
-  | "VES"
-  | "VND"
-  | "VUV"
-  | "WST"
-  | "XAF"
-  | "XCD"
-  | "XOF"
-  | "XPF"
-  | "YER"
-  | "ZAR"
-  | "ZMW"
-  | "ZWL";
-/**
- * A phantom-typed identifier that prevents mixing different kinds of IDs.
- *
- * This type wraps a string identifier with a phantom type parameter to ensure
- * type safety at compile time. Different `Id<T>` types with different `T`
- * cannot be compared or mixed accidentally, preventing entire classes of bugs.
- *
- * # Type Parameters
- *
- * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
- *
- * # Invariants
- *
- * - Storage uses `Arc<str>` for efficient cloning
- * - The phantom marker has zero size and runtime cost
- * - Two `Id<T>` values are equal if their string values are equal
- * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
- *
- * # Thread Safety
- *
- * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
- * safely share and clone IDs with minimal synchronization overhead.
- */
-export type Id = string;
-/**
  * Initial margin calculation methodology.
  *
  * Different methodologies are used depending on regulatory requirements,
@@ -255,20 +69,12 @@ export type Id = string;
  */
 export type ImMethodology = "haircut" | "simm" | "schedule" | "internal_model" | "clearing_house";
 /**
- * Exact decimal encoded only as a JSON string.
- */
-export type DecimalWire = string;
-/**
  * Margin call frequency.
  *
  * Determines how often margin calls are made and collateral is exchanged.
  * Industry standard for OTC derivatives is daily under BCBS-IOSCO rules.
  */
 export type MarginTenor = "daily" | "weekly" | "monthly" | "on_demand";
-/**
- * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
- */
-export type DateWire = string;
 /**
  * DRC sector classification.
  */
@@ -617,22 +423,6 @@ export interface CreditXvaRow {
 }
 /**
  * Credit Support Annex specification (ISDA standard).
- *
- * The CSA governs the exchange of collateral between counterparties
- * for OTC derivatives. This specification captures all key commercial
- * terms needed for margin calculation and management.
- *
- * # ISDA Documentation
- *
- * This type represents terms from:
- * - ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)
- * - ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)
- *
- * # References
- *
- * - ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`
- * - ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`
- * - BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`
  */
 export interface CsaSpec {
   /**
@@ -641,7 +431,7 @@ export interface CsaSpec {
    * All exposures and collateral values are converted to this currency
    * for netting and comparison with thresholds.
    */
-  base_currency: Currency;
+  base_currency: valuations.Currency;
   /**
    * Contractual business-day calendar for calls and settlements.
    */
@@ -656,7 +446,7 @@ export interface CsaSpec {
    * Cash collateral is typically discounted at OIS/RFR rates.
    * This curve should match the CSA's collateral interest rate.
    */
-  collateral_curve_id: Id;
+  collateral_curve_id: valuations.Id;
   /**
    * Eligible collateral schedule.
    *
@@ -761,7 +551,7 @@ export interface ImParameters {
    *
    * Combined IM+VM MTA must not exceed €500,000 under BCBS-IOSCO.
    */
-  mta: Money;
+  mta: valuations.Money;
   /**
    * Whether IM must be held in a segregated account.
    *
@@ -775,28 +565,7 @@ export interface ImParameters {
    * BCBS-IOSCO permits €50M aggregate threshold at group level.
    * Many large dealers operate with zero threshold by agreement.
    */
-  threshold: Money;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- */
-export interface Money {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: DecimalWire;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency: Currency;
+  threshold: valuations.Money;
 }
 /**
  * Variation margin parameters.
@@ -824,20 +593,20 @@ export interface VmParameters {
    * Fixed collateral amount required regardless of exposure.
    * Often used for credit enhancement or as a buffer.
    */
-  independent_amount: Money;
+  independent_amount: valuations.Money;
   /**
    * Minimum Transfer Amount (MTA).
    *
    * Margin calls below MTA are not made. BCBS-IOSCO permits combined
    * IM+VM MTA up to €500,000 equivalent.
    */
-  mta: Money;
+  mta: valuations.Money;
   /**
    * Rounding increment for margin amounts.
    *
    * Margin calls are typically rounded to the nearest multiple of this amount.
    */
-  rounding: Money;
+  rounding: valuations.Money;
   /**
    * Settlement lag in business days (T+n).
    *
@@ -850,7 +619,7 @@ export interface VmParameters {
    * Under BCBS-IOSCO rules for covered entities, VM threshold must be zero.
    * Legacy bilateral CSAs may have non-zero thresholds.
    */
-  threshold: Money;
+  threshold: valuations.Money;
 }
 /**
  * A position subject to the Default Risk Charge.
@@ -1046,15 +815,15 @@ export interface ExcessCollateral {
   /**
    * Collateral value
    */
-  collateral_value: Money;
+  collateral_value: valuations.Money;
   /**
    * Excess amount (positive) or shortfall (negative)
    */
-  excess: Money;
+  excess: valuations.Money;
   /**
    * Required value
    */
-  required_value: Money;
+  required_value: valuations.Money;
   [k: string]: unknown;
 }
 /**
@@ -1200,7 +969,7 @@ export interface FrtbScenarioCharges {
  * FRTB sensitivity inputs organized by risk class.
  */
 export interface FrtbSensitivities {
-  base_currency: Currency;
+  base_currency: valuations.Currency;
   commodity_curvature: [string, number, number, number][];
   commodity_delta: [string, number, string, string, number][];
   commodity_vega: [string, number, string, number][];
@@ -1218,14 +987,14 @@ export interface FrtbSensitivities {
   equity_delta: [string, number, number][];
   equity_repo_delta: [string, number, number][];
   equity_vega: [string, number, string, number][];
-  fx_curvature: [Currency, Currency, number, number][];
-  fx_delta: [Currency, Currency, number][];
-  fx_vega: [Currency, Currency, string, number][];
-  girr_curvature: [Currency, number, number][];
-  girr_delta: [Currency, string, number][];
-  girr_inflation_delta: [Currency, number][];
-  girr_vega: [Currency, string, string, number][];
-  girr_xccy_basis_delta: [Currency, number][];
+  fx_curvature: [valuations.Currency, valuations.Currency, number, number][];
+  fx_delta: [valuations.Currency, valuations.Currency, number][];
+  fx_vega: [valuations.Currency, valuations.Currency, string, number][];
+  girr_curvature: [valuations.Currency, number, number][];
+  girr_delta: [valuations.Currency, string, number][];
+  girr_inflation_delta: [valuations.Currency, number][];
+  girr_vega: [valuations.Currency, string, string, number][];
+  girr_xccy_basis_delta: [valuations.Currency, number][];
   rrao_exotic_notionals: RraoPosition[];
 }
 /**
@@ -1377,7 +1146,7 @@ export interface Haircut01 {
   /**
    * Collateral value
    */
-  collateral_value: Money;
+  collateral_value: valuations.Money;
   /**
    * Current haircut (decimal)
    */
@@ -1385,7 +1154,7 @@ export interface Haircut01 {
   /**
    * PV change for +1bp haircut
    */
-  pv_change: Money;
+  pv_change: valuations.Money;
   [k: string]: unknown;
 }
 /**
@@ -1395,15 +1164,15 @@ export interface ImCollateralResult {
   /**
    * Existing nonnegative collateral balance in this one-way IM account.
    */
-  current_collateral: Money;
+  current_collateral: valuations.Money;
   /**
    * Gross model IM after MPOR adjustment, before contractual thresholds.
    */
-  gross_initial_margin: Money;
+  gross_initial_margin: valuations.Money;
   /**
    * Target collateral balance, max(gross IM minus allocated CSA threshold, 0).
    */
-  required_collateral: Money;
+  required_collateral: valuations.Money;
   /**
    * True requires separate custody with no reuse to satisfy VM obligations.
    */
@@ -1412,7 +1181,7 @@ export interface ImCollateralResult {
    * Signed transfer: positive posts additional IM, negative returns excess.
    * Absolute transfers strictly below MTA are zero; equality triggers transfer.
    */
-  transfer: Money;
+  transfer: valuations.Money;
 }
 /**
  * Initial margin calculation result.
@@ -1421,7 +1190,7 @@ export interface ImResult {
   /**
    * Calculated initial margin amount
    */
-  amount: Money;
+  amount: valuations.Money;
   /**
    * Whether the amount is an approximation rather than
    * an exact computation under the named methodology.
@@ -1452,7 +1221,7 @@ export interface ImResult {
    * `interest_rate`). Values are IM amounts for that component.
    */
   breakdown: {
-    [k: string]: Money;
+    [k: string]: valuations.Money;
   };
   /**
    * Methodology used for calculation
@@ -1620,7 +1389,7 @@ export interface MarginCall {
   /**
    * Nonnegative transfer amount; call_type specifies the desk cashflow direction.
    */
-  amount: Money;
+  amount: valuations.Money;
   /**
    * Date the margin call is issued
    */
@@ -1636,11 +1405,11 @@ export interface MarginCall {
   /**
    * MTA applied (may have reduced the call amount)
    */
-  mta_applied: Money;
+  mta_applied: valuations.Money;
   /**
    * Mark-to-market value that triggered the call
    */
-  mtm_trigger: Money;
+  mtm_trigger: valuations.Money;
   /**
    * Settlement date for the margin transfer
    */
@@ -1648,7 +1417,7 @@ export interface MarginCall {
   /**
    * Threshold in effect at time of call
    */
-  threshold: Money;
+  threshold: valuations.Money;
 }
 /**
  * Margin constants a host needs to interpret inputs and results.
@@ -1772,7 +1541,7 @@ export interface MarginFundingCost {
   /**
    * Net funding cost (annualized)
    */
-  annual_cost: Money;
+  annual_cost: valuations.Money;
   /**
    * Collateral return rate (e.g., Fed Funds)
    */
@@ -1784,15 +1553,15 @@ export interface MarginFundingCost {
   /**
    * Posted margin amount
    */
-  margin_posted: Money;
+  margin_posted: valuations.Money;
   [k: string]: unknown;
 }
 /**
  * Margin utilization result.
  */
 export interface MarginUtilization {
-  posted: Money;
-  required: Money;
+  posted: valuations.Money;
+  required: valuations.Money;
 }
 /**
  * Result of an MVA computation.
@@ -1876,7 +1645,7 @@ export interface SaCcrNettingSetConfig {
   /**
    * Valuation date used for forward-start and remaining-maturity calculations.
    */
-  as_of: DateWire;
+  as_of: valuations.DateWire;
   /**
    * Net current collateral held (positive = bank holds collateral).
    */
@@ -1921,7 +1690,7 @@ export interface SaCcrTrade {
   /**
    * Underlying end date used for supervisory duration; linear trade maturity.
    */
-  end_date: DateWire;
+  end_date: valuations.DateWire;
   /**
    * Hedging set identifier within the asset class.
    * Trades with the same hedging set can partially offset.
@@ -1944,7 +1713,7 @@ export interface SaCcrTrade {
    * Option expiry for maturity-factor calculation, distinct from the
    * underlying start/end dates used for supervisory duration.
    */
-  option_maturity_date?: DateWire | null;
+  option_maturity_date?: valuations.DateWire | null;
   /**
    * Option exercise type if applicable.
    */
@@ -1952,7 +1721,7 @@ export interface SaCcrTrade {
   /**
    * Underlying start date used for IR/credit supervisory duration.
    */
-  start_date: DateWire;
+  start_date: valuations.DateWire;
   /**
    * Explicit supervisory category; required outside IR and FX.
    */
@@ -2018,7 +1787,7 @@ export interface SimmSensitivitiesJson {
   /**
    * Base currency for the sensitivities.
    */
-  base_currency: Currency;
+  base_currency: valuations.Currency;
   /**
    * Commodity delta buckets as `(bucket, amount)`.
    */
@@ -2058,19 +1827,19 @@ export interface SimmSensitivitiesJson {
   /**
    * FX delta buckets as `(currency, amount)`.
    */
-  fx_delta?: [Currency, number][];
+  fx_delta?: [valuations.Currency, number][];
   /**
    * FX vega buckets as `(ccy1, ccy2, amount)`.
    */
-  fx_vega?: [Currency, Currency, number][];
+  fx_vega?: [valuations.Currency, valuations.Currency, number][];
   /**
    * Interest-rate delta buckets as `(currency, tenor, amount)`.
    */
-  ir_delta?: [Currency, string, number][];
+  ir_delta?: [valuations.Currency, string, number][];
   /**
    * Interest-rate vega buckets as `(currency, tenor, amount)`.
    */
-  ir_vega?: [Currency, string, number][];
+  ir_vega?: [valuations.Currency, string, number][];
 }
 /**
  * Variation margin calculation result.
@@ -2081,11 +1850,11 @@ export interface VmResult {
    * passed to the calculator: positive when the desk holds collateral,
    * negative when the desk has posted it.
    */
-  collateral_balance: Money;
+  collateral_balance: valuations.Money;
   /**
    * Amount to collect from the counterparty, including returned collateral
    */
-  collect_amount: Money;
+  collect_amount: valuations.Money;
   /**
    * Calculation date
    */
@@ -2093,26 +1862,26 @@ export interface VmResult {
   /**
    * Gross mark-to-market exposure
    */
-  gross_exposure: Money;
+  gross_exposure: valuations.Money;
   /**
    * CSA independent amount added to the threshold-adjusted exposure to
    * give `net_exposure`, in the CSA base currency.
    */
-  independent_amount: Money;
+  independent_amount: valuations.Money;
   /**
    * CSA minimum transfer amount in the CSA base currency. When
    * `|unrounded_call| < mta`, no transfer is made and both `post_amount`
    * and `collect_amount` are zero.
    */
-  mta: Money;
+  mta: valuations.Money;
   /**
    * Net exposure after applying threshold and independent amount
    */
-  net_exposure: Money;
+  net_exposure: valuations.Money;
   /**
    * Amount to post to the counterparty, including returned collateral
    */
-  post_amount: Money;
+  post_amount: valuations.Money;
   /**
    * CSA rounding increment in the CSA base currency. A transfer that
    * passes the MTA test has its magnitude rounded to a multiple of this
@@ -2120,7 +1889,7 @@ export interface VmResult {
    * `net_exposure` (a delivery), down otherwise (a return). Zero disables
    * rounding.
    */
-  rounding_increment: Money;
+  rounding_increment: valuations.Money;
   /**
    * Settlement date for the margin transfer
    */
@@ -2129,13 +1898,13 @@ export interface VmResult {
    * CSA threshold applied symmetrically to `|gross_exposure|`, in the CSA
    * base currency (non-negative).
    */
-  threshold: Money;
+  threshold: valuations.Money;
   /**
    * Signed credit support amount before the minimum-transfer test and
    * rounding: `net_exposure − collateral_balance`. Positive means collect
    * from the counterparty, negative means the desk pays (post or return).
    */
-  unrounded_call: Money;
+  unrounded_call: valuations.Money;
 }
 /**
  * Result of XVA calculations.
