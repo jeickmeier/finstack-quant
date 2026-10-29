@@ -74,6 +74,14 @@ a hazard curve without a calibration recipe needs the `first_order_shift` bump
 mode; the native error is shown otherwise. Optional `marketScenario` supplies the
 initial draft; this demo seeds a 50bp USD-OIS shift, applied only on request.
 
+Below the report, **Horizon return** runs the native `computeHorizonReturn` of
+the last priced request under the applied scenario: the scenario's time roll
+sets the horizon. It shows Rust's total and annualized return (the annualized
+return reads "not defined" without a roll), factor contributions, the explain
+text and the factor attribution. The attribution method and the roll calendar
+are optional; blank leaves both to Rust. `metrics_based` fails on a hazard
+curve without a calibration recipe, and the native error is shown.
+
 ## Print and publication output
 
 After **Priced**, choose **Print report**. The workbench captures its completed

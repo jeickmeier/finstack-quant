@@ -170,6 +170,44 @@ test("portfolio-metrics by position", async ({ page }) => {
     "portfolio-metrics-by-position.png",
   );
 });
+test("pnl-attribution-report waterfall", async ({ page }) => {
+  const item = await open(
+    page,
+    "pnl-attribution-report",
+    "light",
+    "comfortable",
+  );
+  // The four item baselines stop above the waterfall drawn from Rust's steps.
+  const waterfall = item.getByRole("region", {
+    name: "Waterfall",
+    exact: true,
+  });
+  await expect(
+    waterfall.getByRole("table", { name: "Waterfall steps" }),
+  ).toBeVisible();
+  await expect(waterfall).toHaveScreenshot(
+    "pnl-attribution-report-waterfall.png",
+  );
+});
+test("horizon-return-report attribution", async ({ page }) => {
+  const item = await open(
+    page,
+    "horizon-return-report",
+    "light",
+    "comfortable",
+  );
+  // The four item baselines stop above the embedded factor attribution.
+  const attribution = item.getByRole("region", {
+    name: "Attribution",
+    exact: true,
+  });
+  await expect(
+    attribution.getByRole("table", { name: "P&L by factor" }),
+  ).toBeVisible();
+  await expect(attribution).toHaveScreenshot(
+    "horizon-return-report-attribution.png",
+  );
+});
 test("transition-matrix-heatmap cumulative default probability", async ({
   page,
 }) => {

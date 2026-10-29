@@ -37,6 +37,15 @@ test("pricing-workbench market-scenario applied beside the base valuation", asyn
   await expect(
     results.getByRole("table", { name: "Applied shocks" }),
   ).toContainText("USD-OIS");
+  // Rust's horizon return of the same request under the applied scenario.
+  const horizon = results.getByRole("region", {
+    name: "Horizon return report",
+    exact: true,
+  });
+  await expect(horizon.getByText("Total return (decimal)")).toBeVisible();
+  await expect(
+    horizon.getByText("Annualized return (decimal)").locator(".."),
+  ).toContainText("not defined");
   await page.evaluate(() => document.fonts.ready);
   await expect(results).toHaveScreenshot("workbench-market-scenario.png");
   expect(errors).toEqual([]);

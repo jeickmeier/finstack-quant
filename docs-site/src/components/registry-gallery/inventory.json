@@ -301,6 +301,18 @@
       "worker": "none"
     },
     {
+      "name": "horizon-return-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the HorizonReport returned by scenarios.computeHorizonReturn (useHorizonReturn): total and annualized return and each factor contribution as the decimal fractions Rust computed (an undefined value, such as the annualized return without a time roll, reads \"not defined\", never zero), the horizon in calendar days, the exact initial and terminal values, the Rust explain text (scenarios.horizonResultExplainText), the attribution through pnl-attribution-report and the scenario application report through market-scenario-report in a disclosure. Nothing is computed here. Accepts report, explain, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "pnl-attribution-report",
+      "type": "registry:component",
+      "docs": "Display-only view of a PnlAttribution as returned (by attribution.attributePnl / attributePnlMany, or inside scenarios.computeHorizonReturn): total, mark-to-market and endpoint values, every factor bucket as exact money with a signed bar chart of the returned amounts, the waterfall drawn only from Rust's waterfall_steps (pv_before to pv_after per step; nothing when the method returns none), the residual with the returned residual_pct and tolerances, notes, the policy stamp and the JSON. Optional explain, residualWithinTolerance and pctOfTotal props take Rust's pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotal; without residualWithinTolerance no verdict is shown. Nothing is summed, differenced or converted. Accepts attribution, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "performance-report",
       "type": "registry:component",
       "docs": "Display-only view of the report returned by usePerformanceReport (analytics.Performance over a host-supplied panel). A ticker control selects the per-ticker sections. Lookback tiles show MTD, QTD, YTD and FYTD to the returned reference date; the summary is the returned TableEnvelope; cumulative returns (every ticker), drawdown, rolling series, monthly returns (heatmap) and annual returns are drawn against each ticker's own active dates; drawdown episodes are listed largest first. Values are the decimal fractions and ratios Rust returns, with no units inferred; non-finite values are left out of figures and shown as returned elsewhere. The monthly colour domain is the caller's, else the extent of the returned values. Accepts report, loading, error, initialTicker, monthlyDomain, formatValue and density props; no worker or query provider required.",
@@ -480,6 +492,10 @@
     },
     {
       "name": "use-apply-market-scenario",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-horizon-return",
       "type": "registry:hook"
     },
     {
@@ -1031,6 +1047,14 @@
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
       "sha256": "2df669e995742cd83fa991c28adff9ea992532594fcf3911aa3bd54ed83ad0c9"
+    },
+    {
+      "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
+      "sha256": "27d8b8f197a8a66b854dee54fdf2fce7b70e2f830e05cbf3f65243fa24f3f2f6"
+    },
+    {
+      "path": "finstack-quant-ui/tests/attribution/cases.json",
+      "sha256": "97f0920fcf37c1d07633557c56da625599a5e1dbc1d7b39b038456eef35014ad"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",

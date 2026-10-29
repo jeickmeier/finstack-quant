@@ -281,6 +281,24 @@ const displays = [
       "Returned ApplicationReport counters, applied shocks, time roll with carry and warnings; nothing summed or converted. The workbench prices the shocked market at the returned valuation date with the base model and metrics and shows both valuations; no P&L is computed.",
   },
   {
+    id: "horizon-return-report",
+    api: [
+      "scenarios.computeHorizonReturn",
+      "ScenariosNamespace",
+      "computeHorizonReturn",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned HorizonReport: Rust's summary total and annualized return and factor contributions as decimal fractions of the initial value (null shown as not defined, never 0), horizon calendar days, exact initial and terminal values, horizonResultExplainText, the PnlAttribution and the ApplicationReport. Omitted method, config and calendar are left to Rust; nothing is computed in TypeScript.",
+  },
+  {
+    id: "pnl-attribution-report",
+    api: ["attribution.attributePnl", "AttributionNamespace", "attributePnl"],
+    route: "returned-report",
+    convention:
+      "Returned PnlAttribution: total, mark-to-market and endpoint values and every factor bucket as exact money; the waterfall only from waterfall_steps pv_before/pv_after; the residual with the returned residual_pct and tolerances, with a verdict only from pnlAttributionResidualWithinTolerance; shares only from pnlAttributionPctOfTotal; explain only from pnlAttributionExplainText. Nothing is summed, differenced or converted.",
+  },
+  {
     id: "scenario-heatmap",
     api: [
       "valuations.instruments.trancheScenarioTable",

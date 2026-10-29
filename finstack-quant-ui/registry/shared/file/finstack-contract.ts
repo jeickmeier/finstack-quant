@@ -18,6 +18,7 @@ import type {
   CalendarYearLadderRow,
   ArbitrageValidationResult,
   ApplicationReport,
+  HorizonReport,
   DatedSeries,
   DrawdownEpisode,
   LookbackReturns,
@@ -31,6 +32,7 @@ import type {
   valuations,
 } from "finstack-quant-wasm";
 import type {
+  attribution as attributionWire,
   core as wire,
   scenarios as scenarioWire,
 } from "finstack-quant-wasm/types";
@@ -195,6 +197,28 @@ export interface MarketScenarioApplication {
   readonly asOf: string;
   /** The shocked instrument when the scenario mutates instruments, else the request's. */
   readonly instrumentJson: string;
+}
+/** Horizon total return of one instrument under a canonical scenario, from its market and valuation date. */
+export interface HorizonReturnRequest {
+  /** Canonical instrument envelope JSON. */
+  readonly instrumentJson: string;
+  /** Canonical MarketContext JSON at the valuation date. */
+  readonly marketJson: string;
+  /** ISO valuation date (T0). */
+  readonly asOf: string;
+  /** Canonical ScenarioSpec JSON; a time roll sets the horizon. */
+  readonly scenarioJson: string;
+  /** AttributionMethod wire value; omitted is Rust's default method. */
+  readonly method?: attributionWire.AttributionMethod | null;
+  /** Built-in holiday calendar id for business-day roll targets; omitted is Rust's weekends-only calendar. */
+  readonly calendarId?: string | null;
+}
+/** The native horizon report and its Rust explain text. */
+export interface HorizonReturn {
+  /** scenarios.computeHorizonReturn as returned (HorizonResult plus its Rust summary). */
+  readonly report: HorizonReport;
+  /** scenarios.horizonResultExplainText of the report. */
+  readonly explain: string;
 }
 /** A ticker-major panel for analytics.Performance; every omitted option is left to Rust. */
 export interface PerformanceReportRequest {
@@ -481,7 +505,7 @@ export interface CashflowsApi {
     cashflows: CashflowEnvelope,
   ): Promise<Envelope<CurrencyLadder[]>>;
 }
-/** scenarios: market scenario construction and application. */
+/** scenarios: market scenario construction, application and horizon total return. */
 export interface ScenariosApi {
   /** scenarios.operationSpecTimeRollForward + parallelBpMany per shift + parseScenarioSpec: canonical ScenarioSpec text. */
   buildMarketScenario(
@@ -491,6 +515,10 @@ export interface ScenariosApi {
   applyMarketScenario(
     request: MarketScenarioApplicationRequest,
   ): Promise<Envelope<MarketScenarioApplication>>;
+  /** scenarios.computeHorizonReturn (omitted method, config and calendar left to Rust) + horizonResultExplainText. */
+  horizonReturn(
+    request: HorizonReturnRequest,
+  ): Promise<Envelope<HorizonReturn>>;
 }
 /** analytics: performance reports over a host-supplied panel. */
 export interface AnalyticsApi {
