@@ -3829,6 +3829,39 @@
       }
     },
     {
+      "name": "contract-table-envelope",
+      "type": "registry:lib",
+      "title": "Table envelope contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust table_envelope contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/table_envelope.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/table_envelope.json"
+        },
+        {
+          "path": "src/generated/types/table_envelope.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/table_envelope.ts"
+        },
+        {
+          "path": "src/generated/meta/table_envelope.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/table_envelope.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "instrument-catalogue",
       "type": "registry:lib",
       "title": "Instrument catalogue",

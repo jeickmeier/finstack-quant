@@ -21,6 +21,7 @@ import { Example as Example17 } from "./examples/finstack-form";
 import { Example as Example18 } from "./examples/finstack-table";
 import { Example as Example19 } from "./examples/finstack-chart";
 import { Example as Example20 } from "./examples/domain-field";
+import { Example as Example21 } from "./examples/table-envelope";
 
 const examples = {
   "finstack-theme": Example0,
@@ -44,6 +45,7 @@ const examples = {
   "finstack-table": Example18,
   "finstack-chart": Example19,
   "domain-field": Example20,
+  "table-envelope": Example21,
 };
 export function PrimitiveDemo({
   name,
