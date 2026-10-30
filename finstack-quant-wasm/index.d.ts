@@ -11930,16 +11930,16 @@ export interface VmCalculator extends WasmOwned {
    * @param exposure - Signed mark-to-market in `currency`: positive means the counterparty owes the desk.
    * @param postedCollateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.
    * @param currency - ISO-4217 code; must equal the CSA base currency.
-   * @param asOf - ISO-8601 calculation date; the settlement date is derived from it on the CSA calendar.
-   * @returns The `VmResult` as a plain object: `date`, `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.
+   * @param asOf - ISO-8601 valuation date; a date that is not a business day of the CSA calendar is rolled to the next one (Following), and the settlement date is derived from that call date.
+   * @returns The `VmResult` as a plain object: `date` (the call date, a CSA business day), `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.
    * @throws Error - Throws if the currency is unknown or differs from the CSA base currency, an amount is non-finite, the date is not ISO 8601, or the CSA calendar is not registered.
    */
   calculate(exposure: number, postedCollateral: number, currency: string, asOf: string): VmResult;
   /**
    * Run an exposure time series into a margin-call schedule.
-   * @param exposures - Array of `[date, exposure]` pairs: ISO-8601 date and signed exposure in the CSA base currency (positive means the counterparty owes the desk), processed in the order given.
+   * @param exposures - Array of `[date, exposure]` pairs: ISO-8601 date and signed exposure in the CSA base currency (positive means the counterparty owes the desk), processed in the order given; a date that is not a business day of the CSA calendar is rolled to the next one (Following).
    * @param initialCollateral - Collateral balance before the first date, in major units of the CSA base currency.
-   * @returns One `MarginCall` plain object per call (`call_date`, `settlement_date`, `call_type`, `amount`, `mtm_trigger`, `threshold`, `mta_applied`); dates without a call produce no entry.
+   * @returns One `MarginCall` plain object per call (`call_date` on a CSA business day, `settlement_date`, `call_type`, `amount`, `mtm_trigger`, `threshold`, `mta_applied`); dates without a call produce no entry.
    * @throws Error - Throws if `exposures` is not an array of `[string, number]` pairs, an amount is non-finite, a date is not ISO 8601, or the CSA calendar is not registered.
    */
   generateMarginCalls(

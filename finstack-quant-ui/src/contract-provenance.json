@@ -2242,15 +2242,15 @@
           }
         ],
         "returns": "VmResult",
-        "declaration": "/**\n   * Calculate variation margin for one date.\n   * @param exposure - Signed mark-to-market in `currency`: positive means the counterparty owes the desk.\n   * @param postedCollateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.\n   * @param currency - ISO-4217 code; must equal the CSA base currency.\n   * @param asOf - ISO-8601 calculation date; the settlement date is derived from it on the CSA calendar.\n   * @returns The `VmResult` as a plain object: `date`, `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.\n   * @throws Error - Throws if the currency is unknown or differs from the CSA base currency, an amount is non-finite, the date is not ISO 8601, or the CSA calendar is not registered.\n   */\n  calculate(exposure: number, postedCollateral: number, currency: string, asOf: string): VmResult;",
-        "sha256": "abcdabfc0166b3a04b31e5abb2266ce03f720fc8be1a2d09408f0dc90511dd61"
+        "declaration": "/**\n   * Calculate variation margin for one date.\n   * @param exposure - Signed mark-to-market in `currency`: positive means the counterparty owes the desk.\n   * @param postedCollateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.\n   * @param currency - ISO-4217 code; must equal the CSA base currency.\n   * @param asOf - ISO-8601 valuation date; a date that is not a business day of the CSA calendar is rolled to the next one (Following), and the settlement date is derived from that call date.\n   * @returns The `VmResult` as a plain object: `date` (the call date, a CSA business day), `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.\n   * @throws Error - Throws if the currency is unknown or differs from the CSA base currency, an amount is non-finite, the date is not ISO 8601, or the CSA calendar is not registered.\n   */\n  calculate(exposure: number, postedCollateral: number, currency: string, asOf: string): VmResult;",
+        "sha256": "73295a50c67cdd6307d88c571dcfa2450e30413b02c434774f0e4fc3402a100b"
       },
       "schemas": [
         {
           "uri": "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json",
           "pointer": "#",
           "source": "finstack-quant/margin/schemas/margin/1/vm_result.schema.json",
-          "sha256": "b079abde2e51a36f7cb01f80edafd8f71b95b4e8064fe258638719bf3786c412",
+          "sha256": "a1c79edce35bff5e19bc99fe328b5cbdd458b788ba27e273c4e2944ea15ca0c4",
           "description": "Variation margin calculation result."
         }
       ]
