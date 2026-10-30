@@ -25,8 +25,7 @@ export function fxDeltaOptions(
 }
 /** Native annualized Black decimal volatilities in coordinate order; errors are unchanged. */
 export function useFxDeltaSamples(request: FxDeltaSampleRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...fxDeltaOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    fxDeltaOptions(worker.client, worker.session, request),
+  );
 }

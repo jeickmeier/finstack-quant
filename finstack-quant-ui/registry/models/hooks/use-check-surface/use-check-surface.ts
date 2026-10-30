@@ -28,8 +28,7 @@ export function checkSurfaceOptions(
 }
 /** Native models.volatility.checkSurface report; errors (such as a rejected quote convention) are unchanged. */
 export function useCheckSurface(request: CheckSurfaceRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...checkSurfaceOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    checkSurfaceOptions(worker.client, worker.session, request),
+  );
 }

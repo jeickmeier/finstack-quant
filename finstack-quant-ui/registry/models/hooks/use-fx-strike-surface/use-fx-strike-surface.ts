@@ -28,8 +28,7 @@ export function fxStrikeSurfaceOptions(
 }
 /** Native strike-space surface materialized from FX delta quotes; errors are unchanged. */
 export function useFxStrikeSurface(request: FxStrikeSurfaceRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...fxStrikeSurfaceOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    fxStrikeSurfaceOptions(worker.client, worker.session, request),
+  );
 }

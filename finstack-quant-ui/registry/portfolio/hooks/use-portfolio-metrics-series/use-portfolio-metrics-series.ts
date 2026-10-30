@@ -30,8 +30,7 @@ export function portfolioMetricsSeriesOptions(
 export function usePortfolioMetricsSeries(
   request: PortfolioMetricsSeriesRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...portfolioMetricsSeriesOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    portfolioMetricsSeriesOptions(worker.client, worker.session, request),
+  );
 }

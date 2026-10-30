@@ -25,8 +25,7 @@ export function cubeSmileOptions(
 }
 /** Native SABR smile, arbitrage check and optional repair of one cube node; errors are unchanged. */
 export function useCubeSmile(request: CubeSmileRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...cubeSmileOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    cubeSmileOptions(worker.client, worker.session, request),
+  );
 }

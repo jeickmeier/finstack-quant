@@ -23,8 +23,7 @@ export function portfolioMarginOptions(
 }
 /** Native portfolio.portfolioMargin result for a host-supplied book, market and date, or the actual native error; supply a Finstack/Query provider. */
 export function usePortfolioMargin(request: PortfolioMarginRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...portfolioMarginOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    portfolioMarginOptions(worker.client, worker.session, request),
+  );
 }

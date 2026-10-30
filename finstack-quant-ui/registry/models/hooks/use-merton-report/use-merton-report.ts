@@ -27,8 +27,7 @@ export function mertonReportOptions(
 }
 /** Native models.credit.MertonModel results graded on the default PD master scale, or the actual native error; supply a Finstack/Query provider. */
 export function useMertonReport(request: MertonReportRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...mertonReportOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    mertonReportOptions(worker.client, worker.session, request),
+  );
 }

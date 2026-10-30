@@ -28,8 +28,7 @@ export function benchmarkReportOptions(
 }
 /** Native analytics.Performance benchmark-relative results of a host-supplied panel, or the actual native error; supply a Finstack/Query provider. */
 export function useBenchmarkReport(request: BenchmarkReportRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...benchmarkReportOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    benchmarkReportOptions(worker.client, worker.session, request),
+  );
 }

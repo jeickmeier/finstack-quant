@@ -28,8 +28,7 @@ export function migrationProjectionOptions(
 export function useMigrationProjection(
   request: MigrationProjectionRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...migrationProjectionOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    migrationProjectionOptions(worker.client, worker.session, request),
+  );
 }

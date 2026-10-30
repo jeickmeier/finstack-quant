@@ -26,8 +26,7 @@ export function attributePnlManyOptions(
 }
 /** Native attribution.attributePnlMany results (one per instrument, in order) with Rust's explain text, residual check and share of total, or the actual native error; supply a Finstack/Query provider. */
 export function useAttributePnlMany(request: AttributePnlManyRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...attributePnlManyOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    attributePnlManyOptions(worker.client, worker.session, request),
+  );
 }

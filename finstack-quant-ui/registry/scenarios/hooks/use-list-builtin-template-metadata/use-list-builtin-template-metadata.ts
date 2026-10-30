@@ -19,8 +19,7 @@ export function listBuiltinTemplateMetadataOptions(
 }
 /** Native scenarios.listBuiltinTemplateMetadata in registry order, or the actual native error; supply a Finstack/Query provider. */
 export function useListBuiltinTemplateMetadata() {
-  return useWorkerQuery((worker) => ({
-    ...listBuiltinTemplateMetadataOptions(worker.client, worker.session),
-    enabled: worker.status === "ready",
-  }));
+  return useWorkerQuery((worker) =>
+    listBuiltinTemplateMetadataOptions(worker.client, worker.session),
+  );
 }

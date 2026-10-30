@@ -33,8 +33,7 @@ export function applyScenarioAndRevalueOptions(
 export function useApplyScenarioAndRevalue(
   request: ScenarioRevalueRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...applyScenarioAndRevalueOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    applyScenarioAndRevalueOptions(worker.client, worker.session, request),
+  );
 }
