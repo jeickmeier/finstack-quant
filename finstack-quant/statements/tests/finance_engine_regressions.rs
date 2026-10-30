@@ -194,3 +194,73 @@ fn finite_money_overflow_retains_conversion_warning_in_both_paths() {
         );
     }
 }
+
+/// Every Monte Carlo path re-evaluates the actual periods, so a warning there
+/// used to be reported once per path (1,400 copies for 200 paths of the UI's
+/// analyst model). Only simulated forecast periods are reported, each
+/// distinct warning once.
+#[test]
+fn monte_carlo_reports_each_forecast_warning_once() {
+    use finstack_quant_statements::types::{AmountOrScalar, ForecastMethod, ForecastSpec};
+    let q = |n| PeriodId::quarter(2025, n).unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("mc warnings");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
+            "revenue",
+            &[
+                (q(1), AmountOrScalar::scalar(100.0)),
+                (q(2), AmountOrScalar::scalar(110.0)),
+            ],
+        );
+        let mut params = indexmap::IndexMap::new();
+        params.insert("mean".into(), serde_json::json!(120.0));
+        params.insert("std_dev".into(), serde_json::json!(5.0));
+        params.insert("seed".into(), serde_json::json!(42));
+        model_builder.forecast(
+            "revenue",
+            ForecastSpec {
+                method: ForecastMethod::Normal,
+                params,
+            },
+        );
+        model_builder.value(
+            "denominator",
+            &(1..=4)
+                .map(|n| (q(n), AmountOrScalar::scalar(if n == 3 { 0.0 } else { 1.0 })))
+                .collect::<Vec<_>>(),
+        );
+        // NaN in the first (actual) quarter on every path.
+        model_builder
+            .compute("growth", "pct_change(revenue, 1)")
+            .unwrap();
+        // A finite 2025Q3 forecast cell that warns on every path: the division
+        // by zero is skipped by `sum`.
+        model_builder
+            .compute("total", "sum(revenue, revenue / denominator)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
+    let results = Evaluator::new()
+        .evaluate_monte_carlo(&model, &MonteCarloConfig::new(50, 7))
+        .unwrap();
+
+    assert!(!results.warnings.is_empty(), "the 2025Q3 warning is kept");
+    let mut keys: Vec<String> = results
+        .warnings
+        .iter()
+        .map(|warning| {
+            let period = match warning {
+                EvalWarning::DivisionByZero { period, .. }
+                | EvalWarning::NonFiniteValue { period, .. }
+                | EvalWarning::CapitalStructure { period, .. }
+                | EvalWarning::NonFiniteSkipped { period, .. } => *period,
+            };
+            assert!(results.forecast_periods.contains(&period), "{warning:?}");
+            format!("{warning:?}")
+        })
+        .collect();
+    let reported = keys.len();
+    keys.dedup();
+    assert_eq!(keys.len(), reported, "{:?}", results.warnings);
+}

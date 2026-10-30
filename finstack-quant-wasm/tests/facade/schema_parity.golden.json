@@ -2140,7 +2140,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 31502
+            "bytes": 31713
           },
           {
             "path": "schemas/statements/1/normalization_config.schema.json",
@@ -4572,7 +4572,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 31502
+            "bytes": 31713
           },
           {
             "domain": "statements",

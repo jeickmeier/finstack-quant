@@ -216,7 +216,10 @@ export interface MonteCarloResultsWire {
    */
   percentiles: number[];
   /**
-   * Warnings encountered while evaluating Monte Carlo paths.
+   * Distinct warnings raised in the simulated forecast periods, each
+   * reported once however many paths raised it, in a canonical sorted
+   * order. Warnings in actual periods are omitted: those periods are not
+   * simulated and every path repeats the deterministic evaluation's.
    */
   warnings?: DCf776B61125046D84B45[];
   [k: string]: unknown;

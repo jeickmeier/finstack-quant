@@ -263,7 +263,9 @@ it("presents the returned percentiles of the chosen metric in Rust's order, with
     ),
   ).toBeTruthy();
   expect(
-    screen.getByText(`Simulation warnings (${results.warnings!.length})`),
+    screen.getByText(
+      `Simulation warnings (${(results.warnings ?? []).length})`,
+    ),
   ).toBeTruthy();
 });
 

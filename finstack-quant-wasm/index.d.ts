@@ -30946,7 +30946,7 @@ export interface Evaluator extends WasmOwned {
    * `Evaluator::evaluate_monte_carlo`).
    * @param model - `FinancialModelSpec` whose stochastic forecast nodes are simulated (object or JSON).
    * @param config - `MonteCarloConfig`: `n_paths`, `seed`, optional `percentiles` (fractions in `[0, 1]`) and `include_path_data` (object or JSON).
-   * @returns `MonteCarloResults` plain object with percentile summaries per metric and, when requested, the per-path table.
+   * @returns `MonteCarloResults` plain object with percentile summaries per metric, the distinct forecast-period `warnings` (each reported once however many paths raised it; actual periods are not simulated and are omitted) and, when requested, the per-path table.
    * @throws Error with kind `validation` if an input is malformed, `n_paths` is zero, the model has a capital structure, or a path fails to evaluate; kind `not_found` if a formula references a missing node.
    */
   evaluateMonteCarlo(
