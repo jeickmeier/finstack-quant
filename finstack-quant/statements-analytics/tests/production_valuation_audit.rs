@@ -54,7 +54,7 @@ fn credit_reports_and_checks_reject_mixed_currency_ratios() {
         model_builder.build().unwrap()
     };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
-    let report = CreditAssessment::compute(&results, period);
+    let report = CreditAssessment::compute(&results, period).unwrap();
     assert_eq!(report.leverage_ratio, None);
     assert_eq!(report.interest_coverage, None);
     let context = CheckContext::new(&model, &results);
@@ -73,7 +73,7 @@ fn credit_reports_and_checks_reject_mixed_currency_ratios() {
     assert!(leverage.execute(&context).is_err());
     assert!(coverage.execute(&context).is_err());
     results.node_value_types.clear();
-    let report = CreditAssessment::compute(&results, period);
+    let report = CreditAssessment::compute(&results, period).unwrap();
     assert_eq!(report.leverage_ratio, None);
     assert_eq!(report.interest_coverage, None);
     let context = CheckContext::new(&model, &results);
@@ -132,7 +132,9 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
     };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     assert_eq!(
-        CreditAssessment::compute(&results, period).leverage_ratio,
+        CreditAssessment::compute(&results, period)
+            .unwrap()
+            .leverage_ratio,
         Some(5.0)
     );
     results
@@ -141,7 +143,9 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
         .unwrap()
         .insert(period, 1_000.0);
     assert_eq!(
-        CreditAssessment::compute(&results, period).leverage_ratio,
+        CreditAssessment::compute(&results, period)
+            .unwrap()
+            .leverage_ratio,
         None
     );
     let precise = Money::from_decimal_str("100.12345", Currency::USD).unwrap();
@@ -156,7 +160,9 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
         .unwrap()
         .insert(period, precise.amount());
     assert_eq!(
-        CreditAssessment::compute(&results, period).leverage_ratio,
+        CreditAssessment::compute(&results, period)
+            .unwrap()
+            .leverage_ratio,
         Some(500.0 / precise.amount())
     );
 }
