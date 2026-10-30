@@ -226,14 +226,16 @@ pub fn scenario_comparison_table(
 /// `baseValue * (1 + pct / 100)`.
 /// @param node_id - Node identifier to vary.
 /// @param period_id - Period to vary, e.g. `"2025Q1"`.
-/// @param base_value - Base value of the node in its own units.
+/// @param base_value - Finite base value of the node in its own units.
 /// @param pct_range - Percentage moves, e.g. `[-10, 0, 10]` for ±10%.
 /// @returns Plain `ParameterSpec` object (`node_id`, `period_id`, `base_value`, absolute `perturbations`) for a `SensitivityConfig`.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if `periodId` is not a valid period, and kind
-/// `invalid_type` if a number argument is not a number.
+/// Throws with kind `validation` if `periodId` is not a valid period, if
+/// `baseValue` or a percentage is not finite (`NaN` or infinite), or if a
+/// converted shock overflows, and kind `invalid_type` if a number argument is
+/// not a number.
 #[wasm_bindgen(js_name = parameterSpecWithPercentages)]
 pub fn parameter_spec_with_percentages(
     node_id: JsValue,
@@ -250,7 +252,8 @@ pub fn parameter_spec_with_percentages(
             period_id,
             js_f64(&base_value, "baseValue")?,
             js_f64_seq(&pct_range, "pctRange")?,
-        ),
+        )
+        .map_err(to_js_err)?,
     )
 }
 

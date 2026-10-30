@@ -145,7 +145,8 @@ impl PyParameterSpec {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``period`` does not parse.
+    ///     If ``period`` does not parse, ``base_value`` or a percentage is not
+    ///     finite (``NaN`` or infinite), or a converted shock overflows.
     #[staticmethod]
     #[pyo3(text_signature = "(node_id, period, base_value, pct_range)")]
     fn with_percentages(
@@ -160,7 +161,8 @@ impl PyParameterSpec {
                 parse_period_id(period)?,
                 base_value,
                 pct_range,
-            ),
+            )
+            .map_err(crate::errors::statements_to_py)?,
         })
     }
 
@@ -284,8 +286,9 @@ impl PySensitivityConfig {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``period`` does not parse or neither/both of ``perturbations``
-    ///     and ``pct`` are supplied.
+    ///     If ``period`` does not parse, neither/both of ``perturbations``
+    ///     and ``pct`` are supplied, or ``pct`` is given with a non-finite
+    ///     ``base_value`` or percentage or a shock that overflows.
     #[pyo3(signature = (node_id, period, base_value, perturbations=None, pct=None))]
     fn add_parameter(
         &mut self,
@@ -304,7 +307,8 @@ impl PySensitivityConfig {
                 parse_period_id(period)?,
                 base_value,
                 pct_range,
-            ),
+            )
+            .map_err(crate::errors::statements_to_py)?,
             _ => {
                 return Err(crate::errors::value_error(
                     "add_parameter takes exactly one of `perturbations` or `pct`",

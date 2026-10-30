@@ -79,3 +79,20 @@ fn tornado_reads_the_metric_at_the_requested_period() {
     let actual = generate_tornado_entries(&result, "cumulative_revenue", quarter(1)).unwrap();
     assert_eq!((actual[0].downside, actual[0].upside), (0.0, 0.0));
 }
+
+/// Percentage shocks of a non-finite base used to build a spec whose
+/// perturbations were `NaN` (`null` on the wire), failing only later inside
+/// `run_sensitivity` with an opaque deserialization error.
+#[test]
+fn percentage_parameter_rejects_non_finite_inputs() {
+    for base in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let error = ParameterSpec::with_percentages("revenue", quarter(2), base, vec![-10.0, 10.0])
+            .unwrap_err();
+        assert!(error.to_string().contains("must be finite"), "{error}");
+    }
+    assert!(ParameterSpec::with_percentages("revenue", quarter(2), 100.0, vec![f64::NAN]).is_err());
+    assert!(ParameterSpec::with_percentages("revenue", quarter(2), f64::MAX, vec![100.0]).is_err());
+    let spec =
+        ParameterSpec::with_percentages("revenue", quarter(2), 100.0, vec![-10.0, 10.0]).unwrap();
+    assert_eq!(spec.perturbations.len(), 2);
+}

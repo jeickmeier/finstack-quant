@@ -279,7 +279,8 @@ class ParameterSpec:
         Raises
         ------
         ValueError
-            If ``period`` does not parse.
+            If ``period`` does not parse, ``base_value`` or a percentage is not
+            finite (``NaN`` or infinite), or a converted shock overflows.
 
         Examples
         --------
@@ -793,8 +794,9 @@ class SensitivityConfig:
         Raises
         ------
         ValueError
-            If ``period`` does not parse or neither/both of ``perturbations``
-            and ``pct`` are supplied.
+            If ``period`` does not parse, neither/both of ``perturbations``
+            and ``pct`` are supplied, or ``pct`` is given with a non-finite
+            ``base_value`` or percentage or a shock that overflows.
         """
     @property
     def parameters(self) -> list[ParameterSpec]:
