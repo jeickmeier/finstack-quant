@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { expect, it } from "vitest";
+import { createRequire } from "node:module";
 import { instruments } from "../../src/generated/instruments";
 import {
   INSTRUMENT_SHEET,
@@ -11,6 +12,10 @@ import {
   propertiesOf,
   type Schema,
 } from "@/components/finstack/core/components/schema-form/schema";
+
+const native = createRequire(import.meta.url)(
+  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
+);
 
 /** The linked instrument spec schema that SchemaForm walks, not the raw JSON file. */
 async function specOf(type: string) {
@@ -76,8 +81,8 @@ it("clears only bond market quotes that exist in the generated schema", async ()
   const keys = branches(root, quotes!).flatMap((branch) =>
     propertiesOf(branch).map(([key]) => key),
   );
-  expect(promotedTerms.bond.exclusiveWith?.length).toBeGreaterThan(0);
-  expect(keys).toEqual(
-    expect.arrayContaining([...promotedTerms.bond.exclusiveWith!]),
-  );
+  const fields = native.priceDriverFields();
+  expect(fields.length).toBeGreaterThan(0);
+  expect(fields).toContain(promotedTerms.bond.path.split(".").at(-1));
+  expect(keys).toEqual(expect.arrayContaining(fields));
 });

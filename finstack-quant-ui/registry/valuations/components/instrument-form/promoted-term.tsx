@@ -22,8 +22,6 @@ export interface PromotedTerm {
     "market-quote" | "nullable-term" | "contract-term" | "single-fixed-tranche";
   /** Describes the source used when an optional quote is absent. */
   emptySource?: string;
-  /** Other mutually exclusive market quote keys, cleared when this quote is entered. */
-  exclusiveWith?: readonly string[];
   /** Set false for instruments without a secondary pricing disclosure. */
   morePricingOverrides?: boolean;
 }
@@ -40,17 +38,6 @@ export const promotedTerms: Record<string, PromotedTerm> = {
     hint: "99.5 = 99.5% of par; overrides model PV.",
     emptySource: "Model price",
     kind: "market-quote",
-    exclusiveWith: [
-      "quoted_dirty_price_currency",
-      "quoted_ytm",
-      "quoted_ytw",
-      "quoted_z_spread",
-      "quoted_oas",
-      "quoted_discount_margin",
-      "quoted_i_spread",
-      "quoted_asw_market",
-      "quoted_japanese_simple_yield",
-    ],
   },
   equity_option: {
     path: `${marketQuotePath}.implied_volatility`,
@@ -144,6 +131,7 @@ function setMarketQuote(
   form: SchemaFormApi,
   values: Record<string, unknown>,
   term: PromotedTerm,
+  competitors: readonly string[],
   text: string,
 ) {
   const spec = objectValue(atPath(values, "instrument.spec"));
@@ -157,7 +145,7 @@ function setMarketQuote(
   if (text === "") {
     delete quotes[key];
   } else {
-    for (const other of term.exclusiveWith ?? []) delete quotes[other];
+    for (const other of competitors) delete quotes[other];
     quotes[key] = text;
   }
   // Nullable quote siblings have no effect when absent; keep only supplied values.
@@ -175,8 +163,12 @@ function PromotedTermField({
   form,
   values,
   term,
+  priceDriverFields,
   reveal,
-}: SheetControls & { term: PromotedTerm }) {
+}: SheetControls & {
+  term: PromotedTerm;
+  priceDriverFields: readonly string[];
+}) {
   const id = useId();
   const optional =
     term.kind === "market-quote" || term.kind === "nullable-term";
@@ -191,12 +183,15 @@ function PromotedTermField({
       "instrument.spec.instrument_pricing_overrides.market_quotes",
     ),
   );
-  const competing = (term.exclusiveWith ?? []).filter((key) =>
-    hasValue(quotes[key]),
-  );
+  const quoteKey = term.path.split(".").at(-1)!;
+  // Rust rejects more than one price driver, so entering one replaces the others.
+  const competitors = priceDriverFields.includes(quoteKey)
+    ? priceDriverFields.filter((key) => key !== quoteKey)
+    : [];
+  const competing = competitors.filter((key) => hasValue(quotes[key]));
   const setValue = (text: string) => {
     if (term.kind === "market-quote") {
-      setMarketQuote(form, values, term, text);
+      setMarketQuote(form, values, term, competitors, text);
     } else {
       form.setFieldValue(term.path, text === "" && optional ? null : text);
     }
@@ -318,7 +313,10 @@ function PromotedTermField({
 }
 
 /** The promoted desk quote or deal rate for an instrument type, or undefined when it has none. */
-export function promotedField(type: string): SchemaFormProps["promotedField"] {
+export function promotedField(
+  type: string,
+  priceDriverFields: readonly string[],
+): SchemaFormProps["promotedField"] {
   const term = promotedTerms[type];
   if (!term) return undefined;
   return (controls) =>
@@ -326,6 +324,12 @@ export function promotedField(type: string): SchemaFormProps["promotedField"] {
       ? null
       : {
           path: term.path,
-          node: <PromotedTermField term={term} {...controls} />,
+          node: (
+            <PromotedTermField
+              term={term}
+              priceDriverFields={priceDriverFields}
+              {...controls}
+            />
+          ),
         };
 }

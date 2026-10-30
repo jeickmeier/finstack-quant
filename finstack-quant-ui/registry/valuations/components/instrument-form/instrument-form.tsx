@@ -27,6 +27,12 @@ export function InstrumentForm(props: {
   onValidated?: (json: string | null) => void;
   layout?: SchemaFormProps["layout"];
   submitVariant?: SchemaFormProps["submitVariant"];
+  /**
+   * Native valuations.instruments.priceDriverFields; connect usePriceDriverFields.
+   * Entering one replaces the others. Absent, nothing is replaced and native
+   * validation reports the conflict.
+   */
+  priceDriverFields?: readonly string[];
 }) {
   const [loaded, setLoaded] = useState<{
     type: string;
@@ -123,7 +129,10 @@ export function InstrumentForm(props: {
                   submitVariant={props.submitVariant}
                   sheet={INSTRUMENT_SHEET}
                   disclosure={instrumentDisclosure(props.type)}
-                  promotedField={promotedField(props.type)}
+                  promotedField={promotedField(
+                    props.type,
+                    props.priceDriverFields ?? [],
+                  )}
                 />
               )}
               {props.showGeneratedExample !== false && (

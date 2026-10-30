@@ -119,6 +119,7 @@
     "valuations.instruments.listModelsGrouped",
     "valuations.instruments.metricMetadata",
     "valuations.instruments.metricsForInstrument",
+    "valuations.instruments.priceDriverFields",
     "valuations.instruments.priceInstrumentWithMarket",
     "valuations.instruments.trancheBreakevenCdr",
     "valuations.instruments.trancheDiscountMargin",

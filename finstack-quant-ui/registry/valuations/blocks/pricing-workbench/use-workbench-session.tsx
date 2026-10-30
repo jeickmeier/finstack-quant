@@ -17,6 +17,7 @@ import {
   useMetrics,
   useMetricMetadata,
   useMoneyFormat,
+  usePriceDriverFields,
   usePriceInstrument,
   type PriceRequest,
 } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
@@ -194,6 +195,7 @@ export function useWorkbenchSession({
   const worker = useFinstack();
   const validate = useInstrumentValidator();
   const validateMarket = useMarketValidator();
+  const priceDriverFields = usePriceDriverFields();
   const models = useModels(),
     metrics = useMetrics(type || null);
   const candidate = useMemo<PriceRequest | null>(
@@ -266,6 +268,7 @@ export function useWorkbenchSession({
   );
 
   return {
+    priceDriverFields: priceDriverFields.data,
     initial,
     initialType,
     type,

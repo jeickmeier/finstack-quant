@@ -7,6 +7,7 @@
 #### Added
 
 - `models::credit::merton_report` (Python `models.credit.merton_report`, WASM `models.credit.mertonReport`) returns the full Merton report in one call. It owns the KMV default point of an equity source and the default master scale, so hosts cannot differ on them. A non-positive horizon now fails the whole report, and a measure rejected for the model is null with its message in `errors` rather than a structured error.
+- `MarketQuoteOverrides::price_driver_fields()` (Python and WASM `valuations.instruments.price_driver_fields` / `priceDriverFields`) publishes the mutually exclusive price-driving quote fields. `price_driver_count` reads the same definition, and `InstrumentForm` takes the list through `priceDriverFields` (connect `usePriceDriverFields`) instead of holding a copy.
 
 ### Statements: rollup defaults decided in Rust
 

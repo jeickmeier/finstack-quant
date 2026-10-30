@@ -23174,6 +23174,12 @@ export interface ValuationInstrumentsNamespace {
    */
   metricMetadata(keys: string[]): MetricMetadata[];
   /**
+   * Wire names of the mutually exclusive price-driving market quotes.
+   * @returns Field names as they appear on the wire, in precedence order.
+   * @throws Error - Throws a `computation` error only if the names cannot cross the boundary.
+   */
+  priceDriverFields(): string[];
+  /**
    * List the standard metrics registered for one instrument type, grouped by
    * display category.
    * @example

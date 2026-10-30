@@ -4569,6 +4569,7 @@
       "prepaymentPenaltyStepDown",
       "prepaymentPenaltyYieldMaintenance",
       "prettyInstrumentJson",
+      "priceDriverFields",
       "priceInstrument",
       "priceInstrumentWithMarket",
       "trancheBreakevenCdr",
@@ -4807,6 +4808,9 @@
     "kind": "function"
   },
   "valuations.instruments.metricsForInstrument": {
+    "kind": "function"
+  },
+  "valuations.instruments.priceDriverFields": {
     "kind": "function"
   },
   "valuations.instruments.trancheDiscountMargin": {

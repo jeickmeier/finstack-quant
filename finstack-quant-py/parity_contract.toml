@@ -1023,6 +1023,7 @@ public = [
     "metric_metadata",
     "metrics_for_instrument",
     "pretty_instrument_json",
+    "price_driver_fields",
     "price_instrument",
     "tranche_breakeven_cdr",
     "tranche_discount_margin",

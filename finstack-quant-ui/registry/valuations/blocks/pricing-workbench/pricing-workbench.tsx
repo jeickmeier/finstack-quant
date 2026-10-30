@@ -164,6 +164,7 @@ export function PricingWorkbench({
     measureGridProps,
     pricingContext,
     completed,
+    priceDriverFields,
   } = useWorkbenchSession({
     defaultRequest,
     density,
@@ -337,6 +338,7 @@ export function PricingWorkbench({
                     exampleRequests ? Object.keys(exampleRequests) : undefined
                   }
                   showGeneratedExample={!exampleRequests}
+                  priceDriverFields={priceDriverFields}
                   defaultJson={
                     exampleRequests?.[type]?.instrumentJson ??
                     ((defaultInstrumentType ?? initialType) === initialType

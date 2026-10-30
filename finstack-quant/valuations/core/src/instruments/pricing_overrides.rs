@@ -235,27 +235,57 @@ impl MarketQuoteOverrides {
         }
     }
 
+    /// The price-driving fields and their values, by wire name, in precedence order.
+    ///
+    /// The one definition of the set: [`Self::price_driver_count`] and
+    /// [`Self::price_driver_fields`] both read it.
+    fn price_drivers(&self) -> [(&'static str, Option<f64>); 10] {
+        [
+            ("quoted_clean_price_pct", self.quoted_clean_price_pct),
+            (
+                "quoted_dirty_price_currency",
+                self.quoted_dirty_price_currency,
+            ),
+            ("quoted_ytm", self.quoted_ytm),
+            ("quoted_ytw", self.quoted_ytw),
+            ("quoted_z_spread", self.quoted_z_spread),
+            ("quoted_oas", self.quoted_oas),
+            ("quoted_discount_margin", self.quoted_discount_margin),
+            ("quoted_i_spread", self.quoted_i_spread),
+            ("quoted_asw_market", self.quoted_asw_market),
+            (
+                "quoted_japanese_simple_yield",
+                self.quoted_japanese_simple_yield,
+            ),
+        ]
+    }
+
+    /// Wire names of the mutually exclusive price-driving fields.
+    ///
+    /// [`Self::validate`] rejects more than one of these being set, so a host
+    /// editor can clear the others when one is entered.
+    ///
+    /// # Returns
+    ///
+    /// The field names as they appear on the wire, in precedence order.
+    pub fn price_driver_fields() -> Vec<&'static str> {
+        Self::default()
+            .price_drivers()
+            .iter()
+            .map(|(name, _)| *name)
+            .collect()
+    }
+
     /// Return the number of price-driving fields that are currently set.
     ///
     /// The price-driving fields are mutually exclusive inside `Bond::base_value`
     /// (only the first one in the precedence chain would take effect), so
     /// [`Self::validate`] enforces that at most one is set.
     fn price_driver_count(&self) -> usize {
-        [
-            self.quoted_clean_price_pct.is_some(),
-            self.quoted_dirty_price_currency.is_some(),
-            self.quoted_ytm.is_some(),
-            self.quoted_ytw.is_some(),
-            self.quoted_z_spread.is_some(),
-            self.quoted_oas.is_some(),
-            self.quoted_discount_margin.is_some(),
-            self.quoted_i_spread.is_some(),
-            self.quoted_asw_market.is_some(),
-            self.quoted_japanese_simple_yield.is_some(),
-        ]
-        .iter()
-        .filter(|b| **b)
-        .count()
+        self.price_drivers()
+            .iter()
+            .filter(|(_, value)| value.is_some())
+            .count()
     }
 
     /// Whether any price-driving quote other than `quoted_z_spread` is set.
@@ -1339,6 +1369,40 @@ impl ScenarioPricingOverrides {
             return Ok(value);
         };
         Money::new(value.amount() * (1.0 + shock), value.currency())
+    }
+}
+
+#[cfg(test)]
+mod price_driver_tests {
+    use super::MarketQuoteOverrides;
+
+    /// Set every named field through the wire, so a name that is not a real
+    /// field fails to deserialize.
+    fn with_fields(fields: &[&str]) -> MarketQuoteOverrides {
+        let quotes: serde_json::Map<String, serde_json::Value> = fields
+            .iter()
+            .map(|field| ((*field).to_string(), serde_json::json!(1.0)))
+            .collect();
+        serde_json::from_value(serde_json::Value::Object(quotes)).expect("wire field names")
+    }
+
+    #[test]
+    fn published_fields_are_the_wire_names_the_count_reads() {
+        let fields = MarketQuoteOverrides::price_driver_fields();
+        assert_eq!(fields.len(), 10);
+        assert_eq!(with_fields(&fields).price_driver_count(), fields.len());
+        for field in &fields {
+            assert_eq!(with_fields(&[field]).price_driver_count(), 1, "{field}");
+        }
+    }
+
+    #[test]
+    fn non_driving_quotes_are_not_in_the_set() {
+        let fields = MarketQuoteOverrides::price_driver_fields();
+        for field in ["implied_volatility", "quoted_premium", "cds_quote_bp"] {
+            assert!(!fields.contains(&field));
+            assert_eq!(with_fields(&[field]).price_driver_count(), 0, "{field}");
+        }
     }
 }
 

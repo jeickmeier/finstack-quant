@@ -1,0 +1,12 @@
+[
+  "quoted_clean_price_pct",
+  "quoted_dirty_price_currency",
+  "quoted_ytm",
+  "quoted_ytw",
+  "quoted_z_spread",
+  "quoted_oas",
+  "quoted_discount_margin",
+  "quoted_i_spread",
+  "quoted_asw_market",
+  "quoted_japanese_simple_yield"
+]
