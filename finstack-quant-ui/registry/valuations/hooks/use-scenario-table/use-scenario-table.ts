@@ -24,8 +24,7 @@ export function scenarioOptions(
 }
 /** Exact native scenario table or structured failure. */
 export function useScenarioTable(request: ScenarioRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...scenarioOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    scenarioOptions(worker.client, worker.session, request),
+  );
 }

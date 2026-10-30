@@ -25,6 +25,6 @@ export function cashflowOptions(
 export function useCashflows(request: CashflowRequest, enabled = true) {
   return useWorkerQuery((worker) => ({
     ...cashflowOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && enabled,
+    enabled,
   }));
 }

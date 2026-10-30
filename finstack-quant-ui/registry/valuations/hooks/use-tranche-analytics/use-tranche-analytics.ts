@@ -81,29 +81,25 @@ export function trancheBreakevenCdrOptions(
 }
 /** Native TrancheMetrics or a structured failure. */
 export function useTrancheMetrics(request: TrancheMetricsRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...trancheMetricsOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    trancheMetricsOptions(worker.client, worker.session, request),
+  );
 }
 /** Native OasResult under the supplied OasConfig, else Rust's default; pass null until the user asks for the solve. */
 export function useTrancheOas(request: TrancheOasRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...trancheOasOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    trancheOasOptions(worker.client, worker.session, request),
+  );
 }
 /** Native decimal discount margin or a structured failure (fixed-rate tranches fail natively). */
 export function useTrancheDiscountMargin(request: TranchePriceRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...trancheDiscountMarginOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    trancheDiscountMarginOptions(worker.client, worker.session, request),
+  );
 }
 /** Native decimal break-even constant default rate or a structured failure. */
 export function useTrancheBreakevenCdr(request: TrancheRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...trancheBreakevenCdrOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    trancheBreakevenCdrOptions(worker.client, worker.session, request),
+  );
 }
